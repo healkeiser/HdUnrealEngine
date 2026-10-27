@@ -99,9 +99,17 @@ void submit(HdUEState& state) {
         const auto& data = state.materials.at(id);
         nativeMaterials.push_back(asset(state, "nativeMaterialAssets", id));
         HdueMaterialDesc desc{};
-        desc.id = data.id.c_str(); desc.native_asset = nativeMaterials.back().c_str(); desc.base_color_texture = data.texture.c_str();
-        for (int i = 0; i < 3; ++i) desc.base_color[i] = data.color[i];
+        desc.id = data.id.c_str(); desc.native_asset = nativeMaterials.back().c_str();
+        for (int i = 0; i < 3; ++i) { desc.base_color[i] = data.color[i]; desc.emissive_color[i] = data.emissive[i]; }
         desc.base_color[3] = data.opacity; desc.metallic = data.metallic; desc.roughness = data.roughness;
+        desc.opacity_threshold = data.opacityThreshold;
+        std::copy(data.uvTransform.begin(), data.uvTransform.end(), desc.uv_transform);
+        for (int slot = 0; slot < HDUE_TEXTURE_SLOT_COUNT; ++slot) {
+            const auto& texture = data.textures[slot];
+            auto& out = desc.textures[slot];
+            out.file = texture.file.c_str();
+            for (int i = 0; i < 4; ++i) { out.scale[i] = texture.scale[i]; out.bias[i] = texture.bias[i]; out.channel_mask[i] = texture.mask[i]; }
+        }
         materials.push_back(desc);
         if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
     }

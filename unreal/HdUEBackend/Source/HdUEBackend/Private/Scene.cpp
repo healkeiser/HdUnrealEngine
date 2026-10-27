@@ -16,6 +16,7 @@
 #include "Materials/Material.h"
 #include "MaterialShared.h"
 #include "RHI.h"
+#include "Algo/AllOf.h"
 
 FHdueScene::FHdueScene(UWorld* InWorld) : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld) {}
 FHdueScene::~FHdueScene() {
@@ -76,6 +77,16 @@ void FHdueScene::Remove(const FString& Id) {
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
 }
+UTexture2D* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
+    const FString Key = File + (SRGB ? TEXT("|srgb") : TEXT("|raw"));
+    if (const auto* Cached = PreviewTextures.Find(Key)) return Cached->Get();
+    UTexture2D* Texture = FImageUtils::ImportFileAsTexture2D(File);
+    if (!Texture) { Error = FString::Printf(TEXT("Failed to import texture %s."), *File); return nullptr; }
+    // Float images (EXR/HDR) are already linear; only 8-bit images carry the sRGB choice.
+    if (Texture->SRGB != SRGB && Texture->GetPixelFormat() == PF_B8G8R8A8) { Texture->SRGB = SRGB; Texture->UpdateResource(); }
+    PreviewTextures.Add(Key, TStrongObjectPtr<UTexture2D>(Texture));
+    return Texture;
+}
 void FHdueScene::BindMaterials() {
     for (const auto& Entry : MeshMaterials) {
         AActor** Actor = Actors.Find(Entry.Key);
@@ -115,7 +126,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         for (TActorIterator<AActor> It(World); It; ++It)
             if (It->GetLevel()==World->PersistentLevel && (It->FindComponentByClass<UMeshComponent>() || It->FindComponentByClass<ULightComponent>())) Fixtures.Add(*It);
         for (auto* A : Fixtures) World->DestroyActor(A);
-        Actors.Empty(); CameraLightDirections.Empty(); MeshMaterials.Empty(); Materials.Empty();
+        Actors.Empty(); CameraLightDirections.Empty(); MeshMaterials.Empty(); Materials.Empty(); PreviewTextures.Empty();
         WetBindings.Empty(); GeometryRevisions.Empty();
     }
     for (uint32 Index = 0; Index < Batch.removed_count; ++Index) {
@@ -136,21 +147,46 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         } else {
             if (!FMath::IsFinite(Desc.base_color[3])) { Error = TEXT("Material opacity must be finite."); return false; }
             const float Opacity = FMath::Clamp(Desc.base_color[3], 0.f, 1.f);
-            const TCHAR* ParentPath = Opacity < 1.f
-                ? TEXT("/Game/HdUE/M_PreviewSurfaceTranslucent.M_PreviewSurfaceTranslucent")
+            const auto HasTexture = [&](int32 Slot) { return Desc.textures[Slot].file && *Desc.textures[Slot].file; };
+            // UsdPreviewSurface: opacityThreshold > 0 is cutout; otherwise partial opacity is see-through.
+            const bool Masked = Desc.opacity_threshold > 0.f;
+            const bool Translucent = !Masked && (Opacity < 1.f || HasTexture(HDUE_TEXTURE_OPACITY));
+            const TCHAR* ParentPath = Masked ? TEXT("/Game/HdUE/M_PreviewSurfaceMasked.M_PreviewSurfaceMasked")
+                : Translucent ? TEXT("/Game/HdUE/M_PreviewSurfaceTranslucent.M_PreviewSurfaceTranslucent")
                 : TEXT("/Game/HdUE/M_PreviewSurface.M_PreviewSurface");
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, ParentPath);
             if (Parent) {
                 auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
-                Instance->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], Desc.base_color[3]));
-                Instance->SetScalarParameterValue(TEXT("Metallic"), FMath::Clamp(Desc.metallic, 0.f, 1.f));
-                Instance->SetScalarParameterValue(TEXT("Roughness"), FMath::Clamp(Desc.roughness, 0.f, 1.f));
-                if (Opacity < 1.f) Instance->SetScalarParameterValue(TEXT("Opacity"), Opacity);
-                if (Desc.base_color_texture && *Desc.base_color_texture) {
-                    UTexture2D* Texture = FImageUtils::ImportFileAsTexture2D(UTF8_TO_TCHAR(Desc.base_color_texture));
-                    if (!Texture) { Error = TEXT("Failed to import base color texture."); return false; }
-                    Instance->SetTextureParameterValue(TEXT("BaseColorTexture"), Texture);
+                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal")};
+                const FLinearColor Constants[HDUE_TEXTURE_SLOT_COUNT] = {
+                    FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], 1),
+                    FLinearColor(Desc.emissive_color[0], Desc.emissive_color[1], Desc.emissive_color[2], 0),
+                    FLinearColor(FVector4f(FMath::Clamp(Desc.metallic, 0.f, 1.f))),
+                    FLinearColor(FVector4f(FMath::Clamp(Desc.roughness, 0.f, 1.f))),
+                    FLinearColor(FVector4f(Opacity)),
+                    FLinearColor(0, 0, 1, 0)};
+                for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
+                    const auto& Texture = Desc.textures[Slot];
+                    const FString Name = Slots[Slot];
+                    if (!HasTexture(Slot)) {
+                        Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(0, 0, 0, 0));
+                        Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
+                        continue;
+                    }
+                    const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE;
+                    UTexture2D* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), Color, Error);
+                    if (!Image) return false;
+                    Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image);
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(Texture.scale[0], Texture.scale[1], Texture.scale[2], Texture.scale[3]));
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), FLinearColor(Texture.bias[0], Texture.bias[1], Texture.bias[2], Texture.bias[3]));
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), FLinearColor(Texture.channel_mask[0], Texture.channel_mask[1], Texture.channel_mask[2], Texture.channel_mask[3]));
                 }
+                static const float Identity[6] = {1, 0, 0, 0, 1, 0};
+                const bool Unset = Algo::AllOf(Desc.uv_transform, [](float Value) { return Value == 0.f; });
+                const float* M = Unset ? Identity : Desc.uv_transform;
+                Instance->SetVectorParameterValue(TEXT("UVRow0"), FLinearColor(M[0], M[1], M[2], 0));
+                Instance->SetVectorParameterValue(TEXT("UVRow1"), FLinearColor(M[3], M[4], M[5], 0));
+                if (Masked) Instance->SetScalarParameterValue(TEXT("OpacityThreshold"), Desc.opacity_threshold);
                 Material = Instance;
             }
         }

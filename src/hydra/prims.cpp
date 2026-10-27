@@ -20,6 +20,26 @@
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
 template<class T> T value(const VtValue& v, T fallback) { return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback; }
+// UsdTransform2d feeding a texture's st, as an affine in UE's flipped-V UV space.
+// Returns false when st is unconnected, so a later texture may still supply one.
+bool uvTransform(const HdMaterialNetwork2& network, const HdMaterialNode2& texture, std::array<float, 6>& out) {
+    const auto st = texture.inputConnections.find(TfToken("st"));
+    if (st == texture.inputConnections.end() || st->second.empty()) return false;
+    const auto node = network.nodes.find(st->second.front().upstreamNode);
+    if (node == network.nodes.end() || node->second.nodeTypeId != TfToken("UsdTransform2d")) return true;
+    const auto param = [&](const char* name) { const auto it = node->second.parameters.find(TfToken(name)); return it == node->second.parameters.end() ? VtValue() : it->second; };
+    const GfVec2f scale = value(param("scale"), GfVec2f(1)), translation = value(param("translation"), GfVec2f(0));
+    const double radians = value(param("rotation"), 0.f) * 3.14159265358979323846 / 180;
+    // USD order: scale, then rotate, then translate.
+    const auto usd = [&](GfVec2f p) {
+        p = GfVec2f(p[0] * scale[0], p[1] * scale[1]);
+        return GfVec2f(float(std::cos(radians) * p[0] - std::sin(radians) * p[1]), float(std::sin(radians) * p[0] + std::cos(radians) * p[1])) + translation;
+    };
+    const auto ue = [&](float u, float v) { const auto p = usd(GfVec2f(u, 1 - v)); return GfVec2f(p[0], 1 - p[1]); };
+    const auto origin = ue(0, 0), du = ue(1, 0) - origin, dv = ue(0, 1) - origin;
+    out = {du[0], dv[0], origin[0], du[1], dv[1], origin[1]};
+    return true;
+}
 HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name) {
     for (int i = 0; i < HdInterpolationCount; ++i)
         for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i))) if (p.name == name) return HdInterpolation(i);
@@ -215,19 +235,37 @@ public:
             if (node.nodeTypeId != TfToken("UsdPreviewSurface")) continue;
             const auto get = [&](const char* name) { const auto it = node.parameters.find(TfToken(name)); return it == node.parameters.end() ? VtValue() : it->second; };
             data.color = value(get("diffuseColor"), data.color);
+            data.emissive = value(get("emissiveColor"), data.emissive);
             data.metallic = value(get("metallic"), data.metallic);
             data.roughness = value(get("roughness"), data.roughness);
             data.opacity = value(get("opacity"), data.opacity);
-            const auto connection = node.inputConnections.find(TfToken("diffuseColor"));
-            if (connection != node.inputConnections.end() && !connection->second.empty()) {
-                const auto upstream = network.nodes.find(connection->second.front().upstreamNode);
-                if (upstream != network.nodes.end()) {
-                    const auto file = upstream->second.parameters.find(TfToken("file"));
-                    if (file != upstream->second.parameters.end() && file->second.IsHolding<SdfAssetPath>()) {
-                        const auto& asset = file->second.UncheckedGet<SdfAssetPath>();
-                        data.texture = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
-                    }
+            data.opacityThreshold = value(get("opacityThreshold"), data.opacityThreshold);
+            static const std::pair<const char*, int> inputs[] = {{"diffuseColor", HDUE_TEXTURE_BASE_COLOR},
+                {"emissiveColor", HDUE_TEXTURE_EMISSIVE}, {"metallic", HDUE_TEXTURE_METALLIC}, {"roughness", HDUE_TEXTURE_ROUGHNESS},
+                {"opacity", HDUE_TEXTURE_OPACITY}, {"normal", HDUE_TEXTURE_NORMAL}};
+            bool uvSet = false;
+            for (const auto& [input, slot] : inputs) {
+                const auto connection = node.inputConnections.find(TfToken(input));
+                if (connection == node.inputConnections.end() || connection->second.empty()) continue;
+                const auto& link = connection->second.front();
+                const auto upstream = network.nodes.find(link.upstreamNode);
+                if (upstream == network.nodes.end() || upstream->second.nodeTypeId != TfToken("UsdUVTexture")) continue;
+                const auto& texture = upstream->second;
+                const auto param = [&](const char* name) { const auto it = texture.parameters.find(TfToken(name)); return it == texture.parameters.end() ? VtValue() : it->second; };
+                const auto file = param("file");
+                if (!file.IsHolding<SdfAssetPath>()) continue;
+                const auto& asset = file.UncheckedGet<SdfAssetPath>();
+                auto& out = data.textures[slot];
+                out.file = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
+                out.scale = value(param("scale"), out.scale);
+                out.bias = value(param("bias"), out.bias);
+                // A single-channel output (r, g, b, a) selects that channel; rgb keeps all.
+                const auto& channel = link.upstreamOutputName.GetString();
+                if (channel.size() == 1 && std::string("rgba").find(channel[0]) != std::string::npos) {
+                    out.mask = GfVec4f(0); out.mask[int(std::string("rgba").find(channel[0]))] = 1;
                 }
+                // ponytail: one UV transform per material, from the first textured input; per-texture transforms if assets mix them.
+                if (!uvSet) uvSet = uvTransform(network, texture, data.uvTransform);
             }
         }
         auto* state = static_cast<HdUEState*>(param);

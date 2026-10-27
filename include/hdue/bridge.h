@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 1u
+#define HDUE_ABI_VERSION 2u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -117,13 +117,27 @@ typedef struct HdueFrameInfo {
 
 enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2,
     HDUE_CAMERA_DISTANT_LIGHT = 3 };
+/* UsdPreviewSurface inputs that can be driven by a UsdUVTexture. */
+enum { HDUE_TEXTURE_BASE_COLOR = 0, HDUE_TEXTURE_EMISSIVE = 1, HDUE_TEXTURE_METALLIC = 2,
+    HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_SLOT_COUNT = 6 };
+typedef struct HdueTextureDesc {
+    const char* file; /* Null or empty: the slot uses its constant. */
+    /* value = texel * scale + bias. Scalar slots first reduce the texel with channel_mask. */
+    float scale[4];
+    float bias[4];
+    float channel_mask[4];
+} HdueTextureDesc;
 typedef struct HdueMaterialDesc {
     const char* id;
     const char* native_asset;
-    const char* base_color_texture;
-    float base_color[4];
+    float base_color[4]; /* rgb diffuseColor, a opacity */
     float metallic;
     float roughness;
+    float emissive_color[3];
+    float opacity_threshold; /* > 0 selects cutout (masked) coverage */
+    /* UE UV (top-left origin) affine: u' = m[0]u + m[1]v + m[2], v' = m[3]u + m[4]v + m[5]. */
+    float uv_transform[6];
+    HdueTextureDesc textures[HDUE_TEXTURE_SLOT_COUNT];
 } HdueMaterialDesc;
 typedef struct HdueMeshDesc {
     const char* id;

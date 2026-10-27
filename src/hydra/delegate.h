@@ -7,6 +7,8 @@
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec3f.h"
+#include "pxr/base/gf/vec4f.h"
+#include <array>
 #include <map>
 #include <set>
 #include <mutex>
@@ -30,10 +32,16 @@ struct HdUEMeshData {
     bool visible = true;
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
+struct HdUETextureData {
+    std::string file;
+    GfVec4f scale{1}, bias{0}, mask{1, 0, 0, 0};
+};
 struct HdUEMaterialData {
-    std::string id, texture;
-    GfVec3f color{0.7f};
-    float metallic = 0, roughness = 0.5f, opacity = 1;
+    std::string id;
+    GfVec3f color{0.7f}, emissive{0};
+    float metallic = 0, roughness = 0.5f, opacity = 1, opacityThreshold = 0;
+    std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
+    std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
 };
 struct HdUELightData {
     std::string id;

@@ -18,6 +18,13 @@
 #include "Materials/MaterialExpressionConstant3Vector.h"
 #include "Materials/MaterialExpressionPathTracingQualitySwitch.h"
 #include "Materials/MaterialExpressionSubstrate.h"
+#include "Materials/MaterialExpressionTextureCoordinate.h"
+#include "Materials/MaterialExpressionAppendVector.h"
+#include "Materials/MaterialExpressionDotProduct.h"
+#include "Materials/MaterialExpressionComponentMask.h"
+#include "Materials/MaterialExpressionConstant.h"
+#include "Materials/MaterialExpressionNormalize.h"
+#include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
 #include "StaticMeshCompiler.h"
@@ -80,6 +87,111 @@ UMaterial* CreatePBR(const TCHAR* Name, FLinearColor Color, float Metal, float R
         Material->BlendMode = BLEND_TranslucentGreyTransmittance;
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
+UTexture2D* CreateLinearWhite() {
+    // Default for data-texture samplers, which must not be sRGB.
+    if (auto* Existing = LoadObject<UTexture2D>(nullptr, TEXT("/Game/HdUE/T_LinearWhite.T_LinearWhite"), nullptr, LOAD_NoWarn)) return Existing;
+    UPackage* Package = CreatePackage(TEXT("/Game/HdUE/T_LinearWhite"));
+    auto* Texture = NewObject<UTexture2D>(Package, TEXT("T_LinearWhite"), RF_Public | RF_Standalone);
+    const uint8 White[4] = {255, 255, 255, 255};
+    Texture->Source.Init(1, 1, 1, 1, TSF_BGRA8, White);
+    Texture->SRGB = false;
+    Texture->CompressionSettings = TC_VectorDisplacementmap;
+    Texture->MipGenSettings = TMGS_NoMipmaps;
+    Texture->PostEditChange();
+    return SaveAsset(Texture) ? Texture : nullptr;
+}
+// UsdPreviewSurface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar
+// inputs then dot <Slot>Mask), so an untextured input is Scale 0, Bias constant.
+UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite) {
+    const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
+    if (Material && Material->GetBlendMode() == Blend)
+        for (const auto& Expression : Material->GetExpressionCollection().Expressions)
+            if (const auto* Sample = Cast<UMaterialExpressionTextureSampleParameter2D>(Expression); Sample && Sample->ParameterName == TEXT("NormalTexture")) return Material;
+    if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    TArray<UMaterialExpression*> Expressions;
+    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    const auto Vector = [&](const FString& Parameter, FLinearColor Value) {
+        auto* Expression = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+        Expression->ParameterName = *Parameter; Expression->DefaultValue = Value; return Expression;
+    };
+    // The delegate's UV affine: u' = dot((u,v,1), UVRow0.rgb), v' = dot((u,v,1), UVRow1.rgb).
+    auto* Coordinate = Add(NewObject<UMaterialExpressionTextureCoordinate>(Material));
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    Homogeneous->A.Connect(0, Coordinate); Homogeneous->B.Connect(0, One);
+    UMaterialExpressionDotProduct* Rows[2];
+    for (int32 Row = 0; Row < 2; ++Row) {
+        Rows[Row] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+        Rows[Row]->A.Connect(0, Homogeneous);
+        Rows[Row]->B.Connect(0, Vector(FString::Printf(TEXT("UVRow%d"), Row), Row ? FLinearColor(0, 1, 0) : FLinearColor(1, 0, 0)));
+    }
+    auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    UV->A.Connect(0, Rows[0]); UV->B.Connect(0, Rows[1]);
+    const auto Slot = [&](const FString& Slot, FLinearColor Default, bool Color, bool Scalar) -> UMaterialExpression* {
+        auto* Sample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
+        Sample->ParameterName = *(Slot + TEXT("Texture"));
+        Sample->Coordinates.Connect(0, UV);
+        Sample->SamplerType = Color ? SAMPLERTYPE_Color : SAMPLERTYPE_LinearColor;
+        Sample->Texture = Color ? LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture")) : LinearWhite;
+        auto* Scaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
+        Scaled->A.Connect(5, Sample); Scaled->B.Connect(5, Vector(Slot + TEXT("Scale"), FLinearColor(0, 0, 0, 0)));
+        auto* Biased = Add(NewObject<UMaterialExpressionAdd>(Material));
+        Biased->A.Connect(0, Scaled); Biased->B.Connect(5, Vector(Slot + TEXT("Bias"), Default));
+        if (Scalar) {
+            auto* Channel = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+            Channel->A.Connect(0, Biased); Channel->B.Connect(5, Vector(Slot + TEXT("Mask"), FLinearColor(1, 0, 0, 0)));
+            return Channel;
+        }
+        auto* Rgb = Add(NewObject<UMaterialExpressionComponentMask>(Material));
+        Rgb->Input.Connect(0, Biased); Rgb->R = Rgb->G = Rgb->B = 1; Rgb->A = 0;
+        return Rgb;
+    };
+    auto* BaseColor = Slot(TEXT("BaseColor"), FLinearColor(.7f, .7f, .7f, 1), true, false);
+    auto* Emissive = Slot(TEXT("Emissive"), FLinearColor(0, 0, 0, 0), true, false);
+    auto* Metallic = Slot(TEXT("Metallic"), FLinearColor(0, 0, 0, 0), false, true);
+    auto* Roughness = Slot(TEXT("Roughness"), FLinearColor(.5f, .5f, .5f, .5f), false, true);
+    auto* Opacity = Slot(TEXT("Opacity"), FLinearColor(1, 1, 1, 1), false, true);
+    auto* Normal = Slot(TEXT("Normal"), FLinearColor(0, 0, 1, 0), false, false);
+    // USD tangent-space normals are +Y up (OpenGL); UE's are -Y after the V flip.
+    auto* FlipGreen = Add(NewObject<UMaterialExpressionConstant3Vector>(Material)); FlipGreen->Constant = FLinearColor(1, -1, 1);
+    auto* UENormal = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    UENormal->A.Connect(0, Normal); UENormal->B.Connect(0, FlipGreen);
+    auto* UnitNormal = Add(NewObject<UMaterialExpressionNormalize>(Material)); UnitNormal->VectorInput.Connect(0, UENormal);
+    auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
+    Conversion->BaseColor.Connect(0, BaseColor); Conversion->Metallic.Connect(0, Metallic);
+    auto* Slab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
+    Slab->DiffuseAlbedo.Connect(0, Conversion); Slab->F0.Connect(1, Conversion);
+    Slab->Roughness.Connect(0, Roughness); Slab->Normal.Connect(0, UnitNormal); Slab->EmissiveColor.Connect(0, Emissive);
+    auto* Data = Material->GetEditorOnlyData();
+    Data->BaseColor.Expression = nullptr; Data->Metallic.Expression = nullptr; Data->Roughness.Expression = nullptr;
+    Data->FrontMaterial.Connect(0, Slab);
+    Material->BlendMode = Blend;
+    if (Blend == BLEND_Masked) {
+        // Cutout at opacityThreshold, independent of UE's per-asset clip value.
+        auto* Threshold = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+        Threshold->ParameterName = TEXT("OpacityThreshold"); Threshold->DefaultValue = .5f;
+        auto* Coverage = Add(NewObject<UMaterialExpressionSubtract>(Material));
+        Coverage->A.Connect(0, Opacity); Coverage->B.Connect(0, Threshold);
+        auto* Centered = Add(NewObject<UMaterialExpressionAdd>(Material));
+        Centered->A.Connect(0, Coverage); Centered->ConstB = .5f;
+        Data->OpacityMask.Connect(0, Centered);
+        Material->OpacityMaskClipValue = .5f;
+    } else if (Blend == BLEND_TranslucentGreyTransmittance) {
+        auto* Weight = Add(NewObject<UMaterialExpressionSubstrateWeight>(Material));
+        Weight->A.Connect(0, Slab); Weight->Weight.Connect(0, Opacity);
+        Data->FrontMaterial.Connect(0, Weight);
+        Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
+    }
+    // ponytail: doubleSided is not in the ABI; cutout and see-through cards are usually viewed from both sides.
+    Material->TwoSided = Blend != BLEND_Opaque;
+    for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
@@ -161,8 +273,12 @@ UHdUEPrepareCommandlet::UHdUEPrepareCommandlet()
 }
 int32 UHdUEPrepareCommandlet::Main(const FString& Params)
 {
-    UMaterial* Preview = CreatePBR(TEXT("M_PreviewSurface"), FLinearColor(0.7f, 0.7f, 0.7f), 0, 0.5f);
-    UMaterial* Translucent = CreatePBR(TEXT("M_PreviewSurfaceTranslucent"), FLinearColor(0.7f, 0.7f, 0.7f), 0, 0.5f, true);
+    UTexture2D* LinearWhite = CreateLinearWhite();
+    if (!LinearWhite) return 3;
+    UMaterial* Preview = CreatePreviewSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
+    UMaterial* Masked = CreatePreviewSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
+    UMaterial* Translucent = CreatePreviewSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
+    if (!Masked) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
     UMaterial* Red = CreatePBR(TEXT("M_ReferenceRed"), FLinearColor(0.7f, 0.05f, 0.02f), 0.05f, 0.4f);

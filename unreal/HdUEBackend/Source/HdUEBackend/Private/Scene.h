@@ -36,6 +36,9 @@ private:
     TMap<FString, FVector> CameraLightDirections;
     TMap<FString, FString> MeshMaterials;
     TMap<FString, TStrongObjectPtr<UMaterialInterface>> Materials;
+    // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits matter.
+    TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
+    UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;
         UMaterialInterface* Base = nullptr;

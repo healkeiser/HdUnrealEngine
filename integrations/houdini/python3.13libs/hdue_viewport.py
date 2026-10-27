@@ -1,7 +1,7 @@
 """Caller-owned C diagnostics and readback for the Houdini delegate."""
 import ctypes as C
 from pathlib import Path
-from hdue_runtime import Api,U32,U64,Result
+from hdue_runtime import ABI_VERSION,Api,U32,U64,Result
 from material_api import Parameter
 
 class Frame(C.Structure):
@@ -41,7 +41,7 @@ class Viewport:
             self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result
         if C.sizeof(Wet)!=48 or C.sizeof(Surfaces)!=40: raise RuntimeError('Invalid viewport surface ABI')
         if C.sizeof(Material)!=32 or C.sizeof(Materials)!=32: raise RuntimeError('Invalid viewport material ABI')
-        api=Api(); runtime.check(runtime.library.hdue_get_api(1,C.sizeof(api),C.byref(api)),'readback API')
+        api=Api(); runtime.check(runtime.library.hdue_get_api(ABI_VERSION,C.sizeof(api),C.byref(api)),'readback API')
         self.poll=C.CFUNCTYPE(Result,U64,C.POINTER(Frame))(api.poll_frame)
         self.copy=C.CFUNCTYPE(Result,U64,U64,C.c_void_p,U64)(api.copy_frame)
         self.get_depth=runtime.library.hdue_get_depth_api
