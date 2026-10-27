@@ -33,10 +33,11 @@ Hydra changes are batched and applied on the UE owner thread. Rendering and read
 
 - Unreal Engine **5.8.4** source: tag `5.8.4-release`, commit `f45729c0b6f097038e72b52d366a62baeca3275b`.
 - Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, DirectX 12, and hardware ray tracing. The CMake scripts use the `Visual Studio 17 2022` generator.
+- MSVC **14.44.35211 or newer** (a current Visual Studio 2022 17.14 update) or **14.50.35723 or newer**. UE 5.8.4 rejects MSVC 14.39-14.43, 14.44 before 35211, and 14.50 before 35723; `Engine/Config/Windows/Windows_SDK.json` in the engine source holds the authoritative list.
+- .NET Framework **4.8 SDK** and **4.6.2 targeting pack** (Visual Studio Installer components `Microsoft.Net.Component.4.8.SDK` and `Microsoft.Net.Component.4.6.2.TargetingPack`). Without them, UnrealBuildTool stops with `Could not find NetFxSDK install dir`.
 - PowerShell 7, Git, and CMake **3.24 or newer**, with Git and CMake available on `PATH`.
 - OpenUSD **26.03** C++ SDK with Hydra/usdImaging, usdview, and Python **3.11** bindings for the standalone host and usdview.
-- Houdini **22.0.466**, with its bundled USD **26.05** and Python **3.13**, for Solaris.
-- `uv` for all Python execution and dependency management.
+- Houdini **22.0.466**, with its bundled USD **26.05** and Python **3.13**, for Solaris.- `uv` for all Python execution and dependency management.
 
 The standalone and Houdini delegates use separate builds because their USD ABIs differ. The UE backend disables UE's USD and Python plugins. Dependencies retain their own licensing requirements.
 
@@ -134,11 +135,17 @@ Build, cook, and stage the updated backend together with the updated delegate. L
 
 ## Houdini Solaris
 
-Build the Houdini-specific delegate:
+Solaris does not need OpenUSD or `Build-Host.ps1`. Build and stage the backend, then the Houdini-specific delegate:
 
 ```powershell
+.\scripts\Setup-Engine.ps1
+.\scripts\Prepare-Content.ps1
+.\scripts\Build-Backend.ps1
+.\scripts\Stage-Runtime.ps1
 .\scripts\Build-Houdini.ps1
 ```
+
+`Stage-Runtime.ps1` builds the `hdue_backend_smoke` host without OpenUSD when `Build-Host.ps1` has not produced it.
 
 After staging the repository backend, create a local runtime profile:
 
