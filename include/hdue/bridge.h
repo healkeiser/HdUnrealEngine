@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 3u
+#define HDUE_ABI_VERSION 4u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -100,7 +100,9 @@ typedef struct HdueRenderRequest {
 } HdueRenderRequest;
 /* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
 enum { HDUE_AOV_COLOR = 0, HDUE_AOV_ALBEDO = 1, HDUE_AOV_NORMAL = 2, HDUE_AOV_ROUGHNESS = 3,
-    HDUE_AOV_METALLIC = 4, HDUE_AOV_SPECULAR = 5, HDUE_AOV_OCCLUSION = 6, HDUE_AOV_COUNT = 7 };
+    HDUE_AOV_METALLIC = 4, HDUE_AOV_SPECULAR = 5, HDUE_AOV_OCCLUSION = 6,
+    /* Unlit ID pass: R = id / 2048, G = id % 2048, B = 1 where a mesh with prim_id >= 0 is visible. */
+    HDUE_AOV_PRIM_ID = 7, HDUE_AOV_COUNT = 8 };
 
 typedef struct HdueFrameInfo {
     uint32_t struct_size;
@@ -156,6 +158,8 @@ typedef struct HdueMeshDesc {
     uint32_t flags;
     /* Row-major UE world transform. Dynamic vertices are in local UE cm. */
     double transform[16];
+    int32_t prim_id; /* Hydra prim ID written by the HDUE_AOV_PRIM_ID pass; -1 for none */
+    uint32_t reserved;
 } HdueMeshDesc;
 typedef struct HdueLightDesc {
     const char* id;

@@ -28,6 +28,8 @@ public:
     TArray<TStrongObjectPtr<UTexture2D>> GatherVirtualTextures() const;
     bool HasRefractiveMaterials() const;
     HdueResult PickNative(const HdueNativeRay& Ray, HdueNativeHit& Hit, FString& ObjectId, FString& Error);
+    // Swaps every mesh to M_HdUEId (its prim ID in custom primitive data) for the ID pass, or back.
+    bool SetIdMode(bool On, FString& Error);
     FHdueNativeAssets Assets;
     TUniquePtr<FHdueLighting> Lighting;
 private:
@@ -36,6 +38,8 @@ private:
     TMap<FString, FVector> CameraLightDirections;
     TMap<FString, FString> MeshMaterials;
     TMap<FString, TStrongObjectPtr<UMaterialInterface>> Materials;
+    TMap<FString, int32> PrimIds;
+    bool IdMode = false;
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits matter.
     TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
     UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);

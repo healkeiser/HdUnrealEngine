@@ -189,7 +189,7 @@ The deferred call runs on the UI owner thread. Selecting the renderer alone does
 
 When Reference or Edit LOPs are added after `hdUE_settings`, the host places an `hdUE_viewport_prepare` LOP after the displayed output. This final layer expands instanceable references and resolves embedded/COP images before material binding and Hydra translation. Transforms on the reference prim and its ancestors continue through the same layer. The artist's input layers and referenced files retain their original instancing and attributes. The generated LOP follows display-output changes and is removed when switching renderers or closing the host; connections through it are preserved.
 
-Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The current target is one active hdUE viewport with a centered perspective camera. Standard selection outlines, ID AOVs, and precise native viewport picking are not implemented. Use the Scene Graph Tree for prim selection and editing.
+Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The current target is one active hdUE viewport with a centered perspective camera. The delegate provides `primId` and `instanceId` AOVs, so Solaris draws its native selection highlight on hdUE images. Click picking through those AOVs has not been verified separately; the Scene Graph Tree remains the reliable way to select prims.
 
 ### Rendering to disk with husk
 
@@ -214,8 +214,12 @@ Besides `color` and `depth`, render vars may request these `sourceName`s, render
 | `albedo` (or `baseColor`) | color3f | Base color |
 | `normal` | normal3f | World-space shading normal in USD axes, normalized |
 | `roughness`, `metallic`, `specular`, `occlusion` | float | Material channels |
+| `primId` | int | Hydra prim ID of the visible mesh, -1 for background |
+| `instanceId` | int | -1; Hydra instancing is not translated yet |
 
-After the beauty converges, each bound AOV is rasterized from the same camera and time with Lumen, path tracing, anti-aliasing and post effects off, so the channels stay exact and pixel-aligned with a Path Tracer beauty. They describe the nearest opaque surface; translucent surfaces and emission are not separated. Each extra AOV costs one short raster render per frame.
+After the beauty converges, each bound AOV is rasterized from the same camera and time with Lumen, path tracing, anti-aliasing and post effects off, so the channels stay exact and pixel-aligned with a Path Tracer beauty. They describe the nearest opaque surface; translucent surfaces and emission are not separated. Each extra AOV costs one short raster render per frame. AOV renders use their own UE view state and frame slot (`include/hdue/aov_api.h`), so the beauty's Lumen or Path Tracer history and the frames returned by `poll_frame` are unaffected.
+
+`primId` comes from an unlit pass in which every mesh draws `M_HdUEId` with its prim ID in custom primitive data. Cutout opacity is ignored there, so masked foliage selects as its whole card, and meshes placed from the native asset catalog read as background.
 
 ### COP textures
 

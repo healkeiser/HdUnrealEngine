@@ -234,6 +234,29 @@ UMaterial* CreateAovMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// ID pass material: unlit emission of custom primitive data 0..2, set per component to the
+// encoded Hydra prim ID (see HDUE_AOV_PRIM_ID).
+UMaterial* CreateIdMaterial() {
+    const FString Path = TEXT("/Game/HdUE/M_HdUEId");
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId"), nullptr, LOAD_NoWarn);
+    if (Material && Material->HasSubstrateFrontMaterialConnected()) return Material;
+    if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEId"), RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    auto* Id = NewObject<UMaterialExpressionVectorParameter>(Material);
+    Id->ParameterName = TEXT("HdUEId"); Id->DefaultValue = FLinearColor(0, 0, 0, 0);
+    Id->bUseCustomPrimitiveData = true; Id->PrimitiveDataIndex = 0;
+    auto* Unlit = NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material);
+    Unlit->EmissiveColor.Connect(0, Id);
+    Material->GetExpressionCollection().AddExpression(Id);
+    Material->GetExpressionCollection().AddExpression(Unlit);
+    Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
+    Material->bUsedWithNanite = true;
+    Material->TwoSided = true;
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
 UMaterial* CreateGlass() {
     const FString Path = TEXT("/Game/HdUE/M_Glass");
     UPackage* Package = CreatePackage(*Path);
@@ -317,7 +340,7 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
     UMaterial* Preview = CreatePreviewSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
     UMaterial* Masked = CreatePreviewSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
     UMaterial* Translucent = CreatePreviewSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
-    if (!Masked || !CreateAovMaterial()) return 3;
+    if (!Masked || !CreateAovMaterial() || !CreateIdMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
     UMaterial* Red = CreatePBR(TEXT("M_ReferenceRed"), FLinearColor(0.7f, 0.05f, 0.02f), 0.05f, 0.4f);

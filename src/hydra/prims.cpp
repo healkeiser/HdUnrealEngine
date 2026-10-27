@@ -100,6 +100,7 @@ public:
         mesh.material = delegate->GetMaterialId(GetId()).GetString();
         mesh.transform = delegate->GetTransform(GetId());
         mesh.visible = delegate->GetVisible(GetId());
+        mesh.primId = GetPrimId();
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();

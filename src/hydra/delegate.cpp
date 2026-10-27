@@ -17,6 +17,7 @@
 #include <cmath>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <memory>
 #include <numeric>
@@ -51,11 +52,14 @@ struct HdUESelfHost {
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
 }
-// Hydra AOV names hdUE renders from the GBuffer; 0 for color and unsupported names.
+// instanceId has no pass of its own: it is -1 until Hydra instancing is translated.
+constexpr uint32_t HdUEInstanceIdAov = 0x100;
+// Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
 uint32_t HdUEAovId(const TfToken& name) {
     static const std::pair<TfToken, uint32_t> names[] = {{TfToken("albedo"), HDUE_AOV_ALBEDO}, {TfToken("baseColor"), HDUE_AOV_ALBEDO},
         {HdAovTokens->normal, HDUE_AOV_NORMAL}, {TfToken("roughness"), HDUE_AOV_ROUGHNESS}, {TfToken("metallic"), HDUE_AOV_METALLIC},
-        {TfToken("specular"), HDUE_AOV_SPECULAR}, {TfToken("occlusion"), HDUE_AOV_OCCLUSION}};
+        {TfToken("specular"), HDUE_AOV_SPECULAR}, {TfToken("occlusion"), HDUE_AOV_OCCLUSION},
+        {HdAovTokens->primId, HDUE_AOV_PRIM_ID}, {HdAovTokens->instanceId, HdUEInstanceIdAov}};
     for (const auto& [token, id] : names) if (name == token) return id;
     return 0;
 }
@@ -219,6 +223,7 @@ void submit(HdUEState& state) {
         desc.id = data.id.c_str(); desc.material_id = data.material.c_str(); desc.native_asset = nativeMeshes.back().c_str();
         desc.positions = p.data(); desc.normals = n.empty() ? nullptr : n.data(); desc.uv = uv.empty() ? nullptr : uv.data();
         desc.indices = index.data(); desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
+        desc.prim_id = data.primId;
         desc.flags = state.setting<bool>("requireNanite", false) && !nativeMeshes.back().empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!nativeMeshes.back().empty()) {
@@ -401,6 +406,17 @@ class Pass final : public HdRenderPass {
     bool aovInFlight_ = false, aovsDone_ = true;
     void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame, const std::vector<float>& rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
+        if (id == HDUE_AOV_PRIM_ID || id == HdUEInstanceIdAov) {
+            // Int32 buffers hold the integer bit patterns in the float storage.
+            std::vector<float> out(count);
+            for (size_t i = 0; i < count; ++i) {
+                const float* p = rgba.empty() ? nullptr : &rgba[i * 4];
+                const int32_t value = p && id == HDUE_AOV_PRIM_ID && p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
+                std::memcpy(&out[i], &value, sizeof(value));
+            }
+            target.publish(frame, std::move(out));
+            return;
+        }
         const bool vector = id == HDUE_AOV_ALBEDO || id == HDUE_AOV_NORMAL;
         const bool zUp = state_->setting<std::string>("upAxis", "Y") == "Z";
         std::vector<float> out(count * (vector ? 3 : 1));
@@ -510,17 +526,6 @@ public:
             if (result == HDUE_OK && frame.generation == s.generation && frame.frame_id != lastFrame_) {
                 std::vector<float> pixels(size_t(frame.required_bytes / sizeof(float)));
                 const auto copy = s.backend->api().copy_frame(s.session, frame.frame_id, pixels.data(), frame.required_bytes);
-                if (aovInFlight_) {
-                    if (copy == HDUE_STALE_FRAME) ++s.staleFrameRetries;
-                    else {
-                        s.backend->require(copy, "copy_frame");
-                        lastFrame_ = frame.frame_id;
-                        if (frame.converged && aovSlot_ < aovs_.size()) {
-                            publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, frame, pixels);
-                            aovInFlight_ = false; ++aovSlot_;
-                        }
-                    }
-                } else {
                 std::vector<float> depthPixels;
                 HdueResult depthCopy=HDUE_OK;
                 if(copy==HDUE_OK && depth) {
@@ -549,8 +554,22 @@ public:
                     ++s.publishedFrames;
                     s.lastFrame = frame; lastFrame_ = frame.frame_id;
                 }
-                }
             } else if (result != HDUE_PENDING && result != HDUE_OK) s.backend->require(result, "poll_frame");
+            if (aovInFlight_) {
+                // AOV frames have their own slot (hdue/aov_api.h); the beauty above is untouched.
+                HdueFrameInfo aovFrame{}; aovFrame.struct_size = sizeof(aovFrame);
+                const auto polled = s.backend->aov_api().poll_aov(s.session, &aovFrame);
+                if (polled == HDUE_OK && aovFrame.generation == s.aovGeneration && aovFrame.converged && aovSlot_ < aovs_.size()) {
+                    std::vector<float> pixels(size_t(aovFrame.required_bytes / sizeof(float)));
+                    const auto copied = s.backend->api().copy_frame(s.session, aovFrame.frame_id, pixels.data(), aovFrame.required_bytes);
+                    if (copied == HDUE_STALE_FRAME) ++s.staleFrameRetries;
+                    else {
+                        s.backend->require(copied, "copy_frame");
+                        publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, aovFrame, pixels);
+                        aovInFlight_ = false; ++aovSlot_;
+                    }
+                } else if (polled != HDUE_PENDING && polled != HDUE_OK) s.backend->require(polled, "poll_aov");
+            }
             converged_ = s.lastFrame.frame_id && s.lastFrame.converged;
             const bool settingsChanged = settingsVersion != settingsVersion_;
             const bool cameraChanged = view != view_ || projection != projection_;
@@ -563,7 +582,7 @@ public:
                 converged_ = false;
             } else if (needsRequest) {
                 HdueRenderRequest request{};
-                request.struct_size = sizeof(request); request.generation = s.generation+1;
+                request.struct_size = sizeof(request); request.generation = std::max(s.generation, s.aovGeneration)+1;
                 request.mode = s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED : HDUE_REALTIME;
                 request.samples_per_pixel = uint32_t(std::max(1, s.setting<int>("samplesPerPixel", 64)));
                 request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 16)));
@@ -603,16 +622,19 @@ public:
                 for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
             }
             if (!needsRequest && converged_ && !aovsDone_ && !aovInFlight_) {
+                for (; aovSlot_ < aovs_.size() && aovs_[aovSlot_].second == HdUEInstanceIdAov; ++aovSlot_)
+                    publishAov(*aovs_[aovSlot_].first, HdUEInstanceIdAov, s.lastFrame, {});
                 if (aovSlot_ >= aovs_.size()) aovsDone_ = true;
                 else {
                     // Same camera and time as the beauty; GBuffer channels converge after a couple of draws.
                     auto request = beautyRequest_;
-                    request.generation = s.generation + 1; request.mode = HDUE_REALTIME; request.lumen_enabled = 0;
+                    if (!s.backend->aov_api().poll_aov) throw std::runtime_error("This runtime has no AOV extension; build and stage the current backend");
+                    request.generation = std::max(s.generation, s.aovGeneration) + 1; request.mode = HDUE_REALTIME; request.lumen_enabled = 0;
                     request.warmup_frames = 2; request.aov = aovs_[aovSlot_].second;
                     const auto requested = s.backend->api().request_render(s.session, &request);
                     if (requested != HDUE_PENDING) {
                         s.backend->require(requested, "request_render");
-                        s.generation = request.generation; aovInFlight_ = true;
+                        s.aovGeneration = request.generation; aovInFlight_ = true;
                     }
                 }
             }
@@ -716,6 +738,8 @@ HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return C
 void HdUERenderDelegate::DestroyBprim(HdBprim* p) { delete p; }
 HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const {
     if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat32Vec4,false,VtValue(GfVec4f(0)));
+    if(const auto aov=HdUEAovId(name); aov==HDUE_AOV_PRIM_ID || aov==HdUEInstanceIdAov)
+        return HdAovDescriptor(HdFormatInt32,false,VtValue(-1));
     if(const auto aov=HdUEAovId(name)) return aov==HDUE_AOV_ALBEDO || aov==HDUE_AOV_NORMAL
         ? HdAovDescriptor(HdFormatFloat32Vec3,false,VtValue(GfVec3f(0))) : HdAovDescriptor(HdFormatFloat32,false,VtValue(0.f));
 #if defined(HDUE_HOUDINI)

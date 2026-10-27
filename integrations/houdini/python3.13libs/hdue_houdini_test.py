@@ -161,11 +161,12 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         viewer.setCurrentSceneGraphSelection(('/World/Cube',))
         viewer.setSceneGraphHighlight(('/World/Cube',))
         for _ in range(12): yield
-        selected_image=yield from self.capture('06-selection-solaris.png')
+        selected_image=yield from self.capture('06-selection-solaris.png',selected=True)
         if self.api.status()['generation']!=stable['generation']: raise AssertionError('Selection reset the Path Tracer')
         if '/World/Cube' not in viewer.currentSceneGraphSelection(): raise AssertionError('Scene graph selection was not retained')
         self.selection_overlay=bool(np.mean(np.abs(native_image.astype(float)-selected_image.astype(float)))>=.001)
-        if not self.selection_overlay: integration._report('Native selection outline is not supported yet (no primId AOV)')
+        # The delegate's primId AOV drives Houdini's native selection highlight.
+        if not self.selection_overlay: raise AssertionError('Selecting /World/Cube drew no native highlight')
         viewer.setCurrentSceneGraphSelection(())
         viewer.setSceneGraphHighlight(())
         viewer.enterViewState()
@@ -190,7 +191,7 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         if old_size==new_size: raise AssertionError('Resize did not reallocate the AOVs')
         yield from self.capture('10-resize-solaris.png')
 
-    def capture(self,name):
+    def capture(self,name,selected=False):
         # Native flipbook dispatch captures the actual Solaris compositor.
         # QWidget.grab must not re-enter Houdini's Vulkan/GL viewport painting.
         import hdefereval
@@ -215,7 +216,8 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
                 for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
         blue=sum(pixels[y*stride+x*4+2]>30 and pixels[y*stride+x*4+2]>pixels[y*stride+x*4]*1.5 and pixels[y*stride+x*4+2]>pixels[y*stride+x*4+1]*1.3
                 for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
-        if lit<image.width()*image.height()*.005 or red<image.width()*image.height()*.0001:
+        # Houdini's selection highlight tints the selected red cube.
+        if lit<image.width()*image.height()*.005 or (not selected and red<image.width()*image.height()*.0001):
             raise AssertionError(f'Solaris did not display the red cube: {name}, lit={lit}, red={red}')
         if self.frames[-1]['meshes']>=4 and blue<image.width()*image.height()*.0001:
             raise AssertionError('Solaris did not display the native blue meshes: '+name)

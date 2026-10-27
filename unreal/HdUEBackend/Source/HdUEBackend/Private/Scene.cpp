@@ -74,8 +74,32 @@ void FHdueScene::Remove(const FString& Id) {
     }
     Materials.Remove(Id);
     MeshMaterials.Remove(Id);
+    PrimIds.Remove(Id);
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
+}
+bool FHdueScene::SetIdMode(bool On, FString& Error) {
+    if (On == IdMode) return true;
+    UMaterialInterface* IdMaterial = nullptr;
+    if (On && !(IdMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId")))) {
+        Error = TEXT("ID material /Game/HdUE/M_HdUEId is missing; run Prepare-Content.ps1 and stage the runtime."); return false;
+    }
+    const auto Swap = [&](AActor* Actor, int32 Id) {
+        TArray<UMeshComponent*> Meshes; Actor->GetComponents(Meshes);
+        for (auto* Mesh : Meshes) {
+            if (On) {
+                // Exact in the float16 readback: both halves stay below 2048.
+                Mesh->SetCustomPrimitiveDataVector4f(0, Id >= 0 ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0) : FVector4f(0, 0, 0, 0));
+                for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
+            } else if (auto* Static = Cast<UStaticMeshComponent>(Mesh)) Static->EmptyOverrideMaterials();
+        }
+    };
+    for (const auto& Entry : Actors) if (IsValid(Entry.Value)) { const int32* Id = PrimIds.Find(Entry.Key); Swap(Entry.Value, Id ? *Id : -1); }
+    // ponytail: native catalog assets carry no Hydra prim ID; they read as background in the ID pass.
+    for (auto* Actor : Assets.GetActors()) if (IsValid(Actor)) Swap(Actor, -1);
+    IdMode = On;
+    if (!On) BindMaterials();
+    return true;
 }
 UTexture2D* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
     const FString Key = File + (SRGB ? TEXT("|srgb") : TEXT("|raw"));
@@ -116,6 +140,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             if (Mesh.indices[I] >= Mesh.vertex_count) { Error = TEXT("Mesh index out of range."); return false; }
         }
     }
+    if (IdMode) { FString Ignored; SetIdMode(false, Ignored); }
     if (Batch.reset_scene) {
         Lighting->Clear();
         Assets.Reset();
@@ -126,7 +151,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         for (TActorIterator<AActor> It(World); It; ++It)
             if (It->GetLevel()==World->PersistentLevel && (It->FindComponentByClass<UMeshComponent>() || It->FindComponentByClass<ULightComponent>())) Fixtures.Add(*It);
         for (auto* A : Fixtures) World->DestroyActor(A);
-        Actors.Empty(); CameraLightDirections.Empty(); MeshMaterials.Empty(); Materials.Empty(); PreviewTextures.Empty();
+        Actors.Empty(); CameraLightDirections.Empty(); MeshMaterials.Empty(); Materials.Empty(); PreviewTextures.Empty(); PrimIds.Empty();
         WetBindings.Empty(); GeometryRevisions.Empty();
     }
     for (uint32 Index = 0; Index < Batch.removed_count; ++Index) {
@@ -264,6 +289,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
+        PrimIds.Add(Id, Desc.prim_id);
     }
     for (uint32 Index = 0; Index < Batch.light_count; ++Index) {
         const auto& Desc = Batch.lights[Index];

@@ -13,6 +13,7 @@
 #include "NativePicking.h"
 #include "hdue/material_api.h"
 #include "hdue/depth_api.h"
+#include "hdue/aov_api.h"
 #include "RenderUtils.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -92,6 +93,12 @@ struct FSession {
     bool ResidencyFailed = false;
     bool MegaLightsActive=false;
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial; // PP_HdUEAov, weights select HDUE_AOV_*.
+    // AOV requests use their own view state and frame slot (hdue/aov_api.h); Frame/Pixels/depth
+    // and the beauty's Lumen or Path Tracer history belong to BeautyRequest.
+    HdueRenderRequest BeautyRequest{};
+    FSceneViewStateInterface* AovViewState = nullptr;
+    HdueFrameInfo AovFrame{};
+    TArray<float> AovPixels;
 };
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
@@ -243,6 +250,7 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     Session->Pending.Reset();
     Session->ViewState->Destroy();
     Session->ViewState = nullptr;
+    if (Session->AovViewState) { Session->AovViewState->Destroy(); Session->AovViewState = nullptr; }
     Session->Target->RemoveFromRoot();
     Session->Target = nullptr;
     Runtime.Session.Reset();
@@ -286,8 +294,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
     if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
     if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
-    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
-        return Fail(HDUE_ENGINE_ERROR, TEXT("AOV material /Game/HdUE/PP_HdUEAov is missing; run Prepare-Content.ps1 and stage the runtime."));
+    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, Request->aov == HDUE_AOV_PRIM_ID
+            ? TEXT("/Game/HdUE/M_HdUEId.M_HdUEId") : TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
+        return Fail(HDUE_ENGINE_ERROR, TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
     if (!Session->Scene->SurfaceReady()) return HDUE_PENDING;
@@ -300,18 +309,22 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     // A moving realtime camera needs Lumen's persistent temporal history. Scene
     // edits cancel HasRequest in ApplyScene; mode/time/settings changes still
     // reset, and every Path Tracer request starts a fresh accumulation.
-    const auto& Previous = Session->Request;
+    const bool Aov = Request->aov != HDUE_AOV_COLOR;
+    const auto& Previous = Session->BeautyRequest;
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
         Previous.time_seconds == Request->time_seconds && Previous.lumen_enabled == Request->lumen_enabled &&
         Previous.samples_per_pixel == Request->samples_per_pixel && Previous.warmup_frames == Request->warmup_frames &&
         Previous.aov == Request->aov;
-    if (!KeepHistory) {
+    if (Aov) {
+        if (!Session->AovViewState) Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+    } else if (!KeepHistory) {
         FlushRenderingCommands();
         Session->ViewState->Destroy();
         Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     }
-    Session->CameraCut = !KeepHistory;
+    Session->CameraCut = Aov || !KeepHistory;
     Session->Request = *Request;
+    if (!Aov) Session->BeautyRequest = *Request;
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
     Session->Draws = 0;
     Session->HasRequest = true;
@@ -336,6 +349,8 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
     const bool Aov = Request.aov != HDUE_AOV_COLOR;
     const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
+    FString IdError;
+    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
     if (Session->Preparing) {
         const auto Residency = Session->Residency;
         ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
@@ -358,7 +373,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             Request.time_seconds, Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
     FSceneViewInitOptions Options;
     Options.ViewFamily = &Family;
-    Options.SceneViewStateInterface = Session->ViewState;
+    Options.SceneViewStateInterface = Aov ? Session->AovViewState : Session->ViewState;
     Options.SetViewRectangle(FIntRect(0, 0, Session->Width, Session->Height));
     Options.ViewOrigin = FVector(Request.eye[0], Request.eye[1], Request.eye[2]);
     IStreamingManager::Get().AddViewInformation(Options.ViewOrigin, float(Session->Width),
@@ -391,7 +406,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
             if (Parent) Session->AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
         }
-        if (auto* Material = Session->AovMaterial.Get()) {
+        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID ? nullptr : Session->AovMaterial.Get()) {
             for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
                 Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
             FPostProcessSettings Blend;
@@ -411,8 +426,8 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
     Job->Preparing = Session->Preparing;
-    Job->DepthEnabled = Session->DepthEnabled;
-    if(!PathTracing && Session->Scene->Lighting->BackgroundVisible()) {
+    Job->DepthEnabled = Session->DepthEnabled && !Aov;
+    if(!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
         Job->Environment=Session->Scene->Lighting->EnvironmentTexture();
         Job->EnvironmentScale=Session->Scene->Lighting->EnvironmentScale();
     }
@@ -475,10 +490,13 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
             Info.readback_ms = (Now - Job->Started) * 1000;
             FScopeLock Lock(&Session->FrameMutex);
+            if (Request.aov != HDUE_AOV_COLOR) { Session->AovPixels = MoveTemp(Pixels); Session->AovFrame = Info; }
+            else {
             Session->Pixels = MoveTemp(Pixels);
             Session->DepthPixels = MoveTemp(DepthPixels);
             Session->Frame = Info;
             Session->MegaLightsActive=Job->MegaLightsActive;
+            }
         } else {
             Job->Failed.Store(true);
         }
@@ -524,7 +542,8 @@ HdueResult HDUE_CALL Tick() {
     }
     {
         FScopeLock Lock(&Session->FrameMutex);
-        if (Session->Frame.generation == Session->Request.generation && Session->Frame.converged) return HDUE_OK;
+        const auto& Current = Session->Request.aov == HDUE_AOV_COLOR ? Session->Frame : Session->AovFrame;
+        if (Current.generation == Session->Request.generation && Current.converged) return HDUE_OK;
     }
     Draw(Session);
     return HDUE_OK;
@@ -535,8 +554,19 @@ HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
     if (!ValidSession(Handle) || !Frame || Frame->struct_size != sizeof(*Frame)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     FScopeLock Lock(&Session->FrameMutex);
-    if (!Session->HasRequest || !Session->Frame.frame_id || Session->Frame.generation != Session->Request.generation) return HDUE_PENDING;
+    if (!Session->HasRequest || !Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_PENDING;
     *Frame = Session->Frame;
+    return HDUE_OK;
+}
+
+HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Frame || Frame->struct_size != sizeof(*Frame)) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    FScopeLock Lock(&Session->FrameMutex);
+    if (!Session->HasRequest || Session->Request.aov == HDUE_AOV_COLOR || !Session->AovFrame.frame_id ||
+        Session->AovFrame.generation != Session->Request.generation) return HDUE_PENDING;
+    *Frame = Session->AovFrame;
     return HDUE_OK;
 }
 
@@ -545,7 +575,12 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
     if (!ValidSession(Handle) || !Buffer) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     FScopeLock Lock(&Session->FrameMutex);
-    if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id || Session->Frame.generation != Session->Request.generation) return HDUE_STALE_FRAME;
+    if (Session->HasRequest && FrameId && FrameId == Session->AovFrame.frame_id && Session->AovFrame.generation == Session->Request.generation) {
+        if (Capacity < Session->AovFrame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
+        FMemory::Memcpy(Buffer, Session->AovPixels.GetData(), Session->AovFrame.required_bytes);
+        return HDUE_OK;
+    }
+    if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_STALE_FRAME;
     if (Capacity < Session->Frame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
     FMemory::Memcpy(Buffer, Session->Pixels.GetData(), Session->Frame.required_bytes);
     return HDUE_OK;
@@ -567,7 +602,7 @@ HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,u
     const auto Session=Runtime.Session;
     FScopeLock Lock(&Session->FrameMutex);
     if(!Session->DepthEnabled) return HDUE_NOT_SUPPORTED;
-    if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id || Session->Frame.generation!=Session->Request.generation) return HDUE_STALE_FRAME;
+    if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id || Session->Frame.generation!=Session->BeautyRequest.generation) return HDUE_STALE_FRAME;
     const uint64 Bytes=uint64(Session->Width)*Session->Height*sizeof(float);
     if(Capacity<Bytes) return HDUE_BUFFER_TOO_SMALL;
     if(Session->DepthPixels.Num()!=int64(Session->Width)*Session->Height) return HDUE_PENDING;
@@ -625,7 +660,7 @@ HdueResult HDUE_CALL LightingStatus(HdueSession Handle,HdueLightingStatus* Statu
     if(ProjectCVar) Result.mega_lights_project=ProjectCVar->GetInt()!=0;
     if(AllowedCVar) Result.mega_lights_allowed=AllowedCVar->GetInt()!=0;
     FScopeLock Lock(&Session->FrameMutex);
-    if(Session->HasRequest && Session->Frame.generation==Session->Request.generation) {
+    if(Session->HasRequest && Session->Frame.generation==Session->BeautyRequest.generation) {
         Result.frame_id=Session->Frame.frame_id; Result.generation=Session->Frame.generation; Result.mega_lights_active=Session->MegaLightsActive;
     }
     *Status=Result; return HDUE_OK;
@@ -767,6 +802,12 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Versio
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_asset_api(uint32 Version, uint32 Capacity, HdueAssetApi* Api) {
     if (!Api || Version != HDUE_ASSET_ABI_VERSION || Capacity < sizeof(HdueAssetApi)) return HDUE_INVALID_ARGUMENT;
     *Api={sizeof(HdueAssetApi),HDUE_ASSET_ABI_VERSION,UpsertAsset,RemoveAsset,AssetStatus,AssetSceneStatus}; return HDUE_OK;
+}
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32 Version, uint32 Capacity, HdueAovApi* Api) {
+    if (!Api || Capacity < sizeof(HdueAovApi)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_AOV_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(HdueAovApi), HDUE_AOV_ABI_VERSION, PollAov};
+    return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version,uint32 Capacity,HdueDepthApi* Api) {
     if(!Api || Capacity<sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;

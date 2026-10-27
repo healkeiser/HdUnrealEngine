@@ -30,6 +30,7 @@ struct HdUEMeshData {
     std::vector<uint32_t> sourceCorners;
     GfMatrix4d transform{1};
     bool visible = true;
+    int primId = -1; // HdRprim::GetPrimId, written by the ID pass
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
 struct HdUETextureData {
@@ -66,6 +67,7 @@ struct HdUEState : HdRenderParam {
     std::shared_ptr<const VtDictionary> wetBindings = std::make_shared<const VtDictionary>();
     std::shared_ptr<hdue::Backend> backend;
     HdueSession session = 0;
+    uint64_t aovGeneration = 0; // AOV requests (hdue/aov_api.h); generation stays the beauty's
     uint32_t width = 0, height = 0;
     uint64_t revision = 1, submittedRevision = 0, generation = 0;
     uint64_t requestSettingsRevision = 1;

@@ -37,6 +37,12 @@ Backend::Backend(const std::filesystem::path& dll) {
             candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_DEPTH_ABI_VERSION &&
             candidate.set_enabled && candidate.copy_depth) depthApi_=candidate;
     }
+    const auto aov=reinterpret_cast<HdueGetAovApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_aov_api"));
+    if(aov) {
+        HdueAovApi candidate{};
+        if(aov(HDUE_AOV_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
+            candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_AOV_ABI_VERSION && candidate.poll_aov) aovApi_=candidate;
+    }
     const auto assets = reinterpret_cast<HdueGetAssetApiFn>(GetProcAddress(static_cast<HMODULE>(module_), "hdue_get_asset_api"));
     if (assets) {
         HdueAssetApi candidate{};
