@@ -189,7 +189,21 @@ The deferred call runs on the UI owner thread. Selecting the renderer alone does
 
 When Reference or Edit LOPs are added after `hdUE_settings`, the host places an `hdUE_viewport_prepare` LOP after the displayed output. This final layer expands instanceable references and resolves embedded/COP images before material binding and Hydra translation. Transforms on the reference prim and its ancestors continue through the same layer. The artist's input layers and referenced files retain their original instancing and attributes. The generated LOP follows display-output changes and is removed when switching renderers or closing the host; connections through it are preserved.
 
-Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The current target is one active hdUE viewport with a centered perspective camera. Standard selection outlines, ID AOVs, precise native viewport picking, husk, and USD Render ROP integration are not implemented. Use the Scene Graph Tree for prim selection and editing.
+Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The current target is one active hdUE viewport with a centered perspective camera. Standard selection outlines, ID AOVs, and precise native viewport picking are not implemented. Use the Scene Graph Tree for prim selection and editing.
+
+### Rendering to disk with husk
+
+husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), ticks it from the render pass, and shuts it down with the last delegate. UE allows one lifetime per process, which matches one husk invocation rendering a frame range. Renderer settings come from the `hdUE:*` attributes on the render settings prim, so `hdUE:renderMode = "pathtraced"` selects the Path Tracer.
+
+```powershell
+$env:HOUDINI_PATH = "$PWD\integrations\houdini;&"
+$env:PXR_PLUGINPATH_NAME = "$PWD\build\houdini-22.0.466\resources"
+$env:HDUE_HOUDINI_ENABLE = '1'
+$env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
+husk --renderer HdUEHoudiniRendererPlugin --frame 1 --frame-count 1 -o out/smoke.exr samples/smoke.usda
+```
+
+A USD Render ROP inside a Houdini session started by `Launch-Houdini.ps1` passes this environment to husk. The color AOV is written; other render vars are part of the AOV work.
 
 ### COP textures
 

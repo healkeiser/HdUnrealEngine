@@ -12,17 +12,76 @@
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/tf/stringUtils.h"
+#include "pxr/base/js/json.h"
 #include <cmath>
 #include <chrono>
+#include <cstdio>
+#include <fstream>
+#include <memory>
 #include <numeric>
 #include <limits>
 #include <algorithm>
+#include <sstream>
+#include <windows.h>
 #if defined(HDUE_HOUDINI)
 #include "../houdini/diagnostics.h"
-#include <windows.h>
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
+namespace {
+// Hosts such as husk never start UE. The first delegate created while the
+// runtime is cold starts it on its own thread and ticks it from Execute, as
+// hdue_usd_render does; the last delegate shuts it down.
+struct HdUESelfHost {
+    std::unique_ptr<hdue::Backend> backend;
+    HWND window = nullptr;
+    DWORD thread = 0;
+    int delegates = 0;
+    void tick() const {
+        if (!backend || GetCurrentThreadId() != thread) return;
+        MSG message{};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+        backend->require(backend->api().tick(), "tick");
+    }
+};
+HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
+LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+    const auto& host = selfHost();
+    if (host.backend && host.backend->initialized()) {
+        int64_t result = 0;
+        if (host.backend->api().window_message(reinterpret_cast<uint64_t>(window), message, uint64_t(wparam), int64_t(lparam), &result) == HDUE_OK) return LRESULT(result);
+    }
+    return DefWindowProcW(window, message, wparam, lparam);
+}
+// backend_dll / runtime_project from the runtime profile named by HDUE_RUNTIME_CONFIG.
+std::string runtimeConfig(const char* key) {
+    const auto path = TfGetenv("HDUE_RUNTIME_CONFIG");
+    if (path.empty()) return {};
+    std::ifstream file(std::filesystem::u8path(path));
+    std::stringstream text; text << file.rdbuf();
+    const auto root = JsParseString(text.str());
+    if (!root.IsObject()) return {};
+    const auto& object = root.GetJsObject();
+    const auto it = object.find(key);
+    return it != object.end() && it->second.IsString() ? it->second.GetString() : std::string();
+}
+void startSelfHost(const std::string& dll, const std::string& project) {
+    auto& host = selfHost();
+    if (project.empty()) throw std::runtime_error("hdUE cannot start UE without runtime_project in HDUE_RUNTIME_CONFIG");
+    const auto instance = GetModuleHandleW(nullptr);
+    WNDCLASSW cls{}; cls.hInstance = instance; cls.lpfnWndProc = selfHostWindow; cls.lpszClassName = L"HdUESelfHost";
+    RegisterClassW(&cls);
+    host.window = CreateWindowExW(0, cls.lpszClassName, L"hdUE", WS_OVERLAPPEDWINDOW, 0, 0, 640, 360, nullptr, nullptr, instance, nullptr);
+    if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
+    host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
+    HdueInitDesc init{}; init.struct_size = sizeof(init);
+    init.instance_handle = reinterpret_cast<uint64_t>(instance); init.window_handle = reinterpret_cast<uint64_t>(host.window);
+    init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
+    host.backend->initialize(init);
+    host.thread = GetCurrentThreadId();
+}
+}
 HdRprim* HdUECreateMesh(const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
@@ -341,6 +400,7 @@ public:
 #if defined(HDUE_HOUDINI)
             s.executeThread=GetCurrentThreadId();
 #endif
+            selfHost().tick();
             // Keep the last valid AOV while a prepared material graph is
             // invalid. Dirty USD data stays queued until preparation/undo.
             if (!s.setting<bool>("materialGraphValid", true)) { converged_ = true; return; }
@@ -492,11 +552,23 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     const auto stageUnits=settings.find(TfToken("stageMetersPerUnit"));
     if (stageUnits!=settings.end() && stageUnits->second.IsHolding<double>())
         state_->settings[TfToken("metersPerUnit")]=stageUnits->second;
-    const auto dll = state_->setting<std::string>("backendLibrary", TfGetenv("HDUE_BACKEND_DLL"));
-    if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary and a host-initialized UELibrary runtime");
+    auto dll = state_->setting<std::string>("backendLibrary", TfGetenv("HDUE_BACKEND_DLL"));
+    if (dll.empty()) dll = runtimeConfig("backend_dll");
+    if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
     state_->backend = std::make_shared<hdue::Backend>(std::filesystem::u8path(dll));
     HdueStatus status{}; status.struct_size = sizeof(status);
     state_->backend->require(state_->backend->api().get_status(&status), "get_status");
+    if (status.state == HDUE_STATE_COLD && !selfHost().backend) {
+        startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")));
+        // UE reports ready only after its first ticks.
+        for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
+            selfHost().tick();
+            state_->backend->require(state_->backend->api().get_status(&status), "get_status");
+            if (status.state == HDUE_STATE_FAILED) break;
+            Sleep(10);
+        }
+    }
+    if (selfHost().backend) { ++selfHost().delegates; selfHosted_ = true; }
     if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
         throw std::runtime_error("hdUE requires a ready runtime; launch usdview with scripts/Launch-Usdview.ps1");
     if (state_->backend->material_api().get_renderer_info)
@@ -514,6 +586,16 @@ HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)
     HdUEUnregisterViewport(this);
 #endif
+    auto& host = selfHost();
+    if (!selfHosted_ || --host.delegates > 0) return;
+    // The session must end while UE still runs; UE allows one lifetime per process.
+    {
+        std::lock_guard lock(state_->mutex);
+        if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
+    }
+    try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE shutdown: %s", e.what()); }
+    if (host.window) DestroyWindow(host.window);
+    host.window = nullptr; host.backend.reset();
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->mesh}; return t; }
 const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->camera, HdPrimTypeTokens->material,
