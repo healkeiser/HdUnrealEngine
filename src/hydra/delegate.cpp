@@ -559,6 +559,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
     {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
     {"Environment cube resolution",TfToken("domeResolution"),VtValue(512)} }; }
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) {
+    if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
     if(key.GetString().starts_with("hdUE:")) { SetRenderSetting(TfToken(key.GetString().substr(5)),value); return; }
     if (key==TfToken("stageMetersPerUnit")) {
         SetRenderSetting(TfToken("metersPerUnit"),value); return;

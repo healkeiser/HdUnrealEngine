@@ -38,10 +38,15 @@ assert proxy and len(proxy.GetPointsAttr().Get())==8
 assert UsdGeom.PrimvarsAPI(proxy).GetPrimvar('hdue:asset').Get()=='/Game/HdUE/SM_Nanite.SM_Nanite'
 assert abs(UsdGeom.BBoxCache(Usd.TimeCode.Default(),['default','render']).ComputeWorldBound(proxy.GetPrim()).ComputeAlignedRange().GetSize()[0]-1.)<1e-5
 assert stage.GetMetadata('renderSettingsPrimPath')=='/Render/hdUE',stage.GetRootLayer().ExportToString()
-settings=stage.GetPrimAtPath('/Render/hdUE')
+assert not stage.GetPrimAtPath('/Render/hdUE'),'hdUE settings must leave render settings to Render Settings LOPs'
+assert integration.render_options(stage)==('realtime',64)
+render=integration.render_settings_node(node)
+assert not render.errors(),render.errors()
+settings=render.stage().GetPrimAtPath('/Render/hdUE')
 assert settings.GetAttribute('hdUE:renderMode').Get()=='realtime'
-node.parm('hdue_mode').set('pathtraced')
-assert node.stage().GetPrimAtPath('/Render/hdUE').GetAttribute('hdUE:renderMode').Get()=='pathtraced'
+assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'unset controls must not author'
+integration._render_property(render,'xn__hdUErenderMode','pathtraced')
+assert integration.render_options(render.stage())==('pathtraced',64)
 assert source.stage().GetRootLayer().ExportToString()==before
 native=integration.settings_node(source) # native Solaris input: Y-up / meters
 native_stage=native.stage()

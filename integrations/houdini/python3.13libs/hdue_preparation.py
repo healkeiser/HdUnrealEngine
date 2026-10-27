@@ -43,17 +43,15 @@ class ViewportPreparation:
             self.refresh()
             return self.node
         self.close()
-        if source==controls: return None
+        # Render settings only author /Render; the prepared stage above them is already complete.
+        upstream=source
+        while upstream and upstream!=controls and upstream.type().name()=='rendersettings':
+            upstream=upstream.inputs()[0] if upstream.inputs() else None
+        if upstream==controls: return None
         self.source=source
         node=source.parent().createNode('pythonscript','hdUE_viewport_prepare')
         self.node=node
         node.setUserData(TAG,'1'); node.setInput(0,source)
-        group=node.parmTemplateGroup()
-        group.append(hou.StringParmTemplate('hdue_mode','Render mode',1))
-        group.append(hou.IntParmTemplate('hdue_samples','Samples',1))
-        node.setParmTemplateGroup(group)
-        node.parm('hdue_mode').setExpression('chs("'+controls.path()+'/hdue_mode")',hou.exprLanguage.Hscript)
-        node.parm('hdue_samples').setExpression('ch("'+controls.path()+'/hdue_samples")',hou.exprLanguage.Hscript)
         node.parm('python').set('import hdue_houdini\nhdue_houdini.prepare_viewport(hou.pwd())')
         node.setPosition(source.position()+hou.Vector2(0,-1))
         self.refresh(force=True)

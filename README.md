@@ -165,7 +165,9 @@ New-Item -ItemType Directory -Force .local | Out-Null
 
 The update script places the current depth-capable DLL under a content-hash filename. `-SetDefault` records an ignored fallback profile. An explicit `-RuntimeConfig`, `HDUE_RUNTIME_CONFIG`, or the local `runtime_config` key takes priority over that fallback. Restart Houdini to change runtimes.
 
-The launcher registers `Unreal Engine (hdUE)` for its process without editing the user's Houdini environment file. It creates a source layer and an `hdUE_settings` subnet. Lumen is the default mode; Path Tracer defaults to 64 samples. Standard tumble, pan, and dolly controls are used. A secondary image window is optional.
+The launcher registers `Unreal Engine (hdUE)` for its process without editing the user's Houdini environment file. It creates a source layer, an `hdUE_settings` subnet that prepares the stage, and a standard Render Settings LOP (`hdUE_render_settings`, `/Render/hdUE`). Lumen is the default mode; Path Tracer defaults to 64 samples. Standard tumble, pan, and dolly controls are used. A secondary image window is optional.
+
+Renderer settings are `hdUE:*` attributes on a UsdRenderSettings prim, so any Render Settings LOP drives hdUE. With the delegate registered, Render Settings LOPs show them on an **Unreal Engine** tab (`integrations/houdini/soho/parameters/HdUEHoudiniRendererPlugin_Global.ds`): render mode, Path Tracer samples, Lumen, Lumen warmup frames, environment cube resolution, the unlit-scene light, and the stage up axis. As with Karma's properties, each control defaults to not authoring. Render settings flow downstream like other USD data; `hdue_houdini.set_render_setting()` edits the displayed chain's Render Settings LOP, adding one when there is none.
 
 Output uses **Y-up and one unit per meter**. Normalization preserves prim paths, original transform interpolation, reset stacks, and camera optical dimensions. The subnet's source-axis and source-unit controls handle inputs whose metadata was lost during composition.
 

@@ -1,0 +1,133 @@
+/// hdUE render settings, authored as hdUE:* attributes on a UsdRenderSettings prim.
+/// Add them to a Render Settings LOP with hdue_houdini.add_render_properties(node),
+/// or through Edit Parameter Interface > Render Properties > Unreal Engine > Global.
+
+#include "$HFS/houdini/soho/parameters/CommonMacros.ds"
+
+#define HDUE_CONTROL(NAME, LABEL) \
+    parm { \
+        name    NAME \
+        label   LABEL \
+        type    string \
+        default { "set" } \
+        menujoin { \
+            [ "import loputils" ] \
+            [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
+            language python \
+        } \
+        parmtag { "sidefx::look" "icon" } \
+    }
+
+{
+    name        "hdUE"
+    label       "Unreal Engine"
+    parmtag     { spare_opfilter        "!!SHOP/PROPERTIES!!" }
+    parmtag     { spare_classtags       "render" }
+
+    group {
+        name "global"
+        label "Global"
+
+        HDUE_CONTROL("xn__hdUErenderMode_control_ucb", "Render Mode")
+        parm {
+            name    "xn__hdUErenderMode_tya"
+            label   "Render Mode"
+            type    string
+            size    1
+            default { "realtime" }
+            menu { "realtime" "Lumen" "pathtraced" "Path Tracer" }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "string" }
+            disablewhen R"({ xn__hdUErenderMode_control_ucb == block } { xn__hdUErenderMode_control_ucb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEsamplesPerPixel_control_zkb", "Path Tracer Samples")
+        parm {
+            name    "xn__hdUEsamplesPerPixel_y6a"
+            label   "Path Tracer Samples"
+            type    int
+            size    1
+            default { 64 }
+            range   { 1! 4096 }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEsamplesPerPixel_control_zkb == block } { xn__hdUEsamplesPerPixel_control_zkb == none })"
+        }
+        HDUE_CONTROL("xn__hdUElumenEnabled_control_3fb", "Enable Lumen")
+        parm {
+            name    "xn__hdUElumenEnabled_21a"
+            label   "Enable Lumen"
+            type    toggle
+            size    1
+            default { 1 }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUElumenEnabled_control_3fb == block } { xn__hdUElumenEnabled_control_3fb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEwarmupFrames_control_3fb", "Lumen Warmup Frames")
+        parm {
+            name    "xn__hdUEwarmupFrames_21a"
+            label   "Lumen Warmup Frames"
+            type    int
+            size    1
+            default { 16 }
+            range   { 0! 256 }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEwarmupFrames_control_3fb == block } { xn__hdUEwarmupFrames_control_3fb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEdomeResolution_control_djb", "Environment Cube Resolution")
+        parm {
+            name    "xn__hdUEdomeResolution_c5a"
+            label   "Environment Cube Resolution"
+            type    int
+            size    1
+            default { 512 }
+            menu { "32" "32" "64" "64" "128" "128" "256" "256" "512" "512" "1024" "1024" "2048" "2048" }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEdomeResolution_control_djb == block } { xn__hdUEdomeResolution_control_djb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEautoViewerLight_control_zkb", "Light Unlit Scenes")
+        parm {
+            name    "xn__hdUEautoViewerLight_y6a"
+            label   "Light Unlit Scenes"
+            type    toggle
+            size    1
+            default { 1 }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUEautoViewerLight_control_zkb == block } { xn__hdUEautoViewerLight_control_zkb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEviewerLightIntensity_control_4sb", "Unlit Scene Light Intensity")
+        parm {
+            name    "xn__hdUEviewerLightIntensity_3fb"
+            label   "Unlit Scene Light Intensity"
+            type    float
+            size    1
+            default { 4 }
+            range   { 0! 100 }
+            parmtag { "spare_category" "Global" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEviewerLightIntensity_control_4sb == block } { xn__hdUEviewerLightIntensity_control_4sb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEupAxis_control_c5a", "Stage Up Axis")
+        parm {
+            name    "xn__hdUEupAxis_bsa"
+            label   "Stage Up Axis"
+            type    string
+            size    1
+            default { "Y" }
+            menu { "Y" "Y" "Z" "Z" }
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "string" }
+            disablewhen R"({ xn__hdUEupAxis_control_c5a == block } { xn__hdUEupAxis_control_c5a == none })"
+        }
+    }
+}

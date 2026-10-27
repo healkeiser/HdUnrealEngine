@@ -87,10 +87,7 @@ class Viewer(QtWidgets.QDialog):
 
     def change_samples(self,value):
         import hdue_houdini as integration
-        node=integration.current_settings_node()
-        if node:
-            node.parm('hdue_samples').set(value); node.cook(force=True)
-            integration.scene_viewer().curViewport().draw()
+        integration.set_render_setting('xn__hdUEsamplesPerPixel',value)
 
     def frame_all(self):
         import hdefereval,hdue_houdini as integration

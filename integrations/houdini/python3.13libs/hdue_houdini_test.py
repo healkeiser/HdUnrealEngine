@@ -143,13 +143,15 @@ p.CreateAttribute("hdue:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nan
 UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
 ''')
         prepared=integration.settings_node(native); prepared.setDisplayFlag(True); prepared.setCurrent(True,clear_all_selected=True)
+        # Render settings flow downstream, so this chain inherits Path Tracer from step 03.
+        integration.set_mode('realtime')
         yield from self.image('05-native-lumen',0,self.frames[-1]['generation'],minimum_meshes=4)
         from asset_runtime import Assets,AssetSceneStatus
         api=Assets(self.host.runtime); assets=AssetSceneStatus(); assets.struct_size=C.sizeof(assets)
         self.host.runtime.check(api.get_scene(self.frames[-1]['session'],C.byref(assets)),'native scene status')
         if (assets.instances,assets.loading,assets.failed,assets.meshes)!=(2,0,0,2): raise AssertionError('Native meshes were not ready')
         self.frames[-1]['native_assets']={n:getattr(assets,n) for n,_ in assets._fields_ if n!='message'}
-        prepared.parm('hdue_mode').set('pathtraced')
+        integration.set_mode('pathtraced')
         prepared.cook(force=True)
         yield from self.image('06-native-pathtraced',1,self.frames[-1]['generation'])
         native_image=yield from self.capture('06-native-pathtraced-solaris.png')

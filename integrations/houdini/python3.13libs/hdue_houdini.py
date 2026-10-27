@@ -150,7 +150,8 @@ class Host:
                                 self.material_error=None
                             except (ValueError,OSError,hou.Error) as error:
                                 self.material_problem(str(error),state['session'])
-                        options=(state['session'],node.evalParm('hdue_mode')=='pathtraced',node.evalParm('hdue_samples'),
+                        mode,samples=render_options(stage)
+                        options=(state['session'],mode=='pathtraced',samples,
                                  UsdGeom.GetStageMetersPerUnit(stage),UsdGeom.GetStageUpAxis(stage)=='Z',hou.frame()/hou.fps())
                         if options!=self.last_options and self.api.options(*options[1:]):
                             self.last_options=options; scene_viewer().curViewport().draw()
@@ -304,7 +305,7 @@ def current_settings_node():
     network=viewer.pwd()
     node=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
     from hdue_preparation import TAG
-    while node and (not node.parm('hdue_mode') or node.userData(TAG)=='1'):
+    while node and (not node.parm('hdue_source_axis') or node.userData(TAG)=='1'):
         inputs=node.inputs(); node=inputs[0] if inputs else None
     return node
 
@@ -327,9 +328,7 @@ def settings_node(input_node,metadata=None):
     node=input_node.parent().createNode('subnet','hdUE_settings')
     node.setInput(0,input_node)
     group=node.parmTemplateGroup()
-    group.append(hou.StringParmTemplate('hdue_mode','Render mode',1,default_value=('realtime',),
-        menu_items=('realtime','pathtraced'),menu_labels=('Lumen','Path Tracer')))
-    group.append(hou.IntParmTemplate('hdue_samples','Path Tracer samples',1,default_value=(64,),min=1,max=4096))
+    # Render mode and samples are hdUE:* render settings; see render_settings_node().
     group.append(hou.StringParmTemplate('hdue_materialx_library','Cooked MaterialX library',1,
         default_value=(os.environ.get('HDUE_MATERIALX_LIBRARY') or runtime_config().get('materialx_library',''),),
         string_type=hou.stringParmType.FileReference))
@@ -360,12 +359,6 @@ def settings_node(input_node,metadata=None):
         layer.parm('set'+name).set(1); layer.parm(name).set(value)
     bridge=node.createNode('pythonscript','asset_bridge')
     bridge.setInput(0,layer)
-    channels=bridge.parmTemplateGroup()
-    channels.append(hou.StringParmTemplate('hdue_mode','Render mode',1))
-    channels.append(hou.IntParmTemplate('hdue_samples','Samples',1))
-    bridge.setParmTemplateGroup(channels)
-    bridge.parm('hdue_mode').setExpression('chs("../hdue_mode")',hou.exprLanguage.Hscript)
-    bridge.parm('hdue_samples').setExpression('ch("../hdue_samples")',hou.exprLanguage.Hscript)
     bridge.parm('python').set('import hdue_houdini\nhdue_houdini.cook(hou.pwd())')
     node.node('output0').setInput(0,bridge)
     node.layoutChildren()
@@ -391,7 +384,6 @@ def prepare_viewport(node):
 
 def cook(node):
     stage=node.editableStage()
-    controls=node
     from hdue_op_textures import resolve_stage, preview_fallbacks
     resolve_stage(stage,node)
     preview_fallbacks(stage)
@@ -447,19 +439,39 @@ def cook(node):
         xform.SetXformOpOrder([op]); op.Set(matrix)
         for package in catalog.get(asset,{}).get('unavailable_script_packages',[]):
             _report(f'{path}: unavailable source script package {package}; its actors were omitted by cook')
-    settings=UsdRender.Settings.Define(stage,'/Render/hdUE')
-    color=UsdRender.Var.Define(stage,'/Render/Vars/color')
-    color.CreateDataTypeAttr('color4f'); color.CreateSourceNameAttr('color'); color.CreateSourceTypeAttr('raw')
-    product=UsdRender.Product.Define(stage,'/Render/hdUE_product')
-    product.CreateProductNameAttr('hdUE'); product.CreateProductTypeAttr('raster')
-    product.CreateOrderedVarsRel().SetTargets([color.GetPath()])
-    settings.CreateProductsRel().SetTargets([product.GetPath()])
-    for name,type_,value in (('renderMode',Sdf.ValueTypeNames.String,controls.evalParm('hdue_mode')),
-                              ('samplesPerPixel',Sdf.ValueTypeNames.Int,controls.evalParm('hdue_samples')),
-                              ('lumenEnabled',Sdf.ValueTypeNames.Bool,True),
-                              ('autoViewerLight',Sdf.ValueTypeNames.Bool,True),
-                              ('upAxis',Sdf.ValueTypeNames.String,str(UsdGeom.GetStageUpAxis(stage)))):
-        settings.GetPrim().CreateAttribute('hdUE:'+name,type_,custom=True).Set(value)
+
+def render_settings_node(input_node,mode='realtime',samples=64):
+    """A standard Render Settings LOP at /Render/hdUE with hdUE's mode and samples authored."""
+    node=input_node.parent().createNode('rendersettings','hdUE_render_settings')
+    node.setInput(0,input_node)
+    node.parm('primpath').set('/Render/hdUE')
+    for name,value in (('xn__hdUErenderMode',mode),('xn__hdUEsamplesPerPixel',samples)):
+        _render_property(node,name,value)
+    return node
+
+def _render_property(node,prefix,value):
+    # Encoded hdUE:* parameter names come from HdUEHoudiniRendererPlugin_Global.ds. Houdini adds
+    # them only while the hdUE delegate is registered, so add the same tagged spare parms otherwise.
+    find=lambda control: next((p for p in node.parms() if p.name().startswith(prefix+'_') and (('_control_' in p.name())==control)),None)
+    if find(False) is None:
+        attribute='hdUE:'+prefix[len('xn__hdUE'):]
+        tags={'spare_category':'Global','usdvaluetype':'string' if isinstance(value,str) else 'int'}
+        template=(hou.StringParmTemplate if isinstance(value,str) else hou.IntParmTemplate)(hou.encode(attribute),attribute,1,tags=tags)
+        control=hou.StringParmTemplate(hou.encode(attribute+'_control'),attribute,1,default_value=('none',))
+        group=node.parmTemplateGroup(); group.append(control); group.append(template); node.setParmTemplateGroup(group)
+    find(True).set('set'); find(False).set(value)
+
+def render_options(stage):
+    """hdUE render mode and samples from the stage's render settings prim, else the defaults."""
+    path=stage.GetMetadata('renderSettingsPrimPath')
+    prim=stage.GetPrimAtPath(path) if path else None
+    if not prim:
+        root=stage.GetPrimAtPath('/Render')
+        prim=next((child for child in root.GetChildren() if child.IsA(UsdRender.Settings)),None) if root else None
+    def get(name,default):
+        attr=prim.GetAttribute('hdUE:'+name) if prim else None
+        return attr.Get() if attr and attr.HasAuthoredValue() else default
+    return get('renderMode','realtime'),get('samplesPerPixel',64)
 
 def open_usd(path):
     stage=hou.node('/stage')
@@ -469,6 +481,7 @@ def open_usd(path):
     file_stage=Usd.Stage.Open(str(Path(path).resolve()),Usd.Stage.LoadNone)
     node=settings_node(source,{'metersperunit':UsdGeom.GetStageMetersPerUnit(file_stage),
                                'upaxis':str(UsdGeom.GetStageUpAxis(file_stage)).lower()})
+    node=render_settings_node(node)
     node.setDisplayFlag(True); node.setCurrent(True,clear_all_selected=True)
     stage.layoutChildren()
     viewer=scene_viewer(); viewer.setPwd(stage)
@@ -481,9 +494,20 @@ def open_usd(path):
 
 def set_mode(mode):
     if mode not in ('realtime','pathtraced'): raise ValueError(mode)
-    node=current_settings_node()
-    if not node: raise RuntimeError('Select the hdUE settings LOP')
-    node.parm('hdue_mode').set(mode)
+    set_render_setting('xn__hdUErenderMode',mode)
+
+def set_render_setting(prefix,value):
+    """Author an hdUE:* setting on the displayed chain's Render Settings LOP, adding one if there is none."""
+    viewer=scene_viewer(); network=viewer.pwd()
+    display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
+    from hdue_preparation import TAG
+    node=display
+    while node and (node.userData(TAG)=='1' or node.type().name()!='rendersettings'):
+        inputs=node.inputs(); node=inputs[0] if inputs else None
+    if node: _render_property(node,prefix,value)
+    else:
+        if not display: raise RuntimeError('Display a LOP network in the Scene Viewer')
+        node=render_settings_node(display); _render_property(node,prefix,value); node.setDisplayFlag(True)
     node.cook(force=True)
-    scene_viewer().curViewport().draw()
+    viewer.curViewport().draw()
 
