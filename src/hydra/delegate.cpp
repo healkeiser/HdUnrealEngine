@@ -101,6 +101,8 @@ void startSelfHost(const std::string& dll, const std::string& project) {
 }
 }
 HdRprim* HdUECreateMesh(const SdfPath&);
+HdRprim* HdUECreatePoints(const SdfPath&);
+HdRprim* HdUECreateCurves(const SdfPath&);
 HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
@@ -486,9 +488,21 @@ public:
                 auto* renderBuffer=aov.renderBuffer;
                 if (!renderBuffer && !aov.renderBufferId.IsEmpty())
                     renderBuffer=static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer,aov.renderBufferId));
-                if(aov.aovName==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
-                if(aov.aovName==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
-                if(const auto id=HdUEAovId(aov.aovName); id && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
+                // husk names bindings after the render var's AOV name; a raw var's sourceName says what to render.
+                const auto setting=[&](const char* key) {
+                    const auto it=aov.aovSettings.find(TfToken(key));
+                    if(it==aov.aovSettings.end()) return TfToken();
+                    return it->second.IsHolding<TfToken>() ? it->second.UncheckedGet<TfToken>()
+                        : it->second.IsHolding<std::string>() ? TfToken(it->second.UncheckedGet<std::string>()) : TfToken();
+                };
+                TfToken name=aov.aovName;
+                const auto sourceType=setting("sourceType"), sourceName=setting("sourceName");
+                // ponytail: every light path expression renders the full beauty; split lobes if LPE AOVs are needed.
+                if(sourceType==TfToken("lpe")) name=HdAovTokens->color;
+                else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
+                if(name==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
+                if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
+                if(const auto id=HdUEAovId(name); id && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
                     aovs.emplace_back(dynamic_cast<HdUERenderBuffer*>(renderBuffer),id);
             }
             if(aovs!=aovs_) { aovs_=aovs; aovSlot_=0; aovInFlight_=false; aovsDone_=aovs_.empty(); }
@@ -593,6 +607,12 @@ public:
             const bool settingsChanged = settingsVersion != settingsVersion_;
             const bool cameraChanged = view != view_ || projection != projection_;
             const bool needsRequest = changed || settingsChanged || cameraChanged;
+            if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
+                std::fprintf(stderr, "hdUE pass changed=%d settings=%d camera=%d converged=%d frame=%llu gen=%llu buffer=%ux%u aovs=%zu slot=%zu inflight=%d done=%d error=%s\n",
+                    changed, settingsChanged, cameraChanged, converged_, (unsigned long long)s.lastFrame.frame_id, (unsigned long long)s.generation,
+                    buffer->GetWidth(), buffer->GetHeight(), aovs_.size(), aovSlot_, aovInFlight_, aovsDone_, s.error.c_str());
+                std::fflush(stderr);
+            }
             const bool deferCamera = needsRequest && !changed && !settingsChanged && s.generation && !s.lastFrame.frame_id;
             if (deferCamera) {
                 // Read the newest matrices on the next Execute; never queue every
@@ -659,6 +679,7 @@ public:
             }
             { std::lock_guard lock(s.mutex); s.error.clear(); }
         } catch (const std::exception& error) {
+            if (TfGetenvBool("HDUE_TRACE_PASS", false)) { std::fprintf(stderr, "hdUE pass error: %s\n", error.what()); std::fflush(stderr); }
             std::lock_guard lock(state_->mutex); state_->error = error.what(); converged_ = false;
         }
     }
@@ -725,7 +746,7 @@ HdUERenderDelegate::~HdUERenderDelegate() {
     if (host.window) DestroyWindow(host.window);
     host.window = nullptr; host.backend.reset();
 }
-const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->mesh}; return t; }
+const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->mesh, HdPrimTypeTokens->points, HdPrimTypeTokens->basisCurves}; return t; }
 const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->camera, HdPrimTypeTokens->material,
     HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->domeLight,HdPrimTypeTokens->diskLight,HdPrimTypeTokens->cylinderLight}; return t; }
@@ -735,7 +756,11 @@ HdRenderPassSharedPtr HdUERenderDelegate::CreateRenderPass(HdRenderIndex* index,
 }
 HdInstancer* HdUERenderDelegate::CreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return HdUECreateInstancer(delegate, id); }
 void HdUERenderDelegate::DestroyInstancer(HdInstancer* p) { delete p; }
-HdRprim* HdUERenderDelegate::CreateRprim(const TfToken& type, const SdfPath& id) { return type == HdPrimTypeTokens->mesh ? HdUECreateMesh(id) : nullptr; }
+HdRprim* HdUERenderDelegate::CreateRprim(const TfToken& type, const SdfPath& id) {
+    if (type == HdPrimTypeTokens->points) return HdUECreatePoints(id);
+    if (type == HdPrimTypeTokens->basisCurves) return HdUECreateCurves(id);
+    return type == HdPrimTypeTokens->mesh ? HdUECreateMesh(id) : nullptr;
+}
 void HdUERenderDelegate::DestroyRprim(HdRprim* p) { delete p; }
 HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id) {
     if (type == HdPrimTypeTokens->camera) return new HdCamera(id);

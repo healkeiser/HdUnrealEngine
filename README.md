@@ -106,7 +106,9 @@ Generic Hydra translation supports meshes, cameras, materials, and distant, sphe
 
 Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not subdivide geometry or apply subdivision creases. The smoke fixture authors its box normals explicitly.
 
-Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. `instanceId` stays -1. The Solaris settings subnet still expands instanceable references in its own layer for editable mesh/material translation. Curves, points and volumes are not implemented.
+Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. `instanceId` stays -1. The Solaris settings subnet still expands instanceable references in its own layer for editable mesh/material translation.
+
+Points render as one shared sphere instanced per point, sized by `widths` (0.1 when unauthored). BasisCurves render as six-sided tubes: linear curves follow their vertices, cubic Bezier, B-spline and Catmull-Rom curves are evaluated in their basis, and `widths` set the diameter (0.01 when unauthored). Both use one material, the bound one or a constant `displayColor`/`displayOpacity`; per-point or per-vertex colors, tube end caps and curves under instancers are not translated. Volumes are not implemented.
 
 Camera controls include orbit, pan, and dolly. Continuous updates are coalesced. Lumen retains its ViewState during camera motion; scene, material, time, resolution, and Path Tracer request changes reset accumulation.
 
@@ -207,7 +209,7 @@ A USD Render ROP inside a Houdini session started by `Launch-Houdini.ps1` passes
 
 ### AOVs
 
-Besides `color` and `depth`, render vars may request these `sourceName`s, rendered from the GBuffer (Substrate's first BSDF):
+Besides `color` and `depth`, render vars may request these `sourceName`s, rendered from the GBuffer (Substrate's first BSDF). The delegate matches a binding by its `raw` `sourceName`, so the render var and channel may be named anything; any `lpe` source renders the full beauty.
 
 | AOV | Format | Contents |
 | --- | --- | --- |

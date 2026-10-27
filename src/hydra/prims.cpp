@@ -1,5 +1,7 @@
 #include "delegate.h"
 #include "pxr/imaging/hd/mesh.h"
+#include "pxr/imaging/hd/points.h"
+#include "pxr/imaging/hd/basisCurves.h"
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/light.h"
@@ -306,6 +308,182 @@ protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
+// Points and curves become triangle meshes: one shared sphere instanced per point, and a tube
+// per curve. They keep one material (bound, or constant displayColor/displayOpacity).
+void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
+    std::lock_guard lock(state.mutex);
+    if (mesh.material.empty()) {
+        HdUEMaterialData material; material.id = mesh.id + ".displayColor";
+        const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
+        if (!color.empty()) material.color = color[0];
+        const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
+        if (!opacity.empty() && std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
+        mesh.material = material.id;
+        const auto previous = state.materials.find(material.id);
+        if (previous == state.materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity) {
+            state.materials[material.id] = material; state.dirtyMaterials.insert(material.id);
+        }
+    }
+    const auto previous = state.meshes.find(mesh.id);
+    const bool changed = previous == state.meshes.end() || previous->second.points != mesh.points || previous->second.normals != mesh.normals ||
+        previous->second.uv != mesh.uv || previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
+        previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances;
+    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points ? previous->second.pickMesh : std::make_shared<HdUEPickMesh>(mesh.points);
+    const auto key = mesh.id;
+    state.meshes[key] = std::move(mesh); state.removed.erase(key);
+    if (changed) { state.dirtyMeshes.insert(key); ++state.revision; }
+}
+HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
+    HdUEMeshData mesh;
+    mesh.id = mesh.sourceId = prim.GetId().GetString();
+    mesh.scenePath = mesh.bindingPath = delegate->GetScenePrimPath(prim.GetId(), -1).GetString();
+    mesh.material = delegate->GetMaterialId(prim.GetId()).GetString();
+    mesh.transform = delegate->GetTransform(prim.GetId());
+    mesh.visible = delegate->GetVisible(prim.GetId());
+    mesh.primId = prim.GetPrimId();
+    return mesh;
+}
+// Widths per vertex (or with a matching count), else the first (constant), else the fallback.
+float HdUEWidth(const VtFloatArray& widths, size_t index, float fallback) {
+    if (widths.empty()) return fallback;
+    return widths.size() > index ? widths[index] : widths[0];
+}
+// Unit sphere (8 x 6 UV sphere) as a triangle soup with radial normals.
+void HdUEAppendSphere(HdUEMeshData& mesh) {
+    constexpr int Slices = 8, Stacks = 6;
+    const auto at = [](int stack, int slice) {
+        const double theta = 3.14159265358979323846 * stack / Stacks, phi = 2 * 3.14159265358979323846 * slice / Slices;
+        return GfVec3f(float(std::sin(theta) * std::cos(phi)), float(std::cos(theta)), float(std::sin(theta) * std::sin(phi)));
+    };
+    for (int stack = 0; stack < Stacks; ++stack) for (int slice = 0; slice < Slices; ++slice) {
+        const GfVec3f a = at(stack, slice), b = at(stack + 1, slice), c = at(stack + 1, slice + 1), d = at(stack, slice + 1);
+        // Counter-clockwise seen from outside, as USD front faces are.
+        for (const auto& corner : {a, c, b, a, d, c}) { mesh.points.push_back(corner); mesh.normals.push_back(corner); mesh.uv.emplace_back(0.f, 0.f); }
+    }
+}
+class Points final : public HdPoints {
+public:
+    explicit Points(const SdfPath& id) : HdPoints(id) {}
+    HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
+    void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
+        auto mesh = HdUEShapeBase(*this, delegate);
+        const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
+        HdUEAppendSphere(mesh);
+        mesh.instanced = true;
+        // ponytail: points under a Hydra instancer draw once, uninstanced; nest the instances if that comes up.
+        for (size_t i = 0; i < points.size(); ++i) {
+            const double radius = .5 * HdUEWidth(widths, i, .1f);
+            mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * mesh.transform);
+        }
+        HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
+        *bits = HdChangeTracker::Clean;
+    }
+    void Finalize(HdRenderParam* param) override {
+        auto* state = static_cast<HdUEState*>(param);
+        state->erase(GetId().GetString()); state->erase(GetId().GetString() + ".displayColor");
+    }
+protected:
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
+};
+class Curves final : public HdBasisCurves {
+    // Samples along one curve: cubic segments are evaluated in their basis; linear curves keep their vertices.
+    static std::vector<std::pair<GfVec3d, double>> samples(const std::vector<GfVec3d>& cv, const std::vector<double>& width,
+        const TfToken& type, const TfToken& basis, bool periodic) {
+        const size_t n = cv.size();
+        std::vector<std::pair<GfVec3d, double>> out;
+        if (type == HdTokens->linear || n < 4) {
+            for (size_t i = 0; i < n; ++i) out.emplace_back(cv[i], width[i]);
+            if (periodic && n > 2) out.push_back(out.front());
+            return out;
+        }
+        const bool bezier = basis == HdTokens->bezier;
+        const size_t step = bezier ? 3 : 1;
+        const size_t segments = bezier ? (periodic ? n / 3 : (n - 1) / 3) : (periodic ? n : n - 3);
+        constexpr int Steps = 16;
+        for (size_t s = 0; s < segments; ++s) {
+            const size_t first = s * step;
+            const auto P = [&](size_t k) { return cv[(first + k) % n]; };
+            const auto W = [&](size_t k) { return width[(first + k) % n]; };
+            for (int t = (s ? 1 : 0); t <= Steps; ++t) {
+                const double u = double(t) / Steps, u2 = u * u, u3 = u2 * u, m = 1 - u;
+                double b[4];
+                if (bezier) { b[0] = m * m * m; b[1] = 3 * u * m * m; b[2] = 3 * u2 * m; b[3] = u3; }
+                else if (basis == HdTokens->catmullRom) { b[0] = .5 * (-u3 + 2 * u2 - u); b[1] = .5 * (3 * u3 - 5 * u2 + 2); b[2] = .5 * (-3 * u3 + 4 * u2 + u); b[3] = .5 * (u3 - u2); }
+                else { b[0] = m * m * m / 6; b[1] = (3 * u3 - 6 * u2 + 4) / 6; b[2] = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6; b[3] = u3 / 6; } // bspline
+                GfVec3d point(0); double w = 0;
+                for (size_t k = 0; k < 4; ++k) { point += b[k] * P(k); w += b[k] * W(k); }
+                out.emplace_back(point, w);
+            }
+        }
+        return out;
+    }
+public:
+    explicit Curves(const SdfPath& id) : HdBasisCurves(id) {}
+    HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
+    void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
+        auto mesh = HdUEShapeBase(*this, delegate);
+        const auto topology = delegate->GetBasisCurvesTopology(GetId());
+        const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
+        const auto counts = topology.GetCurveVertexCounts();
+        const auto indices = topology.GetCurveIndices();
+        const bool periodic = topology.GetCurveWrap() == HdTokens->periodic;
+        constexpr int Sides = 6;
+        size_t offset = 0;
+        // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
+        for (const int count : counts) {
+            std::vector<GfVec3d> cv; std::vector<double> width;
+            for (int i = 0; i < count; ++i) {
+                const size_t vertex = indices.empty() ? offset + i : size_t(indices[offset + i]);
+                if (vertex >= points.size()) { TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText()); return; }
+                cv.emplace_back(points[vertex]);
+                width.push_back(HdUEWidth(widths, vertex, .01f));
+            }
+            offset += size_t(count);
+            const auto curve = samples(cv, width, topology.GetCurveType(), topology.GetCurveBasis(), periodic);
+            if (curve.size() < 2) continue;
+            // Parallel-transported frame along the curve.
+            GfVec3d tangent = (curve[1].first - curve[0].first).GetNormalized();
+            GfVec3d normal = GfCross(tangent, std::abs(tangent[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0)).GetNormalized();
+            std::vector<std::vector<GfVec3f>> rings, ringNormals;
+            for (size_t i = 0; i < curve.size(); ++i) {
+                const auto next = curve[std::min(i + 1, curve.size() - 1)].first, prev = curve[i ? i - 1 : 0].first;
+                const auto t = (next - prev).GetLength() > 1e-12 ? (next - prev).GetNormalized() : tangent;
+                normal = normal - t * GfDot(normal, t);
+                if (normal.GetLength() < 1e-9) normal = GfCross(t, std::abs(t[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0));
+                normal.Normalize();
+                const auto binormal = GfCross(t, normal);
+                rings.emplace_back(); ringNormals.emplace_back(); tangent = t;
+                for (int side = 0; side < Sides; ++side) {
+                    const double angle = 2 * 3.14159265358979323846 * side / Sides;
+                    const auto dir = std::cos(angle) * normal + std::sin(angle) * binormal;
+                    rings.back().emplace_back(curve[i].first + .5 * curve[i].second * dir);
+                    ringNormals.back().emplace_back(dir);
+                }
+            }
+            for (size_t i = 0; i + 1 < rings.size(); ++i) for (int side = 0; side < Sides; ++side) {
+                const int next = (side + 1) % Sides;
+                // Counter-clockwise seen from outside (dir = cos * normal + sin * binormal turns about the tangent).
+                const std::pair<size_t, int> quad[6] = {{i, side}, {i + 1, next}, {i + 1, side}, {i, side}, {i, next}, {i + 1, next}};
+                for (const auto& [ring, corner] : quad) {
+                    mesh.points.push_back(rings[ring][corner]); mesh.normals.push_back(ringNormals[ring][corner]);
+                    mesh.uv.emplace_back(float(corner) / Sides, float(ring) / float(rings.size() - 1));
+                }
+            }
+        }
+        HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
+        *bits = HdChangeTracker::Clean;
+    }
+    void Finalize(HdRenderParam* param) override {
+        auto* state = static_cast<HdUEState*>(param);
+        state->erase(GetId().GetString()); state->erase(GetId().GetString() + ".displayColor");
+    }
+protected:
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
+};
 class Material final : public HdMaterial {
 public:
     explicit Material(const SdfPath& id) : HdMaterial(id) {}
@@ -428,6 +606,8 @@ public:
 };
 }
 HdRprim* HdUECreateMesh(const SdfPath& id) { return new Mesh(id); }
+HdRprim* HdUECreatePoints(const SdfPath& id) { return new Points(id); }
+HdRprim* HdUECreateCurves(const SdfPath& id) { return new Curves(id); }
 HdInstancer* HdUECreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return new Instancer(delegate, id); }
 void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
     std::set<SdfPath> sources;
