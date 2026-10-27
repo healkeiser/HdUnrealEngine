@@ -203,7 +203,19 @@ $env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
 husk --renderer HdUEHoudiniRendererPlugin --frame 1 --frame-count 1 -o out/smoke.exr samples/smoke.usda
 ```
 
-A USD Render ROP inside a Houdini session started by `Launch-Houdini.ps1` passes this environment to husk. The color AOV is written; other render vars are part of the AOV work.
+A USD Render ROP inside a Houdini session started by `Launch-Houdini.ps1` passes this environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers.
+
+### AOVs
+
+Besides `color` and `depth`, render vars may request these `sourceName`s, rendered from the GBuffer (Substrate's first BSDF):
+
+| AOV | Format | Contents |
+| --- | --- | --- |
+| `albedo` (or `baseColor`) | color3f | Base color |
+| `normal` | normal3f | World-space shading normal in USD axes, normalized |
+| `roughness`, `metallic`, `specular`, `occlusion` | float | Material channels |
+
+After the beauty converges, each bound AOV is rasterized from the same camera and time with Lumen, path tracing, anti-aliasing and post effects off, so the channels stay exact and pixel-aligned with a Path Tracer beauty. They describe the nearest opaque surface; translucent surfaces and emission are not separated. Each extra AOV costs one short raster render per frame.
 
 ### COP textures
 

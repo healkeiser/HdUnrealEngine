@@ -24,6 +24,7 @@
 #include "Materials/MaterialExpressionComponentMask.h"
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionNormalize.h"
+#include "Materials/MaterialExpressionSceneTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
@@ -195,6 +196,44 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// AOV post process: sum of SceneTexture lookups (Substrate first BSDF) weighted by
+// Aov1..Aov6; the backend sets one weight to 1 to output that HDUE_AOV_* channel.
+UMaterial* CreateAovMaterial() {
+    const FString Path = TEXT("/Game/HdUE/PP_HdUEAov");
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"), nullptr, LOAD_NoWarn);
+    if (Material && Material->MaterialDomain == MD_PostProcess) return Material;
+    if (!Material) Material = NewObject<UMaterial>(Package, TEXT("PP_HdUEAov"), RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    TArray<UMaterialExpression*> Expressions;
+    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    // Order matches HDUE_AOV_ALBEDO..HDUE_AOV_OCCLUSION; scalar channels broadcast to RGB.
+    const ESceneTextureId Ids[] = {PPI_BaseColor, PPI_WorldNormal, PPI_Roughness, PPI_Metallic, PPI_Specular, PPI_MaterialAO};
+    UMaterialExpression* Sum = nullptr;
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Ids); ++Index) {
+        auto* Lookup = Add(NewObject<UMaterialExpressionSceneTexture>(Material));
+        Lookup->SceneTextureId = Ids[Index];
+        auto* Channel = Add(NewObject<UMaterialExpressionComponentMask>(Material));
+        Channel->Input.Connect(0, Lookup);
+        Channel->R = 1; Channel->G = Channel->B = Index < 2; Channel->A = 0;
+        auto* Weight = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+        Weight->ParameterName = *FString::Printf(TEXT("Aov%d"), Index + 1); Weight->DefaultValue = 0;
+        auto* Term = Add(NewObject<UMaterialExpressionMultiply>(Material));
+        Term->A.Connect(0, Channel); Term->B.Connect(0, Weight);
+        if (Sum) { auto* Next = Add(NewObject<UMaterialExpressionAdd>(Material)); Next->A.Connect(0, Sum); Next->B.Connect(0, Term); Sum = Next; }
+        else Sum = Term;
+    }
+    // Scalar terms are float; the first term is RGB, so the sum is RGB.
+    auto* Output = Add(NewObject<UMaterialExpressionSubstratePostProcess>(Material));
+    Output->Color.Connect(0, Sum);
+    Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Output);
+    Material->MaterialDomain = MD_PostProcess;
+    Material->BlendableLocation = BL_SceneColorBeforeDOF;
+    for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
 UMaterial* CreateGlass() {
     const FString Path = TEXT("/Game/HdUE/M_Glass");
     UPackage* Package = CreatePackage(*Path);
@@ -278,7 +317,7 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
     UMaterial* Preview = CreatePreviewSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
     UMaterial* Masked = CreatePreviewSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
     UMaterial* Translucent = CreatePreviewSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
-    if (!Masked) return 3;
+    if (!Masked || !CreateAovMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
     UMaterial* Red = CreatePBR(TEXT("M_ReferenceRed"), FLinearColor(0.7f, 0.05f, 0.02f), 0.05f, 0.4f);

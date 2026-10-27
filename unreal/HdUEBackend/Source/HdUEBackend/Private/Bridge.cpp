@@ -37,6 +37,8 @@
 #include "SceneViewExtension.h"
 #include "SceneTexturesConfig.h"
 #include "PostProcess/PostProcessInputs.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/StrongObjectPtr.h"
 #include "RenderGraphBuilder.h"
 #include "RenderGraphUtils.h"
 #include "ScreenPass.h"
@@ -89,6 +91,7 @@ struct FSession {
     bool Preparing = false;
     bool ResidencyFailed = false;
     bool MegaLightsActive=false;
+    TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial; // PP_HdUEAov, weights select HDUE_AOV_*.
 };
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
@@ -273,7 +276,8 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (!ValidSession(Handle) || !Request || Request->struct_size != sizeof(*Request) || !Request->generation ||
         Request->mode > HDUE_PATH_TRACED || Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
         !FMath::IsFinite(Request->horizontal_fov_degrees) || Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
-        !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0 || !FMath::IsFinite(Request->time_seconds)) return HDUE_INVALID_ARGUMENT;
+        !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0 || !FMath::IsFinite(Request->time_seconds) ||
+        Request->aov >= HDUE_AOV_COUNT) return HDUE_INVALID_ARGUMENT;
     for (int32 Index = 0; Index < 3; ++Index) {
         if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) || !FMath::IsFinite(Request->up[Index])) return HDUE_INVALID_ARGUMENT;
     }
@@ -282,6 +286,8 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
     if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
     if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
+    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
+        return Fail(HDUE_ENGINE_ERROR, TEXT("AOV material /Game/HdUE/PP_HdUEAov is missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
     if (!Session->Scene->SurfaceReady()) return HDUE_PENDING;
@@ -297,7 +303,8 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const auto& Previous = Session->Request;
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
         Previous.time_seconds == Request->time_seconds && Previous.lumen_enabled == Request->lumen_enabled &&
-        Previous.samples_per_pixel == Request->samples_per_pixel && Previous.warmup_frames == Request->warmup_frames;
+        Previous.samples_per_pixel == Request->samples_per_pixel && Previous.warmup_frames == Request->warmup_frames &&
+        Previous.aov == Request->aov;
     if (!KeepHistory) {
         FlushRenderingCommands();
         Session->ViewState->Destroy();
@@ -326,7 +333,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
 
 void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const auto& Request = Session->Request;
-    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing;
+    // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
+    const bool Aov = Request.aov != HDUE_AOV_COLOR;
+    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
     if (Session->Preparing) {
         const auto Residency = Session->Residency;
         ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
@@ -338,6 +347,10 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Flags.SetTonemapper(false);
     Flags.SetEyeAdaptation(false);
     Flags.SetRefraction(true);
+    if (Aov) {
+        Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
+        Flags.SetDepthOfField(false); Flags.SetVignette(false); Flags.SetGrain(false); Flags.SetLensFlares(false);
+    }
     auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
     FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene, Flags)
         .SetRealtimeUpdate(true).SetResolveScene(true)
@@ -371,6 +384,21 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     View->FinalPostProcessSettings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
     View->FinalPostProcessSettings.PathTracingMaxBounces = Session->Scene->HasRefractiveMaterials() ? 16 : 8;
     View->FinalPostProcessSettings.LumenFrontLayerTranslucencyReflections = true;
+    if (Aov) {
+        View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
+        View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
+        if (!Session->AovMaterial.IsValid()) {
+            auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
+            if (Parent) Session->AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
+        }
+        if (auto* Material = Session->AovMaterial.Get()) {
+            for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
+                Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
+            FPostProcessSettings Blend;
+            Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
+            View->OverridePostProcessSettings(Blend, 1.f);
+        }
+    }
     View->EndFinalPostprocessSettings(Options);
     View->FinalPostProcessSettings.bMegaLights=!PathTracing;
     Family.Views.Add(View);

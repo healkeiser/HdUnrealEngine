@@ -38,14 +38,28 @@ struct HdUESelfHost {
     HWND window = nullptr;
     DWORD thread = 0;
     int delegates = 0;
+    std::filesystem::path directory; // the host's working directory, which UE moves to its Binaries
     void tick() const {
         if (!backend || GetCurrentThreadId() != thread) return;
         MSG message{};
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
-        backend->require(backend->api().tick(), "tick");
+        const auto result = backend->api().tick();
+        // husk resolves relative output paths against its working directory.
+        std::error_code ignored; std::filesystem::current_path(directory, ignored);
+        backend->require(result, "tick");
     }
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
+}
+// Hydra AOV names hdUE renders from the GBuffer; 0 for color and unsupported names.
+uint32_t HdUEAovId(const TfToken& name) {
+    static const std::pair<TfToken, uint32_t> names[] = {{TfToken("albedo"), HDUE_AOV_ALBEDO}, {TfToken("baseColor"), HDUE_AOV_ALBEDO},
+        {HdAovTokens->normal, HDUE_AOV_NORMAL}, {TfToken("roughness"), HDUE_AOV_ROUGHNESS}, {TfToken("metallic"), HDUE_AOV_METALLIC},
+        {TfToken("specular"), HDUE_AOV_SPECULAR}, {TfToken("occlusion"), HDUE_AOV_OCCLUSION}};
+    for (const auto& [token, id] : names) if (name == token) return id;
+    return 0;
+}
+namespace {
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     const auto& host = selfHost();
     if (host.backend && host.backend->initialized()) {
@@ -379,6 +393,31 @@ class Pass final : public HdRenderPass {
     double centimetersPerUnit_ = 1;
     bool depthEnabled_ = false;
     bool converged_ = false;
+    // GBuffer AOVs render one by one after the beauty converges, from its camera.
+    std::unique_ptr<HdUERenderBuffer> internalColor_; // beauty target when no color AOV is bound
+    HdueRenderRequest beautyRequest_{};
+    std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs_;
+    size_t aovSlot_ = 0;
+    bool aovInFlight_ = false, aovsDone_ = true;
+    void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame, const std::vector<float>& rgba) const {
+        const size_t count = size_t(frame.width) * frame.height;
+        const bool vector = id == HDUE_AOV_ALBEDO || id == HDUE_AOV_NORMAL;
+        const bool zUp = state_->setting<std::string>("upAxis", "Y") == "Z";
+        std::vector<float> out(count * (vector ? 3 : 1));
+        for (size_t i = 0; i < count; ++i) {
+            const float* p = &rgba[i * 4];
+            if (!vector) { out[i] = p[0]; continue; }
+            float* o = &out[i * 3];
+            // UE world normals back to USD world: the inverse of HdUEState::convert.
+            if (id == HDUE_AOV_NORMAL && zUp) { o[0] = p[0]; o[1] = -p[1]; o[2] = p[2]; }
+            else if (id == HDUE_AOV_NORMAL) { o[0] = p[1]; o[1] = p[2]; o[2] = -p[0]; }
+            else { o[0] = p[0]; o[1] = p[1]; o[2] = p[2]; }
+            // SceneTexture WorldNormal is not normalized; background pixels stay zero.
+            if (const float length = std::sqrt(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]); id == HDUE_AOV_NORMAL && length > 1e-6f)
+                for (int c = 0; c < 3; ++c) o[c] /= length;
+        }
+        target.publish(frame, std::move(out));
+    }
 public:
     Pass(HdRenderIndex* index, const HdRprimCollection& collection, std::shared_ptr<HdUEState> state)
         : HdRenderPass(index, collection), state_(std::move(state)) {}
@@ -386,7 +425,8 @@ public:
         if (const auto error=state_->setting<std::string>("wetValidationError", ""); !error.empty())
             return converged_ && state_->error==error;
         if (!state_->setting<bool>("materialGraphValid",true)) return true;
-        return converged_ && settingsVersion_==state_->requestSettingsRevision && state_->submittedRevision==state_->revision;
+        return converged_ && (aovs_.empty() || aovsDone_) &&
+            settingsVersion_==state_->requestSettingsRevision && state_->submittedRevision==state_->revision;
     }
     void _Execute(const HdRenderPassStateSharedPtr& pass, const TfTokenVector&) override {
         try {
@@ -406,12 +446,24 @@ public:
             if (!s.setting<bool>("materialGraphValid", true)) { converged_ = true; return; }
             HdUERenderBuffer* buffer = nullptr;
             HdUERenderBuffer* depth = nullptr;
+            std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
             for (const auto& aov : pass->GetAovBindings()) {
                 auto* renderBuffer=aov.renderBuffer;
                 if (!renderBuffer && !aov.renderBufferId.IsEmpty())
                     renderBuffer=static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer,aov.renderBufferId));
                 if(aov.aovName==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if(aov.aovName==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
+                if(const auto id=HdUEAovId(aov.aovName); id && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
+                    aovs.emplace_back(dynamic_cast<HdUERenderBuffer*>(renderBuffer),id);
+            }
+            if(aovs!=aovs_) { aovs_=aovs; aovSlot_=0; aovInFlight_=false; aovsDone_=aovs_.empty(); }
+            if(!buffer && !aovs_.empty() && aovs_.front().first->GetWidth()) {
+                const auto* first=aovs_.front().first;
+                if(!internalColor_ || internalColor_->GetWidth()!=first->GetWidth() || internalColor_->GetHeight()!=first->GetHeight()) {
+                    internalColor_=std::make_unique<HdUERenderBuffer>(SdfPath("/__hdUE/beauty"));
+                    internalColor_->Allocate(GfVec3i(int(first->GetWidth()),int(first->GetHeight()),1),HdFormatFloat32Vec4,false);
+                }
+                buffer=internalColor_.get();
             }
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
                 std::string bindings;
@@ -458,6 +510,17 @@ public:
             if (result == HDUE_OK && frame.generation == s.generation && frame.frame_id != lastFrame_) {
                 std::vector<float> pixels(size_t(frame.required_bytes / sizeof(float)));
                 const auto copy = s.backend->api().copy_frame(s.session, frame.frame_id, pixels.data(), frame.required_bytes);
+                if (aovInFlight_) {
+                    if (copy == HDUE_STALE_FRAME) ++s.staleFrameRetries;
+                    else {
+                        s.backend->require(copy, "copy_frame");
+                        lastFrame_ = frame.frame_id;
+                        if (frame.converged && aovSlot_ < aovs_.size()) {
+                            publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, frame, pixels);
+                            aovInFlight_ = false; ++aovSlot_;
+                        }
+                    }
+                } else {
                 std::vector<float> depthPixels;
                 HdueResult depthCopy=HDUE_OK;
                 if(copy==HDUE_OK && depth) {
@@ -485,6 +548,7 @@ public:
                     buffer->publish(frame, std::move(pixels));
                     ++s.publishedFrames;
                     s.lastFrame = frame; lastFrame_ = frame.frame_id;
+                }
                 }
             } else if (result != HDUE_PENDING && result != HDUE_OK) s.backend->require(result, "poll_frame");
             converged_ = s.lastFrame.frame_id && s.lastFrame.converged;
@@ -534,6 +598,23 @@ public:
                 centimetersPerUnit_=s.setting<double>("metersPerUnit",.01)*100.;
                 converged_ = false; s.lastFrame = {}; buffer->invalidate();
                 if(depth) depth->invalidate();
+                beautyRequest_ = request;
+                aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty();
+                for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
+            }
+            if (!needsRequest && converged_ && !aovsDone_ && !aovInFlight_) {
+                if (aovSlot_ >= aovs_.size()) aovsDone_ = true;
+                else {
+                    // Same camera and time as the beauty; GBuffer channels converge after a couple of draws.
+                    auto request = beautyRequest_;
+                    request.generation = s.generation + 1; request.mode = HDUE_REALTIME; request.lumen_enabled = 0;
+                    request.warmup_frames = 2; request.aov = aovs_[aovSlot_].second;
+                    const auto requested = s.backend->api().request_render(s.session, &request);
+                    if (requested != HDUE_PENDING) {
+                        s.backend->require(requested, "request_render");
+                        s.generation = request.generation; aovInFlight_ = true;
+                    }
+                }
             }
             { std::lock_guard lock(s.mutex); s.error.clear(); }
         } catch (const std::exception& error) {
@@ -545,6 +626,8 @@ public:
 
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings), state_(std::make_shared<HdUEState>()), registry_(std::make_shared<HdResourceRegistry>()) {
+    // Before the backend DLL loads: UE changes the working directory while it loads and starts.
+    const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
     for(const auto& [key,value]:settings) if(key.GetString().starts_with("hdUE:"))
         state_->settings[TfToken(key.GetString().substr(5))]=value;
@@ -559,7 +642,9 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     HdueStatus status{}; status.struct_size = sizeof(status);
     state_->backend->require(state_->backend->api().get_status(&status), "get_status");
     if (status.state == HDUE_STATE_COLD && !selfHost().backend) {
+        selfHost().directory = hostDirectory;
         startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")));
+        std::error_code ignored; std::filesystem::current_path(selfHost().directory, ignored);
         // UE reports ready only after its first ticks.
         for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
             selfHost().tick();
@@ -594,6 +679,8 @@ HdUERenderDelegate::~HdUERenderDelegate() {
         if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
     }
     try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE shutdown: %s", e.what()); }
+    // husk may write its images after releasing the delegate.
+    std::error_code ignored; std::filesystem::current_path(host.directory, ignored);
     if (host.window) DestroyWindow(host.window);
     host.window = nullptr; host.backend.reset();
 }
@@ -629,6 +716,8 @@ HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return C
 void HdUERenderDelegate::DestroyBprim(HdBprim* p) { delete p; }
 HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const {
     if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat32Vec4,false,VtValue(GfVec4f(0)));
+    if(const auto aov=HdUEAovId(name)) return aov==HDUE_AOV_ALBEDO || aov==HDUE_AOV_NORMAL
+        ? HdAovDescriptor(HdFormatFloat32Vec3,false,VtValue(GfVec3f(0))) : HdAovDescriptor(HdFormatFloat32,false,VtValue(0.f));
 #if defined(HDUE_HOUDINI)
     if(name==HdAovTokens->depth) return HdAovDescriptor(HdFormatFloat32,false,VtValue(std::numeric_limits<float>::max()));
 #endif

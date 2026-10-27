@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 2u
+#define HDUE_ABI_VERSION 3u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -95,9 +95,12 @@ typedef struct HdueRenderRequest {
     float horizontal_fov_degrees;
     float near_clip_cm;
     uint32_t lumen_enabled;
-    uint32_t reserved;
+    uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel */
     double up[3];
 } HdueRenderRequest;
+/* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
+enum { HDUE_AOV_COLOR = 0, HDUE_AOV_ALBEDO = 1, HDUE_AOV_NORMAL = 2, HDUE_AOV_ROUGHNESS = 3,
+    HDUE_AOV_METALLIC = 4, HDUE_AOV_SPECULAR = 5, HDUE_AOV_OCCLUSION = 6, HDUE_AOV_COUNT = 7 };
 
 typedef struct HdueFrameInfo {
     uint32_t struct_size;
