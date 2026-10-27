@@ -1,5 +1,5 @@
 # Houdini's USD ABI is intentionally isolated from the standalone 26.03 build.
-find_package(Houdini 22.0.466 EXACT CONFIG REQUIRED
+find_package(Houdini 22.0 CONFIG REQUIRED
     PATHS "${HDUE_HOUDINI_ROOT}/toolkit/cmake" NO_DEFAULT_PATH)
 file(STRINGS "${HDUE_HOUDINI_ROOT}/toolkit/include/pxr/pxr.h" _pxr_version REGEX "^#define PXR_VERSION ")
 if(NOT _pxr_version MATCHES "2605$")

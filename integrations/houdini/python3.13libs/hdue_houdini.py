@@ -41,7 +41,7 @@ class Host:
         from PySide6 import QtCore, QtWidgets
         from hdue_runtime import Runtime
         from hdue_viewport import Viewport
-        if hou.applicationVersion()!=(22,0,466): raise RuntimeError('This package requires Houdini 22.0.466')
+        if hou.applicationVersion()[:2]!=(22,0): raise RuntimeError('This package requires Houdini 22.0')
         self.owner=threading.get_ident()
         self.log_dir=Path(os.environ.get('HDUE_HOUDINI_LOG_DIR',str(ROOT/'out/houdini-22.0.466/session')))
         self.log_dir.mkdir(parents=True,exist_ok=True)

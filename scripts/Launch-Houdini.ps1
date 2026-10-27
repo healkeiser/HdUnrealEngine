@@ -17,7 +17,7 @@ $BuildDirectory=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory
 $TaskRoot=Split-Path -Parent $PSScriptRoot
 $HoudiniExe=Join-Path $HoudiniRoot 'bin\houdini.exe'
 $Version=(Get-Item -LiteralPath $HoudiniExe).VersionInfo
-if (@($Version.FileMajorPart,$Version.FileMinorPart,$Version.FileBuildPart,$Version.FilePrivatePart) -join '.' -ne '22.0.0.466') {throw 'This delegate requires the Houdini 22.0.466 ABI.'}
+if (@($Version.FileMajorPart,$Version.FileMinorPart) -join '.' -ne '22.0') {throw 'This delegate requires a Houdini 22.0 ABI.'}
 if (-not $RuntimeConfig) {
     $ActiveConfig=Join-Path $TaskRoot 'out\project-assets\active-houdini.json'
     $RuntimeConfig=Get-HdUELocalPath -Key runtime_config -Optional

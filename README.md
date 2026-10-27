@@ -37,7 +37,7 @@ Hydra changes are batched and applied on the UE owner thread. Rendering and read
 - .NET Framework **4.8 SDK** and **4.6.2 targeting pack** (Visual Studio Installer components `Microsoft.Net.Component.4.8.SDK` and `Microsoft.Net.Component.4.6.2.TargetingPack`). Without them, UnrealBuildTool stops with `Could not find NetFxSDK install dir`.
 - PowerShell 7, Git, and CMake **3.24 or newer**, with Git and CMake available on `PATH`.
 - OpenUSD **26.03** C++ SDK with Hydra/usdImaging, usdview, and Python **3.11** bindings for the standalone host and usdview.
-- Houdini **22.0.466**, with its bundled USD **26.05** and Python **3.13**, for Solaris.- `uv` for all Python execution and dependency management.
+- Houdini **22.0.466**, with its bundled USD **26.05** and Python **3.13**, for Solaris. Other Houdini 22.0 builds are accepted when they bundle USD 26.05; only 22.0.466 is verified, and 22.0.368 has been run with the smoke scene.- `uv` for all Python execution and dependency management.
 
 The standalone and Houdini delegates use separate builds because their USD ABIs differ. The UE backend disables UE's USD and Python plugins. Dependencies retain their own licensing requirements.
 
