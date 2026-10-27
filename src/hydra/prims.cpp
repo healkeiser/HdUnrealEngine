@@ -16,6 +16,11 @@
 #include "wet_mask.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hd/renderIndex.h"
+#include "pxr/imaging/hd/instancer.h"
+#include "pxr/base/gf/quatd.h"
+#include "pxr/base/gf/quatf.h"
+#include "pxr/base/gf/quath.h"
+#include "pxr/base/gf/matrix4d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
@@ -81,6 +86,67 @@ template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPa
     }
     return out;
 }
+// Instance transforms as hdEmbree composes them: for each index,
+// instanceTransform * scale * rotation * translation * instancerTransform, then nested
+// instancers apply after (child * parent).
+class Instancer final : public HdInstancer {
+    std::map<TfToken, VtValue> primvars_;
+    bool visible_ = true;
+    template<class V> static bool vec3(const VtValue& v, size_t i, GfVec3d& out) {
+        if (!v.IsHolding<VtArray<V>>() || i >= v.UncheckedGet<VtArray<V>>().size()) return false;
+        const auto& x = v.UncheckedGet<VtArray<V>>()[i]; out = GfVec3d(x[0], x[1], x[2]); return true;
+    }
+    static bool vector3(const VtValue& v, size_t i, GfVec3d& out) {
+        return vec3<GfVec3f>(v, i, out) || vec3<GfVec3d>(v, i, out) || vec3<GfVec3h>(v, i, out);
+    }
+    template<class Q> static bool quat(const VtValue& v, size_t i, GfQuatd& out) {
+        if (!v.IsHolding<VtArray<Q>>() || i >= v.UncheckedGet<VtArray<Q>>().size()) return false;
+        const auto& q = v.UncheckedGet<VtArray<Q>>()[i]; const auto im = q.GetImaginary();
+        out = GfQuatd(q.GetReal(), GfVec3d(im[0], im[1], im[2])); return true;
+    }
+    static bool rotation(const VtValue& v, size_t i, GfQuatd& out) {
+        if (quat<GfQuath>(v, i, out) || quat<GfQuatf>(v, i, out) || quat<GfQuatd>(v, i, out)) return true;
+        if (!v.IsHolding<VtVec4fArray>() || i >= v.UncheckedGet<VtVec4fArray>().size()) return false;
+        const auto& q = v.UncheckedGet<VtVec4fArray>()[i]; out = GfQuatd(q[0], GfVec3d(q[1], q[2], q[3])); return true; // <real, i, j, k>
+    }
+    VtValue primvar(const TfToken& name) const { const auto it = primvars_.find(name); return it == primvars_.end() ? VtValue() : it->second; }
+public:
+    Instancer(HdSceneDelegate* delegate, const SdfPath& id) : HdInstancer(delegate, id) {}
+    void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
+        _UpdateInstancer(delegate, bits);
+        if (*bits & HdChangeTracker::DirtyVisibility) visible_ = delegate->GetVisible(GetId());
+        if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId()))
+            for (const auto& primvar : delegate->GetPrimvarDescriptors(GetId(), HdInterpolationInstance))
+                if (HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name)) primvars_[primvar.name] = delegate->Get(GetId(), primvar.name);
+    }
+    VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype) const {
+        if (!visible_) return {};
+        const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
+        const auto indices = GetDelegate()->GetInstanceIndices(GetId(), prototype);
+        const auto translations = primvar(HdInstancerTokens->instanceTranslations), rotations = primvar(HdInstancerTokens->instanceRotations);
+        const auto scales = primvar(HdInstancerTokens->instanceScales), matrices = primvar(HdInstancerTokens->instanceTransforms);
+        VtMatrix4dArray transforms(indices.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            const size_t index = size_t(indices[i]);
+            GfMatrix4d m = instancer, step(1);
+            GfVec3d v; GfQuatd q;
+            if (vector3(translations, index, v)) m = step.SetTranslate(v) * m;
+            if (rotation(rotations, index, q)) m = GfMatrix4d(1).SetRotate(q) * m;
+            if (vector3(scales, index, v)) m = GfMatrix4d(1).SetScale(v) * m;
+            if (matrices.IsHolding<VtMatrix4dArray>() && index < matrices.UncheckedGet<VtMatrix4dArray>().size())
+                m = matrices.UncheckedGet<VtMatrix4dArray>()[index] * m;
+            transforms[i] = m;
+        }
+        if (GetParentId().IsEmpty()) return transforms;
+        const auto* parent = dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
+        if (!parent) return transforms;
+        const auto parents = parent->ComputeInstanceTransforms(GetId());
+        VtMatrix4dArray nested(parents.size() * transforms.size());
+        for (size_t i = 0; i < parents.size(); ++i)
+            for (size_t j = 0; j < transforms.size(); ++j) nested[i * transforms.size() + j] = transforms[j] * parents[i];
+        return nested;
+    }
+};
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
     HdMeshTopology maskTopology_;
@@ -100,6 +166,13 @@ public:
         mesh.material = delegate->GetMaterialId(GetId()).GetString();
         mesh.transform = delegate->GetTransform(GetId());
         mesh.visible = delegate->GetVisible(GetId());
+        _UpdateInstancer(delegate, bits); // sets GetInstancerId
+        if (!GetInstancerId().IsEmpty()) {
+            HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), GetInstancerId());
+            mesh.instanced = true;
+            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
+                for (const auto& instance : instancer->ComputeInstanceTransforms(GetId())) mesh.instances.push_back(mesh.transform * instance);
+        }
         mesh.primId = GetPrimId();
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
@@ -179,7 +252,8 @@ public:
                 previous->second.sceneAsset==part.sceneAsset && previous->second.transform==part.transform && previous->second.visible==part.visible;
             const bool meshChanged = !onlyNativeBounds && (previous == state->meshes.end() || previous->second.points != part.points ||
                 previous->second.normals != part.normals || previous->second.uv != part.uv || previous->second.transform != part.transform ||
-                previous->second.material != part.material || previous->second.visible != part.visible || previous->second.sceneAsset != part.sceneAsset);
+                previous->second.material != part.material || previous->second.visible != part.visible || previous->second.sceneAsset != part.sceneAsset ||
+                previous->second.instanced != part.instanced || previous->second.instances != part.instances);
             const auto id = part.id;
             const bool maskChanged=previous==state->meshes.end() || previous->second.masks!=part.masks || previous->second.maskErrors!=part.maskErrors;
             state->meshes[id] = std::move(part);
@@ -354,6 +428,7 @@ public:
 };
 }
 HdRprim* HdUECreateMesh(const SdfPath& id) { return new Mesh(id); }
+HdInstancer* HdUECreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return new Instancer(delegate, id); }
 void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
     std::set<SdfPath> sources;
     { std::lock_guard lock(state.mutex);

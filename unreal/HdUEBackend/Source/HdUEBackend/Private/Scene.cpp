@@ -17,6 +17,9 @@
 #include "MaterialShared.h"
 #include "RHI.h"
 #include "Algo/AllOf.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "DynamicMeshToMeshDescription.h"
+#include "StaticMeshAttributes.h"
 
 FHdueScene::FHdueScene(UWorld* InWorld) : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld) {}
 FHdueScene::~FHdueScene() {
@@ -132,7 +135,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // Validate all mesh array bounds before mutating the scene.
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Mesh = Batch.meshes[Index];
-        if (!Mesh.id || Mesh.index_count % 3 || Mesh.vertex_count > 10000000 ||
+        if (!Mesh.id || Mesh.index_count % 3 || Mesh.vertex_count > 10000000 || (Mesh.instance_transforms && Mesh.instance_count > 10000000) ||
             (Mesh.vertex_count && !Mesh.positions) || (Mesh.index_count && !Mesh.indices)) {
             Error = TEXT("Invalid mesh descriptor."); return false;
         }
@@ -223,14 +226,17 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         const FString Id = UTF8_TO_TCHAR(Desc.id);
         AActor* Actor = Actors.FindRef(Id);
         const bool Native = Desc.native_asset && *Desc.native_asset;
-        if (Actor && ((Actor->FindComponentByClass<UStaticMeshComponent>() != nullptr) != Native)) {
+        // Hydra instancer prototypes draw through one ISM: the native asset, or a static mesh built here.
+        const bool Instanced = Desc.instance_transforms != nullptr;
+        UClass* Wanted = Instanced ? UInstancedStaticMeshComponent::StaticClass() : Native ? UStaticMeshComponent::StaticClass() : UDynamicMeshComponent::StaticClass();
+        if (Actor && (!Actor->GetRootComponent() || Actor->GetRootComponent()->GetClass() != Wanted)) {
             Remove(Id); Actor = nullptr;
         }
         if (!Actor) {
             Actor = World->SpawnActor<AActor>();
             Actors.Add(Id, Actor);
-            if (Native) {
-                auto* Component = NewObject<UStaticMeshComponent>(Actor);
+            if (Native || Instanced) {
+                auto* Component = NewObject<UStaticMeshComponent>(Actor, Wanted);
                 Component->SetMobility(EComponentMobility::Movable);
                 Actor->SetRootComponent(Component);
                 Actor->AddInstanceComponent(Component);
@@ -248,9 +254,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         }
         Actor->SetActorHiddenInGame(!Desc.visible);
         FMatrix Matrix;
-        for (int R = 0; R < 4; ++R) for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc.transform[R * 4 + C];
+        for (int R = 0; R < 4; ++R) for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Instanced ? (R == C) : Desc.transform[R * 4 + C];
         Actor->SetActorTransform(FTransform(Matrix));
-        if (Native) {
+        UStaticMesh* InstanceMesh = nullptr;
+        if (Native && Instanced) {
+            InstanceMesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(Desc.native_asset));
+            if (!InstanceMesh) { Error = TEXT("Native StaticMesh not found in cooked content."); return false; }
+        } else if (Native) {
             auto* Mesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(Desc.native_asset));
             if (!Mesh) { Error = TEXT("Native StaticMesh not found in cooked content."); return false; }
             if ((Desc.flags & HDUE_MESH_REQUIRE_NANITE) && !Mesh->HasValidNaniteData()) { Error = TEXT("Native asset has no cooked Nanite data."); return false; }
@@ -285,8 +295,31 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 UVOverlay->SetTriangle(Triangle, UVIds);
                 Colors->SetTriangle(Triangle, ColorIds);
             }
-            Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(Mesh));
+            if (Instanced) {
+                FMeshDescription Description;
+                FStaticMeshAttributes Attributes(Description); Attributes.Register();
+                FDynamicMeshToMeshDescription().Convert(&Mesh, Description);
+                InstanceMesh = NewObject<UStaticMesh>(Actor);
+                // Texture streaming reads UV density; cooked meshes get it from the editor.
+                FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f);
+                InstanceMesh->GetStaticMaterials().Add(Slot);
+                UStaticMesh::FBuildMeshDescriptionsParams Params;
+                Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
+                InstanceMesh->BuildFromMeshDescriptions({&Description}, Params);
+            } else Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(Mesh));
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
+        }
+        if (Instanced) {
+            auto* Instances = Actor->FindComponentByClass<UInstancedStaticMeshComponent>();
+            Instances->SetStaticMesh(InstanceMesh);
+            TArray<FTransform> Transforms; Transforms.Reserve(Desc.instance_count);
+            for (uint32 I = 0; I < Desc.instance_count; ++I) {
+                FMatrix Instance;
+                for (int R = 0; R < 4; ++R) for (int C = 0; C < 4; ++C) Instance.M[R][C] = Desc.instance_transforms[I * 16 + R * 4 + C];
+                Transforms.Add(FTransform(Instance));
+            }
+            Instances->ClearInstances();
+            Instances->AddInstances(Transforms, false, true);
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
         PrimIds.Add(Id, Desc.prim_id);

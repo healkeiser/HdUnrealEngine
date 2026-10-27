@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 4u
+#define HDUE_ABI_VERSION 5u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -159,7 +159,10 @@ typedef struct HdueMeshDesc {
     /* Row-major UE world transform. Dynamic vertices are in local UE cm. */
     double transform[16];
     int32_t prim_id; /* Hydra prim ID written by the HDUE_AOV_PRIM_ID pass; -1 for none */
-    uint32_t reserved;
+    /* With instance_transforms, vertices are prototype-local UE cm and the mesh draws once per
+     * row-major UE world matrix (16 doubles each); transform is ignored. NULL: not instanced. */
+    uint32_t instance_count;
+    const double* instance_transforms;
 } HdueMeshDesc;
 typedef struct HdueLightDesc {
     const char* id;

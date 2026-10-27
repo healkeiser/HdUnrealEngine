@@ -101,6 +101,7 @@ void startSelfHost(const std::string& dll, const std::string& project) {
 }
 }
 HdRprim* HdUECreateMesh(const SdfPath&);
+HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
 void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
@@ -133,6 +134,7 @@ void submit(HdUEState& state) {
     std::vector<HdueMeshDesc> meshes;
     std::vector<HdueAssetDesc> sceneAssets;
     std::vector<std::vector<float>> positions, normals, uvs;
+    std::vector<std::vector<double>> instances; // row-major UE world matrices per instanced mesh
     std::vector<std::vector<uint32_t>> indices;
     std::vector<std::string> nativeMeshes, nativeMaterials;
     std::vector<HdueMaterialDesc> materials;
@@ -170,7 +172,7 @@ void submit(HdUEState& state) {
     const auto& surfaceApi=state.backend->surface_api();
     if (!wet.empty() && !surfaceApi.apply) throw std::runtime_error("Wet surface extension unavailable; build/cook/stage the current runtime.");
     const auto count = state.dirtyMeshes.size();
-    positions.reserve(count); normals.reserve(count); uvs.reserve(count); indices.reserve(count); nativeMeshes.reserve(count);
+    positions.reserve(count); normals.reserve(count); uvs.reserve(count); indices.reserve(count); nativeMeshes.reserve(count); instances.reserve(count);
     nativeMaterials.reserve(state.dirtyMaterials.size());
     for (const auto& id : state.dirtyMaterials) {
         const auto& data = state.materials.at(id);
@@ -204,9 +206,11 @@ void submit(HdUEState& state) {
         nativeMeshes.push_back(asset(state, "nativeMeshAssets", id));
         positions.emplace_back(); normals.emplace_back(); uvs.emplace_back(); indices.emplace_back();
         auto& p = positions.back(); auto& n = normals.back(); auto& uv = uvs.back(); auto& index = indices.back();
-        const auto normalTransform = data.transform.GetInverse().GetTranspose();
+        // Instanced prototypes keep local vertices; each instance matrix carries the placement.
+        const GfMatrix4d bake = data.instanced ? GfMatrix4d(1) : data.transform;
+        const auto normalTransform = bake.GetInverse().GetTranspose();
         for (size_t i = 0; i < data.points.size(); ++i) {
-            const auto point = state.convert(data.transform.Transform(GfVec3d(data.points[i])));
+            const auto point = state.convert(bake.Transform(GfVec3d(data.points[i])));
             for (int c = 0; c < 3; ++c) p.push_back(float(point[c]));
             if (data.normals.size() == data.points.size()) {
                 auto normal = state.convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
@@ -217,13 +221,28 @@ void submit(HdUEState& state) {
         index.resize(data.points.size()); std::iota(index.begin(), index.end(), 0u);
         // World transforms are baked into dynamic vertices. Preserve front
         // faces when an authored transform adds another handedness reversal.
-        if (data.transform.GetDeterminant() < 0)
+        if (bake.GetDeterminant() < 0)
             for (size_t i = 0; i + 2 < index.size(); i += 3) std::swap(index[i + 1], index[i + 2]);
         HdueMeshDesc desc{};
         desc.id = data.id.c_str(); desc.material_id = data.material.c_str(); desc.native_asset = nativeMeshes.back().c_str();
         desc.positions = p.data(); desc.normals = n.empty() ? nullptr : n.data(); desc.uv = uv.empty() ? nullptr : uv.data();
         desc.indices = index.data(); desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
         desc.prim_id = data.primId;
+        instances.emplace_back();
+        if (data.instanced) {
+            // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units.
+            GfMatrix4d basis(1);
+            for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = state.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
+            const auto inverse = basis.GetInverse();
+            auto& matrices = instances.back(); matrices.reserve(data.instances.size() * 16);
+            for (const auto& instance : data.instances) {
+                const auto m = inverse * instance * basis;
+                for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) matrices.push_back(m[r][c]);
+            }
+            desc.instance_count = uint32_t(data.instances.size());
+            static const double none = 0;
+            desc.instance_transforms = matrices.empty() ? &none : matrices.data();
+        }
         desc.flags = state.setting<bool>("requireNanite", false) && !nativeMeshes.back().empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!nativeMeshes.back().empty()) {
@@ -714,7 +733,7 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const { static
 HdRenderPassSharedPtr HdUERenderDelegate::CreateRenderPass(HdRenderIndex* index, const HdRprimCollection& collection) {
     state_->renderIndex=index; return std::make_shared<Pass>(index, collection, state_);
 }
-HdInstancer* HdUERenderDelegate::CreateInstancer(HdSceneDelegate*, const SdfPath&) { TF_RUNTIME_ERROR("Instancing is not implemented in the initial hdUE delegate"); return nullptr; }
+HdInstancer* HdUERenderDelegate::CreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return HdUECreateInstancer(delegate, id); }
 void HdUERenderDelegate::DestroyInstancer(HdInstancer* p) { delete p; }
 HdRprim* HdUERenderDelegate::CreateRprim(const TfToken& type, const SdfPath& id) { return type == HdPrimTypeTokens->mesh ? HdUECreateMesh(id) : nullptr; }
 void HdUERenderDelegate::DestroyRprim(HdRprim* p) { delete p; }

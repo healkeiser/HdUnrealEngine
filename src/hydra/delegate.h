@@ -31,6 +31,8 @@ struct HdUEMeshData {
     GfMatrix4d transform{1};
     bool visible = true;
     int primId = -1; // HdRprim::GetPrimId, written by the ID pass
+    bool instanced = false; // prototype of a Hydra instancer: drawn once per entry of instances
+    std::vector<GfMatrix4d> instances; // USD world matrices (prototype transform included)
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
 struct HdUETextureData {

@@ -110,7 +110,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
-    if (Material && Material->GetBlendMode() == Blend)
+    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (const auto* Sample = Cast<UMaterialExpressionTextureSampleParameter2D>(Expression); Sample && Sample->ParameterName == TEXT("NormalTexture")) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -192,6 +192,8 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     }
     // ponytail: doubleSided is not in the ABI; cutout and see-through cards are usually viewed from both sides.
     Material->TwoSided = Blend != BLEND_Opaque;
+    // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
+    Material->bUsedWithInstancedStaticMeshes = true;
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
@@ -240,7 +242,7 @@ UMaterial* CreateIdMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEId");
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId"), nullptr, LOAD_NoWarn);
-    if (Material && Material->HasSubstrateFrontMaterialConnected()) return Material;
+    if (Material && Material->HasSubstrateFrontMaterialConnected() && Material->bUsedWithInstancedStaticMeshes) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEId"), RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
@@ -253,6 +255,7 @@ UMaterial* CreateIdMaterial() {
     Material->GetExpressionCollection().AddExpression(Unlit);
     Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
     Material->bUsedWithNanite = true;
+    Material->bUsedWithInstancedStaticMeshes = true;
     Material->TwoSided = true;
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;

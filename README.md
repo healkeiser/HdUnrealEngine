@@ -106,7 +106,7 @@ Generic Hydra translation supports meshes, cameras, materials, and distant, sphe
 
 Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not subdivide geometry or apply subdivision creases. The smoke fixture authors its box normals explicitly.
 
-Hydra instancing, curves, points, and volumes are not implemented. The Solaris settings subnet expands instanceable references in its own layer for editable mesh/material translation; point instancers remain unsupported.
+Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. `instanceId` stays -1. The Solaris settings subnet still expands instanceable references in its own layer for editable mesh/material translation. Curves, points and volumes are not implemented.
 
 Camera controls include orbit, pan, and dolly. Continuous updates are coalesced. Lumen retains its ViewState during camera motion; scene, material, time, resolution, and Path Tracer request changes reset accumulation.
 

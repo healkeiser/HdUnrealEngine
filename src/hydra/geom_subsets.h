@@ -22,6 +22,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
     prototype.sceneAsset=mesh.sceneAsset; prototype.transform=mesh.transform; prototype.visible=mesh.visible;
     prototype.bindingPath=mesh.bindingPath; prototype.maskErrors=mesh.maskErrors;
     prototype.sourceId=mesh.sourceId; prototype.primId=mesh.primId;
+    prototype.instanced=mesh.instanced; prototype.instances=mesh.instances;
     std::vector<HdUEMeshData> parts{prototype};
     for (const auto& subset : topology.GetGeomSubsets()) {
         if (subset.type != HdGeomSubset::TypeFaceSet || subset.materialId.IsEmpty()) continue;
