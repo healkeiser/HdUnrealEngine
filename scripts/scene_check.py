@@ -87,7 +87,7 @@ class SceneCheck(SmokeTest):
         try:
             stage.SetEditTarget(session)
             light = UsdLux.DistantLight.Define(stage, "/HdUEViewerLightTest")
-            light.CreateIntensityAttr(4)
+            light.CreateIntensityAttr(4); light.CreateNormalizeAttr(True)
             light.AddTransformOp().Set(self.view.resolveCamera()[0].transform)
             yield from self.wait_image("07-scene-light", self.frames[-1]["generation"], viewer=0, scene=1)
             model.viewSettings.enableSceneLights = False

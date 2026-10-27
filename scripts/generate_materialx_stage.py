@@ -115,6 +115,7 @@ for name, position, intensity, size in (
 # Rect lights. Include an analytic light so both renderers exercise it.
 analytic = UsdLux.DistantLight.Define(stage, "/AnisotropyKey")
 analytic.CreateIntensityAttr(2.0)
+analytic.CreateNormalizeAttr(True)  # intensity in lux
 analytic.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(Gf.Vec3d(-250,-350,500),target,Gf.Vec3d(0,0,1)).GetInverse())
 stage.GetRootLayer().Save()
 print(args.output)

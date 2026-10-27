@@ -88,7 +88,7 @@ def generate(folder):
     camera.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(eye,target,Gf.Vec3d(0,0,1)).GetInverse())
     camera.CreateHorizontalApertureAttr(36); camera.CreateVerticalApertureAttr(20.25); camera.CreateFocalLengthAttr(38)
     camera.CreateClippingRangeAttr(Gf.Vec2f(1,5000))
-    light=UsdLux.DistantLight.Define(stage,"/Key"); light.CreateIntensityAttr(2.0)
+    light=UsdLux.DistantLight.Define(stage,"/Key"); light.CreateIntensityAttr(2.0); light.CreateNormalizeAttr(True)
     light.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(Gf.Vec3d(0,-500,700),target,Gf.Vec3d(0,0,1)).GetInverse())
     stage.GetRootLayer().Save()
     print(folder/"normal_udim.usda")

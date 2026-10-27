@@ -356,6 +356,7 @@ def Camera "Camera"
 def DistantLight "Key"
 {
     float inputs:intensity = 2
+    bool inputs:normalize = 1
     matrix4d xformOp:transform = ( (1, 0, -0, 0), (0, 0.6925318281897135, 0.7213873210309516, 0), (0, -0.7213873210309516, 0.6925318281897135, 0), (0, -500, 700.0000000000001, 1) )
     uniform token[] xformOpOrder = ["xformOp:transform"]
 }

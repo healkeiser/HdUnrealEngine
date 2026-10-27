@@ -91,7 +91,7 @@ spot=UsdLux.SphereLight.Define(stage,'/World/Lights/Spot'); orient(spot,(1,2,2))
 spot.CreateRadiusAttr(.1); spot.CreateIntensityAttr(40)
 shaping=UsdLux.ShapingAPI.Apply(spot.GetPrim()); shaping.CreateShapingConeAngleAttr(30); shaping.CreateShapingConeSoftnessAttr(.3)
 sun=UsdLux.DistantLight.Define(stage,'/World/Lights/Sun'); sun.AddRotateXYZOp().Set((-35,20,0))
-sun.CreateIntensityAttr(1); sun.CreateAngleAttr(1.)
+sun.CreateIntensityAttr(1); sun.CreateNormalizeAttr(True); sun.CreateAngleAttr(1.)
 stage.GetRootLayer().Save()
 file=root/'lighting.usda'
 file.write_text(file.read_text(encoding='utf-8').rstrip()+'\n',encoding='utf-8',newline='\n')

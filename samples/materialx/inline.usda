@@ -798,6 +798,7 @@ def RectLight "Fill"
 def DistantLight "AnisotropyKey"
 {
     float inputs:intensity = 2
+    bool inputs:normalize = 1
     matrix4d xformOp:transform = ( (0.8137334712067349, -0.5812381937190964, 2.7755575615628907e-17, 0), (0.37607967367983214, 0.5265115431517651, 0.7624629000632213, 0), (-0.4431725588105707, -0.620441582334799, 0.6470319358634333, 0), (-250, -350, 500, 1) )
     uniform token[] xformOpOrder = ["xformOp:transform"]
 }

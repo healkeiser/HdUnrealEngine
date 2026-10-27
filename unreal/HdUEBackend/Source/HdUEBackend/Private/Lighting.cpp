@@ -133,15 +133,31 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
     Light->bAllowMegaLights=!Distant && (D.flags&HDUE_LIGHT_MEGALIGHTS)!=0;
     Actor->SetActorLocation(FVector(D.position_cm[0],D.position_cm[1],D.position_cm[2]));
     Actor->SetActorRotation(FRotationMatrix::MakeFromXZ(-Axis(D,2),Axis(D,1)).Rotator());
+    // UsdLux intensity is luminance in nits for every light; normalize divides by the size factor.
     float Intensity=D.intensity;
     if(auto* Local=Cast<ULocalLightComponent>(Light)) {
-        Local->SetIntensityUnits(ELightUnits::Candelas); Local->SetAttenuationRadius(100000);
+        Local->SetAttenuationRadius(100000);
         const double Radius=D.width_cm*.01;
         double Projected=UE_PI*Radius*Radius,Area=4*Projected;
         if(D.type==HDUE_RECT_LIGHT) Projected=Area=D.width_cm*D.height_cm*.0001;
         if(D.type==HDUE_DISK_LIGHT) Area=Projected=UE_PI*D.width_cm*D.height_cm*.0001;
         if(D.type==HDUE_CYLINDER_LIGHT) {Projected=2*Radius*D.length_cm*.01+UE_PI*Radius*Radius; Area=2*UE_PI*Radius*D.length_cm*.01;}
-        if(!(D.flags&HDUE_LIGHT_POINT)) Intensity*=float(Projected/FMath::Max((D.flags&HDUE_LIGHT_NORMALIZE)?Area:1.,1e-12));
+        if(D.flags&HDUE_LIGHT_NORMALIZE) Intensity/=float(FMath::Max(Area,1e-12));
+        if(D.type==HDUE_RECT_LIGHT || D.type==HDUE_DISK_LIGHT) {
+            // UE nits use the rect's own area, but its rect lights measured 2.05x a Lambertian emitter
+            // (Lumen and Path Tracer, 0.5 m rect at 1 m); halve to match UsdLux luminance.
+            Local->SetIntensityUnits(ELightUnits::Nits); Intensity*=.5f;
+        } else {
+            // UE point-light nits spread over the whole capsule surface; UsdLux luminance seen
+            // from outside is luminous intensity over the projected area.
+            Local->SetIntensityUnits(ELightUnits::Candelas); Intensity*=float(Projected);
+        }
+    } else if(D.type==HDUE_DISTANT_LIGHT) {
+        // UsdLux: illuminance = luminance * pi * sin^2(angle/2); normalize makes intensity the illuminance in lux.
+        const double Half=FMath::Clamp(FMath::DegreesToRadians(double(D.angle_degrees))/2,0.,UE_DOUBLE_PI);
+        const double Sin2=FMath::Square(FMath::Sin(Half));
+        const double SizeFactor=Half<=UE_DOUBLE_HALF_PI?UE_DOUBLE_PI*Sin2:(2-Sin2)*UE_DOUBLE_PI;
+        if(!(D.flags&HDUE_LIGHT_NORMALIZE) && Half>0) Intensity*=float(SizeFactor);
     }
     if(auto* Point=Cast<UPointLightComponent>(Light)) {
         Point->SetSourceRadius((D.flags&HDUE_LIGHT_POINT)?0:D.width_cm);

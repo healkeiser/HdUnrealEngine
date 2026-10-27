@@ -335,6 +335,7 @@ def Xform "World"
         {
             float inputs:angle = 1
             float inputs:intensity = 1
+            bool inputs:normalize = 1
             float3 xformOp:rotateXYZ = (-35, 20, 0)
             uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
         }

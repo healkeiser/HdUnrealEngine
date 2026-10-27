@@ -66,6 +66,7 @@ def Camera "Camera" {
 def DistantLight "KeyLight" {
     color3f inputs:color = (1,1,1)
     float inputs:intensity = 5
+    bool inputs:normalize = 1
     float inputs:angle = 0.5
     float3 xformOp:rotateXYZ = (-45,0,30)
     uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
