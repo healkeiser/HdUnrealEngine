@@ -101,7 +101,8 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch,FString& Error) {
                 Images.Add(Definition.File,MoveTemp(Entry)); LightTextures.Remove(Definition.File);
             }
             const auto& Image=*Images[Definition.File].Image;
-            if(D.type==HDUE_DOME_LIGHT && Image.SizeX!=Image.SizeY*2) {Error=TEXT("Dome image must be a 2:1 latitude-longitude map."); return false;}
+            // Sampling is UV-normalized, so other aspects stretch over the sphere as in Karma and Storm.
+            if(D.type==HDUE_DOME_LIGHT && Image.SizeX!=Image.SizeY*2) UE_LOG(LogTemp, Warning, TEXT("hdUE dome image %s is %dx%d, not 2:1; stretching it as a latitude-longitude map."), *Definition.File, Image.SizeX, Image.SizeY);
             if(D.type!=HDUE_DOME_LIGHT && D.type!=HDUE_RECT_LIGHT) {Error=TEXT("Image emission is supported on DomeLight and RectLight."); return false;}
         }
         Pending.Add(MoveTemp(Definition));
