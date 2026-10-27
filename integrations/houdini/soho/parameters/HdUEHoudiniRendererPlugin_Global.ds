@@ -9,7 +9,7 @@
         name    NAME \
         label   LABEL \
         type    string \
-        default { "set" } \
+        default { "none" } \
         menujoin { \
             [ "import loputils" ] \
             [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \

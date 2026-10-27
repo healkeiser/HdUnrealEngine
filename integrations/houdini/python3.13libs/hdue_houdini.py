@@ -305,7 +305,8 @@ def current_settings_node():
     network=viewer.pwd()
     node=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
     from hdue_preparation import TAG
-    while node and (not node.parm('hdue_source_axis') or node.userData(TAG)=='1'):
+    # hdue_materialx_library exists only on the hdUE_settings subnet; its children copy other controls.
+    while node and (not node.parm('hdue_materialx_library') or node.userData(TAG)=='1'):
         inputs=node.inputs(); node=inputs[0] if inputs else None
     return node
 
@@ -445,6 +446,10 @@ def render_settings_node(input_node,mode='realtime',samples=64):
     node=input_node.parent().createNode('rendersettings','hdUE_render_settings')
     node.setInput(0,input_node)
     node.parm('primpath').set('/Render/hdUE')
+    # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
+    stage=input_node.stage()
+    camera=next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None
+    if camera: node.parm('camera').set(str(camera.GetPath()))
     for name,value in (('xn__hdUErenderMode',mode),('xn__hdUEsamplesPerPixel',samples)):
         _render_property(node,name,value)
     return node
