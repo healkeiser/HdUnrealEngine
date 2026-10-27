@@ -25,6 +25,10 @@
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionNormalize.h"
 #include "Materials/MaterialExpressionSceneTexture.h"
+#include "Materials/MaterialExpressionTextureSampleParameterVolume.h"
+#include "Materials/MaterialExpressionTransformPosition.h"
+#include "Materials/MaterialExpressionWorldPosition.h"
+#include "Engine/VolumeTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
@@ -260,6 +264,66 @@ UMaterial* CreateIdMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// Heterogeneous volume material for dense density grids: UVW_j = dot((world, 1), WorldToUVW_j),
+// rows the backend derives from the voxel transform; extinction = density * ExtinctionScale.
+UMaterial* CreateVolumeMaterial() {
+    UVolumeTexture* Empty = LoadObject<UVolumeTexture>(nullptr, TEXT("/Game/HdUE/T_HdUEVolumeEmpty.T_HdUEVolumeEmpty"), nullptr, LOAD_NoWarn);
+    if (!Empty) {
+        UPackage* Package = CreatePackage(TEXT("/Game/HdUE/T_HdUEVolumeEmpty"));
+        Empty = NewObject<UVolumeTexture>(Package, TEXT("T_HdUEVolumeEmpty"), RF_Public | RF_Standalone);
+        const uint8 Black[4] = {0, 0, 0, 0};
+        Empty->Source.Init(1, 1, 1, 1, TSF_BGRA8, Black);
+        Empty->SRGB = false; Empty->CompressionSettings = TC_VectorDisplacementmap; Empty->MipGenSettings = TMGS_NoMipmaps;
+        Empty->PostEditChange();
+        if (!SaveAsset(Empty)) return nullptr;
+    }
+    const FString Path = TEXT("/Game/HdUE/M_HdUEVolume");
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"), nullptr, LOAD_NoWarn);
+    if (Material && Material->MaterialDomain == MD_Volume && Material->bUsedWithHeterogeneousVolumes) {
+        for (const auto& Expression : Material->GetExpressionCollection().Expressions)
+            if (const auto* Row = Cast<UMaterialExpressionVectorParameter>(Expression); Row && Row->ParameterName == TEXT("WorldToUVW0")) return Material;
+    }
+    if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEVolume"), RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    TArray<UMaterialExpression*> Expressions;
+    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    auto* World = Add(NewObject<UMaterialExpressionWorldPosition>(Material));
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    Homogeneous->A.Connect(0, World); Homogeneous->B.Connect(0, One);
+    UMaterialExpressionDotProduct* Axes[3];
+    for (int32 Axis = 0; Axis < 3; ++Axis) {
+        auto* Row = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+        Row->ParameterName = *FString::Printf(TEXT("WorldToUVW%d"), Axis); Row->DefaultValue = FLinearColor(0, 0, 0, 0);
+        Axes[Axis] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+        Axes[Axis]->A.Connect(0, Homogeneous); Axes[Axis]->B.Connect(5, Row);
+    }
+    auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    UV->A.Connect(0, Axes[0]); UV->B.Connect(0, Axes[1]);
+    auto* UVW = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    UVW->A.Connect(0, UV); UVW->B.Connect(0, Axes[2]);
+    auto* Density = Add(NewObject<UMaterialExpressionTextureSampleParameterVolume>(Material));
+    Density->ParameterName = TEXT("Density"); Density->Texture = Empty; Density->SamplerType = SAMPLERTYPE_LinearColor;
+    Density->Coordinates.Connect(0, UVW);
+    auto* Scale = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    Scale->ParameterName = TEXT("ExtinctionScale"); Scale->DefaultValue = 1.f;
+    auto* Extinction = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Extinction->A.Connect(1, Density); Extinction->B.Connect(0, Scale);
+    auto* Albedo = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+    Albedo->ParameterName = TEXT("Albedo"); Albedo->DefaultValue = FLinearColor(.8f, .8f, .8f, 1);
+    auto* Data = Material->GetEditorOnlyData();
+    // Legacy volume inputs, as UE's SparseVolumeTextureMaterialFactory uses: albedo, extinction.
+    Data->BaseColor.Connect(0, Albedo);
+    Data->SubsurfaceColor.Connect(0, Extinction);
+    Material->MaterialDomain = MD_Volume;
+    Material->BlendMode = BLEND_Additive;
+    Material->bUsedWithHeterogeneousVolumes = true;
+    for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
 UMaterial* CreateGlass() {
     const FString Path = TEXT("/Game/HdUE/M_Glass");
     UPackage* Package = CreatePackage(*Path);
@@ -343,7 +407,7 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
     UMaterial* Preview = CreatePreviewSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
     UMaterial* Masked = CreatePreviewSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
     UMaterial* Translucent = CreatePreviewSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
-    if (!Masked || !CreateAovMaterial() || !CreateIdMaterial()) return 3;
+    if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
     UMaterial* Red = CreatePBR(TEXT("M_ReferenceRed"), FLinearColor(0.7f, 0.05f, 0.02f), 0.05f, 0.4f);

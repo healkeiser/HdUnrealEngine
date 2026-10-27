@@ -35,6 +35,15 @@ struct HdUEMeshData {
     std::vector<GfMatrix4d> instances; // USD world matrices (prototype transform included)
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
+// A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.
+struct HdUEVolumeData {
+    std::string id;
+    bool visible = true;
+    uint32_t width = 0, height = 0, depth = 0;
+    std::vector<float> density;
+    GfMatrix4d localToWorld{1};
+    GfVec3f albedo{.8f};
+};
 struct HdUETextureData {
     std::string file;
     GfVec4f scale{1}, bias{0}, mask{1, 0, 0, 0};
@@ -62,6 +71,8 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUEMeshData> meshes;
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
+    std::map<std::string, HdUEVolumeData> volumes;
+    std::set<std::string> dirtyVolumes;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;

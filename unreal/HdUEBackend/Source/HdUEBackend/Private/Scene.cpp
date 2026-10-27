@@ -18,6 +18,9 @@
 #include "RHI.h"
 #include "Algo/AllOf.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HeterogeneousVolumeComponent.h"
+#include "Engine/VolumeTexture.h"
+#include "TextureResource.h"
 #include "DynamicMeshToMeshDescription.h"
 #include "StaticMeshAttributes.h"
 
@@ -70,6 +73,7 @@ TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
 }
 void FHdueScene::Remove(const FString& Id) {
     Lighting->Remove(Id);
+    RemoveVolume(Id);
     CameraLightDirections.Remove(Id);
     if (AActor** Actor = Actors.Find(Id)) {
         if (IsValid(*Actor)) World->DestroyActor(*Actor);
@@ -80,6 +84,59 @@ void FHdueScene::Remove(const FString& Id) {
     PrimIds.Remove(Id);
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
+}
+bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
+    const FString Id = UTF8_TO_TCHAR(Desc.id);
+    const uint64 Count = uint64(Desc.width) * Desc.height * Desc.depth;
+    auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"));
+    if (!Parent) { Error = TEXT("Volume material /Game/HdUE/M_HdUEVolume is missing; run Prepare-Content.ps1 and stage the runtime."); return false; }
+    FVolume& Volume = Volumes.FindOrAdd(Id);
+    if (!IsValid(Volume.Actor)) {
+        Volume.Actor = World->SpawnActor<AActor>();
+        auto* Component = NewObject<UHeterogeneousVolumeComponent>(Volume.Actor);
+        Component->SetMobility(EComponentMobility::Movable);
+        Volume.Actor->SetRootComponent(Component); Volume.Actor->AddInstanceComponent(Component);
+        Component->RegisterComponent();
+        Volume.Material.Reset(UMaterialInstanceDynamic::Create(Parent, World));
+    }
+    auto* Component = Volume.Actor->FindComponentByClass<UHeterogeneousVolumeComponent>();
+    if (Count) {
+        // ponytail: half-float dense 3D texture; sparse grids beyond a few hundred voxels per side cost memory.
+        UVolumeTexture* Texture = Volume.Texture.Get();
+        if (!Texture || Texture->GetSizeX() != int32(Desc.width) || Texture->GetSizeY() != int32(Desc.height) || Texture->GetSizeZ() != int32(Desc.depth)) {
+            Texture = UVolumeTexture::CreateTransient(Desc.width, Desc.height, Desc.depth, PF_R16F);
+            if (!Texture) { Error = TEXT("Cannot create the volume texture."); return false; }
+            Texture->SRGB = false; Texture->Filter = TF_Trilinear; Texture->NeverStream = true;
+            Volume.Texture.Reset(Texture);
+        }
+        auto& Mip = Texture->GetPlatformData()->Mips[0];
+        auto* Voxels = static_cast<FFloat16*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
+        for (uint64 I = 0; I < Count; ++I) Voxels[I] = FFloat16(FMath::Max(0.f, Desc.density[I]));
+        Mip.BulkData.Unlock();
+        Texture->UpdateResource();
+        Volume.Material->SetTextureParameterValue(TEXT("Density"), Texture);
+    }
+    Volume.Material->SetVectorParameterValue(TEXT("Albedo"), FLinearColor(Desc.albedo[0], Desc.albedo[1], Desc.albedo[2], 1));
+    Volume.Material->SetScalarParameterValue(TEXT("ExtinctionScale"), Desc.extinction_scale);
+    Component->SetMaterial(0, Volume.Material.Get());
+    Component->SetVolumeResolution(FIntVector(Desc.width, Desc.height, Desc.depth));
+    FMatrix Matrix;
+    for (int R = 0; R < 4; ++R) for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc.transform[R * 4 + C];
+    Volume.Actor->SetActorTransform(FTransform(Matrix));
+    // UVW_j = dot((world, 1), row_j): column j of the inverse voxel transform over the resolution.
+    const FMatrix Inverse = Matrix.Inverse();
+    const double Size[3] = {double(FMath::Max(1u, Desc.width)), double(FMath::Max(1u, Desc.height)), double(FMath::Max(1u, Desc.depth))};
+    for (int32 Axis = 0; Axis < 3; ++Axis)
+        Volume.Material->SetVectorParameterValue(*FString::Printf(TEXT("WorldToUVW%d"), Axis), FLinearColor(
+            float(Inverse.M[0][Axis] / Size[Axis]), float(Inverse.M[1][Axis] / Size[Axis]), float(Inverse.M[2][Axis] / Size[Axis]), float(Inverse.M[3][Axis] / Size[Axis])));
+    Volume.Actor->SetActorHiddenInGame(!Desc.visible || !Count);
+    return true;
+}
+void FHdueScene::RemoveVolume(const FString& Id) {
+    if (FVolume* Volume = Volumes.Find(Id)) {
+        if (IsValid(Volume->Actor)) World->DestroyActor(Volume->Actor);
+        Volumes.Remove(Id);
+    }
 }
 bool FHdueScene::SetIdMode(bool On, FString& Error) {
     if (On == IdMode) return true;
@@ -155,6 +212,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             if (It->GetLevel()==World->PersistentLevel && (It->FindComponentByClass<UMeshComponent>() || It->FindComponentByClass<ULightComponent>())) Fixtures.Add(*It);
         for (auto* A : Fixtures) World->DestroyActor(A);
         Actors.Empty(); CameraLightDirections.Empty(); MeshMaterials.Empty(); Materials.Empty(); PreviewTextures.Empty(); PrimIds.Empty();
+        for (const auto& Entry : Volumes) if (IsValid(Entry.Value.Actor)) World->DestroyActor(Entry.Value.Actor);
+        Volumes.Empty();
         WetBindings.Empty(); GeometryRevisions.Empty();
     }
     for (uint32 Index = 0; Index < Batch.removed_count; ++Index) {

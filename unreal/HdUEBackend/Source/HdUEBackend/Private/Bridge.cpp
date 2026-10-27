@@ -14,6 +14,7 @@
 #include "hdue/material_api.h"
 #include "hdue/depth_api.h"
 #include "hdue/aov_api.h"
+#include "hdue/volume_api.h"
 #include "RenderUtils.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -115,12 +116,18 @@ public:
     void PreRenderViewFamily_RenderThread(FRDGBuilder&,FSceneViewFamily& Family) override {
         Job->MegaLightsActive=!Family.EngineShowFlags.PathTracing && MegaLights::IsEnabled(Family);
     }
+    // The HDRI background goes in right after the base pass, so heterogeneous volumes and
+    // translucency composite over it; deferred lighting leaves far-depth pixels alone.
+    void PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder,FSceneView& View,const FRenderTargetBindingSlots& RenderTargets,
+        TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures) override {
+        if(!Job->Environment.IsValid() || !SceneTextures) return;
+        HdUEDrawEnvironment(GraphBuilder,View,RenderTargets.Output[0].GetTexture(),SceneTextures->GetParameters()->SceneDepthTexture,
+            Job->Environment.GetReference(),Job->EnvironmentScale);
+    }
     void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder,const FSceneView& View,const FPostProcessingInputs& Inputs) override {
         if(!Inputs.SceneTextures) return;
         FRDGTextureRef Source=Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
         if(!Source) return;
-        if(Job->Environment.IsValid()) HdUEDrawEnvironment(GraphBuilder,View,Inputs.SceneTextures->GetParameters()->SceneColorTexture,
-            Source,Job->Environment.GetReference(),Job->EnvironmentScale);
         if(!Job->DepthEnabled) return;
         const FIntPoint Size(Session->Width,Session->Height);
         auto Desc=FRDGTextureDesc::Create2D(Size,PF_R32_FLOAT,FClearValueBinding::None,
@@ -365,6 +372,8 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     if (Aov) {
         Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
         Flags.SetDepthOfField(false); Flags.SetVignette(false); Flags.SetGrain(false); Flags.SetLensFlares(false);
+        // Volumes composite into scene color and would overwrite surface channels and IDs.
+        Flags.SetHeterogeneousVolumes(false);
     }
     auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
     FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene, Flags)
@@ -556,6 +565,28 @@ HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
     FScopeLock Lock(&Session->FrameMutex);
     if (!Session->HasRequest || !Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_PENDING;
     *Frame = Session->Frame;
+    return HDUE_OK;
+}
+
+HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || !Desc->id) return HDUE_INVALID_ARGUMENT;
+    const uint64 Count = uint64(Desc->width) * Desc->height * Desc->depth;
+    if (Desc->width > 2048 || Desc->height > 2048 || Desc->depth > 2048 || Count > (uint64(1) << 28) || (Count && !Desc->density) ||
+        !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0) return HDUE_INVALID_ARGUMENT;
+    for (double Value : Desc->transform) if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    FString Error;
+    if (!Session->Scene->UpsertVolume(*Desc, Error)) return Fail(HDUE_ENGINE_ERROR, *Error);
+    Session->HasRequest = false; // restart accumulation, as scene batches do
+    return HDUE_OK;
+}
+
+HdueResult HDUE_CALL RemoveVolume(HdueSession Handle, const char* Id) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
+    Runtime.Session->Scene->RemoveVolume(UTF8_TO_TCHAR(Id));
+    Runtime.Session->HasRequest = false;
     return HDUE_OK;
 }
 
@@ -802,6 +833,12 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Versio
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_asset_api(uint32 Version, uint32 Capacity, HdueAssetApi* Api) {
     if (!Api || Version != HDUE_ASSET_ABI_VERSION || Capacity < sizeof(HdueAssetApi)) return HDUE_INVALID_ARGUMENT;
     *Api={sizeof(HdueAssetApi),HDUE_ASSET_ABI_VERSION,UpsertAsset,RemoveAsset,AssetStatus,AssetSceneStatus}; return HDUE_OK;
+}
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_volume_api(uint32 Version, uint32 Capacity, HdueVolumeApi* Api) {
+    if (!Api || Capacity < sizeof(HdueVolumeApi)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_VOLUME_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(HdueVolumeApi), HDUE_VOLUME_ABI_VERSION, UpsertVolume, RemoveVolume};
+    return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32 Version, uint32 Capacity, HdueAovApi* Api) {
     if (!Api || Capacity < sizeof(HdueAovApi)) return HDUE_BUFFER_TOO_SMALL;

@@ -2,6 +2,13 @@
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/points.h"
 #include "pxr/imaging/hd/basisCurves.h"
+#include "pxr/imaging/hd/volume.h"
+#include "pxr/imaging/hd/field.h"
+#include <mutex>
+#if defined(HDUE_HOUDINI)
+#include <openvdb/openvdb.h>
+#include <openvdb/io/File.h>
+#endif
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/light.h"
@@ -484,6 +491,82 @@ protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
+#if defined(HDUE_HOUDINI)
+// openvdbAsset fields carry filePath/fieldName; volumes read them through the scene delegate.
+class Field final : public HdField {
+public:
+    explicit Field(const SdfPath& id) : HdField(id) {}
+    HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
+    void Sync(HdSceneDelegate*, HdRenderParam*, HdDirtyBits* bits) override { *bits = Clean; }
+};
+// Density from an OpenVDB float grid, densified over its active bounding box.
+class Volume final : public HdVolume {
+    static constexpr int MaxResolution = 512; // per axis; larger grids are point-sampled with a stride
+public:
+    explicit Volume(const SdfPath& id) : HdVolume(id) {}
+    HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
+    void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
+        auto* state = static_cast<HdUEState*>(param);
+        HdUEVolumeData volume; volume.id = GetId().GetString(); volume.visible = delegate->GetVisible(GetId());
+        const auto fields = delegate->GetVolumeFieldDescriptors(GetId());
+        const HdVolumeFieldDescriptor* chosen = nullptr;
+        for (const auto& field : fields) if (field.fieldName == TfToken("density")) chosen = &field;
+        if (!chosen && !fields.empty()) chosen = &fields.front();
+        try {
+            if (chosen) {
+                if (chosen->fieldPrimType != TfToken("openvdbAsset"))
+                    throw std::runtime_error("only openvdbAsset fields are supported, not " + chosen->fieldPrimType.GetString());
+                const auto file = value(delegate->Get(chosen->fieldId, TfToken("filePath")), SdfAssetPath());
+                const auto path = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
+                auto gridName = value(delegate->Get(chosen->fieldId, TfToken("fieldName")), TfToken()).GetString();
+                if (gridName.empty()) gridName = chosen->fieldName.GetString();
+                static std::once_flag initialized; std::call_once(initialized, [] { openvdb::initialize(); });
+                openvdb::io::File vdb(path); vdb.open(false);
+                const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(vdb.readGrid(gridName));
+                vdb.close();
+                if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
+                const auto box = grid->evalActiveVoxelBoundingBox();
+                if (!box.empty()) {
+                    const auto size = box.dim();
+                    const int stride = std::max({1, (size.x() + MaxResolution - 1) / MaxResolution, (size.y() + MaxResolution - 1) / MaxResolution, (size.z() + MaxResolution - 1) / MaxResolution});
+                    volume.width = uint32_t((size.x() + stride - 1) / stride); volume.height = uint32_t((size.y() + stride - 1) / stride); volume.depth = uint32_t((size.z() + stride - 1) / stride);
+                    volume.density.resize(size_t(volume.width) * volume.height * volume.depth);
+                    auto accessor = grid->getConstAccessor();
+                    const auto min = box.min();
+                    for (uint32_t k = 0; k < volume.depth; ++k) for (uint32_t j = 0; j < volume.height; ++j) for (uint32_t i = 0; i < volume.width; ++i)
+                        volume.density[(size_t(k) * volume.height + j) * volume.width + i] =
+                            accessor.getValue(openvdb::Coord(min.x() + int(i) * stride, min.y() + int(j) * stride, min.z() + int(k) * stride));
+                    const auto affine = grid->transform().baseMap()->getAffineMap();
+                    if (!affine) throw std::runtime_error("grid " + gridName + " has a non-affine (frustum) transform");
+                    const auto m = affine->getMat4();
+                    GfMatrix4d indexToWorld; for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) indexToWorld[r][c] = m(r, c);
+                    // Local voxel i covers [i, i+1]; its sample is index min + stride * i.
+                    const GfMatrix4d localToIndex = GfMatrix4d(1).SetScale(double(stride)) *
+                        GfMatrix4d(1).SetTranslate(GfVec3d(min.x() - .5 * stride, min.y() - .5 * stride, min.z() - .5 * stride));
+                    volume.localToWorld = localToIndex * indexToWorld * delegate->GetTransform(GetId());
+                }
+            }
+        } catch (const std::exception& error) {
+            TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
+            volume.width = volume.height = volume.depth = 0; volume.density.clear();
+        }
+        if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
+            const auto& m = volume.localToWorld;
+            std::fprintf(stderr, "hdUE volume %s fields=%zu dims=%ux%ux%u origin=(%g,%g,%g) x=(%g,%g,%g)%c", GetId().GetText(), fields.size(),
+                volume.width, volume.height, volume.depth, m[3][0], m[3][1], m[3][2], m[0][0], m[0][1], m[0][2], 10);
+            std::fflush(stderr);
+        }
+        std::lock_guard lock(state->mutex);
+        state->volumes[volume.id] = std::move(volume);
+        state->dirtyVolumes.insert(GetId().GetString()); state->removed.erase(GetId().GetString()); ++state->revision;
+        *bits = HdChangeTracker::Clean;
+    }
+    void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+protected:
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
+};
+#endif
 class Material final : public HdMaterial {
 public:
     explicit Material(const SdfPath& id) : HdMaterial(id) {}
@@ -608,6 +691,10 @@ public:
 HdRprim* HdUECreateMesh(const SdfPath& id) { return new Mesh(id); }
 HdRprim* HdUECreatePoints(const SdfPath& id) { return new Points(id); }
 HdRprim* HdUECreateCurves(const SdfPath& id) { return new Curves(id); }
+#if defined(HDUE_HOUDINI)
+HdRprim* HdUECreateVolume(const SdfPath& id) { return new Volume(id); }
+HdBprim* HdUECreateField(const SdfPath& id) { return new Field(id); }
+#endif
 HdInstancer* HdUECreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return new Instancer(delegate, id); }
 void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
     std::set<SdfPath> sources;

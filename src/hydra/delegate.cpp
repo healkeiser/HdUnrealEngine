@@ -10,6 +10,7 @@
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/base/gf/vec4f.h"
+#include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -103,6 +104,8 @@ void startSelfHost(const std::string& dll, const std::string& project) {
 HdRprim* HdUECreateMesh(const SdfPath&);
 HdRprim* HdUECreatePoints(const SdfPath&);
 HdRprim* HdUECreateCurves(const SdfPath&);
+HdRprim* HdUECreateVolume(const SdfPath&);
+HdBprim* HdUECreateField(const SdfPath&);
 HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
@@ -111,7 +114,7 @@ void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
 HdUEState::~HdUEState() { if (session && backend) backend->api().destroy_session(session); }
 void HdUEState::erase(const std::string& id) {
     std::lock_guard lock(mutex);
-    meshes.erase(id); materials.erase(id); lights.erase(id);
+    meshes.erase(id); materials.erase(id); lights.erase(id); volumes.erase(id); dirtyVolumes.erase(id);
     geometryRevisions.erase(id);
     dirtyMeshes.erase(id); dirtyMaterials.erase(id); dirtyLights.erase(id);
     removed.insert(id); ++revision;
@@ -366,6 +369,30 @@ void submit(HdUEState& state) {
             state.backend->require(assetApi.remove(state.session,id.c_str()),"remove_asset");
     }
     for (const auto& desc : sceneAssets) state.backend->require(assetApi.upsert(state.session,&desc),"upsert_asset");
+    if (!state.dirtyVolumes.empty()) {
+        const auto& volumeApi = state.backend->volume_api();
+        if (!volumeApi.upsert) throw std::runtime_error("This scene has volumes; build and stage the current backend");
+        // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
+        GfMatrix4d basis(1);
+        for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = state.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
+        const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
+        for (const auto& id : state.dirtyVolumes) {
+            const auto it = state.volumes.find(id);
+            if (it == state.volumes.end()) continue;
+            const auto& volume = it->second;
+            HdueVolumeDesc desc{}; desc.struct_size = sizeof(desc); desc.id = volume.id.c_str(); desc.visible = volume.visible;
+            desc.width = volume.width; desc.height = volume.height; desc.depth = volume.depth;
+            desc.density = volume.density.empty() ? nullptr : volume.density.data();
+            const auto m = volume.localToWorld * basis;
+            for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) desc.transform[r * 4 + c] = m[r][c];
+            for (int c = 0; c < 3; ++c) desc.albedo[c] = volume.albedo[c];
+            // Density is extinction per scene unit; UE's ray marcher steps in voxel units (measured: halving
+            // the resolution halves optical depth), so scale by the voxel's edge length in cm.
+            const double voxelCm = std::cbrt(std::abs(m.ExtractRotationMatrix().GetDeterminant()));
+            desc.extinction_scale = float(perCentimeter * voxelCm);
+            state.backend->require(volumeApi.upsert(state.session, &desc), "upsert_volume");
+        }
+    }
     state.submittedMeshes += meshes.size(); state.submittedMaterials += materials.size();
     const auto overrides = state.setting<VtDictionary>("nativeMaterialParameters", {});
     for (const auto& id : state.dirtyMaterials) {
@@ -409,7 +436,7 @@ void submit(HdUEState& state) {
     }
     state.submittedNativeLights = state.nativeAssets.lights;
     ++state.sceneSubmissions;
-    state.dirtyMeshes.clear(); state.dirtyMaterials.clear(); state.dirtyLights.clear(); state.removed.clear();
+    state.dirtyMeshes.clear(); state.dirtyMaterials.clear(); state.dirtyLights.clear(); state.dirtyVolumes.clear(); state.removed.clear();
     state.submittedRevision = state.revision; state.firstBatch = false;
 }
 class Pass final : public HdRenderPass {
@@ -746,11 +773,25 @@ HdUERenderDelegate::~HdUERenderDelegate() {
     if (host.window) DestroyWindow(host.window);
     host.window = nullptr; host.backend.reset();
 }
-const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->mesh, HdPrimTypeTokens->points, HdPrimTypeTokens->basisCurves}; return t; }
+const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const {
+#if defined(HDUE_HOUDINI)
+    static TfTokenVector t{HdPrimTypeTokens->mesh, HdPrimTypeTokens->points, HdPrimTypeTokens->basisCurves, HdPrimTypeTokens->volume};
+#else
+    static TfTokenVector t{HdPrimTypeTokens->mesh, HdPrimTypeTokens->points, HdPrimTypeTokens->basisCurves};
+#endif
+    return t;
+}
 const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->camera, HdPrimTypeTokens->material,
     HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->domeLight,HdPrimTypeTokens->diskLight,HdPrimTypeTokens->cylinderLight}; return t; }
-const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->renderBuffer}; return t; }
+const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
+#if defined(HDUE_HOUDINI)
+    static TfTokenVector t{HdPrimTypeTokens->renderBuffer, TfToken("openvdbAsset")};
+#else
+    static TfTokenVector t{HdPrimTypeTokens->renderBuffer};
+#endif
+    return t;
+}
 HdRenderPassSharedPtr HdUERenderDelegate::CreateRenderPass(HdRenderIndex* index, const HdRprimCollection& collection) {
     state_->renderIndex=index; return std::make_shared<Pass>(index, collection, state_);
 }
@@ -759,6 +800,9 @@ void HdUERenderDelegate::DestroyInstancer(HdInstancer* p) { delete p; }
 HdRprim* HdUERenderDelegate::CreateRprim(const TfToken& type, const SdfPath& id) {
     if (type == HdPrimTypeTokens->points) return HdUECreatePoints(id);
     if (type == HdPrimTypeTokens->basisCurves) return HdUECreateCurves(id);
+#if defined(HDUE_HOUDINI)
+    if (type == HdPrimTypeTokens->volume) return HdUECreateVolume(id);
+#endif
     return type == HdPrimTypeTokens->mesh ? HdUECreateMesh(id) : nullptr;
 }
 void HdUERenderDelegate::DestroyRprim(HdRprim* p) { delete p; }
@@ -776,6 +820,9 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) { return CreateSprim(type, SdfPath::EmptyPath()); }
 void HdUERenderDelegate::DestroySprim(HdSprim* p) { delete p; }
 HdBprim* HdUERenderDelegate::CreateBprim(const TfToken& type, const SdfPath& id) {
+#if defined(HDUE_HOUDINI)
+    if (type == TfToken("openvdbAsset")) return HdUECreateField(id);
+#endif
     return type == HdPrimTypeTokens->renderBuffer ? new HdUERenderBuffer(id) : nullptr;
 }
 HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return CreateBprim(type, SdfPath::EmptyPath()); }
