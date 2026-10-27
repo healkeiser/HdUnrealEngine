@@ -47,9 +47,19 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 }
 template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name,
     const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type) {
-    const auto raw = delegate->Get(id, name);
+    // Indexed primvars (primvars:x:indices) arrive unflattened; expand them first.
+    VtIntArray indices;
+    const auto raw = delegate->GetIndexedPrimvar(id, name, &indices);
     if (!raw.IsHolding<VtArray<T>>()) return {};
-    const auto& array = raw.UncheckedGet<VtArray<T>>();
+    VtArray<T> array = raw.UncheckedGet<VtArray<T>>();
+    if (!indices.empty()) {
+        VtArray<T> flat(indices.size());
+        for (size_t i = 0; i < indices.size(); ++i) {
+            if (indices[i] < 0 || size_t(indices[i]) >= array.size()) return {};
+            flat[i] = array[indices[i]];
+        }
+        array = std::move(flat);
+    }
     if (array.empty()) return {};
     const auto domain = interpolation(delegate, id, name);
     VtArray<T> faceValues;
