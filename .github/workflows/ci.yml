@@ -1,0 +1,49 @@
+# Checks that run without Unreal Engine, Houdini, OpenUSD or a ray-tracing GPU.
+# Rendering, Hydra and Solaris coverage stays in scripts/Verify.ps1 and scripts/Test-Houdini.ps1 (see VERIFICATION.md).
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Client library and C ABI
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DHDUE_BUILD_HYDRA=OFF
+      - name: Build
+        run: cmake --build build --config Release
+      - name: ABI layout test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  scripts:
+    name: Python and PowerShell
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Repository scope
+        run: uv run --python 3.11 tests/test_repository_scope.py
+      - name: Byte-compile Python (Houdini 22 uses 3.13)
+        run: uv run --python 3.13 python -m compileall -q scripts tests integrations
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          $failed = 0
+          Get-ChildItem -Recurse -Include *.ps1, *.psm1 -Path scripts, tests, packaging, integrations | ForEach-Object {
+              $errors = $null
+              [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors)
+              foreach ($e in $errors) { $failed++; Write-Output "::error file=$($_.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)" }
+          }
+          if ($failed) { exit 1 }
+      - name: Local path settings
+        shell: pwsh
+        run: ./tests/local_paths.ps1
