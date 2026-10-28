@@ -67,7 +67,7 @@ $env:HDUE_HOUDINI_ENABLE = '1'
 $env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
 ```
 
-UE renders offscreen (`-RenderOffscreen`): it opens no window, and frames come from GPU readback as before. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging.
+UE renders offscreen (`-RenderOffscreen`), in husk, Live Render, the Solaris viewport and usdview alike: it opens no window, and frames come from GPU readback as before. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging. UE's log reaches the host console as UTF-8 (`-stdout`) and is written in full to `HdUEBackendSavedogs`.
 
 UE starts once per husk process, and Hydra resends only what changes between frames, so render a frame range in one husk call (and give farm tasks chunks of frames) rather than one process per frame. On an RTX 4090, a 1080p Lumen frame of a simple scene with the default 16 warmup frames takes about 0.3 s including the EXR write, after about 3 s of UE startup per process. Realtime mode (`hdUE:renderMode = realtime`) is meant for final frames too; heavier scenes cost more, mostly on the GPU. When husk owns UE, the delegate ticks it continuously instead of once per husk poll, and only the first, the converged and (for progress) one draw per 250 ms are read back from the GPU.
 

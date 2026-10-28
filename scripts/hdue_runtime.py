@@ -1,6 +1,7 @@
 """Main-thread UELibrary owner for Python hosts. ABI: include/hdue/bridge.h."""
 import ctypes as C
 from ctypes import wintypes as W
+import os
 from pathlib import Path
 import threading
 
@@ -71,9 +72,13 @@ class Runtime:
         self.user.DefWindowProcW.argtypes = [W.HWND, W.UINT, W.WPARAM, W.LPARAM]
         self.user.DefWindowProcW.restype = C.c_ssize_t
 
+        # UE renders offscreen and opens no window (HDUE_SHOW_WINDOW=1 shows it); offscreen UE has no window of its
+        # own to route these messages to.
+        visible = os.environ.get("HDUE_SHOW_WINDOW", "0") not in ("", "0")
+
         @proc_type
         def window_proc(hwnd, message, wparam, lparam):
-            if self.ready:
+            if visible and self.ready:
                 result = I64()
                 if self.window_message(hwnd, message, wparam, lparam, C.byref(result)) == 0:
                     return result.value
@@ -100,7 +105,8 @@ class Runtime:
             0x00CF0000, 0, 0, 640, 360, None, None, instance, None)
         if not self.window:
             raise C.WinError(C.get_last_error())
-        arguments = "-UTF8Output" + (f' -abslog="{Path(log).resolve()}"' if log else "")
+        # -stdout: without it UE echoes its log with wprintf, which reaches the host's console as UTF-16.
+        arguments = ("-stdout" if visible else "-stdout -RenderOffscreen") + (f' -abslog="{Path(log).resolve()}"' if log else "")
         project_bytes = str(Path(project).resolve()).encode("utf-8")
         desc = InitDesc(C.sizeof(InitDesc), 0, instance, self.window, project_bytes,
                         b"/Game/HdUETest", arguments.encode("utf-8"))
