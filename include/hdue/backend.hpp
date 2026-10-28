@@ -34,6 +34,9 @@ public:
     const HdueVolumeApi& volume_api() const { return volumeApi_; }
     const HdueLightingApi& lighting_api() const { return lightingApi_; }
     const HdueSurfaceApi& surface_api() const { return surfaceApi_; }
+    // hdue_resize_session: resize a session's render target, keeping its scene. HDUE_INVALID_STATE on runtimes
+    // without it (the caller recreates the session instead).
+    HdueResult resize_session(HdueSession session, uint32_t width, uint32_t height) const;
     void initialize(const HdueInitDesc& desc);
     void shutdown();
     bool initialized() const { return initialized_; }

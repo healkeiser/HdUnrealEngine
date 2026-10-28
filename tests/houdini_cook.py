@@ -37,12 +37,12 @@ proxy=UsdGeom.Mesh(stage.GetPrimAtPath('/Native/__HdUEAssetProxy'))
 assert proxy and len(proxy.GetPointsAttr().Get())==8
 assert UsdGeom.PrimvarsAPI(proxy).GetPrimvar('hdue:asset').Get()=='/Game/HdUE/SM_Nanite.SM_Nanite'
 assert abs(UsdGeom.BBoxCache(Usd.TimeCode.Default(),['default','render']).ComputeWorldBound(proxy.GetPrim()).ComputeAlignedRange().GetSize()[0]-1.)<1e-5
-assert stage.GetMetadata('renderSettingsPrimPath')=='/Render/hdUE',stage.GetRootLayer().ExportToString()
-assert not stage.GetPrimAtPath('/Render/hdUE'),'hdUE settings must leave render settings to Render Settings LOPs'
+assert stage.GetMetadata('renderSettingsPrimPath')=='/Render/rendersettings',stage.GetRootLayer().ExportToString()
+assert not stage.GetPrimAtPath('/Render/rendersettings'),'hdUE settings must leave render settings to Render Settings LOPs'
 assert integration.render_options(stage)==('realtime',64)
 render=integration.render_settings_node(node)
 assert not render.errors(),render.errors()
-settings=render.stage().GetPrimAtPath('/Render/hdUE')
+settings=render.stage().GetPrimAtPath('/Render/rendersettings')
 assert settings.GetAttribute('hdUE:renderMode').Get()=='realtime'
 assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'unset controls must not author'
 integration._render_property(render,'xn__hdUErenderMode','pathtraced')

@@ -48,7 +48,10 @@ class Host:
         config=runtime_config()
         os.environ['HDUE_BACKEND_DLL']=config['backend_dll']
         hou.putenv('HDUE_BACKEND_DLL',config['backend_dll'])
-        self.runtime=Runtime(config['backend_dll'],config['runtime_project'],self.log_dir/'ue.log')
+        # UE runs on hdUE's own thread (started by the first hdUE delegate), not on Houdini's UI thread: there it only
+        # advanced between Qt events, so navigation waited seconds per frame and heavy UE work froze the UI.
+        os.environ['HDUE_HOUDINI_UI']='1'; hou.putenv('HDUE_HOUDINI_UI','1')
+        self.runtime=Runtime(config['backend_dll'],config['runtime_project'],self.log_dir/'ue.log',start=False)
         self.api=Viewport(self.runtime,os.environ.get('HDUE_HOUDINI_PLUGIN',str(ROOT/'build/houdini-22.0.466/Release/hdUE_Houdini22.dll')))
         from hdue_materialx import PreparedMaterials
         from substrate_live import LivePreparation
@@ -65,13 +68,13 @@ class Host:
         self.last_textures=0.
         self.texture_error=None
         self.running=True
-        # Schedule after each completed Tick. A permanent due timer can starve
-        # LOP cooks, while Houdini idle callbacks throttle UE to about 10 Hz.
+        # Housekeeping only (preparation, textures, status): UE ticks on its own thread. Rescheduled after each
+        # run, since a permanent due timer can starve LOP cooks.
         self.timer=QtCore.QTimer()
         self.timer.setSingleShot(True)
         self.timer.setTimerType(QtCore.Qt.PreciseTimer)
         self.timer.timeout.connect(self.tick)
-        self.timer.start(8)
+        self.timer.start(16)
         QtWidgets.QApplication.instance().aboutToQuit.connect(self.close)
         atexit.register(self.close)
         self.write_state()
@@ -157,12 +160,14 @@ class Host:
                             self.last_options=options; scene_viewer().curViewport().draw()
             elif self.prepared_output.node is not None:
                 self.prepared_output.close()
-            self.runtime.tick()
-            # UE work from delegates on other threads (Live Render), after UE advanced.
-            if self.api.run_ui_tasks: self.api.run_ui_tasks()
             if self.viewer:
                 if state['error']: self.viewer.status.setText(state['error'])
                 elif not state['active']: self.viewer.status.setText('Select Unreal Engine (hdUE) in Solaris to resume')
+            # UE publishes frames on its own thread; redraw the viewport when one arrived so Houdini shows it.
+            if state['active'] and state['published_frames']!=getattr(self,'shown_frames',None):
+                self.shown_frames=state['published_frames']
+                try: scene_viewer().curViewport().draw()
+                except (hou.Error,AttributeError): pass
             if self.viewer and self.viewer.isVisible() and state['active'] and state['frame']['frame_id']:
                 key=(state['session'],state['generation'],state['frame']['frame_id'])
                 if key!=self.viewer.last_frame:
@@ -176,7 +181,7 @@ class Host:
             if self.viewer: self.viewer.status.setText(_failure.splitlines()[-1])
             self.write_state(_failure); _report(_failure)
         finally:
-            if self.running and not self.closed: self.timer.start(8)
+            if self.running and not self.closed: self.timer.start(16)
 
     def close(self):
         if self.closed: return
@@ -190,6 +195,10 @@ class Host:
         except BaseException: _report(traceback.format_exc())
         if self.viewer: self.viewer.hide()
         self.runtime.close()
+        # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process).
+        shutdown=getattr(self.api.library,'hdue_shutdown_ue',None)
+        if shutdown:
+            shutdown.argtypes=[]; shutdown.restype=None; shutdown()
         self.prepared_output.close()
         from hdue_op_textures import close
         close()
@@ -357,7 +366,7 @@ def settings_node(input_node,metadata=None):
     normalize.parm('python').set('import hdue_houdini\nhdue_houdini.normalize(hou.pwd())')
     layer=node.createNode('configurelayer','stage_metadata')
     layer.setInput(0,normalize)
-    layer.parm('setrendersettings').set(1); layer.parm('rendersettings').set('/Render/hdUE')
+    layer.parm('setrendersettings').set(1); layer.parm('rendersettings').set('/Render/rendersettings')
     for name,value in {'metersperunit':1.,'upaxis':'y'}.items():
         layer.parm('set'+name).set(1); layer.parm(name).set(value)
     bridge=node.createNode('pythonscript','asset_bridge')
@@ -444,10 +453,10 @@ def cook(node):
             _report(f'{path}: unavailable source script package {package}; its actors were omitted by cook')
 
 def render_settings_node(input_node,mode='realtime',samples=64):
-    """A standard Render Settings LOP at /Render/hdUE with hdUE's mode and samples authored."""
+    """A standard Render Settings LOP at /Render/rendersettings (Houdini's default path) with hdUE's mode and samples authored."""
     node=input_node.parent().createNode('rendersettings','hdUE_render_settings')
     node.setInput(0,input_node)
-    node.parm('primpath').set('/Render/hdUE')
+    node.parm('primpath').set('/Render/rendersettings')
     # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
     stage=input_node.stage()
     camera=next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None

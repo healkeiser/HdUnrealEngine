@@ -26,6 +26,7 @@
 #include "subdivision.h"
 #include "mesh_normals.h"
 #include "surface_settings.h"
+#include "color_management.h"
 #include "wet_mask.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -148,6 +149,7 @@ HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& 
 }
 // USD velocities are per second; motion blur times are in frames.
 double HdUEFramesPerSecond(const HdUEState& state) {
+    std::lock_guard lock(state.settingsMutex);
     const auto it = state.settings.find(TfToken("houdini:fps"));
     const double fps = it == state.settings.end() ? 0 : it->second.IsHolding<double>() ? it->second.UncheckedGet<double>()
         : it->second.IsHolding<float>() ? it->second.UncheckedGet<float>() : 0;
@@ -244,6 +246,13 @@ public:
         return nested;
     }
 };
+// Cumulative mesh Sync time (all Hydra threads), reported with each scene submit by HDUE_TRACE_TIMING.
+std::atomic<int64_t> meshSyncMicroseconds{0};
+std::atomic<int> meshSyncs{0};
+struct MeshSyncTimer {
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~MeshSyncTimer() { meshSyncMicroseconds += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(); ++meshSyncs; }
+};
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
     HdMeshTopology maskTopology_;
@@ -254,6 +263,7 @@ public:
     explicit Mesh(const SdfPath& id) : HdMesh(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
+        const MeshSyncTimer timer;
         auto* state = static_cast<HdUEState*>(param);
         HdUEMeshData mesh;
         mesh.id = GetId().GetString();
@@ -363,7 +373,7 @@ public:
             HdUEMaterialData material;
             material.id = mesh.id + ".displayColor";
             const auto color = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
-            if (!color.empty()) material.color = color[0];
+            if (!color.empty()) material.color = HdUEFromSceneLinear(color[0]);
             material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
             if (material.vertexColor) material.color = GfVec3f(1);
             const auto opacity = value(delegate->Get(GetId(), HdTokens->displayOpacity), VtFloatArray());
@@ -387,20 +397,26 @@ public:
         catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText()); return; }
         std::set<std::string> current;
         for (auto& part : parts) {
-            const auto previous = state->meshes.find(part.id);
-            if (previous != state->meshes.end() && previous->second.points == part.points) part.pickMesh = previous->second.pickMesh;
-            if (!part.pickMesh) part.pickMesh = std::make_shared<HdUEPickMesh>(part.points);
-            const bool onlyNativeBounds = previous != state->meshes.end() && !part.sceneAsset.empty() &&
+            // A prim deleted and re-created with the same data (Houdini rebuilds the Hydra scene when its LOP chain
+            // changes) is compared with its last data, so an unchanged mesh is neither removed nor re-uploaded.
+            auto previous = state->meshes.find(part.id);
+            const bool revived = previous == state->meshes.end() && state->erasedMeshes.count(part.id);
+            if (revived) previous = state->erasedMeshes.find(part.id);
+            const auto missing = revived ? state->erasedMeshes.end() : state->meshes.end();
+            if (previous != missing && previous->second.points == part.points) part.pickMesh = previous->second.pickMesh;
+            // Pick structures are built on the first pick (HdUERenderDelegate pick): building a BVH for every mesh here,
+            // under the state mutex, serialized scene loads (tens of seconds on Sponza).
+            const bool onlyNativeBounds = previous != missing && !part.sceneAsset.empty() &&
                 previous->second.sceneAsset==part.sceneAsset && previous->second.transform==part.transform && previous->second.visible==part.visible;
-            const bool meshChanged = !onlyNativeBounds && (previous == state->meshes.end() || previous->second.points != part.points ||
+            const bool meshChanged = !onlyNativeBounds && (previous == missing || previous->second.points != part.points ||
                 previous->second.normals != part.normals || previous->second.uv != part.uv || previous->second.transform != part.transform ||
                 previous->second.material != part.material || previous->second.visible != part.visible || previous->second.sceneAsset != part.sceneAsset ||
                 previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
                 previous->second.colors != part.colors || previous->second.instanceColors != part.instanceColors);
             const auto id = part.id;
-            const bool maskChanged=previous==state->meshes.end() || previous->second.masks!=part.masks || previous->second.maskErrors!=part.maskErrors;
+            const bool maskChanged=previous==missing || previous->second.masks!=part.masks || previous->second.maskErrors!=part.maskErrors;
             state->meshes[id] = std::move(part);
-            state->removed.erase(id);
+            state->removed.erase(id); state->erasedMeshes.erase(id);
             if (meshChanged) { state->dirtyMeshes.insert(id); ++state->revision; }
             else if (maskChanged) ++state->revision;
             current.insert(id);
@@ -473,7 +489,7 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
         previous->second.uv != mesh.uv || previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
         previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
         previous->second.colors != mesh.colors || previous->second.instanceColors != mesh.instanceColors;
-    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points ? previous->second.pickMesh : std::make_shared<HdUEPickMesh>(mesh.points);
+    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points ? previous->second.pickMesh : nullptr; // built on first pick
     const auto key = mesh.id;
     state.meshes[key] = std::move(mesh); state.removed.erase(key);
     if (changed) { state.dirtyMeshes.insert(key); ++state.revision; }
@@ -760,15 +776,17 @@ public:
         for (const auto& [path, node] : network.nodes) {
             if (node.nodeTypeId != TfToken("UsdPreviewSurface")) continue;
             const auto get = [&](const char* name) { const auto it = node.parameters.find(TfToken(name)); return it == node.parameters.end() ? VtValue() : it->second; };
-            data.color = value(get("diffuseColor"), data.color);
-            data.emissive = value(get("emissiveColor"), data.emissive);
+            // Authored colours are in the OCIO scene_linear role; UE works in linear Rec.709.
+            data.color = HdUEFromSceneLinear(value(get("diffuseColor"), data.color));
+            data.emissive = HdUEFromSceneLinear(value(get("emissiveColor"), data.emissive));
             data.metallic = value(get("metallic"), data.metallic);
             data.roughness = value(get("roughness"), data.roughness);
             data.opacity = value(get("opacity"), data.opacity);
             data.opacityThreshold = value(get("opacityThreshold"), data.opacityThreshold);
+            data.displacement = value(get("displacement"), data.displacement);
             static const std::pair<const char*, int> inputs[] = {{"diffuseColor", HDUE_TEXTURE_BASE_COLOR},
                 {"emissiveColor", HDUE_TEXTURE_EMISSIVE}, {"metallic", HDUE_TEXTURE_METALLIC}, {"roughness", HDUE_TEXTURE_ROUGHNESS},
-                {"opacity", HDUE_TEXTURE_OPACITY}, {"normal", HDUE_TEXTURE_NORMAL}};
+                {"opacity", HDUE_TEXTURE_OPACITY}, {"normal", HDUE_TEXTURE_NORMAL}, {"displacement", HDUE_TEXTURE_DISPLACEMENT}};
             bool uvSet = false;
             for (const auto& [input, slot] : inputs) {
                 const auto connection = node.inputConnections.find(TfToken(input));
@@ -783,6 +801,10 @@ public:
                 const auto& asset = file.UncheckedGet<SdfAssetPath>();
                 auto& out = data.textures[slot];
                 out.file = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
+                // Linear colour textures are authored in scene_linear (OCIO); UE works in linear Rec.709.
+                const auto sourceSpace = value(param("sourceColorSpace"), TfToken());
+                if ((slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE) && sourceSpace != TfToken("raw"))
+                    out.file = HdUELinearRec709Texture(out.file);
                 out.scale = value(param("scale"), out.scale);
                 out.bias = value(param("bias"), out.bias);
                 // A single-channel output (r, g, b, a) selects that channel; rgb keeps all.
@@ -812,7 +834,7 @@ public:
         const auto get = [&](const char* name) { return delegate->GetLightParamValue(GetId(), TfToken(name)); };
         const auto applicationLight = get("params");
         data.viewer = applicationLight.IsHolding<GlfSimpleLight>() && !applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight();
-        data.color = value(get("color"), data.color);
+        data.color = HdUEFromSceneLinear(value(get("color"), data.color));
         data.intensity = value(get("intensity"), 1.f) * std::exp2(value(get("exposure"), 0.f));
         if(value(get("enableColorTemperature"),false)) {
             const auto temperature=UsdLuxBlackbodyTemperatureAsRgb(value(get("colorTemperature"),6500.f));
@@ -915,4 +937,8 @@ void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
 }
 HdSprim* HdUECreateMaterial(const SdfPath& id) { return new Material(id); }
 HdSprim* HdUECreateLight(const SdfPath& id, uint32_t type) { return new Light(id, type); }
+// Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
+void HdUETakeMeshSyncStats(double& milliseconds, int& count) {
+    milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0; count = meshSyncs.exchange(0);
+}
 PXR_NAMESPACE_CLOSE_SCOPE

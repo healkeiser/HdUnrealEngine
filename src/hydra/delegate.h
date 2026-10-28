@@ -90,7 +90,7 @@ struct HdUETextureData {
 struct HdUEMaterialData {
     std::string id;
     GfVec3f color{0.7f}, emissive{0};
-    float metallic = 0, roughness = 0.5f, opacity = 1, opacityThreshold = 0;
+    float metallic = 0, roughness = 0.5f, opacity = 1, opacityThreshold = 0, displacement = 0; // displacement in scene units
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false; // HDUE_MATERIAL_VERTEX_COLOR
@@ -120,7 +120,12 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
+    // Meshes erased since the last submit, kept so a re-created identical prim cancels its removal (HdUEState::erase).
+    std::map<std::string, HdUEMeshData> erasedMeshes;
     HdRenderSettingsMap settings;
+    // Guards settings: Houdini's UI thread writes them (SetRenderSetting) while hdUE's UE thread reads them.
+    mutable std::recursive_mutex settingsMutex;
+    HdRenderSettingsMap settingsSnapshot() const { std::lock_guard lock(settingsMutex); return settings; }
     std::shared_ptr<const VtDictionary> wetBindings = std::make_shared<const VtDictionary>();
     std::shared_ptr<hdue::Backend> backend;
     HdueSession session = 0;
@@ -151,6 +156,7 @@ struct HdUEState : HdRenderParam {
     ~HdUEState() override;
     void erase(const std::string& id);
     template<class T> T setting(const char* key, T fallback) const {
+        std::lock_guard lock(settingsMutex);
         const auto it = settings.find(TfToken(key));
         if (it == settings.end()) return fallback;
         if (it->second.IsHolding<T>()) return it->second.UncheckedGet<T>();

@@ -22,6 +22,7 @@
 #include "Materials/MaterialExpressionAppendVector.h"
 #include "Materials/MaterialExpressionDotProduct.h"
 #include "Materials/MaterialExpressionComponentMask.h"
+#include "Materials/MaterialExpressionVertexNormalWS.h"
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionNormalize.h"
 #include "Materials/MaterialExpressionSceneTexture.h"
@@ -118,7 +119,8 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
-    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided)
+    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided &&
+        Material->GetEditorOnlyData()->WorldPositionOffset.Expression)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -180,6 +182,24 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     auto* Roughness = Slot(TEXT("Roughness"), FLinearColor(.5f, .5f, .5f, .5f), false, true);
     auto* Opacity = Slot(TEXT("Opacity"), FLinearColor(1, 1, 1, 1), false, true);
     auto* Normal = Slot(TEXT("Normal"), FLinearColor(0, 0, 1, 0), false, false);
+    // UsdPreviewSurface displacement: along the vertex normal, in cm (the delegate converts scale, bias and constant).
+    // World Position Offset runs in the vertex shader, so the texture is sampled at mip 0.
+    auto* DisplacementSample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
+    DisplacementSample->ParameterName = TEXT("DisplacementTexture");
+    DisplacementSample->Coordinates.Connect(0, UV);
+    DisplacementSample->SamplerType = SAMPLERTYPE_LinearColor;
+    DisplacementSample->Texture = LinearWhite;
+    DisplacementSample->MipValueMode = TMVM_MipLevel;
+    DisplacementSample->ConstMipValue = 0;
+    auto* DisplacementScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    DisplacementScaled->A.Connect(5, DisplacementSample); DisplacementScaled->B.Connect(5, Vector(TEXT("DisplacementScale"), FLinearColor(0, 0, 0, 0)));
+    auto* DisplacementBiased = Add(NewObject<UMaterialExpressionAdd>(Material));
+    DisplacementBiased->A.Connect(0, DisplacementScaled); DisplacementBiased->B.Connect(5, Vector(TEXT("DisplacementBias"), FLinearColor(0, 0, 0, 0)));
+    auto* DisplacementAmount = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+    DisplacementAmount->A.Connect(0, DisplacementBiased); DisplacementAmount->B.Connect(5, Vector(TEXT("DisplacementMask"), FLinearColor(1, 0, 0, 0)));
+    auto* VertexNormal = Add(NewObject<UMaterialExpressionVertexNormalWS>(Material));
+    auto* Offset = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Offset->A.Connect(0, VertexNormal); Offset->B.Connect(0, DisplacementAmount);
     // USD tangent-space normals are +Y up (OpenGL); UE's are -Y after the V flip.
     auto* FlipGreen = Add(NewObject<UMaterialExpressionConstant3Vector>(Material)); FlipGreen->Constant = FLinearColor(1, -1, 1);
     auto* UENormal = Add(NewObject<UMaterialExpressionMultiply>(Material));
@@ -193,6 +213,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     auto* Data = Material->GetEditorOnlyData();
     Data->BaseColor.Expression = nullptr; Data->Metallic.Expression = nullptr; Data->Roughness.Expression = nullptr;
     Data->FrontMaterial.Connect(0, Slab);
+    Data->WorldPositionOffset.Connect(0, Offset);
     Material->BlendMode = Blend;
     if (Blend == BLEND_Masked) {
         // Cutout at opacityThreshold, independent of UE's per-asset clip value.

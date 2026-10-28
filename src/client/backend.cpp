@@ -118,5 +118,10 @@ void Backend::require(HdueResult result, const char* operation) const {
     if (result != HDUE_OK) throw std::runtime_error(std::string(operation) + " failed (" +
         std::to_string(result) + "): " + status_message());
 }
-}
 
+HdueResult Backend::resize_session(HdueSession session, uint32_t width, uint32_t height) const {
+    using ResizeFn = HdueResult(HDUE_CALL*)(HdueSession, uint32_t, uint32_t);
+    const auto resize = reinterpret_cast<ResizeFn>(GetProcAddress(static_cast<HMODULE>(module_), "hdue_resize_session"));
+    return resize ? resize(session, width, height) : HDUE_INVALID_STATE;
+}
+}

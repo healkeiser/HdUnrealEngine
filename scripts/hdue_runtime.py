@@ -36,7 +36,9 @@ _process_libraries = []
 
 
 class Runtime:
-    def __init__(self, library, project, log=None):
+    def __init__(self, library, project, log=None, start=True):
+        """start=False attaches to UE that hdUE's delegate runs on its own thread (Houdini's UI): status and errors
+        only; ticking and shutdown belong to that thread."""
         if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (48, 552, 96):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()
@@ -62,6 +64,9 @@ class Runtime:
         self.shutdown_fn = C.CFUNCTYPE(Result)(api.shutdown)
         self.window_message = C.CFUNCTYPE(Result, U64, U32, U64, I64,
                                          C.POINTER(I64))(api.window_message)
+        self.attached = not start
+        if self.attached:
+            return
         self.user = C.WinDLL("user32", use_last_error=True)
         kernel = C.WinDLL("kernel32", use_last_error=True)
         kernel.GetModuleHandleW.argtypes = [W.LPCWSTR]
@@ -125,7 +130,7 @@ class Runtime:
             raise
 
     def assert_owner(self):
-        if threading.get_ident() != self.owner:
+        if not self.attached and threading.get_ident() != self.owner:
             raise RuntimeError("UELibrary must run on the Qt main thread")
 
     def status(self):
@@ -142,6 +147,8 @@ class Runtime:
 
     def tick(self):
         self.assert_owner()
+        if self.attached:
+            return
         self.check(self.tick_fn(), "tick")
         self.ticks += 1
 
@@ -153,6 +160,9 @@ class Runtime:
     def close(self):
         self.assert_owner()
         if self.closed:
+            return
+        if self.attached:
+            self.closed = True
             return
         self.ready = False
         try:

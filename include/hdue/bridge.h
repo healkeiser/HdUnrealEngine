@@ -46,7 +46,8 @@ enum {
     HDUE_STATE_STOPPED = 4
 };
 enum { HDUE_REALTIME = 0, HDUE_PATH_TRACED = 1 };
-enum { HDUE_RGBA32_FLOAT = 1, HDUE_SCENE_LINEAR_SRGB = 1, HDUE_MESH_REQUIRE_NANITE = 1 };
+enum { HDUE_RGBA32_FLOAT = 1, HDUE_SCENE_LINEAR_SRGB = 1, HDUE_MESH_REQUIRE_NANITE = 1,
+    HDUE_MESH_EDITABLE = 2 }; // EDITABLE: geometry edited after upload (surface effects); others build static meshes
 
 /* Every descriptor is caller-owned. Set struct_size to sizeof(the descriptor).
  * Strings are UTF-8 and are copied during the call. No UE/pxr/STL type, native
@@ -135,7 +136,8 @@ enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2,
     HDUE_CAMERA_DISTANT_LIGHT = 3 };
 /* UsdPreviewSurface inputs that can be driven by a UsdUVTexture. */
 enum { HDUE_TEXTURE_BASE_COLOR = 0, HDUE_TEXTURE_EMISSIVE = 1, HDUE_TEXTURE_METALLIC = 2,
-    HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_SLOT_COUNT = 6 };
+    HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_DISPLACEMENT = 6,
+    HDUE_TEXTURE_SLOT_COUNT = 7 };
 typedef struct HdueTextureDesc {
     const char* file; /* Null or empty: the slot uses its constant. */
     /* value = texel * scale + bias. Scalar slots first reduce the texel with channel_mask. */
@@ -155,6 +157,8 @@ typedef struct HdueMaterialDesc {
     float uv_transform[6];
     HdueTextureDesc textures[HDUE_TEXTURE_SLOT_COUNT];
     uint32_t flags; /* HDUE_MATERIAL_* */
+    /* UsdPreviewSurface displacement, in cm along the vertex normal (texture scale/bias are in cm too). */
+    float displacement;
 } HdueMaterialDesc;
 /* Multiply the base color by the mesh's colors / instance_colors (displayColor primvars). */
 #define HDUE_MATERIAL_VERTEX_COLOR 1u

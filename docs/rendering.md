@@ -39,6 +39,31 @@ Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float
 
 Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5); Karma's default for unbound geometry is darker, so compare renderers with bound materials.
 
+## Colour management (OCIO, ACES)
+
+UE renders in linear Rec.709. In the Houdini build, hdUE converts at its boundaries with the OpenColorIO configuration Houdini uses (`$OCIO`):
+
+- The beauty is published in the config's `scene_linear` role. With an ACES pipeline whose `scene_linear` is ACEScg, renders come out in ACEScg, as Karma's do. Houdini 22's default config uses linear Rec.709 for `scene_linear`, so nothing is converted there.
+- Authored colours (Preview Surface diffuse and emissive colours, `displayColor`, light colours) are read as `scene_linear` values and converted to linear Rec.709 for UE.
+- With UE's tonemapper on, the beauty is display-referred sRGB and is not converted.
+- `HDUE_COLOR_MANAGEMENT=0` turns the conversion off.
+
+- Linear colour textures (EXR, HDR in the base colour and emissive inputs, unless `sourceColorSpace = "raw"`) are read as `scene_linear` and converted once to linear Rec.709 with OpenImageIO, into a cache under the temp folder (`hdue_ocio`), keyed by path, file time and colour space.
+
+8-bit colour textures are read as sRGB-encoded Rec.709, which is what sRGB textures are in any config. Per-file colour space metadata other than `raw` is not read yet.
+
+## Alpha
+
+The beauty carries straight alpha: 1 where geometry covers the pixel, 0 where the camera sees no geometry, fractional on anti-aliased edges and see-through surfaces. hdUE turns on UE's `r.PostProcessing.PropagateAlpha` at startup and converts UE's inverted coverage to straight alpha. A dome light hidden from camera rays (`hdue:visibleBackground = 0`) leaves alpha 0 behind it.
+
+## Displacement
+
+The Preview Surface `displacement` input (a constant or a texture) moves vertices along their normal by that distance in scene units, as World Position Offset in hdUE's preview materials. Only existing vertices move: detail finer than the mesh needs a denser mesh, for example `catmullClark` subdivision (`hdUE:subdivisionLevel`). Shading normals are not recomputed from the displacement. Nanite tessellation, UE's adaptive displacement, needs Nanite meshes, which hdUE cannot build at runtime (see below).
+
+## Nanite
+
+Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). Meshes hdUE builds from Hydra cannot be Nanite: UE builds Nanite data only in the editor, and the runtime static mesh build (`BuildFromMeshDescriptions`) supports only its fast, non-Nanite path.
+
 ## Denoising
 
 With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. hdUE renders albedo and normal passes as guides (internally when they are not bound as AOVs), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.

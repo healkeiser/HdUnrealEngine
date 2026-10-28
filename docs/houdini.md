@@ -20,6 +20,16 @@ Pick **Unreal Engine (hdUE)** in the viewport's renderer menu. Renderer settings
 
 Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The delegate provides `primId` and `instanceId` AOVs, so Solaris draws its native selection highlight on hdUE images. Click picking through those AOVs has not been verified separately; the Scene Graph Tree is the reliable way to select prims. The current target is one active hdUE viewport.
 
+### Performance
+
+In the Houdini UI, UE runs on its own thread and ticks continuously; the viewport only posts camera and scene changes and picks up finished frames, so a slow UE tick never blocks Houdini. Frames are read back as fast as one readback at a time allows, and the host redraws the viewport when one arrives.
+
+- **Image resolution.** Display Options > Render > Image Resolution set to *Render Settings Prim* renders at the render settings' resolution; the viewport size is cheaper while navigating.
+- **Selection IDs.** Solaris asks for `primId` and `instanceId` for its selection highlight. Rendering them swaps every material twice per converged view, so the viewport leaves them out unless `HDUE_VIEWPORT_ID_AOVS=1`; selection then works from the Scene Graph Tree but is not highlighted in the hdUE image.
+- **Loading.** Textures decode in parallel and meshes are assembled on all cores. Meshes first appear as dynamic meshes and are converted to static meshes in the background, one per tick (cached draw commands and static ray-tracing geometry). Meshes with wet surface effects stay dynamic.
+- **Re-created prims.** A prim deleted and re-created with identical data (Houdini rebuilds the Hydra scene when its LOP chain changes) is not re-uploaded.
+- `HDUE_TRACE_TIMING=1` (with `HDUE_TRACE_FILE=<path>`, since Houdini's UI has no visible stderr) logs where each frame's and each scene upload's time goes.
+
 ### Development launcher
 
 From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine (hdUE)` for its process without editing the user's Houdini environment file:
@@ -32,7 +42,7 @@ From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine (hdUE)` fo
 
 `.local/runtime.json` names the staged runtime (`backend_dll`, `runtime_project`, both under `out/runtime/Windows/HdUEBackend`). The update script places the current depth-capable DLL under a content-hash filename; `-SetDefault` records an ignored fallback profile. An explicit `-RuntimeConfig`, `HDUE_RUNTIME_CONFIG`, or the local `runtime_config` key takes priority over that fallback. Restart Houdini to change runtimes.
 
-The launcher creates a source layer, an `hdUE_settings` subnet that prepares the stage, and a standard Render Settings LOP (`hdUE_render_settings`, `/Render/hdUE`). Output uses **Y-up and one unit per meter**: geometry wired into `hdUE_settings` is rescaled from the source stage's units, so add test geometry in those units. Normalization preserves prim paths, original transform interpolation, reset stacks, and camera optical dimensions. The subnet's source-axis and source-unit controls handle inputs whose metadata was lost during composition.
+The launcher creates a source layer, an `hdUE_settings` subnet that prepares the stage, and a standard Render Settings LOP (`hdUE_render_settings`, `/Render/rendersettings`, which the stage's `renderSettingsPrimPath` names). Output uses **Y-up and one unit per meter**: geometry wired into `hdUE_settings` is rescaled from the source stage's units, so add test geometry in those units. Normalization preserves prim paths, original transform interpolation, reset stacks, and camera optical dimensions. The subnet's source-axis and source-unit controls handle inputs whose metadata was lost during composition.
 
 For an existing LOP output, replace `YOUR_OUTPUT` with a node in the current network and run this in Houdini's Python Shell:
 

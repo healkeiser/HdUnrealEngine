@@ -38,4 +38,56 @@
         default { 1 }
         parmtag { "uiscope" "viewport" }
     }
+    parm {
+        name "xn__hdUEwarmupFrames_21a"
+        label "Lumen warmup frames"
+        type int
+        size 1
+        default { 16 }
+        range { 1! 64 }
+        parmtag { "uiscope" "viewport" }
+    }
+    parm {
+        name "xn__hdUEsubdivisionLevel_l8a"
+        label "Subdivision level"
+        type int
+        size 1
+        default { 2 }
+        range { 0! 4 }
+        parmtag { "uiscope" "viewport" }
+    }
+    parm {
+        name "xn__hdUEmotionBlur_tya"
+        label "Motion blur"
+        type toggle
+        size 1
+        default { 1 }
+        parmtag { "uiscope" "viewport" }
+    }
+    parm {
+        name "xn__hdUEdenoiser_kva"
+        label "Denoiser"
+        type string
+        size 1
+        default { "off" }
+        menu { "off" "Off" "oidn" "Open Image Denoise" }
+        parmtag { "uiscope" "viewport" }
+    }
+    parm {
+        name "xn__hdUEtonemapper_tya"
+        label "Unreal tonemapper"
+        type toggle
+        size 1
+        default { 0 }
+        parmtag { "uiscope" "viewport" }
+    }
+    parm {
+        name "xn__hdUEviewerLightIntensity_3fb"
+        label "Viewer light intensity"
+        type float
+        size 1
+        default { 4 }
+        range { 0 20 }
+        parmtag { "uiscope" "viewport" }
+    }
 }

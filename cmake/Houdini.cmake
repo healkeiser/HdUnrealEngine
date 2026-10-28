@@ -9,10 +9,13 @@ add_library(hdue_hdk INTERFACE)
 target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_glf.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/openvdb_sesi.lib"
-    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageDenoise.lib")
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageDenoise.lib"
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenColorIO_sidefx.lib"
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageIO_sidefx.lib"
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageIO_Util_sidefx.lib")
 target_compile_definitions(hdue_hdk INTERFACE HDUE_HOUDINI=1
     _SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
-add_library(hdUE SHARED src/houdini/diagnostics.cpp src/houdini/volume_fields.cpp src/hydra/delegate.cpp src/hydra/prims.cpp
+add_library(hdUE SHARED src/houdini/diagnostics.cpp src/houdini/volume_fields.cpp src/hydra/delegate.cpp src/hydra/color_management.cpp src/hydra/prims.cpp
     src/hydra/render_buffer.cpp src/hydra/plugin.cpp src/hydra/picking.cpp src/hydra/implicit_surfaces.cpp)
 set_target_properties(hdUE PROPERTIES OUTPUT_NAME hdUE_Houdini22)
 target_compile_definitions(hdUE PRIVATE HDUE_HYDRA_EXPORTS)

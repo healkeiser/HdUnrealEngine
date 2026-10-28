@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "ImageUtils.h"
+#include "Async/ParallelFor.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
 #include "MaterialShared.h"
@@ -183,7 +184,12 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
 UTexture2D* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
     const FString Key = File + (SRGB ? TEXT("|srgb") : TEXT("|raw"));
     if (const auto* Cached = PreviewTextures.Find(Key)) return Cached->Get();
-    UTexture2D* Texture = FImageUtils::ImportFileAsTexture2D(File);
+    const double ImportStart = FPlatformTime::Seconds();
+    // Images decoded in parallel by Apply; files outside a batch (lights) decode here.
+    UTexture2D* Texture = nullptr;
+    if (FImage* Decoded = DecodedImages.Find(File)) Texture = FImageUtils::CreateTexture2DFromImage(*Decoded);
+    else Texture = FImageUtils::ImportFileAsTexture2D(File);
+    TextureSeconds += FPlatformTime::Seconds() - ImportStart; ++TextureImports;
     if (!Texture) { Error = FString::Printf(TEXT("Failed to import texture %s."), *File); return nullptr; }
     // Float images (EXR/HDR) are already linear; only 8-bit images carry the sRGB choice.
     if (Texture->SRGB != SRGB && Texture->GetPixelFormat() == PF_B8G8R8A8) { Texture->SRGB = SRGB; Texture->UpdateResource(); }
@@ -202,6 +208,66 @@ void FHdueScene::BindMaterials() {
             if (Component->GetMaterial(0)!=Desired) Component->SetMaterial(0,Desired);
         }
     }
+}
+// Replaces one dynamic mesh queued by Apply with a static mesh (cached draw commands, static ray-tracing geometry).
+void FHdueScene::TickConversions() {
+    for (auto It = PendingStatic.CreateIterator(); It; ++It) {
+        AActor* Actor = Actors.FindRef(It.Key());
+        auto* Dynamic = IsValid(Actor) ? Cast<UDynamicMeshComponent>(Actor->GetRootComponent()) : nullptr;
+        if (!Dynamic) { It.RemoveCurrent(); continue; }
+        auto* Built = NewObject<UStaticMesh>(Actor);
+        FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f); // texture streaming UV density
+        Built->GetStaticMaterials().Add(Slot);
+        UStaticMesh::FBuildMeshDescriptionsParams Params;
+        Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
+        Built->BuildFromMeshDescriptions({&It.Value()}, Params);
+        auto* Component = NewObject<UStaticMeshComponent>(Actor);
+        Component->SetMobility(EComponentMobility::Movable);
+        Component->SetStaticMesh(Built);
+        Component->SetMaterial(0, Dynamic->GetMaterial(0));
+        Actor->SetRootComponent(Component);
+        Actor->AddInstanceComponent(Component);
+        Component->RegisterComponent();
+        Actor->SetActorTransform(Dynamic->GetComponentTransform());
+        Dynamic->DestroyComponent();
+        It.RemoveCurrent();
+        return; // one per tick keeps frames smooth
+    }
+}
+
+namespace {
+// One Hydra mesh as an FDynamicMesh3; pure CPU work, so Apply builds a batch's meshes in parallel.
+UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
+    using namespace UE::Geometry;
+    FDynamicMesh3 Mesh;
+    Mesh.EnableAttributes();
+    Mesh.Attributes()->SetNumNormalLayers(1);
+    Mesh.Attributes()->SetNumUVLayers(1);
+    Mesh.Attributes()->EnablePrimaryColors();
+    auto* Colors = Mesh.Attributes()->PrimaryColors();
+    auto* NormalOverlay = Mesh.Attributes()->PrimaryNormals();
+    auto* UVOverlay = Mesh.Attributes()->PrimaryUV();
+    for (uint32 V = 0; V < Desc.vertex_count; ++V) Mesh.AppendVertex(FVector3d(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]));
+    for (uint32 I = 0; I < Desc.index_count; I += 3) {
+        const FIndex3i Vertices(Desc.indices[I], Desc.indices[I + 1], Desc.indices[I + 2]);
+        const int32 Triangle = Mesh.AppendTriangle(Vertices);
+        if (Triangle < 0) continue;
+        const FVector3f FaceNormal = FVector3f(Mesh.GetTriNormal(Triangle));
+        FIndex3i NormalIds, UVIds, ColorIds;
+        for (int C = 0; C < 3; ++C) {
+            const auto V = Vertices[C];
+            const FVector3f Normal = Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FaceNormal;
+            const FVector2f UV = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
+            NormalIds[C] = NormalOverlay->AppendElement(Normal);
+            UVIds[C] = UVOverlay->AppendElement(UV);
+            ColorIds[C] = Colors->AppendElement(Desc.colors ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f) : FVector4f(1.f, 1.f, 1.f, 1.f));
+        }
+        NormalOverlay->SetTriangle(Triangle, NormalIds);
+        UVOverlay->SetTriangle(Triangle, UVIds);
+        Colors->SetTriangle(Triangle, ColorIds);
+    }
+    return Mesh;
+}
 }
 bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     if ((Batch.material_count && !Batch.materials) || (Batch.mesh_count && !Batch.meshes) ||
@@ -238,6 +304,32 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     for (uint32 Index = 0; Index < Batch.removed_count; ++Index) {
         if (Batch.removed_ids[Index]) Remove(UTF8_TO_TCHAR(Batch.removed_ids[Index]));
     }
+    const double ApplyStart = FPlatformTime::Seconds();
+    RetiredMaterials.Reset(); // replaced by the previous Apply; frames that used them have long finished
+    TextureSeconds = 0; TextureImports = 0;
+    {
+        // Decode this batch's new texture files in parallel: decoding them one by one on this thread took most of
+        // a large scene's load (111 Sponza textures, ~19 s). Creating the UTexture2Ds stays on this thread.
+        TArray<FString> Files;
+        for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
+            const auto& Desc = Batch.materials[Index];
+            if (Desc.native_asset && *Desc.native_asset) continue;
+            for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
+                if (!Desc.textures[Slot].file || !*Desc.textures[Slot].file) continue;
+                const FString File = UTF8_TO_TCHAR(Desc.textures[Slot].file);
+                const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE;
+                if (!PreviewTextures.Contains(File + (Color ? TEXT("|srgb") : TEXT("|raw"))) && !DecodedImages.Contains(File)) Files.AddUnique(File);
+            }
+        }
+        if (Files.Num()) {
+            const double DecodeStart = FPlatformTime::Seconds();
+            TArray<FImage> Images; Images.SetNum(Files.Num());
+            TArray<uint8> Loaded; Loaded.SetNumZeroed(Files.Num());
+            ParallelFor(Files.Num(), [&](int32 Index) { Loaded[Index] = FImageUtils::LoadImage(*Files[Index], Images[Index]) ? 1 : 0; });
+            for (int32 Index = 0; Index < Files.Num(); ++Index) if (Loaded[Index]) DecodedImages.Add(Files[Index], MoveTemp(Images[Index]));
+            TextureSeconds += FPlatformTime::Seconds() - DecodeStart;
+        }
+    }
     for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
         const auto& Desc = Batch.materials[Index];
         if (!Desc.id) { Error = TEXT("Material has no ID."); return false; }
@@ -263,14 +355,15 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, ParentPath);
             if (Parent) {
                 auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
-                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal")};
+                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal"), TEXT("Displacement")};
                 const FLinearColor Constants[HDUE_TEXTURE_SLOT_COUNT] = {
                     FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], 1),
                     FLinearColor(Desc.emissive_color[0], Desc.emissive_color[1], Desc.emissive_color[2], 0),
                     FLinearColor(FVector4f(FMath::Clamp(Desc.metallic, 0.f, 1.f))),
                     FLinearColor(FVector4f(FMath::Clamp(Desc.roughness, 0.f, 1.f))),
                     FLinearColor(FVector4f(Opacity)),
-                    FLinearColor(0, 0, 1, 0)};
+                    FLinearColor(0, 0, 1, 0),
+                    FLinearColor(FVector4f(Desc.displacement))};
                 for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                     const auto& Texture = Desc.textures[Slot];
                     const FString Name = Slots[Slot];
@@ -298,8 +391,37 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             }
         }
         if (!Material) { Error = TEXT("Material asset missing. Prepare/cook content or check the native asset path."); return false; }
+        // A replaced material can still be referenced by frames in flight on the render thread (ray-tracing instance
+        // gathering crashed on a material edit); keep it until the next Apply.
+        if (auto* Previous = Materials.Find(UTF8_TO_TCHAR(Desc.id)); Previous && Previous->Get() != Material) RetiredMaterials.Add(MoveTemp(*Previous));
         Materials.Add(UTF8_TO_TCHAR(Desc.id), TStrongObjectPtr<UMaterialInterface>(Material));
     }
+    const double MaterialsDone = FPlatformTime::Seconds();
+    // Assemble the generated meshes on all cores; components and assets are created below on this thread. Meshes that
+    // are not edited after upload become static meshes: UDynamicMeshComponent rebuilt its draw commands and dynamic
+    // ray-tracing instances every frame.
+    TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
+    TArray<FMeshDescription> Descriptions; Descriptions.SetNum(Batch.mesh_count);
+    // Interactive hosts (Houdini's viewport) convert generated meshes to static ones in the background, one per tick
+    // (TickConversions): building static render data on this thread made a large scene's load 4x slower. Offline
+    // hosts (husk) keep dynamic meshes, which are cheaper for a few frames.
+    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
+    const auto StaticGenerated = [&](const HdueMeshDesc& Desc) {
+        return !(Desc.native_asset && *Desc.native_asset) && Desc.instance_transforms != nullptr;
+    };
+    const auto ConvertLater = [&](const HdueMeshDesc& Desc) {
+        return Interactive && !(Desc.native_asset && *Desc.native_asset) && !Desc.instance_transforms && !(Desc.flags & HDUE_MESH_EDITABLE);
+    };
+    ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
+        const auto& Desc = Batch.meshes[Index];
+        if (Desc.native_asset && *Desc.native_asset) return;
+        BuiltMeshes[Index] = BuildDynamicMesh(Desc);
+        if (StaticGenerated(Desc) || ConvertLater(Desc)) {
+            FStaticMeshAttributes Attributes(Descriptions[Index]); Attributes.Register();
+            FDynamicMeshToMeshDescription().Convert(&BuiltMeshes[Index], Descriptions[Index]);
+            if (StaticGenerated(Desc)) BuiltMeshes[Index].Clear();
+        }
+    });
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Desc = Batch.meshes[Index];
         const FString Id = UTF8_TO_TCHAR(Desc.id);
@@ -307,14 +429,15 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         const bool Native = Desc.native_asset && *Desc.native_asset;
         // Hydra instancer prototypes draw through one ISM: the native asset, or a static mesh built here.
         const bool Instanced = Desc.instance_transforms != nullptr;
-        UClass* Wanted = Instanced ? UInstancedStaticMeshComponent::StaticClass() : Native ? UStaticMeshComponent::StaticClass() : UDynamicMeshComponent::StaticClass();
+        const bool Static = StaticGenerated(Desc);
+        UClass* Wanted = Instanced ? UInstancedStaticMeshComponent::StaticClass() : (Native || Static) ? UStaticMeshComponent::StaticClass() : UDynamicMeshComponent::StaticClass();
         if (Actor && (!Actor->GetRootComponent() || Actor->GetRootComponent()->GetClass() != Wanted)) {
             Remove(Id); Actor = nullptr;
         }
         if (!Actor) {
             Actor = World->SpawnActor<AActor>();
             Actors.Add(Id, Actor);
-            if (Native || Instanced) {
+            if (Native || Instanced || Static) {
                 auto* Component = NewObject<UStaticMeshComponent>(Actor, Wanted);
                 Component->SetMobility(EComponentMobility::Movable);
                 Actor->SetRootComponent(Component);
@@ -347,45 +470,21 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
             using namespace UE::Geometry;
-            FDynamicMesh3 Mesh;
-            Mesh.EnableAttributes();
-            Mesh.Attributes()->SetNumNormalLayers(1);
-            Mesh.Attributes()->SetNumUVLayers(1);
-            Mesh.Attributes()->EnablePrimaryColors();
-            auto* Colors = Mesh.Attributes()->PrimaryColors();
-            auto* NormalOverlay = Mesh.Attributes()->PrimaryNormals();
-            auto* UVOverlay = Mesh.Attributes()->PrimaryUV();
-            for (uint32 V = 0; V < Desc.vertex_count; ++V) Mesh.AppendVertex(FVector3d(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]));
-            for (uint32 I = 0; I < Desc.index_count; I += 3) {
-                const FIndex3i Vertices(Desc.indices[I], Desc.indices[I + 1], Desc.indices[I + 2]);
-                const int32 Triangle = Mesh.AppendTriangle(Vertices);
-                if (Triangle < 0) continue;
-                const FVector3f FaceNormal = FVector3f(Mesh.GetTriNormal(Triangle));
-                FIndex3i NormalIds, UVIds, ColorIds;
-                for (int C = 0; C < 3; ++C) {
-                    const auto V = Vertices[C];
-                    const FVector3f Normal = Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FaceNormal;
-                    const FVector2f UV = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
-                    NormalIds[C] = NormalOverlay->AppendElement(Normal);
-                    UVIds[C] = UVOverlay->AppendElement(UV);
-                    ColorIds[C] = Colors->AppendElement(Desc.colors ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f) : FVector4f(1.f, 1.f, 1.f, 1.f));
-                }
-                NormalOverlay->SetTriangle(Triangle, NormalIds);
-                UVOverlay->SetTriangle(Triangle, UVIds);
-                Colors->SetTriangle(Triangle, ColorIds);
-            }
-            if (Instanced) {
-                FMeshDescription Description;
-                FStaticMeshAttributes Attributes(Description); Attributes.Register();
-                FDynamicMeshToMeshDescription().Convert(&Mesh, Description);
-                InstanceMesh = NewObject<UStaticMesh>(Actor);
+            if (Static) {
+                auto* Built = NewObject<UStaticMesh>(Actor);
                 // Texture streaming reads UV density; cooked meshes get it from the editor.
                 FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f);
-                InstanceMesh->GetStaticMaterials().Add(Slot);
+                Built->GetStaticMaterials().Add(Slot);
                 UStaticMesh::FBuildMeshDescriptionsParams Params;
                 Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
-                InstanceMesh->BuildFromMeshDescriptions({&Description}, Params);
-            } else Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(Mesh));
+                Built->BuildFromMeshDescriptions({&Descriptions[Index]}, Params);
+                if (Instanced) InstanceMesh = Built;
+                else Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
+            } else {
+                Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
+                if (ConvertLater(Desc)) PendingStatic.Add(Id, MoveTemp(Descriptions[Index]));
+                else PendingStatic.Remove(Id);
+            }
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
         }
         if (Instanced) {
@@ -433,7 +532,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         if (auto* Point = Cast<UPointLightComponent>(Light)) { Point->SetAttenuationRadius(100000); Point->SetSourceRadius(FMath::Max(0.1f, Desc.width_cm)); }
         if (auto* Rect = Cast<URectLightComponent>(Light)) { Rect->SetSourceWidth(Desc.width_cm); Rect->SetSourceHeight(Desc.height_cm); Rect->SetAttenuationRadius(100000); }
     }
+    const double MeshesDone = FPlatformTime::Seconds();
+    DecodedImages.Reset(); // their textures exist now
     BindMaterials();
+    if (Batch.material_count || Batch.mesh_count)
+        UE_LOG(LogTemp, Display, TEXT("hdUE apply: %u materials %.0f ms (%d texture imports %.0f ms), %u meshes %.0f ms, bind %.0f ms"),
+            Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, TextureSeconds * 1000, Batch.mesh_count,
+            (MeshesDone - MaterialsDone) * 1000, (FPlatformTime::Seconds() - MeshesDone) * 1000);
     return true;
 }
 void FHdueScene::UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up) {

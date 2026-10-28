@@ -1,4 +1,6 @@
 #pragma once
+#include "ImageCore.h"
+#include "MeshDescription.h"
 #include "CoreMinimal.h"
 #include "hdue/bridge.h"
 #include "hdue/material_api.h"
@@ -20,6 +22,7 @@ public:
     explicit FHdueScene(UWorld* InWorld);
     ~FHdueScene();
     bool Apply(const HdueSceneBatch& Batch, FString& Error);
+    void TickConversions();
     void UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up);
     HdueResult SetMaterialParameters(const HdueMaterialUpdate& Update, FString& Error);
     HdueResult GetMaterialStats(const char* Id, HdueMaterialStats& Stats, FString& Error);
@@ -53,6 +56,10 @@ private:
     int32 IdMode = 0;
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits matter.
     TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
+    double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
+    TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
+    TMap<FString, FImage> DecodedImages;
+    TMap<FString, FMeshDescription> PendingStatic; // dynamic meshes TickConversions turns into static meshes // decoded in parallel at the start of Apply, consumed by PreviewTexture
     UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;
