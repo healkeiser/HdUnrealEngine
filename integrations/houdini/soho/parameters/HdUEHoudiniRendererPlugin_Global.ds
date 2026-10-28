@@ -104,6 +104,19 @@
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none })"
         }
+        HDUE_CONTROL("xn__hdUEsubdivisionLevel_control_mmb", "Subdivision Level")
+        parm {
+            name    "xn__hdUEsubdivisionLevel_l8a"
+            label   "Subdivision Level"
+            type    int
+            size    1
+            default { 2 }
+            range   { 0! 5 }
+            help    "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's surfaces closely, 0 renders the cage."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEsubdivisionLevel_control_mmb == block } { xn__hdUEsubdivisionLevel_control_mmb == none })"
+        }
         HDUE_CONTROL("xn__hdUEtonemapper_control_ucb", "Unreal Tonemapper")
         parm {
             name    "xn__hdUEtonemapper_tya"

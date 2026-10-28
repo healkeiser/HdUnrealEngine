@@ -6,6 +6,10 @@
 #include "Components/SkyLightComponent.h"
 #include "Engine/TextureCube.h"
 #include "Engine/Texture2D.h"
+#include "Engine/TextureLightProfile.h"
+#include "IESConverter.h"
+#include "Misc/FileHelper.h"
+#include "UObject/Package.h"
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
 #include "ImageUtils.h"
@@ -73,7 +77,7 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch,FString& Error) {
         for(double Value:D.axes) if(!FMath::IsFinite(Value)) {Error=TEXT("Nonfinite light orientation."); return false;}
         for(double Value:D.position_cm) if(!FMath::IsFinite(Value)) {Error=TEXT("Nonfinite light position."); return false;}
         for(float Value:D.color) if(!FMath::IsFinite(Value) || Value<0) {Error=TEXT("Invalid light color."); return false;}
-        for(float Value:{D.intensity,D.width_cm,D.height_cm,D.length_cm,D.angle_degrees,D.diffuse,D.specular,D.cone_angle,D.cone_softness})
+        for(float Value:{D.intensity,D.width_cm,D.height_cm,D.length_cm,D.angle_degrees,D.diffuse,D.specular,D.cone_angle,D.cone_softness,D.ies_angle_scale})
             if(!FMath::IsFinite(Value) || Value<0) {Error=TEXT("Invalid light parameter."); return false;}
         if(FMath::Abs(Frame(D).Determinant())<1e-8 || D.angle_degrees>180 || D.cone_angle>180 || D.cone_softness>1) {
             Error=TEXT("Degenerate light frame or invalid cone/angle."); return false;
@@ -83,6 +87,11 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch,FString& Error) {
         }
         FDefinition Definition; Definition.Data=D; Definition.Id=UTF8_TO_TCHAR(D.id);
         Definition.File=D.texture_file?UTF8_TO_TCHAR(D.texture_file):TEXT(""); Definition.Data.id=nullptr; Definition.Data.texture_file=nullptr;
+        Definition.Ies=D.ies_file?UTF8_TO_TCHAR(D.ies_file):TEXT(""); Definition.Data.ies_file=nullptr;
+        if(!Definition.Ies.IsEmpty() && (D.type==HDUE_DOME_LIGHT || D.type==HDUE_DISTANT_LIGHT || D.type==HDUE_CAMERA_DISTANT_LIGHT)) {
+            Error=TEXT("IES profiles apply to local lights only."); return false;
+        }
+        if(!Definition.Ies.IsEmpty() && !Profile(Definition.Ies,Error)) return false;
         if(Ids.Contains(Definition.Id)) {Error=TEXT("Duplicate light ID."); return false;} Ids.Add(Definition.Id);
         if(!Definition.File.IsEmpty()) {
             const auto Stat=IFileManager::Get().GetStatData(*Definition.File);
@@ -195,8 +204,42 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
             Rect->SetSourceTexture(LightTextures[Definition.File].Get());
         }
     }
+    if(auto* Local=Cast<ULocalLightComponent>(Light); Local && !Definition.Ies.IsEmpty()) {
+        // UE has no IES angle scale; the profile keeps its own angles.
+        if(D.ies_angle_scale!=0) UE_LOG(LogTemp, Warning, TEXT("hdUE: shaping:ies:angleScale is not supported (%s)"), *Definition.Id);
+        UTextureLightProfile* Texture=Profile(Definition.Ies,Error);
+        if(!Texture) return false;
+        Local->SetIESTexture(Texture); Local->bUseIESBrightness=false;
+        // normalize keeps the light's total power: scale by the profile's sphere-integration multiplier.
+        if(D.ies_normalize && Texture->TextureMultiplier>0) Intensity*=Texture->TextureMultiplier;
+    }
     Light->SetIntensity(Intensity); Light->RegisterComponent(); Actor->SetActorHiddenInGame(!D.visible);
     return true;
+}
+UTextureLightProfile* FHdueLighting::Profile(const FString& File,FString& Error) {
+    const auto Stat=IFileManager::Get().GetStatData(*File);
+    if(!Stat.bIsValid || Stat.bIsDirectory) {Error=TEXT("IES profile is not a readable file: ")+File; return nullptr;}
+    if(const auto* Cached=Profiles.Find(File); Cached && Cached->Modified==Stat.ModificationTime && Cached->Size==Stat.FileSize) return Cached->Texture.Get();
+    TArray<uint8> Bytes;
+    if(!FFileHelper::LoadFileToArray(Bytes,*File)) {Error=TEXT("Cannot read IES profile: ")+File; return nullptr;}
+    FIESConverter Converter(Bytes.GetData(),uint32(Bytes.Num()));
+    if(!Converter.IsValid()) {Error=FString::Printf(TEXT("Invalid IES profile %s: %s"),*File,Converter.GetError()); return nullptr;}
+    // The editor imports IES as RGBA16F source data; build the same texture's platform data directly.
+    const int32 Width=int32(Converter.GetWidth()),Height=int32(Converter.GetHeight());
+    if(Converter.GetRawData().Num()!=int64(Width)*Height*int64(sizeof(FFloat16Color))) {Error=TEXT("Unexpected IES texture layout: ")+File; return nullptr;}
+    auto* Texture=NewObject<UTextureLightProfile>(GetTransientPackage(),NAME_None,RF_Transient);
+    auto* Data=new FTexturePlatformData(); Data->SizeX=Width; Data->SizeY=Height; Data->SetNumSlices(1); Data->PixelFormat=PF_FloatRGBA;
+    auto* Mip=new FTexture2DMipMap(Width,Height,1); Data->Mips.Add(Mip);
+    Mip->BulkData.Lock(LOCK_READ_WRITE);
+    FMemory::Memcpy(Mip->BulkData.Realloc(Converter.GetRawData().Num()),Converter.GetRawData().GetData(),Converter.GetRawData().Num());
+    Mip->BulkData.Unlock();
+    Texture->SetPlatformData(Data);
+    Texture->AddressX=TA_Clamp; Texture->AddressY=TA_Clamp; Texture->SRGB=false; Texture->NeverStream=true;
+    Texture->CompressionSettings=TC_HDR; Texture->Filter=TF_Bilinear;
+    Texture->Brightness=Converter.GetBrightness(); Texture->TextureMultiplier=Converter.GetMultiplier();
+    Texture->UpdateResource();
+    auto& Entry=Profiles.FindOrAdd(File); Entry.Modified=Stat.ModificationTime; Entry.Size=Stat.FileSize; Entry.Texture.Reset(Texture);
+    return Texture;
 }
 bool FHdueLighting::RebuildEnvironment(FString& Error) {
     DomeCount=0; Resolution=0; ShowBackground=false; MaximumRadiance=0;

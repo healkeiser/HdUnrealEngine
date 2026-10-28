@@ -23,6 +23,7 @@
 #include <cmath>
 #include <algorithm>
 #include "geom_subsets.h"
+#include "subdivision.h"
 #include "mesh_normals.h"
 #include "surface_settings.h"
 #include "wet_mask.h"
@@ -68,7 +69,7 @@ std::vector<GfVec3f> HdUEVaryingColors(std::vector<GfVec3f> colors, size_t count
     return colors;
 }
 template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name,
-    const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type) {
+    const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type, const HdUESubdivision* subdivision = nullptr) {
     // Indexed primvars (primvars:x:indices) arrive unflattened; expand them first.
     VtIntArray indices;
     const auto raw = delegate->GetIndexedPrimvar(id, name, &indices);
@@ -84,6 +85,7 @@ template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPa
     }
     if (array.empty()) return {};
     const auto domain = interpolation(delegate, id, name);
+    if (subdivision && (array = subdivision->refine(array, domain)).empty()) return {};
     VtArray<T> faceValues;
     if (domain == HdInterpolationFaceVarying) {
         VtValue output;
@@ -256,8 +258,11 @@ public:
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
-        const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
-        const auto topology = delegate->GetMeshTopology(GetId());
+        auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        auto topology = delegate->GetMeshTopology(GetId());
+        // catmullClark and loop meshes are refined uniformly (hdUE:subdivisionLevel); authored normals do not apply to them.
+        const auto subdivision = mesh.sceneAsset.empty() ? HdUESubdivision::Create(topology, state->setting<int>("subdivisionLevel", 2)) : nullptr;
+        if (subdivision) { points = subdivision->refine(points, HdInterpolationVertex); topology = subdivision->topology(); }
         HdMeshUtil util(&topology, GetId());
         VtVec3iArray triangles;
         VtIntArray parameters;
@@ -275,7 +280,8 @@ public:
             const size_t count = delegate->SamplePrimvar(GetId(), HdTokens->points, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, samples);
             bool moves = false;
             for (size_t k = 0; k < count && count > 1; ++k) {
-                const auto sample = value(samples[k], VtVec3fArray());
+                auto sample = value(samples[k], VtVec3fArray());
+                if (subdivision) sample = subdivision->refine(sample, HdInterpolationVertex);
                 if (sample.size() != points.size()) { mesh.deformTimes.clear(); mesh.deformOffsets.clear(); moves = false; break; }
                 auto& offsets = mesh.deformOffsets.emplace_back(); offsets.reserve(mesh.points.size());
                 for (const auto& triangle : triangles) for (int corner : {0, 1, 2}) {
@@ -286,7 +292,8 @@ public:
             }
             if (!moves) {
                 mesh.deformTimes.clear(); mesh.deformOffsets.clear();
-                const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
+                auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
+                if (subdivision) velocities = subdivision->refine(velocities, HdInterpolationVertex);
                 if (velocities.size() == points.size() && std::any_of(velocities.begin(), velocities.end(), [](const auto& v) { return v != GfVec3f(0); })) {
                     const float fps = float(HdUEFramesPerSecond(*state));
                     mesh.deformTimes = {-1.f, 1.f}; mesh.deformOffsets.resize(2);
@@ -297,7 +304,7 @@ public:
                 }
             }
         }
-        mesh.normals = expanded<GfVec3f>(delegate, GetId(), HdTokens->normals, triangles, parameters, util, HdTypeFloatVec3);
+        if (!subdivision) mesh.normals = expanded<GfVec3f>(delegate, GetId(), HdTokens->normals, triangles, parameters, util, HdTypeFloatVec3);
         if (mesh.normals.size() != mesh.points.size()) mesh.normals.resize(mesh.points.size(), GfVec3f(0));
         if (std::any_of(mesh.normals.begin(),mesh.normals.end(),[](const auto& normal) {return normal.GetLengthSq()<1e-12f;})) {
             try {
@@ -306,9 +313,9 @@ public:
                     if (mesh.normals[i].GetLengthSq()<1e-12f) mesh.normals[i]=smooth[i];
             } catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s",error.what(),GetId().GetText()); return; }
         }
-        mesh.uv = expanded<GfVec2f>(delegate, GetId(), TfToken("st"), triangles, parameters, util, HdTypeFloatVec2);
+        mesh.uv = expanded<GfVec2f>(delegate, GetId(), TfToken("st"), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
         if (mesh.material.empty() && mesh.sceneAsset.empty())
-            mesh.colors = HdUEVaryingColors(expanded<GfVec3f>(delegate, GetId(), HdTokens->displayColor, triangles, parameters, util, HdTypeFloatVec3), mesh.points.size());
+            mesh.colors = HdUEVaryingColors(expanded<GfVec3f>(delegate, GetId(), HdTokens->displayColor, triangles, parameters, util, HdTypeFloatVec3, subdivision.get()), mesh.points.size());
         std::shared_ptr<const VtDictionary> selectedBindings;
         { std::lock_guard lock(state->mutex); selectedBindings=state->wetBindings; }
         const auto& wetBindings=*selectedBindings;
@@ -795,6 +802,11 @@ public:
         data.diffuse=value(get("diffuse"),1.f); data.specular=value(get("specular"),1.f);
         data.angle=value(get("angle"),.53f);
         data.coneAngle=value(get("shaping:cone:angle"),180.f); data.coneSoftness=value(get("shaping:cone:softness"),0.f);
+        if(const auto ies=get("shaping:ies:file"); ies.IsHolding<SdfAssetPath>()) {
+            const auto& file=ies.UncheckedGet<SdfAssetPath>();
+            data.ies=file.GetResolvedPath().empty()?file.GetAssetPath():file.GetResolvedPath();
+        }
+        data.iesAngleScale=value(get("shaping:ies:angleScale"),0.f); data.iesNormalize=value(get("shaping:ies:normalize"),false);
         auto texture=get("texture:file");
         if(applicationLight.IsHolding<GlfSimpleLight>() && applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
             texture=VtValue(applicationLight.UncheckedGet<GlfSimpleLight>().GetDomeLightTextureFile());
@@ -825,7 +837,8 @@ public:
             old->second.type==data.type && old->second.width==data.width && old->second.height==data.height && old->second.length==data.length &&
             old->second.flags==data.flags && old->second.diffuse==data.diffuse && old->second.specular==data.specular &&
             old->second.angle==data.angle && old->second.coneAngle==data.coneAngle && old->second.coneSoftness==data.coneSoftness &&
-            old->second.textureFormat==data.textureFormat) {*bits=Clean; return;}
+            old->second.textureFormat==data.textureFormat && old->second.ies==data.ies && old->second.iesAngleScale==data.iesAngleScale &&
+            old->second.iesNormalize==data.iesNormalize) {*bits=Clean; return;}
         if (data.viewer && old != state->lights.end() && old->second.viewer && old->second.color == data.color && old->second.visible == data.visible) {
             // The backend follows the render camera at request time. Moving
             // Hdx's camera light must not submit/cancel the entire scene.

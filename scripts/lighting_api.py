@@ -18,8 +18,8 @@ class Lighting:
         get=runtime.library.hdue_get_lighting_api
         get.argtypes=[U32,U32,C.POINTER(Api)]; get.restype=Result
         api=Api()
-        runtime.check(get(1,C.sizeof(api),C.byref(api)),'lighting API')
-        if api.struct_size!=C.sizeof(api) or api.abi_version!=1: raise RuntimeError('Unsupported lighting ABI')
+        runtime.check(get(2,C.sizeof(api),C.byref(api)),'lighting API')
+        if api.struct_size!=C.sizeof(api) or api.abi_version!=2: raise RuntimeError('Unsupported lighting ABI')
         self.get_status=C.CFUNCTYPE(Result,U64,C.POINTER(Status))(api.get_status)
 
     def status(self,session):

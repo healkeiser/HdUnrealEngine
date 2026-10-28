@@ -11,6 +11,7 @@ class AActor;
 class USkyLightComponent;
 class UTextureCube;
 class UTexture2D;
+class UTextureLightProfile;
 
 class FHdueLighting {
 public:
@@ -28,13 +29,16 @@ public:
     void Status(HdueLightingStatus& Status) const;
     const FString& GetError() const {return LastError;}
 private:
-    struct FDefinition {HdueLight Data{}; FString Id,File;};
+    struct FDefinition {HdueLight Data{}; FString Id,File,Ies;};
     struct FImageEntry {FDateTime Modified; int64 Size=0; TSharedPtr<FImage> Image;};
     UWorld* World;
     TMap<FString,FDefinition> Definitions;
     TMap<FString,AActor*> Actors;
     TMap<FString,FImageEntry> Images;
     TMap<FString,TStrongObjectPtr<UTexture2D>> LightTextures;
+    struct FProfileEntry {FDateTime Modified; int64 Size=0; TStrongObjectPtr<UTextureLightProfile> Texture;};
+    TMap<FString,FProfileEntry> Profiles; // IES files by path
+    UTextureLightProfile* Profile(const FString& File,FString& Error);
     AActor* SkyActor=nullptr;
     USkyLightComponent* Sky=nullptr;
     TStrongObjectPtr<UTextureCube> Environment;

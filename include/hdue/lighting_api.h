@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define HDUE_LIGHTING_ABI_VERSION 1u
+#define HDUE_LIGHTING_ABI_VERSION 2u
 enum { HDUE_DOME_LIGHT=4, HDUE_DISK_LIGHT=5, HDUE_CYLINDER_LIGHT=6 };
 enum { HDUE_LIGHT_SHADOWS=1, HDUE_LIGHT_NORMALIZE=2, HDUE_LIGHT_POINT=4,
        HDUE_LIGHT_BACKGROUND=8, HDUE_LIGHT_MEGALIGHTS=16 };
@@ -21,6 +21,10 @@ typedef struct HdueLight {
     float width_cm, height_cm, length_cm, angle_degrees;
     float diffuse, specular, cone_angle, cone_softness;
     uint32_t cube_resolution, texture_format;
+    /* UsdLux ShapingAPI IES profile (point, sphere, spot, rect and disk lights); empty for none. */
+    const char* ies_file;
+    float ies_angle_scale;
+    uint32_t ies_normalize;
 } HdueLight;
 typedef struct HdueLightBatch {
     uint32_t struct_size, light_count;

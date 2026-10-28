@@ -5,7 +5,7 @@
 #include "hdue/viewport_api.h"
 #include "hdue/depth_api.h"
 #include "hdue/lighting_api.h"
-_Static_assert(sizeof(HdueLight) == 184, "extended light layout");
+_Static_assert(sizeof(HdueLight) == 200, "extended light layout");
 _Static_assert(sizeof(HdueLightBatch) == 16, "light batch layout");
 _Static_assert(sizeof(HdueLightingStatus) == 56, "lighting status layout");
 _Static_assert(sizeof(HdueLightingApi) == 24, "lighting API layout");

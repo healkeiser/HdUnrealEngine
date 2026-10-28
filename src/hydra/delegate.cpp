@@ -375,6 +375,8 @@ void submit(HdUEState& state) {
         light.cube_resolution=uint32_t(state.setting<int>("domeResolution",512));
         light.texture_format=source?source->textureFormat:HDUE_ENVIRONMENT_AUTOMATIC;
         light.texture_file=source?source->texture.c_str():"";
+        light.ies_file=source?source->ies.c_str():""; light.ies_angle_scale=source?source->iesAngleScale:0;
+        light.ies_normalize=source && source->iesNormalize;
         for(int c=0;c<3;++c) {light.position_cm[c]=legacy.position[c]; light.color[c]=legacy.color[c];}
         for(int axis=0;axis<3;++axis) {
             GfVec3d direction(0); direction[axis]=1;
@@ -1145,6 +1147,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             state_->settings[TfToken("timeSeconds")]=VtValue(frame/fps);
             ++state_->requestSettingsRevision;
         }
+    }
+    if (key == TfToken("subdivisionLevel") && state_->renderIndex) {
+        for (const auto& id : state_->renderIndex->GetRprimIds()) state_->renderIndex->GetChangeTracker().MarkRprimDirty(id, HdChangeTracker::DirtyTopology);
+        ++state_->revision;
     }
     if (key == TfToken("autoViewerLight") || key == TfToken("viewerLightIntensity")) {
         for (const auto& [id, light] : state_->lights) if (light.viewer) state_->dirtyLights.insert(id);

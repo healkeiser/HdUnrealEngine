@@ -66,6 +66,7 @@ Left: hdUE (UE Path Tracer). Right: Karma CPU. Same USD file, same husk command,
 | **Orthographic camera** | ![Orthographic](docs/images/ortho.png) |
 | **Camera exposure** | ![Exposure](docs/images/exposure.png) |
 | **Volumes from SOPs** (VDB and native Houdini volumes) | ![Volumes](docs/images/volumes.png) |
+| **Subdivision surfaces** (Catmull-Clark with a GeomSubset, level 3, next to `subdivisionScheme = "none"`) | ![Subdivision](docs/images/subdivision.png) |
 | **Curves, points, instances** with their `primId` / `instanceId` AOVs | ![Shapes](docs/images/shapes.png) |
 | **Unreal post-processing** (linear beauty, then UE's tonemapper, bloom, grading and grain) | ![Post-processing](docs/images/postprocess.png) |
 
@@ -78,10 +79,10 @@ In the motion-blur image, hdUE blurs the points and instances from their `veloci
 |------|--------------|---------|
 | **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
 | **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames, about 0.25 s per simple 1080p Lumen frame | |
-| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance | Subdivision, displacement, varying `displayOpacity` |
+| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform) | Displacement, adaptive subdivision, varying `displayOpacity` |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
 | **Materials** | UsdPreviewSurface with every texture input and cutouts, prepared MaterialX (Standard Surface, OpenPBR) and Substrate, COP textures | Arbitrary MaterialX at runtime |
-| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, IES, portals |
+| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, portals; IES profiles are experimental (applied and oriented, but brightness and falloff do not match Karma yet) |
 | **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`) | Lens distortion |
 | **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR | LPE AOVs, cryptomatte, deep output |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |

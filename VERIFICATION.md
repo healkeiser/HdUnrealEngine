@@ -114,6 +114,7 @@ The README gallery comes from husk renders of synthetic scenes with `--renderer 
 
 - Post-processing (husk, realtime and Path Tracer): with `hdUE:tonemapper` off, `ColorSaturation` leaves the image unchanged; with it on, saturation 0 gives a grey image (zero chroma), bloom and vignette apply, `AutoExposureBias` 3 saturates the image, and Lumen and Path Tracer agree (mean 0.255 against 0.259). A post-process material loads as a blendable, and an unknown property logs a warning without failing the frame. The Render Settings LOP authors the matching `hdUE:*` attributes.
 - Throughput (RTX 4090, 1080p, simple scene, 16 warmup frames, one husk call for 24 frames): 0.3 s per Lumen frame and about 3 s of UE startup, against 5.3 s per frame before husk-owned ticking and readback throttling. Output images were unchanged by those changes (identical means). A 480x270, 64-sample Path Tracer frame went from 25 s to 6 s including startup.
+- Subdivision: a Catmull-Clark cube with face-varying `st` and a two-face material GeomSubset renders as Karma's limit surface does, with the subset on the same faces; at level 3 the silhouette matches closely, at the default level 2 it is still faceted. A `subdivisionScheme = "none"` cube stays a cube.
 - Deformation blur: time-sampled `points` blur over the same extent as Karma; per-point `velocities` on a mesh blur in hdUE and were left sharp by Karma with default settings.
 
 ## Publication checks
