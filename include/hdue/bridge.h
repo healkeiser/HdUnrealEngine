@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 5u
+#define HDUE_ABI_VERSION 6u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -143,7 +143,10 @@ typedef struct HdueMaterialDesc {
     /* UE UV (top-left origin) affine: u' = m[0]u + m[1]v + m[2], v' = m[3]u + m[4]v + m[5]. */
     float uv_transform[6];
     HdueTextureDesc textures[HDUE_TEXTURE_SLOT_COUNT];
+    uint32_t flags; /* HDUE_MATERIAL_* */
 } HdueMaterialDesc;
+/* Multiply the base color by the mesh's colors / instance_colors (displayColor primvars). */
+#define HDUE_MATERIAL_VERTEX_COLOR 1u
 typedef struct HdueMeshDesc {
     const char* id;
     const char* material_id;
@@ -163,6 +166,10 @@ typedef struct HdueMeshDesc {
      * row-major UE world matrix (16 doubles each); transform is ignored. NULL: not instanced. */
     uint32_t instance_count;
     const double* instance_transforms;
+    /* Linear RGB multiplied into the surface's base color: per vertex (vertex_count * 3) and, with
+     * instance_transforms, per instance (instance_count * 3). NULL: white. */
+    const float* colors;
+    const float* instance_colors;
 } HdueMeshDesc;
 typedef struct HdueLightDesc {
     const char* id;

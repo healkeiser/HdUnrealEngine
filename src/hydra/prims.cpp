@@ -59,6 +59,11 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
         for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i))) if (p.name == name) return HdInterpolation(i);
     return HdInterpolationConstant;
 }
+// Varying colors only: a uniform displayColor stays the material's constant color.
+std::vector<GfVec3f> HdUEVaryingColors(std::vector<GfVec3f> colors, size_t count) {
+    if (colors.size() != count || std::all_of(colors.begin(), colors.end(), [&](const GfVec3f& c) { return c == colors[0]; })) return {};
+    return colors;
+}
 template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name,
     const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type) {
     // Indexed primvars (primvars:x:indices) arrive unflattened; expand them first.
@@ -128,6 +133,19 @@ public:
             for (const auto& primvar : delegate->GetPrimvarDescriptors(GetId(), HdInterpolationInstance))
                 if (HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name)) primvars_[primvar.name] = delegate->Get(GetId(), primvar.name);
     }
+    // Per-instance displayColor (instance interpolation), repeated for each parent instance like the transforms.
+    std::vector<GfVec3f> ComputeInstanceColors(const SdfPath& prototype) const {
+        const auto colors = value(primvar(HdTokens->displayColor), VtVec3fArray());
+        if (colors.empty() || !visible_) return {};
+        std::vector<GfVec3f> out;
+        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype)) out.push_back(size_t(index) < colors.size() ? colors[index] : colors[0]);
+        if (GetParentId().IsEmpty()) return out;
+        const auto* parent = dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
+        const size_t parents = parent ? parent->ComputeInstanceTransforms(GetId()).size() : 0;
+        std::vector<GfVec3f> nested; nested.reserve(parents * out.size());
+        for (size_t i = 0; i < parents; ++i) nested.insert(nested.end(), out.begin(), out.end());
+        return nested;
+    }
     VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype) const {
         if (!visible_) return {};
         const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
@@ -179,8 +197,10 @@ public:
         if (!GetInstancerId().IsEmpty()) {
             HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), GetInstancerId());
             mesh.instanced = true;
-            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
+            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId()))) {
                 for (const auto& instance : instancer->ComputeInstanceTransforms(GetId())) mesh.instances.push_back(mesh.transform * instance);
+                if (mesh.material.empty()) mesh.instanceColors = HdUEVaryingColors(instancer->ComputeInstanceColors(GetId()), mesh.instances.size());
+            }
         }
         mesh.primId = GetPrimId();
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
@@ -209,6 +229,8 @@ public:
             } catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s",error.what(),GetId().GetText()); return; }
         }
         mesh.uv = expanded<GfVec2f>(delegate, GetId(), TfToken("st"), triangles, parameters, util, HdTypeFloatVec2);
+        if (mesh.material.empty() && mesh.sceneAsset.empty())
+            mesh.colors = HdUEVaryingColors(expanded<GfVec3f>(delegate, GetId(), HdTokens->displayColor, triangles, parameters, util, HdTypeFloatVec3), mesh.points.size());
         std::shared_ptr<const VtDictionary> selectedBindings;
         { std::lock_guard lock(state->mutex); selectedBindings=state->wetBindings; }
         const auto& wetBindings=*selectedBindings;
@@ -234,6 +256,8 @@ public:
             material.id = mesh.id + ".displayColor";
             const auto color = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
             if (!color.empty()) material.color = color[0];
+            material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
+            if (material.vertexColor) material.color = GfVec3f(1);
             const auto opacity = value(delegate->Get(GetId(), HdTokens->displayOpacity), VtFloatArray());
             if (!opacity.empty()) {
                 // The generic ABI carries one opacity per material. Constant
@@ -244,7 +268,8 @@ public:
             }
             mesh.material = material.id;
             const auto previous = state->materials.find(material.id);
-            if (previous == state->materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity) {
+            if (previous == state->materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity ||
+                previous->second.vertexColor != material.vertexColor) {
                 state->materials[material.id] = material;
                 state->dirtyMaterials.insert(material.id);
             }
@@ -262,7 +287,8 @@ public:
             const bool meshChanged = !onlyNativeBounds && (previous == state->meshes.end() || previous->second.points != part.points ||
                 previous->second.normals != part.normals || previous->second.uv != part.uv || previous->second.transform != part.transform ||
                 previous->second.material != part.material || previous->second.visible != part.visible || previous->second.sceneAsset != part.sceneAsset ||
-                previous->second.instanced != part.instanced || previous->second.instances != part.instances);
+                previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
+                previous->second.colors != part.colors || previous->second.instanceColors != part.instanceColors);
             const auto id = part.id;
             const bool maskChanged=previous==state->meshes.end() || previous->second.masks!=part.masks || previous->second.maskErrors!=part.maskErrors;
             state->meshes[id] = std::move(part);
@@ -323,18 +349,22 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
         HdUEMaterialData material; material.id = mesh.id + ".displayColor";
         const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
         if (!color.empty()) material.color = color[0];
+        material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
+        if (material.vertexColor) material.color = GfVec3f(1);
         const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
         if (!opacity.empty() && std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
         mesh.material = material.id;
         const auto previous = state.materials.find(material.id);
-        if (previous == state.materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity) {
+        if (previous == state.materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity ||
+            previous->second.vertexColor != material.vertexColor) {
             state.materials[material.id] = material; state.dirtyMaterials.insert(material.id);
         }
     }
     const auto previous = state.meshes.find(mesh.id);
     const bool changed = previous == state.meshes.end() || previous->second.points != mesh.points || previous->second.normals != mesh.normals ||
         previous->second.uv != mesh.uv || previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
-        previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances;
+        previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
+        previous->second.colors != mesh.colors || previous->second.instanceColors != mesh.instanceColors;
     mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points ? previous->second.pickMesh : std::make_shared<HdUEPickMesh>(mesh.points);
     const auto key = mesh.id;
     state.meshes[key] = std::move(mesh); state.removed.erase(key);
@@ -382,6 +412,10 @@ public:
         for (size_t i = 0; i < points.size(); ++i) {
             const double radius = .5 * HdUEWidth(widths, i, .1f);
             mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * mesh.transform);
+        }
+        if (mesh.material.empty()) {
+            const auto colors = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
+            mesh.instanceColors = HdUEVaryingColors(std::vector<GfVec3f>(colors.begin(), colors.end()), points.size());
         }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;

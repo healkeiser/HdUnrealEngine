@@ -144,7 +144,7 @@ std::string asset(const HdUEState& state, const char* key, const std::string& id
 void submit(HdUEState& state) {
     std::vector<HdueMeshDesc> meshes;
     std::vector<HdueAssetDesc> sceneAssets;
-    std::vector<std::vector<float>> positions, normals, uvs;
+    std::vector<std::vector<float>> positions, normals, uvs, colors, instanceColors;
     std::vector<std::vector<double>> instances; // row-major UE world matrices per instanced mesh
     std::vector<std::vector<uint32_t>> indices;
     std::vector<std::string> nativeMeshes, nativeMaterials;
@@ -184,6 +184,7 @@ void submit(HdUEState& state) {
     if (!wet.empty() && !surfaceApi.apply) throw std::runtime_error("Wet surface extension unavailable; build/cook/stage the current runtime.");
     const auto count = state.dirtyMeshes.size();
     positions.reserve(count); normals.reserve(count); uvs.reserve(count); indices.reserve(count); nativeMeshes.reserve(count); instances.reserve(count);
+    colors.reserve(count); instanceColors.reserve(count);
     nativeMaterials.reserve(state.dirtyMaterials.size());
     for (const auto& id : state.dirtyMaterials) {
         const auto& data = state.materials.at(id);
@@ -193,6 +194,7 @@ void submit(HdUEState& state) {
         for (int i = 0; i < 3; ++i) { desc.base_color[i] = data.color[i]; desc.emissive_color[i] = data.emissive[i]; }
         desc.base_color[3] = data.opacity; desc.metallic = data.metallic; desc.roughness = data.roughness;
         desc.opacity_threshold = data.opacityThreshold;
+        desc.flags = data.vertexColor ? HDUE_MATERIAL_VERTEX_COLOR : 0;
         std::copy(data.uvTransform.begin(), data.uvTransform.end(), desc.uv_transform);
         for (int slot = 0; slot < HDUE_TEXTURE_SLOT_COUNT; ++slot) {
             const auto& texture = data.textures[slot];
@@ -239,6 +241,9 @@ void submit(HdUEState& state) {
         desc.positions = p.data(); desc.normals = n.empty() ? nullptr : n.data(); desc.uv = uv.empty() ? nullptr : uv.data();
         desc.indices = index.data(); desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
         desc.prim_id = data.primId;
+        colors.emplace_back(); instanceColors.emplace_back();
+        for (const auto& c : data.colors) colors.back().insert(colors.back().end(), {c[0], c[1], c[2]});
+        if (colors.back().size() == p.size()) desc.colors = colors.back().data();
         instances.emplace_back();
         if (data.instanced) {
             // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units.
@@ -251,6 +256,8 @@ void submit(HdUEState& state) {
                 for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) matrices.push_back(m[r][c]);
             }
             desc.instance_count = uint32_t(data.instances.size());
+            for (const auto& c : data.instanceColors) instanceColors.back().insert(instanceColors.back().end(), {c[0], c[1], c[2]});
+            if (instanceColors.back().size() == size_t(desc.instance_count) * 3 && desc.instance_count) desc.instance_colors = instanceColors.back().data();
             static const double none = 0;
             desc.instance_transforms = matrices.empty() ? &none : matrices.data();
         }

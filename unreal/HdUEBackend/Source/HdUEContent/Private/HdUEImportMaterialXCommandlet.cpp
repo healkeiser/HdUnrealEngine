@@ -165,6 +165,8 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
             }
             ++MaterialCount;
             Material->bUsedWithNanite = true;
+            // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
+            Material->bUsedWithInstancedStaticMeshes = true;
             Entry->SetNumberField(TEXT("normal_scale_corrections"), CorrectNormalScale(Material));
             Material->PostEditChange();
             Entry->SetBoolField(TEXT("native_substrate"), true);

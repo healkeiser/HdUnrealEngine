@@ -274,6 +274,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Instance->SetVectorParameterValue(TEXT("UVRow0"), FLinearColor(M[0], M[1], M[2], 0));
                 Instance->SetVectorParameterValue(TEXT("UVRow1"), FLinearColor(M[3], M[4], M[5], 0));
                 if (Masked) Instance->SetScalarParameterValue(TEXT("OpacityThreshold"), Desc.opacity_threshold);
+                Instance->SetScalarParameterValue(TEXT("UseVertexColor"), (Desc.flags & HDUE_MATERIAL_VERTEX_COLOR) ? 1.f : 0.f);
                 Material = Instance;
             }
         }
@@ -348,7 +349,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const FVector2f UV = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
                     NormalIds[C] = NormalOverlay->AppendElement(Normal);
                     UVIds[C] = UVOverlay->AppendElement(UV);
-                    ColorIds[C] = Colors->AppendElement(FVector4f(1.f, 0.f, 0.f, 1.f));
+                    ColorIds[C] = Colors->AppendElement(Desc.colors ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f) : FVector4f(1.f, 1.f, 1.f, 1.f));
                 }
                 NormalOverlay->SetTriangle(Triangle, NormalIds);
                 UVOverlay->SetTriangle(Triangle, UVIds);
@@ -378,7 +379,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Transforms.Add(FTransform(Instance));
             }
             Instances->ClearInstances();
+            // Per-instance displayColor for M_PreviewSurface's PerInstanceCustomData3Vector.
+            Instances->SetNumCustomDataFloats(Desc.instance_colors ? 3 : 0);
             Instances->AddInstances(Transforms, false, true);
+            if (Desc.instance_colors)
+                for (uint32 I = 0; I < Desc.instance_count; ++I)
+                    Instances->SetCustomData(int32(I), MakeArrayView(Desc.instance_colors + I * 3, 3), I + 1 == Desc.instance_count);
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
         PrimIds.Add(Id, Desc.prim_id);

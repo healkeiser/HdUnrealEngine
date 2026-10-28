@@ -28,6 +28,9 @@
 #include "Materials/MaterialExpressionTextureSampleParameterVolume.h"
 #include "Materials/MaterialExpressionTransformPosition.h"
 #include "Materials/MaterialExpressionWorldPosition.h"
+#include "Materials/MaterialExpressionVertexColor.h"
+#include "Materials/MaterialExpressionPerInstanceCustomData.h"
+#include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Engine/VolumeTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
@@ -116,7 +119,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
-            if (const auto* Sample = Cast<UMaterialExpressionTextureSampleParameter2D>(Expression); Sample && Sample->ParameterName == TEXT("NormalTexture")) return Material;
+            if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
@@ -158,7 +161,19 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         Rgb->Input.Connect(0, Biased); Rgb->R = Rgb->G = Rgb->B = 1; Rgb->A = 0;
         return Rgb;
     };
-    auto* BaseColor = Slot(TEXT("BaseColor"), FLinearColor(.7f, .7f, .7f, 1), true, false);
+    auto* Surface = Slot(TEXT("BaseColor"), FLinearColor(.7f, .7f, .7f, 1), true, false);
+    // displayColor primvars: vertex colors times ISM per-instance custom data, enabled by UseVertexColor.
+    auto* VertexColor = Add(NewObject<UMaterialExpressionVertexColor>(Material));
+    auto* InstanceColor = Add(NewObject<UMaterialExpressionPerInstanceCustomData3Vector>(Material));
+    InstanceColor->DataIndex = 0; InstanceColor->ConstDefaultValue = FLinearColor(1, 1, 1, 1);
+    auto* Primvar = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Primvar->A.Connect(0, VertexColor); Primvar->B.Connect(0, InstanceColor);
+    auto* UseVertexColor = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    UseVertexColor->ParameterName = TEXT("UseVertexColor"); UseVertexColor->DefaultValue = 0.f;
+    auto* Tint = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    Tint->ConstA = 1.f; Tint->B.Connect(0, Primvar); Tint->Alpha.Connect(0, UseVertexColor);
+    auto* BaseColor = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    BaseColor->A.Connect(0, Surface); BaseColor->B.Connect(0, Tint);
     auto* Emissive = Slot(TEXT("Emissive"), FLinearColor(0, 0, 0, 0), true, false);
     auto* Metallic = Slot(TEXT("Metallic"), FLinearColor(0, 0, 0, 0), false, true);
     auto* Roughness = Slot(TEXT("Roughness"), FLinearColor(.5f, .5f, .5f, .5f), false, true);

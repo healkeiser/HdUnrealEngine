@@ -25,6 +25,7 @@ struct HdUEMeshData {
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
     std::vector<GfVec3f> points, normals;
     std::vector<GfVec2f> uv;
+    std::vector<GfVec3f> colors; // per corner; empty unless displayColor varies
     std::map<std::string, std::vector<float>> masks;
     std::map<std::string, std::string> maskErrors;
     std::vector<uint32_t> sourceCorners;
@@ -33,6 +34,7 @@ struct HdUEMeshData {
     int primId = -1; // HdRprim::GetPrimId, written by the ID pass
     bool instanced = false; // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances; // USD world matrices (prototype transform included)
+    std::vector<GfVec3f> instanceColors; // per instance; empty unless displayColor varies
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
 // A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.
@@ -54,6 +56,7 @@ struct HdUEMaterialData {
     float metallic = 0, roughness = 0.5f, opacity = 1, opacityThreshold = 0;
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
+    bool vertexColor = false; // HDUE_MATERIAL_VERTEX_COLOR
 };
 struct HdUELightData {
     std::string id;

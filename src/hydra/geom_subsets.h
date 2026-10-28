@@ -22,7 +22,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
     prototype.sceneAsset=mesh.sceneAsset; prototype.transform=mesh.transform; prototype.visible=mesh.visible;
     prototype.bindingPath=mesh.bindingPath; prototype.maskErrors=mesh.maskErrors;
     prototype.sourceId=mesh.sourceId; prototype.primId=mesh.primId;
-    prototype.instanced=mesh.instanced; prototype.instances=mesh.instances;
+    prototype.instanced=mesh.instanced; prototype.instances=mesh.instances; prototype.instanceColors=mesh.instanceColors;
     std::vector<HdUEMeshData> parts{prototype};
     for (const auto& subset : topology.GetGeomSubsets()) {
         if (subset.type != HdGeomSubset::TypeFaceSet || subset.materialId.IsEmpty()) continue;
@@ -38,7 +38,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
         }
     }
     for (auto& part : parts) {
-        part.points.clear(); part.normals.clear(); part.uv.clear(); part.pickMesh.reset();
+        part.points.clear(); part.normals.clear(); part.uv.clear(); part.colors.clear(); part.pickMesh.reset();
     }
     for (size_t triangle = 0; triangle < faceParams.size(); ++triangle) {
         const int face = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(faceParams[triangle]);
@@ -47,6 +47,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
         for (size_t corner = triangle * 3; corner < triangle * 3 + 3; ++corner) {
             part.points.push_back(mesh.points[corner]); part.normals.push_back(mesh.normals[corner]);
             if (!mesh.uv.empty()) part.uv.push_back(mesh.uv[corner]);
+            if (!mesh.colors.empty()) part.colors.push_back(mesh.colors[corner]);
             part.sourceCorners.push_back(uint32_t(corner));
             for (const auto& [name, values] : mesh.masks) part.masks[name].push_back(values.at(corner));
         }
