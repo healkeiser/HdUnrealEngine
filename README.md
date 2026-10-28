@@ -147,7 +147,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 | **Materials** | UsdPreviewSurface with every texture input and cutouts, prepared MaterialX (Standard Surface, OpenPBR) and Substrate, COP textures | Arbitrary MaterialX at runtime |
 | **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, portals; IES profiles are experimental (applied and oriented, but brightness and falloff do not match Karma yet) |
 | **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`) | Lens distortion |
-| **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR | LPE AOVs, cryptomatte, deep output |
+| **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer | LPE AOVs, cryptomatte, deep output |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 
 <!-- ARCHITECTURE -->

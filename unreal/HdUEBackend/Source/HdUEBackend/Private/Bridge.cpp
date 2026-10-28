@@ -678,6 +678,11 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     for (uint32 Index = 0; Index < Desc->count; ++Index) {
         if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        if (Name.StartsWith(TEXT("r."))) {
+            if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name)) CVar->Set(*Text, ECVF_SetByCode);
+            else UE_LOG(LogTemp, Warning, TEXT("hdUE: console variable %s skipped (unknown)"), *Name);
+            continue;
+        }
         FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
         auto* Override = CastField<FBoolProperty>(FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
         if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {

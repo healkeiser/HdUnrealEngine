@@ -32,6 +32,9 @@
 #include <future>
 #include <thread>
 #include <atomic>
+#if defined(HDUE_HOUDINI)
+#include <OpenImageDenoise/oidn.hpp>
+#endif
 #include <windows.h>
 #if defined(HDUE_HOUDINI)
 #define HDUE_VIEWPORT_EXPORTS 1 // hdue_run_ui_tasks is defined below
@@ -589,6 +592,58 @@ class Pass final : public HdRenderPass {
     std::unique_ptr<HdUERenderBuffer> internalColor_; // beauty target when no color AOV is bound
     HdueRenderRequest beautyRequest_{};
     std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs_;
+    // hdUE:denoiser = oidn: the converged Path Tracer beauty waits for albedo and normal guides, then Open Image
+    // Denoise (Houdini's, GPU when available) replaces it. Guides render as AOVs, internally when not bound.
+    std::unique_ptr<HdUERenderBuffer> guideAlbedo_, guideNormal_;
+    std::vector<float> beautyPixels_; // top-down RGBA of the converged beauty, before denoising
+    HdueFrameInfo beautyFrame_{};
+    bool denoisePending_ = false;
+    static std::vector<float> topDown(HdUERenderBuffer& buffer, size_t channels) {
+        std::vector<float> out;
+        const auto* data = static_cast<const float*>(buffer.Map());
+        if (!data) return out;
+        const size_t width = buffer.GetWidth(), height = buffer.GetHeight(), row = width * channels;
+        out.resize(row * height);
+        for (size_t y = 0; y < height; ++y) std::copy_n(data + (height - 1 - y) * row, row, out.begin() + y * row);
+        buffer.Unmap();
+        return out;
+    }
+    void denoise(HdUERenderBuffer& beauty) {
+#if defined(HDUE_HOUDINI)
+        HdUERenderBuffer *albedo = nullptr, *normal = nullptr;
+        for (const auto& [target, id] : aovs_) { if (id == HDUE_AOV_ALBEDO) albedo = target; if (id == HDUE_AOV_NORMAL) normal = target; }
+        const auto albedoPixels = albedo ? topDown(*albedo, 3) : std::vector<float>();
+        const auto normalPixels = normal ? topDown(*normal, 3) : std::vector<float>();
+        const size_t width = beautyFrame_.width, height = beautyFrame_.height, count = width * height;
+        static oidn::DeviceRef device = [] { auto d = oidn::newDevice(); d.commit(); return d; }();
+        auto color = device.newBuffer(count * 4 * sizeof(float)), output = device.newBuffer(count * 4 * sizeof(float));
+        color.write(0, count * 4 * sizeof(float), beautyPixels_.data());
+        auto filter = device.newFilter("RT");
+        filter.setImage("color", color, oidn::Format::Float3, width, height, 0, 4 * sizeof(float));
+        filter.setImage("output", output, oidn::Format::Float3, width, height, 0, 4 * sizeof(float));
+        oidn::BufferRef albedoBuffer, normalBuffer;
+        if (albedoPixels.size() == count * 3) {
+            albedoBuffer = device.newBuffer(count * 3 * sizeof(float)); albedoBuffer.write(0, count * 3 * sizeof(float), albedoPixels.data());
+            filter.setImage("albedo", albedoBuffer, oidn::Format::Float3, width, height);
+            if (normalPixels.size() == count * 3) {
+                normalBuffer = device.newBuffer(count * 3 * sizeof(float)); normalBuffer.write(0, count * 3 * sizeof(float), normalPixels.data());
+                filter.setImage("normal", normalBuffer, oidn::Format::Float3, width, height);
+            }
+            filter.set("cleanAux", true); // GBuffer guides are noise-free
+        }
+        filter.set("hdr", true);
+        filter.commit();
+        filter.execute();
+        const char* message = nullptr;
+        if (device.getError(message) != oidn::Error::None) throw std::runtime_error(std::string("Open Image Denoise: ") + (message ? message : "error"));
+        std::vector<float> pixels(count * 4);
+        output.read(0, count * 4 * sizeof(float), pixels.data());
+        for (size_t i = 0; i < count; ++i) pixels[i * 4 + 3] = beautyPixels_[i * 4 + 3];
+        beauty.publish(beautyFrame_, std::move(pixels));
+#else
+        beauty.publish(beautyFrame_, beautyPixels_); // the standalone build has no denoiser
+#endif
+    }
     size_t aovSlot_ = 0;
     bool aovInFlight_ = false, aovsDone_ = true;
     void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame, const std::vector<float>& rgba) const {
@@ -628,7 +683,7 @@ public:
         if (const auto error=state_->setting<std::string>("wetValidationError", ""); !error.empty())
             return converged_ && state_->error==error;
         if (!state_->setting<bool>("materialGraphValid",true)) return true;
-        return converged_ && (aovs_.empty() || aovsDone_) &&
+        return converged_ && (aovs_.empty() || aovsDone_) && !denoisePending_ &&
             settingsVersion_==state_->requestSettingsRevision && state_->submittedRevision==state_->revision;
     }
     void _Execute(const HdRenderPassStateSharedPtr& pass, const TfTokenVector& tags) override {
@@ -683,6 +738,20 @@ public:
                 if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if(const auto id=HdUEAovId(name); id && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
                     aovs.emplace_back(dynamic_cast<HdUERenderBuffer*>(renderBuffer),id);
+            }
+            const bool denoising = s.setting<std::string>("renderMode", "realtime") == "pathtraced" &&
+                TfStringToLower(s.setting<std::string>("denoiser", "off")) == "oidn";
+            if (denoising && buffer && buffer->GetWidth()) {
+                const auto guide = [&](std::unique_ptr<HdUERenderBuffer>& owned, uint32_t id, const char* path) {
+                    if (std::any_of(aovs.begin(), aovs.end(), [&](const auto& aov) { return aov.second == id; })) return;
+                    if (!owned || owned->GetWidth() != buffer->GetWidth() || owned->GetHeight() != buffer->GetHeight()) {
+                        owned = std::make_unique<HdUERenderBuffer>(SdfPath(path));
+                        owned->Allocate(GfVec3i(int(buffer->GetWidth()), int(buffer->GetHeight()), 1), HdFormatFloat32Vec3, false);
+                    }
+                    aovs.emplace_back(owned.get(), id);
+                };
+                guide(guideAlbedo_, HDUE_AOV_ALBEDO, "/__hdUE/denoiseAlbedo");
+                guide(guideNormal_, HDUE_AOV_NORMAL, "/__hdUE/denoiseNormal");
             }
             if(aovs!=aovs_) { aovs_=aovs; aovSlot_=0; aovInFlight_=false; aovsDone_=aovs_.empty(); }
             if(!buffer && !aovs_.empty() && aovs_.front().first->GetWidth()) {
@@ -797,6 +866,7 @@ public:
                     if (frame.frame_id != lastFrame_) {
                         if (lens_[3] != 1.f && !s.setting<bool>("tonemapper", false)) // camera exposure, as Karma applies it to the beauty only
                             for (size_t i = 0; i + 3 < pixels.size(); i += 4) { pixels[i] *= lens_[3]; pixels[i + 1] *= lens_[3]; pixels[i + 2] *= lens_[3]; }
+                        if (denoising && frame.converged) { beautyPixels_ = pixels; beautyFrame_ = frame; denoisePending_ = true; }
                         buffer->publish(frame, std::move(pixels));
                         ++s.publishedFrames;
                         s.lastFrame = frame; lastFrame_ = frame.frame_id;
@@ -943,7 +1013,7 @@ public:
                     s.lastFrame = {}; buffer->invalidate();
                     if(depth) depth->invalidate();
                     beautyRequest_ = build(view); // AOVs render the unblurred pose at the current time
-                    aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty();
+                    aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty(); denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
                 }
             }
@@ -962,6 +1032,7 @@ public:
                     }
                 }
             }
+            if (denoisePending_ && aovsDone_) { denoise(*buffer); denoisePending_ = false; }
             { std::lock_guard lock(s.mutex); s.error.clear(); }
         } catch (const std::exception& error) {
             if (TfGetenvBool("HDUE_TRACE_PASS", false)) { std::fprintf(stderr, "hdUE pass error: %s\n", error.what()); std::fflush(stderr); }
@@ -1145,7 +1216,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
         key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
-        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") ||
+        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") ||
         TfStringStartsWith(key.GetString(), "postProcess:")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);

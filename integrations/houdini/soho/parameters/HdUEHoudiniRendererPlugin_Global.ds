@@ -104,6 +104,19 @@
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none })"
         }
+        HDUE_CONTROL("xn__hdUEdenoiser_control_l8a", "Denoiser")
+        parm {
+            name    "xn__hdUEdenoiser_kva"
+            label   "Denoiser"
+            type    string
+            size    1
+            default { "off" }
+            menu { "off" "Off" "oidn" "Open Image Denoise" }
+            help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. Lumen is unaffected."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "string" }
+            disablewhen R"({ xn__hdUEdenoiser_control_l8a == block } { xn__hdUEdenoiser_control_l8a == none })"
+        }
         HDUE_CONTROL("xn__hdUEsubdivisionLevel_control_mmb", "Subdivision Level")
         parm {
             name    "xn__hdUEsubdivisionLevel_l8a"
