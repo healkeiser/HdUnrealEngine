@@ -97,6 +97,19 @@ Synthetic normal/UDIM tests cover raw normals, strength, texture replacement, ti
 
 The generator verifies 21 mesh bindings and twelve materials after reference composition. Native Solaris captures confirmed colored Preview Surface fallbacks in Lumen and 64-sample Path Tracer mode. The generator repairs reference encapsulation; full native MaterialX rendering uses the separately prepared/cooked registry described above.
 
+## Karma comparisons (husk)
+
+The README gallery comes from husk renders of synthetic scenes with `--renderer HdUEHoudiniRendererPlugin` (Path Tracer, 128 samples) and `--renderer BRAY_HdKarma`, 480x270, on Houdini 22.0.368. The scene generator and comparison scripts are kept out of the repository; the measured results were:
+
+- Lens shift: the luminance-weighted image centroid is (238.5, 211.3) for hdUE and (238.9, 211.7) for Karma. Before the sign fix, hdUE shifted the other way.
+- Orthographic: centroid (240.0, 129.8) against (240.0, 130.5).
+- Depth of field (f/0.8, focus 9 m, USD lens units): same in-focus plane and blur growth as Karma; the realtime mode uses UE's post-process approximation instead.
+- Exposure 1: the beauty doubles (mean 0.203 to 0.405) and matches Karma's framing.
+- Light calibration with a bound, fully rough Preview Surface: mean 0.05755 (hdUE) against 0.05759 (Karma). Glossier materials (roughness 0.6 to 0.9) come out 1.3 to 1.4x brighter in hdUE.
+- Motion blur: transform blur matches Karma's extent; point and instance `velocities` blur in hdUE, which Karma left sharp with default settings.
+- `primId` / `instanceId`: five prims and per-instance indices on a scene with curves, points, and a PointInstancer whose prototypes are a cube, points, and a curve.
+- Volumes: a SOP VDB fog and a native Houdini volume, saved by the USD Render ROP (`.vdb` and `.bgeo.sc`), render in place within about 13% of Karma's brightness in realtime. The same SOP volumes, unsaved (`op:` paths), render in the Solaris viewport.
+
 ## Publication checks
 
 `tests/test_repository_scope.py` checks publication candidates for machine-specific absolute paths, non-English documentation, local/private directories, external project descriptors, and symlinks escaping the repository. Installation paths and runtime profiles must not be embedded in tracked defaults or sample metadata.

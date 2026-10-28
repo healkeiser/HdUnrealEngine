@@ -1,0 +1,62 @@
+# Materials
+
+UsdPreviewSurface renders through `M_PreviewSurface` with every texture input and cutout opacity. MaterialX and Substrate graphs are prepared ahead of time into native UE materials, as below. COP and embedded textures are described in the [Houdini page](houdini.md#cop-and-embedded-textures).
+
+## MaterialX and Substrate
+
+The backend uses Substrate with Adaptive GBuffer, up to four closures and 128 bytes per pixel. Generic PBR materials use a Substrate Slab.
+
+Prepared MaterialX rendering uses UE's editor-side Interchange importer to create native Substrate materials, followed by cook and staging. The runtime does not load USD or MaterialX importers. The usdview integration maps source materials to prepared native assets and applies supported public parameter edits.
+
+```powershell
+.\scripts\Import-MaterialX.ps1 `
+  -Source @('samples/materialx/standard_surface.mtlx','samples/materialx/open_pbr_surface.mtlx') `
+  -OutputDirectory out/materialx-import/review
+.\scripts\Stage-Runtime.ps1
+.\scripts\Launch-Usdview.ps1 `
+  -InputUsd samples/materialx/showcase.usda -CameraPath /Camera `
+  -MaterialXLibrary out/materialx-import/review/library.json
+```
+
+Inline USD graphs use `Import-UsdMaterialX.ps1` with `samples/materialx/inline.usda` and a fresh output directory. The supported subset includes Standard Surface, OpenPBR, color/vector/float images, float normal-map strength, UV0 coordinates, color/float multiplication, and float inversion. Nested NodeGraphs and interfaces are resolved during preparation. Unsupported nodes, cycles, unresolved images, incompatible connections, extra UV sets, volume, and displacement are rejected. Imported materials are marked for instanced static meshes so they render on PointInstancer prototypes; that flag is set by the importer but has not been exercised on this branch.
+
+Published scalar and color inputs can be edited without resending geometry. Structural or source-file changes require preparation, cook, staging, and restart. Dependency hashes detect stale registries. Texture overrides require prepared native texture paths.
+
+The experimental [Substrate Builder](substrate-builder.md) adds Houdini VOP authoring, typed USD graphs, and preparation into native UE Substrate materials. Texture Sample, UV Coordinates, Extract Channel, and Normal Map nodes connect images directly to Slabs and layer masks; explicit UDIM patterns use streaming virtual textures. Numeric/color inputs, UV transforms, channel selection, and normal controls update live through automatically generated material parameters. Node and wiring edits compile/cook in the background and replace the material in the same Houdini/UE process when ready. The earlier [wet surface layer draft](wet-surface-layer.md) records the original fixed-profile proposal.
+
+usdview and Solaris both accept the cooked registry through `-MaterialXLibrary`. In Solaris, the same file can be selected in the settings subnet's **Cooked MaterialX library** field or the local runtime profile's `materialx_library` key. Bindings follow reference composition and validate the graph before applying native assets and parameters on the owner thread. With no cooked library selected, Solaris uses the basic Preview Surface fallback. Restart with a staged runtime containing the prepared materials; importing alone does not add them to an already running UE process.
+
+### Reference-safe sample
+
+Use `samples/materialx/showcase_solaris.usda` with Solaris Asset Reference. Its single default prim contains geometry, materials, lights, and cameras, and uses Y-up/meters. All 21 meshes retain bindings when referenced below another prim.
+
+The original `showcase.usda` is a complete-stage sample. Its materials are outside the default geometry prim, so open it as a stage or sublayer. Referencing only the geometry prim drops its material bindings.
+
+Regenerate the reference-safe scene through `uv run` with the configured Houdini Python executable and `scripts/generate_solaris_materialx_sample.py`.
+
+### Normal maps and UDIMs
+
+`samples/materialx/normal_udim_showcase/normal_udim.usda` contains synthetic color and normal UDIM fixtures. Prepare it with `Import-UsdMaterialX.ps1` and a fresh output directory.
+
+Normal maps use raw vector images through the float normal-map node. Import disables sRGB, uses normal compression, and adjusts the green channel for the UV convention. Strength scales decoded XY components before normalization. Custom tangent frames and vector-valued strength are unsupported.
+
+UDIM validation covers conventional numbering, power-of-two resolutions, common aspect ratio, mixed resolutions, sparse tile sets, coordinates, and dependency hashes. Arbitrary uncooked UDIM import at runtime is unsupported.
+
+The Path Tracer waits for all required streaming virtual-texture pages and mappings before accumulating. Planning and requests are spread across frames without synchronous file-I/O waits. Capacity limits and timeout fail rather than accumulating low-resolution images. The default pool is 128 MiB per physical format. Runtime/adaptive virtual textures and automatic pool expansion are outside the current scope.
+
+## Cooked native assets
+
+Xform, Scope, or Mesh prims can specify a cooked object path through `hdue:asset`. The registry determines whether it is a StaticMesh, SkeletalMesh, Actor Blueprint, or Level:
+
+```usda
+def Xform "NativeMesh"
+{
+    custom string hdue:asset = "/Game/HdUE/SM_Nanite.SM_Nanite"
+}
+```
+
+The bridge generates bounds proxies in its own layer. Native assets retain their pivot, material slots, and centimeter dimensions. Authored and parent transforms follow stage units without double unit conversion.
+
+Transform, visibility, deletion, and re-creation are supported. Level transforms reload the instance. Virtual-texture waiting also covers native materials. Skeletal meshes use reference poses; Blueprint game progression, time synchronization, and World Partition coverage remain limited.
+
+`Prepare-ProjectAssets.ps1` accepts explicit private content inputs and a required map. Keep all input projects, catalogs, generated scenes, and runtime profiles local and ignored.
