@@ -180,6 +180,8 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
     if(auto* Rect=Cast<URectLightComponent>(Light)) {
         Rect->SetSourceWidth(D.type==HDUE_DISK_LIGHT?D.width_cm*2:D.width_cm);
         Rect->SetSourceHeight(D.type==HDUE_DISK_LIGHT?D.height_cm*2:D.height_cm);
+        // UsdLux rect lights have no barn doors; UE.s default 20 cm flaps cut grazing emission; open them fully and shorten them to the minimum.
+        Rect->SetBarnDoorAngle(GetRectLightBarnDoorMaxAngle()); Rect->SetBarnDoorLength(0.1f);
         if(D.type==HDUE_DISK_LIGHT) {
             if(!DiskTexture.IsValid()) {
                 DiskTexture.Reset(UTexture2D::CreateTransient(64,64,PF_FloatRGBA)); DiskTexture->SRGB=false; DiskTexture->NeverStream=true;

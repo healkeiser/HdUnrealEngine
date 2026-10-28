@@ -883,9 +883,16 @@ public:
                         names.push_back(key.GetString().substr(12));
                         values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value));
                     }
-                    if (tonemapper && std::find(names.begin(), names.end(), "AutoExposureBias") == names.end()) {
-                        names.push_back("AutoExposureBias"); values.push_back(TfStringify(std::log2(std::max(lens[3], 1e-6f))));
-                        names.push_back("AutoExposureApplyPhysicalCameraExposure"); values.push_back("False");
+                    if (tonemapper) {
+                        // The USD camera exposure adds to any authored AutoExposureBias; UE's own physical camera
+                        // exposure (ISO, shutter, aperture) stays off unless the scene asks for it.
+                        const float stops = std::log2(std::max(lens[3], 1e-6f));
+                        const auto bias = std::find(names.begin(), names.end(), "AutoExposureBias");
+                        if (bias == names.end()) { names.push_back("AutoExposureBias"); values.push_back(TfStringify(stops)); }
+                        else values[bias - names.begin()] = TfStringify(std::strtof(values[bias - names.begin()].c_str(), nullptr) + stops);
+                        if (std::find(names.begin(), names.end(), "AutoExposureApplyPhysicalCameraExposure") == names.end()) {
+                            names.push_back("AutoExposureApplyPhysicalCameraExposure"); values.push_back("False");
+                        }
                     }
                     const auto list = s.settings.find(TfToken("postProcessMaterials"));
                     if (list != s.settings.end()) {

@@ -380,6 +380,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
     Flags.SetScreenPercentage(false);
+    Flags.SetOnScreenDebug(false); // UE draws warnings (e.g. exposure clipping) into the frame otherwise
     Flags.SetTonemapper(!Aov && Session->Tonemapper);
     Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // AEM_Manual: applies AutoExposureBias, never adapts
     Flags.SetRefraction(true);
