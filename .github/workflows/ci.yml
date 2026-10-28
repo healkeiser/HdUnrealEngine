@@ -16,7 +16,7 @@ jobs:
     name: Client library and C ABI
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -DHDUE_BUILD_HYDRA=OFF
       - name: Build
@@ -28,8 +28,10 @@ jobs:
     name: Python and PowerShell
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: false # no lock file; scripts run with uv run
       - name: Repository scope
         run: uv run --python 3.11 tests/test_repository_scope.py
       - name: Byte-compile Python (Houdini 22 uses 3.13)
