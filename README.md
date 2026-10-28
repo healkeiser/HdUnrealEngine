@@ -115,7 +115,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 ### Sponza
 
 <!-- sponza:start -->
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. hdUE runs no denoiser, so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome. Add-ons from the same package, sublayered unchanged: `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 x 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. hdUE runs no denoiser, so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 x 540:
 
 - **hdUE Lumen**: realtime mode, 16 warmup frames.
 - **hdUE Path Tracer**: 256 samples per pixel, up to 8 bounces.
@@ -124,11 +124,11 @@ Regenerate with `hython scripts/render_gallery.py`.
 - Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
 - Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean luminance relative to Karma CPU, the reference (1.00 = same).
 
-Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSponza_Main_USD_Yup_003.usda> --addon <add-on .usda>`.
+Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSponza_Main_USD_Yup_003.usda> --addon <add-on .usda> --addon <add-on .usda>`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.2 s | 3.3 s | 84.1 s | 404.9 s | 420x / 26x | 0.78 / 1.02 |
+| Main view | < 0.1 s | 3.3 s | 24.7 s | 508.3 s | n/a / 7x | 0.83 / 0.96 |
 
 | Scene | hdUE Lumen &#124; hdUE Path Tracer &#124; Karma XPU &#124; Karma CPU |
 | --- | --- |
