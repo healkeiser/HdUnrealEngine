@@ -60,7 +60,8 @@ Write-Output "Package ready: $Package"
 if ($Zip) {
     $Archive="$Package.zip"
     if (Test-Path -LiteralPath $Archive) {Remove-Item -LiteralPath $Archive}
-    & tar.exe -a -c -f $Archive -C $Out $Name
+    # Windows' bsdtar writes zip; a GNU tar earlier on PATH (Git Bash) cannot.
+    & (Join-Path $env:SystemRoot 'System32\tar.exe') -a -c -f $Archive -C $Out $Name
     if ($LASTEXITCODE) {throw 'Zip failed.'}
     Write-Output "Archive: $Archive"
 }
