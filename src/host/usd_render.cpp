@@ -58,7 +58,7 @@ struct Options {
     std::string mode = "both", camera = "/Camera";
     uint32_t width = 640, height = 360, cycles = 1;
     double time = 0, timeout = 120;
-    bool selfTest = false, lightingTest = false;
+    bool selfTest = false, lightingTest = false, primId = false;
     VtDictionary meshes, materials;
 };
 Options parse(int argc, wchar_t** argv) {
@@ -67,6 +67,7 @@ Options parse(int argc, wchar_t** argv) {
         const std::wstring key = argv[i];
         if (key == L"--self-test") { out.selfTest = true; continue; }
         if (key == L"--lighting-test") { out.lightingTest = true; continue; }
+        if (key == L"--prim-id") { out.primId = true; continue; }
         if (i + 1 == argc) throw std::runtime_error("Missing option value");
         const std::filesystem::path value = argv[++i];
         if (key == L"--backend") out.dll = std::filesystem::absolute(value);
@@ -113,6 +114,8 @@ public:
 template<class T> T stat(const VtDictionary& dict, const char* name, T fallback) {
     const auto it = dict.find(name); return it != dict.end() && it->second.IsHolding<T>() ? it->second.UncheckedGet<T>() : fallback;
 }
+// Optional primId AOV bound beside color, as usdview does; written as <label>-primId.pfm.
+HdRenderBuffer* primIdBuffer = nullptr;
 std::vector<float> render(HdEngine& engine, HdRenderIndex* index, HdTaskSharedPtrVector& tasks, HdRenderBuffer* buffer,
     HdRenderDelegate* delegate, const Options& options, const std::string& label, std::ofstream& metrics, bool& comma) {
     const auto start = Clock::now();
@@ -128,7 +131,7 @@ std::vector<float> render(HdEngine& engine, HdRenderIndex* index, HdTaskSharedPt
         check(errors.IsClean(), "Hydra reported an error during rendering");
         const auto id = stat<uint64_t>(stats, "frameId", 0);
         if (id && id != lastId) { if (!delivered) firstFrameMs = stat<double>(stats, "requestToFrameMs", 0); ++delivered; lastId = id; }
-        if (buffer->IsConverged()) break;
+        if (buffer->IsConverged() && (!primIdBuffer || primIdBuffer->IsConverged())) break;
         backend->require(backend->api().tick(), "tick");
         check(std::chrono::duration<double>(Clock::now() - start).count() < options.timeout, "Hydra render timed out");
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -149,6 +152,15 @@ std::vector<float> render(HdEngine& engine, HdRenderIndex* index, HdTaskSharedPt
     const auto stats = delegate->GetRenderStats();
     HdueFrameInfo frame{}; frame.width = width; frame.height = height; frame.pixel_format = HDUE_RGBA32_FLOAT; frame.row_stride_bytes = width * 16;
     hdue::write_pfm(options.output / (label + ".pfm"), frame, pixels.data());
+    if (primIdBuffer) {
+        const auto* ids = static_cast<const int32_t*>(primIdBuffer->Map());
+        check(ids != nullptr, "No CPU primId AOV");
+        std::vector<float> rgba(size_t(width) * height * 4);
+        for (uint32_t y = 0; y < height; ++y) for (uint32_t x = 0; x < width; ++x)
+            for (int c = 0; c < 4; ++c) rgba[(size_t(height - 1 - y) * width + x) * 4 + c] = c == 3 ? 1.f : float(ids[size_t(y) * width + x]);
+        primIdBuffer->Unmap();
+        hdue::write_pfm(options.output / (label + "-primId.pfm"), frame, rgba.data());
+    }
     const double elapsed = std::chrono::duration<double>(Clock::now() - start).count();
     const auto mode = delegate->GetRenderSetting(TfToken("renderMode"));
     const std::string modeName = mode.IsHolding<std::string>() ? mode.UncheckedGet<std::string>() : "realtime";
@@ -221,7 +233,15 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
         check(buffer->Allocate(GfVec3i(options.width, options.height, 1), HdFormatFloat32Vec4, false), "Cannot allocate CPU AOV");
         HdRenderPassAovBinding binding;
         binding.aovName = HdAovTokens->color; binding.renderBuffer = buffer; binding.clearValue = VtValue(GfVec4f(0));
-        state->SetAovBindings({binding});
+        HdRenderPassAovBindingVector bindings{binding};
+        std::unique_ptr<HdRenderBuffer, decltype(releaseBuffer)> ownedPrimId(nullptr, releaseBuffer);
+        if (options.primId) {
+            ownedPrimId.reset(static_cast<HdRenderBuffer*>(raw->CreateBprim(HdPrimTypeTokens->renderBuffer, SdfPath("/hdUEPrimId"))));
+            check(ownedPrimId->Allocate(GfVec3i(options.width, options.height, 1), HdFormatInt32, false), "Cannot allocate primId AOV");
+            HdRenderPassAovBinding id; id.aovName = HdAovTokens->primId; id.renderBuffer = ownedPrimId.get(); id.clearValue = VtValue(-1);
+            bindings.push_back(id); primIdBuffer = ownedPrimId.get();
+        }
+        state->SetAovBindings(bindings);
         state->SetViewport(GfVec4d(0, 0, options.width, options.height));
         auto task = std::make_shared<Task>(pass, state, imaging.ConvertCachePathToIndexPath(SdfPath(options.camera)));
         HdTaskSharedPtrVector tasks{task};
@@ -352,6 +372,7 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             next = capture("deleted");
             changed(previous, next, "deletion");
             check(buffer->Allocate(GfVec3i(options.width + 64, options.height + 32, 1), HdFormatFloat32Vec4, false), "Resize failed");
+            if (primIdBuffer) check(primIdBuffer->Allocate(GfVec3i(options.width + 64, options.height + 32, 1), HdFormatInt32, false), "Resize failed");
             state->SetViewport(GfVec4d(0, 0, options.width + 64, options.height + 32));
             capture("resized");
         }

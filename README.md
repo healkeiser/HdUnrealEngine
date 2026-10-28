@@ -239,11 +239,11 @@ Besides `color` and `depth`, render vars may request these `sourceName`s, render
 | `normal` | normal3f | World-space shading normal in USD axes, normalized |
 | `roughness`, `metallic`, `specular`, `occlusion` | float | Material channels |
 | `primId` | int | Hydra prim ID of the visible mesh, -1 for background |
-| `instanceId` | int | -1; Hydra instancing is not translated yet |
+| `instanceId` | int | -1; instances of one Hydra instancer share their prototype's `primId` |
 
 After the beauty converges, each bound AOV is rasterized from the same camera and time with Lumen, path tracing, anti-aliasing and post effects off, so the channels stay exact and pixel-aligned with a Path Tracer beauty. They describe the nearest opaque surface; translucent surfaces and emission are not separated. Each extra AOV costs one short raster render per frame. AOV renders use their own UE view state and frame slot (`include/hdue/aov_api.h`), so the beauty's Lumen or Path Tracer history and the frames returned by `poll_frame` are unaffected.
 
-`primId` comes from an unlit pass in which every mesh draws `M_HdUEId` with its prim ID in custom primitive data. Cutout opacity is ignored there, so masked foliage selects as its whole card, and meshes placed from the native asset catalog read as background.
+`primId` comes from an unlit pass in which every mesh draws `M_HdUEId` with its prim ID in custom primitive data. Cutout opacity is ignored there, so masked foliage selects as its whole card, and meshes placed from the native asset catalog read as background. Because AOVs follow the converged beauty, a viewer that tints its selection from `primId` (usdview, Solaris) can show the previous frame's IDs for a moment after an edit.
 
 ### COP textures
 

@@ -148,6 +148,8 @@ class SmokeTest:
         model = self.controller._dataModel
         model.viewSettings.showHUD = False
         model.viewSettings.showBBoxes = False
+        # hdUE's primId AOV lets usdview tint the selection; the checks below find prims by their colour.
+        model.viewSettings.selHighlightMode = "Never"
         model.viewSettings.cameraPrim = model.stage.GetPrimAtPath("/Camera")
         model.currentFrame = Usd.TimeCode(0)
         self.controller._mainWindow.resize(1100, 800)
