@@ -21,11 +21,11 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'out' / 'gallery'
 IMAGES = ROOT / 'docs' / 'images' / 'gallery'
 
-THEMES = {  # reference data-viz palette: surface, inks, hairlines, engine hues
-    'light': dict(surface='#fcfcfb', primary='#0b0b0b', secondary='#52514e', muted='#898781', grid='#e1e0d9',
-                  axis='#c3c2b7', hdue='#2a78d6', karma='#eb6834'),
-    'dark': dict(surface='#1a1a19', primary='#f0efec', secondary='#c3c2b7', muted='#898781', grid='#2c2c2a',
-                 axis='#383835', hdue='#3987e5', karma='#d95926'),
+THEMES = {  # GitHub's page colours (the charts are transparent; surface only rings the markers) and engine hues
+    'light': dict(surface='#ffffff', primary='#1f2328', secondary='#59636e', muted='#59636e', grid='#e3e7eb',
+                  axis='#d1d9e0', hdue='#2a78d6', karma='#eb6834'),
+    'dark': dict(surface='#0d1117', primary='#f0f6fc', secondary='#9198a1', muted='#9198a1', grid='#21262d',
+                 axis='#3d444d', hdue='#3987e5', karma='#d95926'),
 }
 SERIES = {  # renderer key: label, engine, marker
     'lumen': ('hdUE Lumen', 'hdue', 'o'),
@@ -52,7 +52,7 @@ def rows():
 
 
 def style(ax, t):
-    ax.set_facecolor(t['surface'])
+    ax.set_facecolor('none')
     for side in ('top', 'right', 'left'):
         ax.spines[side].set_visible(False)
     ax.spines['bottom'].set_color(t['axis'])
@@ -86,7 +86,7 @@ HEADER = 1.25  # inches above the plot: title, subtitle, legend
 def figure(t, data, title, subtitle):
     height = 0.42 * len(data) + HEADER + 0.5
     fig, ax = plt.subplots(figsize=(9, height), dpi=100)
-    fig.patch.set_facecolor(t['surface'])
+    fig.patch.set_alpha(0)
     fig.subplots_adjust(left=0.27, right=0.97, top=1 - HEADER / height, bottom=0.5 / height)
     at = lambda inches: 1 - inches / height
     fig.text(0.01, at(0.12), title, color=t['primary'], fontsize=13, fontweight='bold', va='top')
@@ -139,7 +139,7 @@ PREVIEW = Path(sys.argv[sys.argv.index('--preview') + 1]) if '--preview' in sys.
 
 
 def save(fig, name, t):
-    fig.savefig(IMAGES / f'{name}.svg', facecolor=t['surface'])
+    fig.savefig(IMAGES / f'{name}.svg', transparent=True)
     if PREVIEW:  # PNG copies for checking the layout
         fig.savefig(PREVIEW / f'{name}.png', facecolor=t['surface'], dpi=110)
 

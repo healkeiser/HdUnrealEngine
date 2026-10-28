@@ -58,6 +58,29 @@ bool uvTransform(const HdMaterialNetwork2& network, const HdMaterialNode2& textu
     out = {du[0], dv[0], origin[0], du[1], dv[1], origin[1]};
     return true;
 }
+// The UV primvar a material's UsdPrimvarReader_float2 reads (exporters name it map1, UVMap, ...); empty when none.
+TfToken uvPrimvar(HdSceneDelegate* delegate, const SdfPath& material) {
+    if (material.IsEmpty()) return TfToken();
+    const auto resource = delegate->GetMaterialResource(material);
+    HdMaterialNetwork2 network;
+    if (resource.IsHolding<HdMaterialNetwork2>()) network = resource.UncheckedGet<HdMaterialNetwork2>();
+    else if (resource.IsHolding<HdMaterialNetworkMap>()) network = HdConvertToHdMaterialNetwork2(resource.UncheckedGet<HdMaterialNetworkMap>());
+    for (const auto& [path, node] : network.nodes) {
+        if (node.nodeTypeId != TfToken("UsdPrimvarReader_float2")) continue;
+        const auto it = node.parameters.find(TfToken("varname"));
+        if (it == node.parameters.end()) continue;
+        if (it->second.IsHolding<TfToken>() && !it->second.UncheckedGet<TfToken>().IsEmpty()) return it->second.UncheckedGet<TfToken>();
+        if (it->second.IsHolding<std::string>() && !it->second.UncheckedGet<std::string>().empty()) return TfToken(it->second.UncheckedGet<std::string>());
+    }
+    return TfToken();
+}
+// The mesh's UV primvar: from its own binding, else from its GeomSubsets' bindings, else st.
+// ponytail: one UV set per mesh; per-subset sets if assets mix them.
+TfToken meshUvPrimvar(HdSceneDelegate* delegate, const SdfPath& mesh, const HdMeshTopology& topology) {
+    auto name = uvPrimvar(delegate, delegate->GetMaterialId(mesh));
+    for (const auto& subset : topology.GetGeomSubsets()) if (name.IsEmpty()) name = uvPrimvar(delegate, subset.materialId);
+    return name.IsEmpty() ? TfToken("st") : name;
+}
 HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name) {
     for (int i = 0; i < HdInterpolationCount; ++i)
         for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i))) if (p.name == name) return HdInterpolation(i);
@@ -313,7 +336,7 @@ public:
                     if (mesh.normals[i].GetLengthSq()<1e-12f) mesh.normals[i]=smooth[i];
             } catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s",error.what(),GetId().GetText()); return; }
         }
-        mesh.uv = expanded<GfVec2f>(delegate, GetId(), TfToken("st"), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
+        mesh.uv = expanded<GfVec2f>(delegate, GetId(), meshUvPrimvar(delegate, GetId(), topology), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
         if (mesh.material.empty() && mesh.sceneAsset.empty())
             mesh.colors = HdUEVaryingColors(expanded<GfVec3f>(delegate, GetId(), HdTokens->displayColor, triangles, parameters, util, HdTypeFloatVec3, subdivision.get()), mesh.points.size());
         std::shared_ptr<const VtDictionary> selectedBindings;

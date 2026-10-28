@@ -199,6 +199,28 @@ def settings_of(layer):
     return resolution, int(text.split('int hdUE:samplesPerPixel = ')[1].split('\n')[0])
 
 
+def addon_fixes(addon, units, out):
+    """A layer over a Sponza add-on: scales its root into the scene's units (sublayers ignore metersPerUnit; the trees
+    are in metres) and applies MaterialBindingAPI where the exporter bound materials without it, which USD ignores."""
+    from pxr import Usd, UsdGeom, UsdShade
+    source = Usd.Stage.Open(str(addon), Usd.Stage.LoadNone)
+    fixes = Usd.Stage.CreateInMemory()
+    scale = UsdGeom.GetStageMetersPerUnit(source) / units
+    root = source.GetDefaultPrim()
+    if root and abs(scale - 1) > 1e-6:
+        ops = UsdGeom.Xformable(root).GetOrderedXformOps()
+        over = UsdGeom.Xformable(fixes.OverridePrim(root.GetPath()))
+        unit = over.AddScaleOp(UsdGeom.XformOp.PrecisionDouble, 'hdueUnits')
+        unit.Set((scale, scale, scale))
+        over.CreateXformOpOrderAttr().Set([unit.GetOpName(), *(op.GetOpName() for op in ops)])
+    for prim in source.Traverse():
+        if prim.HasRelationship('material:binding') and not prim.HasAPI(UsdShade.MaterialBindingAPI):
+            UsdShade.MaterialBindingAPI.Apply(fixes.OverridePrim(prim.GetPath()))
+    path = out / f'{addon.stem}.fixes.usda'
+    fixes.GetRootLayer().Export(str(path))
+    return path
+
+
 def scenes(which, sponza_file, addons=()):
     """(name, title, doc, root layer) per scene; Sponza scenes are written into out/gallery/sponza."""
     if which == 'cornell':
@@ -210,14 +232,15 @@ def scenes(which, sponza_file, addons=()):
                 doc = 'The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.'
             yield name, title, doc, layer
         return
-    from pxr import Usd
+    from pxr import Usd, UsdGeom
     out = SETS['sponza'][0]
     out.mkdir(parents=True, exist_ok=True)
     stage = Usd.Stage.Open(str(sponza_file), Usd.Stage.LoadNone)
     metadata = stage_metadata(sponza_file).replace('    defaultPrim', '    renderSettingsPrimPath = "/Render/Settings"\n    defaultPrim')
+    fixes = [addon_fixes(addon, UsdGeom.GetStageMetersPerUnit(stage), out) for addon in addons]
     for index, camera in enumerate(SPONZA_CAMERAS, 1):
         exposure = stage.GetPrimAtPath(f'/root/{camera}').GetAttribute('exposure').Get()
-        layer = override_layer(out / f'{camera}.usda', [SPONZA / 'lighting.usda', sponza_file, *addons], metadata,
+        layer = override_layer(out / f'{camera}.usda', [SPONZA / 'lighting.usda', sponza_file, *fixes, *addons], metadata,
                                [f'rel camera = </root/{camera}>'])
         yield camera, 'Main view', f"`/root/{camera}` (Intel's Render_Main_A view), exposure +{exposure:g} stops as authored.", layer
 

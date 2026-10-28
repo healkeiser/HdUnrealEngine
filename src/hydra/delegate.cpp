@@ -125,9 +125,11 @@ uint32_t HdUEAovId(const TfToken& name) {
     return 0;
 }
 namespace {
+// Offscreen UE (-RenderOffscreen) has no window of its own to route messages to.
+const bool selfHostVisible = TfGetenvBool("HDUE_SHOW_WINDOW", false);
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     const auto& host = selfHost();
-    if (host.backend && host.backend->initialized()) {
+    if (selfHostVisible && host.backend && host.backend->initialized()) {
         int64_t result = 0;
         if (host.backend->api().window_message(reinterpret_cast<uint64_t>(window), message, uint64_t(wparam), int64_t(lparam), &result) == HDUE_OK) return LRESULT(result);
     }
@@ -168,6 +170,8 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             HdueInitDesc init{}; init.struct_size = sizeof(init);
             init.instance_handle = reinterpret_cast<uint64_t>(instance); init.window_handle = reinterpret_cast<uint64_t>(host.window);
             init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
+            // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
+            if (!selfHostVisible) init.extra_arguments = "-RenderOffscreen";
             host.thread = GetCurrentThreadId();
             host.backend->initialize(init);
             started.set_value();
