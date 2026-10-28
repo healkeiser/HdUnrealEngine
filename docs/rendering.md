@@ -12,6 +12,9 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 | `hdUE:warmupFrames` | 16 | Realtime frames before a frame counts as converged |
 | `hdUE:motionBlur` | 1 | Motion blur when the camera shutter is open and something moves |
 | `hdUE:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
+| `hdUE:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
+| `hdUE:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty |
+| `hdUE:postProcessMaterials` | | Cooked post-process materials added to the beauty |
 | `hdUE:domeResolution` | 512 | Environment cubemap face size |
 | `hdUE:autoViewerLight`, `hdUE:viewerLightIntensity` | | Review light for scenes without lights |
 | `hdUE:upAxis` | stage | Up axis override |
@@ -47,9 +50,22 @@ With the render camera's `shutter:open` before `shutter:close` and something mov
 - transform samples on meshes, curves, points and their ancestors;
 - PointInstancer transform samples, and per-instance `velocities` on top-level instancers;
 - per-point `velocities` on Points;
+- deforming meshes: time-sampled `points` with a constant point count, else per-point `velocities` (Houdini's `v`);
 - camera transform samples.
 
-`velocities` are in units per second, converted with `houdini:fps` when husk provides it, else `hdUE:framesPerSecond` (24). Matrices are interpolated linearly between samples, so fast rotations shorten slightly within a frame. Deforming meshes (time-sampled `points`), `angularVelocities`, `accelerations` and velocities on nested instancers are not blurred. Each sub-frame is a full render, so realtime motion blur costs `motionSamples` times the warmup; Path Tracer samples are divided between sub-frames, so the total is unchanged. Too few sub-frames show discrete copies of fast objects.
+`velocities` are in units per second, converted with `houdini:fps` when husk provides it, else `hdUE:framesPerSecond` (24). Matrices are interpolated linearly between samples, so fast rotations shorten slightly within a frame. Deforming meshes are uploaded again for each sub-frame, which costs time on dense meshes. `angularVelocities`, `accelerations` and velocities on nested instancers are not blurred. Lumen keeps its history between sub-frames, so the realtime warmup and the Path Tracer samples are divided between sub-frames and the total stays about the same. Too few sub-frames show discrete copies of fast objects.
+
+## Unreal post-processing
+
+By default the beauty is linear scene-referred HDR, like Karma's, so colour management and compositing work as usual. UE's post-processing can be applied on top:
+
+- `hdUE:postProcess:<Property>` sets any [`FPostProcessSettings`](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/Engine/FPostProcessSettings) property by name, and its override flag: `float hdUE:postProcess:BloomIntensity = 2`, `float4 hdUE:postProcess:ColorSaturation = (0, 0, 0, 1)`. Numbers, booleans, enum names, object paths and tuples (filling a struct's fields in order) are accepted. Unknown names or values are skipped with a warning in the UE log (`HdUEBackend\Saved\Logs`).
+- `hdUE:postProcessMaterials` lists cooked post-process material paths (a string array, or one string separated by spaces), added as blendables.
+- `hdUE:tonemapper` runs UE's tonemapper. Bloom, colour grading (saturation, contrast, gamma, gain, offset, white balance, LUTs), the film curve, vignette, grain, chromatic aberration and lens flares only happen inside it, so they need it on. The camera exposure is then applied before the tonemapper (`AutoExposureBias`) rather than to the result. The beauty becomes display-referred (sRGB), so set the Solaris viewport's colour correction to raw, and don't expect it to match Karma.
+
+Depth of field, post-process materials with a "Before Tonemapping" blendable location, and the other settings apply with the tonemapper off too. The render settings LOP shows Tonemapper, Post-Process Materials, Bloom, Vignette, Film Grain, White Balance, Saturation and Contrast; add other properties with an Edit Properties LOP or in the USD file. Post-processing applies to the beauty only; AOVs stay raw. Changing a post-process setting restarts Path Tracer accumulation.
+
+![UE post-processing](images/postprocess.png)
 
 ## Lights and HDR environments
 
@@ -80,7 +96,7 @@ Volumes (Houdini build) render the `density` field, or the first field, of a Vol
 
 From Houdini geometry, the VDB or Houdini volume primitive named after `fieldName` is used, else the `fieldIndex`-th one. Grids are densified over their active bounding box and point-sampled with a stride above 512 voxels per axis. Volume materials, other fields, temperature/emission, tapered Houdini volumes and frustum VDBs are not translated.
 
-Measured against Karma: in realtime, a fog's brightness is within about 15%, but volumes cast no shadow onto surfaces. The Path Tracer casts it (optical depth 1.4 against Karma's 1.9) and includes multiple scattering, but resamples volumes into a coarse grid, so their silhouettes are blocky.
+Measured against Karma: in realtime, a fog's brightness is within about 15%, but volumes cast no shadow onto surfaces (enabling `r.HeterogeneousVolumes.Shadows` did not produce one in testing; the cause is not identified yet). The Path Tracer casts it (optical depth 1.4 against Karma's 1.9) and includes multiple scattering, but resamples volumes into a coarse grid, so their silhouettes are blocky.
 
 ## Opacity and glass
 

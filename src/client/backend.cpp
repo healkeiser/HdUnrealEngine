@@ -49,6 +49,12 @@ Backend::Backend(const std::filesystem::path& dll) {
         if(motion(HDUE_MOTION_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
             candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_MOTION_ABI_VERSION && candidate.set_transforms) motionApi_=candidate;
     }
+    const auto postProcess=reinterpret_cast<HdueGetPostProcessApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_postprocess_api"));
+    if(postProcess) {
+        HduePostProcessApi candidate{};
+        if(postProcess(HDUE_POSTPROCESS_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
+            candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_POSTPROCESS_ABI_VERSION && candidate.set_post_process) postProcessApi_=candidate;
+    }
     const auto volume=reinterpret_cast<HdueGetVolumeApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_volume_api"));
     if(volume) {
         HdueVolumeApi candidate{};

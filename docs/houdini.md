@@ -67,6 +67,8 @@ $env:HDUE_HOUDINI_ENABLE = '1'
 $env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
 ```
 
+UE starts once per husk process, and Hydra resends only what changes between frames, so render a frame range in one husk call (and give farm tasks chunks of frames) rather than one process per frame. On an RTX 4090, a 1080p Lumen frame of a simple scene with the default 16 warmup frames takes about 0.3 s including the EXR write, after about 3 s of UE startup per process. Realtime mode (`hdUE:renderMode = realtime`) is meant for final frames too; heavier scenes cost more, mostly on the GPU. When husk owns UE, the delegate ticks it continuously instead of once per husk poll, and only the first, the converged and (for progress) one draw per 250 ms are read back from the GPU.
+
 husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate's `percentDone` stat: Path Tracer samples, or 100 once the realtime warmup converges. If none of the requested render vars is one hdUE renders, the frame fails with an error instead of waiting forever.
 
 A USD Render ROP passes its environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers. Unsaved SOP volumes are written next to the USD file by the ROP and render from there.

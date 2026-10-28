@@ -6,6 +6,7 @@
 #include "hdue/depth_api.h"
 #include "hdue/aov_api.h"
 #include "hdue/motion_api.h"
+#include "hdue/postprocess_api.h"
 #include "hdue/volume_api.h"
 #include "hdue/lighting_api.h"
 #include "hdue/surface_api.h"
@@ -29,6 +30,7 @@ public:
     const HdueDepthApi& depth_api() const { return depthApi_; }
     const HdueAovApi& aov_api() const { return aovApi_; }
     const HdueMotionApi& motion_api() const { return motionApi_; }
+    const HduePostProcessApi& postprocess_api() const { return postProcessApi_; }
     const HdueVolumeApi& volume_api() const { return volumeApi_; }
     const HdueLightingApi& lighting_api() const { return lightingApi_; }
     const HdueSurfaceApi& surface_api() const { return surfaceApi_; }
@@ -47,6 +49,7 @@ private:
     HdueDepthApi depthApi_{};
     HdueAovApi aovApi_{};
     HdueMotionApi motionApi_{};
+    HduePostProcessApi postProcessApi_{};
     HdueVolumeApi volumeApi_{};
     HdueLightingApi lightingApi_{};
     HdueSurfaceApi surfaceApi_{};

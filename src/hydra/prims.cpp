@@ -269,6 +269,34 @@ public:
             if (triangle[corner] < 0 || size_t(triangle[corner]) >= points.size()) { TF_RUNTIME_ERROR("Invalid mesh index at %s", GetId().GetText()); return; }
             mesh.points.push_back(points[triangle[corner]]);
         }
+        {
+            // Deformation blur from time-sampled points of the same count, else from per-point velocities.
+            float times[HdUEMaxMotionSamples]; VtValue samples[HdUEMaxMotionSamples];
+            const size_t count = delegate->SamplePrimvar(GetId(), HdTokens->points, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, samples);
+            bool moves = false;
+            for (size_t k = 0; k < count && count > 1; ++k) {
+                const auto sample = value(samples[k], VtVec3fArray());
+                if (sample.size() != points.size()) { mesh.deformTimes.clear(); mesh.deformOffsets.clear(); moves = false; break; }
+                auto& offsets = mesh.deformOffsets.emplace_back(); offsets.reserve(mesh.points.size());
+                for (const auto& triangle : triangles) for (int corner : {0, 1, 2}) {
+                    offsets.push_back(sample[triangle[corner]] - points[triangle[corner]]);
+                    moves = moves || offsets.back() != GfVec3f(0);
+                }
+                mesh.deformTimes.push_back(times[k]);
+            }
+            if (!moves) {
+                mesh.deformTimes.clear(); mesh.deformOffsets.clear();
+                const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
+                if (velocities.size() == points.size() && std::any_of(velocities.begin(), velocities.end(), [](const auto& v) { return v != GfVec3f(0); })) {
+                    const float fps = float(HdUEFramesPerSecond(*state));
+                    mesh.deformTimes = {-1.f, 1.f}; mesh.deformOffsets.resize(2);
+                    for (const auto& triangle : triangles) for (int corner : {0, 1, 2}) {
+                        const auto v = velocities[triangle[corner]] / fps;
+                        mesh.deformOffsets[0].push_back(-v); mesh.deformOffsets[1].push_back(v);
+                    }
+                }
+            }
+        }
         mesh.normals = expanded<GfVec3f>(delegate, GetId(), HdTokens->normals, triangles, parameters, util, HdTypeFloatVec3);
         if (mesh.normals.size() != mesh.points.size()) mesh.normals.resize(mesh.points.size(), GfVec3f(0));
         if (std::any_of(mesh.normals.begin(),mesh.normals.end(),[](const auto& normal) {return normal.GetLengthSq()<1e-12f;})) {

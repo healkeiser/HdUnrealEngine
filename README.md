@@ -28,8 +28,9 @@ In the motion-blur image, hdUE blurs the points and instances from their `veloci
 | Volumes | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
 | Materials | UsdPreviewSurface with every texture input and cutouts, prepared MaterialX (Standard Surface, OpenPBR) and Substrate, COP textures | Arbitrary MaterialX at runtime |
 | Lights | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, IES, portals |
-| Camera | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, point and instance `velocities`) | Deformation blur, lens distortion |
+| Camera | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`) | Lens distortion |
 | Output | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`; husk, USD Render ROP, Render Gallery, multi-frame | LPE AOVs, cryptomatte, deep output |
+| Post-processing | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 | Houdini | Viewport renderer, **Unreal Engine** tab on Render Settings LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
 
 ## Install (Houdini 22.0, Windows)
@@ -42,7 +43,7 @@ husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 10 -o render.$F4.exr scene.usd
 
 The target machine needs Houdini 22.0, a DirectX 12 GPU with hardware ray tracing, and nothing else (no Unreal, Visual Studio or OpenUSD). See [Installing](docs/houdini.md#installing-on-another-machine) for studio-wide installs.
 
-Renderer settings live on any Render Settings LOP, on its **Unreal Engine** tab: render mode (Lumen or Path Tracer), samples, motion blur and motion samples, Lumen, environment resolution. They are `hdUE:*` attributes on the UsdRenderSettings prim, so files rendered on a farm carry them.
+Renderer settings live on any Render Settings LOP, on its **Unreal Engine** tab: render mode (Lumen or Path Tracer), samples, motion blur and motion samples, Lumen, environment resolution, and Unreal post-processing (tonemapper, bloom, grading, post-process materials). They are `hdUE:*` attributes on the UsdRenderSettings prim, so files rendered on a farm carry them.
 
 ## Documentation
 

@@ -24,6 +24,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
     prototype.sourceId=mesh.sourceId; prototype.primId=mesh.primId;
     prototype.instanced=mesh.instanced; prototype.instances=mesh.instances; prototype.instanceColors=mesh.instanceColors; prototype.instanceIds=mesh.instanceIds;
     prototype.motionLeft=mesh.motionLeft; prototype.motionRight=mesh.motionRight; prototype.velocities=mesh.velocities;
+    prototype.deformTimes=mesh.deformTimes; prototype.deformOffsets.resize(mesh.deformOffsets.size());
     std::vector<HdUEMeshData> parts{prototype};
     for (const auto& subset : topology.GetGeomSubsets()) {
         if (subset.type != HdGeomSubset::TypeFaceSet || subset.materialId.IsEmpty()) continue;
@@ -50,6 +51,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
             if (!mesh.uv.empty()) part.uv.push_back(mesh.uv[corner]);
             if (!mesh.colors.empty()) part.colors.push_back(mesh.colors[corner]);
             part.sourceCorners.push_back(uint32_t(corner));
+            for (size_t k = 0; k < mesh.deformOffsets.size(); ++k) part.deformOffsets[k].push_back(mesh.deformOffsets[k][corner]);
             for (const auto& [name, values] : mesh.masks) part.masks[name].push_back(values.at(corner));
         }
     }

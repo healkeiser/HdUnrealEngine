@@ -58,7 +58,20 @@ struct HdUEMeshData {
     // transform or each instance. Both factors are relative to the current frame (identity at t = 0).
     HdUEMotionSamples motionLeft, motionRight;
     std::vector<GfVec3f> velocities; // per instance, world units per frame
-    bool moving() const { return motionLeft.moving() || motionRight.moving() || !velocities.empty(); }
+    // Deformation blur: per-corner point offsets at frame-relative times (piecewise linear); empty unless points move.
+    std::vector<float> deformTimes;
+    std::vector<std::vector<GfVec3f>> deformOffsets;
+    bool moving() const { return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !deformTimes.empty(); }
+    std::vector<GfVec3f> pointsAt(float t) const {
+        auto out = points;
+        if (deformTimes.empty() || !t) return out;
+        size_t i = 1;
+        while (i + 1 < deformTimes.size() && t > deformTimes[i]) ++i;
+        const float span = std::max(1e-6f, deformTimes[i] - deformTimes[i - 1]);
+        const float u = std::clamp((t - deformTimes[i - 1]) / span, 0.f, 1.f);
+        for (size_t c = 0; c < out.size(); ++c) out[c] += deformOffsets[i - 1][c] * (1 - u) + deformOffsets[i][c] * u;
+        return out;
+    }
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
 // A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.

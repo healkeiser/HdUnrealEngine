@@ -110,6 +110,12 @@ The README gallery comes from husk renders of synthetic scenes with `--renderer 
 - `primId` / `instanceId`: five prims and per-instance indices on a scene with curves, points, and a PointInstancer whose prototypes are a cube, points, and a curve.
 - Volumes: a SOP VDB fog and a native Houdini volume, saved by the USD Render ROP (`.vdb` and `.bgeo.sc`), render in place within about 13% of Karma's brightness in realtime. The same SOP volumes, unsaved (`op:` paths), render in the Solaris viewport.
 
+## Post-processing and husk throughput
+
+- Post-processing (husk, realtime and Path Tracer): with `hdUE:tonemapper` off, `ColorSaturation` leaves the image unchanged; with it on, saturation 0 gives a grey image (zero chroma), bloom and vignette apply, `AutoExposureBias` 3 saturates the image, and Lumen and Path Tracer agree (mean 0.255 against 0.259). A post-process material loads as a blendable, and an unknown property logs a warning without failing the frame. The Render Settings LOP authors the matching `hdUE:*` attributes.
+- Throughput (RTX 4090, 1080p, simple scene, 16 warmup frames, one husk call for 24 frames): 0.3 s per Lumen frame and about 3 s of UE startup, against 5.3 s per frame before husk-owned ticking and readback throttling. Output images were unchanged by those changes (identical means). A 480x270, 64-sample Path Tracer frame went from 25 s to 6 s including startup.
+- Deformation blur: time-sampled `points` blur over the same extent as Karma; per-point `velocities` on a mesh blur in hdUE and were left sharp by Karma with default settings.
+
 ## Publication checks
 
 `tests/test_repository_scope.py` checks publication candidates for machine-specific absolute paths, non-English documentation, local/private directories, external project descriptors, and symlinks escaping the repository. Installation paths and runtime profiles must not be embedded in tracked defaults or sample metadata.

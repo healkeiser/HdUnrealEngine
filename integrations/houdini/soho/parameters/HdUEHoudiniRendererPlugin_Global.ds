@@ -1,6 +1,6 @@
 /// hdUE render settings, authored as hdUE:* attributes on a UsdRenderSettings prim.
-/// Add them to a Render Settings LOP with hdue_houdini.add_render_properties(node),
-/// or through Edit Parameter Interface > Render Properties > Unreal Engine > Global.
+/// With the delegate registered, Render Settings LOPs show them on an "Unreal Engine" tab.
+/// hdUE:postProcess:<FPostProcessSettings property> attributes not listed here also work.
 
 #include "$HFS/houdini/soho/parameters/CommonMacros.ds"
 
@@ -103,6 +103,106 @@
             parmtag { "spare_category" "Global" }
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEtonemapper_control_ucb", "Unreal Tonemapper")
+        parm {
+            name    "xn__hdUEtonemapper_tya"
+            label   "Unreal Tonemapper"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. Makes the beauty display-referred: set the viewport colour correction to raw."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUEtonemapper_control_ucb == block } { xn__hdUEtonemapper_control_ucb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessMaterials_control_4sb", "Post-Process Materials")
+        parm {
+            name    "xn__hdUEpostProcessMaterials_3fb"
+            label   "Post-Process Materials"
+            type    string
+            size    1
+            default { "" }
+            help    "Cooked post-process material paths, separated by spaces, added as blendables to the beauty."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "string" }
+            disablewhen R"({ xn__hdUEpostProcessMaterials_control_4sb == block } { xn__hdUEpostProcessMaterials_control_4sb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessBloomIntensity_control_90bl", "Bloom Intensity")
+        parm {
+            name    "xn__hdUEpostProcessBloomIntensity_8nbl"
+            label   "Bloom Intensity"
+            type    float
+            size    1
+            default { 0.675 }
+            range   { 0! 8 }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessBloomIntensity_control_90bl == block } { xn__hdUEpostProcessBloomIntensity_control_90bl == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessVignetteIntensity_control_55bl", "Vignette Intensity")
+        parm {
+            name    "xn__hdUEpostProcessVignetteIntensity_4sbl"
+            label   "Vignette Intensity"
+            type    float
+            size    1
+            default { 0.4 }
+            range   { 0! 1! }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessVignetteIntensity_control_55bl == block } { xn__hdUEpostProcessVignetteIntensity_control_55bl == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessFilmGrainIntensity_control_s7bl", "Film Grain Intensity")
+        parm {
+            name    "xn__hdUEpostProcessFilmGrainIntensity_rubl"
+            label   "Film Grain Intensity"
+            type    float
+            size    1
+            default { 0 }
+            range   { 0! 1! }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == block } { xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessWhiteTemp_control_4sbl", "White Balance Temperature")
+        parm {
+            name    "xn__hdUEpostProcessWhiteTemp_3fbl"
+            label   "White Balance Temperature"
+            type    float
+            size    1
+            default { 6500 }
+            range   { 1500 15000 }
+            help    "Kelvin. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessWhiteTemp_control_4sbl == block } { xn__hdUEpostProcessWhiteTemp_control_4sbl == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessColorSaturation_control_w2bl", "Saturation")
+        parm {
+            name    "xn__hdUEpostProcessColorSaturation_vpbl"
+            label   "Saturation"
+            type    float
+            size    4
+            default { 1 1 1 1 }
+            help    "RGB and overall saturation. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float4" }
+            disablewhen R"({ xn__hdUEpostProcessColorSaturation_control_w2bl == block } { xn__hdUEpostProcessColorSaturation_control_w2bl == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessColorContrast_control_nzbl", "Contrast")
+        parm {
+            name    "xn__hdUEpostProcessColorContrast_mmbl"
+            label   "Contrast"
+            type    float
+            size    4
+            default { 1 1 1 1 }
+            help    "RGB and overall contrast. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "float4" }
+            disablewhen R"({ xn__hdUEpostProcessColorContrast_control_nzbl == block } { xn__hdUEpostProcessColorContrast_control_nzbl == none })"
         }
         HDUE_CONTROL("xn__hdUEdomeResolution_control_djb", "Environment Cube Resolution")
         parm {

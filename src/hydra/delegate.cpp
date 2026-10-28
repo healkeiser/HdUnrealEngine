@@ -10,6 +10,7 @@
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/base/gf/vec4f.h"
+#include "pxr/base/vt/types.h"
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/getenv.h"
@@ -485,6 +486,17 @@ class Pass final : public HdRenderPass {
             else push(mesh.transform.GetInverse() * place(mesh.transform, nullptr)); // generic meshes are submitted in world space
             ids.push_back(&id);
         }
+        // Deforming meshes are resubmitted with their points at t, before set_transforms moves them.
+        std::vector<std::pair<HdUEMeshData*, std::vector<GfVec3f>>> rest;
+        for (auto& [id, mesh] : s.meshes) if (!mesh.deformTimes.empty() && mesh.sceneAsset.empty()) {
+            rest.emplace_back(&mesh, mesh.points);
+            mesh.points = mesh.pointsAt(t);
+            s.dirtyMeshes.insert(id);
+        }
+        if (!rest.empty()) {
+            submit(s);
+            for (auto& [mesh, points] : rest) mesh->points = std::move(points);
+        }
         std::vector<HdueMeshTransform> moves;
         for (size_t i = 0; i < ids.size(); ++i) moves.push_back({ids[i]->c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});
         if (!moves.empty()) s.backend->require(s.backend->motion_api().set_transforms(s.session, moves.data(), uint32_t(moves.size())), "set_transforms");
@@ -540,7 +552,16 @@ public:
         return converged_ && (aovs_.empty() || aovsDone_) &&
             settingsVersion_==state_->requestSettingsRevision && state_->submittedRevision==state_->revision;
     }
-    void _Execute(const HdRenderPassStateSharedPtr& pass, const TfTokenVector&) override {
+    void _Execute(const HdRenderPassStateSharedPtr& pass, const TfTokenVector& tags) override {
+        // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
+        // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
+        const auto& host = selfHost();
+        if (!host.backend || GetCurrentThreadId() != host.thread) { executeOnce(pass, tags); return; }
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+        do executeOnce(pass, tags);
+        while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
+    }
+    void executeOnce(const HdRenderPassStateSharedPtr& pass, const TfTokenVector&) {
         try {
             auto& s = *state_;
             if (const auto error=s.setting<std::string>("wetValidationError", ""); !error.empty()) {
@@ -693,7 +714,7 @@ public:
                         if (frame.converged) applyMotion(s, 0);
                     } else if (subframes_ > 1) lastFrame_ = frame.frame_id; // an unfinished sub-frame stays out of the average
                     if (frame.frame_id != lastFrame_) {
-                        if (lens_[3] != 1.f) // camera exposure, as Karma applies it to the beauty only
+                        if (lens_[3] != 1.f && !s.setting<bool>("tonemapper", false)) // camera exposure, as Karma applies it to the beauty only
                             for (size_t i = 0; i + 3 < pixels.size(); i += 4) { pixels[i] *= lens_[3]; pixels[i + 1] *= lens_[3]; pixels[i + 2] *= lens_[3]; }
                         buffer->publish(frame, std::move(pixels));
                         ++s.publishedFrames;
@@ -771,6 +792,33 @@ public:
                 }
                 return request;
               };
+                if (needsRequest && s.backend->postprocess_api().set_post_process) {
+                    // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper.
+                    // With the tonemapper on, the camera exposure goes in before it rather than onto display values.
+                    std::vector<std::string> names, values, materials;
+                    const bool tonemapper = s.setting<bool>("tonemapper", false);
+                    for (const auto& [key, value] : s.settings) {
+                        if (!TfStringStartsWith(key.GetString(), "postProcess:")) continue;
+                        names.push_back(key.GetString().substr(12));
+                        values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value));
+                    }
+                    if (tonemapper && std::find(names.begin(), names.end(), "AutoExposureBias") == names.end()) {
+                        names.push_back("AutoExposureBias"); values.push_back(TfStringify(std::log2(std::max(lens[3], 1e-6f))));
+                        names.push_back("AutoExposureApplyPhysicalCameraExposure"); values.push_back("False");
+                    }
+                    const auto list = s.settings.find(TfToken("postProcessMaterials"));
+                    if (list != s.settings.end()) {
+                        if (list->second.IsHolding<VtStringArray>()) for (const auto& m : list->second.UncheckedGet<VtStringArray>()) materials.push_back(m);
+                        else if (list->second.IsHolding<VtTokenArray>()) for (const auto& m : list->second.UncheckedGet<VtTokenArray>()) materials.push_back(m.GetString());
+                        else for (const auto& m : TfStringTokenize(s.setting<std::string>("postProcessMaterials", ""), " ,;")) materials.push_back(m);
+                    }
+                    std::vector<const char*> namePtrs, valuePtrs, materialPtrs;
+                    for (size_t i = 0; i < names.size(); ++i) { namePtrs.push_back(names[i].c_str()); valuePtrs.push_back(values[i].c_str()); }
+                    for (const auto& m : materials) materialPtrs.push_back(m.c_str());
+                    const HduePostProcessDesc desc{sizeof(HduePostProcessDesc), namePtrs.data(), valuePtrs.data(), uint32_t(names.size()),
+                        materialPtrs.data(), uint32_t(materials.size()), tonemapper ? 1 : 0};
+                    s.backend->require(s.backend->postprocess_api().set_post_process(s.session, &desc), "set_post_process");
+                }
                 if (needsRequest) {
                     applyMotion(s, 0);
                     // Motion blur needs a shutter, sub-frames and something moving.
@@ -994,7 +1042,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
         key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
-        key==TfToken("framesPerSecond")) ++state_->requestSettingsRevision;
+        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") ||
+        TfStringStartsWith(key.GetString(), "postProcess:")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);
         const double fps=state_->setting<double>("houdini:fps",24.);

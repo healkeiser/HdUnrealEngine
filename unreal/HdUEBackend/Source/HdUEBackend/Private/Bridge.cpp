@@ -15,6 +15,7 @@
 #include "hdue/depth_api.h"
 #include "hdue/aov_api.h"
 #include "hdue/motion_api.h"
+#include "hdue/postprocess_api.h"
 #include "hdue/volume_api.h"
 #include "RenderUtils.h"
 #include "Engine/Engine.h"
@@ -41,6 +42,8 @@
 #include "SceneTexturesConfig.h"
 #include "PostProcess/PostProcessInputs.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
+#include "MaterialDomain.h"
 #include "UObject/StrongObjectPtr.h"
 #include "RenderGraphBuilder.h"
 #include "RenderGraphUtils.h"
@@ -80,6 +83,7 @@ struct FSession {
     bool HasRequest = false;
     bool CameraCut = true;
     uint32 Draws = 0;
+    double LastReadback = 0; // when the last draw was read back; intermediate draws skip it
     double RequestedAt = 0;
     TSharedPtr<FReadbackJob, ESPMode::ThreadSafe> Pending;
     TUniquePtr<FRHIGPUTextureReadback> Readback; // Render Thread only; reused at this session's fixed size.
@@ -95,6 +99,10 @@ struct FSession {
     bool ResidencyFailed = false;
     bool MegaLightsActive=false;
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial; // PP_HdUEAov, weights select HDUE_AOV_*.
+    // hdue/postprocess_api.h: beauty overrides; the materials stay referenced while they are blendables.
+    FPostProcessSettings PostProcess;
+    TArray<TStrongObjectPtr<UMaterialInterface>> PostProcessMaterials;
+    bool Tonemapper = false;
     // AOV requests use their own view state and frame slot (hdue/aov_api.h); Frame/Pixels/depth
     // and the beauty's Lumen or Path Tracer history belong to BeautyRequest.
     HdueRenderRequest BeautyRequest{};
@@ -372,8 +380,8 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
     Flags.SetScreenPercentage(false);
-    Flags.SetTonemapper(false);
-    Flags.SetEyeAdaptation(false);
+    Flags.SetTonemapper(!Aov && Session->Tonemapper);
+    Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // AEM_Manual: applies AutoExposureBias, never adapts
     Flags.SetRefraction(true);
     if (Aov) {
         Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
@@ -438,6 +446,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         View->FinalPostProcessSettings.DepthOfFieldFocalDistance = 0.f;
         View->FinalPostProcessSettings.DepthOfFieldFstop = 0.f;
     }
+    if (!Aov) View->OverridePostProcessSettings(Session->PostProcess, 1.f);
     if (Aov) {
         View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
         View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
@@ -465,15 +474,21 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
     Job->Preparing = Session->Preparing;
-    Job->DepthEnabled = Session->DepthEnabled && !Aov;
+    // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the first
+    // draw (an immediate preview), the one that should converge, and otherwise at most every 250 ms for progress.
+    const double Now = FPlatformTime::Seconds();
+    const bool ReadBack = Job->DrawIndex == 1 || Session->Preparing || Now - Session->LastReadback >= 0.25 ||
+        Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames));
+    Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
     if(!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
         Job->Environment=Session->Scene->Lighting->EnvironmentTexture();
         Job->EnvironmentScale=Session->Scene->Lighting->EnvironmentScale();
     }
-    Session->Pending = Job;
+    if (ReadBack) { Session->Pending = Job; Session->LastReadback = Now; }
     Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session,Job));
     Renderer().BeginRenderingViewFamily(&Canvas, &Family);
     Canvas.Flush_GameThread();
+    if (!ReadBack) return;
     const auto State = Session->ViewState;
     ENQUEUE_RENDER_COMMAND(HdueCopyColor)([Session, Job, Resource, State, PathTracing](FRHICommandListImmediate& Commands) {
         if (!Session->Readback) Session->Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));
@@ -629,6 +644,62 @@ HdueResult HDUE_CALL SetTransforms(HdueSession Handle, const HdueMeshTransform* 
         if (!Mesh.id || (Mesh.count && !Mesh.matrices)) return HDUE_INVALID_ARGUMENT;
         Runtime.Session->Scene->SetTransforms(UTF8_TO_TCHAR(Mesh.id), Mesh.count, Mesh.matrices);
     }
+    return HDUE_OK;
+}
+
+// Text for one FPostProcessSettings property; struct fields can also be given as bare numbers.
+bool ImportPostProcessValue(FProperty* Property, const FString& Text, FPostProcessSettings& Settings) {
+    void* Value = Property->ContainerPtrToValuePtr<void>(&Settings);
+    const auto* Struct = CastField<FStructProperty>(Property);
+    if (Struct && !Text.Contains(TEXT("="))) {
+        TArray<FString> Numbers;
+        Text.Replace(TEXT("("), TEXT(" ")).Replace(TEXT(")"), TEXT(" ")).Replace(TEXT(","), TEXT(" ")).ParseIntoArrayWS(Numbers);
+        int32 Index = 0;
+        for (TFieldIterator<FNumericProperty> Field(Struct->Struct); Field && Index < Numbers.Num(); ++Field, ++Index) {
+            if (!Numbers[Index].IsNumeric()) return false;
+            if (Field->IsFloatingPoint()) Field->SetFloatingPointPropertyValue(Field->ContainerPtrToValuePtr<void>(Value), FCString::Atod(*Numbers[Index]));
+            else Field->SetIntPropertyValue(Field->ContainerPtrToValuePtr<void>(Value), FCString::Atoi64(*Numbers[Index]));
+        }
+        return Index > 0 && Index == Numbers.Num();
+    }
+    const TCHAR* End = Property->ImportText_Direct(*Text, Value, nullptr, PPF_None);
+    return End && !*End;
+}
+
+HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
+        (Desc->material_count && !Desc->materials)) return HDUE_INVALID_ARGUMENT;
+    FPostProcessSettings Settings;
+    // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
+    for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
+        if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
+    for (uint32 Index = 0; Index < Desc->count; ++Index) {
+        if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
+        const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
+        auto* Override = CastField<FBoolProperty>(FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
+        if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"), *Name, *Text);
+            continue;
+        }
+        if (Override) Override->SetPropertyValue_InContainer(&Settings, true);
+    }
+    TArray<TStrongObjectPtr<UMaterialInterface>> Materials;
+    for (uint32 Index = 0; Index < Desc->material_count; ++Index) {
+        const FString Path = Desc->materials[Index] ? UTF8_TO_TCHAR(Desc->materials[Index]) : TEXT("");
+        auto* Material = Path.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Path);
+        if (!Material || !Material->GetMaterial() || Material->GetMaterial()->MaterialDomain != MD_PostProcess) {
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process material '%s' skipped (missing or not a post-process material)"), *Path);
+            continue;
+        }
+        Materials.Emplace(Material);
+        Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
+    }
+    const auto Session = Runtime.Session;
+    Session->PostProcess = MoveTemp(Settings);
+    Session->PostProcessMaterials = MoveTemp(Materials);
+    Session->Tonemapper = Desc->tonemapper != 0;
     return HDUE_OK;
 }
 
@@ -892,6 +963,12 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32 Version, 
     if (!Api || Capacity < sizeof(HdueMotionApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_MOTION_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(HdueMotionApi), HDUE_MOTION_ABI_VERSION, SetTransforms};
+    return HDUE_OK;
+}
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32 Version, uint32 Capacity, HduePostProcessApi* Api) {
+    if (!Api || Capacity < sizeof(HduePostProcessApi)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_POSTPROCESS_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(HduePostProcessApi), HDUE_POSTPROCESS_ABI_VERSION, SetPostProcess};
     return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version,uint32 Capacity,HdueDepthApi* Api) {
