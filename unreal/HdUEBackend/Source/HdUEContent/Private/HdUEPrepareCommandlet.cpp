@@ -118,7 +118,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
-    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes)
+    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -210,8 +210,9 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
-    // ponytail: doubleSided is not in the ABI; cutout and see-through cards are usually viewed from both sides.
-    Material->TwoSided = Blend != BLEND_Opaque;
+    // Two-sided like Karma and most path tracers, which ignore doubleSided: production assets often leave it unset
+    // on thin single-sided geometry that is meant to be seen from both sides.
+    Material->TwoSided = true;
     // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
     Material->bUsedWithInstancedStaticMeshes = true;
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);

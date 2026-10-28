@@ -71,7 +71,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.1 s | 2.4 s | 84.1 s | 404.9 s | 700x / 36x | 0.79 / 1.03 |
+| Main view | 0.2 s | 3.3 s | 84.1 s | 404.9 s | 420x / 26x | 0.78 / 1.02 |
 
 | Scene | hdUE Lumen &#124; hdUE Path Tracer &#124; Karma XPU &#124; Karma CPU |
 | --- | --- |

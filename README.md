@@ -128,7 +128,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.1 s | 2.4 s | 84.1 s | 404.9 s | 700x / 36x | 0.79 / 1.03 |
+| Main view | 0.2 s | 3.3 s | 84.1 s | 404.9 s | 420x / 26x | 0.78 / 1.02 |
 
 | Scene | hdUE Lumen &#124; hdUE Path Tracer &#124; Karma XPU &#124; Karma CPU |
 | --- | --- |
@@ -140,7 +140,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 
 | Area | What you get | Not yet |
 |------|--------------|---------|
-| **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
+| **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings and Light LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
 | **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames, about 0.25 s per simple 1080p Lumen frame | |
 | **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform) | Displacement, adaptive subdivision, varying `displayOpacity` |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |

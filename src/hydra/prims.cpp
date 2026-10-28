@@ -799,6 +799,7 @@ public:
         if(!value(get("shadow:enable"),true)) data.flags&=~HDUE_LIGHT_SHADOWS;
         if(value(get("treatAsPoint"),false)) data.flags|=HDUE_LIGHT_POINT;
         if(!value(get("hdue:visibleBackground"),true)) data.flags&=~HDUE_LIGHT_BACKGROUND;
+        if(!value(get("hdue:megaLights"),true)) data.flags&=~HDUE_LIGHT_MEGALIGHTS;
         data.diffuse=value(get("diffuse"),1.f); data.specular=value(get("specular"),1.f);
         data.angle=value(get("angle"),.53f);
         data.coneAngle=value(get("shaping:cone:angle"),180.f); data.coneSoftness=value(get("shaping:cone:softness"),0.f);

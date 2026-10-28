@@ -1,0 +1,50 @@
+/// hdUE light settings, authored as hdue:* attributes on UsdLux lights.
+/// With the delegate registered, Light LOPs show them on an "Unreal Engine" tab.
+
+#include "$HFS/houdini/soho/parameters/CommonMacros.ds"
+
+#define HDUE_CONTROL(NAME, LABEL) \
+    parm { \
+        name    NAME \
+        label   LABEL \
+        type    string \
+        default { "none" } \
+        menujoin { \
+            [ "import loputils" ] \
+            [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
+            language python \
+        } \
+        parmtag { "sidefx::look" "icon" } \
+    }
+
+{
+    name        "hdUE"
+    label       "Unreal Engine"
+    parmtag     { spare_opfilter        "!!SHOP/PROPERTIES!!" }
+    parmtag     { spare_classtags       "render" }
+
+    HDUE_CONTROL("xn__hduevisibleBackground_control_8nb", "Visible to Camera")
+    parm {
+        name    "xn__hduevisibleBackground_79a"
+        label   "Visible to Camera"
+        type    toggle
+        size    1
+        default { 1 }
+        help    "Dome lights: draw the environment as the background. Off, the dome still lights the scene but camera rays that escape see black."
+        parmtag { "spare_category" "Light" }
+        parmtag { "usdvaluetype" "bool" }
+        disablewhen R"({ xn__hduevisibleBackground_control_8nb == block } { xn__hduevisibleBackground_control_8nb == none })"
+    }
+    HDUE_CONTROL("xn__hduemegaLights_control_ucb", "MegaLights")
+    parm {
+        name    "xn__hduemegaLights_tya"
+        label   "MegaLights"
+        type    toggle
+        size    1
+        default { 1 }
+        help    "Realtime mode: shade this local light with UE's MegaLights (stochastic, ray-traced shadows). Off, it uses UE's regular deferred lighting. The Path Tracer is unaffected."
+        parmtag { "spare_category" "Light" }
+        parmtag { "usdvaluetype" "bool" }
+        disablewhen R"({ xn__hduemegaLights_control_ucb == block } { xn__hduemegaLights_control_ucb == none })"
+    }
+}
