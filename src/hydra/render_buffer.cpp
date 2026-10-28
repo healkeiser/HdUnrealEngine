@@ -1,4 +1,5 @@
 #include "delegate.h"
+#include "pxr/base/work/loops.h"
 #include <algorithm>
 PXR_NAMESPACE_OPEN_SCOPE
 HdUERenderBuffer::HdUERenderBuffer(const SdfPath& id) : HdRenderBuffer(id) {}
@@ -41,11 +42,20 @@ void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pi
     if (frame.width != width_ || frame.height != height_ || pixels.size() != size_t(width_) * height_ * channels) return;
     // UE's C ABI is top-down. Hydra/Hdx CPU AOVs use a lower-left origin.
     const size_t row = size_t(width_) * channels;
-    for (uint32_t y = 0; y < height_ / 2; ++y)
-        std::swap_ranges(pixels.begin() + y * row, pixels.begin() + (y + 1) * row,
-                         pixels.begin() + (height_ - 1 - y) * row);
+    WorkParallelForN(height_ / 2, [&](size_t begin, size_t end) {
+        for (size_t y = begin; y < end; ++y)
+            std::swap_ranges(pixels.begin() + y * row, pixels.begin() + (y + 1) * row, pixels.begin() + (height_ - 1 - y) * row);
+    });
+    // Keep the replaced frame's allocation for the next one unless a Map still holds it.
+    if (pixels_ && pixels_.use_count() == 1 && pixels_->size() == pixels.size()) spare_ = std::move(*pixels_);
     pixels_ = std::make_shared<std::vector<float>>(std::move(pixels));
     converged_ = frame.converged != 0;
+}
+std::vector<float> HdUERenderBuffer::takeSpare(size_t size) {
+    std::vector<float> spare;
+    { std::lock_guard lock(mutex_); spare.swap(spare_); }
+    spare.resize(size);
+    return spare;
 }
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -30,6 +30,7 @@
 #include "Math/PerspectiveMatrix.h"
 #include "Math/Float16Color.h"
 #include "Misc/Paths.h"
+#include "Async/ParallelFor.h"
 #include "Misc/ScopeLock.h"
 #include "Modules/ModuleManager.h"
 #include "RendererInterface.h"
@@ -96,6 +97,7 @@ struct FSession {
     HdueFrameInfo Frame{};
     TArray<float> Pixels;
     TArray<float> DepthPixels;
+    TArray<float> SparePixels, SpareDepth; // the previous frame's arrays, reused: a fresh 33 MB array page-faults on every frame
     bool DepthEnabled = false;
     HdueResidencyOptions ResidencyOptions{sizeof(HdueResidencyOptions), 0, 120.0};
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
@@ -559,11 +561,12 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
         const auto* DepthData=Job->DepthEnabled ? static_cast<const float*>(DepthReadback->Lock(DepthPitch,&DepthHeight)) : nullptr;
         const bool DepthValid=!Job->DepthEnabled || (DepthData && DepthPitch>=int32(Width) && DepthHeight>=int32(Height));
         if (Data && Pitch >= int32(Width) && BufferHeight >= int32(Height) && DepthValid) {
-            TArray<float> Pixels;
-            TArray<float> DepthPixels;
+            TArray<float> Pixels = MoveTemp(Session->SparePixels);
+            TArray<float> DepthPixels = MoveTemp(Session->SpareDepth);
             if(Job->DepthEnabled) DepthPixels.SetNumUninitialized(int64(Width)*Height);
             Pixels.SetNumUninitialized(int64(Width) * Height * 4);
-            for (uint32 Y = 0; Y < Height; ++Y) {
+            ParallelFor(int32(Height), [&](int32 Row) {
+                const uint32 Y = uint32(Row);
                 for (uint32 X = 0; X < Width; ++X) {
                     const auto& P = Data[uint64(Y) * Pitch + X];
                     const uint64 Index = (uint64(Y) * Width + X) * 4;
@@ -576,7 +579,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
                             : Request.orthographic ? Request.far_clip_cm-Z*(Request.far_clip_cm-Request.near_clip_cm) : Request.near_clip_cm/Z;
                     }
                 }
-            }
+            });
             const double Now = FPlatformTime::Seconds();
             HdueFrameInfo Info{};
             Info.struct_size = sizeof(Info); Info.width = Width; Info.height = Height;
@@ -592,8 +595,8 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
             FScopeLock Lock(&Session->FrameMutex);
             if (Request.aov != HDUE_AOV_COLOR) { Session->AovPixels = MoveTemp(Pixels); Session->AovFrame = Info; }
             else {
-            Session->Pixels = MoveTemp(Pixels);
-            Session->DepthPixels = MoveTemp(DepthPixels);
+            Session->SparePixels = MoveTemp(Session->Pixels); Session->Pixels = MoveTemp(Pixels);
+            Session->SpareDepth = MoveTemp(Session->DepthPixels); Session->DepthPixels = MoveTemp(DepthPixels);
             Session->Frame = Info;
             Session->MegaLightsActive=Job->MegaLightsActive;
             }
@@ -614,14 +617,13 @@ HdueResult HDUE_CALL Tick() {
     if (!Session || !Session->HasRequest) return HDUE_OK;
     // A readback in flight no longer stops drawing: waiting on it serialized every draw behind a full-frame GPU->CPU
     // copy (about 270 ms at 2048x1152), so a camera move took seconds and stalled the host's UI thread.
-    if (Session->InFlight.Num()) {
-        const auto Oldest = Session->InFlight[0];
-        if (!Oldest->Complete.Load()) PollReadback(Session, Oldest);
-        else {
-            if (Oldest->Failed.Load()) return Fail(HDUE_ENGINE_ERROR, TEXT("GPU color/depth readback failed, was not queued, or returned an invalid stride."));
-            Session->InFlight.RemoveAt(0);
-        }
+    // Retire finished readbacks, then poll every pending one: render commands run in order, so frames still publish
+    // oldest first, and a frame no longer waits a tick per older readback.
+    while (Session->InFlight.Num() && Session->InFlight[0]->Complete.Load()) {
+        if (Session->InFlight[0]->Failed.Load()) return Fail(HDUE_ENGINE_ERROR, TEXT("GPU color/depth readback failed, was not queued, or returned an invalid stride."));
+        Session->InFlight.RemoveAt(0);
     }
+    for (const auto& Job : Session->InFlight) PollReadback(Session, Job);
     if (Session->Preparing) {
         const auto Status = Session->Residency->Status();
         if (Status.phase == HDUE_RESIDENCY_FAILED) {
@@ -781,7 +783,12 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
     }
     if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_STALE_FRAME;
     if (Capacity < Session->Frame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
-    FMemory::Memcpy(Buffer, Session->Pixels.GetData(), Session->Frame.required_bytes);
+    // A 1080p RGBA float frame is 33 MB: copy it in parallel chunks.
+    const uint64 Bytes = Session->Frame.required_bytes, Chunk = 1 << 20;
+    ParallelFor(int32((Bytes + Chunk - 1) / Chunk), [&](int32 Index) {
+        const uint64 Offset = uint64(Index) * Chunk;
+        FMemory::Memcpy(static_cast<uint8*>(Buffer) + Offset, reinterpret_cast<const uint8*>(Session->Pixels.GetData()) + Offset, FMath::Min(Chunk, Bytes - Offset));
+    });
     return HDUE_OK;
 }
 

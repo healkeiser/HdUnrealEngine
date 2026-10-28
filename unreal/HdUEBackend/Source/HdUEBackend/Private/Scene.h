@@ -72,9 +72,10 @@ private:
     TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
     double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
-    TMap<FString, FImage> DecodedImages;
-    TMap<FString, FMeshDescription> PendingStatic; // dynamic meshes TickConversions turns into static meshes
-    TMap<FString, UE::Tasks::TTask<TSharedPtr<Nanite::FResources>>> PendingNanite; // their Nanite builds // decoded in parallel at the start of Apply, consumed by PreviewTexture
+    TMap<FString, FImage> DecodedImages; // decoded in parallel at the start of Apply, consumed by PreviewTexture
+    // Dynamic meshes TickConversions turns into static (and Nanite) meshes, with their background builds.
+    struct FConversion { FMeshDescription Description; TSharedPtr<Nanite::FResources> Nanite; };
+    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic;
     UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;

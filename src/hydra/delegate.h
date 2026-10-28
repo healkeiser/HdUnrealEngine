@@ -190,6 +190,7 @@ public:
     void Resolve() override {}
     bool IsConverged() const override;
     void publish(const HdueFrameInfo&, std::vector<float> pixels);
+    std::vector<float> takeSpare(size_t size); // a previous frame's allocation, sized for the next publish
     void invalidate();
     std::string allocationError() const { std::lock_guard lock(mutex_); return allocationError_; }
 protected:
@@ -201,6 +202,7 @@ private:
     bool converged_ = false, multiSampled_ = false;
     std::string allocationError_;
     std::shared_ptr<std::vector<float>> pixels_, pinned_;
+    std::vector<float> spare_;
 };
 
 class HDUE_HYDRA_API HdUERenderDelegate final : public HdRenderDelegate {

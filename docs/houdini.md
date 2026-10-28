@@ -30,6 +30,8 @@ In the Houdini UI, UE runs on its own thread and ticks continuously; the viewpor
 - **Re-created prims.** A prim deleted and re-created with identical data (Houdini rebuilds the Hydra scene when its LOP chain changes) is not re-uploaded.
 - `HDUE_TRACE_TIMING=1` (with `HDUE_TRACE_FILE=<path>`, since Houdini's UI has no visible stderr) logs where each frame's and each scene upload's time goes.
 
+`HDUE_UE_ARGS` appends arguments to UE's command line, for example `-csvGpuStats -csvCaptureFrames=600` for a CSV profile in `HdUEBackend/Saved/Profiling`.
+
 ### Development launcher
 
 From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine (hdUE)` for its process without editing the user's Houdini environment file:

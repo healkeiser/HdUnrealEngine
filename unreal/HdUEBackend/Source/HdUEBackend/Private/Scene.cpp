@@ -260,30 +260,28 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
 // with Nanite data when its build has finished.
 void FHdueScene::TickConversions() {
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
-        if (const auto* Task = PendingNanite.Find(It.Key()); Task && !Task->IsCompleted()) continue; // not built yet
+        if (!It.Value().IsCompleted()) continue; // not built yet
         AActor* Actor = Actors.FindRef(It.Key());
         auto* Dynamic = IsValid(Actor) ? Cast<UDynamicMeshComponent>(Actor->GetRootComponent()) : nullptr;
         if (!Dynamic) { It.RemoveCurrent(); continue; }
+        const TSharedPtr<FConversion> Conversion = It.Value().GetResult();
         auto* Built = NewObject<UStaticMesh>(Actor);
         FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f); // texture streaming UV density
         Built->GetStaticMaterials().Add(Slot);
         UStaticMesh::FBuildMeshDescriptionsParams Params;
         Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
-        Built->BuildFromMeshDescriptions({&It.Value()}, Params);
-        if (auto* Task = PendingNanite.Find(It.Key())) {
-            if (TSharedPtr<Nanite::FResources> Resources = Task->GetResult(); Resources && Built->GetRenderData()) {
-                // The fast build made LOD0 (fallback, ray tracing) and empty Nanite resources; swap in the built ones.
-                // Only the Nanite resources: LOD0's CPU copies are gone, so its buffers can't be re-created.
-                // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
-                FStaticMeshLODResources& LOD0 = Built->GetRenderData()->LODResources[0];
-                LOD0.BuffersSize = FMath::Max<uint32>(LOD0.BuffersSize, 1);
-                Nanite::FResources& Nanite = *Built->GetRenderData()->NaniteResourcesPtr;
-                Nanite.ReleaseResources();
-                FlushRenderingCommands();
-                Nanite = MoveTemp(*Resources);
-                Nanite.InitResources(Built);
-            }
-            PendingNanite.Remove(It.Key());
+        Built->BuildFromMeshDescriptions({&Conversion->Description}, Params);
+        if (Conversion->Nanite && Built->GetRenderData()) {
+            // The fast build made LOD0 (fallback, ray tracing) and empty Nanite resources; swap in the built ones.
+            // Only the Nanite resources: LOD0's CPU copies are gone, so its buffers can't be re-created.
+            // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
+            FStaticMeshLODResources& LOD0 = Built->GetRenderData()->LODResources[0];
+            LOD0.BuffersSize = FMath::Max<uint32>(LOD0.BuffersSize, 1);
+            Nanite::FResources& Nanite = *Built->GetRenderData()->NaniteResourcesPtr;
+            Nanite.ReleaseResources();
+            FlushRenderingCommands();
+            Nanite = MoveTemp(*Conversion->Nanite);
+            Nanite.InitResources(Built);
             static int32 NaniteMeshes = 0, Tried = 0;
             ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
             if (Tried % 50 == 1 || PendingStatic.Num() == 1)
@@ -496,10 +494,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         const auto& Desc = Batch.meshes[Index];
         if (Desc.native_asset && *Desc.native_asset) return;
         BuiltMeshes[Index] = BuildDynamicMesh(Desc);
-        if (StaticGenerated(Desc) || ConvertLater(Desc)) {
+        if (StaticGenerated(Desc)) {
             FStaticMeshAttributes Attributes(Descriptions[Index]); Attributes.Register();
             FDynamicMeshToMeshDescription().Convert(&BuiltMeshes[Index], Descriptions[Index]);
-            if (StaticGenerated(Desc)) BuiltMeshes[Index].Clear();
+            BuiltMeshes[Index].Clear();
         }
     });
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
@@ -562,13 +560,20 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 else Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
             } else {
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
-                if (ConvertLater(Desc)) PendingStatic.Add(Id, MoveTemp(Descriptions[Index]));
-                else PendingStatic.Remove(Id);
-                PendingNanite.Remove(Id);
-                if (ConvertLater(Desc) && NaniteMeshes) {
-                    // Build on worker threads from a copy of the descriptor's arrays (Apply's batch is the caller's).
+                PendingStatic.Remove(Id);
+                if (ConvertLater(Desc)) {
+                    // The static mesh description and Nanite data are built on background workers, from a copy of the
+                    // descriptor's arrays: done here, they doubled the time to the first frame (and normal-priority
+                    // Nanite tasks starved its rendering for 15 s).
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    PendingNanite.Add(Id, UE::Tasks::Launch(TEXT("HdueNanite"), [Copy] { return BuildNanite(Copy->Desc); }));
+                    PendingStatic.Add(Id, UE::Tasks::Launch(TEXT("HdueConversion"), [Copy]() -> TSharedPtr<FConversion> {
+                        TSharedPtr<FConversion> Result = MakeShared<FConversion>();
+                        UE::Geometry::FDynamicMesh3 Mesh = BuildDynamicMesh(Copy->Desc);
+                        FStaticMeshAttributes Attributes(Result->Description); Attributes.Register();
+                        FDynamicMeshToMeshDescription().Convert(&Mesh, Result->Description);
+                        if (NaniteMeshes) Result->Nanite = BuildNanite(Copy->Desc);
+                        return Result;
+                    }, UE::Tasks::ETaskPriority::BackgroundLow));
                 }
             }
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;

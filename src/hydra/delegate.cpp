@@ -15,6 +15,7 @@
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/work/loops.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/js/json.h"
 #include <cmath>
@@ -88,6 +89,7 @@ struct HdUESelfHost {
     // Houdini's UI: called on this thread after each idle tick so finished frames reach the render buffers without
     // waiting for the host to call Execute (keyed by render pass; touched only on this thread).
     std::map<const void*, std::function<void()>> pumps;
+    bool pumping = false; // pumps run right after the loop's tick, so Execute skips its own
     bool stopping = false;
     template<class F> auto run(F&& f) -> decltype(f()) {
         if (!worker.joinable() || std::this_thread::get_id() == worker.get_id()) return f();
@@ -218,8 +220,11 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
             // Without -stdout, UE echoes Display/Warning/Error lines with wprintf, which reached the host's console
             // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
-            init.extra_arguments = host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive" : "-RenderOffscreen -stdout -hdUEInteractive")
-                                                   : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout");
+            // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
+            const std::string arguments = std::string(host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive" : "-RenderOffscreen -stdout -hdUEInteractive")
+                                                                      : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout")) +
+                                          " " + TfGetenv("HDUE_UE_ARGS");
+            init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
             host.backend->initialize(init);
             started.set_value();
@@ -239,7 +244,9 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             else {
                 const auto start = std::chrono::steady_clock::now();
                 try { host.tick(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE tick: %s", e.what()); }
+                host.pumping = true;
                 for (auto& [key, pump] : host.pumps) pump();
+                host.pumping = false;
                 const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
                 if (ms > 20) trace("hdUE slow tick: %.1f ms\n", ms);
             }
@@ -839,7 +846,7 @@ public:
 #if defined(HDUE_HOUDINI)
             s.executeThread=GetCurrentThreadId();
 #endif
-            selfHost().tick();
+            if (!selfHost().pumping) selfHost().tick(); // a second tick per loop doubled each frame's engine cost
             // Keep the last valid AOV while a prepared material graph is
             // invalid. Dirty USD data stays queued until preparation/undo.
             if (!s.setting<bool>("materialGraphValid", true)) { converged_ = true; return; }
@@ -983,13 +990,13 @@ public:
             const auto result = s.backend->api().poll_frame(s.session, &frame);
             if (result == HDUE_OK && frame.generation == s.generation && frame.frame_id != lastFrame_) {
                 const auto copyStart = Clock::now();
-                std::vector<float> pixels(size_t(frame.required_bytes / sizeof(float)));
+                std::vector<float> pixels = buffer->takeSpare(size_t(frame.required_bytes / sizeof(float)));
                 const auto copy = s.backend->api().copy_frame(s.session, frame.frame_id, pixels.data(), frame.required_bytes);
                 copyMs = ms(copyStart, Clock::now()); traced = frame;
                 std::vector<float> depthPixels;
                 HdueResult depthCopy=HDUE_OK;
                 if(copy==HDUE_OK && depth) {
-                    depthPixels.resize(size_t(frame.width)*frame.height);
+                    depthPixels=depth->takeSpare(size_t(frame.width)*frame.height);
                     depthCopy=s.backend->depth_api().copy_depth(s.session,frame.frame_id,depthPixels.data(),depthPixels.size()*sizeof(float));
                 }
                 if (copy == HDUE_STALE_FRAME || depthCopy==HDUE_STALE_FRAME) {
@@ -1001,13 +1008,16 @@ public:
                     s.backend->require(copy, "copy_frame");
                     if(depth) {
                         s.backend->require(depthCopy,"copy_depth");
-                        for(auto& value:depthPixels) {
+                        WorkParallelForN(depthPixels.size(), [&](size_t begin, size_t end) {
+                            for (size_t i = begin; i < end; ++i) {
+                                float& value = depthPixels[i];
 #if defined(HDUE_HOUDINI)
-                            value=value>0 && std::isfinite(value) ? float(value/centimetersPerUnit_) : std::numeric_limits<float>::max();
+                                value=value>0 && std::isfinite(value) ? float(value/centimetersPerUnit_) : std::numeric_limits<float>::max();
 #else
-                            value=HdUEProjectDepth(value,projection_,centimetersPerUnit_);
+                                value=HdUEProjectDepth(value,projection_,centimetersPerUnit_);
 #endif
-                        }
+                            }
+                        });
                         depth->publish(frame,std::move(depthPixels));
                     }
                     if (subframes_ > 1 && frame.converged) {
