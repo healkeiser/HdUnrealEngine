@@ -139,6 +139,24 @@ The repository-owned fixture contains a procedural HDRI, a textured rect light, 
 
 Build, cook, and stage the updated backend together with the updated delegate. Light `op:` and `opdef:` texture inputs use the same Houdini preparation/cache path as material images.
 
+## Installing on another machine
+
+Like HtoA, Redshift or V-Ray, hdUE ships as one relocatable folder plus a Houdini package file. On the build machine:
+
+```powershell
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip
+```
+
+This writes `out\package\hdUE-<version>-houdini22.0-win64` (about 1.2 GB; PDBs are left out) and the matching `.zip`. The folder holds the delegate (`plugin\`), the Solaris integration, the Python helpers, the samples, the staged UE runtime (`runtime\`) and a `runtime.json` with paths relative to itself.
+
+On the target machine (Houdini 22.0, Windows x64; no UE, Visual Studio or OpenUSD needed), unzip the folder to a writable location, because UE writes its shader cache and logs into `runtime\Windows\HdUEBackend\Saved`. Then run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`, which sets `HDUE_HOUDINI_ENABLE`, `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_PLUGIN`, appends the plugin to `PXR_PLUGINPATH_NAME`, and adds the integration to `HOUDINI_PATH`. For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. Houdini, hython and husk all pick it up:
+
+```powershell
+husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 1 -o render.exr scene.usd
+```
+
+The package's `uiready.py` replaces Houdini's own (which only pre-warms the info window), as with any package that ships one.
+
 ## Houdini Solaris
 
 Solaris does not need OpenUSD or `Build-Host.ps1`. Build and stage the backend, then the Houdini-specific delegate:

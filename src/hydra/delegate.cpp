@@ -74,16 +74,22 @@ LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM
     return DefWindowProcW(window, message, wparam, lparam);
 }
 // backend_dll / runtime_project from the runtime profile named by HDUE_RUNTIME_CONFIG.
+// Relative paths resolve against the profile's folder, as in hdue_houdini.runtime_config.
 std::string runtimeConfig(const char* key) {
     const auto path = TfGetenv("HDUE_RUNTIME_CONFIG");
     if (path.empty()) return {};
-    std::ifstream file(std::filesystem::u8path(path));
+    const auto file_path = std::filesystem::u8path(path);
+    std::ifstream file(file_path);
     std::stringstream text; text << file.rdbuf();
     const auto root = JsParseString(text.str());
     if (!root.IsObject()) return {};
     const auto& object = root.GetJsObject();
     const auto it = object.find(key);
-    return it != object.end() && it->second.IsString() ? it->second.GetString() : std::string();
+    if (it == object.end() || !it->second.IsString()) return {};
+    const auto value = std::filesystem::u8path(it->second.GetString());
+    if (value.is_absolute()) return it->second.GetString();
+    const auto resolved = (std::filesystem::absolute(file_path).parent_path() / value).lexically_normal().u8string();
+    return std::string(resolved.begin(), resolved.end());
 }
 void startSelfHost(const std::string& dll, const std::string& project) {
     auto& host = selfHost();
