@@ -315,7 +315,7 @@ protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
-// Points and curves become triangle meshes: one shared sphere instanced per point, and a tube
+// Points and curves become triangle meshes: one shared sphere instanced per point, and a capped tube
 // per curve. They keep one material (bound, or constant displayColor/displayOpacity).
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
     std::lock_guard lock(state.mutex);
@@ -477,6 +477,20 @@ public:
                 for (const auto& [ring, corner] : quad) {
                     mesh.points.push_back(rings[ring][corner]); mesh.normals.push_back(ringNormals[ring][corner]);
                     mesh.uv.emplace_back(float(corner) / Sides, float(ring) / float(rings.size() - 1));
+                }
+            }
+            if (periodic) continue;
+            // Flat caps: the end faces +tangent (ring order is counter-clockwise seen from there), the start faces -tangent.
+            for (const bool end : {false, true}) {
+                const size_t ring = end ? rings.size() - 1 : 0;
+                const auto t = end ? curve.back().first - curve[curve.size() - 2].first : curve[0].first - curve[1].first;
+                if (t.GetLength() < 1e-12) continue;
+                const GfVec3f center(curve[ring].first), facing(t.GetNormalized());
+                for (int side = 0; side < Sides; ++side) {
+                    const int next = (side + 1) % Sides;
+                    for (const auto& corner : {center, rings[ring][end ? side : next], rings[ring][end ? next : side]}) {
+                        mesh.points.push_back(corner); mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end));
+                    }
                 }
             }
         }
