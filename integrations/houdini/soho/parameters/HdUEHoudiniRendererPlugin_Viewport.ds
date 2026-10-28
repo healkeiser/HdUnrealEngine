@@ -1,93 +1,128 @@
+/// hdUE viewport settings (Display Options > Unreal Engine). Names match _Global.ds: keep them.
 #include "$HFS/houdini/soho/parameters/CommonMacros.ds"
 {
     name "hdUE"
     label "Unreal Engine"
     parmtag { spare_opfilter "!!SHOP/PROPERTIES!!" }
     parmtag { spare_classtags "render" }
-    parm {
-        name "xn__hdUErenderMode_tya"
-        label "Render mode"
-        type string
-        size 1
-        default { "realtime" }
-        menu { "realtime" "Lumen" "pathtraced" "Path Tracer" }
+
+    group {
+        name "hdUE_Rendering"
+        label "Rendering"
         parmtag { "uiscope" "viewport" }
+        parm {
+            name "xn__hdUErenderMode_tya"
+            label "Render Mode"
+            type string
+            size 1
+            default { "realtime" }
+            menu { "realtime" "Realtime (Lumen)" "pathtraced" "Path Tracer" }
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+        }
+        parm {
+            name "xn__hdUEwarmupFrames_21a"
+            label "Warmup Frames"
+            type int
+            size 1
+            default { 16 }
+            range { 0! 256 }
+            help "Realtime frames before a frame counts as converged."
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+        }
+        parm {
+            name "xn__hdUEsamplesPerPixel_y6a"
+            label "Path Tracer Samples"
+            type int
+            size 1
+            default { 64 }
+            range { 1! 4096 }
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
+        }
+        parm {
+            name "xn__hdUEdenoiser_kva"
+            label "Denoiser"
+            type string
+            size 1
+            default { "off" }
+            menu { "off" "Off" "oidn" "Open Image Denoise" }
+            help "Denoises the converged Path Tracer image."
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
+        }
+        parm {
+            name "xn__hdUEmotionBlur_tya"
+            label "Motion Blur"
+            type toggle
+            size 1
+            default { 1 }
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+        }
     }
-    parm {
-        name "xn__hdUEsamplesPerPixel_y6a"
-        label "Path Tracer samples"
-        type int
-        size 1
-        default { 64 }
-        range { 1! 4096 }
+    group {
+        name "hdUE_Lighting"
+        label "Lighting"
         parmtag { "uiscope" "viewport" }
+        parm {
+            name "xn__hdUElumenEnabled_21a"
+            label "Lumen"
+            type toggle
+            size 1
+            default { 1 }
+            parmtag { "spare_category" "Lighting" }
+            parmtag { "uiscope" "viewport" }
+            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+        }
+        parm {
+            name "xn__hdUEautoViewerLight_y6a"
+            label "Light Unlit Scenes"
+            type toggle
+            size 1
+            default { 1 }
+            parmtag { "spare_category" "Lighting" }
+            parmtag { "uiscope" "viewport" }
+        }
+        parm {
+            name "xn__hdUEviewerLightIntensity_3fb"
+            label "Viewer Light Intensity"
+            type float
+            size 1
+            default { 4 }
+            range { 0! 100! }
+            help "Intensity of the unlit-scene lights and of the headlight."
+            parmtag { "spare_category" "Lighting" }
+            parmtag { "uiscope" "viewport" }
+        }
     }
-    parm {
-        name "xn__hdUElumenEnabled_21a"
-        label "Enable Lumen"
-        type toggle
-        size 1
-        default { 1 }
+    group {
+        name "hdUE_Geometry"
+        label "Geometry and Post"
         parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEautoViewerLight_y6a"
-        label "Light unlit scenes"
-        type toggle
-        size 1
-        default { 1 }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEwarmupFrames_21a"
-        label "Lumen warmup frames"
-        type int
-        size 1
-        default { 16 }
-        range { 1! 64 }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEsubdivisionLevel_l8a"
-        label "Subdivision level"
-        type int
-        size 1
-        default { 2 }
-        range { 0! 4 }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEmotionBlur_tya"
-        label "Motion blur"
-        type toggle
-        size 1
-        default { 1 }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEdenoiser_kva"
-        label "Denoiser"
-        type string
-        size 1
-        default { "off" }
-        menu { "off" "Off" "oidn" "Open Image Denoise" }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEtonemapper_tya"
-        label "Unreal tonemapper"
-        type toggle
-        size 1
-        default { 0 }
-        parmtag { "uiscope" "viewport" }
-    }
-    parm {
-        name "xn__hdUEviewerLightIntensity_3fb"
-        label "Viewer light intensity"
-        type float
-        size 1
-        default { 4 }
-        range { 0 20 }
-        parmtag { "uiscope" "viewport" }
+        parm {
+            name "xn__hdUEsubdivisionLevel_l8a"
+            label "Subdivision Level"
+            type int
+            size 1
+            default { 2 }
+            range { 0! 5 }
+            parmtag { "spare_category" "Geometry" }
+            parmtag { "uiscope" "viewport" }
+        }
+        parm {
+            name "xn__hdUEtonemapper_tya"
+            label "Unreal Tonemapper"
+            type toggle
+            size 1
+            default { 0 }
+            help "Makes the beauty display-referred: set the viewport colour correction to raw."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "uiscope" "viewport" }
+        }
     }
 }

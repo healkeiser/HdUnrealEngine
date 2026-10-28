@@ -832,6 +832,7 @@ public:
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
 class Light final : public HdLight {
+    bool viewerStored_ = false, viewerVisible_ = false; GfVec3f viewerColor_{0.f};
     uint32_t type_;
 public:
     Light(const SdfPath& id, uint32_t type) : HdLight(id), type_(type) {}
@@ -884,7 +885,11 @@ public:
         data.height=type_==HDUE_DISK_LIGHT?data.width:value(get("height"),1.f);
         data.length=value(get("length"),1.f);
         auto* state = static_cast<HdUEState*>(param);
+        // Hdx moves the camera light with every camera move; the backend follows the camera itself, so an unchanged
+        // viewer light needs no state lock (a scene upload holds it for seconds and Houdini's UI would wait).
+        if (data.viewer && viewerStored_ && viewerColor_ == data.color && viewerVisible_ == data.visible) { *bits = Clean; return; }
         std::lock_guard lock(state->mutex);
+        if (data.viewer) { viewerStored_ = true; viewerColor_ = data.color; viewerVisible_ = data.visible; }
         const auto old = state->lights.find(data.id);
         if(old!=state->lights.end() && old->second.transform==data.transform && old->second.texture==data.texture &&
             old->second.color==data.color && old->second.intensity==data.intensity && old->second.visible==data.visible &&
@@ -918,7 +923,7 @@ public:
         HdUEMotionSamples motion;
         for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) { motion.times.push_back(times[i]); motion.values.push_back(values[i]); }
         auto* state = static_cast<HdUEState*>(param);
-        std::lock_guard lock(state->mutex);
+        std::lock_guard lock(state->cameraMutex);
         if (motion.moving()) state->cameraMotion[GetId().GetString()] = motion; else state->cameraMotion.erase(GetId().GetString());
     }
 };

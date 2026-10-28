@@ -114,20 +114,28 @@ struct HdUELightData {
 };
 struct HdUEState : HdRenderParam {
     std::mutex mutex;
+    // Short reads/writes of shared state from the UE thread (Sync runs concurrently on Houdini's threads).
+    template <class F> auto locked(F&& f) { std::lock_guard lock(mutex); return f(); }
+    void setError(std::string message) { std::lock_guard lock(mutex); error = std::move(message); }
     std::map<std::string, HdUEMeshData> meshes;
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
     std::map<std::string, HdUEMotionSamples> cameraMotion; // absolute camera transforms by camera id
+    std::mutex cameraMutex; // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
     std::set<std::string> dirtyVolumes;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
+    // Cached viewport status for Houdini's UI while an upload holds the lock (diagnostics.cpp).
+    std::mutex statusMutex; std::shared_ptr<void> viewportStatus;
     // Meshes erased since the last submit, kept so a re-created identical prim cancels its removal (HdUEState::erase).
     std::map<std::string, HdUEMeshData> erasedMeshes;
     HdRenderSettingsMap settings;
     // Guards settings: Houdini's UI thread writes them (SetRenderSetting) while hdUE's UE thread reads them.
     mutable std::recursive_mutex settingsMutex;
+    // GetRenderStats' last result; the UE thread refreshes it (Houdini's UI asks often and must not wait on UE).
+    std::mutex statsMutex; VtDictionary stats; std::atomic<bool> statsPending{false};
     HdRenderSettingsMap settingsSnapshot() const { std::lock_guard lock(settingsMutex); return settings; }
     std::shared_ptr<const VtDictionary> wetBindings = std::make_shared<const VtDictionary>();
     std::shared_ptr<hdue::Backend> backend;
@@ -172,7 +180,15 @@ struct HdUEState : HdRenderParam {
         }
         return fallback;
     }
-    GfVec3d convert(const GfVec3d& point, bool direction = false) const;
+    // USD scene space to UE (centimetres, Z up). Converter reads the settings once, for loops over many points.
+    struct Converter {
+        double scale = 1; bool zUp = false;
+        GfVec3d operator()(const GfVec3d& p, bool direction = false) const {
+            return (zUp ? GfVec3d(p[0], -p[1], p[2]) : GfVec3d(-p[2], p[0], p[1])) * (direction ? 1 : scale);
+        }
+    };
+    Converter converter() const { return {setting<double>("metersPerUnit", 0.01) * 100, setting<std::string>("upAxis", "Y") == "Z"}; }
+    GfVec3d convert(const GfVec3d& point, bool direction = false) const { return converter()(point, direction); }
 };
 
 class HDUE_HYDRA_API HdUERenderBuffer final : public HdRenderBuffer {
@@ -234,7 +250,7 @@ public:
 private:
     std::shared_ptr<HdUEState> state_;
     HdResourceRegistrySharedPtr registry_;
-    VtDictionary renderStats() const;
+    static VtDictionary renderStats(HdUEState& state);
     bool selfHosted_ = false; // this delegate counts towards the UE runtime it started (husk)
 };
 PXR_NAMESPACE_CLOSE_SCOPE

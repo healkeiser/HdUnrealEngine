@@ -90,6 +90,24 @@ void FHdueScene::Remove(const FString& Id) {
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
 }
+namespace {
+// The root component of an hdUE actor: movable and render-only. Collision stays off, so UE neither cooks physics
+// for generated meshes (which runtime builds cannot provide) nor runs queries against them.
+template <class T> T* AddRootComponent(AActor* Actor, TFunctionRef<void(T&)> Configure, UClass* Class = T::StaticClass()) {
+    T* Component = NewObject<T>(Actor, Class);
+    Component->SetMobility(EComponentMobility::Movable);
+    if (auto* Primitive = Cast<UPrimitiveComponent>(Component)) {
+        Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Primitive->SetCanEverAffectNavigation(false);
+    }
+    Configure(*Component);
+    Actor->SetRootComponent(Component);
+    Actor->AddInstanceComponent(Component);
+    Component->RegisterComponent();
+    return Component;
+}
+}
+
 bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     const FString Id = UTF8_TO_TCHAR(Desc.id);
     const uint64 Count = uint64(Desc.width) * Desc.height * Desc.depth;
@@ -98,10 +116,7 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     FVolume& Volume = Volumes.FindOrAdd(Id);
     if (!IsValid(Volume.Actor)) {
         Volume.Actor = World->SpawnActor<AActor>();
-        auto* Component = NewObject<UHeterogeneousVolumeComponent>(Volume.Actor);
-        Component->SetMobility(EComponentMobility::Movable);
-        Volume.Actor->SetRootComponent(Component); Volume.Actor->AddInstanceComponent(Component);
-        Component->RegisterComponent();
+        AddRootComponent<UHeterogeneousVolumeComponent>(Volume.Actor, [](UHeterogeneousVolumeComponent&) {});
         Volume.Material.Reset(UMaterialInstanceDynamic::Create(Parent, World));
     }
     auto* Component = Volume.Actor->FindComponentByClass<UHeterogeneousVolumeComponent>();
@@ -271,7 +286,9 @@ void FHdueScene::TickConversions() {
         UStaticMesh::FBuildMeshDescriptionsParams Params;
         Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
         Built->BuildFromMeshDescriptions({&Conversion->Description}, Params);
-        if (Conversion->Nanite && Built->GetRenderData()) {
+        const UMaterialInterface* Material = Dynamic->GetMaterial(0);
+        const bool NaniteMaterial = !Material || !IsTranslucentBlendMode(*Material); // Nanite draws opaque and masked only
+        if (Conversion->Nanite && NaniteMaterial && Built->GetRenderData()) {
             // The fast build made LOD0 (fallback, ray tracing) and empty Nanite resources; swap in the built ones.
             // Only the Nanite resources: LOD0's CPU copies are gone, so its buffers can't be re-created.
             // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
@@ -287,13 +304,10 @@ void FHdueScene::TickConversions() {
             if (Tried % 50 == 1 || PendingStatic.Num() == 1)
                 UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
         }
-        auto* Component = NewObject<UStaticMeshComponent>(Actor);
-        Component->SetMobility(EComponentMobility::Movable);
-        Component->SetStaticMesh(Built);
-        Component->SetMaterial(0, Dynamic->GetMaterial(0));
-        Actor->SetRootComponent(Component);
-        Actor->AddInstanceComponent(Component);
-        Component->RegisterComponent();
+        AddRootComponent<UStaticMeshComponent>(Actor, [&](UStaticMeshComponent& Component) {
+            Component.SetStaticMesh(Built);
+            Component.SetMaterial(0, Dynamic->GetMaterial(0));
+        });
         Actor->SetActorTransform(Dynamic->GetComponentTransform());
         Dynamic->DestroyComponent();
         It.RemoveCurrent();
@@ -515,22 +529,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         if (!Actor) {
             Actor = World->SpawnActor<AActor>();
             Actors.Add(Id, Actor);
-            if (Native || Instanced || Static) {
-                auto* Component = NewObject<UStaticMeshComponent>(Actor, Wanted);
-                Component->SetMobility(EComponentMobility::Movable);
-                Actor->SetRootComponent(Component);
-                Actor->AddInstanceComponent(Component);
-                Component->RegisterComponent();
-            } else {
-                auto* Component = NewObject<UDynamicMeshComponent>(Actor);
-                Component->SetMobility(EComponentMobility::Movable);
-                Component->SetEnableRaytracing(true);
-                Component->SetTangentsType(EDynamicMeshComponentTangentsMode::AutoCalculated);
-                Component->SetVertexColorSpaceTransformMode(EDynamicMeshVertexColorTransformMode::NoTransform);
-                Actor->SetRootComponent(Component);
-                Actor->AddInstanceComponent(Component);
-                Component->RegisterComponent();
-            }
+            if (Native || Instanced || Static) AddRootComponent<UStaticMeshComponent>(Actor, [](UStaticMeshComponent&) {}, Wanted);
+            else AddRootComponent<UDynamicMeshComponent>(Actor, [](UDynamicMeshComponent& Component) {
+                Component.SetEnableRaytracing(true);
+                Component.SetTangentsType(EDynamicMeshComponentTangentsMode::AutoCalculated);
+                Component.SetVertexColorSpaceTransformMode(EDynamicMeshVertexColorTransformMode::NoTransform);
+            });
         }
         Actor->SetActorHiddenInGame(!Desc.visible);
         FMatrix Matrix;

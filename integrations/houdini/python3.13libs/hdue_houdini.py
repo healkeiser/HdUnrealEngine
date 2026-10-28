@@ -60,12 +60,12 @@ class Host:
         from hdue_preparation import ViewportPreparation
         self.prepared_output=ViewportPreparation()
         self.material_error=None
-        self.last_materials=0.
+        self.last_materials=None
         self.viewer=None
         self.last_options=None
         self.closed=False
         self.last_state=time.monotonic()
-        self.last_textures=0.
+        self.last_textures=None
         self.texture_error=None
         self.running=True
         # Housekeeping only (preparation, textures, status): UE ticks on its own thread. Rescheduled after each
@@ -102,8 +102,10 @@ class Host:
             self.live_substrate.tick()
             node=current_settings_node()
             if node:
-                if time.monotonic()-self.last_textures>.25:
-                    self.last_textures=time.monotonic()
+                # The prepared output and asset bridge depend on the displayed LOP's cook: refresh when it recooks.
+                textures_key=_stage_key(node)
+                if textures_key!=self.last_textures:
+                    self.last_textures=textures_key
                     from hdue_op_textures import cache,refresh
                     try:
                         viewer=scene_viewer()
@@ -137,8 +139,10 @@ class Host:
                     except (hou.Error,ValueError,RuntimeError) as error:
                         self.material_problem(str(error),state['session']); stage=None
                     if stage:
-                        if state['session'] and time.monotonic()-self.last_materials>.25:
-                            self.last_materials=time.monotonic()
+                        # Material preparation walks the stage and hashes embedded textures: only after a change.
+                        materials_key=(state['session'],_stage_key(node),hou.frame())
+                        if state['session'] and materials_key!=self.last_materials:
+                            self.last_materials=materials_key
                             try:
                                 preview=node.parm('hdue_wet_mask_preview')
                                 self.prepared_materials.settings['wetMaskPreview']=bool(preview.eval()) if preview else False
@@ -256,6 +260,15 @@ def start():
         path.mkdir(parents=True,exist_ok=True)
         (path/'startup-error.txt').write_text(_failure,encoding='utf-8')
     return _host
+
+def _stage_key(settings):
+    """Changes whenever the viewed stage or the hdUE settings change: the displayed LOP's cook count and the settings values."""
+    viewer=scene_viewer()
+    network=viewer.pwd()
+    display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
+    values=tuple(parm.eval() for parm in settings.parms() if parm.name().startswith('hdue_'))
+    return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,values)
+
 
 def scene_viewer():
     viewer=hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)

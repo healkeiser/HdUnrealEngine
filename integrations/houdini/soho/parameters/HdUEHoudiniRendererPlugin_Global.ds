@@ -1,5 +1,6 @@
 /// hdUE render settings, authored as hdUE:* attributes on a UsdRenderSettings prim.
-/// With the delegate registered, Render Settings LOPs show them on an "Unreal Engine" tab.
+/// With the delegate registered, Render Settings LOPs show them on an "Unreal Engine" tab,
+/// in collapsible sections like Karma's. Parameter names encode the attribute names: keep them.
 /// hdUE:postProcess:<FPostProcessSettings property> attributes not listed here also work.
 
 #include "$HFS/houdini/soho/parameters/CommonMacros.ds"
@@ -18,15 +19,32 @@
         parmtag { "sidefx::look" "icon" } \
     }
 
+/// Same, hidden with its parameter (a setting that applies to one render mode only).
+#define HDUE_CONTROL_HIDE(NAME, LABEL, HIDE) \
+    parm { \
+        name    NAME \
+        label   LABEL \
+        type    string \
+        default { "none" } \
+        menujoin { \
+            [ "import loputils" ] \
+            [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
+            language python \
+        } \
+        parmtag { "sidefx::look" "icon" } \
+        hidewhen HIDE \
+    }
+
 {
     name        "hdUE"
     label       "Unreal Engine"
     parmtag     { spare_opfilter        "!!SHOP/PROPERTIES!!" }
     parmtag     { spare_classtags       "render" }
 
-    group {
-        name "global"
-        label "Global"
+    groupcollapsible {
+        name "hdUE_Rendering"
+        label "Rendering"
+        grouptag { "group_default" "1" }
 
         HDUE_CONTROL("xn__hdUErenderMode_control_ucb", "Render Mode")
         parm {
@@ -35,13 +53,29 @@
             type    string
             size    1
             default { "realtime" }
-            menu { "realtime" "Lumen" "pathtraced" "Path Tracer" }
-            parmtag { "spare_category" "Global" }
+            menu { "realtime" "Realtime (Lumen)" "pathtraced" "Path Tracer" }
+            help    "Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. Path Tracer accumulates UE's reference path tracer."
+            parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "string" }
             disablewhen R"({ xn__hdUErenderMode_control_ucb == block } { xn__hdUErenderMode_control_ucb == none })"
         }
-        HDUE_CONTROL("xn__hdUEsamplesPerPixel_control_zkb", "Path Tracer Samples")
+        HDUE_CONTROL_HIDE("xn__hdUEwarmupFrames_control_3fb", "Warmup Frames", "{ xn__hdUErenderMode_tya == pathtraced }")
+        parm {
+            name    "xn__hdUEwarmupFrames_21a"
+            label   "Warmup Frames"
+            type    int
+            size    1
+            default { 16 }
+            range   { 0! 256 }
+            help    "Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. Divided between motion-blur sub-frames."
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEwarmupFrames_control_3fb == block } { xn__hdUEwarmupFrames_control_3fb == none })"
+            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+        }
+        HDUE_CONTROL_HIDE("xn__hdUEsamplesPerPixel_control_zkb", "Path Tracer Samples", "{ xn__hdUErenderMode_tya != pathtraced }")
         parm {
             name    "xn__hdUEsamplesPerPixel_y6a"
             label   "Path Tracer Samples"
@@ -49,62 +83,14 @@
             size    1
             default { 64 }
             range   { 1! 4096 }
-            parmtag { "spare_category" "Global" }
+            help    "Samples per pixel. Divided between motion-blur sub-frames."
+            parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEsamplesPerPixel_control_zkb == block } { xn__hdUEsamplesPerPixel_control_zkb == none })"
+            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
         }
-        HDUE_CONTROL("xn__hdUElumenEnabled_control_3fb", "Enable Lumen")
-        parm {
-            name    "xn__hdUElumenEnabled_21a"
-            label   "Enable Lumen"
-            type    toggle
-            size    1
-            default { 1 }
-            parmtag { "spare_category" "Global" }
-            parmtag { "uiscope" "viewport" }
-            parmtag { "usdvaluetype" "bool" }
-            disablewhen R"({ xn__hdUElumenEnabled_control_3fb == block } { xn__hdUElumenEnabled_control_3fb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEwarmupFrames_control_3fb", "Lumen Warmup Frames")
-        parm {
-            name    "xn__hdUEwarmupFrames_21a"
-            label   "Lumen Warmup Frames"
-            type    int
-            size    1
-            default { 16 }
-            range   { 0! 256 }
-            parmtag { "spare_category" "Global" }
-            parmtag { "uiscope" "viewport" }
-            parmtag { "usdvaluetype" "int" }
-            disablewhen R"({ xn__hdUEwarmupFrames_control_3fb == block } { xn__hdUEwarmupFrames_control_3fb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEmotionBlur_control_ucb", "Motion Blur")
-        parm {
-            name    "xn__hdUEmotionBlur_tya"
-            label   "Motion Blur"
-            type    toggle
-            size    1
-            default { 1 }
-            help    "Average sub-frames over the camera shutter (shutter:open/close) when something moves."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "bool" }
-            disablewhen R"({ xn__hdUEmotionBlur_control_ucb == block } { xn__hdUEmotionBlur_control_ucb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEmotionSamples_control_qhb", "Motion Samples")
-        parm {
-            name    "xn__hdUEmotionSamples_p3a"
-            label   "Motion Samples"
-            type    int
-            size    1
-            default { 16 }
-            range   { 1! 64 }
-            help    "Sub-frames per frame; Path Tracer samples are divided between them."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "int" }
-            disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEdenoiser_control_l8a", "Denoiser")
+        HDUE_CONTROL_HIDE("xn__hdUEdenoiser_control_l8a", "Denoiser", "{ xn__hdUErenderMode_tya != pathtraced }")
         parm {
             name    "xn__hdUEdenoiser_kva"
             label   "Denoiser"
@@ -112,123 +98,32 @@
             size    1
             default { "off" }
             menu { "off" "Off" "oidn" "Open Image Denoise" }
-            help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. Lumen is unaffected."
-            parmtag { "spare_category" "Global" }
+            help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. AOVs and Lumen are unaffected."
+            parmtag { "spare_category" "Rendering" }
             parmtag { "usdvaluetype" "string" }
             disablewhen R"({ xn__hdUEdenoiser_control_l8a == block } { xn__hdUEdenoiser_control_l8a == none })"
+            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
         }
-        HDUE_CONTROL("xn__hdUEsubdivisionLevel_control_mmb", "Subdivision Level")
+    }
+
+    groupcollapsible {
+        name "hdUE_Lighting"
+        label "Lighting"
+        grouptag { "group_default" "1" }
+
+        HDUE_CONTROL_HIDE("xn__hdUElumenEnabled_control_3fb", "Lumen", "{ xn__hdUErenderMode_tya == pathtraced }")
         parm {
-            name    "xn__hdUEsubdivisionLevel_l8a"
-            label   "Subdivision Level"
-            type    int
-            size    1
-            default { 2 }
-            range   { 0! 5 }
-            help    "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's surfaces closely, 0 renders the cage."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "int" }
-            disablewhen R"({ xn__hdUEsubdivisionLevel_control_mmb == block } { xn__hdUEsubdivisionLevel_control_mmb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEtonemapper_control_ucb", "Unreal Tonemapper")
-        parm {
-            name    "xn__hdUEtonemapper_tya"
-            label   "Unreal Tonemapper"
+            name    "xn__hdUElumenEnabled_21a"
+            label   "Lumen"
             type    toggle
             size    1
-            default { 0 }
-            help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. Makes the beauty display-referred: set the viewport colour correction to raw."
-            parmtag { "spare_category" "Global" }
+            default { 1 }
+            help    "Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal Engine tab."
+            parmtag { "spare_category" "Lighting" }
+            parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "bool" }
-            disablewhen R"({ xn__hdUEtonemapper_control_ucb == block } { xn__hdUEtonemapper_control_ucb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessMaterials_control_4sb", "Post-Process Materials")
-        parm {
-            name    "xn__hdUEpostProcessMaterials_3fb"
-            label   "Post-Process Materials"
-            type    string
-            size    1
-            default { "" }
-            help    "Cooked post-process material paths, separated by spaces, added as blendables to the beauty."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "string" }
-            disablewhen R"({ xn__hdUEpostProcessMaterials_control_4sb == block } { xn__hdUEpostProcessMaterials_control_4sb == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessBloomIntensity_control_90bl", "Bloom Intensity")
-        parm {
-            name    "xn__hdUEpostProcessBloomIntensity_8nbl"
-            label   "Bloom Intensity"
-            type    float
-            size    1
-            default { 0.675 }
-            range   { 0! 8 }
-            help    "Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float" }
-            disablewhen R"({ xn__hdUEpostProcessBloomIntensity_control_90bl == block } { xn__hdUEpostProcessBloomIntensity_control_90bl == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessVignetteIntensity_control_55bl", "Vignette Intensity")
-        parm {
-            name    "xn__hdUEpostProcessVignetteIntensity_4sbl"
-            label   "Vignette Intensity"
-            type    float
-            size    1
-            default { 0.4 }
-            range   { 0! 1! }
-            help    "Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float" }
-            disablewhen R"({ xn__hdUEpostProcessVignetteIntensity_control_55bl == block } { xn__hdUEpostProcessVignetteIntensity_control_55bl == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessFilmGrainIntensity_control_s7bl", "Film Grain Intensity")
-        parm {
-            name    "xn__hdUEpostProcessFilmGrainIntensity_rubl"
-            label   "Film Grain Intensity"
-            type    float
-            size    1
-            default { 0 }
-            range   { 0! 1! }
-            help    "Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float" }
-            disablewhen R"({ xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == block } { xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessWhiteTemp_control_4sbl", "White Balance Temperature")
-        parm {
-            name    "xn__hdUEpostProcessWhiteTemp_3fbl"
-            label   "White Balance Temperature"
-            type    float
-            size    1
-            default { 6500 }
-            range   { 1500 15000 }
-            help    "Kelvin. Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float" }
-            disablewhen R"({ xn__hdUEpostProcessWhiteTemp_control_4sbl == block } { xn__hdUEpostProcessWhiteTemp_control_4sbl == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessColorSaturation_control_w2bl", "Saturation")
-        parm {
-            name    "xn__hdUEpostProcessColorSaturation_vpbl"
-            label   "Saturation"
-            type    float
-            size    4
-            default { 1 1 1 1 }
-            help    "RGB and overall saturation. Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float4" }
-            disablewhen R"({ xn__hdUEpostProcessColorSaturation_control_w2bl == block } { xn__hdUEpostProcessColorSaturation_control_w2bl == none })"
-        }
-        HDUE_CONTROL("xn__hdUEpostProcessColorContrast_control_nzbl", "Contrast")
-        parm {
-            name    "xn__hdUEpostProcessColorContrast_mmbl"
-            label   "Contrast"
-            type    float
-            size    4
-            default { 1 1 1 1 }
-            help    "RGB and overall contrast. Needs the Unreal tonemapper."
-            parmtag { "spare_category" "Global" }
-            parmtag { "usdvaluetype" "float4" }
-            disablewhen R"({ xn__hdUEpostProcessColorContrast_control_nzbl == block } { xn__hdUEpostProcessColorContrast_control_nzbl == none })"
+            disablewhen R"({ xn__hdUElumenEnabled_control_3fb == block } { xn__hdUElumenEnabled_control_3fb == none })"
+            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
         }
         HDUE_CONTROL("xn__hdUEdomeResolution_control_djb", "Environment Cube Resolution")
         parm {
@@ -238,7 +133,8 @@
             size    1
             default { 512 }
             menu { "32" "32" "64" "64" "128" "128" "256" "256" "512" "512" "1024" "1024" "2048" "2048" }
-            parmtag { "spare_category" "Global" }
+            help    "Face size of the cubemap dome lights are baked into, for lighting, reflections and the background."
+            parmtag { "spare_category" "Lighting" }
             parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEdomeResolution_control_djb == block } { xn__hdUEdomeResolution_control_djb == none })"
@@ -250,23 +146,196 @@
             type    toggle
             size    1
             default { 1 }
-            parmtag { "spare_category" "Global" }
+            help    "Add a camera-relative key and fill light when the scene has no lights, so unlit scenes are reviewable."
+            parmtag { "spare_category" "Lighting" }
             parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "bool" }
             disablewhen R"({ xn__hdUEautoViewerLight_control_zkb == block } { xn__hdUEautoViewerLight_control_zkb == none })"
         }
-        HDUE_CONTROL("xn__hdUEviewerLightIntensity_control_4sb", "Unlit Scene Light Intensity")
+        HDUE_CONTROL("xn__hdUEviewerLightIntensity_control_4sb", "Viewer Light Intensity")
         parm {
             name    "xn__hdUEviewerLightIntensity_3fb"
-            label   "Unlit Scene Light Intensity"
+            label   "Viewer Light Intensity"
             type    float
             size    1
             default { 4 }
-            range   { 0! 100 }
-            parmtag { "spare_category" "Global" }
+            range   { 0! 100! }
+            help    "Intensity of the unlit-scene lights and of the viewport's headlight."
+            parmtag { "spare_category" "Lighting" }
             parmtag { "uiscope" "viewport" }
             parmtag { "usdvaluetype" "float" }
             disablewhen R"({ xn__hdUEviewerLightIntensity_control_4sb == block } { xn__hdUEviewerLightIntensity_control_4sb == none })"
+        }
+    }
+
+    groupcollapsible {
+        name "hdUE_MotionBlur"
+        label "Motion Blur"
+        grouptag { "group_default" "1" }
+
+        HDUE_CONTROL("xn__hdUEmotionBlur_control_ucb", "Motion Blur")
+        parm {
+            name    "xn__hdUEmotionBlur_tya"
+            label   "Motion Blur"
+            type    toggle
+            size    1
+            default { 1 }
+            help    "Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes from the camera's fStop and focusDistance."
+            parmtag { "spare_category" "Motion Blur" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUEmotionBlur_control_ucb == block } { xn__hdUEmotionBlur_control_ucb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEmotionSamples_control_qhb", "Motion Samples")
+        parm {
+            name    "xn__hdUEmotionSamples_p3a"
+            label   "Motion Samples"
+            type    int
+            size    1
+            default { 16 }
+            range   { 1! 64 }
+            help    "Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show discrete copies of fast objects."
+            parmtag { "spare_category" "Motion Blur" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none } { xn__hdUEmotionBlur_tya == 0 })"
+        }
+    }
+
+    groupcollapsible {
+        name "hdUE_Post"
+        label "Post-Processing"
+        grouptag { "group_default" "0" }
+
+        HDUE_CONTROL("xn__hdUEtonemapper_control_ucb", "Unreal Tonemapper")
+        parm {
+            name    "xn__hdUEtonemapper_tya"
+            label   "Unreal Tonemapper"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. Makes the beauty display-referred: set the viewport colour correction to raw."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUEtonemapper_control_ucb == block } { xn__hdUEtonemapper_control_ucb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessBloomIntensity_control_90bl", "Bloom Intensity")
+        parm {
+            name    "xn__hdUEpostProcessBloomIntensity_8nbl"
+            label   "Bloom Intensity"
+            type    float
+            size    1
+            default { 0.675 }
+            range   { 0! 8 }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessBloomIntensity_control_90bl == block } { xn__hdUEpostProcessBloomIntensity_control_90bl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessVignetteIntensity_control_55bl", "Vignette Intensity")
+        parm {
+            name    "xn__hdUEpostProcessVignetteIntensity_4sbl"
+            label   "Vignette Intensity"
+            type    float
+            size    1
+            default { 0.4 }
+            range   { 0! 1! }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessVignetteIntensity_control_55bl == block } { xn__hdUEpostProcessVignetteIntensity_control_55bl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessFilmGrainIntensity_control_s7bl", "Film Grain Intensity")
+        parm {
+            name    "xn__hdUEpostProcessFilmGrainIntensity_rubl"
+            label   "Film Grain Intensity"
+            type    float
+            size    1
+            default { 0 }
+            range   { 0! 1! }
+            help    "Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == block } { xn__hdUEpostProcessFilmGrainIntensity_control_s7bl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessWhiteTemp_control_4sbl", "White Balance Temperature")
+        parm {
+            name    "xn__hdUEpostProcessWhiteTemp_3fbl"
+            label   "White Balance Temperature"
+            type    float
+            size    1
+            default { 6500 }
+            range   { 1500 15000 }
+            help    "Kelvin. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float" }
+            disablewhen R"({ xn__hdUEpostProcessWhiteTemp_control_4sbl == block } { xn__hdUEpostProcessWhiteTemp_control_4sbl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessColorSaturation_control_w2bl", "Saturation")
+        parm {
+            name    "xn__hdUEpostProcessColorSaturation_vpbl"
+            label   "Saturation"
+            type    float
+            size    4
+            default { 1 1 1 1 }
+            help    "RGB and overall saturation. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float4" }
+            disablewhen R"({ xn__hdUEpostProcessColorSaturation_control_w2bl == block } { xn__hdUEpostProcessColorSaturation_control_w2bl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessColorContrast_control_nzbl", "Contrast")
+        parm {
+            name    "xn__hdUEpostProcessColorContrast_mmbl"
+            label   "Contrast"
+            type    float
+            size    4
+            default { 1 1 1 1 }
+            help    "RGB and overall contrast. Needs the Unreal tonemapper."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "float4" }
+            disablewhen R"({ xn__hdUEpostProcessColorContrast_control_nzbl == block } { xn__hdUEpostProcessColorContrast_control_nzbl == none } { xn__hdUEtonemapper_tya == 0 })"
+        }
+        HDUE_CONTROL("xn__hdUEpostProcessMaterials_control_4sb", "Post-Process Materials")
+        parm {
+            name    "xn__hdUEpostProcessMaterials_3fb"
+            label   "Post-Process Materials"
+            type    string
+            size    1
+            default { "" }
+            help    "Cooked post-process material paths, separated by spaces, added as blendables to the beauty. Before Tonemapping materials work with the Unreal tonemapper off."
+            parmtag { "spare_category" "Post-Processing" }
+            parmtag { "usdvaluetype" "string" }
+            disablewhen R"({ xn__hdUEpostProcessMaterials_control_4sb == block } { xn__hdUEpostProcessMaterials_control_4sb == none })"
+        }
+    }
+
+    groupcollapsible {
+        name "hdUE_Geometry"
+        label "Geometry"
+        grouptag { "group_default" "0" }
+
+        HDUE_CONTROL("xn__hdUEsubdivisionLevel_control_mmb", "Subdivision Level")
+        parm {
+            name    "xn__hdUEsubdivisionLevel_l8a"
+            label   "Subdivision Level"
+            type    int
+            size    1
+            default { 2 }
+            range   { 0! 5 }
+            help    "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's surfaces closely, 0 renders the cage."
+            parmtag { "spare_category" "Geometry" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEsubdivisionLevel_control_mmb == block } { xn__hdUEsubdivisionLevel_control_mmb == none })"
+        }
+        HDUE_CONTROL("xn__hdUErequireNanite_control_qhb", "Require Nanite")
+        parm {
+            name    "xn__hdUErequireNanite_p3a"
+            label   "Require Nanite"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). Meshes built from Hydra are unaffected."
+            parmtag { "spare_category" "Geometry" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUErequireNanite_control_qhb == block } { xn__hdUErequireNanite_control_qhb == none })"
         }
         HDUE_CONTROL("xn__hdUEupAxis_control_c5a", "Stage Up Axis")
         parm {
@@ -276,7 +345,8 @@
             size    1
             default { "Y" }
             menu { "Y" "Y" "Z" "Z" }
-            parmtag { "spare_category" "Global" }
+            help    "Overrides the stage's upAxis metadata."
+            parmtag { "spare_category" "Geometry" }
             parmtag { "usdvaluetype" "string" }
             disablewhen R"({ xn__hdUEupAxis_control_c5a == block } { xn__hdUEupAxis_control_c5a == none })"
         }

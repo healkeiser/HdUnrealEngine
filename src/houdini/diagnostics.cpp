@@ -4,6 +4,7 @@
 #include "diagnostics.h"
 #include <windows.h>
 #include <cstring>
+#include <mutex>
 #include <cmath>
 #include "pxr/base/gf/vec4f.h"
 namespace { std::weak_ptr<PXR_NS::HdUEState> Viewport; PXR_NS::HdUERenderDelegate* Delegate=nullptr; }
@@ -91,7 +92,13 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(Hd
     if (!status || status->struct_size!=sizeof(*status)) return HDUE_INVALID_ARGUMENT;
     HdueViewportStatus out{}; out.struct_size=sizeof(out);
     if (const auto s=Viewport.lock()) {
-        std::lock_guard lock(s->mutex);
+        // Houdini's UI thread polls this: while an upload is being prepared under the state lock, answer with the last status.
+        std::unique_lock lock(s->mutex, std::try_to_lock);
+        if (!lock.owns_lock()) {
+            std::lock_guard cached(s->statusMutex);
+            if (const auto last=std::static_pointer_cast<HdueViewportStatus>(s->viewportStatus)) { *status=*last; return HDUE_OK; }
+            lock.lock();
+        }
         out.active=1; out.create_thread=s->createThread; out.execute_thread=s->executeThread;
         out.session=s->session; out.generation=s->generation; out.published_frames=s->publishedFrames; out.scene_submissions=s->sceneSubmissions;
         out.mode=s->setting<std::string>("renderMode","realtime")=="pathtraced"?HDUE_PATH_TRACED:HDUE_REALTIME;
@@ -101,6 +108,7 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(Hd
         if(s->submittedRequestSettingsRevision==s->requestSettingsRevision && s->submittedRevision==s->revision)
             out.frame=s->lastFrame;
         std::memcpy(out.error,s->error.c_str(),std::min(s->error.size(),sizeof(out.error)-1));
+        std::lock_guard cached(s->statusMutex); s->viewportStatus=std::make_shared<HdueViewportStatus>(out);
     }
     *status=out; return HDUE_OK;
 }

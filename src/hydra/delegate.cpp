@@ -15,6 +15,7 @@
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/getenv.h"
+#include <optional>
 #include "pxr/base/work/loops.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/js/json.h"
@@ -79,6 +80,9 @@ struct HdUESelfHost {
     // Houdini's UI (HDUE_HOUDINI_UI, set by hdue_houdini): UE ticks continuously on this thread while a delegate
     // exists, Execute only submits and polls, and UE outlives individual viewports until hdue_shutdown_ue.
     bool continuous = false;
+    // Houdini's UI boots UE on this thread without waiting (as Karma loads); a failed boot is reported here.
+    std::mutex bootMutex; std::string bootError;
+    std::string error() { std::lock_guard lock(bootMutex); return bootError; }
     std::filesystem::path directory; // the host's working directory, which UE moves to its Binaries
     // UE runs on its own thread: husk calls from one thread, but Live Render creates the delegate on one
     // thread and executes it on others, and UE only accepts calls from the thread that started it.
@@ -199,14 +203,16 @@ bool houdiniUi() {
     for (auto& c : name) c = wchar_t(towlower(c));
     return name == L"houdini.exe" || name == L"houdinifx.exe" || name == L"houdinicore.exe" || name == L"happrentice.exe" || name == L"houdinicore.exe";
 }
-void startSelfHost(const std::string& dll, const std::string& project) {
+// Starts UE on hdUE's thread and ticks it until its world and RHI are ready. wait = false (Houdini's UI) returns at once:
+// work posted meanwhile runs once UE is ready, and a failure is kept in HdUESelfHost::bootError.
+void startSelfHost(const std::string& dll, const std::string& project, bool wait) {
     auto& host = selfHost();
     if (project.empty()) throw std::runtime_error("hdUE cannot start UE without runtime_project in HDUE_RUNTIME_CONFIG");
-    std::promise<void> started;
-    auto ready = started.get_future();
+    auto started = std::make_shared<std::promise<void>>();
+    auto ready = started->get_future();
     host.stopping = false;
     host.continuous = TfGetenvBool("HDUE_HOUDINI_UI", false) || houdiniUi();
-    host.worker = std::thread([&host, dll, project, &started] {
+    host.worker = std::thread([&host, dll, project, started] {
         try {
             const auto instance = GetModuleHandleW(nullptr);
             WNDCLASSW cls{}; cls.hInstance = instance; cls.lpfnWndProc = selfHostWindow; cls.lpszClassName = L"HdUESelfHost";
@@ -227,8 +233,22 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
             host.backend->initialize(init);
-            started.set_value();
-        } catch (...) { host.backend.reset(); started.set_exception(std::current_exception()); return; }
+            // UE reports ready only after its first ticks.
+            HdueStatus status{}; status.struct_size = sizeof(status);
+            for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
+                host.tick();
+                host.backend->require(host.backend->api().get_status(&status), "get_status");
+                if (status.state == HDUE_STATE_FAILED) break;
+                Sleep(10);
+            }
+            if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
+                throw std::runtime_error(std::string("hdUE: UE did not become ready: ") + status.message);
+            started->set_value();
+        } catch (const std::exception& e) {
+            { std::lock_guard lock(host.bootMutex); host.bootError = e.what(); }
+            host.backend.reset(); started->set_exception(std::current_exception());
+            // Keep serving the queue: work posted meanwhile fails with UE's errors instead of waiting forever.
+        }
         for (;;) {
             std::function<void()> task;
             {
@@ -252,6 +272,7 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             }
         }
     });
+    if (!wait) return;
     try { ready.get(); } catch (...) { host.worker.join(); throw; }
 }
 }
@@ -275,10 +296,6 @@ void HdUEState::erase(const std::string& id) {
     dirtyMeshes.erase(id); dirtyMaterials.erase(id); dirtyLights.erase(id);
     removed.insert(id); ++revision;
 }
-GfVec3d HdUEState::convert(const GfVec3d& p, bool direction) const {
-    const double scale = direction ? 1 : setting<double>("metersPerUnit", 0.01) * 100;
-    return (setting<std::string>("upAxis", "Y") == "Z" ? GfVec3d(p[0], -p[1], p[2]) : GfVec3d(-p[2], p[0], p[1])) * scale;
-}
 namespace {
 constexpr const char* AutoKey = "hdUE:viewer:key";
 constexpr const char* AutoFill = "hdUE:viewer:fill";
@@ -291,57 +308,87 @@ std::string asset(const HdUEState& state, const char* key, const std::string& id
     const auto it = mapping.find(id);
     return it != mapping.end() && it->second.IsHolding<std::string>() ? it->second.UncheckedGet<std::string>() : "";
 }
-void submit(HdUEState& state) {
-    const auto submitStart = std::chrono::steady_clock::now();
+// One scene upload, with copies of everything its descriptors point to. prepareScene fills it under the state lock;
+// sendScene hands it to UE without the lock, so Hydra Sync and Houdini's UI never wait for UE's apply (seconds on
+// large scenes); finishScene records the result under the lock again.
+struct ScenePacket {
+    // Owned storage. Deques: their elements never move, so descriptor pointers into them stay valid.
+    std::deque<std::string> text;
+    std::deque<std::vector<float>> floats;
+    std::deque<std::vector<double>> doubles;
+    std::deque<std::vector<uint32_t>> indices;
+    std::deque<std::vector<int32_t>> ids;
+    std::deque<std::vector<HdueMaterialParameter>> parameters;
+    const char* own(std::string value) { return text.emplace_back(std::move(value)).c_str(); }
+    template <class T, class Store> const T* own(Store& store, std::vector<T> values) {
+        return values.empty() ? nullptr : store.emplace_back(std::move(values)).data();
+    }
+    // What this upload covers; Sync may dirty more meanwhile, for the next upload.
+    std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, removedIds;
+    // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
+    std::map<std::string, std::vector<GfVec3f>> points;
+    // Takes the state's dirty sets (state lock held).
+    void take(HdUEState& state) {
+        dirtyMeshes.swap(state.dirtyMeshes); dirtyMaterials.swap(state.dirtyMaterials);
+        dirtyLights.swap(state.dirtyLights); dirtyVolumes.swap(state.dirtyVolumes); removedIds.swap(state.removed);
+    }
+    // Gives them back after a failed upload (state lock held). Sync may have erased or revived prims meanwhile:
+    // only prims that still exist stay dirty, and only prims still gone stay removed.
+    void giveBack(HdUEState& state) const {
+        const auto restore = [](const std::set<std::string>& from, std::set<std::string>& to, const auto& prims) {
+            for (const auto& id : from) if (prims.count(id)) to.insert(id);
+        };
+        restore(dirtyMeshes, state.dirtyMeshes, state.meshes); restore(dirtyMaterials, state.dirtyMaterials, state.materials);
+        restore(dirtyLights, state.dirtyLights, state.lights); restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
+        for (const auto& id : removedIds)
+            if (!state.meshes.count(id) && !state.materials.count(id) && !state.lights.count(id) && !state.volumes.count(id)) state.removed.insert(id);
+    }
+    uint64_t revision = 0;
+    bool firstBatch = false;
+    // Descriptors.
     std::vector<HdueMeshDesc> meshes;
-    std::vector<HdueAssetDesc> sceneAssets;
-    std::vector<std::vector<float>> positions, normals, uvs, colors, instanceColors;
-    std::vector<std::vector<double>> instances; // row-major UE world matrices per instanced mesh
-    std::vector<std::vector<uint32_t>> indices;
-    std::vector<std::string> nativeMeshes, nativeMaterials;
     std::vector<HdueMaterialDesc> materials;
     std::vector<HdueLightDesc> lights;
     std::vector<HdueLight> extendedLights;
-    std::vector<const char*> removed;
-    // Sync has joined before Execute. The lock also protects stats/settings access.
-    std::lock_guard lock(state.mutex);
-    const auto effects=state.setting<VtDictionary>("surfaceEffects",{});
+    std::vector<HdueAssetDesc> sceneAssets;
+    std::vector<HdueVolumeDesc> volumes;
+    std::vector<HdueMaterialUpdate> materialUpdates;
     std::vector<HdueWetBinding> wet;
-    std::vector<std::string> wetAssets, wetPreviews;
-    wetAssets.reserve(state.meshes.size()); wetPreviews.reserve(state.meshes.size());
-    for (const auto& [id, data] : state.meshes) {
-        const auto fields=HdUEWetSettings(effects,data);
-        if (fields.empty()) continue;
-        const float amount=HdUEWetValue<float>(fields,"amount",float(HdUEWetValue<double>(fields,"amount",1.)));
-        if (amount==0.f && !state.setting<bool>("wetMaskPreview",false)) continue;
-        const auto maskName=HdUEWetValue<std::string>(fields,"maskPrimvar","");
-        const auto mask=data.masks.find(maskName);
-        if (!maskName.empty() && mask==data.masks.end()) {
-            const auto error=data.maskErrors.find(maskName);
-            throw std::runtime_error(data.bindingPath+": "+(error!=data.maskErrors.end()?error->second:"Wet mask not synchronized: "+maskName));
-        }
-        wetAssets.push_back(HdUEWetValue<std::string>(fields,"asset",""));
-        wetPreviews.push_back(HdUEWetValue<std::string>(fields,"previewAsset",""));
-        HdueWetBinding binding{}; binding.struct_size=sizeof(binding); binding.object_id=data.id.c_str();
-        binding.variant_asset=wetAssets.back().c_str(); binding.preview_asset=wetPreviews.back().c_str();
-        binding.amount=amount;
-        binding.roughness=HdUEWetValue<float>(fields,"roughness",float(HdUEWetValue<double>(fields,"roughness",.08)));
-        binding.flags=state.setting<bool>("wetMaskPreview",false)?HDUE_WET_MASK_PREVIEW:0;
-        if (HdUEWetValue<bool>(fields,"graph",false)) binding.flags|=HDUE_SURFACE_GRAPH;
-        if (!maskName.empty()) { binding.mask=mask->second.data(); binding.mask_count=uint32_t(mask->second.size()); }
-        wet.push_back(binding);
-    }
-    const auto& surfaceApi=state.backend->surface_api();
-    if (!wet.empty() && !surfaceApi.apply) throw std::runtime_error("Wet surface extension unavailable; build/cook/stage the current runtime.");
-    const auto count = state.dirtyMeshes.size();
-    positions.reserve(count); normals.reserve(count); uvs.reserve(count); indices.reserve(count); nativeMeshes.reserve(count); instances.reserve(count);
-    colors.reserve(count); instanceColors.reserve(count);
-    nativeMaterials.reserve(state.dirtyMaterials.size());
-    for (const auto& id : state.dirtyMaterials) {
+    std::vector<const char*> removed, removedAssets;
+    std::vector<std::string> genericMeshes; // non-native meshes, whose geometry revision the upload advances
+    bool autoLight = false, surfaceUpdate = false;
+    int cameraLights = 0;
+    uint32_t nativeLights = 0;
+};
+GfMatrix4d sceneBasis(const HdUEState& state) {
+    GfMatrix4d basis(1);
+    for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = state.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
+    return basis;
+}
+void rowMajor(const GfMatrix4d& m, double* out) { for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) out[r * 4 + c] = m[r][c]; }
+HdueMaterialParameter materialParameter(ScenePacket& packet, const std::string& name, const VtValue& value) {
+    HdueMaterialParameter p{}; p.name = packet.own(name);
+    if (value.IsHolding<float>() || value.IsHolding<double>() || value.IsHolding<int>()) {
+        p.type = HDUE_PARAMETER_SCALAR;
+        p.value[0] = value.IsHolding<float>() ? value.UncheckedGet<float>() : value.IsHolding<double>() ? float(value.UncheckedGet<double>()) : float(value.UncheckedGet<int>());
+    } else if (value.IsHolding<GfVec3f>() || value.IsHolding<GfVec3d>()) {
+        p.type = HDUE_PARAMETER_VECTOR; p.value[3] = 1;
+        const auto v = value.IsHolding<GfVec3f>() ? GfVec3d(value.UncheckedGet<GfVec3f>()) : value.UncheckedGet<GfVec3d>();
+        for (int c = 0; c < 3; ++c) p.value[c] = float(v[c]);
+    } else if (value.IsHolding<GfVec4f>()) {
+        p.type = HDUE_PARAMETER_VECTOR;
+        for (int c = 0; c < 4; ++c) p.value[c] = value.UncheckedGet<GfVec4f>()[c];
+    } else if (value.IsHolding<std::string>()) {
+        p.type = HDUE_PARAMETER_TEXTURE; p.texture_asset = packet.own(value.UncheckedGet<std::string>());
+    } else throw std::runtime_error("Unsupported native material parameter value: " + name);
+    return p;
+}
+void prepareMaterials(HdUEState& state, ScenePacket& packet) {
+    const float units = float(state.setting<double>("metersPerUnit", 0.01) * 100);
+    for (const auto& id : packet.dirtyMaterials) {
         const auto& data = state.materials.at(id);
-        nativeMaterials.push_back(asset(state, "nativeMaterialAssets", id));
         HdueMaterialDesc desc{};
-        desc.id = data.id.c_str(); desc.native_asset = nativeMaterials.back().c_str();
+        desc.id = packet.own(data.id); desc.native_asset = packet.own(asset(state, "nativeMaterialAssets", id));
         for (int i = 0; i < 3; ++i) { desc.base_color[i] = data.color[i]; desc.emissive_color[i] = data.emissive[i]; }
         desc.base_color[3] = data.opacity; desc.metallic = data.metallic; desc.roughness = data.roughness;
         desc.opacity_threshold = data.opacityThreshold;
@@ -350,142 +397,155 @@ void submit(HdUEState& state) {
         for (int slot = 0; slot < HDUE_TEXTURE_SLOT_COUNT; ++slot) {
             const auto& texture = data.textures[slot];
             auto& out = desc.textures[slot];
-            out.file = texture.file.c_str();
+            out.file = packet.own(texture.file);
             // Displacement is a distance: scene units to UE centimetres.
-            const float units = slot == HDUE_TEXTURE_DISPLACEMENT ? float(state.setting<double>("metersPerUnit", 0.01) * 100) : 1.f;
-            for (int i = 0; i < 4; ++i) { out.scale[i] = texture.scale[i] * units; out.bias[i] = texture.bias[i] * units; out.channel_mask[i] = texture.mask[i]; }
+            const float scale = slot == HDUE_TEXTURE_DISPLACEMENT ? units : 1.f;
+            for (int i = 0; i < 4; ++i) { out.scale[i] = texture.scale[i] * scale; out.bias[i] = texture.bias[i] * scale; out.channel_mask[i] = texture.mask[i]; }
         }
-        desc.displacement = data.displacement * float(state.setting<double>("metersPerUnit", 0.01) * 100);
+        desc.displacement = data.displacement * units;
         desc.occlusion = data.occlusion; desc.clearcoat = data.clearcoat; desc.clearcoat_roughness = data.clearcoatRoughness; desc.ior = data.ior;
         for (int i = 0; i < 3; ++i) desc.specular_color[i] = data.specularColor[i];
         if (data.specularWorkflow) desc.flags |= HDUE_MATERIAL_SPECULAR_WORKFLOW;
-        materials.push_back(desc);
+        packet.materials.push_back(desc);
         if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
     }
-    for (const auto& id : state.dirtyMeshes) {
+    // Native material parameter overrides.
+    const auto overrides = state.setting<VtDictionary>("nativeMaterialParameters", {});
+    for (const auto& id : packet.dirtyMaterials) {
+        if (state.materials.find(id) == state.materials.end()) continue;
+        const auto entry = overrides.find(id);
+        if (entry == overrides.end()) continue;
+        if (asset(state, "nativeMaterialAssets", id).empty() || !entry->second.IsHolding<VtDictionary>())
+            throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
+        if (!state.backend->material_api().set_parameters) throw std::runtime_error("Backend has no material parameter extension");
+        std::vector<HdueMaterialParameter> parameters;
+        for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>()) parameters.push_back(materialParameter(packet, name, value));
+        HdueMaterialUpdate update{}; update.struct_size = sizeof(update); update.material_id = packet.own(id);
+        update.parameter_count = uint32_t(parameters.size()); update.parameters = packet.own(packet.parameters, std::move(parameters));
+        packet.materialUpdates.push_back(update);
+    }
+}
+void prepareMeshes(HdUEState& state, ScenePacket& packet) {
+    const auto convert = state.converter();
+    const auto basis = sceneBasis(state);
+    const bool requireNanite = state.setting<bool>("requireNanite", false);
+    const auto inverse = basis.GetInverse();
+    for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
         if (!data.sceneAsset.empty()) {
-            HdueAssetDesc d{}; d.struct_size=sizeof(d); d.id=data.id.c_str(); d.asset_path=data.sceneAsset.c_str(); d.visible=data.visible;
-            GfMatrix4d basis(1);
-            for (int r=0; r<3; ++r) { GfVec3d e(0); e[r]=1; const auto v=state.convert(e); for (int c=0; c<3; ++c) basis[r][c]=v[c]; }
-            const auto t=basis.GetInverse()*data.transform*basis;
-            for (int r=0; r<4; ++r) for (int c=0; c<4; ++c) d.transform[r*4+c]=t[r][c];
-            sceneAssets.push_back(d); removed.push_back(data.id.c_str());
+            HdueAssetDesc d{}; d.struct_size = sizeof(d); d.id = packet.own(data.id); d.asset_path = packet.own(data.sceneAsset); d.visible = data.visible;
+            rowMajor(inverse * data.transform * basis, d.transform);
+            packet.sceneAssets.push_back(d); packet.removed.push_back(d.id);
             continue;
         }
-        nativeMeshes.push_back(asset(state, "nativeMeshAssets", id));
-        positions.emplace_back(); normals.emplace_back(); uvs.emplace_back(); indices.emplace_back();
-        auto& p = positions.back(); auto& n = normals.back(); auto& uv = uvs.back(); auto& index = indices.back();
+        packet.removedAssets.push_back(packet.own(id)); // in case it was a scene asset before
+        const auto nativeAsset = asset(state, "nativeMeshAssets", id);
         // Instanced prototypes keep local vertices; each instance matrix carries the placement.
         const GfMatrix4d bake = data.instanced ? GfMatrix4d(1) : data.transform;
         const auto normalTransform = bake.GetInverse().GetTranspose();
-        for (size_t i = 0; i < data.points.size(); ++i) {
-            const auto point = state.convert(bake.Transform(GfVec3d(data.points[i])));
+        const auto moved = packet.points.find(id);
+        const auto& points = moved != packet.points.end() ? moved->second : data.points;
+        std::vector<float> p, n, uv;
+        p.reserve(points.size() * 3);
+        for (size_t i = 0; i < points.size(); ++i) {
+            const auto point = convert(bake.Transform(GfVec3d(points[i])));
             for (int c = 0; c < 3; ++c) p.push_back(float(point[c]));
             if (data.normals.size() == data.points.size()) {
-                auto normal = state.convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
+                const auto normal = convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
                 for (int c = 0; c < 3; ++c) n.push_back(float(normal[c]));
             }
             if (data.uv.size() == data.points.size()) { uv.push_back(data.uv[i][0]); uv.push_back(1 - data.uv[i][1]); }
         }
-        index.resize(data.points.size()); std::iota(index.begin(), index.end(), 0u);
+        std::vector<uint32_t> index(data.points.size()); std::iota(index.begin(), index.end(), 0u);
         // World transforms are baked into dynamic vertices. Preserve front
         // faces when an authored transform adds another handedness reversal.
         if (bake.GetDeterminant() < 0)
             for (size_t i = 0; i + 2 < index.size(); i += 3) std::swap(index[i + 1], index[i + 2]);
+        std::vector<float> colors;
+        for (const auto& c : data.colors) colors.insert(colors.end(), {c[0], c[1], c[2]});
         HdueMeshDesc desc{};
-        desc.id = data.id.c_str(); desc.material_id = data.material.c_str(); desc.native_asset = nativeMeshes.back().c_str();
-        desc.positions = p.data(); desc.normals = n.empty() ? nullptr : n.data(); desc.uv = uv.empty() ? nullptr : uv.data();
-        desc.indices = index.data(); desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
+        desc.id = packet.own(data.id); desc.material_id = packet.own(data.material); desc.native_asset = packet.own(nativeAsset);
+        desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
         desc.prim_id = data.primId;
-        colors.emplace_back(); instanceColors.emplace_back();
-        for (const auto& c : data.colors) colors.back().insert(colors.back().end(), {c[0], c[1], c[2]});
-        if (colors.back().size() == p.size()) desc.colors = colors.back().data();
-        instances.emplace_back();
+        if (colors.size() == p.size()) desc.colors = packet.own(packet.floats, std::move(colors));
+        desc.positions = packet.own(packet.floats, std::move(p));
+        desc.normals = packet.own(packet.floats, std::move(n));
+        desc.uv = packet.own(packet.floats, std::move(uv));
+        desc.indices = packet.own(packet.indices, std::move(index));
         if (data.instanced) {
             // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units.
-            GfMatrix4d basis(1);
-            for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = state.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
-            const auto inverse = basis.GetInverse();
-            auto& matrices = instances.back(); matrices.reserve(data.instances.size() * 16);
-            for (const auto& instance : data.instances) {
-                const auto m = inverse * instance * basis;
-                for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) matrices.push_back(m[r][c]);
-            }
+            std::vector<double> matrices(data.instances.size() * 16);
+            for (size_t i = 0; i < data.instances.size(); ++i) rowMajor(inverse * data.instances[i] * basis, &matrices[i * 16]);
             desc.instance_count = uint32_t(data.instances.size());
-            for (const auto& c : data.instanceColors) instanceColors.back().insert(instanceColors.back().end(), {c[0], c[1], c[2]});
-            if (instanceColors.back().size() == size_t(desc.instance_count) * 3 && desc.instance_count) desc.instance_colors = instanceColors.back().data();
-            if (data.instanceIds.size() == desc.instance_count && desc.instance_count) desc.instance_ids = data.instanceIds.data();
+            std::vector<float> instanceColors;
+            for (const auto& c : data.instanceColors) instanceColors.insert(instanceColors.end(), {c[0], c[1], c[2]});
+            if (instanceColors.size() == size_t(desc.instance_count) * 3 && desc.instance_count) desc.instance_colors = packet.own(packet.floats, std::move(instanceColors));
+            if (data.instanceIds.size() == desc.instance_count && desc.instance_count)
+                desc.instance_ids = packet.own(packet.ids, std::vector<int32_t>(data.instanceIds.begin(), data.instanceIds.end()));
             static const double none = 0;
-            desc.instance_transforms = matrices.empty() ? &none : matrices.data();
+            desc.instance_transforms = matrices.empty() ? &none : packet.own(packet.doubles, std::move(matrices));
         }
-        desc.flags = state.setting<bool>("requireNanite", false) && !nativeMeshes.back().empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
+        desc.flags = requireNanite && !nativeAsset.empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
         // Surface effects edit vertex colours after upload, so their meshes stay editable (dynamic) in UE.
         if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) desc.flags |= HDUE_MESH_EDITABLE;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
-        if (!nativeMeshes.back().empty()) {
-            // The cooked sample cube has side 100 cm. Native geometry keeps its
-            // own dimensions; only its placement transform comes from Hydra.
-            GfMatrix4d basis(1);
-            for (int r = 0; r < 3; ++r) {
-                GfVec3d e(0); e[r] = 1;
-                const auto v = state.convert(e);
-                for (int c = 0; c < 3; ++c) basis[r][c] = v[c];
-            }
-            const auto transform = basis.GetInverse() * data.transform * basis;
-            for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) desc.transform[r * 4 + c] = transform[r][c];
-        }
-        meshes.push_back(desc);
-        if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE mesh %s material=%s first=(%g,%g,%g)", desc.id, desc.material_id, p.empty()?0:p[0], p.empty()?0:p[1], p.empty()?0:p[2]);
+        // Native geometry keeps its own dimensions; only its placement transform comes from Hydra.
+        if (!nativeAsset.empty()) rowMajor(inverse * data.transform * basis, desc.transform);
+        else packet.genericMeshes.push_back(id);
+        packet.meshes.push_back(desc);
+        if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
     }
+}
+void prepareLights(HdUEState& state, ScenePacket& packet) {
     const double viewerIntensity = state.setting<double>("viewerLightIntensity", state.setting<float>("viewerLightIntensity", 4.f));
     if (!std::isfinite(viewerIntensity) || viewerIntensity < 0 || viewerIntensity > 100)
         throw std::runtime_error("viewerLightIntensity must be between 0 and 100");
-    int sceneLights = 0, cameraLights = 0;
+    int sceneLights = 0;
     for (const auto& [id, light] : state.lights) if (active(light)) {
-        if (light.viewer) ++cameraLights;
+        if (light.viewer) ++packet.cameraLights;
         else if (state.setting<bool>("sceneLightsEnabled", true)) ++sceneLights;
     }
-    const bool autoLight = state.setting<bool>("autoViewerLight", false) && !sceneLights && !cameraLights && !state.nativeAssets.lights;
-    const auto extend=[&](const HdueLightDesc& legacy,const HdUELightData* source) {
-        HdueLight light{}; light.struct_size=sizeof(light); light.type=legacy.type; light.id=legacy.id;
-        light.visible=legacy.visible; light.intensity=legacy.intensity;
-        light.flags=source?source->flags:HDUE_LIGHT_SHADOWS|HDUE_LIGHT_MEGALIGHTS;
-        light.diffuse=source?source->diffuse:1; light.specular=source?source->specular:1;
-        light.cone_angle=source?source->coneAngle:180; light.cone_softness=source?source->coneSoftness:0;
-        light.angle_degrees=source?source->angle:.53f;
-        light.cube_resolution=uint32_t(state.setting<int>("domeResolution",512));
-        light.texture_format=source?source->textureFormat:HDUE_ENVIRONMENT_AUTOMATIC;
-        light.texture_file=source?source->texture.c_str():"";
-        light.ies_file=source?source->ies.c_str():""; light.ies_angle_scale=source?source->iesAngleScale:0;
-        light.ies_normalize=source && source->iesNormalize;
-        for(int c=0;c<3;++c) {light.position_cm[c]=legacy.position[c]; light.color[c]=legacy.color[c];}
-        for(int axis=0;axis<3;++axis) {
-            GfVec3d direction(0); direction[axis]=1;
-            direction=source?state.convert(source->transform.TransformDir(direction),true).GetNormalized():direction;
-            for(int c=0;c<3;++c) light.axes[axis*3+c]=direction[c];
+    packet.autoLight = state.setting<bool>("autoViewerLight", false) && !sceneLights && !packet.cameraLights && !state.nativeAssets.lights;
+    const double units = state.setting<double>("metersPerUnit", .01) * 100;
+    const auto domeResolution = uint32_t(state.setting<int>("domeResolution", 512));
+    const auto extend = [&](const HdueLightDesc& legacy, const HdUELightData* source) {
+        HdueLight light{}; light.struct_size = sizeof(light); light.type = legacy.type; light.id = legacy.id;
+        light.visible = legacy.visible; light.intensity = legacy.intensity;
+        light.flags = source ? source->flags : HDUE_LIGHT_SHADOWS | HDUE_LIGHT_MEGALIGHTS;
+        light.diffuse = source ? source->diffuse : 1; light.specular = source ? source->specular : 1;
+        light.cone_angle = source ? source->coneAngle : 180; light.cone_softness = source ? source->coneSoftness : 0;
+        light.angle_degrees = source ? source->angle : .53f;
+        light.cube_resolution = domeResolution;
+        light.texture_format = source ? source->textureFormat : HDUE_ENVIRONMENT_AUTOMATIC;
+        light.texture_file = packet.own(source ? source->texture : "");
+        light.ies_file = packet.own(source ? source->ies : ""); light.ies_angle_scale = source ? source->iesAngleScale : 0;
+        light.ies_normalize = source && source->iesNormalize;
+        for (int c = 0; c < 3; ++c) { light.position_cm[c] = legacy.position[c]; light.color[c] = legacy.color[c]; }
+        for (int axis = 0; axis < 3; ++axis) {
+            GfVec3d direction(0); direction[axis] = 1;
+            direction = source ? state.convert(source->transform.TransformDir(direction), true).GetNormalized() : direction;
+            for (int c = 0; c < 3; ++c) light.axes[axis * 3 + c] = direction[c];
         }
-        light.width_cm=legacy.width_cm; light.height_cm=legacy.height_cm;
-        const double units=state.setting<double>("metersPerUnit",.01)*100;
-        if(source) {
-            light.length_cm=float(source->length*source->transform.TransformDir(GfVec3d(1,0,0)).GetLength()*units);
-            if(source->type==HDUE_CYLINDER_LIGHT || source->type==HDUE_SPHERE_LIGHT) {
-                const double x=source->transform.TransformDir(GfVec3d(1,0,0)).GetLength();
-                const double y=source->transform.TransformDir(GfVec3d(0,1,0)).GetLength();
-                const double z=source->transform.TransformDir(GfVec3d(0,0,1)).GetLength();
-                light.width_cm=float(source->width*(source->type==HDUE_CYLINDER_LIGHT?std::max(y,z):std::max({x,y,z}))*units);
-                if(light.width_cm==0 && source->type==HDUE_SPHERE_LIGHT) light.flags|=HDUE_LIGHT_POINT;
+        light.width_cm = legacy.width_cm; light.height_cm = legacy.height_cm;
+        if (source) {
+            light.length_cm = float(source->length * source->transform.TransformDir(GfVec3d(1, 0, 0)).GetLength() * units);
+            if (source->type == HDUE_CYLINDER_LIGHT || source->type == HDUE_SPHERE_LIGHT) {
+                const double x = source->transform.TransformDir(GfVec3d(1, 0, 0)).GetLength();
+                const double y = source->transform.TransformDir(GfVec3d(0, 1, 0)).GetLength();
+                const double z = source->transform.TransformDir(GfVec3d(0, 0, 1)).GetLength();
+                light.width_cm = float(source->width * (source->type == HDUE_CYLINDER_LIGHT ? std::max(y, z) : std::max({x, y, z})) * units);
+                if (light.width_cm == 0 && source->type == HDUE_SPHERE_LIGHT) light.flags |= HDUE_LIGHT_POINT;
             }
         }
-        if(legacy.type==HDUE_CAMERA_DISTANT_LIGHT) {
-            for(int i=0;i<9;++i) light.axes[i]=(i%4)==0?1.:0.;
-            for(int c=0;c<3;++c) light.axes[c]=legacy.direction[c];
+        if (legacy.type == HDUE_CAMERA_DISTANT_LIGHT) {
+            for (int i = 0; i < 9; ++i) light.axes[i] = (i % 4) == 0 ? 1. : 0.;
+            for (int c = 0; c < 3; ++c) light.axes[c] = legacy.direction[c];
         }
-        extendedLights.push_back(light);
+        packet.extendedLights.push_back(light);
     };
-    for (const auto& id : state.dirtyLights) {
+    for (const auto& id : packet.dirtyLights) {
         const auto& data = state.lights.at(id);
-        HdueLightDesc desc{}; desc.id = data.id.c_str(); desc.type = data.type;
+        HdueLightDesc desc{}; desc.id = packet.own(data.id); desc.type = data.type;
         desc.visible = data.visible && (data.viewer || state.setting<bool>("sceneLightsEnabled", true));
         const auto position = state.convert(data.transform.ExtractTranslation());
         const auto direction = state.convert(data.transform.TransformDir(GfVec3d(0, 0, -1)), true).GetNormalized();
@@ -495,132 +555,172 @@ void submit(HdUEState& state) {
             desc.intensity = float(viewerIntensity);
             desc.direction[0] = 1; desc.direction[1] = desc.direction[2] = 0;
         }
-        const double widthScale=data.transform.TransformDir(GfVec3d(1,0,0)).GetLength();
-        const double heightScale=data.transform.TransformDir(GfVec3d(0,1,0)).GetLength();
-        desc.width_cm = float(data.width * widthScale * state.setting<double>("metersPerUnit", 0.01) * 100);
-        desc.height_cm = float(data.height * heightScale * state.setting<double>("metersPerUnit", 0.01) * 100);
-        lights.push_back(desc);
-        extend(desc,&data);
+        desc.width_cm = float(data.width * data.transform.TransformDir(GfVec3d(1, 0, 0)).GetLength() * units);
+        desc.height_cm = float(data.height * data.transform.TransformDir(GfVec3d(0, 1, 0)).GetLength() * units);
+        packet.lights.push_back(desc);
+        extend(desc, &data);
         if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE light %s intensity=%g rgb=(%g,%g,%g)", desc.id, desc.intensity, desc.color[0], desc.color[1], desc.color[2]);
     }
-    for (const auto& id : state.removed) removed.push_back(id.c_str());
-    if (autoLight) {
+    if (packet.autoLight) {
         for (int i = 0; i < 2; ++i) {
             HdueLightDesc desc{};
             desc.id = i ? AutoFill : AutoKey; desc.type = HDUE_CAMERA_DISTANT_LIGHT; desc.visible = 1;
             desc.color[0] = desc.color[1] = desc.color[2] = 1;
             desc.intensity = float(viewerIntensity * (i ? 0.1875 : 1.0));
             desc.direction[0] = 1; desc.direction[1] = i ? -0.6 : 0.4; desc.direction[2] = i ? -0.2 : -0.5;
-            lights.push_back(desc);
-            extend(desc,nullptr);
+            packet.lights.push_back(desc);
+            extend(desc, nullptr);
         }
     } else if (state.autoLightActive) {
-        removed.push_back(AutoKey); removed.push_back(AutoFill);
+        packet.removed.push_back(AutoKey); packet.removed.push_back(AutoFill);
     }
-    HdueSceneBatch batch{};
-    batch.struct_size = sizeof(batch); batch.reset_scene = state.firstBatch;
-    batch.meshes = meshes.data(); batch.mesh_count = uint32_t(meshes.size());
-    batch.materials = materials.data(); batch.material_count = uint32_t(materials.size());
-    const auto& lightingApi=state.backend->lighting_api();
-    if(!lightingApi.upsert) for(const auto& light:extendedLights)
-        if(light.type>HDUE_CAMERA_DISTANT_LIGHT || (light.texture_file && *light.texture_file))
+    if (!state.backend->lighting_api().upsert) for (const auto& light : packet.extendedLights)
+        if (light.type > HDUE_CAMERA_DISTANT_LIGHT || (light.texture_file && *light.texture_file))
             throw std::runtime_error("This scene requires the backend lighting extension; build/cook/stage a current runtime.");
-    batch.lights = lightingApi.upsert?nullptr:lights.data(); batch.light_count = lightingApi.upsert?0:uint32_t(lights.size());
-    batch.removed_ids = removed.data(); batch.removed_count = uint32_t(removed.size());
+}
+void prepareVolumes(HdUEState& state, ScenePacket& packet) {
+    if (packet.dirtyVolumes.empty()) return;
+    if (!state.backend->volume_api().upsert) throw std::runtime_error("This scene has volumes; build and stage the current backend");
+    // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
+    const auto basis = sceneBasis(state);
+    const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
+    for (const auto& id : packet.dirtyVolumes) {
+        const auto it = state.volumes.find(id);
+        if (it == state.volumes.end()) continue;
+        const auto& volume = it->second;
+        HdueVolumeDesc desc{}; desc.struct_size = sizeof(desc); desc.id = packet.own(volume.id); desc.visible = volume.visible;
+        desc.width = volume.width; desc.height = volume.height; desc.depth = volume.depth;
+        desc.density = packet.own(packet.floats, std::vector<float>(volume.density.begin(), volume.density.end()));
+        const auto m = volume.localToWorld * basis;
+        rowMajor(m, desc.transform);
+        for (int c = 0; c < 3; ++c) desc.albedo[c] = volume.albedo[c];
+        // Density is extinction per scene unit; UE's ray marcher steps in voxel units (measured: halving
+        // the resolution halves optical depth), so scale by the voxel's edge length in cm.
+        const double voxelCm = std::cbrt(std::abs(m.ExtractRotationMatrix().GetDeterminant()));
+        desc.extinction_scale = float(perCentimeter * voxelCm);
+        packet.volumes.push_back(desc);
+    }
+}
+void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
+    const auto effects = state.setting<VtDictionary>("surfaceEffects", {});
+    const bool preview = state.setting<bool>("wetMaskPreview", false);
+    for (const auto& [id, data] : state.meshes) {
+        const auto fields = HdUEWetSettings(effects, data);
+        if (fields.empty()) continue;
+        const float amount = HdUEWetValue<float>(fields, "amount", float(HdUEWetValue<double>(fields, "amount", 1.)));
+        if (amount == 0.f && !preview) continue;
+        const auto maskName = HdUEWetValue<std::string>(fields, "maskPrimvar", "");
+        const auto mask = data.masks.find(maskName);
+        if (!maskName.empty() && mask == data.masks.end()) {
+            const auto error = data.maskErrors.find(maskName);
+            throw std::runtime_error(data.bindingPath + ": " + (error != data.maskErrors.end() ? error->second : "Wet mask not synchronized: " + maskName));
+        }
+        HdueWetBinding binding{}; binding.struct_size = sizeof(binding); binding.object_id = packet.own(data.id);
+        binding.variant_asset = packet.own(HdUEWetValue<std::string>(fields, "asset", ""));
+        binding.preview_asset = packet.own(HdUEWetValue<std::string>(fields, "previewAsset", ""));
+        binding.amount = amount;
+        binding.roughness = HdUEWetValue<float>(fields, "roughness", float(HdUEWetValue<double>(fields, "roughness", .08)));
+        binding.flags = preview ? HDUE_WET_MASK_PREVIEW : 0;
+        if (HdUEWetValue<bool>(fields, "graph", false)) binding.flags |= HDUE_SURFACE_GRAPH;
+        if (!maskName.empty()) {
+            binding.mask = packet.own(packet.floats, std::vector<float>(mask->second.begin(), mask->second.end()));
+            binding.mask_count = uint32_t(mask->second.size());
+        }
+        // The revision this upload leaves the mesh at: generic meshes advance by one when re-uploaded.
+        const bool reuploaded = packet.dirtyMeshes.count(id) && data.sceneAsset.empty() && asset(state, "nativeMeshAssets", id).empty();
+        binding.geometry_revision = state.geometryRevisions[data.id] + uint64_t(reuploaded);
+        packet.wet.push_back(binding);
+    }
+    packet.surfaceUpdate = state.backend->surface_api().apply && state.backend->surface_api().get_status &&
+        (!packet.wet.empty() || state.surfaceStatus.binding_count);
+    if (!packet.wet.empty() && !state.backend->surface_api().apply) throw std::runtime_error("Wet surface extension unavailable; build/cook/stage the current runtime.");
+}
+// Under the state lock: takes the dirty sets and copies what UE needs.
+void prepareScene(HdUEState& state, ScenePacket& packet) {
+    packet.take(state);
+    packet.revision = state.revision; packet.firstBatch = state.firstBatch;
+    packet.nativeLights = state.nativeAssets.lights;
+    prepareSurfaceEffects(state, packet);
+    prepareMaterials(state, packet);
+    prepareMeshes(state, packet);
+    prepareLights(state, packet);
+    prepareVolumes(state, packet);
+    for (const auto& id : packet.removedIds) packet.removed.push_back(packet.own(id));
+}
+// Without the state lock: only the backend and the packet (the UE thread owns the session).
+void sendScene(const HdUEState& state, ScenePacket& packet) {
+    const auto& backend = *state.backend;
+    const auto session = state.session;
+    const auto& lightingApi = backend.lighting_api();
+    HdueSceneBatch batch{};
+    batch.struct_size = sizeof(batch); batch.reset_scene = packet.firstBatch;
+    batch.meshes = packet.meshes.data(); batch.mesh_count = uint32_t(packet.meshes.size());
+    batch.materials = packet.materials.data(); batch.material_count = uint32_t(packet.materials.size());
+    batch.lights = lightingApi.upsert ? nullptr : packet.lights.data(); batch.light_count = lightingApi.upsert ? 0 : uint32_t(packet.lights.size());
+    batch.removed_ids = packet.removed.data(); batch.removed_count = uint32_t(packet.removed.size());
     if (batch.reset_scene || batch.mesh_count || batch.material_count || batch.light_count || batch.removed_count) {
         const auto applyStart = std::chrono::steady_clock::now();
-        state.backend->require(state.backend->api().apply_scene(state.session, &batch), "apply_scene");
-        const auto applyEnd = std::chrono::steady_clock::now();
-        trace("hdUE scene submit: convert %.1f ms, UE apply %.1f ms (%u meshes, %u materials, %u lights)\n",
-            std::chrono::duration<double, std::milli>(applyStart - submitStart).count(),
-            std::chrono::duration<double, std::milli>(applyEnd - applyStart).count(), batch.mesh_count, batch.material_count, batch.light_count);
+        backend.require(backend.api().apply_scene(session, &batch), "apply_scene");
+        trace("hdUE scene submit: UE apply %.1f ms (%u meshes, %u materials, %u lights)\n",
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(), batch.mesh_count, batch.material_count, batch.light_count);
         double syncMs = 0; int syncs = 0; HdUETakeMeshSyncStats(syncMs, syncs);
         if (syncs) trace("hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads\n", syncs, syncMs);
-        for (const auto& id:state.removed) state.geometryRevisions.erase(id);
-        for (const auto& mesh:meshes) if (!mesh.native_asset || !*mesh.native_asset) ++state.geometryRevisions[mesh.id];
     }
-    if(lightingApi.upsert && !extendedLights.empty()) {
-        HdueLightBatch update{sizeof(HdueLightBatch),uint32_t(extendedLights.size()),extendedLights.data()};
-        state.backend->require(lightingApi.upsert(state.session,&update),"upsert_lights");
+    if (lightingApi.upsert && !packet.extendedLights.empty()) {
+        HdueLightBatch update{sizeof(HdueLightBatch), uint32_t(packet.extendedLights.size()), packet.extendedLights.data()};
+        backend.require(lightingApi.upsert(session, &update), "upsert_lights");
     }
-    const auto& assetApi=state.backend->asset_api();
-    if (!sceneAssets.empty() && !assetApi.upsert) throw std::runtime_error("Backend has no native scene asset extension");
+    const auto& assetApi = backend.asset_api();
+    if (!packet.sceneAssets.empty() && !assetApi.upsert) throw std::runtime_error("Backend has no native scene asset extension");
     if (assetApi.remove) {
-        for (const auto& id : state.removed) state.backend->require(assetApi.remove(state.session,id.c_str()),"remove_asset");
-        for (const auto& id : state.dirtyMeshes) if (state.meshes.at(id).sceneAsset.empty())
-            state.backend->require(assetApi.remove(state.session,id.c_str()),"remove_asset");
+        for (const auto& id : packet.removedIds) backend.require(assetApi.remove(session, id.c_str()), "remove_asset");
+        for (const auto* id : packet.removedAssets) backend.require(assetApi.remove(session, id), "remove_asset");
     }
-    for (const auto& desc : sceneAssets) state.backend->require(assetApi.upsert(state.session,&desc),"upsert_asset");
-    if (!state.dirtyVolumes.empty()) {
-        const auto& volumeApi = state.backend->volume_api();
-        if (!volumeApi.upsert) throw std::runtime_error("This scene has volumes; build and stage the current backend");
-        // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
-        GfMatrix4d basis(1);
-        for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = state.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
-        const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
-        for (const auto& id : state.dirtyVolumes) {
-            const auto it = state.volumes.find(id);
-            if (it == state.volumes.end()) continue;
-            const auto& volume = it->second;
-            HdueVolumeDesc desc{}; desc.struct_size = sizeof(desc); desc.id = volume.id.c_str(); desc.visible = volume.visible;
-            desc.width = volume.width; desc.height = volume.height; desc.depth = volume.depth;
-            desc.density = volume.density.empty() ? nullptr : volume.density.data();
-            const auto m = volume.localToWorld * basis;
-            for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) desc.transform[r * 4 + c] = m[r][c];
-            for (int c = 0; c < 3; ++c) desc.albedo[c] = volume.albedo[c];
-            // Density is extinction per scene unit; UE's ray marcher steps in voxel units (measured: halving
-            // the resolution halves optical depth), so scale by the voxel's edge length in cm.
-            const double voxelCm = std::cbrt(std::abs(m.ExtractRotationMatrix().GetDeterminant()));
-            desc.extinction_scale = float(perCentimeter * voxelCm);
-            state.backend->require(volumeApi.upsert(state.session, &desc), "upsert_volume");
-        }
+    for (const auto& desc : packet.sceneAssets) backend.require(assetApi.upsert(session, &desc), "upsert_asset");
+    for (const auto& desc : packet.volumes) backend.require(backend.volume_api().upsert(session, &desc), "upsert_volume");
+    for (const auto& update : packet.materialUpdates) backend.require(backend.material_api().set_parameters(session, &update), "set_material_parameters");
+}
+// Under the state lock again: records what reached UE.
+void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceStatus& surface) {
+    for (const auto& id : packet.removedIds) {
+        if (state.meshes.count(id)) { state.dirtyMeshes.insert(id); ++state.revision; continue; } // revived during the send
+        state.geometryRevisions.erase(id); state.erasedMeshes.erase(id);
     }
-    state.submittedMeshes += meshes.size(); state.submittedMaterials += materials.size();
-    const auto overrides = state.setting<VtDictionary>("nativeMaterialParameters", {});
-    for (const auto& id : state.dirtyMaterials) {
-        if (state.materials.find(id) == state.materials.end()) continue;
-        const auto entry = overrides.find(id);
-        if (entry == overrides.end()) continue;
-        if (asset(state, "nativeMaterialAssets", id).empty() || !entry->second.IsHolding<VtDictionary>())
-            throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
-        const auto& api = state.backend->material_api();
-        if (!api.set_parameters) throw std::runtime_error("Backend has no material parameter extension");
-        const auto& fields = entry->second.UncheckedGet<VtDictionary>();
-        std::vector<HdueMaterialParameter> parameters;
-        for (const auto& [name, value] : fields) {
-            HdueMaterialParameter p{}; p.name = name.c_str();
-            if (value.IsHolding<float>() || value.IsHolding<double>() || value.IsHolding<int>()) {
-                p.type = HDUE_PARAMETER_SCALAR;
-                p.value[0] = value.IsHolding<float>() ? value.UncheckedGet<float>() : value.IsHolding<double>() ? float(value.UncheckedGet<double>()) : float(value.UncheckedGet<int>());
-            } else if (value.IsHolding<GfVec3f>() || value.IsHolding<GfVec3d>()) {
-                p.type = HDUE_PARAMETER_VECTOR; p.value[3] = 1;
-                const auto v = value.IsHolding<GfVec3f>() ? GfVec3d(value.UncheckedGet<GfVec3f>()) : value.UncheckedGet<GfVec3d>();
-                for (int c = 0; c < 3; ++c) p.value[c] = float(v[c]);
-            } else if (value.IsHolding<GfVec4f>()) {
-                p.type = HDUE_PARAMETER_VECTOR;
-                for (int c = 0; c < 4; ++c) p.value[c] = value.UncheckedGet<GfVec4f>()[c];
-            } else if (value.IsHolding<std::string>()) {
-                p.type = HDUE_PARAMETER_TEXTURE; p.texture_asset = value.UncheckedGet<std::string>().c_str();
-            } else throw std::runtime_error("Unsupported native material parameter value: " + name);
-            parameters.push_back(p);
-        }
-        HdueMaterialUpdate update{}; update.struct_size = sizeof(update); update.material_id = id.c_str();
-        update.parameter_count = uint32_t(parameters.size()); update.parameters = parameters.data();
-        state.backend->require(api.set_parameters(state.session, &update), "set_material_parameters");
-        ++state.materialParameterUpdates;
-    }
-    state.autoLightActive = autoLight; state.viewerLights = cameraLights + (autoLight ? 2 : 0);
-    if (surfaceApi.apply && (!wet.empty() || state.surfaceStatus.binding_count)) {
-        for (auto& binding:wet) binding.geometry_revision=state.geometryRevisions[binding.object_id];
-        HdueSurfaceBatch surface{sizeof(surface),uint32_t(wet.size()),wet.data()};
-        state.backend->require(surfaceApi.apply(state.session,&surface),"apply_surface_effects");
-        state.backend->require(surfaceApi.get_status(state.session,&state.surfaceStatus),"surface_status");
-    }
-    state.submittedNativeLights = state.nativeAssets.lights;
+    for (const auto& id : packet.genericMeshes) ++state.geometryRevisions[id];
+    state.submittedMeshes += packet.meshes.size(); state.submittedMaterials += packet.materials.size();
+    state.materialParameterUpdates += packet.materialUpdates.size();
+    state.autoLightActive = packet.autoLight; state.viewerLights = packet.cameraLights + (packet.autoLight ? 2 : 0);
+    if (packet.surfaceUpdate) state.surfaceStatus = surface;
+    state.submittedNativeLights = packet.nativeLights;
     ++state.sceneSubmissions;
-    for (const auto& id : state.removed) state.erasedMeshes.erase(id); // their removal reached UE
-    state.dirtyMeshes.clear(); state.dirtyMaterials.clear(); state.dirtyLights.clear(); state.dirtyVolumes.clear(); state.removed.clear();
-    state.submittedRevision = state.revision; state.firstBatch = false;
+    state.submittedRevision = packet.revision; state.firstBatch = false;
+}
+// Uploads the scene changes since the last call. Runs on the UE thread; holds the state lock only to copy and record.
+void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points = {}) {
+    const auto start = std::chrono::steady_clock::now();
+    ScenePacket packet;
+    packet.points = std::move(points);
+    {
+        std::lock_guard lock(state.mutex);
+        try { prepareScene(state, packet); } catch (...) { packet.giveBack(state); throw; }
+    }
+    trace("hdUE scene prepare: %.1f ms under the state lock\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    HdueSurfaceStatus surface{sizeof(HdueSurfaceStatus)};
+    try {
+        sendScene(state, packet);
+        if (packet.surfaceUpdate) {
+            const auto& surfaceApi = state.backend->surface_api();
+            HdueSurfaceBatch batch{sizeof(batch), uint32_t(packet.wet.size()), packet.wet.data()};
+            state.backend->require(surfaceApi.apply(state.session, &batch), "apply_surface_effects");
+            state.backend->require(surfaceApi.get_status(state.session, &surface), "surface_status");
+        }
+    } catch (...) {
+        std::lock_guard lock(state.mutex); // not uploaded: dirty again, for the next attempt
+        packet.giveBack(state);
+        throw;
+    }
+    std::lock_guard lock(state.mutex);
+    finishScene(state, packet, surface);
 }
 class Pass final : public HdRenderPass {
     std::shared_ptr<HdUEState> state_;
@@ -634,9 +734,9 @@ class Pass final : public HdRenderPass {
     // Moves every moving mesh to frame-relative time t through hdue/motion_api.h; t = 0 restores the submitted pose.
     void applyMotion(HdUEState& s, float t) {
         if (!s.backend->motion_api().set_transforms || (!t && !motionApplied_)) return;
-        GfMatrix4d basis(1);
-        for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = s.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
+        const auto basis = sceneBasis(s);
         const auto inverse = basis.GetInverse();
+        std::unique_lock lock(s.mutex);
         std::vector<std::vector<double>> storage;
         std::vector<const std::string*> ids;
         for (const auto& [id, mesh] : s.meshes) {
@@ -656,18 +756,17 @@ class Pass final : public HdRenderPass {
             ids.push_back(&id);
         }
         // Deforming meshes are resubmitted with their points at t, before set_transforms moves them.
-        std::vector<std::pair<HdUEMeshData*, std::vector<GfVec3f>>> rest;
-        for (auto& [id, mesh] : s.meshes) if (!mesh.deformTimes.empty() && mesh.sceneAsset.empty()) {
-            rest.emplace_back(&mesh, mesh.points);
-            mesh.points = mesh.pointsAt(t);
+        std::map<std::string, std::vector<GfVec3f>> deformed;
+        for (const auto& [id, mesh] : s.meshes) if (!mesh.deformTimes.empty() && mesh.sceneAsset.empty()) {
+            deformed[id] = mesh.pointsAt(t);
             s.dirtyMeshes.insert(id);
         }
-        if (!rest.empty()) {
-            submit(s);
-            for (auto& [mesh, points] : rest) mesh->points = std::move(points);
-        }
+        std::vector<std::string> names; names.reserve(ids.size());
+        for (const auto* id : ids) names.push_back(*id);
+        lock.unlock();
+        if (!deformed.empty()) submit(s, std::move(deformed));
         std::vector<HdueMeshTransform> moves;
-        for (size_t i = 0; i < ids.size(); ++i) moves.push_back({ids[i]->c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});
+        for (size_t i = 0; i < names.size(); ++i) moves.push_back({names[i].c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});
         if (!moves.empty()) s.backend->require(s.backend->motion_api().set_transforms(s.session, moves.data(), uint32_t(moves.size())), "set_transforms");
         motionApplied_ = t != 0;
     }
@@ -796,8 +895,11 @@ public:
         // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
         // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
         auto& host = selfHost();
-        if (!host.backend) { ueRun([&] { executeOnce(pass, tags); }); return; }
+        if (!host.worker.joinable()) { ueRun([&] { executeOnce(pass, tags); }); return; }
         if (host.continuous) {
+            if (const auto error = host.error(); !error.empty()) {
+                std::lock_guard lock(state_->mutex); state_->error = error; converged_ = true; return;
+            }
             // Houdini's UI: post and return; Hydra calls again while not converged. A UE tick can take hundreds of ms
             // (scene uploads, ID-pass material swaps), which froze the UI while it waited.
             const auto eye = pass->view.GetInverse().ExtractTranslation();
@@ -841,7 +943,7 @@ public:
                 // Preparation/undo must change the graph before rendering can
                 // resume. Stop Hydra's update loop, retaining the displayed AOV
                 // while keeping the invalid request out of completed-frame APIs.
-                s.error=error; s.lastFrame={}; converged_=true; return;
+                s.setError(error); s.lastFrame={}; converged_=true; return;
             }
 #if defined(HDUE_HOUDINI)
             s.executeThread=GetCurrentThreadId();
@@ -921,7 +1023,7 @@ public:
                 std::string names;
                 for (const auto& aov : pass->GetAovBindings()) names += " " + aov.aovName.GetString();
                 if (s.error.empty()) TF_RUNTIME_ERROR("hdUE renders none of the requested render vars:%s", names.c_str());
-                s.error = "hdUE renders none of the requested render vars:" + names; converged_ = true; aovsDone_ = true; return;
+                s.setError("hdUE renders none of the requested render vars:" + names); converged_ = true; aovsDone_ = true; return;
             }
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
                 std::string bindings;
@@ -929,7 +1031,7 @@ public:
                 throw std::runtime_error("hdUE requires an allocated float32 RGBA color AOV; bindings:"+bindings+
                     (buffer?" allocation: "+buffer->allocationError():" (missing buffer)"));
             }
-            bool changed = s.submittedRevision != s.revision;
+            bool changed = s.locked([&] { return s.submittedRevision != s.revision; });
             // A new size keeps the session and its scene when the runtime can resize in place (leaving a camera in
             // Houdini changes the size); recreating it re-sent every mesh, material and texture.
             if (s.session && (s.width != buffer->GetWidth() || s.height != buffer->GetHeight())) {
@@ -965,8 +1067,8 @@ public:
                 const bool lightsChanged=assets.lights != s.submittedNativeLights;
                 s.nativeAssets=assets;
                 if (assets.loading) { s.error.clear(); s.assetRequestPending=true; converged_=false; return; }
-                if (assets.failed) { s.error=assets.message; s.assetRequestPending=true; converged_=true; return; }
-                if (lightsChanged) { ++s.revision; submit(s); changed=true; }
+                if (assets.failed) { s.setError(assets.message); s.assetRequestPending=true; converged_=true; return; }
+                if (lightsChanged) { s.locked([&] { ++s.revision; }); submit(s); changed=true; }
             }
             if (s.assetRequestPending) { changed=true; s.assetRequestPending=false; }
             const auto view = pass->GetWorldToViewMatrix();
@@ -975,13 +1077,17 @@ public:
             const GfVec4f lens = hdCamera ? GfVec4f(hdCamera->GetFStop(), hdCamera->GetFocusDistance(), hdCamera->GetFocalLength(), hdCamera->GetLinearExposureScale())
                                           : GfVec4f(0.f, 0.f, 0.f, 1.f);
             // Sub-frame times are spread over the camera shutter; the camera moves with its own samples.
-            const auto cameraMotion = hdCamera ? s.cameraMotion.find(hdCamera->GetId().GetString()) : s.cameraMotion.end();
+            std::optional<HdUEMotionSamples> cameraMotion;
+            if (hdCamera) {
+                std::lock_guard cameraLock(s.cameraMutex);
+                if (const auto it = s.cameraMotion.find(hdCamera->GetId().GetString()); it != s.cameraMotion.end()) cameraMotion = it->second;
+            }
             const auto subframeTime = [&](int k) {
                 return float(hdCamera->GetShutterOpen() + (k + .5) / subframes_ * (hdCamera->GetShutterClose() - hdCamera->GetShutterOpen()));
             };
             const auto viewAt = [&](float t) {
-                if (subframes_ < 2 || cameraMotion == s.cameraMotion.end()) return view;
-                return view * cameraMotion->second.at(0) * cameraMotion->second.at(t).GetInverse();
+                if (subframes_ < 2 || !cameraMotion) return view;
+                return view * cameraMotion->at(0) * cameraMotion->at(t).GetInverse();
             };
             const auto settingsVersion = s.requestSettingsRevision;
             // Consume a completed image before changing its generation. Otherwise
@@ -1158,8 +1264,8 @@ public:
                     // Motion blur needs a shutter, sub-frames and something moving.
                     const int samples = std::max(1, s.setting<int>("motionSamples", 16));
                     const bool shutter = hdCamera && hdCamera->GetShutterClose() > hdCamera->GetShutterOpen();
-                    const bool moving = cameraMotion != s.cameraMotion.end() ||
-                        std::any_of(s.meshes.begin(), s.meshes.end(), [](const auto& entry) { return entry.second.moving(); });
+                    const bool moving = cameraMotion.has_value() ||
+                        s.locked([&] { return std::any_of(s.meshes.begin(), s.meshes.end(), [](const auto& entry) { return entry.second.moving(); }); });
                     subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 && s.backend->motion_api().set_transforms ? samples : 1;
                     subframe_ = 0; subframeSamples_ = 0; accum_.clear();
                 }
@@ -1244,27 +1350,35 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     if (dll.empty()) dll = runtimeConfig("backend_dll");
     if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
     state_->backend = std::make_shared<hdue::Backend>(std::filesystem::u8path(dll));
-    HdueStatus status{}; status.struct_size = sizeof(status);
-    ueRun([&] { state_->backend->require(state_->backend->api().get_status(&status), "get_status"); });
-    if (status.state == HDUE_STATE_COLD && !selfHost().backend) {
-        selfHost().directory = hostDirectory;
-        startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")));
-        std::error_code ignored; std::filesystem::current_path(selfHost().directory, ignored);
-        // UE reports ready only after its first ticks.
-        selfHost().run([&] {
-            for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
-                selfHost().tick();
-                state_->backend->require(state_->backend->api().get_status(&status), "get_status");
-                if (status.state == HDUE_STATE_FAILED) break;
-                Sleep(10);
-            }
-        });
+    auto& host = selfHost();
+    const auto rendererInfo = [state = state_] {
+        if (state->backend->material_api().get_renderer_info)
+            state->backend->require(state->backend->material_api().get_renderer_info(&state->rendererInfo), "get_renderer_info");
+    };
+    if (host.worker.joinable()) {
+        // UE runs (or boots) on hdUE's thread.
+        if (const auto error = host.error(); !error.empty()) throw std::runtime_error(error);
+        ++host.delegates; selfHosted_ = true;
+        if (host.continuous) host.post(rendererInfo); else host.run(rendererInfo);
+    } else {
+        HdueStatus status{}; status.struct_size = sizeof(status);
+        ueRun([&] { state_->backend->require(state_->backend->api().get_status(&status), "get_status"); });
+        if (status.state == HDUE_STATE_COLD) {
+            // This process owns UE. Houdini's UI does not wait for the boot: Execute's work queues behind it, and
+            // the viewport shows Hydra's progress until frames arrive.
+            host.directory = hostDirectory;
+            const bool wait = !(TfGetenvBool("HDUE_HOUDINI_UI", false) || houdiniUi());
+            startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")), wait);
+            std::error_code ignored; std::filesystem::current_path(host.directory, ignored);
+            ++host.delegates; selfHosted_ = true;
+            if (host.continuous) host.post(rendererInfo); else host.run(rendererInfo);
+        } else {
+            // A host (usdview, or a test) started UE and ticks it.
+            if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
+                throw std::runtime_error("hdUE requires a ready runtime; launch usdview with scripts/Launch-Usdview.ps1");
+            ueRun(rendererInfo);
+        }
     }
-    if (selfHost().backend) { ++selfHost().delegates; selfHosted_ = true; }
-    if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
-        throw std::runtime_error("hdUE requires a ready runtime; launch usdview with scripts/Launch-Usdview.ps1");
-    if (state_->backend->material_api().get_renderer_info)
-        ueRun([&] { state_->backend->require(state_->backend->material_api().get_renderer_info(&state_->rendererInfo), "get_renderer_info"); });
 #if defined(HDUE_HOUDINI)
     state_->createThread=GetCurrentThreadId();
     if (!ownerQueue().owner || ownerQueue().owner == state_->createThread) HdUERegisterViewport(state_,this);
@@ -1389,10 +1503,15 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     if (key==TfToken("stageMetersPerUnit")) {
         SetRenderSetting(TfToken("metersPerUnit"),value); return;
     }
-    std::lock_guard settingsLock(state_->settingsMutex);
+    // Houdini repeats settings on redraws: an unchanged value returns without the state lock (held while an upload is
+    // prepared). The state lock is taken first, as everywhere else (setting() takes settingsMutex inside it).
+    {
+        std::lock_guard settingsLock(state_->settingsMutex);
+        if (const auto old=state_->settings.find(key); old!=state_->settings.end() && old->second==value) return;
+    }
     std::lock_guard lock(state_->mutex);
-    const auto old=state_->settings.find(key);
-    if (old!=state_->settings.end() && old->second==value) return;
+    std::lock_guard settingsLock(state_->settingsMutex);
+    if (const auto old=state_->settings.find(key); old!=state_->settings.end() && old->second==value) return;
     HdRenderDelegate::SetRenderSetting(key, value);
     if (key == TfToken("nativeMaterialParameters")) {
         const auto previous = state_->setting<VtDictionary>("nativeMaterialParameters", {});
@@ -1446,72 +1565,87 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
 }
 VtDictionary HdUERenderDelegate::GetRenderStats() const {
+    auto& host = selfHost();
+    if (host.continuous && host.worker.joinable()) {
+        // Answer from the last refresh and queue the next: a synchronous call waited out whole UE ticks (seconds while
+        // loading) on Houdini's UI thread.
+        if (!state_->statsPending.exchange(true)) {
+            host.post([state = state_] {
+                VtDictionary fresh;
+                try { fresh = renderStats(*state); } catch (const std::exception& e) { fresh["error"] = VtValue(std::string(e.what())); }
+                catch (...) { fresh["error"] = VtValue(std::string("unknown error")); }
+                std::lock_guard lock(state->statsMutex); state->stats = std::move(fresh); state->statsPending = false;
+            });
+        }
+        std::lock_guard lock(state_->statsMutex);
+        return state_->stats;
+    }
     VtDictionary stats;
-    try { ueRun([&] { stats = renderStats(); }); } catch (const std::exception& e) { stats["error"] = VtValue(std::string(e.what())); }
+    try { ueRun([&] { stats = renderStats(*state_); }); } catch (const std::exception& e) { stats["error"] = VtValue(std::string(e.what())); }
     return stats;
 }
-VtDictionary HdUERenderDelegate::renderStats() const {
-    std::lock_guard lock(state_->mutex);
+VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
+    std::lock_guard lock(state.mutex);
     HdueResidencyStatus residency{}; residency.struct_size = sizeof(residency);
-    const auto& residencyApi = state_->backend->residency_api();
-    if (state_->session && state_->backend->surface_api().get_status)
-        state_->backend->surface_api().get_status(state_->session,&state_->surfaceStatus);
-    if (state_->session && residencyApi.get_status) residencyApi.get_status(state_->session, &residency);
+    const auto& residencyApi = state.backend->residency_api();
+    if (state.session && state.backend->surface_api().get_status)
+        state.backend->surface_api().get_status(state.session,&state.surfaceStatus);
+    if (state.session && residencyApi.get_status) residencyApi.get_status(state.session, &residency);
     VtDictionary nativeAssetIds;
     int triangles = 0;
-    for (const auto& [id, mesh] : state_->meshes) {
+    for (const auto& [id, mesh] : state.meshes) {
         triangles += int(mesh.points.size() / 3);
         if (!mesh.sceneAsset.empty()) nativeAssetIds[mesh.scenePath]=VtValue(id);
     }
     int translucentMaterials = 0;
-    for (const auto& [id, material] : state_->materials) if (material.opacity < 1.f && asset(*state_, "nativeMaterialAssets", id).empty()) ++translucentMaterials;
-    int sceneLights = int(state_->nativeAssets.lights);
+    for (const auto& [id, material] : state.materials) if (material.opacity < 1.f && asset(state, "nativeMaterialAssets", id).empty()) ++translucentMaterials;
+    int sceneLights = int(state.nativeAssets.lights);
     HdueLightingStatus lighting{}; lighting.struct_size=sizeof(lighting);
-    const auto& lightingApi=state_->backend->lighting_api();
-    if(lightingApi.get_status && state_->session) state_->backend->require(lightingApi.get_status(state_->session,&lighting),"lighting_status");
-    if (state_->setting<bool>("sceneLightsEnabled", true))
-        for (const auto& [id, light] : state_->lights) if (!light.viewer && active(light)) ++sceneLights;
-    return { {"error", VtValue(residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state_->error)}, {"generation", VtValue(state_->generation)},
-        {"wetBindings",VtValue(int(state_->surfaceStatus.binding_count))}, {"wetUploadPending",VtValue(bool(state_->surfaceStatus.upload_pending))},
-        {"wetMaskUploads",VtValue(state_->surfaceStatus.mask_uploads)}, {"wetMaskBytes",VtValue(state_->surfaceStatus.mask_bytes)},
-        {"wetGeometryUploads",VtValue(state_->surfaceStatus.geometry_uploads)}, {"wetUpdates",VtValue(state_->surfaceStatus.updates)},
+    const auto& lightingApi=state.backend->lighting_api();
+    if(lightingApi.get_status && state.session) state.backend->require(lightingApi.get_status(state.session,&lighting),"lighting_status");
+    if (state.setting<bool>("sceneLightsEnabled", true))
+        for (const auto& [id, light] : state.lights) if (!light.viewer && active(light)) ++sceneLights;
+    return { {"error", VtValue(residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error)}, {"generation", VtValue(state.generation)},
+        {"wetBindings",VtValue(int(state.surfaceStatus.binding_count))}, {"wetUploadPending",VtValue(bool(state.surfaceStatus.upload_pending))},
+        {"wetMaskUploads",VtValue(state.surfaceStatus.mask_uploads)}, {"wetMaskBytes",VtValue(state.surfaceStatus.mask_bytes)},
+        {"wetGeometryUploads",VtValue(state.surfaceStatus.geometry_uploads)}, {"wetUpdates",VtValue(state.surfaceStatus.updates)},
         {"vtResidencyPhase", VtValue(int(residency.phase))}, {"vtResidencyGeneration", VtValue(residency.generation)},
         {"vtRequiredPages", VtValue(residency.required_pages)}, {"vtResidentPages", VtValue(residency.resident_pages)},
         {"vtLockedTiles", VtValue(residency.locked_tiles)}, {"vtRequiredMappings", VtValue(residency.required_mappings)},
         {"vtReadyMappings", VtValue(residency.ready_mappings)}, {"vtTextures", VtValue(int(residency.textures))},
         {"vtPreparationFrames", VtValue(int(residency.preparation_frames))}, {"vtPreparationMs", VtValue(residency.preparation_ms)},
-        {"materialGraphBlocked", VtValue(!state_->setting<bool>("materialGraphValid", true))},
+        {"materialGraphBlocked", VtValue(!state.setting<bool>("materialGraphValid", true))},
         {"translucentMaterials", VtValue(translucentMaterials)},
         {"megaLightsProject",VtValue(bool(lighting.mega_lights_project))}, {"megaLightsAllowed",VtValue(bool(lighting.mega_lights_allowed))},
         {"megaLightsActive",VtValue(bool(lighting.mega_lights_active))}, {"domeLights",VtValue(int(lighting.dome_count))},
         {"environmentPending",VtValue(bool(lighting.environment_pending))}, {"environmentCubeResolution",VtValue(int(lighting.cube_resolution))},
         {"environmentMaxRadiance",VtValue(lighting.environment_max_radiance)},
-        {"nativeAssetInstances", VtValue(int(state_->nativeAssets.instances))},
+        {"nativeAssetInstances", VtValue(int(state.nativeAssets.instances))},
         {"nativeAssetIds", VtValue(nativeAssetIds)},
-        {"nativeAssetLoading", VtValue(int(state_->nativeAssets.loading))},
-        {"nativeAssetFailed", VtValue(int(state_->nativeAssets.failed))},
-        {"nativeActors", VtValue(int(state_->nativeAssets.actors))},
-        {"nativeMeshes", VtValue(int(state_->nativeAssets.meshes))},
-        {"nativeLights", VtValue(int(state_->nativeAssets.lights))},
-        {"sessionHandle", VtValue(uint64_t(state_->session))},
-        {"submittedMeshes", VtValue(state_->submittedMeshes)}, {"submittedMaterials", VtValue(state_->submittedMaterials)},
-        {"gpuLocalMemoryBytes", VtValue(state_->gpuLocalMemoryBytes)}, {"gpuMemoryAvailable", VtValue(state_->gpuMemoryAvailable)},
-        {"materialParameterUpdates", VtValue(state_->materialParameterUpdates)},
-        {"substrateEnabled", VtValue(bool(state_->rendererInfo.substrate_enabled))},
-        {"adaptiveGBuffer", VtValue(bool(state_->rendererInfo.adaptive_gbuffer))},
-        {"substrateClosureBudget", VtValue(int(state_->rendererInfo.project_closures_per_pixel))},
-        {"substrateBytesPerPixel", VtValue(int(state_->rendererInfo.bytes_per_pixel))},
-        {"pick", VtValue(state_->pickResult)},
-        {"publishedFrames", VtValue(state_->publishedFrames)}, {"sceneSubmissions", VtValue(state_->sceneSubmissions)},
-        {"staleFrameRetries", VtValue(state_->staleFrameRetries)},
-        {"coalescedCameraUpdates", VtValue(state_->coalescedCameraUpdates)}, {"requestCpuMsTotal", VtValue(state_->requestCpuMsTotal)},
-        {"meshes", VtValue(int(state_->meshes.size()))}, {"materials", VtValue(int(state_->materials.size()))}, {"lights", VtValue(int(state_->lights.size()))},
-        {"sceneLights", VtValue(sceneLights)}, {"viewerLights", VtValue(state_->viewerLights)}, {"autoLightActive", VtValue(state_->autoLightActive)},
-        {"triangles", VtValue(triangles)}, {"frameId", VtValue(state_->lastFrame.frame_id)}, {"completedSamples", VtValue(int(state_->lastFrame.completed_samples))},
-        {"percentDone", VtValue(state_->lastFrame.converged ? 100.f : state_->lastFrame.frame_id && state_->setting<std::string>("renderMode", "realtime") == "pathtraced"
-            ? std::min(99.f, 100.f * float(state_->lastFrame.completed_samples) / float(std::max(1, state_->setting<int>("samplesPerPixel", 64)))) : 0.f)},
-        {"totalClockTime", VtValue(state_->lastFrame.request_to_frame_ms / 1000.)},
-        {"requestToFrameMs", VtValue(state_->lastFrame.request_to_frame_ms)}, {"readbackMs", VtValue(state_->lastFrame.readback_ms)} };
+        {"nativeAssetLoading", VtValue(int(state.nativeAssets.loading))},
+        {"nativeAssetFailed", VtValue(int(state.nativeAssets.failed))},
+        {"nativeActors", VtValue(int(state.nativeAssets.actors))},
+        {"nativeMeshes", VtValue(int(state.nativeAssets.meshes))},
+        {"nativeLights", VtValue(int(state.nativeAssets.lights))},
+        {"sessionHandle", VtValue(uint64_t(state.session))},
+        {"submittedMeshes", VtValue(state.submittedMeshes)}, {"submittedMaterials", VtValue(state.submittedMaterials)},
+        {"gpuLocalMemoryBytes", VtValue(state.gpuLocalMemoryBytes)}, {"gpuMemoryAvailable", VtValue(state.gpuMemoryAvailable)},
+        {"materialParameterUpdates", VtValue(state.materialParameterUpdates)},
+        {"substrateEnabled", VtValue(bool(state.rendererInfo.substrate_enabled))},
+        {"adaptiveGBuffer", VtValue(bool(state.rendererInfo.adaptive_gbuffer))},
+        {"substrateClosureBudget", VtValue(int(state.rendererInfo.project_closures_per_pixel))},
+        {"substrateBytesPerPixel", VtValue(int(state.rendererInfo.bytes_per_pixel))},
+        {"pick", VtValue(state.pickResult)},
+        {"publishedFrames", VtValue(state.publishedFrames)}, {"sceneSubmissions", VtValue(state.sceneSubmissions)},
+        {"staleFrameRetries", VtValue(state.staleFrameRetries)},
+        {"coalescedCameraUpdates", VtValue(state.coalescedCameraUpdates)}, {"requestCpuMsTotal", VtValue(state.requestCpuMsTotal)},
+        {"meshes", VtValue(int(state.meshes.size()))}, {"materials", VtValue(int(state.materials.size()))}, {"lights", VtValue(int(state.lights.size()))},
+        {"sceneLights", VtValue(sceneLights)}, {"viewerLights", VtValue(state.viewerLights)}, {"autoLightActive", VtValue(state.autoLightActive)},
+        {"triangles", VtValue(triangles)}, {"frameId", VtValue(state.lastFrame.frame_id)}, {"completedSamples", VtValue(int(state.lastFrame.completed_samples))},
+        {"percentDone", VtValue(state.lastFrame.converged ? 100.f : state.lastFrame.frame_id && state.setting<std::string>("renderMode", "realtime") == "pathtraced"
+            ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) / float(std::max(1, state.setting<int>("samplesPerPixel", 64)))) : 0.f)},
+        {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
+        {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)}, {"readbackMs", VtValue(state.lastFrame.readback_ms)} };
 }
 bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args) {
     if (command == TfToken("hdue:sampleMemory")) {
