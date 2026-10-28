@@ -247,6 +247,10 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     }
     // Only the explicit offscreen view family should render our world.
     if (GEngine->GameViewport) GEngine->GameViewport->bDisableWorldRendering = true;
+    // The renderer draws its warnings (Lumen pre-exposure, missing features, ...) into the frame unless these are off;
+    // the OnScreenDebug show flag does not cover them.
+    GAreScreenMessagesEnabled = false;
+    GEngine->bSuppressMapWarnings = true;
     if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground"))) CVar->Set(0, ECVF_SetByCode);
     Runtime.State = HDUE_STATE_READY;
     Runtime.Error.Empty();
@@ -465,6 +469,14 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     }
     View->EndFinalPostprocessSettings(Options);
     View->FinalPostProcessSettings.bMegaLights=!PathTracing;
+    if (!Aov && Session->Tonemapper) {
+        // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
+        // Manual exposure puts the scene near -AutoExposureBias EV; physically dim scenes (large bias) fell below the
+        // default window and their cached indirect lighting underflowed to black. Centre the window on the exposure.
+        static IConsoleVariable* PreExposure = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
+        const float Wanted = FMath::Clamp(2.f - View->FinalPostProcessSettings.AutoExposureBias, -16.f, 16.f);
+        if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
+    }
     Family.Views.Add(View);
     Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, 1.0f));
     FCanvas Canvas(Resource, nullptr, Runtime.World, Runtime.World->GetFeatureLevel());

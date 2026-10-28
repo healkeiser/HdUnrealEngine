@@ -171,7 +171,9 @@ void startSelfHost(const std::string& dll, const std::string& project) {
             init.instance_handle = reinterpret_cast<uint64_t>(instance); init.window_handle = reinterpret_cast<uint64_t>(host.window);
             init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
             // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
-            if (!selfHostVisible) init.extra_arguments = "-RenderOffscreen";
+            // Without -stdout, UE echoes Display/Warning/Error lines with wprintf, which reached the host's console
+            // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
+            init.extra_arguments = selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout";
             host.thread = GetCurrentThreadId();
             host.backend->initialize(init);
             started.set_value();
