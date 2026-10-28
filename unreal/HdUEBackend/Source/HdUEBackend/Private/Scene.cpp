@@ -138,8 +138,24 @@ void FHdueScene::RemoveVolume(const FString& Id) {
         Volumes.Remove(Id);
     }
 }
-bool FHdueScene::SetIdMode(bool On, FString& Error) {
-    if (On == IdMode) return true;
+void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Matrices) {
+    AActor* Actor = Actors.FindRef(Id);
+    if (!IsValid(Actor) || !Count) return;
+    const auto ToTransform = [&](uint32 Index) {
+        FMatrix Matrix;
+        for (int R = 0; R < 4; ++R) for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Matrices[Index * 16 + R * 4 + C];
+        return FTransform(Matrix);
+    };
+    if (auto* Instances = Cast<UInstancedStaticMeshComponent>(Actor->GetRootComponent())) {
+        if (int32(Count) != Instances->GetInstanceCount()) return;
+        TArray<FTransform> Transforms; Transforms.Reserve(Count);
+        for (uint32 I = 0; I < Count; ++I) Transforms.Add(ToTransform(I));
+        Instances->BatchUpdateInstancesTransforms(0, Transforms, true, true, true);
+    } else if (Count == 1) Actor->SetActorTransform(ToTransform(0), false, nullptr, ETeleportType::TeleportPhysics);
+}
+bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
+    if (Mode == IdMode) return true;
+    const bool On = Mode != 0;
     UMaterialInterface* IdMaterial = nullptr;
     if (On && !(IdMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId")))) {
         Error = TEXT("ID material /Game/HdUE/M_HdUEId is missing; run Prepare-Content.ps1 and stage the runtime."); return false;
@@ -149,7 +165,10 @@ bool FHdueScene::SetIdMode(bool On, FString& Error) {
         for (auto* Mesh : Meshes) {
             if (On) {
                 // Exact in the float16 readback: both halves stay below 2048.
-                Mesh->SetCustomPrimitiveDataVector4f(0, Id >= 0 ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0) : FVector4f(0, 0, 0, 0));
+                // Instance mode: instanced components emit their per-instance id (custom data 3), the rest -1.
+                const bool Instances = Mode == 2 && Mesh->IsA<UInstancedStaticMeshComponent>();
+                Mesh->SetCustomPrimitiveDataVector4f(0, Id >= 0 && Mode == 1 ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0) : FVector4f(0, 0, 0, 0));
+                Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
                 for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
             } else if (auto* Static = Cast<UStaticMeshComponent>(Mesh)) Static->EmptyOverrideMaterials();
         }
@@ -157,7 +176,7 @@ bool FHdueScene::SetIdMode(bool On, FString& Error) {
     for (const auto& Entry : Actors) if (IsValid(Entry.Value)) { const int32* Id = PrimIds.Find(Entry.Key); Swap(Entry.Value, Id ? *Id : -1); }
     // ponytail: native catalog assets carry no Hydra prim ID; they read as background in the ID pass.
     for (auto* Actor : Assets.GetActors()) if (IsValid(Actor)) Swap(Actor, -1);
-    IdMode = On;
+    IdMode = Mode;
     if (!On) BindMaterials();
     return true;
 }
@@ -200,7 +219,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             if (Mesh.indices[I] >= Mesh.vertex_count) { Error = TEXT("Mesh index out of range."); return false; }
         }
     }
-    if (IdMode) { FString Ignored; SetIdMode(false, Ignored); }
+    if (IdMode) { FString Ignored; SetIdMode(0, Ignored); }
     if (Batch.reset_scene) {
         Lighting->Clear();
         Assets.Reset();
@@ -379,12 +398,15 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Transforms.Add(FTransform(Instance));
             }
             Instances->ClearInstances();
-            // Per-instance displayColor for M_PreviewSurface's PerInstanceCustomData3Vector.
-            Instances->SetNumCustomDataFloats(Desc.instance_colors ? 3 : 0);
+            // Per-instance displayColor (0..2) for M_PreviewSurface's PerInstanceCustomData3Vector and
+            // the Hydra instanceId (3) for M_HdUEId's instance pass.
+            Instances->SetNumCustomDataFloats(4);
             Instances->AddInstances(Transforms, false, true);
-            if (Desc.instance_colors)
-                for (uint32 I = 0; I < Desc.instance_count; ++I)
-                    Instances->SetCustomData(int32(I), MakeArrayView(Desc.instance_colors + I * 3, 3), I + 1 == Desc.instance_count);
+            for (uint32 I = 0; I < Desc.instance_count; ++I) {
+                float Data[4] = {1.f, 1.f, 1.f, float(Desc.instance_ids ? Desc.instance_ids[I] : int32(I))};
+                if (Desc.instance_colors) FMemory::Memcpy(Data, Desc.instance_colors + I * 3, sizeof(float) * 3);
+                Instances->SetCustomData(int32(I), MakeArrayView(Data, 4), I + 1 == Desc.instance_count);
+            }
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
         PrimIds.Add(Id, Desc.prim_id);

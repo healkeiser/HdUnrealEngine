@@ -26,7 +26,7 @@ _Static_assert(offsetof(HdueInitDesc, instance_handle) == 8, "C ABI alignment");
 _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
-_Static_assert(sizeof(HdueRenderRequest) == 120, "RenderRequest C ABI layout");
+_Static_assert(sizeof(HdueRenderRequest) == 176, "RenderRequest C ABI layout");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 56, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueApi) == 96, "Function table C ABI layout");

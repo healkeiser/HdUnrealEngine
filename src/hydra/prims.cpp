@@ -1,4 +1,5 @@
 #include "delegate.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/points.h"
 #include "pxr/imaging/hd/basisCurves.h"
@@ -8,6 +9,8 @@
 #if defined(HDUE_HOUDINI)
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
+#include "../houdini/volume_fields.h"
+#include "pxr/base/tf/stringUtils.h"
 #endif
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/material.h"
@@ -100,6 +103,31 @@ template<class T> std::vector<T> expanded(HdSceneDelegate* delegate, const SdfPa
     }
     return out;
 }
+// Motion samples cover one frame either side, enough for any shutter; Pass evaluates them at sub-frame times.
+constexpr float HdUEMotionWindow = 1.f;
+constexpr size_t HdUEMaxMotionSamples = 16;
+// Samples of current^-1-relative factors: left = M(t) * M(0)^-1, right = M(0)^-1 * M(t).
+HdUEMotionSamples HdUERelativeMotion(const float* times, const GfMatrix4d* values, size_t count, const GfMatrix4d& current, bool left) {
+    HdUEMotionSamples out;
+    const auto inverse = current.GetInverse();
+    for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) {
+        out.times.push_back(times[i]); out.values.push_back(left ? values[i] * inverse : inverse * values[i]);
+    }
+    if (!out.moving()) out = {};
+    return out;
+}
+HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& id, const GfMatrix4d& current, bool left) {
+    float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
+    const size_t count = delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+    return HdUERelativeMotion(times, values, count, current, left);
+}
+// USD velocities are per second; motion blur times are in frames.
+double HdUEFramesPerSecond(const HdUEState& state) {
+    const auto it = state.settings.find(TfToken("houdini:fps"));
+    const double fps = it == state.settings.end() ? 0 : it->second.IsHolding<double>() ? it->second.UncheckedGet<double>()
+        : it->second.IsHolding<float>() ? it->second.UncheckedGet<float>() : 0;
+    return fps > 0 ? fps : state.setting<double>("framesPerSecond", 24);
+}
 // Instance transforms as hdEmbree composes them: for each index,
 // instanceTransform * scale * rotation * translation * instancerTransform, then nested
 // instancers apply after (child * parent).
@@ -132,6 +160,23 @@ public:
         if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId()))
             for (const auto& primvar : delegate->GetPrimvarDescriptors(GetId(), HdInterpolationInstance))
                 if (HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name)) primvars_[primvar.name] = delegate->Get(GetId(), primvar.name);
+    }
+    // Per-instance velocities in world units per second (top-level instancers only; nested ones return none).
+    std::vector<GfVec3f> ComputeInstanceVelocities(const SdfPath& prototype) const {
+        const auto velocities = primvar(HdTokens->velocities);
+        if (!visible_ || !GetParentId().IsEmpty() || velocities.IsEmpty()) return {};
+        const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
+        std::vector<GfVec3f> out;
+        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype)) {
+            GfVec3d v(0); vector3(velocities, size_t(index), v);
+            out.emplace_back(instancer.TransformDir(v));
+        }
+        return out;
+    }
+    HdUEMotionSamples ComputeMotion() const {
+        float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
+        const size_t count = GetDelegate()->SampleInstancerTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+        return HdUERelativeMotion(times, values, count, GetDelegate()->GetInstancerTransform(GetId()), false);
     }
     // Per-instance displayColor (instance interpolation), repeated for each parent instance like the transforms.
     std::vector<GfVec3f> ComputeInstanceColors(const SdfPath& prototype) const {
@@ -200,8 +245,13 @@ public:
             if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId()))) {
                 for (const auto& instance : instancer->ComputeInstanceTransforms(GetId())) mesh.instances.push_back(mesh.transform * instance);
                 if (mesh.material.empty()) mesh.instanceColors = HdUEVaryingColors(instancer->ComputeInstanceColors(GetId()), mesh.instances.size());
+                mesh.motionRight = instancer->ComputeMotion();
+                mesh.velocities = instancer->ComputeInstanceVelocities(GetId());
+                if (mesh.velocities.size() != mesh.instances.size()) mesh.velocities.clear();
+                for (auto& v : mesh.velocities) v /= float(HdUEFramesPerSecond(*state));
             }
         }
+        mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         mesh.primId = GetPrimId();
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
@@ -380,6 +430,15 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.primId = prim.GetPrimId();
     return mesh;
 }
+// Placements of an rprim under a Hydra instancer (its own transform first), or empty when not instanced.
+std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const SdfPath& id, const SdfPath& instancerId, const GfMatrix4d& transform) {
+    std::vector<GfMatrix4d> out;
+    if (instancerId.IsEmpty()) return out;
+    HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), instancerId);
+    if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(instancerId)))
+        for (const auto& instance : instancer->ComputeInstanceTransforms(id)) out.push_back(transform * instance);
+    return out;
+}
 // Widths per vertex (or with a matching count), else the first (constant), else the fallback.
 float HdUEWidth(const VtFloatArray& widths, size_t index, float fallback) {
     if (widths.empty()) return fallback;
@@ -404,18 +463,29 @@ public:
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto mesh = HdUEShapeBase(*this, delegate);
+        _UpdateInstancer(delegate, bits);
         const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
         HdUEAppendSphere(mesh);
         mesh.instanced = true;
-        // ponytail: points under a Hydra instancer draw once, uninstanced; nest the instances if that comes up.
-        for (size_t i = 0; i < points.size(); ++i) {
-            const double radius = .5 * HdUEWidth(widths, i, .1f);
-            mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * mesh.transform);
-        }
+        auto placements = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
+        if (placements.empty()) placements.push_back(mesh.transform);
+        std::vector<GfVec3f> colors;
         if (mesh.material.empty()) {
-            const auto colors = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
-            mesh.instanceColors = HdUEVaryingColors(std::vector<GfVec3f>(colors.begin(), colors.end()), points.size());
+            const auto authored = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
+            colors = HdUEVaryingColors(std::vector<GfVec3f>(authored.begin(), authored.end()), points.size());
+        }
+        // Points move with their prim (or instancer) transform and their velocities.
+        mesh.motionRight = GetInstancerId().IsEmpty() ? HdUETransformMotion(delegate, GetId(), mesh.transform, false) : HdUEMotionSamples{};
+        const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
+        const float fps = float(HdUEFramesPerSecond(*static_cast<HdUEState*>(param)));
+        // Every point of every placement (nested under a Hydra instancer when there is one).
+        for (const auto& placement : placements) for (size_t i = 0; i < points.size(); ++i) {
+            if (velocities.size() == points.size()) mesh.velocities.emplace_back(GfVec3f(placement.TransformDir(GfVec3d(velocities[i]))) / fps);
+            const double radius = .5 * HdUEWidth(widths, i, .1f);
+            mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placement);
+            if (!colors.empty()) mesh.instanceColors.push_back(colors[i]);
+            mesh.instanceIds.push_back(GetInstancerId().IsEmpty() ? -1 : int32_t(&placement - placements.data()));
         }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
@@ -430,12 +500,13 @@ protected:
 };
 class Curves final : public HdBasisCurves {
     // Samples along one curve: cubic segments are evaluated in their basis; linear curves keep their vertices.
-    static std::vector<std::pair<GfVec3d, double>> samples(const std::vector<GfVec3d>& cv, const std::vector<double>& width,
+    struct Sample { GfVec3d first; double second; GfVec3d color; };
+    static std::vector<Sample> samples(const std::vector<GfVec3d>& cv, const std::vector<double>& width, const std::vector<GfVec3d>& color,
         const TfToken& type, const TfToken& basis, bool periodic) {
         const size_t n = cv.size();
-        std::vector<std::pair<GfVec3d, double>> out;
+        std::vector<Sample> out;
         if (type == HdTokens->linear || n < 4) {
-            for (size_t i = 0; i < n; ++i) out.emplace_back(cv[i], width[i]);
+            for (size_t i = 0; i < n; ++i) out.push_back({cv[i], width[i], color[i]});
             if (periodic && n > 2) out.push_back(out.front());
             return out;
         }
@@ -447,15 +518,16 @@ class Curves final : public HdBasisCurves {
             const size_t first = s * step;
             const auto P = [&](size_t k) { return cv[(first + k) % n]; };
             const auto W = [&](size_t k) { return width[(first + k) % n]; };
+            const auto C = [&](size_t k) { return color[(first + k) % n]; };
             for (int t = (s ? 1 : 0); t <= Steps; ++t) {
                 const double u = double(t) / Steps, u2 = u * u, u3 = u2 * u, m = 1 - u;
                 double b[4];
                 if (bezier) { b[0] = m * m * m; b[1] = 3 * u * m * m; b[2] = 3 * u2 * m; b[3] = u3; }
                 else if (basis == HdTokens->catmullRom) { b[0] = .5 * (-u3 + 2 * u2 - u); b[1] = .5 * (3 * u3 - 5 * u2 + 2); b[2] = .5 * (-3 * u3 + 4 * u2 + u); b[3] = .5 * (u3 - u2); }
                 else { b[0] = m * m * m / 6; b[1] = (3 * u3 - 6 * u2 + 4) / 6; b[2] = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6; b[3] = u3 / 6; } // bspline
-                GfVec3d point(0); double w = 0;
-                for (size_t k = 0; k < 4; ++k) { point += b[k] * P(k); w += b[k] * W(k); }
-                out.emplace_back(point, w);
+                GfVec3d point(0), c(0); double w = 0;
+                for (size_t k = 0; k < 4; ++k) { point += b[k] * P(k); w += b[k] * W(k); c += b[k] * C(k); }
+                out.push_back({point, w, c});
             }
         }
         return out;
@@ -465,7 +537,11 @@ public:
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto mesh = HdUEShapeBase(*this, delegate);
+        _UpdateInstancer(delegate, bits);
         const auto topology = delegate->GetBasisCurvesTopology(GetId());
+        // displayColor per vertex or per curve; constant colors stay on the material.
+        const auto displayColor = mesh.material.empty() ? value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray()) : VtVec3fArray();
+        std::vector<GfVec3f> colors;
         const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
         const auto counts = topology.GetCurveVertexCounts();
@@ -474,16 +550,19 @@ public:
         constexpr int Sides = 6;
         size_t offset = 0;
         // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
-        for (const int count : counts) {
-            std::vector<GfVec3d> cv; std::vector<double> width;
+        for (size_t curveIndex = 0; curveIndex < counts.size(); ++curveIndex) {
+            const int count = counts[curveIndex];
+            std::vector<GfVec3d> cv, color; std::vector<double> width;
             for (int i = 0; i < count; ++i) {
                 const size_t vertex = indices.empty() ? offset + i : size_t(indices[offset + i]);
                 if (vertex >= points.size()) { TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText()); return; }
                 cv.emplace_back(points[vertex]);
                 width.push_back(HdUEWidth(widths, vertex, .01f));
+                color.emplace_back(displayColor.size() == points.size() ? displayColor[vertex]
+                    : displayColor.size() == counts.size() ? displayColor[curveIndex] : GfVec3f(1));
             }
             offset += size_t(count);
-            const auto curve = samples(cv, width, topology.GetCurveType(), topology.GetCurveBasis(), periodic);
+            const auto curve = samples(cv, width, color, topology.GetCurveType(), topology.GetCurveBasis(), periodic);
             if (curve.size() < 2) continue;
             // Parallel-transported frame along the curve.
             GfVec3d tangent = (curve[1].first - curve[0].first).GetNormalized();
@@ -509,7 +588,7 @@ public:
                 // Counter-clockwise seen from outside (dir = cos * normal + sin * binormal turns about the tangent).
                 const std::pair<size_t, int> quad[6] = {{i, side}, {i + 1, next}, {i + 1, side}, {i, side}, {i, next}, {i + 1, next}};
                 for (const auto& [ring, corner] : quad) {
-                    mesh.points.push_back(rings[ring][corner]); mesh.normals.push_back(ringNormals[ring][corner]);
+                    mesh.points.push_back(rings[ring][corner]); mesh.normals.push_back(ringNormals[ring][corner]); colors.emplace_back(curve[ring].color);
                     mesh.uv.emplace_back(float(corner) / Sides, float(ring) / float(rings.size() - 1));
                 }
             }
@@ -523,11 +602,18 @@ public:
                 for (int side = 0; side < Sides; ++side) {
                     const int next = (side + 1) % Sides;
                     for (const auto& corner : {center, rings[ring][end ? side : next], rings[ring][end ? next : side]}) {
-                        mesh.points.push_back(corner); mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end));
+                        mesh.points.push_back(corner); mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end)); colors.emplace_back(curve[ring].color);
                     }
                 }
             }
         }
+        mesh.colors = HdUEVaryingColors(std::move(colors), mesh.points.size());
+        mesh.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
+        mesh.instanced = !GetInstancerId().IsEmpty();
+        mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
+        if (mesh.instanced)
+            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
+                mesh.motionRight = instancer->ComputeMotion();
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
     }
@@ -562,37 +648,25 @@ public:
         if (!chosen && !fields.empty()) chosen = &fields.front();
         try {
             if (chosen) {
-                if (chosen->fieldPrimType != TfToken("openvdbAsset"))
-                    throw std::runtime_error("only openvdbAsset fields are supported, not " + chosen->fieldPrimType.GetString());
+                const bool vdb = chosen->fieldPrimType == TfToken("openvdbAsset");
+                if (!vdb && chosen->fieldPrimType != TfToken("houdiniFieldAsset"))
+                    throw std::runtime_error("only openvdbAsset and houdiniFieldAsset fields are supported, not " + chosen->fieldPrimType.GetString());
                 const auto file = value(delegate->Get(chosen->fieldId, TfToken("filePath")), SdfAssetPath());
                 const auto path = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
                 auto gridName = value(delegate->Get(chosen->fieldId, TfToken("fieldName")), TfToken()).GetString();
                 if (gridName.empty()) gridName = chosen->fieldName.GetString();
+                const auto index = delegate->Get(chosen->fieldId, TfToken("fieldIndex"));
                 static std::once_flag initialized; std::call_once(initialized, [] { openvdb::initialize(); });
-                openvdb::io::File vdb(path); vdb.open(false);
-                const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(vdb.readGrid(gridName));
-                vdb.close();
-                if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
-                const auto box = grid->evalActiveVoxelBoundingBox();
-                if (!box.empty()) {
-                    const auto size = box.dim();
-                    const int stride = std::max({1, (size.x() + MaxResolution - 1) / MaxResolution, (size.y() + MaxResolution - 1) / MaxResolution, (size.z() + MaxResolution - 1) / MaxResolution});
-                    volume.width = uint32_t((size.x() + stride - 1) / stride); volume.height = uint32_t((size.y() + stride - 1) / stride); volume.depth = uint32_t((size.z() + stride - 1) / stride);
-                    volume.density.resize(size_t(volume.width) * volume.height * volume.depth);
-                    auto accessor = grid->getConstAccessor();
-                    const auto min = box.min();
-                    for (uint32_t k = 0; k < volume.depth; ++k) for (uint32_t j = 0; j < volume.height; ++j) for (uint32_t i = 0; i < volume.width; ++i)
-                        volume.density[(size_t(k) * volume.height + j) * volume.width + i] =
-                            accessor.getValue(openvdb::Coord(min.x() + int(i) * stride, min.y() + int(j) * stride, min.z() + int(k) * stride));
-                    const auto affine = grid->transform().baseMap()->getAffineMap();
-                    if (!affine) throw std::runtime_error("grid " + gridName + " has a non-affine (frustum) transform");
-                    const auto m = affine->getMat4();
-                    GfMatrix4d indexToWorld; for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) indexToWorld[r][c] = m(r, c);
-                    // Local voxel i covers [i, i+1]; its sample is index min + stride * i.
-                    const GfMatrix4d localToIndex = GfMatrix4d(1).SetScale(double(stride)) *
-                        GfMatrix4d(1).SetTranslate(GfVec3d(min.x() - .5 * stride, min.y() - .5 * stride, min.z() - .5 * stride));
-                    volume.localToWorld = localToIndex * indexToWorld * delegate->GetTransform(GetId());
-                }
+                const bool vdbFile = vdb && path.rfind("op:", 0) != 0 && TfStringEndsWith(TfStringToLower(path), ".vdb");
+                if (vdbFile) {
+                    openvdb::io::File file(path); file.open(false);
+                    const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
+                    file.close();
+                    if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
+                    HdUEDensifyGrid(*grid, MaxResolution, volume);
+                } else // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
+                    HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb, MaxResolution, volume);
+                volume.localToWorld = volume.localToWorld * delegate->GetTransform(GetId());
             }
         } catch (const std::exception& error) {
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
@@ -736,6 +810,24 @@ public:
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
 }
+// HdCamera that also records its transform samples for camera motion blur.
+class Camera final : public HdCamera {
+public:
+    explicit Camera(const SdfPath& id) : HdCamera(id) {}
+    void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
+        const bool transformDirty = *bits & DirtyTransform;
+        HdCamera::Sync(delegate, param, bits);
+        if (!transformDirty || GetId().IsEmpty()) return;
+        float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
+        const size_t count = delegate->SampleTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+        HdUEMotionSamples motion;
+        for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) { motion.times.push_back(times[i]); motion.values.push_back(values[i]); }
+        auto* state = static_cast<HdUEState*>(param);
+        std::lock_guard lock(state->mutex);
+        if (motion.moving()) state->cameraMotion[GetId().GetString()] = motion; else state->cameraMotion.erase(GetId().GetString());
+    }
+};
+HdSprim* HdUECreateCamera(const SdfPath& id) { return new Camera(id); }
 HdRprim* HdUECreateMesh(const SdfPath& id) { return new Mesh(id); }
 HdRprim* HdUECreatePoints(const SdfPath& id) { return new Points(id); }
 HdRprim* HdUECreateCurves(const SdfPath& id) { return new Curves(id); }

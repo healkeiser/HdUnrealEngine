@@ -117,6 +117,9 @@ class Test:
         if sum(abs(a-b) for a,b in zip(first,moved))/len(first)<.001: raise AssertionError('Camera did not change the image')
         node=viewer.currentNode()
         integration._report('Settings node: '+str(node))
+        # The smoke cube is animated and the viewport camera has a shutter; this test checks
+        # Path Tracer accumulation of whole frames, so keep motion-blur sub-frames out of it.
+        integration.set_render_setting('xn__hdUEmotionBlur',0)
         integration.set_mode('pathtraced')
         from pxr import UsdGeom
         stage=viewer.stage()

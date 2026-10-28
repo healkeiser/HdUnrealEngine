@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 6u
+#define HDUE_ABI_VERSION 7u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -97,12 +97,23 @@ typedef struct HdueRenderRequest {
     uint32_t lumen_enabled;
     uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel */
     double up[3];
+    /* Projection (ABI 7) in view space (cm, +X right, +Y up, +Z forward): NDC = scale * xy / z + offset
+       for perspective, scale * xy + offset for orthographic. A zero scale derives it from the FOV. */
+    double projection_scale[2];
+    double projection_offset[2];
+    uint32_t orthographic;
+    float far_clip_cm;       /* orthographic depth range [near_clip_cm, far_clip_cm] */
+    float fstop;             /* depth of field when fstop and focus_distance_cm are > 0 */
+    float focus_distance_cm;
+    float focal_length_cm;
 } HdueRenderRequest;
 /* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
 enum { HDUE_AOV_COLOR = 0, HDUE_AOV_ALBEDO = 1, HDUE_AOV_NORMAL = 2, HDUE_AOV_ROUGHNESS = 3,
     HDUE_AOV_METALLIC = 4, HDUE_AOV_SPECULAR = 5, HDUE_AOV_OCCLUSION = 6,
     /* Unlit ID pass: R = id / 2048, G = id % 2048, B = 1 where a mesh with prim_id >= 0 is visible. */
-    HDUE_AOV_PRIM_ID = 7, HDUE_AOV_COUNT = 8 };
+    HDUE_AOV_PRIM_ID = 7,
+    /* Same encoding as PRIM_ID with the Hydra instance index of instanced meshes; -1 elsewhere. */
+    HDUE_AOV_INSTANCE_ID = 8, HDUE_AOV_COUNT = 9 };
 
 typedef struct HdueFrameInfo {
     uint32_t struct_size;
@@ -170,6 +181,9 @@ typedef struct HdueMeshDesc {
      * instance_transforms, per instance (instance_count * 3). NULL: white. */
     const float* colors;
     const float* instance_colors;
+    /* Hydra instanceId per instance for the HDUE_AOV_INSTANCE_ID pass (instance_count entries,
+     * -1 for none). NULL: the instance's index. */
+    const int32_t* instance_ids;
 } HdueMeshDesc;
 typedef struct HdueLightDesc {
     const char* id;

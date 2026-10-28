@@ -13,7 +13,7 @@
     "needsselection": true,
     "depthstyle": "linear",
     "aovsupport": true,
-    "statsdatapaths": {"rendererStage": "error", "totalClockTime": "requestToFrameMs"},
+    "statsdatapaths": {"rendererStage": "error", "totalClockTime": "totalClockTime", "percentDone": "percentDone"},
     "viewstats": ["nativeActors", "nativeMeshes", "completedSamples"]
   }
 }

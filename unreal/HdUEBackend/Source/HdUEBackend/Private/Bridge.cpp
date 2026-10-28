@@ -14,6 +14,7 @@
 #include "hdue/material_api.h"
 #include "hdue/depth_api.h"
 #include "hdue/aov_api.h"
+#include "hdue/motion_api.h"
 #include "hdue/volume_api.h"
 #include "RenderUtils.h"
 #include "Engine/Engine.h"
@@ -290,9 +291,14 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (CheckReady() != HDUE_OK) return CheckReady();
     if (!ValidSession(Handle) || !Request || Request->struct_size != sizeof(*Request) || !Request->generation ||
         Request->mode > HDUE_PATH_TRACED || Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
-        !FMath::IsFinite(Request->horizontal_fov_degrees) || Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
-        !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0 || !FMath::IsFinite(Request->time_seconds) ||
-        Request->aov >= HDUE_AOV_COUNT) return HDUE_INVALID_ARGUMENT;
+        (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) || Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
+            !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0)) ||
+        (Request->orthographic && (!FMath::IsFinite(Request->near_clip_cm) || !FMath::IsFinite(Request->far_clip_cm) || Request->far_clip_cm <= Request->near_clip_cm ||
+            !(Request->projection_scale[0] > 0) || !(Request->projection_scale[1] > 0))) ||
+        !FMath::IsFinite(Request->projection_scale[0]) || !FMath::IsFinite(Request->projection_scale[1]) ||
+        !FMath::IsFinite(Request->projection_offset[0]) || !FMath::IsFinite(Request->projection_offset[1]) ||
+        !FMath::IsFinite(Request->fstop) || !FMath::IsFinite(Request->focus_distance_cm) || !FMath::IsFinite(Request->focal_length_cm) ||
+        !FMath::IsFinite(Request->time_seconds) || Request->aov >= HDUE_AOV_COUNT) return HDUE_INVALID_ARGUMENT;
     for (int32 Index = 0; Index < 3; ++Index) {
         if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) || !FMath::IsFinite(Request->up[Index])) return HDUE_INVALID_ARGUMENT;
     }
@@ -301,7 +307,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
     if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
     if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
-    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, Request->aov == HDUE_AOV_PRIM_ID
+    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, Request->aov == HDUE_AOV_PRIM_ID || Request->aov == HDUE_AOV_INSTANCE_ID
             ? TEXT("/Game/HdUE/M_HdUEId.M_HdUEId") : TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
         return Fail(HDUE_ENGINE_ERROR, TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
@@ -357,7 +363,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const bool Aov = Request.aov != HDUE_AOV_COLOR;
     const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
     FString IdError;
-    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
+    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID ? 1 : Request.aov == HDUE_AOV_INSTANCE_ID ? 2 : 0, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
     if (Session->Preparing) {
         const auto Residency = Session->Residency;
         ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
@@ -386,14 +392,26 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Options.SetViewRectangle(FIntRect(0, 0, Session->Width, Session->Height));
     Options.ViewOrigin = FVector(Request.eye[0], Request.eye[1], Request.eye[2]);
     IStreamingManager::Get().AddViewInformation(Options.ViewOrigin, float(Session->Width),
-        float(Session->Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
+        Request.orthographic ? float(Session->Width) : float(Session->Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
         1.f, false, 1.f, nullptr, Runtime.World);
     const FVector Target(Request.target[0], Request.target[1], Request.target[2]);
     const FVector Up(Request.up[0], Request.up[1], Request.up[2]);
     Options.ViewRotationMatrix = FRotationMatrix::MakeFromXZ(Target - Options.ViewOrigin, Up).GetTransposed() * FMatrix(
         FPlane(0, 0, 1, 0), FPlane(1, 0, 0, 0), FPlane(0, 1, 0, 0), FPlane(0, 0, 0, 1));
-    Options.ProjectionMatrix = FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
-        double(Session->Width), double(Session->Height), double(Request.near_clip_cm));
+    if (Request.orthographic) {
+        // Reversed Z over the camera's clipping range: near maps to 1, far to 0.
+        const double Range = double(Request.far_clip_cm) - Request.near_clip_cm;
+        Options.ProjectionMatrix = FMatrix(FPlane(Request.projection_scale[0], 0, 0, 0), FPlane(0, Request.projection_scale[1], 0, 0),
+            FPlane(0, 0, -1 / Range, 0), FPlane(Request.projection_offset[0], Request.projection_offset[1], Request.far_clip_cm / Range, 1));
+    } else {
+        Options.ProjectionMatrix = FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
+            double(Session->Width), double(Session->Height), double(Request.near_clip_cm));
+        // Hydra's conformed window and lens shift (aperture offsets).
+        if (Request.projection_scale[0] > 0 && Request.projection_scale[1] > 0) {
+            Options.ProjectionMatrix.M[0][0] = Request.projection_scale[0]; Options.ProjectionMatrix.M[1][1] = Request.projection_scale[1];
+        }
+        Options.ProjectionMatrix.M[2][0] = Request.projection_offset[0]; Options.ProjectionMatrix.M[2][1] = Request.projection_offset[1];
+    }
     Options.BackgroundColor = FLinearColor::Black;
     FSceneView* View = new FSceneView(Options);
     View->bIsGameView = true;
@@ -408,6 +426,18 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     View->FinalPostProcessSettings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
     View->FinalPostProcessSettings.PathTracingMaxBounces = Session->Scene->HasRefractiveMaterials() ? 16 : 8;
     View->FinalPostProcessSettings.LumenFrontLayerTranslucencyReflections = true;
+    if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 && Request.focal_length_cm > 0) {
+        // UE derives the focal length from the sensor height and vertical FOV (FPhysicalCocModel);
+        // pick the sensor width that yields the USD camera's focal length.
+        View->FinalPostProcessSettings.DepthOfFieldFstop = Request.fstop;
+        View->FinalPostProcessSettings.DepthOfFieldFocalDistance = Request.focus_distance_cm;
+        View->FinalPostProcessSettings.DepthOfFieldSensorWidth = float(20.0 * Request.focal_length_cm * Session->Width / Session->Height / Options.ProjectionMatrix.M[1][1]);
+        View->FinalPostProcessSettings.DepthOfFieldSqueezeFactor = 1.f;
+        View->FinalPostProcessSettings.PathTracingEnableReferenceDOF = true;
+    } else {
+        View->FinalPostProcessSettings.DepthOfFieldFocalDistance = 0.f;
+        View->FinalPostProcessSettings.DepthOfFieldFstop = 0.f;
+    }
     if (Aov) {
         View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
         View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
@@ -415,7 +445,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
             if (Parent) Session->AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
         }
-        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID ? nullptr : Session->AovMaterial.Get()) {
+        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID ? nullptr : Session->AovMaterial.Get()) {
             for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
                 Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
             FPostProcessSettings Blend;
@@ -482,7 +512,8 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
                     Pixels[Index + 2] = P.B.GetFloat(); Pixels[Index + 3] = P.A.GetFloat();
                     if(DepthData) {
                         const float Z=DepthData[uint64(Y)*DepthPitch+X];
-                        DepthPixels[uint64(Y)*Width+X]=Z>0.f && FMath::IsFinite(Z) ? Request.near_clip_cm/Z : 0.f;
+                        DepthPixels[uint64(Y)*Width+X]=!(Z>0.f) || !FMath::IsFinite(Z) ? 0.f
+                            : Request.orthographic ? Request.far_clip_cm-Z*(Request.far_clip_cm-Request.near_clip_cm) : Request.near_clip_cm/Z;
                     }
                 }
             }
@@ -587,6 +618,17 @@ HdueResult HDUE_CALL RemoveVolume(HdueSession Handle, const char* Id) {
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->RemoveVolume(UTF8_TO_TCHAR(Id));
     Runtime.Session->HasRequest = false;
+    return HDUE_OK;
+}
+
+HdueResult HDUE_CALL SetTransforms(HdueSession Handle, const HdueMeshTransform* Meshes, uint32 Count) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || (Count && !Meshes)) return HDUE_INVALID_ARGUMENT;
+    for (uint32 Index = 0; Index < Count; ++Index) {
+        const auto& Mesh = Meshes[Index];
+        if (!Mesh.id || (Mesh.count && !Mesh.matrices)) return HDUE_INVALID_ARGUMENT;
+        Runtime.Session->Scene->SetTransforms(UTF8_TO_TCHAR(Mesh.id), Mesh.count, Mesh.matrices);
+    }
     return HDUE_OK;
 }
 
@@ -844,6 +886,12 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32 Version, uin
     if (!Api || Capacity < sizeof(HdueAovApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_AOV_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(HdueAovApi), HDUE_AOV_ABI_VERSION, PollAov};
+    return HDUE_OK;
+}
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32 Version, uint32 Capacity, HdueMotionApi* Api) {
+    if (!Api || Capacity < sizeof(HdueMotionApi)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_MOTION_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(HdueMotionApi), HDUE_MOTION_ABI_VERSION, SetTransforms};
     return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version,uint32 Capacity,HdueDepthApi* Api) {

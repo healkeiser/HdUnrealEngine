@@ -79,6 +79,31 @@
             parmtag { "usdvaluetype" "int" }
             disablewhen R"({ xn__hdUEwarmupFrames_control_3fb == block } { xn__hdUEwarmupFrames_control_3fb == none })"
         }
+        HDUE_CONTROL("xn__hdUEmotionBlur_control_ucb", "Motion Blur")
+        parm {
+            name    "xn__hdUEmotionBlur_tya"
+            label   "Motion Blur"
+            type    toggle
+            size    1
+            default { 1 }
+            help    "Average sub-frames over the camera shutter (shutter:open/close) when something moves."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__hdUEmotionBlur_control_ucb == block } { xn__hdUEmotionBlur_control_ucb == none })"
+        }
+        HDUE_CONTROL("xn__hdUEmotionSamples_control_qhb", "Motion Samples")
+        parm {
+            name    "xn__hdUEmotionSamples_p3a"
+            label   "Motion Samples"
+            type    int
+            size    1
+            default { 16 }
+            range   { 1! 64 }
+            help    "Sub-frames per frame; Path Tracer samples are divided between them."
+            parmtag { "spare_category" "Global" }
+            parmtag { "usdvaluetype" "int" }
+            disablewhen R"({ xn__hdUEmotionSamples_control_qhb == block } { xn__hdUEmotionSamples_control_qhb == none })"
+        }
         HDUE_CONTROL("xn__hdUEdomeResolution_control_djb", "Environment Cube Resolution")
         parm {
             name    "xn__hdUEdomeResolution_c5a"

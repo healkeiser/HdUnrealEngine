@@ -31,6 +31,7 @@
 #include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialExpressionPerInstanceCustomData.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
+#include "Materials/MaterialExpressionFloor.h"
 #include "Engine/VolumeTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
@@ -256,22 +257,44 @@ UMaterial* CreateAovMaterial() {
     return SaveAsset(Material) ? Material : nullptr;
 }
 // ID pass material: unlit emission of custom primitive data 0..2, set per component to the
-// encoded Hydra prim ID (see HDUE_AOV_PRIM_ID).
+// encoded Hydra prim ID (see HDUE_AOV_PRIM_ID). With custom primitive data 4 set (instance pass),
+// it emits the instance's Hydra instanceId from per-instance custom data 3 in the same encoding.
 UMaterial* CreateIdMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEId");
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId"), nullptr, LOAD_NoWarn);
-    if (Material && Material->HasSubstrateFrontMaterialConnected() && Material->bUsedWithInstancedStaticMeshes) return Material;
+    if (Material && Material->HasSubstrateFrontMaterialConnected() && Material->bUsedWithInstancedStaticMeshes)
+        for (const auto& Expression : Material->GetExpressionCollection().Expressions)
+            if (Expression->IsA<UMaterialExpressionPerInstanceCustomData>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEId"), RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
-    auto* Id = NewObject<UMaterialExpressionVectorParameter>(Material);
+    const auto Add = [&](auto* Expression) { Material->GetExpressionCollection().AddExpression(Expression); return Expression; };
+    auto* Id = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
     Id->ParameterName = TEXT("HdUEId"); Id->DefaultValue = FLinearColor(0, 0, 0, 0);
     Id->bUseCustomPrimitiveData = true; Id->PrimitiveDataIndex = 0;
-    auto* Unlit = NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material);
-    Unlit->EmissiveColor.Connect(0, Id);
-    Material->GetExpressionCollection().AddExpression(Id);
-    Material->GetExpressionCollection().AddExpression(Unlit);
+    auto* InstanceMode = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    InstanceMode->ParameterName = TEXT("HdUEInstanceMode"); InstanceMode->DefaultValue = 0.f;
+    InstanceMode->bUseCustomPrimitiveData = true; InstanceMode->PrimitiveDataIndex = 4;
+    auto* Instance = Add(NewObject<UMaterialExpressionPerInstanceCustomData>(Material));
+    Instance->DataIndex = 3; Instance->ConstDefaultValue = -1.f;
+    auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
+    Scaled->A.Connect(0, Instance); Scaled->ConstB = 2048.f;
+    auto* High = Add(NewObject<UMaterialExpressionFloor>(Material));
+    High->Input.Connect(0, Scaled);
+    auto* HighScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    HighScaled->A.Connect(0, High); HighScaled->ConstB = 2048.f;
+    auto* Low = Add(NewObject<UMaterialExpressionSubtract>(Material));
+    Low->A.Connect(0, Instance); Low->B.Connect(0, HighScaled);
+    auto* HighLow = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    HighLow->A.Connect(0, High); HighLow->B.Connect(0, Low);
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    auto* Encoded = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    Encoded->A.Connect(0, HighLow); Encoded->B.Connect(0, One);
+    auto* Select = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    Select->A.Connect(0, Id); Select->B.Connect(0, Encoded); Select->Alpha.Connect(0, InstanceMode);
+    auto* Unlit = Add(NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material));
+    Unlit->EmissiveColor.Connect(0, Select);
     Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
     Material->bUsedWithNanite = true;
     Material->bUsedWithInstancedStaticMeshes = true;

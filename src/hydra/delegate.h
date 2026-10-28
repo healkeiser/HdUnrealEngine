@@ -8,6 +8,8 @@
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec4f.h"
+#include <algorithm>
+#include <type_traits>
 #include <array>
 #include <map>
 #include <set>
@@ -21,6 +23,22 @@
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
+// Matrix samples at frame-relative times around the current frame (motion blur).
+struct HdUEMotionSamples {
+    std::vector<float> times;
+    std::vector<GfMatrix4d> values;
+    bool moving() const { for (const auto& v : values) if (!GfIsClose(v, values.front(), 1e-9)) return true; return false; }
+    // Piecewise linear per element, clamped to the end samples; identity without samples.
+    GfMatrix4d at(float t) const {
+        if (values.empty()) return GfMatrix4d(1);
+        if (t <= times.front()) return values.front();
+        for (size_t i = 1; i < times.size(); ++i) if (t <= times[i]) {
+            const double u = (t - times[i - 1]) / std::max(1e-6f, times[i] - times[i - 1]);
+            return values[i - 1] * (1 - u) + values[i] * u;
+        }
+        return values.back();
+    }
+};
 struct HdUEMeshData {
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
     std::vector<GfVec3f> points, normals;
@@ -35,6 +53,12 @@ struct HdUEMeshData {
     bool instanced = false; // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances; // USD world matrices (prototype transform included)
     std::vector<GfVec3f> instanceColors; // per instance; empty unless displayColor varies
+    std::vector<int32_t> instanceIds; // Hydra instanceId per instance; empty means the instance index
+    // Motion blur: the matrices at time t are motionLeft.at(t) * M * motionRight.at(t) + velocity * t, for M the
+    // transform or each instance. Both factors are relative to the current frame (identity at t = 0).
+    HdUEMotionSamples motionLeft, motionRight;
+    std::vector<GfVec3f> velocities; // per instance, world units per frame
+    bool moving() const { return motionLeft.moving() || motionRight.moving() || !velocities.empty(); }
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
 // A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.
@@ -75,6 +99,7 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
+    std::map<std::string, HdUEMotionSamples> cameraMotion; // absolute camera transforms by camera id
     std::set<std::string> dirtyVolumes;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
@@ -111,7 +136,16 @@ struct HdUEState : HdRenderParam {
     void erase(const std::string& id);
     template<class T> T setting(const char* key, T fallback) const {
         const auto it = settings.find(TfToken(key));
-        return it != settings.end() && it->second.IsHolding<T>() ? it->second.UncheckedGet<T>() : fallback;
+        if (it == settings.end()) return fallback;
+        if (it->second.IsHolding<T>()) return it->second.UncheckedGet<T>();
+        // USD authors these as string or token, int or int64, float or double: accept either.
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (it->second.IsHolding<TfToken>()) return it->second.UncheckedGet<TfToken>().GetString();
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            const VtValue cast = VtValue::Cast<T>(it->second);
+            if (!cast.IsEmpty()) return cast.UncheckedGet<T>();
+        }
+        return fallback;
     }
     GfVec3d convert(const GfVec3d& point, bool direction = false) const;
 };

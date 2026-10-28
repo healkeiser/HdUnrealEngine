@@ -43,6 +43,12 @@ Backend::Backend(const std::filesystem::path& dll) {
         if(aov(HDUE_AOV_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
             candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_AOV_ABI_VERSION && candidate.poll_aov) aovApi_=candidate;
     }
+    const auto motion=reinterpret_cast<HdueGetMotionApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_motion_api"));
+    if(motion) {
+        HdueMotionApi candidate{};
+        if(motion(HDUE_MOTION_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
+            candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_MOTION_ABI_VERSION && candidate.set_transforms) motionApi_=candidate;
+    }
     const auto volume=reinterpret_cast<HdueGetVolumeApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_volume_api"));
     if(volume) {
         HdueVolumeApi candidate{};

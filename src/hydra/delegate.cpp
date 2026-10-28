@@ -53,14 +53,12 @@ struct HdUESelfHost {
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
 }
-// instanceId has no pass of its own: it is -1 until Hydra instancing is translated.
-constexpr uint32_t HdUEInstanceIdAov = 0x100;
 // Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
 uint32_t HdUEAovId(const TfToken& name) {
     static const std::pair<TfToken, uint32_t> names[] = {{TfToken("albedo"), HDUE_AOV_ALBEDO}, {TfToken("baseColor"), HDUE_AOV_ALBEDO},
         {HdAovTokens->normal, HDUE_AOV_NORMAL}, {TfToken("roughness"), HDUE_AOV_ROUGHNESS}, {TfToken("metallic"), HDUE_AOV_METALLIC},
         {TfToken("specular"), HDUE_AOV_SPECULAR}, {TfToken("occlusion"), HDUE_AOV_OCCLUSION},
-        {HdAovTokens->primId, HDUE_AOV_PRIM_ID}, {HdAovTokens->instanceId, HdUEInstanceIdAov}};
+        {HdAovTokens->primId, HDUE_AOV_PRIM_ID}, {HdAovTokens->instanceId, HDUE_AOV_INSTANCE_ID}};
     for (const auto& [token, id] : names) if (name == token) return id;
     return 0;
 }
@@ -114,6 +112,7 @@ HdRprim* HdUECreateVolume(const SdfPath&);
 HdBprim* HdUECreateField(const SdfPath&);
 HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
+HdSprim* HdUECreateCamera(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
 void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
 
@@ -258,6 +257,7 @@ void submit(HdUEState& state) {
             desc.instance_count = uint32_t(data.instances.size());
             for (const auto& c : data.instanceColors) instanceColors.back().insert(instanceColors.back().end(), {c[0], c[1], c[2]});
             if (instanceColors.back().size() == size_t(desc.instance_count) * 3 && desc.instance_count) desc.instance_colors = instanceColors.back().data();
+            if (data.instanceIds.size() == desc.instance_count && desc.instance_count) desc.instance_ids = data.instanceIds.data();
             static const double none = 0;
             desc.instance_transforms = matrices.empty() ? &none : matrices.data();
         }
@@ -455,6 +455,41 @@ void submit(HdUEState& state) {
 class Pass final : public HdRenderPass {
     std::shared_ptr<HdUEState> state_;
     GfMatrix4d view_{0.0}, projection_{0.0};
+    GfVec4f lens_{0.f}; // fStop, focus distance, focal length, linear exposure scale of the requested camera
+    // Motion blur: the beauty averages subframes_ converged renders at times spread over the shutter.
+    int subframe_ = 0, subframes_ = 1;
+    uint32_t subframeSamples_ = 0; // Path Tracer samples of the finished sub-frames
+    bool subframeDue_ = false, motionApplied_ = false;
+    std::vector<float> accum_;
+    // Moves every moving mesh to frame-relative time t through hdue/motion_api.h; t = 0 restores the submitted pose.
+    void applyMotion(HdUEState& s, float t) {
+        if (!s.backend->motion_api().set_transforms || (!t && !motionApplied_)) return;
+        GfMatrix4d basis(1);
+        for (int r = 0; r < 3; ++r) { GfVec3d e(0); e[r] = 1; const auto v = s.convert(e); for (int c = 0; c < 3; ++c) basis[r][c] = v[c]; }
+        const auto inverse = basis.GetInverse();
+        std::vector<std::vector<double>> storage;
+        std::vector<const std::string*> ids;
+        for (const auto& [id, mesh] : s.meshes) {
+            if (!mesh.moving()) continue;
+            const auto left = mesh.motionLeft.at(t), right = mesh.motionRight.at(t);
+            const auto place = [&](GfMatrix4d m, const GfVec3f* velocity) {
+                m = left * m * right;
+                if (velocity) for (int c = 0; c < 3; ++c) m[3][c] += (*velocity)[c] * t;
+                return m;
+            };
+            auto& out = storage.emplace_back();
+            const auto push = [&](const GfMatrix4d& usd) { const auto m = inverse * usd * basis; for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) out.push_back(m[r][c]); };
+            if (mesh.instanced) {
+                for (size_t i = 0; i < mesh.instances.size(); ++i) push(place(mesh.instances[i], mesh.velocities.size() == mesh.instances.size() ? &mesh.velocities[i] : nullptr));
+            } else if (!asset(s, "nativeMeshAssets", id).empty()) push(place(mesh.transform, nullptr));
+            else push(mesh.transform.GetInverse() * place(mesh.transform, nullptr)); // generic meshes are submitted in world space
+            ids.push_back(&id);
+        }
+        std::vector<HdueMeshTransform> moves;
+        for (size_t i = 0; i < ids.size(); ++i) moves.push_back({ids[i]->c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});
+        if (!moves.empty()) s.backend->require(s.backend->motion_api().set_transforms(s.session, moves.data(), uint32_t(moves.size())), "set_transforms");
+        motionApplied_ = t != 0;
+    }
     uint64_t settingsVersion_ = ~uint64_t(0), lastFrame_ = 0;
     double centimetersPerUnit_ = 1;
     bool depthEnabled_ = false;
@@ -467,12 +502,12 @@ class Pass final : public HdRenderPass {
     bool aovInFlight_ = false, aovsDone_ = true;
     void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame, const std::vector<float>& rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
-        if (id == HDUE_AOV_PRIM_ID || id == HdUEInstanceIdAov) {
+        if (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID) {
             // Int32 buffers hold the integer bit patterns in the float storage.
             std::vector<float> out(count);
             for (size_t i = 0; i < count; ++i) {
                 const float* p = rgba.empty() ? nullptr : &rgba[i * 4];
-                const int32_t value = p && id == HDUE_AOV_PRIM_ID && p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
+                const int32_t value = p && p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
                 std::memcpy(&out[i], &value, sizeof(value));
             }
             target.publish(frame, std::move(out));
@@ -540,6 +575,8 @@ public:
                 // ponytail: every light path expression renders the full beauty; split lobes if LPE AOVs are needed.
                 if(sourceType==TfToken("lpe")) name=HdAovTokens->color;
                 else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
+                // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
+                if(name==TfToken("Ci") || name==TfToken("C") || name==TfToken("beauty")) name=HdAovTokens->color;
                 if(name==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if(const auto id=HdUEAovId(name); id && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
@@ -553,6 +590,15 @@ public:
                     internalColor_->Allocate(GfVec3i(int(first->GetWidth()),int(first->GetHeight()),1),HdFormatFloat32Vec4,false);
                 }
                 buffer=internalColor_.get();
+            }
+            if (!buffer && std::any_of(pass->GetAovBindings().begin(), pass->GetAovBindings().end(), [&](const HdRenderPassAovBinding& aov) {
+                    const auto* b = aov.renderBuffer ? aov.renderBuffer : static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer, aov.renderBufferId));
+                    return b && b->GetWidth(); })) {
+                // Allocated outputs, none of them renderable: fail the frame instead of leaving husk waiting.
+                std::string names;
+                for (const auto& aov : pass->GetAovBindings()) names += " " + aov.aovName.GetString();
+                if (s.error.empty()) TF_RUNTIME_ERROR("hdUE renders none of the requested render vars:%s", names.c_str());
+                s.error = "hdUE renders none of the requested render vars:" + names; converged_ = true; aovsDone_ = true; return;
             }
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
                 std::string bindings;
@@ -591,6 +637,18 @@ public:
             if (s.assetRequestPending) { changed=true; s.assetRequestPending=false; }
             const auto view = pass->GetWorldToViewMatrix();
             const auto projection = pass->GetProjectionMatrix();
+            const HdCamera* hdCamera = pass->GetCamera();
+            const GfVec4f lens = hdCamera ? GfVec4f(hdCamera->GetFStop(), hdCamera->GetFocusDistance(), hdCamera->GetFocalLength(), hdCamera->GetLinearExposureScale())
+                                          : GfVec4f(0.f, 0.f, 0.f, 1.f);
+            // Sub-frame times are spread over the camera shutter; the camera moves with its own samples.
+            const auto cameraMotion = hdCamera ? s.cameraMotion.find(hdCamera->GetId().GetString()) : s.cameraMotion.end();
+            const auto subframeTime = [&](int k) {
+                return float(hdCamera->GetShutterOpen() + (k + .5) / subframes_ * (hdCamera->GetShutterClose() - hdCamera->GetShutterOpen()));
+            };
+            const auto viewAt = [&](float t) {
+                if (subframes_ < 2 || cameraMotion == s.cameraMotion.end()) return view;
+                return view * cameraMotion->second.at(0) * cameraMotion->second.at(t).GetInverse();
+            };
             const auto settingsVersion = s.requestSettingsRevision;
             // Consume a completed image before changing its generation. Otherwise
             // continuous camera input can discard every image before presentation.
@@ -623,9 +681,24 @@ public:
                         }
                         depth->publish(frame,std::move(depthPixels));
                     }
-                    buffer->publish(frame, std::move(pixels));
-                    ++s.publishedFrames;
-                    s.lastFrame = frame; lastFrame_ = frame.frame_id;
+                    if (subframes_ > 1 && frame.converged) {
+                        // One converged sub-frame: add it and publish the running average.
+                        if (accum_.size() != pixels.size()) accum_.assign(pixels.size(), 0.f);
+                        for (size_t i = 0; i < pixels.size(); ++i) accum_[i] += pixels[i];
+                        ++subframe_;
+                        for (size_t i = 0; i < pixels.size(); ++i) pixels[i] = accum_[i] / float(subframe_);
+                        subframeSamples_ += frame.completed_samples; frame.completed_samples = subframeSamples_;
+                        frame.converged = subframe_ >= subframes_;
+                        subframeDue_ = !frame.converged;
+                        if (frame.converged) applyMotion(s, 0);
+                    } else if (subframes_ > 1) lastFrame_ = frame.frame_id; // an unfinished sub-frame stays out of the average
+                    if (frame.frame_id != lastFrame_) {
+                        if (lens_[3] != 1.f) // camera exposure, as Karma applies it to the beauty only
+                            for (size_t i = 0; i + 3 < pixels.size(); i += 4) { pixels[i] *= lens_[3]; pixels[i + 1] *= lens_[3]; pixels[i + 2] *= lens_[3]; }
+                        buffer->publish(frame, std::move(pixels));
+                        ++s.publishedFrames;
+                        s.lastFrame = frame; lastFrame_ = frame.frame_id;
+                    }
                 }
             } else if (result != HDUE_PENDING && result != HDUE_OK) s.backend->require(result, "poll_frame");
             if (aovInFlight_) {
@@ -645,7 +718,7 @@ public:
             }
             converged_ = s.lastFrame.frame_id && s.lastFrame.converged;
             const bool settingsChanged = settingsVersion != settingsVersion_;
-            const bool cameraChanged = view != view_ || projection != projection_;
+            const bool cameraChanged = view != view_ || projection != projection_ || lens != lens_;
             const bool needsRequest = changed || settingsChanged || cameraChanged;
             if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
                 std::fprintf(stderr, "hdUE pass changed=%d settings=%d camera=%d converged=%d frame=%llu gen=%llu buffer=%ux%u aovs=%zu slot=%zu inflight=%d done=%d error=%s\n",
@@ -659,7 +732,8 @@ public:
                 // mouse event or invalidate an in-flight camera image repeatedly.
                 ++s.coalescedCameraUpdates;
                 converged_ = false;
-            } else if (needsRequest) {
+            } else if (needsRequest || subframeDue_) {
+              const auto build = [&](const GfMatrix4d& view) {
                 HdueRenderRequest request{};
                 request.struct_size = sizeof(request); request.generation = std::max(s.generation, s.aovGeneration)+1;
                 request.mode = s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED : HDUE_REALTIME;
@@ -678,31 +752,66 @@ public:
                         pass->GetCamera() ? pass->GetCamera()->GetId().GetText() : "none",
                         eye[0], eye[1], eye[2], target[0], target[1], target[2], request.horizontal_fov_degrees,
                         s.width, s.height, s.setting<double>("metersPerUnit", .01), s.setting<std::string>("upAxis", "Y").c_str());
-                request.near_clip_cm = pass->GetCamera() ? float(pass->GetCamera()->GetClippingRange().GetMin() * s.setting<double>("metersPerUnit", 0.01) * 100) : 0.1f;
-                if (pass->GetCamera() && (pass->GetCamera()->GetProjection() != HdCamera::Perspective ||
-                    pass->GetCamera()->GetHorizontalApertureOffset() != 0 || pass->GetCamera()->GetVerticalApertureOffset() != 0))
-                    throw std::runtime_error("This initial hdUE supports centered perspective cameras");
+                const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
+                request.near_clip_cm = hdCamera ? float(hdCamera->GetClippingRange().GetMin() * cmPerUnit) : 0.1f;
+                // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
+                if (projection[3][3] == 1) {
+                    request.orthographic = 1;
+                    request.projection_scale[0] = projection[0][0] / cmPerUnit; request.projection_scale[1] = projection[1][1] / cmPerUnit;
+                    request.projection_offset[0] = projection[3][0]; request.projection_offset[1] = projection[3][1];
+                    request.near_clip_cm = float((projection[3][2] + 1) / projection[2][2] * cmPerUnit);
+                    request.far_clip_cm = float((projection[3][2] - 1) / projection[2][2] * cmPerUnit);
+                    request.horizontal_fov_degrees = 90;
+                } else {
+                    request.projection_scale[0] = projection[0][0]; request.projection_scale[1] = projection[1][1];
+                    request.projection_offset[0] = -projection[2][0]; request.projection_offset[1] = -projection[2][1];
+                }
+                if (lens[0] > 0 && lens[1] > 0) {
+                    request.fstop = lens[0]; request.focus_distance_cm = float(lens[1] * cmPerUnit); request.focal_length_cm = float(lens[2] * cmPerUnit); // world units, as Hydra and Karma read USD lens attributes
+                }
+                return request;
+              };
+                if (needsRequest) {
+                    applyMotion(s, 0);
+                    // Motion blur needs a shutter, sub-frames and something moving.
+                    const int samples = std::max(1, s.setting<int>("motionSamples", 16));
+                    const bool shutter = hdCamera && hdCamera->GetShutterClose() > hdCamera->GetShutterOpen();
+                    const bool moving = cameraMotion != s.cameraMotion.end() ||
+                        std::any_of(s.meshes.begin(), s.meshes.end(), [](const auto& entry) { return entry.second.moving(); });
+                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 && s.backend->motion_api().set_transforms ? samples : 1;
+                    subframe_ = 0; subframeSamples_ = 0; accum_.clear();
+                }
+                subframeDue_ = false;
+                auto request = build(viewAt(subframes_ > 1 ? subframeTime(subframe_) : 0.f));
+                if (subframes_ > 1) {
+                    applyMotion(s, subframeTime(subframe_));
+                    request.samples_per_pixel = std::max(1u, (request.samples_per_pixel + uint32_t(subframes_) - 1) / uint32_t(subframes_));
+                    // Lumen keeps its history between sub-frames, so the realtime warmup is shared too.
+                    request.warmup_frames = std::max(2u, (request.warmup_frames + uint32_t(subframes_) - 1) / uint32_t(subframes_));
+                }
                 const auto requestStart = std::chrono::steady_clock::now();
                 const auto requested=s.backend->api().request_render(s.session, &request);
                 if(requested==HDUE_PENDING) {
+                    if (!needsRequest) { subframeDue_ = true; converged_ = false; s.error.clear(); return; } // retry the sub-frame
                     s.assetRequestPending=true; converged_=false; s.lastFrame={};
                     buffer->invalidate(); if(depth) depth->invalidate(); s.error.clear(); return;
                 }
                 s.backend->require(requested, "request_render");
                 s.generation=request.generation;
                 s.requestCpuMsTotal += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - requestStart).count();
-                view_ = view; projection_ = projection; settingsVersion_ = settingsVersion;
-                s.submittedRequestSettingsRevision=settingsVersion;
-                centimetersPerUnit_=s.setting<double>("metersPerUnit",.01)*100.;
-                converged_ = false; s.lastFrame = {}; buffer->invalidate();
-                if(depth) depth->invalidate();
-                beautyRequest_ = request;
-                aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty();
-                for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
+                converged_ = false;
+                if (needsRequest) {
+                    view_ = view; projection_ = projection; lens_ = lens; settingsVersion_ = settingsVersion;
+                    s.submittedRequestSettingsRevision=settingsVersion;
+                    centimetersPerUnit_=s.setting<double>("metersPerUnit",.01)*100.;
+                    s.lastFrame = {}; buffer->invalidate();
+                    if(depth) depth->invalidate();
+                    beautyRequest_ = build(view); // AOVs render the unblurred pose at the current time
+                    aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty();
+                    for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
+                }
             }
             if (!needsRequest && converged_ && !aovsDone_ && !aovInFlight_) {
-                for (; aovSlot_ < aovs_.size() && aovs_[aovSlot_].second == HdUEInstanceIdAov; ++aovSlot_)
-                    publishAov(*aovs_[aovSlot_].first, HdUEInstanceIdAov, s.lastFrame, {});
                 if (aovSlot_ >= aovs_.size()) aovsDone_ = true;
                 else {
                     // Same camera and time as the beauty; GBuffer channels converge after a couple of draws.
@@ -799,7 +908,7 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static
     HdPrimTypeTokens->domeLight,HdPrimTypeTokens->diskLight,HdPrimTypeTokens->cylinderLight}; return t; }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
 #if defined(HDUE_HOUDINI)
-    static TfTokenVector t{HdPrimTypeTokens->renderBuffer, TfToken("openvdbAsset")};
+    static TfTokenVector t{HdPrimTypeTokens->renderBuffer, TfToken("openvdbAsset"), TfToken("houdiniFieldAsset")};
 #else
     static TfTokenVector t{HdPrimTypeTokens->renderBuffer};
 #endif
@@ -820,7 +929,7 @@ HdRprim* HdUERenderDelegate::CreateRprim(const TfToken& type, const SdfPath& id)
 }
 void HdUERenderDelegate::DestroyRprim(HdRprim* p) { delete p; }
 HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id) {
-    if (type == HdPrimTypeTokens->camera) return new HdCamera(id);
+    if (type == HdPrimTypeTokens->camera) return HdUECreateCamera(id);
     if (type == HdPrimTypeTokens->material) return HdUECreateMaterial(id);
     if (type == HdPrimTypeTokens->distantLight) return HdUECreateLight(id, HDUE_DISTANT_LIGHT);
     if (type == HdPrimTypeTokens->sphereLight) return HdUECreateLight(id, HDUE_SPHERE_LIGHT);
@@ -834,7 +943,7 @@ HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) { return C
 void HdUERenderDelegate::DestroySprim(HdSprim* p) { delete p; }
 HdBprim* HdUERenderDelegate::CreateBprim(const TfToken& type, const SdfPath& id) {
 #if defined(HDUE_HOUDINI)
-    if (type == TfToken("openvdbAsset")) return HdUECreateField(id);
+    if (type == TfToken("openvdbAsset") || type == TfToken("houdiniFieldAsset")) return HdUECreateField(id);
 #endif
     return type == HdPrimTypeTokens->renderBuffer ? new HdUERenderBuffer(id) : nullptr;
 }
@@ -842,7 +951,7 @@ HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return C
 void HdUERenderDelegate::DestroyBprim(HdBprim* p) { delete p; }
 HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const {
     if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat32Vec4,false,VtValue(GfVec4f(0)));
-    if(const auto aov=HdUEAovId(name); aov==HDUE_AOV_PRIM_ID || aov==HdUEInstanceIdAov)
+    if(const auto aov=HdUEAovId(name); aov==HDUE_AOV_PRIM_ID || aov==HDUE_AOV_INSTANCE_ID)
         return HdAovDescriptor(HdFormatInt32,false,VtValue(-1));
     if(const auto aov=HdUEAovId(name)) return aov==HDUE_AOV_ALBEDO || aov==HDUE_AOV_NORMAL
         ? HdAovDescriptor(HdFormatFloat32Vec3,false,VtValue(GfVec3f(0))) : HdAovDescriptor(HdFormatFloat32,false,VtValue(0.f));
@@ -884,7 +993,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             TF_STATUS("hdUE wet settings: renderIndex=%p rprims=%zu",state_->renderIndex,state_->renderIndex?state_->renderIndex->GetRprimIds().size():0);
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
-        key==TfToken("lumenEnabled") || key==TfToken("timeSeconds")) ++state_->requestSettingsRevision;
+        key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
+        key==TfToken("framesPerSecond")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);
         const double fps=state_->setting<double>("houdini:fps",24.);
@@ -970,6 +1080,9 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
         {"meshes", VtValue(int(state_->meshes.size()))}, {"materials", VtValue(int(state_->materials.size()))}, {"lights", VtValue(int(state_->lights.size()))},
         {"sceneLights", VtValue(sceneLights)}, {"viewerLights", VtValue(state_->viewerLights)}, {"autoLightActive", VtValue(state_->autoLightActive)},
         {"triangles", VtValue(triangles)}, {"frameId", VtValue(state_->lastFrame.frame_id)}, {"completedSamples", VtValue(int(state_->lastFrame.completed_samples))},
+        {"percentDone", VtValue(state_->lastFrame.converged ? 100.f : state_->lastFrame.frame_id && state_->setting<std::string>("renderMode", "realtime") == "pathtraced"
+            ? std::min(99.f, 100.f * float(state_->lastFrame.completed_samples) / float(std::max(1, state_->setting<int>("samplesPerPixel", 64)))) : 0.f)},
+        {"totalClockTime", VtValue(state_->lastFrame.request_to_frame_ms / 1000.)},
         {"requestToFrameMs", VtValue(state_->lastFrame.request_to_frame_ms)}, {"readbackMs", VtValue(state_->lastFrame.readback_ms)} };
 }
 bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args) {

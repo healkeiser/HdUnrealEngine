@@ -30,10 +30,11 @@ public:
     bool HasRefractiveMaterials() const;
     HdueResult PickNative(const HdueNativeRay& Ray, HdueNativeHit& Hit, FString& ObjectId, FString& Error);
     // Swaps every mesh to M_HdUEId (its prim ID in custom primitive data) for the ID pass, or back.
-    bool SetIdMode(bool On, FString& Error);
+    bool SetIdMode(int32 Mode, FString& Error); // 0 off, 1 prim IDs, 2 instance IDs
     // Dense density grids as heterogeneous volumes (hdue/volume_api.h).
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
     void RemoveVolume(const FString& Id);
+    void SetTransforms(const FString& Id, uint32 Count, const double* Matrices); // hdue/motion_api.h
     FHdueNativeAssets Assets;
     TUniquePtr<FHdueLighting> Lighting;
 private:
@@ -49,7 +50,7 @@ private:
         TStrongObjectPtr<UMaterialInstanceDynamic> Material;
     };
     TMap<FString, FVolume> Volumes;
-    bool IdMode = false;
+    int32 IdMode = 0;
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits matter.
     TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
     UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
