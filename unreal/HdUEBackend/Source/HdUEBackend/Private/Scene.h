@@ -1,6 +1,20 @@
 #pragma once
 #include "ImageCore.h"
 #include "MeshDescription.h"
+#include "Tasks/Task.h"
+#include "Rendering/NaniteResources.h"
+#include "hdue/bridge.h"
+// A mesh descriptor with its own copies of the arrays, for Nanite builds that outlive Apply's batch.
+struct FNaniteSource {
+    TArray<float> Positions, Normals, UV, Colors; TArray<uint32> Indices; HdueMeshDesc Desc{};
+    explicit FNaniteSource(const HdueMeshDesc& In) : Desc(In) {
+        Positions = TArray<float>(In.positions, int32(In.vertex_count * 3)); Desc.positions = Positions.GetData();
+        if (In.normals) { Normals = TArray<float>(In.normals, int32(In.vertex_count * 3)); Desc.normals = Normals.GetData(); }
+        if (In.uv) { UV = TArray<float>(In.uv, int32(In.vertex_count * 2)); Desc.uv = UV.GetData(); }
+        if (In.colors) { Colors = TArray<float>(In.colors, int32(In.vertex_count * 3)); Desc.colors = Colors.GetData(); }
+        Indices = TArray<uint32>(In.indices, int32(In.index_count)); Desc.indices = Indices.GetData();
+    }
+};
 #include "CoreMinimal.h"
 #include "hdue/bridge.h"
 #include "hdue/material_api.h"
@@ -59,7 +73,8 @@ private:
     double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
     TMap<FString, FImage> DecodedImages;
-    TMap<FString, FMeshDescription> PendingStatic; // dynamic meshes TickConversions turns into static meshes // decoded in parallel at the start of Apply, consumed by PreviewTexture
+    TMap<FString, FMeshDescription> PendingStatic; // dynamic meshes TickConversions turns into static meshes
+    TMap<FString, UE::Tasks::TTask<TSharedPtr<Nanite::FResources>>> PendingNanite; // their Nanite builds // decoded in parallel at the start of Apply, consumed by PreviewTexture
     UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;

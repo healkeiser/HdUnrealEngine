@@ -24,6 +24,10 @@
 #include "TextureResource.h"
 #include "DynamicMeshToMeshDescription.h"
 #include "StaticMeshAttributes.h"
+#include "NaniteBuilder.h"
+#include "Rendering/NaniteResources.h"
+#include "StaticMeshResources.h"
+#include "Tasks/Task.h"
 
 FHdueScene::FHdueScene(UWorld* InWorld) : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld) {}
 FHdueScene::~FHdueScene() {
@@ -209,9 +213,54 @@ void FHdueScene::BindMaterials() {
         }
     }
 }
-// Replaces one dynamic mesh queued by Apply with a static mesh (cached draw commands, static ray-tracing geometry).
+namespace {
+bool Interactive_() { static const bool Value = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive")); return Value; }
+// Nanite data for one generated mesh (any thread). Every page is a root page: outside the editor, UE streams non-root
+// pages only from cooked files on disk, and these meshes exist only in memory.
+TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
+    if (!Desc.vertex_count || Desc.index_count < 3) return nullptr;
+    Nanite::IBuilderModule::FInputMeshData Input;
+    Input.Vertices.Empty(int32(Desc.vertex_count), 1, 0);
+    FBox3f Bounds(ForceInit);
+    for (uint32 V = 0; V < Desc.vertex_count; ++V) {
+        const FVector3f Position(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]);
+        FVector3f Normal = Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FVector3f::UpVector;
+        if (!Normal.Normalize()) Normal = FVector3f::UpVector;
+        const FVector3f Tangent = (FMath::Abs(Normal.X) < .9f ? FVector3f::ForwardVector : FVector3f::RightVector).Cross(Normal).GetSafeNormal();
+        Input.Vertices.Position.Add(Position);
+        Input.Vertices.TangentZ.Add(Normal);
+        Input.Vertices.TangentX.Add(Tangent);
+        Input.Vertices.TangentY.Add(Normal.Cross(Tangent));
+        Input.Vertices.UVs[0].Add(Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector);
+        if (Desc.colors) Input.Vertices.Color.Add(FLinearColor(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2]).ToFColor(false));
+        Bounds += Position;
+    }
+    // The builder's vertex view drops all-white colours but its format still counts them: keep none in that case.
+    if (!Input.Vertices.Color.ContainsByPredicate([](const FColor& C) { return C != FColor::White; })) Input.Vertices.Color.Empty();
+    const uint32 Triangles = Desc.index_count / 3;
+    Input.TriangleIndices = TArray<uint32>(Desc.indices, int32(Triangles * 3));
+    Input.TriangleCounts.Add(Triangles);
+    Input.MaterialIndices.Init(0, int32(Triangles));
+    Nanite::FMeshDataSection Section;
+    Section.MaterialIndex = 0; Section.FirstIndex = 0; Section.NumTriangles = Triangles;
+    Section.MinVertexIndex = 0; Section.MaxVertexIndex = Desc.vertex_count - 1;
+    Input.Sections.Add(Section);
+    Input.VertexBounds = FBounds3f(Bounds.Min, Bounds.Max);
+    Input.NumTexCoords = 1;
+    FMeshNaniteSettings Settings;
+    Settings.bEnabled = true;
+    Settings.TargetMinimumResidencyInKB = MAX_uint32;
+    auto Resources = MakeShared<Nanite::FResources>();
+    if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
+    return Resources;
+}
+}
+
+// Replaces one dynamic mesh queued by Apply with a static mesh (cached draw commands, static ray-tracing geometry),
+// with Nanite data when its build has finished.
 void FHdueScene::TickConversions() {
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
+        if (const auto* Task = PendingNanite.Find(It.Key()); Task && !Task->IsCompleted()) continue; // not built yet
         AActor* Actor = Actors.FindRef(It.Key());
         auto* Dynamic = IsValid(Actor) ? Cast<UDynamicMeshComponent>(Actor->GetRootComponent()) : nullptr;
         if (!Dynamic) { It.RemoveCurrent(); continue; }
@@ -221,6 +270,25 @@ void FHdueScene::TickConversions() {
         UStaticMesh::FBuildMeshDescriptionsParams Params;
         Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
         Built->BuildFromMeshDescriptions({&It.Value()}, Params);
+        if (auto* Task = PendingNanite.Find(It.Key())) {
+            if (TSharedPtr<Nanite::FResources> Resources = Task->GetResult(); Resources && Built->GetRenderData()) {
+                // The fast build made LOD0 (fallback, ray tracing) and empty Nanite resources; swap in the built ones.
+                // Only the Nanite resources: LOD0's CPU copies are gone, so its buffers can't be re-created.
+                // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
+                FStaticMeshLODResources& LOD0 = Built->GetRenderData()->LODResources[0];
+                LOD0.BuffersSize = FMath::Max<uint32>(LOD0.BuffersSize, 1);
+                Nanite::FResources& Nanite = *Built->GetRenderData()->NaniteResourcesPtr;
+                Nanite.ReleaseResources();
+                FlushRenderingCommands();
+                Nanite = MoveTemp(*Resources);
+                Nanite.InitResources(Built);
+            }
+            PendingNanite.Remove(It.Key());
+            static int32 NaniteMeshes = 0, Tried = 0;
+            ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
+            if (Tried % 50 == 1 || PendingStatic.Num() == 1)
+                UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
+        }
         auto* Component = NewObject<UStaticMeshComponent>(Actor);
         Component->SetMobility(EComponentMobility::Movable);
         Component->SetStaticMesh(Built);
@@ -317,7 +385,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 if (!Desc.textures[Slot].file || !*Desc.textures[Slot].file) continue;
                 const FString File = UTF8_TO_TCHAR(Desc.textures[Slot].file);
-                const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE;
+                const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE || Slot == HDUE_TEXTURE_SPECULAR_COLOR;
                 if (!PreviewTextures.Contains(File + (Color ? TEXT("|srgb") : TEXT("|raw"))) && !DecodedImages.Contains(File)) Files.AddUnique(File);
             }
         }
@@ -355,7 +423,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, ParentPath);
             if (Parent) {
                 auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
-                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal"), TEXT("Displacement")};
+                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal"), TEXT("Displacement"),
+                    TEXT("Occlusion"), TEXT("Clearcoat"), TEXT("ClearcoatRoughness"), TEXT("SpecularColor")};
                 const FLinearColor Constants[HDUE_TEXTURE_SLOT_COUNT] = {
                     FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], 1),
                     FLinearColor(Desc.emissive_color[0], Desc.emissive_color[1], Desc.emissive_color[2], 0),
@@ -363,7 +432,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     FLinearColor(FVector4f(FMath::Clamp(Desc.roughness, 0.f, 1.f))),
                     FLinearColor(FVector4f(Opacity)),
                     FLinearColor(0, 0, 1, 0),
-                    FLinearColor(FVector4f(Desc.displacement))};
+                    FLinearColor(FVector4f(Desc.displacement)),
+                    FLinearColor(FVector4f(Desc.occlusion)), FLinearColor(FVector4f(Desc.clearcoat)),
+                    FLinearColor(FVector4f(Desc.clearcoat_roughness)),
+                    FLinearColor(Desc.specular_color[0], Desc.specular_color[1], Desc.specular_color[2], 1)};
                 for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                     const auto& Texture = Desc.textures[Slot];
                     const FString Name = Slots[Slot];
@@ -372,7 +444,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                         Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
                         continue;
                     }
-                    const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE;
+                    const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE || Slot == HDUE_TEXTURE_SPECULAR_COLOR;
                     UTexture2D* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), Color, Error);
                     if (!Image) return false;
                     Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image);
@@ -386,6 +458,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Instance->SetVectorParameterValue(TEXT("UVRow0"), FLinearColor(M[0], M[1], M[2], 0));
                 Instance->SetVectorParameterValue(TEXT("UVRow1"), FLinearColor(M[3], M[4], M[5], 0));
                 if (Masked) Instance->SetScalarParameterValue(TEXT("OpacityThreshold"), Desc.opacity_threshold);
+                // ior -> dielectric F0 = ((ior - 1) / (ior + 1))^2; UE's Specular 0.5 is F0 0.04, so Specular = F0 / 0.08.
+                const float Ior = Desc.ior > 0.f ? Desc.ior : 1.5f;
+                const float F0 = FMath::Square((Ior - 1.f) / (Ior + 1.f));
+                Instance->SetScalarParameterValue(TEXT("SpecularLevel"), FMath::Clamp(F0 / 0.08f, 0.f, 1.f));
+                Instance->SetScalarParameterValue(TEXT("UseSpecularWorkflow"), (Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW) ? 1.f : 0.f);
                 Instance->SetScalarParameterValue(TEXT("UseVertexColor"), (Desc.flags & HDUE_MATERIAL_VERTEX_COLOR) ? 1.f : 0.f);
                 Material = Instance;
             }
@@ -402,6 +479,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // ray-tracing instances every frame.
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
     TArray<FMeshDescription> Descriptions; Descriptions.SetNum(Batch.mesh_count);
+    // Nanite for converted meshes (interactive hosts); HDUE_NANITE=0 keeps them regular static meshes.
+    static const bool NaniteMeshes = Interactive_() && FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
+    if (NaniteMeshes) Nanite::IBuilderModule::Get(); // load the builder on this thread before worker tasks use it
     // Interactive hosts (Houdini's viewport) convert generated meshes to static ones in the background, one per tick
     // (TickConversions): building static render data on this thread made a large scene's load 4x slower. Offline
     // hosts (husk) keep dynamic meshes, which are cheaper for a few frames.
@@ -484,6 +564,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
                 if (ConvertLater(Desc)) PendingStatic.Add(Id, MoveTemp(Descriptions[Index]));
                 else PendingStatic.Remove(Id);
+                PendingNanite.Remove(Id);
+                if (ConvertLater(Desc) && NaniteMeshes) {
+                    // Build on worker threads from a copy of the descriptor's arrays (Apply's batch is the caller's).
+                    auto Copy = MakeShared<FNaniteSource>(Desc);
+                    PendingNanite.Add(Id, UE::Tasks::Launch(TEXT("HdueNanite"), [Copy] { return BuildNanite(Copy->Desc); }));
+                }
             }
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
         }

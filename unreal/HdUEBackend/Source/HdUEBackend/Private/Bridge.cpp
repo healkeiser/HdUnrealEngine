@@ -230,6 +230,18 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         Runtime.State = HDUE_STATE_FAILED;
         return Fail(HDUE_INVALID_ARGUMENT, TEXT("Project not found, or invalid project/map quoting."));
     }
+    {
+        // NaniteBuilder delay-loads embree4.dll by name. Inside a host process (Houdini) the executable's folder is the
+        // host's, so load it from this DLL's folder first; later by-name loads then resolve to it.
+        HMODULE Self = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&Initialize), &Self);
+        wchar_t Path[MAX_PATH] = {};
+        if (Self && GetModuleFileNameW(Self, Path, MAX_PATH)) {
+            const FString Folder = FPaths::GetPath(FString(Path));
+            LoadLibraryExW(*FPaths::Combine(Folder, TEXT("embree4.dll")), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+        }
+    }
     FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound -NoLoadingScreen -NoSplash -ResX=640 -ResY=360"), *Project, *Map);
     if (Desc->extra_arguments) Command += FString(TEXT(" ")) + UTF8_TO_TCHAR(Desc->extra_arguments);
     const int Code = UELibrary_InitW(reinterpret_cast<HINSTANCE>(Desc->instance_handle),

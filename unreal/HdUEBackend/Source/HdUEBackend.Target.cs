@@ -12,6 +12,8 @@ public class HdUEBackendTarget : TargetRules
         GlobalDefinitions.Add("UE_LIBRARY_ENABLED=1");
         ExtraModuleNames.AddRange(new[] { "HdUEBackend", "UELibrary" });
         bCompileICU = true;
+        // NaniteBuilder (a Developer module) builds Nanite data for the meshes hdUE creates at runtime.
+        bBuildDeveloperTools = true;
     }
 }
 

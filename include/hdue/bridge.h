@@ -137,7 +137,8 @@ enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2,
 /* UsdPreviewSurface inputs that can be driven by a UsdUVTexture. */
 enum { HDUE_TEXTURE_BASE_COLOR = 0, HDUE_TEXTURE_EMISSIVE = 1, HDUE_TEXTURE_METALLIC = 2,
     HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_DISPLACEMENT = 6,
-    HDUE_TEXTURE_SLOT_COUNT = 7 };
+    HDUE_TEXTURE_OCCLUSION = 7, HDUE_TEXTURE_CLEARCOAT = 8, HDUE_TEXTURE_CLEARCOAT_ROUGHNESS = 9, HDUE_TEXTURE_SPECULAR_COLOR = 10,
+    HDUE_TEXTURE_SLOT_COUNT = 11 };
 typedef struct HdueTextureDesc {
     const char* file; /* Null or empty: the slot uses its constant. */
     /* value = texel * scale + bias. Scalar slots first reduce the texel with channel_mask. */
@@ -159,7 +160,12 @@ typedef struct HdueMaterialDesc {
     uint32_t flags; /* HDUE_MATERIAL_* */
     /* UsdPreviewSurface displacement, in cm along the vertex normal (texture scale/bias are in cm too). */
     float displacement;
+    /* UsdPreviewSurface: occlusion, clear coat, index of refraction, and specularColor for the specular workflow. */
+    float occlusion, clearcoat, clearcoat_roughness, ior;
+    float specular_color[3];
 } HdueMaterialDesc;
+/* useSpecularWorkflow: diffuse and F0 come from diffuseColor and specularColor instead of metallic and ior. */
+#define HDUE_MATERIAL_SPECULAR_WORKFLOW 2u
 /* Multiply the base color by the mesh's colors / instance_colors (displayColor primvars). */
 #define HDUE_MATERIAL_VERTEX_COLOR 1u
 typedef struct HdueMeshDesc {

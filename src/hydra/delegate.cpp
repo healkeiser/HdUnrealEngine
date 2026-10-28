@@ -349,6 +349,9 @@ void submit(HdUEState& state) {
             for (int i = 0; i < 4; ++i) { out.scale[i] = texture.scale[i] * units; out.bias[i] = texture.bias[i] * units; out.channel_mask[i] = texture.mask[i]; }
         }
         desc.displacement = data.displacement * float(state.setting<double>("metersPerUnit", 0.01) * 100);
+        desc.occlusion = data.occlusion; desc.clearcoat = data.clearcoat; desc.clearcoat_roughness = data.clearcoatRoughness; desc.ior = data.ior;
+        for (int i = 0; i < 3; ++i) desc.specular_color[i] = data.specularColor[i];
+        if (data.specularWorkflow) desc.flags |= HDUE_MATERIAL_SPECULAR_WORKFLOW;
         materials.push_back(desc);
         if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
     }

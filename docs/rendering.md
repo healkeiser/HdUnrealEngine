@@ -39,6 +39,22 @@ Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float
 
 Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5); Karma's default for unbound geometry is darker, so compare renderers with bound materials.
 
+## Preview Surface inputs
+
+Every `UsdPreviewSurface` input is translated, as a constant or a `UsdUVTexture` (with `scale`, `bias`, a single-channel output and the first `UsdTransform2d`):
+
+| Input | In UE |
+| --- | --- |
+| `diffuseColor`, `emissiveColor` | Base colour and emission (colour textures sampled as sRGB) |
+| `metallic`, `roughness` | Metalness workflow |
+| `ior` | Dielectric reflectance, F0 = ((ior - 1) / (ior + 1))² |
+| `useSpecularWorkflow`, `specularColor` | Specular workflow: diffuse and F0 straight from `diffuseColor` and `specularColor` |
+| `clearcoat`, `clearcoatRoughness` | A second specular lobe weighted by `clearcoat` (Substrate haziness), as UE converts its own clear coat; there is no coat absorption over the base |
+| `opacity`, `opacityThreshold` | See-through (translucent) or cutout (masked) |
+| `normal` | Tangent-space normal map (USD's +Y up) |
+| `occlusion` | Ambient occlusion |
+| `displacement` | World Position Offset along the normal (see [Displacement](#displacement)) |
+
 ## Colour management (OCIO, ACES)
 
 UE renders in linear Rec.709. In the Houdini build, hdUE converts at its boundaries with the OpenColorIO configuration Houdini uses (`$OCIO`):
@@ -58,11 +74,11 @@ The beauty carries straight alpha: 1 where geometry covers the pixel, 0 where th
 
 ## Displacement
 
-The Preview Surface `displacement` input (a constant or a texture) moves vertices along their normal by that distance in scene units, as World Position Offset in hdUE's preview materials. Only existing vertices move: detail finer than the mesh needs a denser mesh, for example `catmullClark` subdivision (`hdUE:subdivisionLevel`). Shading normals are not recomputed from the displacement. Nanite tessellation, UE's adaptive displacement, needs Nanite meshes, which hdUE cannot build at runtime (see below).
+The Preview Surface `displacement` input (a constant or a texture) moves vertices along their normal by that distance in scene units, as World Position Offset in hdUE's preview materials. Only existing vertices move: detail finer than the mesh needs a denser mesh, for example `catmullClark` subdivision (`hdUE:subdivisionLevel`). Shading normals are not recomputed from the displacement. UE's adaptive Nanite tessellation is not used: it needs displacement maps at Nanite build time.
 
 ## Nanite
 
-Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). Meshes hdUE builds from Hydra cannot be Nanite: UE builds Nanite data only in the editor, and the runtime static mesh build (`BuildFromMeshDescriptions`) supports only its fast, non-Nanite path.
+Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). In interactive hosts (Houdini's viewport), meshes hdUE builds from Hydra become Nanite meshes too: hdUE first draws them as dynamic meshes, builds their Nanite data on worker threads, then swaps each one for a Nanite static mesh, one per frame. Every Nanite page stays resident in memory, since UE streams the other pages only from cooked files. Animated or edited meshes stay dynamic, and instanced meshes stay regular instanced static meshes. Batch renders (husk) don't convert, and `HDUE_NANITE=0` turns Nanite off in the viewport.
 
 ## Denoising
 

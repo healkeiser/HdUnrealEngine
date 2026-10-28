@@ -784,9 +784,17 @@ public:
             data.opacity = value(get("opacity"), data.opacity);
             data.opacityThreshold = value(get("opacityThreshold"), data.opacityThreshold);
             data.displacement = value(get("displacement"), data.displacement);
+            data.occlusion = value(get("occlusion"), data.occlusion);
+            data.clearcoat = value(get("clearcoat"), data.clearcoat);
+            data.clearcoatRoughness = value(get("clearcoatRoughness"), data.clearcoatRoughness);
+            data.ior = value(get("ior"), data.ior);
+            data.specularColor = HdUEFromSceneLinear(value(get("specularColor"), data.specularColor));
+            data.specularWorkflow = value(get("useSpecularWorkflow"), 0) != 0;
             static const std::pair<const char*, int> inputs[] = {{"diffuseColor", HDUE_TEXTURE_BASE_COLOR},
                 {"emissiveColor", HDUE_TEXTURE_EMISSIVE}, {"metallic", HDUE_TEXTURE_METALLIC}, {"roughness", HDUE_TEXTURE_ROUGHNESS},
-                {"opacity", HDUE_TEXTURE_OPACITY}, {"normal", HDUE_TEXTURE_NORMAL}, {"displacement", HDUE_TEXTURE_DISPLACEMENT}};
+                {"opacity", HDUE_TEXTURE_OPACITY}, {"normal", HDUE_TEXTURE_NORMAL}, {"displacement", HDUE_TEXTURE_DISPLACEMENT},
+                {"occlusion", HDUE_TEXTURE_OCCLUSION}, {"clearcoat", HDUE_TEXTURE_CLEARCOAT},
+                {"clearcoatRoughness", HDUE_TEXTURE_CLEARCOAT_ROUGHNESS}, {"specularColor", HDUE_TEXTURE_SPECULAR_COLOR}};
             bool uvSet = false;
             for (const auto& [input, slot] : inputs) {
                 const auto connection = node.inputConnections.find(TfToken(input));
@@ -803,7 +811,7 @@ public:
                 out.file = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
                 // Linear colour textures are authored in scene_linear (OCIO); UE works in linear Rec.709.
                 const auto sourceSpace = value(param("sourceColorSpace"), TfToken());
-                if ((slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE) && sourceSpace != TfToken("raw"))
+                if ((slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE || slot == HDUE_TEXTURE_SPECULAR_COLOR) && sourceSpace != TfToken("raw"))
                     out.file = HdUELinearRec709Texture(out.file);
                 out.scale = value(param("scale"), out.scale);
                 out.bias = value(param("bias"), out.bias);

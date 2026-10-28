@@ -119,8 +119,13 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
+    const auto HasParameter = [](UMaterial* Existing, const TCHAR* Parameter) {
+        for (const auto& Expression : Existing->GetExpressionCollection().Expressions)
+            if (const auto* Named = Cast<UMaterialExpressionScalarParameter>(Expression); Named && Named->ParameterName == Parameter) return true;
+        return false;
+    };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided &&
-        Material->GetEditorOnlyData()->WorldPositionOffset.Expression)
+        Material->GetEditorOnlyData()->WorldPositionOffset.Expression && HasParameter(Material, TEXT("PreviewSurfaceVersion3")) && Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -205,14 +210,37 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     auto* UENormal = Add(NewObject<UMaterialExpressionMultiply>(Material));
     UENormal->A.Connect(0, Normal); UENormal->B.Connect(0, FlipGreen);
     auto* UnitNormal = Add(NewObject<UMaterialExpressionNormalize>(Material)); UnitNormal->VectorInput.Connect(0, UENormal);
+    auto* Occlusion = Slot(TEXT("Occlusion"), FLinearColor(1, 1, 1, 1), false, true);
+    auto* Clearcoat = Slot(TEXT("Clearcoat"), FLinearColor(0, 0, 0, 0), false, true);
+    auto* ClearcoatRoughness = Slot(TEXT("ClearcoatRoughness"), FLinearColor(.01f, .01f, .01f, .01f), false, true);
+    auto* SpecularColor = Slot(TEXT("SpecularColor"), FLinearColor(0, 0, 0, 1), true, false);
+    const auto Scalar = [&](const TCHAR* Parameter, float Value) {
+        auto* Expression = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+        Expression->ParameterName = Parameter; Expression->DefaultValue = Value; return Expression;
+    };
+    // Metalness workflow, with ior as the dielectric specular level (the backend converts ior to it).
     auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
     Conversion->BaseColor.Connect(0, BaseColor); Conversion->Metallic.Connect(0, Metallic);
+    Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
+    // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
+    auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
+    Scalar(TEXT("PreviewSurfaceVersion3"), 3.f); // unconnected marker: bump the name when this graph changes, to regenerate
+    auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    Albedo->A.Connect(0, Conversion); Albedo->B.Connect(0, BaseColor); Albedo->Alpha.Connect(0, UseSpecular);
+    auto* F0 = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    F0->A.Connect(1, Conversion); F0->B.Connect(0, SpecularColor); F0->Alpha.Connect(0, UseSpecular);
     auto* Slab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
-    Slab->DiffuseAlbedo.Connect(0, Conversion); Slab->F0.Connect(1, Conversion);
+    Slab->DiffuseAlbedo.Connect(0, Albedo); Slab->F0.Connect(0, F0);
     Slab->Roughness.Connect(0, Roughness); Slab->Normal.Connect(0, UnitNormal); Slab->EmissiveColor.Connect(0, Emissive);
     auto* Data = Material->GetEditorOnlyData();
     Data->BaseColor.Expression = nullptr; Data->Metallic.Expression = nullptr; Data->Roughness.Expression = nullptr;
-    Data->FrontMaterial.Connect(0, Slab);
+    // Clear coat as UE converts its own: a second specular lobe on the slab (Substrate haziness), with clearcoatRoughness
+    // and weighted by clearcoat. An approximation of a coat layer, without the coat's absorption over the base.
+    Slab->SecondRoughness.Connect(0, ClearcoatRoughness);
+    Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
+    auto* Layered = Slab;
+    Data->FrontMaterial.Connect(0, Layered);
+    Data->AmbientOcclusion.Connect(0, Occlusion);
     Data->WorldPositionOffset.Connect(0, Offset);
     Material->BlendMode = Blend;
     if (Blend == BLEND_Masked) {
@@ -227,7 +255,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         Material->OpacityMaskClipValue = .5f;
     } else if (Blend == BLEND_TranslucentGreyTransmittance) {
         auto* Weight = Add(NewObject<UMaterialExpressionSubstrateWeight>(Material));
-        Weight->A.Connect(0, Slab); Weight->Weight.Connect(0, Opacity);
+        Weight->A.Connect(0, Layered); Weight->Weight.Connect(0, Opacity);
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
@@ -236,6 +264,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
     Material->TwoSided = true;
     // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
     Material->bUsedWithInstancedStaticMeshes = true;
+    Material->bUsedWithNanite = true; // runtime-built Nanite meshes (Scene.cpp BuildNanite)
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;

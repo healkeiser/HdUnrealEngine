@@ -91,6 +91,9 @@ struct HdUEMaterialData {
     std::string id;
     GfVec3f color{0.7f}, emissive{0};
     float metallic = 0, roughness = 0.5f, opacity = 1, opacityThreshold = 0, displacement = 0; // displacement in scene units
+    float occlusion = 1, clearcoat = 0, clearcoatRoughness = 0.01f, ior = 1.5f;
+    GfVec3f specularColor{0};
+    bool specularWorkflow = false;
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false; // HDUE_MATERIAL_VERTEX_COLOR

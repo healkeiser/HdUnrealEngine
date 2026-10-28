@@ -65,7 +65,7 @@ Individual steps:
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
 
-The monolithic DLL requires a source engine. A matching editor installation can prepare content. Virtual-texture residency support adds one friend declaration through `Apply-ResidencyPatch.ps1`, which validates the engine version and insertion point. UELibrary and Launch are otherwise unchanged.
+The monolithic DLL requires a source engine. A matching editor installation can prepare content. `Apply-ResidencyPatch.ps1` makes two small engine edits, validating the engine version and each insertion point: one friend declaration for virtual-texture residency, and an editor-only guard around NaniteBuilder's displacement-texture read (`NaniteDisplace.cpp`) so the runtime can build Nanite meshes. UELibrary and Launch are otherwise unchanged.
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
