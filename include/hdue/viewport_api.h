@@ -26,6 +26,9 @@ typedef struct HdueViewportOptions {
     double meters_per_unit, time_seconds;
 } HdueViewportOptions;
 HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(const HdueViewportOptions* options);
+/* Called by the host on the thread that owns UE, after each tick: runs UE work that delegates executing on
+ * other threads (Live Render) queued, and records this thread as the owner. */
+HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks(void);
 typedef struct HdueViewportMaterial {
     const char* material_id;
     const char* native_asset;

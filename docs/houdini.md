@@ -73,6 +73,12 @@ husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate'
 
 A USD Render ROP passes its environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers. Unsaved SOP volumes are written next to the USD file by the ROP and render from there.
 
+## Live Render and Copernicus
+
+The Live Render LOP accepts **HdUEHoudiniRendererPlugin** as its render delegate. It renders inside the Houdini process on its own threads, while UE belongs to Houdini's UI thread (or, when nothing in the process has started UE, to a thread hdUE starts for it, as in husk). The delegate queues its UE work for that thread, which runs it after each UE tick; a render whose work is not picked up within 5 s fails with an error rather than blocking. A File COP with **Source: Live Render** can start and stop it for compositing in Copernicus.
+
+The backend supports one render session per process, so a Live Render and an hdUE Solaris viewport cannot run at the same time (from the code; not tested). The Live Render has been checked to render and converge with its AOVs; the image reaching the File COP has not been verified by the automated tests (in the scripted test the File COP stayed empty with Karma too), so check it in the UI.
+
 ## AOVs
 
 The beauty is the render var whose `sourceName` is `color`, `C`, `Ci` or `beauty` (`raw`), or any `lpe` source such as Karma's `C.*[LO]`. Besides the beauty and `depth`, render vars may request these `sourceName`s, rendered from the GBuffer (Substrate's first BSDF). The delegate matches a binding by its `sourceName`, so the render var and channel may be named anything.

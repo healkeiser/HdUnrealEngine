@@ -36,6 +36,8 @@ class Viewport:
         self.set=self.library.hdue_set_viewport_options; self.set.argtypes=[C.POINTER(Options)]; self.set.restype=Result
         self.set_materials=self.library.hdue_set_viewport_materials
         self.set_materials.argtypes=[C.POINTER(Materials)]; self.set_materials.restype=Result
+        self.run_ui_tasks=getattr(self.library,'hdue_run_ui_tasks',None)
+        if self.run_ui_tasks: self.run_ui_tasks.argtypes=[]; self.run_ui_tasks.restype=None
         self.set_surfaces=getattr(self.library,'hdue_set_viewport_surfaces',None)
         if self.set_surfaces:
             self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result

@@ -158,6 +158,8 @@ class Host:
             elif self.prepared_output.node is not None:
                 self.prepared_output.close()
             self.runtime.tick()
+            # UE work from delegates on other threads (Live Render), after UE advanced.
+            if self.api.run_ui_tasks: self.api.run_ui_tasks()
             if self.viewer:
                 if state['error']: self.viewer.status.setText(state['error'])
                 elif not state['active']: self.viewer.status.setText('Select Unreal Engine (hdUE) in Solaris to resume')

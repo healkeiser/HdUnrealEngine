@@ -220,6 +220,7 @@ public:
 private:
     std::shared_ptr<HdUEState> state_;
     HdResourceRegistrySharedPtr registry_;
+    VtDictionary renderStats() const;
     bool selfHosted_ = false; // this delegate counts towards the UE runtime it started (husk)
 };
 PXR_NAMESPACE_CLOSE_SCOPE

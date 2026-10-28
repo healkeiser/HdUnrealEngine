@@ -26,9 +26,17 @@
 #include <limits>
 #include <algorithm>
 #include <sstream>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <future>
+#include <thread>
+#include <atomic>
 #include <windows.h>
 #if defined(HDUE_HOUDINI)
+#define HDUE_VIEWPORT_EXPORTS 1 // hdue_run_ui_tasks is defined below
 #include "../houdini/diagnostics.h"
+#include "hdue/viewport_api.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -42,6 +50,27 @@ struct HdUESelfHost {
     DWORD thread = 0;
     int delegates = 0;
     std::filesystem::path directory; // the host's working directory, which UE moves to its Binaries
+    // UE runs on its own thread: husk calls from one thread, but Live Render creates the delegate on one
+    // thread and executes it on others, and UE only accepts calls from the thread that started it.
+    std::thread worker;
+    std::mutex queueMutex;
+    std::condition_variable queueReady;
+    std::deque<std::function<void()>> queue;
+    bool stopping = false;
+    template<class F> auto run(F&& f) -> decltype(f()) {
+        if (!worker.joinable() || std::this_thread::get_id() == worker.get_id()) return f();
+        std::packaged_task<decltype(f())()> task(std::forward<F>(f));
+        auto result = task.get_future();
+        { std::lock_guard lock(queueMutex); queue.emplace_back([&task] { task(); }); }
+        queueReady.notify_one();
+        return result.get();
+    }
+    void stop() {
+        if (!worker.joinable()) return;
+        { std::lock_guard lock(queueMutex); stopping = true; }
+        queueReady.notify_one();
+        worker.join();
+    }
     void tick() const {
         if (!backend || GetCurrentThreadId() != thread) return;
         MSG message{};
@@ -53,6 +82,35 @@ struct HdUESelfHost {
     }
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
+// When a host (Houdini's UI thread) owns UE, delegates executing on other threads (Live Render) queue their
+// UE work here; the host runs it from hdue_run_ui_tasks after each tick.
+struct HdUEOwnerQueue {
+    struct Task { std::function<void()> run; int state = 0; std::exception_ptr error; }; // 0 queued, 1 running, 2 done
+    std::mutex mutex;
+    std::condition_variable done;
+    std::deque<std::shared_ptr<Task>> tasks;
+    std::atomic<DWORD> owner{0};
+};
+HdUEOwnerQueue& ownerQueue() { static HdUEOwnerQueue queue; return queue; }
+// Runs f on the thread that owns UE: hdUE's own UE thread, the host's thread, or inline.
+void ueRun(const std::function<void()>& f) {
+    auto& host = selfHost();
+    if (host.worker.joinable()) { host.run(f); return; }
+    auto& queue = ownerQueue();
+    const DWORD owner = queue.owner;
+    if (!owner || owner == GetCurrentThreadId()) { f(); return; }
+    auto task = std::make_shared<HdUEOwnerQueue::Task>();
+    task->run = f;
+    std::unique_lock lock(queue.mutex);
+    queue.tasks.push_back(task);
+    // A UI thread that waits for this thread (stopping a render) never drains: give up on work it has not started.
+    if (!queue.done.wait_for(lock, std::chrono::seconds(5), [&] { return task->state != 0; })) {
+        queue.tasks.erase(std::find(queue.tasks.begin(), queue.tasks.end(), task));
+        throw std::runtime_error("hdUE: the thread that owns UE did not run queued work within 5 s");
+    }
+    queue.done.wait(lock, [&] { return task->state == 2; });
+    if (task->error) std::rethrow_exception(task->error);
+}
 }
 // Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
 uint32_t HdUEAovId(const TfToken& name) {
@@ -93,17 +151,36 @@ std::string runtimeConfig(const char* key) {
 void startSelfHost(const std::string& dll, const std::string& project) {
     auto& host = selfHost();
     if (project.empty()) throw std::runtime_error("hdUE cannot start UE without runtime_project in HDUE_RUNTIME_CONFIG");
-    const auto instance = GetModuleHandleW(nullptr);
-    WNDCLASSW cls{}; cls.hInstance = instance; cls.lpfnWndProc = selfHostWindow; cls.lpszClassName = L"HdUESelfHost";
-    RegisterClassW(&cls);
-    host.window = CreateWindowExW(0, cls.lpszClassName, L"hdUE", WS_OVERLAPPEDWINDOW, 0, 0, 640, 360, nullptr, nullptr, instance, nullptr);
-    if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
-    host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
-    HdueInitDesc init{}; init.struct_size = sizeof(init);
-    init.instance_handle = reinterpret_cast<uint64_t>(instance); init.window_handle = reinterpret_cast<uint64_t>(host.window);
-    init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
-    host.backend->initialize(init);
-    host.thread = GetCurrentThreadId();
+    std::promise<void> started;
+    auto ready = started.get_future();
+    host.stopping = false;
+    host.worker = std::thread([&host, dll, project, &started] {
+        try {
+            const auto instance = GetModuleHandleW(nullptr);
+            WNDCLASSW cls{}; cls.hInstance = instance; cls.lpfnWndProc = selfHostWindow; cls.lpszClassName = L"HdUESelfHost";
+            RegisterClassW(&cls);
+            host.window = CreateWindowExW(0, cls.lpszClassName, L"hdUE", WS_OVERLAPPEDWINDOW, 0, 0, 640, 360, nullptr, nullptr, instance, nullptr);
+            if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
+            host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
+            HdueInitDesc init{}; init.struct_size = sizeof(init);
+            init.instance_handle = reinterpret_cast<uint64_t>(instance); init.window_handle = reinterpret_cast<uint64_t>(host.window);
+            init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
+            host.thread = GetCurrentThreadId();
+            host.backend->initialize(init);
+            started.set_value();
+        } catch (...) { host.backend.reset(); started.set_exception(std::current_exception()); return; }
+        for (;;) {
+            std::function<void()> task;
+            {
+                std::unique_lock lock(host.queueMutex);
+                host.queueReady.wait(lock, [&host] { return host.stopping || !host.queue.empty(); });
+                if (host.queue.empty()) return;
+                task = std::move(host.queue.front()); host.queue.pop_front();
+            }
+            task();
+        }
+    });
+    try { ready.get(); } catch (...) { host.worker.join(); throw; }
 }
 }
 HdRprim* HdUECreateMesh(const SdfPath&);
@@ -555,11 +632,13 @@ public:
     void _Execute(const HdRenderPassStateSharedPtr& pass, const TfTokenVector& tags) override {
         // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
         // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
-        const auto& host = selfHost();
-        if (!host.backend || GetCurrentThreadId() != host.thread) { executeOnce(pass, tags); return; }
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
-        do executeOnce(pass, tags);
-        while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
+        auto& host = selfHost();
+        if (!host.backend) { ueRun([&] { executeOnce(pass, tags); }); return; }
+        host.run([&] {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+            do executeOnce(pass, tags);
+            while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
+        });
     }
     void executeOnce(const HdRenderPassStateSharedPtr& pass, const TfTokenVector&) {
         try {
@@ -899,27 +978,29 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
     state_->backend = std::make_shared<hdue::Backend>(std::filesystem::u8path(dll));
     HdueStatus status{}; status.struct_size = sizeof(status);
-    state_->backend->require(state_->backend->api().get_status(&status), "get_status");
+    ueRun([&] { state_->backend->require(state_->backend->api().get_status(&status), "get_status"); });
     if (status.state == HDUE_STATE_COLD && !selfHost().backend) {
         selfHost().directory = hostDirectory;
         startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")));
         std::error_code ignored; std::filesystem::current_path(selfHost().directory, ignored);
         // UE reports ready only after its first ticks.
-        for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
-            selfHost().tick();
-            state_->backend->require(state_->backend->api().get_status(&status), "get_status");
-            if (status.state == HDUE_STATE_FAILED) break;
-            Sleep(10);
-        }
+        selfHost().run([&] {
+            for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready); ++i) {
+                selfHost().tick();
+                state_->backend->require(state_->backend->api().get_status(&status), "get_status");
+                if (status.state == HDUE_STATE_FAILED) break;
+                Sleep(10);
+            }
+        });
     }
     if (selfHost().backend) { ++selfHost().delegates; selfHosted_ = true; }
     if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
         throw std::runtime_error("hdUE requires a ready runtime; launch usdview with scripts/Launch-Usdview.ps1");
     if (state_->backend->material_api().get_renderer_info)
-        state_->backend->require(state_->backend->material_api().get_renderer_info(&state_->rendererInfo), "get_renderer_info");
+        ueRun([&] { state_->backend->require(state_->backend->material_api().get_renderer_info(&state_->rendererInfo), "get_renderer_info"); });
 #if defined(HDUE_HOUDINI)
     state_->createThread=GetCurrentThreadId();
-    HdUERegisterViewport(state_,this);
+    if (!ownerQueue().owner || ownerQueue().owner == state_->createThread) HdUERegisterViewport(state_,this);
 #endif
     for (const auto& desc : GetRenderSettingDescriptors()) {
         if (!state_->settings.count(desc.key)) state_->settings[desc.key]=desc.defaultValue;
@@ -931,17 +1012,30 @@ HdUERenderDelegate::~HdUERenderDelegate() {
     HdUEUnregisterViewport(this);
 #endif
     auto& host = selfHost();
-    if (!selfHosted_ || --host.delegates > 0) return;
-    // The session must end while UE still runs; UE allows one lifetime per process.
-    {
-        std::lock_guard lock(state_->mutex);
-        if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
+    if (!selfHosted_) {
+        try {
+            ueRun([&] {
+                std::lock_guard lock(state_->mutex);
+                if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
+            });
+        } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE: %s", e.what()); }
+        return;
     }
-    try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE shutdown: %s", e.what()); }
+    if (--host.delegates > 0) return;
+    // The session must end while UE still runs; UE allows one lifetime per process.
+    host.run([&] {
+        {
+            std::lock_guard lock(state_->mutex);
+            if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
+        }
+        try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE shutdown: %s", e.what()); }
+        if (host.window) DestroyWindow(host.window);
+        host.window = nullptr;
+    });
+    host.stop();
+    host.backend.reset();
     // husk may write its images after releasing the delegate.
     std::error_code ignored; std::filesystem::current_path(host.directory, ignored);
-    if (host.window) DestroyWindow(host.window);
-    host.window = nullptr; host.backend.reset();
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const {
 #if defined(HDUE_HOUDINI)
@@ -1072,6 +1166,11 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
 }
 VtDictionary HdUERenderDelegate::GetRenderStats() const {
+    VtDictionary stats;
+    try { ueRun([&] { stats = renderStats(); }); } catch (const std::exception& e) { stats["error"] = VtValue(std::string(e.what())); }
+    return stats;
+}
+VtDictionary HdUERenderDelegate::renderStats() const {
     std::lock_guard lock(state_->mutex);
     HdueResidencyStatus residency{}; residency.struct_size = sizeof(residency);
     const auto& residencyApi = state_->backend->residency_api();
@@ -1241,4 +1340,22 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
     return true;
 }
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#if defined(HDUE_HOUDINI)
+extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks() {
+    auto& queue = PXR_NS::ownerQueue();
+    queue.owner = GetCurrentThreadId();
+    for (;;) {
+        std::shared_ptr<PXR_NS::HdUEOwnerQueue::Task> task;
+        {
+            std::lock_guard lock(queue.mutex);
+            if (queue.tasks.empty()) return;
+            task = queue.tasks.front(); queue.tasks.pop_front(); task->state = 1;
+        }
+        try { task->run(); } catch (...) { task->error = std::current_exception(); }
+        { std::lock_guard lock(queue.mutex); task->state = 2; }
+        queue.done.notify_all();
+    }
+}
+#endif
 
