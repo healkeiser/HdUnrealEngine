@@ -130,25 +130,14 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_textures(
     Delegate->SetRenderSetting(TfToken("opTextures"), VtValue(files));
     return HDUE_OK;
 }
-extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(const HdueViewportOptions* options) {
-    if (!options || options->struct_size != sizeof(*options) || options->mode > 1 || !options->samples ||
-        options->samples > 65536 || options->lumen > 1 || options->auto_light > 1 || options->z_up > 1 ||
-        !std::isfinite(options->meters_per_unit) || options->meters_per_unit <= 0 ||
-        !std::isfinite(options->time_seconds))
-        return HDUE_INVALID_ARGUMENT;
+extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_up_axis(uint32_t z_up) {
+    if (z_up > 1) return HDUE_INVALID_ARGUMENT;
     const auto state = Viewport.lock();
     if (!state || !Delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     using namespace PXR_NS;
-    // The host is authoritative: like hdUE:<name>, not a bare host setting (husk's renderMode).
-    Delegate->SetRenderSetting(TfToken("renderMode"), VtValue(std::string(options->mode ? "pathtraced" : "realtime")),
-                               true);
-    Delegate->SetRenderSetting(TfToken("samplesPerPixel"), VtValue(int(options->samples)), true);
-    Delegate->SetRenderSetting(TfToken("lumenEnabled"), VtValue(bool(options->lumen)), true);
-    Delegate->SetRenderSetting(TfToken("autoViewerLight"), VtValue(bool(options->auto_light)), true);
-    Delegate->SetRenderSetting(TfToken("upAxis"), VtValue(std::string(options->z_up ? "Z" : "Y")), true);
-    Delegate->SetRenderSetting(TfToken("metersPerUnit"), VtValue(options->meters_per_unit), true);
-    Delegate->SetRenderSetting(TfToken("timeSeconds"), VtValue(options->time_seconds), true);
+    // Like Houdini's stageMetersPerUnit: an authored hdUE:upAxis overrides it.
+    Delegate->SetRenderSetting(TfToken("stageUpAxis"), VtValue(std::string(z_up ? "Z" : "Y")));
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(HdueViewportStatus* status) {

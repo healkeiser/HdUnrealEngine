@@ -3,7 +3,6 @@
 import ctypes as C
 import json
 import math
-import os
 import time
 import traceback
 
@@ -182,6 +181,17 @@ class Test:
 
         for _ in range(24):
             yield
+        # The native selection highlight needs the primId/instanceId AOVs, which the viewport renders only on request.
+        settings = viewer.currentNode()
+        ids = settings.parent().createNode("pythonscript", "hdUE_id_aovs")
+        ids.setInput(0, settings)
+        ids.parm("python").set(
+            "from pxr import Sdf\n"
+            "hou.pwd().editableStage().GetPrimAtPath('/Render/rendersettings').CreateAttribute("
+            "'hdUE:viewportIdAovs', Sdf.ValueTypeNames.Bool).Set(True)"
+        )
+        ids.setDisplayFlag(True)
+        ids.setCurrent(True, clear_all_selected=True)
         hdefereval.execute_deferred(viewer.curViewport().frameAll)
         for _ in range(8):
             yield
@@ -194,18 +204,15 @@ class Test:
             raise AssertionError("Solaris output is not the input stage space")
         import threading
 
-        from hdue_viewport import Options
-
         result = []
-        options = Options(C.sizeof(Options), 0, 64, 1, 1, 1, 0.01, 0)
         thread = threading.Thread(
-            target=lambda: result.append(self.api.set(C.byref(options)))
+            target=lambda: result.append(self.api.set_up_axis(1))
         )
         thread.start()
         thread.join()
         if result != [-3]:
             raise AssertionError(
-                "Viewport options did not reject a worker thread: "
+                "Viewport up axis did not reject a worker thread: "
                 + repr(result)
             )
         self.depth_contracts()
@@ -222,16 +229,13 @@ class Test:
         # Path Tracer accumulation of whole frames, so keep motion-blur sub-frames out of it.
         integration.set_render_setting("xn__hdUEmotionBlur", 0)
         integration.set_mode("pathtraced")
-        from pxr import UsdGeom
-
-        stage = viewer.stage()
-        self.api.options(
-            1,
-            64,
-            UsdGeom.GetStageMetersPerUnit(stage),
-            UsdGeom.GetStageUpAxis(stage) == "Z",
-            hou.frame() / hou.fps(),
-        )
+        # Houdini passes the render settings prim's hdUE:renderMode to the delegate on its next update.
+        for _ in range(200):
+            if self.api.status()["mode"] == 1:
+                break
+            yield
+        else:
+            raise AssertionError("hdUE:renderMode did not reach the viewport")
         if self.api.status()["frame"]["frame_id"]:
             raise AssertionError(
                 "The previous Lumen image was exposed as a pending Path Tracer result"
@@ -521,8 +525,4 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
 
 def start(host):
     global _test
-    # The native selection highlight needs the primId/instanceId AOVs, which the viewport renders only on request.
-    # Set before the delegate's first draw, which reads it once.
-    os.environ["HDUE_VIEWPORT_ID_AOVS"] = "1"
-    hou.putenv("HDUE_VIEWPORT_ID_AOVS", "1")
     _test = Test(host)

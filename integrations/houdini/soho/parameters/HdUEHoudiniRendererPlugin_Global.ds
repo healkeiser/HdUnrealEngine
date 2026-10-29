@@ -7,6 +7,7 @@
 
 #include "$HFS/houdini/soho/parameters/CommonMacros.ds"
 
+/// A setting's USD control menu, with the operations of the setting's usdvaluetype (as Karma's).
 #define HDUE_CONTROL(NAME, LABEL) \
     parm { \
         name    NAME \
@@ -15,7 +16,8 @@
         default { "none" } \
         menujoin { \
             [ "import loputils" ] \
-            [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
+            [ "value = kwargs['node'].parm(hou.text.encode(hou.text.decode(kwargs['parm'].name())[:-len('_control')]))" ] \
+            [ "return loputils.createEditPropertiesControlMenu(kwargs, value.parmTemplate().tags().get('usdvaluetype', 'int') if value else 'int')" ] \
             language python \
         } \
         help    "How this node edits the setting: Set or Create authors the value, Set If Exists changes it only where it is authored, Block removes it, Do Nothing keeps the input's." \
@@ -31,7 +33,8 @@
         default { "none" } \
         menujoin { \
             [ "import loputils" ] \
-            [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
+            [ "value = kwargs['node'].parm(hou.text.encode(hou.text.decode(kwargs['parm'].name())[:-len('_control')]))" ] \
+            [ "return loputils.createEditPropertiesControlMenu(kwargs, value.parmTemplate().tags().get('usdvaluetype', 'int') if value else 'int')" ] \
             language python \
         } \
         help    "How this node edits the setting: Set or Create authors the value, Set If Exists changes it only where it is authored, Block removes it, Do Nothing keeps the input's." \
@@ -65,7 +68,7 @@
                 help    "Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. Path Tracer accumulates UE's reference path tracer."
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "uiscope" "viewport" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUErenderMode_control_ucb == block } { xn__hdUErenderMode_control_ucb == none })"
             }
             HDUE_CONTROL_HIDE("xn__hdUEwarmupFrames_control_3fb", "Warmup Frames", "{ xn__hdUErenderMode_tya == pathtraced }")
@@ -108,7 +111,7 @@
                 menu { "off" "Off" "oidn" "Open Image Denoise" }
                 help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. AOVs and Lumen are unaffected."
                 parmtag { "spare_category" "Rendering" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEdenoiser_control_l8a == block } { xn__hdUEdenoiser_control_l8a == none })"
                 hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
             }
@@ -123,7 +126,7 @@
                 help    "Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected."
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "uiscope" "viewport" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEdebugView_control_79a == block } { xn__hdUEdebugView_control_79a == none })"
                 hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
             }
@@ -330,8 +333,41 @@
                 menu { "Y" "Y" "Z" "Z" }
                 help    "Overrides the stage's upAxis metadata."
                 parmtag { "spare_category" "Geometry" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEupAxis_control_c5a == block } { xn__hdUEupAxis_control_c5a == none })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Materials"
+            label "Materials"
+            grouptag { "group_default" "0" }
+
+            HDUE_CONTROL("xn__hdUEmaterialxLibrary_control_mmb", "Cooked MaterialX Library")
+            parm {
+                name    "xn__hdUEmaterialxLibrary_l8a"
+                label   "Cooked MaterialX Library"
+                type    file
+                size    1
+                default { "" }
+                help    "library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: the runtime profile's materialx_library. Houdini's viewport prepares the bound MaterialX materials from it; husk renders the Preview Surface fallback and warns."
+                parmtag { "spare_category" "Materials" }
+                parmtag { "filechooser_pattern" "*.json" }
+                parmtag { "usdvaluetype" "string" }
+                disablewhen R"({ xn__hdUEmaterialxLibrary_control_mmb == block } { xn__hdUEmaterialxLibrary_control_mmb == none })"
+            }
+            HDUE_CONTROL("xn__hdUEsubstrateLibrary_control_mmb", "Prepared Substrate Library")
+            parm {
+                name    "xn__hdUEsubstrateLibrary_l8a"
+                label   "Prepared Substrate Library"
+                type    file
+                size    1
+                default { "" }
+                help    "library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: the runtime profile's substrate_library. Houdini's viewport prepares Substrate Builder materials from it; husk renders the Preview Surface fallback and warns."
+                parmtag { "spare_category" "Materials" }
+                parmtag { "filechooser_pattern" "*.json" }
+                parmtag { "usdvaluetype" "string" }
+                disablewhen R"({ xn__hdUEsubstrateLibrary_control_mmb == block } { xn__hdUEsubstrateLibrary_control_mmb == none })"
             }
         }
     }
@@ -419,7 +455,7 @@
                 menu { "EDynamicGlobalIlluminationMethod::None" "None" "EDynamicGlobalIlluminationMethod::Lumen" "Lumen" "EDynamicGlobalIlluminationMethod::ScreenSpace" "Screen Space (Deprecated)" "EDynamicGlobalIlluminationMethod::Plugin" "Plugin" }
                 help    "Chooses the Dynamic Global Illumination method. Not compatible with Forward Shading. Overrides hdUE:lumenEnabled."
                 parmtag { "spare_category" "Global Illumination" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessDynamicGlobalIlluminationMethod_control_ytcl == block } { xn__hdUEpostProcessDynamicGlobalIlluminationMethod_control_ytcl == none })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessIndirectLightingColor_control_odcl", "Indirect Lighting Color")
@@ -461,7 +497,7 @@
                     menu { "ELumenRayLightingModeOverride::Default" "Project Default" "ELumenRayLightingModeOverride::SurfaceCache" "Surface Cache" "ELumenRayLightingModeOverride::HitLightingForReflections" "Hit Lighting for Reflections" "ELumenRayLightingModeOverride::HitLighting" "Hit Lighting" }
                     help    "Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality."
                     parmtag { "spare_category" "Global Illumination|Lumen Global Illumination" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "usdvaluetype" "token" }
                     disablewhen R"({ xn__hdUEpostProcessLumenRayLightingMode_control_1bcl == block } { xn__hdUEpostProcessLumenRayLightingMode_control_1bcl == none })"
                 }
                 HDUE_CONTROL("xn__hdUEpostProcessLumenSceneLightingQuality_control_6jcl", "Lumen Scene Lighting Quality")
@@ -662,7 +698,7 @@
                 menu { "EReflectionMethod::None" "None" "EReflectionMethod::Lumen" "Lumen" "EReflectionMethod::ScreenSpace" "Screen Space" }
                 help    "Chooses the Reflection method. Not compatible with Forward Shading. Overrides hdUE:lumenEnabled."
                 parmtag { "spare_category" "Reflections" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessReflectionMethod_control_j4bl == block } { xn__hdUEpostProcessReflectionMethod_control_j4bl == none })"
             }
 
@@ -1174,7 +1210,7 @@
                     menu { "ETranslucencyType::Raster" "Raster" "ETranslucencyType::RayTraced" "Ray Traced" }
                     help    "Sets the translucency type"
                     parmtag { "spare_category" "Rendering Features|Translucency" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "usdvaluetype" "token" }
                     disablewhen R"({ xn__hdUEpostProcessTranslucencyType_control_j4bl == block } { xn__hdUEpostProcessTranslucencyType_control_j4bl == none })"
                 }
                 HDUE_CONTROL("xn__hdUEpostProcessRayTracingTranslucencyMaxRoughness_control_uycl", "Max Roughness")
@@ -1252,7 +1288,7 @@
                     menu { "EReflectedAndRefractedRayTracedShadows::Disabled" "Disabled" "EReflectedAndRefractedRayTracedShadows::Hard_shadows" "Hard Shadows" "EReflectedAndRefractedRayTracedShadows::Area_shadows" "Area Shadows" }
                     help    "Sets the translucency shadows type."
                     parmtag { "spare_category" "Rendering Features|Translucency" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "usdvaluetype" "token" }
                     disablewhen R"({ xn__hdUEpostProcessRayTracingTranslucencyShadows_control_pqcl == block } { xn__hdUEpostProcessRayTracingTranslucencyShadows_control_pqcl == none })"
                 }
                 HDUE_CONTROL("xn__hdUEpostProcessRayTracingTranslucencyRefraction_control_lvcl", "Refraction")
@@ -1630,7 +1666,7 @@
                 menu { "BM_SOG" "Standard" "BM_FFT" "Convolution" }
                 help    "Preferred bloom algorithm. A different method may be used if the preferred method is not available on the target platform, e.g. due to performance limits."
                 parmtag { "spare_category" "Lens|Bloom" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessBloomMethod_control_ewbl == block } { xn__hdUEpostProcessBloomMethod_control_ewbl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessBloomIntensity_control_90bl", "Intensity")
@@ -1973,7 +2009,7 @@
                 menu { "AEM_Histogram" "Auto Exposure Histogram" "AEM_Basic" "Auto Exposure Basic" "AEM_Manual" "Manual" }
                 help    "Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure."
                 parmtag { "spare_category" "Lens|Exposure" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessAutoExposureMethod_control_s7bl == block } { xn__hdUEpostProcessAutoExposureMethod_control_s7bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessAutoExposureBias_control_j4bl", "Exposure Compensation ")
@@ -2149,7 +2185,7 @@
                     menu { "TEMP_WhiteBalance" "White Balance" "TEMP_ColorTemperature" "Color Temperature" }
                     help    "Selects the type of temperature calculation. White Balance uses the Temperature value to control the virtual camera's White Balance. This is the default selection. Color Temperature uses the Temperature value to adjust the color temperature of the scene, which is the inverse of the White Balance operation."
                     parmtag { "spare_category" "Color Grading|Temperature" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "usdvaluetype" "token" }
                     disablewhen R"({ xn__hdUEpostProcessTemperatureType_control_w2bl == block } { xn__hdUEpostProcessTemperatureType_control_w2bl == none } { xn__hdUEtonemapper_tya == 0 })"
                 }
                 HDUE_CONTROL("xn__hdUEpostProcessWhiteTemp_control_4sbl", "Temp")
@@ -2595,7 +2631,7 @@
                 menu { "ETonemappingMethod::Filmic" "Filmic" "ETonemappingMethod::StandardACES" "Standard ACES" }
                 help    "Controls the method of tonemapping."
                 parmtag { "spare_category" "Film" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessTonemappingMethod_control_55bl == block } { xn__hdUEpostProcessTonemappingMethod_control_55bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessFilmSlope_control_4sbl", "Slope")
@@ -2754,7 +2790,7 @@
                 menu { "ELocalExposureMethod::Bilateral" "Bilateral" "ELocalExposureMethod::Fusion" "Fusion (Experimental)" }
                 help    "Local Exposure algorithm"
                 parmtag { "spare_category" "Lens|Local Exposure" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessLocalExposureMethod_control_f9bl == block } { xn__hdUEpostProcessLocalExposureMethod_control_f9bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessLocalExposureHighlightContrastScale_control_h0cl", "Highlight Contrast")
@@ -3009,7 +3045,7 @@
                 menu { "EVignetteType::CosineFourthLaw" "Cosine Fourth Law (Default)" "EVignetteType::Texture" "Texture" "EVignetteType::Oval" "Oval" }
                 help    "The shape type of the vignette"
                 parmtag { "spare_category" "Lens|Image Effects" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__hdUEpostProcessVignetteType_control_0xbl == block } { xn__hdUEpostProcessVignetteType_control_0xbl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessVignetteCenter_control_90bl", "Vignette Center")

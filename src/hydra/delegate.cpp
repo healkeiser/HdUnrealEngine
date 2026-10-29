@@ -7,6 +7,7 @@
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/camera.h"
+#include "pxr/imaging/cameraUtil/framing.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -20,6 +21,7 @@
 #include "pxr/base/work/loops.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/js/json.h"
+#include "pxr/usd/sdf/layer.h"
 #include <cmath>
 #include <chrono>
 #include <cstdarg>
@@ -87,7 +89,7 @@ struct HdUESelfHost {
     HWND window = nullptr;
     DWORD thread = 0;
     std::atomic<int> delegates{0}, paused{0};
-    // Houdini's UI (HDUE_HOUDINI_UI, set by hdue_houdini): UE ticks continuously on this thread while a delegate
+    // Houdini's UI (houdiniUi): UE ticks continuously on this thread while a delegate
     // exists, Execute only submits and polls, and UE outlives individual viewports until hdue_shutdown_ue.
     bool continuous = false;
     // Houdini's UI boots UE on this thread without waiting (as Karma loads); a failed boot is reported here.
@@ -159,6 +161,11 @@ struct HdUESelfHost {
 HdUESelfHost& selfHost() {
     static HdUESelfHost host;
     return host;
+}
+// husk prints stderr, not Tf diagnostics: what a batch render should know goes there.
+void batchWarning(const std::string& message) {
+    std::fprintf(stderr, "hdUE warning: %s\n", message.c_str());
+    std::fflush(stderr);
 }
 // Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
 // also the exit handler of every process that started UE. std::atexit in this DLL runs at its detach, after ExitProcess
@@ -276,8 +283,9 @@ std::string runtimeConfig(const char* key) {
     const auto resolved = (std::filesystem::absolute(file_path).parent_path() / value).lexically_normal().u8string();
     return std::string(resolved.begin(), resolved.end());
 }
-// Houdini's interactive UI (not husk or hython), from the process executable: a .hip opened at startup creates the
-// viewport's delegate before hdue_houdini can set HDUE_HOUDINI_UI.
+// Houdini's interactive UI (not husk or hython), from the process executable. UE starts with the first delegate, and
+// Hydra says nothing usable by then: the viewport's delegate is created with no settings (houdini:viewport follows),
+// and both the viewport and husk send houdini:renderer = husk.
 bool houdiniUi() {
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, path, MAX_PATH);
@@ -298,7 +306,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
     auto started = std::make_shared<std::promise<void>>();
     auto ready = started->get_future();
     host.stopping = false;
-    host.continuous = TfGetenvBool("HDUE_HOUDINI_UI", false) || houdiniUi();
+    host.continuous = houdiniUi();
     host.worker = std::thread([&host, dll, project, started] {
         try {
             const auto instance = GetModuleHandleW(nullptr);
@@ -552,7 +560,17 @@ std::string textureFile(HdUEState& state, const std::string& file, bool sceneLin
     if (!HdUEHostTexture(file)) return file;
     const auto files = state.setting<VtDictionary>("opTextures", {});
     const auto it = files.find(file);
-    if (it == files.end() || !it->second.IsHolding<std::string>()) return {};
+    if (it == files.end() || !it->second.IsHolding<std::string>()) {
+        // Only Houdini's UI evaluates op: paths (its hdUE host exports the images): husk has no node to cook.
+        static std::mutex warnedMutex;
+        static std::set<std::string> warned;
+        std::lock_guard lock(warnedMutex);
+        if (!selfHost().continuous && warned.insert(file).second)
+            batchWarning(
+                "renders " + file +
+                " untextured: only Houdini's viewport evaluates op: paths. Save the image to a file for husk.");
+        return {};
+    }
     return sceneLinear ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>())
                        : it->second.UncheckedGet<std::string>();
 }
@@ -1416,6 +1434,42 @@ public:
                    lens == o.lens && sizes == o.sizes;
         }
     };
+    // Framing (crops, tiles, overscan, non-square pixels): UE fills the whole render buffer, so the projection maps the
+    // data window onto it. With Hydra framing, GetProjectionMatrix maps the data window to NDC; the data window may be
+    // a part of the buffer (CameraUtilFraming), so it is remapped. husk sets no framing: it passes the data window as
+    // the viewport (x, y from the bottom, in pixels of the resolution) with the buffer at its size, the resolution,
+    // pixel aspect and conform policy as settings, and conforms the camera to the data window rather than the image.
+    GfMatrix4d framedProjection(const HdRenderPassState& state, const HdCamera& camera,
+                                const std::vector<GfVec2i>& sizes) const {
+        auto& s = *state_;
+        const auto resolution = s.setting<GfVec2i>("resolution", GfVec2i(0));
+        if (!state.GetFraming().IsValid() && resolution[0] > 0 && resolution[1] > 0 &&
+            s.setting<std::string>("houdini:renderer", "") == "husk") {
+            const auto vp = state.GetViewport();
+            const CameraUtilFraming framing(
+                GfRange2f(GfVec2f(0), GfVec2f(resolution)),
+                GfRect2i(GfVec2i(int(vp[0]), resolution[1] - int(vp[1]) - int(vp[3])), int(vp[2]), int(vp[3])),
+                s.setting<float>("pixelAspectRatio", 1.f));
+            const auto policy = s.setting<std::string>("aspectRatioConformPolicy", "expandAperture");
+            return framing.ApplyToProjectionMatrix(camera.ComputeProjectionMatrix(),
+                                                   policy == "cropAperture"             ? CameraUtilCrop
+                                                   : policy == "adjustApertureWidth"    ? CameraUtilMatchVertically
+                                                   : policy == "adjustApertureHeight"   ? CameraUtilMatchHorizontally
+                                                   : policy == "adjustPixelAspectRatio" ? CameraUtilDontConform
+                                                                                        : CameraUtilFit);
+        }
+        auto projection = state.GetProjectionMatrix();
+        const auto& framing = state.GetFraming();
+        const auto size = sizes.empty() ? GfVec2i(0) : sizes[0];
+        if (!framing.IsValid() || size[0] <= 0 || size[1] <= 0) return projection;
+        const auto& w = framing.dataWindow;  // pixels of the buffer, y down
+        GfMatrix4d remap(1);
+        remap[0][0] = double(w.GetWidth()) / size[0];
+        remap[1][1] = double(w.GetHeight()) / size[1];
+        remap[3][0] = double(2 * w.GetMinX() + w.GetWidth() - size[0]) / size[0];
+        remap[3][1] = double(size[1] - 2 * w.GetMinY() - w.GetHeight()) / size[1];
+        return projection * remap;
+    }
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
         const auto* camera = state->GetCamera();
         PassSnapshot snapshot{state->GetAovBindings(), {}, state->GetWorldToViewMatrix(), state->GetProjectionMatrix()};
@@ -1436,6 +1490,7 @@ public:
             snapshot.buffers.push_back(b);
             snapshot.sizes.emplace_back(b ? int(b->GetWidth()) : 0, b ? int(b->GetHeight()) : 0);
         }
+        if (camera) snapshot.projection = framedProjection(*state, *camera, snapshot.sizes);
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
         // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
@@ -1620,8 +1675,8 @@ public:
                 if (name == HdAovTokens->cameraDepth) cameraDepth = dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 // Houdini's viewport binds primId/instanceId for its selection highlight. Rendering them swaps every
                 // material twice per converged view (hundreds of ms each on large scenes), so the viewport skips them
-                // unless HDUE_VIEWPORT_ID_AOVS=1; husk renders what its render vars ask for.
-                static const bool viewportIds = TfGetenvBool("HDUE_VIEWPORT_ID_AOVS", false);
+                // unless hdUE:viewportIdAovs is on; husk renders what its render vars ask for.
+                const bool viewportIds = s.setting<bool>("viewportIdAovs", false);
                 const auto id = HdUEAovId(name);
                 const bool skipped =
                     selfHost().continuous && !viewportIds && (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID);
@@ -1929,7 +1984,7 @@ public:
                     request.generation = std::max(s.generation, s.aovGeneration) + 1;
                     request.mode = s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED
                                                                                                     : HDUE_REALTIME;
-                    request.samples_per_pixel = uint32_t(std::max(1, s.setting<int>("samplesPerPixel", 64)));
+                    request.samples_per_pixel = uint32_t(s.samplesPerPixel());
                     request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 16)));
                     request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
                     request.time_seconds = s.setting<double>("timeSeconds", 0);
@@ -1942,8 +1997,10 @@ public:
                         request.target[c] = target[c];
                         request.up[c] = up[c];
                     }
-                    request.horizontal_fov_degrees =
-                        float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846);
+                    // The backend takes the projection from projection_scale; the field of view only feeds its range
+                    // check and texture streaming, so a narrow crop or tile is not rejected as under 1 degree.
+                    request.horizontal_fov_degrees = std::clamp(
+                        float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846), 1.f, 170.f);
                     if (HdUETraceScene())
                         TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
                                   pass->camera ? pass->cameraId.GetText() : "none", eye[0], eye[1], eye[2], target[0],
@@ -2119,6 +2176,9 @@ public:
             // the camera has been still for 1 s, so navigation never pays for them.
             const bool still =
                 !selfHost().continuous || Clock::now() - lastRequestAt_ > std::chrono::milliseconds(1000);
+            // While Houdini tumbles, scrubs or plays, the beauty alone counts: the AOVs render once it is back to
+            // normal (a houdini:interactive change is a new request, which restarts them).
+            if (!needsRequest && converged_ && !aovInFlight_ && s.interactive()) aovsDone_ = true;
             if (!needsRequest && converged_ && !aovsDone_ && !aovInFlight_ && still) {
                 if (aovSlot_ >= aovs_.size())
                     aovsDone_ = true;
@@ -2179,6 +2239,11 @@ public:
 };
 }  // namespace
 
+// hdUE:<name>, or hdue:<name> as lights and prims spell the namespace (USD namespaces are case-sensitive).
+static bool HdUENamespaced(const TfToken& key) {
+    const auto& name = key.GetString();
+    return name.size() > 5 && (name.starts_with("hdUE:") || name.starts_with("hdue:"));
+}
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
@@ -2186,15 +2251,32 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
-    for (const auto& [key, value] : settings)
-        if (key.GetString().starts_with("hdUE:")) {
+    for (const auto& [key, value] : settings) {
+        if (HdUETraceSettings())
+            std::fprintf(stderr, "hdUE initial setting %s = %s\n", key.GetText(), TfStringify(value).c_str());
+        if (HdUENamespaced(key)) {
             state_->settings[TfToken(key.GetString().substr(5))] = value;
             state_->namespaced.insert(TfToken(key.GetString().substr(5)));
         }
+    }
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
     if (stageUnits != settings.end() && stageUnits->second.IsHolding<double>())
         state_->settings[TfToken("metersPerUnit")] = stageUnits->second;
+    // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
+    // (already open in husk). Houdini's viewport sends stageUpAxis from the hdUE host. hdUE:upAxis overrides both.
+    if (const auto file = settings.find(TfToken("usdFilename"));
+        file != settings.end() && file->second.IsHolding<std::string>() && !state_->namespaced.count(TfToken("upAxis")))
+        if (const auto path =
+                (hostDirectory / std::filesystem::u8path(file->second.UncheckedGet<std::string>())).u8string();
+            const auto layer = SdfLayer::FindOrOpen(std::string(path.begin(), path.end()))) {
+            VtValue axis;
+            if (layer->HasField(SdfPath::AbsoluteRootPath(), TfToken("upAxis"), &axis) && axis.IsHolding<TfToken>())
+                state_->settings[TfToken("upAxis")] = VtValue(axis.UncheckedGet<TfToken>().GetString());
+            if (HdUETraceSettings())
+                std::fprintf(stderr, "hdUE stage up axis of %s: %s\n", layer->GetIdentifier().c_str(),
+                             TfStringify(axis).c_str());
+        }
     auto dll = state_->setting<std::string>("backendLibrary", TfGetenv("HDUE_BACKEND_DLL"));
     if (dll.empty()) dll = runtimeConfig("backend_dll");
     if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
@@ -2222,7 +2304,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             // This process owns UE. Houdini's UI does not wait for the boot: Execute's work queues behind it, and
             // the viewport shows Hydra's progress until frames arrive.
             host.directory = hostDirectory;
-            const bool wait = !(TfGetenvBool("HDUE_HOUDINI_UI", false) || houdiniUi());
+            const bool wait = !houdiniUi();
             startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")), wait);
             std::error_code ignored;
             std::filesystem::current_path(host.directory, ignored);
@@ -2250,6 +2332,14 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
         if (!state_->settings.count(desc.key)) state_->settings[desc.key] = desc.defaultValue;
         HdRenderDelegate::SetRenderSetting(desc.key, state_->settings[desc.key]);
     }
+    // Cooked MaterialX and prepared Substrate libraries are applied by the hdUE host in Houdini's UI (a Python stage
+    // walk); batch renders without that host (husk) keep the Preview Surface fallback.
+    if (selfHosted_ && !host.continuous)
+        for (const char* library : {"materialxLibrary", "substrateLibrary"})
+            if (!state_->setting<std::string>(library, "").empty())
+                batchWarning(std::string("hdUE:") + library +
+                             " is set, but husk renders MaterialX and Substrate Builder materials with their Preview "
+                             "Surface fallback: cooked libraries apply in Houdini's viewport only.");
 }
 HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)
@@ -2463,7 +2553,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str());
         std::fflush(stderr);
     }
-    if (key.GetString().starts_with("hdUE:")) {
+    if (HdUENamespaced(key)) {
         const TfToken bare(key.GetString().substr(5));
         {
             std::lock_guard lock(state_->settingsMutex);
@@ -2495,6 +2585,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         SetRenderSetting(TfToken("metersPerUnit"), value);
         return;
     }
+    if (key == TfToken("stageUpAxis")) {  // the hdUE host (Houdini's viewport); hdUE:upAxis overrides it
+        SetRenderSetting(TfToken("upAxis"), value);
+        return;
+    }
     // Houdini repeats settings on redraws: an unchanged value returns without the state lock (held while an upload is
     // prepared). The state lock is taken first, as everywhere else (setting() takes settingsMutex inside it).
     {
@@ -2512,7 +2606,11 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     const double previousUnits = state_->setting<double>("metersPerUnit", 0.01);
     const std::string previousAxis = state_->setting<std::string>("upAxis", "Y");
     const bool previousNanite = state_->setting<bool>("requireNanite", false);
+    const bool previousInteractive = state_->interactive();
     state_->settings[key] = value;
+    // Into or out of tumbling/scrubbing/playing: capped samples and skipped AOVs (or the full image) need a new
+    // request.
+    if (state_->interactive() != previousInteractive) ++state_->requestSettingsRevision;
     const auto currentDictionary =
         value.IsHolding<VtDictionary>() ? value.UncheckedGet<VtDictionary>() : VtDictionary();
     if (key == TfToken("nativeMaterialParameters") || key == TfToken("nativeMaterialAssets")) {
@@ -2548,7 +2646,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
         key == TfToken("instantaneousShutter") || key == TfToken("tonemapper") ||
         key == TfToken("postProcessMaterials") || key == TfToken("denoiser") || key == TfToken("debugView") ||
-        TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:"))
+        key == TfToken("viewportIdAovs") || TfStringStartsWith(key.GetString(), "postProcess:") ||
+        TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {
         const double frame = state_->setting<double>("houdini:frame", 1.);
@@ -2719,8 +2818,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"percentDone",
          VtValue(state.lastFrame.converged ? 100.f
                  : state.lastFrame.frame_id && state.setting<std::string>("renderMode", "realtime") == "pathtraced"
-                     ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) /
-                                          float(std::max(1, state.setting<int>("samplesPerPixel", 64))))
+                     ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) / float(state.samplesPerPixel()))
                      : 0.f)},
         {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
         {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)},

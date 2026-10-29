@@ -266,6 +266,17 @@ struct HdUEState : HdRenderParam {
             return (zUp ? GfVec3d(p[0], -p[1], p[2]) : GfVec3d(-p[2], p[0], p[1])) * (direction ? 1 : scale);
         }
     };
+    // houdini:interactive: Houdini's viewport is tumbling, scrubbing or playing. Not "normal" nor "flipbooking" (a
+    // flipbook, or a screenshot, waits for full quality).
+    bool interactive() const {
+        const auto purpose = setting<std::string>("houdini:interactive", "normal");
+        return purpose == "tumbling" || purpose == "scrubbing" || purpose == "playing";
+    }
+    // Path Tracer samples, capped while interactive so tumbling and playback keep up (all samples once still).
+    int samplesPerPixel() const {
+        const int samples = std::max(1, setting<int>("samplesPerPixel", 64));
+        return interactive() ? std::min(samples, 8) : samples;  // ponytail: fixed cap; a setting if users ask
+    }
     // hdUE:debugView, which replaces the realtime beauty only.
     std::string debugView() const {
         return setting<std::string>("renderMode", "realtime") == "realtime" ? setting<std::string>("debugView", "off")

@@ -55,20 +55,6 @@ class Status(C.Structure):
     )
 
 
-class Options(C.Structure):
-    _fields_ = [
-        (n, U32)
-        for n in (
-            "struct_size",
-            "mode",
-            "samples",
-            "lumen",
-            "auto_light",
-            "z_up",
-        )
-    ] + [("meters_per_unit", C.c_double), ("time_seconds", C.c_double)]
-
-
 class DepthApi(C.Structure):
     _fields_ = [
         ("struct_size", U32),
@@ -140,20 +126,16 @@ class Surfaces(C.Structure):
 
 class Viewport:
     def __init__(self, runtime, plugin):
-        if (
-            C.sizeof(Frame) != 72
-            or C.sizeof(Status) != 648
-            or C.sizeof(Options) != 40
-        ):
+        if C.sizeof(Frame) != 72 or C.sizeof(Status) != 648:
             raise RuntimeError("Invalid viewport ABI layout")
         self.runtime = runtime
         self.library = C.CDLL(str(Path(plugin).resolve()), winmode=0x1100)
         self.get = self.library.hdue_get_viewport_status
         self.get.argtypes = [C.POINTER(Status)]
         self.get.restype = Result
-        self.set = self.library.hdue_set_viewport_options
-        self.set.argtypes = [C.POINTER(Options)]
-        self.set.restype = Result
+        self.set_up_axis = self.library.hdue_set_viewport_up_axis
+        self.set_up_axis.argtypes = [U32]
+        self.set_up_axis.restype = Result
         self.set_materials = self.library.hdue_set_viewport_materials
         self.set_materials.argtypes = [C.POINTER(Materials)]
         self.set_materials.restype = Result
@@ -214,21 +196,12 @@ class Viewport:
         result["frame"] = {n: getattr(s.frame, n) for n, _ in Frame._fields_}
         return result
 
-    def options(self, mode, samples, meters_per_unit, z_up, time_seconds):
-        options = Options(
-            C.sizeof(Options),
-            mode,
-            samples,
-            1,
-            1,
-            z_up,
-            meters_per_unit,
-            time_seconds,
-        )
-        code = self.set(C.byref(options))
+    def up_axis(self, z_up):
+        """The viewed stage's up axis, which Houdini does not pass to the delegate. False until a viewport exists."""
+        code = self.set_up_axis(int(z_up))
         if code == 1:
             return False
-        self.runtime.check(code, "viewport options")
+        self.runtime.check(code, "viewport up axis")
         return True
 
     def pixels(self, status, require_converged=True):
