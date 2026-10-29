@@ -9,14 +9,19 @@ scripts/render_gallery.py --sponza <file> sublayers this over the downloaded sce
 
 def Xform "lights"
 {
+    # Fitted to Intel's own renders of this scene (samples/sponza/intel/main/reference, Render_Main_A and _C): the
+    # exports carry no light settings, and the sun direction in the glTF/FBX does not light the areas Intel's renders
+    # show lit. Sun direction from a sweep matched to the sunlit areas (azimuth 20 degrees from +Z towards +X,
+    # elevation 75); exposures and colours by a least-squares fit of Karma renders to Intel's. Intensities stay 1.
     def DistantLight "sun"
     {
         bool inputs:normalize = 1
-        float inputs:intensity = 1.5
-        color3f inputs:color = (1, 0.93, 0.82)
+        float inputs:intensity = 1
+        float inputs:exposure = 0.09
+        color3f inputs:color = (1, 0.961, 0.903)
         float inputs:angle = 0.53
-        float3 xformOp:rotateXYZ = (-74, 25, 0)
-        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+        matrix4d xformOp:transform = ( (0.939693, 0, -0.34202, 0), (-0.330366, 0.258819, -0.907673, 0), (0.088521, 0.965926, 0.24321, 0), (0, 0, 0, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
     }
 
     def DomeLight "sky"
@@ -25,8 +30,20 @@ def Xform "lights"
         # Karma's equivalent (its default) so both renderers are told the same thing.
         bool hdue:visibleBackground = 0
         bool inputs:karma:light:renderlightgeo = 0
-        float inputs:intensity = 0.5
-        color3f inputs:color = (0.55, 0.7, 1)
+        float inputs:intensity = 1
+        float inputs:exposure = -0.69
+        color3f inputs:color = (0.751, 0.811, 1)
+    }
+}
+
+over "root"
+{
+    over "PhysCamera001"
+    {
+        # 3ds Max's physical camera corrects vertical tilt (Intel's Render_Main_A has straight verticals): the camera
+        # is levelled and the lens shifted instead, which keeps the aim point centred.
+        float verticalApertureOffset = 4.972893
+        matrix4d xformOp:transform = ( (-0.18552, 0, 0.98264, 0), (0, 1, 0, 0), (-0.98264, 0, -0.18552, 0), (-880.743, 159.222, -85.8258, 1) )
     }
 }
 

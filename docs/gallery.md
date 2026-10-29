@@ -14,7 +14,7 @@ Charts: `uv run --with matplotlib python scripts/gallery_charts.py`.
 
 ## Cornell box: one feature per scene
 
-Every scene is the [CC0 Cornell box](../samples/cornell/) plus one small layer from [samples/cornell/variants](../samples/cornell/variants), rendered with husk at 512 x 512:
+Every scene is the [CC0 Cornell box](../samples/cornell/) plus one small layer from [samples/cornell/variants](../samples/cornell/variants), rendered with husk at 512 × 512:
 
 - **hdUE Lumen**: realtime mode, 16 warmup frames.
 - **hdUE Path Tracer**: 512 samples per pixel, up to 8 bounces.
@@ -76,7 +76,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 ## Sponza: a production-style scene
 
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 x 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
 - **hdUE Lumen**: realtime mode, 16 warmup frames.
 - **hdUE Path Tracer**: 256 samples per pixel, up to 8 bounces.
@@ -89,6 +89,6 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.3 s | 2.1 s | 24.7 s | 508.3 s | 80x / 12x | 0.79 / 0.86 |
+| Main view | 0.4 s | 1.9 s | 48.0 s | 600.2 s | 130x / 26x | 0.79 / 0.86 |
 
-![Main view: `/root/PhysCamera001` (Intel's Render_Main_A view), exposure +4.5 stops as authored.](images/gallery/sponza/PhysCamera001.png)
+![Main view: `/root/PhysCamera001`, levelled as in Intel's Render_Main_A, exposure +4.5 stops as authored; sun and sky fitted to Intel's renders.](images/gallery/sponza/PhysCamera001.png)

@@ -163,14 +163,35 @@ def dots(ax, t, data, keys, value):
 
 
 HEADER = 1.25  # inches above the plot: title, subtitle, legend
+FOOTER = 0.42  # inches below the axis labels: how the scenes were rendered
+
+
+def setup_lines():
+    """Resolution, samples and machine of the renders, as scripts/render_gallery.py records them."""
+    path = OUT / "setup.json"
+    if not path.exists():
+        return []
+    setup = json.loads(path.read_text(encoding="utf-8"))
+    names = {"cornell": "Cornell box", "sponza": "Sponza"}
+    scenes = " · ".join(
+        f"{names[k]}: {v['resolution']}, {v['samples']} spp (path tracers)"
+        for k, v in setup["sets"].items()
+    )
+    return [
+        scenes,
+        f"Up to 8 bounces · hdUE Lumen: 16 warmup frames · {setup['machine']}",
+    ]
 
 
 def figure(t, data, title, subtitle):
-    height = 0.42 * len(data) + HEADER + 0.5
+    height = 0.42 * len(data) + HEADER + 0.5 + FOOTER
     fig, ax = plt.subplots(figsize=(9, height), dpi=100)
     fig.patch.set_alpha(0)
     fig.subplots_adjust(
-        left=0.27, right=0.97, top=1 - HEADER / height, bottom=0.5 / height
+        left=0.27,
+        right=0.97,
+        top=1 - HEADER / height,
+        bottom=(0.5 + FOOTER) / height,
     )
     at = lambda inches: 1 - inches / height
     fig.text(
@@ -186,6 +207,15 @@ def figure(t, data, title, subtitle):
         0.01, at(0.42), subtitle, color=t["secondary"], fontsize=9.5, va="top"
     )
     fig.legend_top = at(0.68)
+    for n, line in enumerate(setup_lines()):
+        fig.text(
+            0.01,
+            (FOOTER - 0.14 - 0.17 * n) / height,
+            line,
+            color=t["secondary"],
+            fontsize=8.5,
+            va="baseline",
+        )
     style(ax, t)
     ax.set_yticks(range(len(data)), [label for label, _ in data])
     ax.set_ylim(len(data) - 0.5, -0.5)

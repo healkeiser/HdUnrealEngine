@@ -220,34 +220,35 @@ def display(image, tonemapped):
 
 # Layout of the comparison images, in pixels: a title bar, then the renders on a dark sheet with gutters, each with
 # a caption under it (renderer in its colour, then settings, time and brightness).
-MARGIN, GUTTER, TITLE, CAPTION = 28, 18, 78, 62
-# The charts' dark theme (scripts/gallery_charts.py: GitHub's dark page colours), its engine hues (hdUE blue, Karma
-# orange) and its marker per mode, so images and charts read as one set.
-hex_colour = lambda h: tuple(int(h[i : i + 2], 16) / 255 for i in (1, 3, 5))
-BACKGROUND, PANEL = hex_colour("#0d1117"), hex_colour("#161b22")
-TEXT, MUTED = hex_colour("#f0f6fc"), hex_colour("#9198a1")
-ENGINES = {"hdue": hex_colour("#3987e5"), "karma": hex_colour("#d95926")}
+# Comparison images are typeset like the charts (scripts/gallery_charts.py): matplotlib draws their text and markers
+# with the charts' font stack, sizes, weights and GitHub dark-theme colours. Both are shown at the README's width, so
+# sizes are the charts' (in units of their 648-wide SVG) scaled by the image's width.
+CHART_WIDTH = (
+    648  # the charts' SVG width in their own units (9 in at 72 per inch)
+)
+FONTS = ["Segoe UI", "DejaVu Sans"]
+BACKGROUND, PANEL = "#0d1117", "#161b22"
+TEXT, MUTED = "#f0f6fc", "#9198a1"
+ENGINES = {"hdue": "#3987e5", "karma": "#d95926"}
 SERIES = {  # renderer key: engine, marker (as in the charts)
     "lumen": ("hdue", "o"),
     "pathtraced": ("hdue", "D"),
     "xpu": ("karma", "^"),
     "karma": ("karma", "s"),
 }
-
-
-def font(bold=False):
-    """DejaVu Sans, matplotlib's font, which the charts use."""
-    import matplotlib
-
-    folder = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf"
-    return str(folder / ("DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"))
+MARKER_SIZE = {
+    "o": 8,
+    "D": 7.5,
+    "^": 9.5,
+    "s": 7.5,
+}  # chart points, optically equal areas
 
 
 def wrap(text, size, width):
-    """Greedy line breaks for DejaVu Sans at size px (about 0.55 em per character)."""
+    """Greedy line breaks for Segoe UI at size px (about 0.5 em per character)."""
     lines, line = [], ""
     for word in text.split():
-        if line and (len(line) + 1 + len(word)) * size * 0.55 > width:
+        if line and (len(line) + 1 + len(word)) * size * 0.5 > width:
             lines.append(line)
             line = word
         else:
@@ -255,67 +256,120 @@ def wrap(text, size, width):
     return [*lines, line] if line else lines
 
 
-def marker(sheet, x, y, shape, colour, size=16):
-    """The charts' legend marker, filled, centred on (x, y)."""
-    r = size / 2
-    yy, xx = np.mgrid[-r:r:1, -r:r:1] + 0.5
-    inside = {
-        "o": xx**2 + yy**2 <= r * r,
-        "D": abs(xx) + abs(yy) <= r,
-        "^": (yy >= -r + 1) & (abs(xx) <= (yy + r) * 0.58),
-        "s": (abs(xx) <= r * 0.85) & (abs(yy) <= r * 0.85),
-    }[shape]
-    top, left = int(y - r), int(x - r)
-    sheet[top : top + size, left : left + size][inside] = colour
-
-
 def panel_image(target, title, doc, panels):
     """panels: list of (image, renderer key, name, detail, tonemapped). Four square frames sit side by side; wide
     ones go in a 2 x 2 grid so they stay readable.
     """
+    import matplotlib
+
+    matplotlib.use("agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
     tiles = [display(image, tonemapped) for image, *_, tonemapped in panels]
     height, width = tiles[0].shape[:2]
     columns = 2 if len(tiles) == 4 and width > 1.4 * height else len(tiles)
     rows = -(-len(tiles) // columns)
-    sheet_width = 2 * MARGIN + columns * width + (columns - 1) * GUTTER
-    doc_lines = wrap(doc, 18, sheet_width - 2 * MARGIN)
-    header = TITLE + 24 * max(0, len(doc_lines) - 1)
-    sheet_height = (
-        header + rows * (height + CAPTION) + (rows - 1) * GUTTER + MARGIN
+    scale = columns * width / CHART_WIDTH  # chart pixels to image pixels
+    margin, gutter = round(10 * scale), round(8 * scale)
+    title_px, doc_px, name_px, detail_px = (
+        13 * scale,
+        9.5 * scale,
+        10 * scale,
+        9 * scale,
     )
-    sheet = np.empty((sheet_height, sheet_width, 3), np.float32)
-    sheet[:] = BACKGROUND
+    sheet_width = 2 * margin + columns * width + (columns - 1) * gutter
+    doc_lines = wrap(doc, doc_px, sheet_width - 2 * margin)
+    header = round(
+        margin + 1.35 * title_px + 1.45 * doc_px * len(doc_lines) + 0.4 * margin
+    )
+    caption = round(1.5 * name_px + 3 * detail_px + 0.6 * margin)
+    sheet_height = (
+        header + rows * (height + caption) + (rows - 1) * gutter + margin
+    )
+    colour = (
+        lambda h: np.array([int(h[i : i + 2], 16) for i in (1, 3, 5)]) / 255
+    )
+    sheet = np.empty((sheet_height, sheet_width, 3))
+    sheet[:] = colour(BACKGROUND)
     places = []
     for i, tile in enumerate(tiles):
-        x = MARGIN + (i % columns) * (width + GUTTER)
-        y = header + (i // columns) * (height + CAPTION + GUTTER)
-        engine, shape = SERIES[panels[i][1]]
-        sheet[y : y + height + CAPTION, x : x + width] = PANEL
+        x = margin + (i % columns) * (width + gutter)
+        y = header + (i // columns) * (height + caption + gutter)
+        sheet[y : y + height + caption, x : x + width] = colour(PANEL)
         sheet[y : y + height, x : x + width] = tile
-        sheet[y + height : y + height + 3, x : x + width] = ENGINES[engine]
-        marker(sheet, x + 22, y + height + 24, shape, ENGINES[engine])
+        accent = round(1.5 * scale)
+        sheet[y + height : y + height + accent, x : x + width] = colour(
+            ENGINES[SERIES[panels[i][1]][0]]
+        )
         places.append((x, y + height))
-    buf = oiio.ImageBuf(
-        oiio.ImageSpec(sheet_width, sheet_height, 3, oiio.FLOAT)
+    dpi = 100
+    points = lambda px: px * 72 / dpi
+    fig = plt.figure(figsize=(sheet_width / dpi, sheet_height / dpi), dpi=dpi)
+    fig.figimage((sheet * 255).astype(np.uint8), 0, 0, origin="upper")
+    at = lambda x, y: (
+        x / sheet_width,
+        1 - y / sheet_height,
+    )  # pixels from the top left to figure fractions
+    text = dict(family=FONTS, va="baseline")
+    fig.text(
+        *at(margin, margin + title_px),
+        title,
+        size=points(title_px),
+        weight="bold",
+        color=TEXT,
+        **text,
     )
-    buf.set_pixels(oiio.ROI(), sheet)
-    oiio.ImageBufAlgo.render_text(buf, MARGIN, 40, title, 26, font(True), TEXT)
     for n, line in enumerate(doc_lines):
-        oiio.ImageBufAlgo.render_text(
-            buf, MARGIN, 64 + 24 * n, line, 17, font(), MUTED
+        fig.text(
+            *at(margin, margin + 1.35 * title_px + 1.45 * doc_px * (n + 0.8)),
+            line,
+            size=points(doc_px),
+            color=MUTED,
+            **text,
         )
     for (x, y), (_, key, name, detail, _) in zip(places, panels, strict=True):
-        oiio.ImageBufAlgo.render_text(
-            buf, x + 38, y + 31, name, 18, font(True), TEXT
+        engine, shape = SERIES[key]
+        first = y + 0.6 * margin + name_px
+        fig.add_artist(
+            Line2D(
+                [at(x + 0.6 * margin + 0.5 * name_px, 0)[0]],
+                [at(0, first - 0.35 * name_px)[1]],
+                transform=fig.transFigure,
+                linestyle="none",
+                marker=shape,
+                markersize=points(MARKER_SIZE[shape] * scale),
+                markerfacecolor=ENGINES[engine],
+                markeredgecolor=PANEL,
+                markeredgewidth=points(1.5 * scale),
+            )
         )
-        oiio.ImageBufAlgo.render_text(
-            buf, x + 14, y + 53, detail, 15, font(), MUTED
+        fig.text(
+            *at(x + 0.6 * margin + 1.4 * name_px, first),
+            name,
+            size=points(name_px),
+            color=TEXT,
+            **text,
         )
-    buf.set_write_format(oiio.UINT8)
+        settings, brightness = detail
+        fig.text(
+            *at(x + 0.6 * margin, first + 3 * detail_px),
+            brightness,
+            size=points(detail_px),
+            color=MUTED,
+            **text,
+        )
+        fig.text(
+            *at(x + 0.6 * margin, first + 1.5 * detail_px),
+            settings,
+            size=points(detail_px),
+            color=MUTED,
+            **text,
+        )
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.stem}.tmp.png")
-    if not buf.write(str(temporary)):
-        raise RuntimeError(buf.geterror())
+    fig.savefig(temporary, dpi=dpi, facecolor=BACKGROUND)
+    plt.close(fig)
     try:
         os.replace(temporary, target)
     except PermissionError as error:
@@ -350,20 +404,24 @@ def duration(seconds):
     return "< 0.1 s" if seconds < 0.05 else f"{seconds:.1f} s"
 
 
-def detail(key, render, reference, samples, compared=True):
-    """Settings, time per frame and brightness against Karma CPU (the reference itself says so)."""
-    parts = [
-        "16 warmup frames" if key == "lumen" else f"{samples} spp",
-        duration(render["seconds"]),
-    ]
+def detail(key, render, reference, samples, resolution, compared=True):
+    """(settings and time per frame, brightness against Karma CPU): the caption's second and third lines."""
+    settings = "16 warmup frames" if key == "lumen" else f"{samples} spp"
     if key == "karma":
-        parts.append("reference")
+        brightness = "Brightness reference"
     elif compared and reference:
-        parts.append(f"{render['luminance'] / reference:.2f}× Karma CPU")
-    return "   ·   ".join(parts)
+        brightness = (
+            f"Brightness {render['luminance'] / reference:.2f}× Karma CPU"
+        )
+    else:
+        brightness = ""
+    return (
+        f"{resolution}  ·  {settings}  ·  {duration(render['seconds'])}",
+        brightness,
+    )
 
 
-def compose(which, name, entry, samples):
+def compose(which, name, entry, samples, resolution):
     out, images, _ = SETS[which]
     renders = entry["renders"]
     reference = renders.get("karma", {}).get("luminance")
@@ -378,7 +436,14 @@ def compose(which, name, entry, samples):
             pixels(out / f"{name}_{key}.exr"),
             key,
             names[key],
-            detail(key, renders[key], reference, samples, not tonemapped(key)),
+            detail(
+                key,
+                renders[key],
+                reference,
+                samples,
+                resolution,
+                not tonemapped(key),
+            ),
             tonemapped(key),
         )
         for key, _, _, _ in RENDERERS
@@ -398,7 +463,7 @@ def settings_of(layer):
         text.split("uniform int2 resolution = ")[1]
         .split("\n")[0]
         .strip("()")
-        .replace(", ", " x ")
+        .replace(", ", " × ")
     )
     return resolution, int(
         text.split("int hdUE:samplesPerPixel = ")[1].split("\n")[0]
@@ -475,7 +540,7 @@ def scenes(which, sponza_file, addons=()):
             metadata,
             [f"rel camera = </root/{camera}>"],
         )
-        yield camera, "Main view", f"`/root/{camera}` (Intel's Render_Main_A view), exposure +{exposure:g} stops as authored.", layer
+        yield camera, "Main view", f"`/root/{camera}`, levelled as in Intel's Render_Main_A, exposure +{exposure:g} stops as authored; sun and sky fitted to Intel's renders.", layer
 
 
 def main():
@@ -540,11 +605,11 @@ def main():
     results = (
         json.loads(results_path.read_text()) if results_path.exists() else {}
     )
-    samples = settings_of(
+    resolution, samples = settings_of(
         CORNELL / "cornell.usda"
         if args.set == "cornell"
         else SPONZA / "lighting.usda"
-    )[1]
+    )
     if not args.docs_only:
         wanted = [
             r for r in RENDERERS if not args.renderers or r[0] in args.renderers
@@ -599,11 +664,11 @@ def main():
                 print(name, key, f"{seconds:.1f}s", flush=True)
             results[name] = entry
             results_path.write_text(json.dumps(results, indent=2))
-            compose(args.set, name, entry, samples)
+            compose(args.set, name, entry, samples, resolution)
     else:
         for name, entry in results.items():
             if not args.only or name in args.only:
-                compose(args.set, name, entry, samples)
+                compose(args.set, name, entry, samples, resolution)
     write_docs(hardware())
 
 
@@ -628,7 +693,8 @@ def section(which, results, machine):
             "(Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials "
             "with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer "
             "image shows more noise than Karma at the same sample count. The scene has no lights, so "
-            "[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome."
+            "[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, "
+            "and levels the camera as Intel's render does."
         )
         addons = sorted(
             {a for entry in results.values() for a in entry.get("addons", [])}
@@ -708,6 +774,18 @@ def section(which, results, machine):
 
 
 def write_docs(machine):
+    # What the charts state about the renders (scripts/gallery_charts.py).
+    setup = {"machine": machine, "sets": {}}
+    for which in SETS:
+        resolution, samples = settings_of(
+            CORNELL / "cornell.usda"
+            if which == "cornell"
+            else SPONZA / "lighting.usda"
+        )
+        setup["sets"][which] = {"resolution": resolution, "samples": samples}
+    (OUT / "setup.json").write_text(
+        json.dumps(setup, indent=2), encoding="utf-8"
+    )
     sections = {}
     for which, (out, _, _) in SETS.items():
         path = out / "results.json"
