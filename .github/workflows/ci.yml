@@ -24,6 +24,22 @@ jobs:
       - name: ABI layout test
         run: ctest --test-dir build -C Release --output-on-failure
 
+  cpp-lint:
+    name: clang-tidy (client library)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: Configure with compile commands
+        run: cmake -S . -B tidy -G Ninja -DHDUE_BUILD_HYDRA=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: clang-tidy
+        shell: pwsh
+        run: |
+          # The Hydra delegate and UE backend need USD, Houdini or UE, which runners lack: they are checked locally.
+          $out = clang-tidy -p tidy --quiet (Get-ChildItem src/client/*.cpp).FullName 2>&1
+          $out
+          if ($out -match 'warning:|error:') { exit 1 }
+
   scripts:
     name: Python and PowerShell
     runs-on: windows-2022

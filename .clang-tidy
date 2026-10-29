@@ -1,0 +1,15 @@
+# Bugs and performance first; style is clang-format's job. Needs compile_commands.json
+# (cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON).
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  performance-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  google-build-using-namespace,
+  google-explicit-constructor,
+  google-runtime-int
+WarningsAsErrors: ''
+HeaderFilterRegex: '(src|include)/.*'

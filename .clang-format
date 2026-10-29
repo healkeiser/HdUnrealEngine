@@ -1,0 +1,10 @@
+# Google C++ style, with the 4-space indent and wider lines the code base already uses.
+# Format changed lines only: git clang-format (CI checks this on every push).
+BasedOnStyle: Google
+IndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 120
+DerivePointerAlignment: false
+PointerAlignment: Left
+# windows.h, USD and UE headers depend on their order.
+SortIncludes: Never

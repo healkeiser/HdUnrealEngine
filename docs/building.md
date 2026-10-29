@@ -86,6 +86,8 @@ The monolithic DLL requires a source engine. A matching editor installation can 
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
+C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools.
+
 ## Standalone rendering and usdview
 
 ```powershell
