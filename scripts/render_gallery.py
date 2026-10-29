@@ -132,8 +132,8 @@ def pixels(path):
 
 
 def display(image, tonemapped):
-    if tonemapped:  # UE's tonemapper already produced display values
-        return np.clip(image, 0, 1)
+    if tonemapped:  # UE's tone curve, already display-linear: encode only
+        return np.clip(image, 0, 1) ** (1 / 2.2)
     return np.clip(image / (1 + image), 0, 1) ** (1 / 2.2)
 
 
@@ -340,7 +340,7 @@ def section(which, results, machine):
                f' | Faster than {reference_label} (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |',
                '| --- |' + ' ---: |' * (len(present) + 2)]
     for name in order:
-        # UE's tonemapper makes the post-processing images display-referred, unlike Karma's linear one.
+        # UE's tone curve makes the post-processing images display-linear, unlike Karma's scene-linear one.
         shade = 'n/a' if name == 'post_processing' else f"{brightness(name, 'lumen'):.2f} / {brightness(name, 'pathtraced'):.2f}"
         cells = ' | '.join(duration(seconds(name, k)) for k, _, _, _ in present)
         summary.append(f"| {results[name]['title']} | {cells} | {speed(name, 'lumen')} / {speed(name, 'pathtraced')} | {shade} |")

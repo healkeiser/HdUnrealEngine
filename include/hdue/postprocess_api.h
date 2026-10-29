@@ -11,7 +11,8 @@ extern "C" {
  * (FVector4 X Y Z W, FLinearColor R G B A). Each listed property also sets its bOverride_ flag.
  * materials are cooked post-process material paths added as blendables with weight 1.
  * tonemapper 0 keeps the beauty linear (default); 1 runs UE's tonemapper, bloom, grading, vignette,
- * grain and lens effects and makes the beauty display-referred.
+ * grain and lens effects, and the beauty becomes UE's tone-mapped image as display-linear Rec.709 (what UE's sRGB
+ * output decodes to). exposure_stops (the host camera's exposure) adds to AutoExposureBias.
  * Names containing a dot set that console variable instead (process-wide, e.g. r.ScreenPercentage, sg.ShadowQuality;
  * True/False become 1/0); a variable dropped from a later set gets back the value it had before hdUE set it.
  * Unknown names and unparsable values are skipped with a warning in the UE log. Replaces the
@@ -24,6 +25,7 @@ typedef struct HduePostProcessDesc {
     const char* const* materials;
     uint32_t material_count;
     int32_t tonemapper;
+    float exposure_stops;
 } HduePostProcessDesc;
 typedef struct HduePostProcessApi {
     uint32_t struct_size, abi_version;

@@ -120,7 +120,7 @@
             type toggle
             size 1
             default { 0 }
-            help "Makes the beauty display-referred: set the viewport colour correction to raw."
+            help "The beauty becomes UE's tone-mapped image (display-linear): view it with the default sRGB view, not Raw or ACES."
             parmtag { "spare_category" "Post-Processing" }
             parmtag { "uiscope" "viewport" }
         }

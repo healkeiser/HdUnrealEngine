@@ -125,6 +125,7 @@ struct FSession {
     FPostProcessSettings PostProcess;
     TArray<TStrongObjectPtr<UMaterialInterface>> PostProcessMaterials;
     bool Tonemapper = false;
+    float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/aov_api.h); Frame/Pixels/depth
     // and the beauty's Lumen or Path Tracer history belong to BeautyRequest.
     HdueRenderRequest BeautyRequest{};
@@ -475,7 +476,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     if (Interactive && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
     Flags.SetOnScreenDebug(false); // UE draws warnings (e.g. exposure clipping) into the frame otherwise
     Flags.SetTonemapper(!Aov && Session->Tonemapper);
-    Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // AEM_Manual: applies AutoExposureBias, never adapts
+    Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // off: exposure 1 whatever the settings
     Flags.SetRefraction(true);
     if (Aov) {
         Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
@@ -488,6 +489,9 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         .SetRealtimeUpdate(true).SetResolveScene(true)
         .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60,
             Request.time_seconds, Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
+    // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and Movie
+    // Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the shadows.
+    Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
     FSceneViewInitOptions Options;
     Options.ViewFamily = &Family;
     Options.SceneViewStateInterface = Aov ? Session->AovViewState : Session->ViewState;
@@ -520,6 +524,8 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     View->bIsOfflineRender = PathTracing;
     View->bCameraCut = Session->CameraCut && Session->Draws == 0;
     View->StartFinalPostprocessSettings(Options.ViewOrigin);
+    // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend on
+    // auto exposure (two identical Sponza renders with it differed by 7%).
     View->FinalPostProcessSettings.AutoExposureMethod = AEM_Manual;
     View->FinalPostProcessSettings.AutoExposureBias = 0;
     View->FinalPostProcessSettings.bMegaLights=!PathTracing;
@@ -540,7 +546,16 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         View->FinalPostProcessSettings.DepthOfFieldFocalDistance = 0.f;
         View->FinalPostProcessSettings.DepthOfFieldFstop = 0.f;
     }
-    if (!Aov) View->OverridePostProcessSettings(Session->PostProcess, 1.f);
+    if (!Aov) {
+        View->OverridePostProcessSettings(Session->PostProcess, 1.f);
+        auto& Exposure = View->FinalPostProcessSettings;
+        Exposure.AutoExposureBias += Session->ExposureStops;
+        // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera cuts), so
+        // offline warmup frames and a viewport that stops drawing once converged settle on it. Authored speeds adapt the
+        // realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
+        if (PathTracing || !Interactive || (!Session->PostProcess.bOverride_AutoExposureSpeedUp && !Session->PostProcess.bOverride_AutoExposureSpeedDown))
+            Exposure.AutoExposureSpeedUp = Exposure.AutoExposureSpeedDown = -1.f;
+    }
     if (Aov) {
         View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
         View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
@@ -559,8 +574,9 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     View->EndFinalPostprocessSettings(Options);
     if (!Aov && Session->Tonemapper) {
         // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
-        // Manual exposure puts the scene near -AutoExposureBias EV; physically dim scenes (large bias) fell below the
-        // default window and their cached indirect lighting underflowed to black. Centre the window on the exposure.
+        // Manual exposure puts the scene near -AutoExposureBias EV (auto exposure within five stops of it); physically dim
+        // scenes (large bias) fell below the default window and their cached indirect lighting underflowed to black.
+        // Centre the window on the exposure.
         static IConsoleVariable* PreExposure = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
         const float Wanted = FMath::Clamp(2.f - View->FinalPostProcessSettings.AutoExposureBias, -16.f, 16.f);
         if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
@@ -866,6 +882,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
     Session->Tonemapper = Desc->tonemapper != 0;
+    Session->ExposureStops = Desc->exposure_stops;
     return HDUE_OK;
 }
 

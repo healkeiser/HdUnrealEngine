@@ -861,8 +861,7 @@ class Pass final : public HdRenderPass {
         const auto& api = s.backend->gpu_api();
         const bool tonemapper = s.setting<bool>("tonemapper", false);
         HdueGpuOptions options{sizeof(options)};
-        options.enabled = frames && !frames->failed() && api.configure && subframes_ <= 1 && !denoising &&
-            (tonemapper || HdUESceneLinearIsRec709());
+        options.enabled = frames && !frames->failed() && api.configure && subframes_ <= 1 && !denoising && HdUESceneLinearIsRec709();
         options.depth = depth != nullptr;
         options.color_scale = tonemapper ? 1.f : lens_[3]; // camera exposure, as the CPU path applies it
         options.depth_scale = float(1 / centimetersPerUnit_);
@@ -931,7 +930,7 @@ class Pass final : public HdRenderPass {
         std::vector<float> pixels(count * 4);
         output.read(0, count * 4 * sizeof(float), pixels.data());
         for (size_t i = 0; i < count; ++i) pixels[i * 4 + 3] = beautyPixels_[i * 4 + 3];
-        HdUEToSceneLinear(pixels); // OCIO scene_linear (ACEScg in ACES pipelines); the tonemapper is never on here
+        HdUEToSceneLinear(pixels); // OCIO scene_linear (ACEScg in ACES pipelines)
         beauty.publish(beautyFrame_, std::move(pixels));
 #else
         beauty.publish(beautyFrame_, beautyPixels_); // the standalone build has no denoiser
@@ -1283,8 +1282,8 @@ public:
                             for (size_t i = 0; i + 3 < pixels.size(); i += 4) { pixels[i] *= lens_[3]; pixels[i + 1] *= lens_[3]; pixels[i + 2] *= lens_[3]; }
                         if (denoising && frame.converged) { beautyPixels_ = pixels; beautyFrame_ = frame; denoisePending_ = true; }
                         const auto publishStart = Clock::now();
-                        // UE renders linear Rec.709; hosts expect the OCIO scene_linear role. Tonemapped output is display-referred.
-                        if (!s.setting<bool>("tonemapper", false)) HdUEToSceneLinear(pixels);
+                        // UE renders linear Rec.709 (tone-mapped: display-linear); hosts expect the OCIO scene_linear role.
+                        HdUEToSceneLinear(pixels);
                         buffer->publish(frame, std::move(pixels));
                         publishMs = ms(publishStart, Clock::now());
                         ++s.publishedFrames;
@@ -1381,12 +1380,7 @@ public:
                         values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value));
                     }
                     if (tonemapper) {
-                        // The USD camera exposure adds to any authored AutoExposureBias; UE's own physical camera
-                        // exposure (ISO, shutter, aperture) stays off unless the scene asks for it.
-                        const float stops = std::log2(std::max(lens[3], 1e-6f));
-                        const auto bias = std::find(names.begin(), names.end(), "AutoExposureBias");
-                        if (bias == names.end()) { names.push_back("AutoExposureBias"); values.push_back(TfStringify(stops)); }
-                        else values[bias - names.begin()] = TfStringify(std::strtof(values[bias - names.begin()].c_str(), nullptr) + stops);
+                        // UE's own physical camera exposure (ISO, shutter, aperture) stays off unless the scene asks for it.
                         if (std::find(names.begin(), names.end(), "AutoExposureApplyPhysicalCameraExposure") == names.end()) {
                             names.push_back("AutoExposureApplyPhysicalCameraExposure"); values.push_back("False");
                         }
@@ -1401,7 +1395,8 @@ public:
                     for (size_t i = 0; i < names.size(); ++i) { namePtrs.push_back(names[i].c_str()); valuePtrs.push_back(values[i].c_str()); }
                     for (const auto& m : materials) materialPtrs.push_back(m.c_str());
                     const HduePostProcessDesc desc{sizeof(HduePostProcessDesc), namePtrs.data(), valuePtrs.data(), uint32_t(names.size()),
-                        materialPtrs.data(), uint32_t(materials.size()), tonemapper ? 1 : 0};
+                        materialPtrs.data(), uint32_t(materials.size()), tonemapper ? 1 : 0,
+                        tonemapper ? std::log2(std::max(lens[3], 1e-6f)) : 0.f}; // the USD camera exposure adds to AutoExposureBias
                     s.backend->require(s.backend->postprocess_api().set_post_process(s.session, &desc), "set_post_process");
                 }
                 if (needsRequest) {

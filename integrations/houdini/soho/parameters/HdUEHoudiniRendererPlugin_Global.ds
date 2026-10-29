@@ -129,7 +129,7 @@
                 size    1
                 default { 8 }
                 range   { 0! 100! }
-                help    "Sets the path tracing maximum bounces hdUE uses 8, or 16 when the scene has refractive materials, unless set."
+                help    "Sets the path tracing maximum bounces. hdUE uses 8, or 16 when the scene has refractive materials, unless set."
                 parmtag { "spare_category" "Path Tracing" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__hdUEpostProcessPathTracingMaxBounces_control_odcl == block } { xn__hdUEpostProcessPathTracingMaxBounces_control_odcl == none })"
@@ -1344,7 +1344,7 @@
                 size    1
                 default { 4 }
                 range   { 1! 32! }
-                help    "Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect Set from the USD camera (fStop, focusDistance, focalLength); this overrides it."
+                help    "Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it."
                 parmtag { "spare_category" "Lens|Camera" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__hdUEpostProcessDepthOfFieldFstop_control_55bl == block } { xn__hdUEpostProcessDepthOfFieldFstop_control_55bl == none })"
@@ -1427,7 +1427,7 @@
                 size    1
                 default { 0 }
                 range   { 1 10000 }
-                help    "Distance in which the Depth of Field effect should be sharp, in unreal units (cm) Set from the USD camera (fStop, focusDistance, focalLength); this overrides it."
+                help    "Distance in which the Depth of Field effect should be sharp, in unreal units (cm). Set from the USD camera (fStop, focusDistance, focalLength); this overrides it."
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__hdUEpostProcessDepthOfFieldFocalDistance_control_6jcl == block } { xn__hdUEpostProcessDepthOfFieldFocalDistance_control_6jcl == none })"
@@ -1580,7 +1580,7 @@
                 type    toggle
                 size    1
                 default { 0 }
-                help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. Makes the beauty display-referred: set the viewport colour correction to raw."
+                help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. The beauty becomes UE's tone-mapped image (display-linear): view it with the default sRGB view, not Raw or ACES."
                 parmtag { "spare_category" "Post-Processing" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__hdUEtonemapper_control_ucb == block } { xn__hdUEtonemapper_control_ucb == none })"
@@ -1956,7 +1956,7 @@
                 size    1
                 default { "AEM_Manual" }
                 menu { "AEM_Histogram" "Auto Exposure Histogram" "AEM_Basic" "Auto Exposure Basic" "AEM_Manual" "Manual" }
-                help    "Luminance computation method hdUE renders with manual exposure."
+                help    "Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure."
                 parmtag { "spare_category" "Lens|Exposure" }
                 parmtag { "usdvaluetype" "string" }
                 disablewhen R"({ xn__hdUEpostProcessAutoExposureMethod_control_s7bl == block } { xn__hdUEpostProcessAutoExposureMethod_control_s7bl == none } { xn__hdUEtonemapper_tya == 0 })"
@@ -2070,7 +2070,7 @@
                 size    1
                 default { 3 }
                 range   { 0.02! 20 }
-                help    ">0"
+                help    ">0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target)."
                 parmtag { "spare_category" "Lens|Exposure" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__hdUEpostProcessAutoExposureSpeedUp_control_f9bl == block } { xn__hdUEpostProcessAutoExposureSpeedUp_control_f9bl == none } { xn__hdUEtonemapper_tya == 0 })"
@@ -2083,7 +2083,7 @@
                 size    1
                 default { 1 }
                 range   { 0.02! 20 }
-                help    ">0"
+                help    ">0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target)."
                 parmtag { "spare_category" "Lens|Exposure" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__hdUEpostProcessAutoExposureSpeedDown_control_odcl == block } { xn__hdUEpostProcessAutoExposureSpeedDown_control_odcl == none } { xn__hdUEtonemapper_tya == 0 })"

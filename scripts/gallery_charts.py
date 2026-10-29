@@ -122,7 +122,7 @@ def accuracy(theme, data):
     data = [(label, r) for label, r in data if 'karma' in r and label != 'Unreal post-processing']
     keys = [k for k in ('lumen', 'pathtraced', 'xpu') if any(k in r for _, r in data)]
     fig, ax = figure(t, data, 'Brightness relative to Karma CPU',
-                     'Mean luminance ratio; 1.0 = same as Karma CPU. Post-processing is display-referred and left out.')
+                     'Mean luminance ratio; 1.0 = same as Karma CPU. Post-processing is tone-mapped and left out.')
     ratio = lambda r, k: r[k]['luminance'] / r['karma']['luminance']
     ax.axvline(1.0, color=t['muted'], linewidth=1, linestyle=(0, (3, 3)), zorder=2)
     ax.text(1.0, -0.62, 'Karma CPU', color=t['muted'], fontsize=9, ha='center', va='bottom')

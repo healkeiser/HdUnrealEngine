@@ -38,7 +38,8 @@ SKIP = {
 SKIP_CATEGORIES = ("Lens|Mobile Depth of Field",)  # mobile renderer only
 # Defaults hdUE sets per view before the authored settings apply (Bridge.cpp Draw), with a note for the help.
 HDUE_DEFAULTS = {
-    "AutoExposureMethod": ("AEM_Manual", "hdUE renders with manual exposure."),
+    "AutoExposureMethod": ("AEM_Manual", "hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; "
+                           "Histogram or Basic turn on UE's auto exposure."),
     "AutoExposureBias": (0.0, "hdUE adds the USD camera exposure to it."),
     "AutoExposureApplyPhysicalCameraExposure": (False, None),
     "DynamicGlobalIlluminationMethod": ("EDynamicGlobalIlluminationMethod::Lumen", "Overrides hdUE:lumenEnabled."),
@@ -47,6 +48,10 @@ HDUE_DEFAULTS = {
     "PathTracingMaxBounces": (8, "hdUE uses 8, or 16 when the scene has refractive materials, unless set."),
     "PathTracingEnableReferenceDOF": (True, "hdUE turns it on when the USD camera has depth of field."),
 }
+SPEED_NOTE = ("Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport "
+              "adapts at this speed (husk and Path Tracer renders always use the target).")
+for _name in ("AutoExposureSpeedUp", "AutoExposureSpeedDown"):
+    HDUE_DEFAULTS[_name] = (None, SPEED_NOTE)
 CAMERA_NOTE = "Set from the USD camera (fStop, focusDistance, focalLength); this overrides it."
 for _name in ("DepthOfFieldFstop", "DepthOfFieldFocalDistance", "DepthOfFieldSensorWidth", "DepthOfFieldSqueezeFactor"):
     HDUE_DEFAULTS.setdefault(_name, (None, CAMERA_NOTE))
@@ -256,7 +261,7 @@ def parse_post_process(header, defaults, enums, skipped):
         if kind == "string":
             help_text += " Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
         if note:
-            help_text += " " + note
+            help_text = (help_text.strip() + ("" if help_text.strip()[-1:] in ("", ".", "!", "?") else ".") + " " + note).strip()
         settings.append(dict(attribute=f"hdUE:postProcess:{name}", label=meta.get("DisplayName") or label_from_name(name),
                              category=category, kind=kind, size=size, default=value, help=help_text.strip(),
                              menu=[(v, l) for v, l in enum], range=ranges(meta, kind)))
