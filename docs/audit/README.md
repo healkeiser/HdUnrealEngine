@@ -2,6 +2,8 @@
 
 An audit of hdUE (`feature/package`, `e8fe1f4`) against the OpenUSD/Hydra, SideFX Houdini 22 and Unreal Engine 5.8 documentation and the public source of reference delegates (HdEmbree, HdStorm, HdArnold, hdPrman, hdCycles). Every finding cites the code (`path:line`) and the document it is measured against; points that could not be checked by reading code or running a test are marked *unverified* or *inferred* in the reports.
 
+Reports 01–05 measure hdUE against the documentation: what is wrong or missing. Reports 06 and 07 are code-quality passes over the whole tree (at `3d65669`): 06 lists what to delete or replace with stdlib/USD/platform features, 07 lists reuse, simplification, efficiency and root-cause fixes. Correctness comes first; [Cleanup](#cleanup-06-07) summarizes 06 and 07.
+
 | Report | Scope | Findings |
 |--------|-------|----------|
 | [01 Hydra delegate](01-hydra-delegate.md) | `HdRenderDelegate`, render pass, buffers/AOVs, camera, geometry, instancing, motion blur | 18 (1 Critical, 3 High) |
@@ -9,6 +11,8 @@ An audit of hdUE (`feature/package`, `e8fe1f4`) against the OpenUSD/Hydra, SideF
 | [03 Materials, lights, color](03-materials-lights-color.md) | UsdPreviewSurface, MaterialX, UsdLux units, IES, OCIO, the Lumen brightness gap | 20 (1 Critical, 4 High) |
 | [04 Unreal backend](04-unreal-backend.md) | UE as a library, Path Tracer, Lumen, PSOs, Nanite, **EULA** | 18 (1 Critical, 4 High) |
 | [05 Build, packaging, quality](05-build-packaging-quality.md) | CMake, Houdini package, release zip, CI, tests, doc accuracy | 24 (4 High) |
+| [06 Over-engineering (ponytail)](06-ponytail-audit.md) | Dead scripts/tests, unused flags, duplicated wrappers, stdlib/USD replacements | net -1630 lines, -1 dep |
+| [07 Code quality (/simplify)](07-simplify.md) | Reuse, simplification, efficiency, root-cause altitude across the whole tree | 66 (9 "do first") |
 
 ## Act first
 
@@ -36,6 +40,14 @@ Spot-checked against the code while consolidating; all held.
 - **Color (COL findings).** With UE's tonemapper on, a display-referred image is published as scene-linear and Houdini transforms it again.
 - **Denoising (UE-07).** `r.PathTracing.Denoiser 0` is forced on every request, so UE's own denoisers never run.
 - **Package hygiene (PKG-02, PKG-03 = HOU-05, HOU-12).** Ship a Test (not Development) runtime without `.lib`/validation layers/test modules; move logs and UE `Saved/` out of the install folder; stop putting `scripts/` first on `sys.path`.
+
+## Cleanup (06, 07)
+
+- **Move Houdini-only Python work behind the delegate (07 ALT-01–04).** Render settings pushed through a ctypes side channel, material preparation, `op:` textures, `hdue:asset` proxies and a 16 ms redraw timer all live in the Python host; Hydra already delivers or supports each. Fixing this also fixes HOU-01, HOU-02 and HOU-04.
+- **Per-frame and per-tick waste (07 EFF-01–04).** `opdef:` images read and hashed every tick, single-threaded OCIO over every frame, a half → float → half beauty round trip, serial mesh conversion under the state lock.
+- **One API table instead of 12 versioned extensions (06, 07 SIM-01).** Removes ~400 lines of loaders, exports and Python mirrors that have already drifted.
+- **Dead code and scripts (06).** Nine unused `generate_*.py` fixture generators, unreferenced tests (`tests/substrate_vop_test.py`, `scripts/test_usd_materialx_export.py`, `tests/houdini_baseline.py`), `scripts/preview_pfm.py` (and with it Pillow), nine near-identical usdview `Test-*.ps1` wrappers. Net about -1630 lines.
+- **Long functions (07 SIM-02–04).** `Pass::_Execute` (~485 lines), backend `Draw` (~224), `Mesh::Sync` (~188).
 
 ## Docs out of date
 
