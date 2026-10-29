@@ -362,13 +362,14 @@ public:
                             [&](const std::string& id) { return state->meshes.count(id); })) {
                 for (const auto& id : emitted_) {
                     auto& part = state->meshes[id];
-                    const bool changed = part.transform != transform || part.visible != visible;
+                    const bool shown = part.visible != visible, moved = !shown && HdUEPlacedOnly(part, transform);
+                    const bool changed = part.transform != transform || shown;
                     part.transform = transform;
                     part.visible = visible;
                     part.renderTag = renderTag;
                     part.motionLeft = motion;
                     if (changed) {
-                        state->dirtyMeshes.insert(id);
+                        (moved ? state->movedMeshes : state->dirtyMeshes).insert(id);
                         ++state->revision;
                     }
                 }
@@ -612,11 +613,12 @@ public:
             const bool onlyNativeBounds =
                 previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
                 previous->second.transform == part.transform && previous->second.visible == part.visible;
+            const bool moved = previous != missing && HdUEPlacedOnly(previous->second, part.transform);
             const bool meshChanged =
                 !onlyNativeBounds &&
                 (previous == missing || previous->second.points != part.points ||
                  previous->second.indices != part.indices || previous->second.normals != part.normals ||
-                 previous->second.uv != part.uv || previous->second.transform != part.transform ||
+                 previous->second.uv != part.uv || (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
@@ -632,14 +634,17 @@ public:
             if (meshChanged) {
                 state->dirtyMeshes.insert(id);
                 ++state->revision;
-            } else if (maskChanged)
+            } else if (moved || maskChanged) {
+                if (moved) state->movedMeshes.insert(id);
                 ++state->revision;
+            }
             current.insert(id);
         }
         for (const auto& id : emitted_)
             if (!current.count(id)) {
                 state->meshes.erase(id);
                 state->dirtyMeshes.erase(id);
+                state->movedMeshes.erase(id);
                 state->removed.insert(id);
                 ++state->revision;
             }

@@ -438,6 +438,7 @@ void HdUEState::erase(const std::string& id) {
     dirtyVolumes.erase(id);
     // geometryRevisions[id] stays until the removal reaches UE (submit), so a revived mesh keeps its revision.
     dirtyMeshes.erase(id);
+    movedMeshes.erase(id);
     dirtyMaterials.erase(id);
     dirtyLights.erase(id);
     removed.insert(id);
@@ -472,12 +473,13 @@ struct ScenePacket {
         return values.empty() ? nullptr : store.emplace_back(std::move(values)).data();
     }
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
-    std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, removedIds;
+    std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, removedIds;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
     std::map<std::string, std::vector<GfVec3f>> points;
     // Takes the state's dirty sets (state lock held).
     void take(HdUEState& state) {
         dirtyMeshes.swap(state.dirtyMeshes);
+        movedMeshes.swap(state.movedMeshes);
         dirtyMaterials.swap(state.dirtyMaterials);
         dirtyLights.swap(state.dirtyLights);
         dirtyVolumes.swap(state.dirtyVolumes);
@@ -491,6 +493,7 @@ struct ScenePacket {
                 if (prims.count(id)) to.insert(id);
         };
         restore(dirtyMeshes, state.dirtyMeshes, state.meshes);
+        restore(movedMeshes, state.movedMeshes, state.meshes);
         restore(dirtyMaterials, state.dirtyMaterials, state.materials);
         restore(dirtyLights, state.dirtyLights, state.lights);
         restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
@@ -503,6 +506,7 @@ struct ScenePacket {
     bool firstBatch = false;
     // Descriptors.
     std::vector<HdueMeshDesc> meshes;
+    std::vector<HdueMeshTransform> moves;  // movedMeshes, through the motion extension after apply_scene
     std::vector<HdueMaterialDesc> materials;
     std::vector<HdueLightDesc> lights;
     std::vector<HdueLight> extendedLights;
@@ -660,6 +664,17 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const bool requireNanite = state.setting<bool>("requireNanite", false);
     const auto inverse = basis.GetInverse();
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
+    // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
+    for (const auto& id : packet.movedMeshes) {
+        if (packet.dirtyMeshes.count(id)) continue;
+        if (packet.firstBatch || !state.backend->motion_api().set_transforms) {
+            packet.dirtyMeshes.insert(id);
+            continue;
+        }
+        std::vector<double> matrix(16);
+        rowMajor(inverse * state.meshes.at(id).transform * basis, matrix.data());
+        packet.moves.push_back({packet.own(id), 1, packet.own(packet.doubles, std::move(matrix))});
+    }
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
         if (!data.sceneAsset.empty()) {
@@ -675,8 +690,10 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         }
         packet.removedAssets.push_back(packet.own(id));  // in case it was a scene asset before
         const auto nativeAsset = asset(nativeMeshes, id);
-        // Instanced prototypes keep local vertices; each instance matrix carries the placement.
-        const GfMatrix4d bake = data.instanced ? GfMatrix4d(1) : data.transform;
+        // Vertices are local: the actor's transform or each instance matrix carries the placement. A shearing
+        // transform, which a UE transform cannot hold, is baked into the vertices of a generic mesh.
+        const bool baked = !data.instanced && nativeAsset.empty() && HdUEShears(data.transform);
+        const GfMatrix4d bake = baked ? data.transform : GfMatrix4d(1);
         const auto normalTransform = bake.GetInverse().GetTranspose();
         const auto moved = packet.points.find(id);
         const auto& points = moved != packet.points.end() ? moved->second : data.points;
@@ -699,8 +716,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             }
         });
         auto index = data.indices;
-        // World transforms are baked into dynamic vertices. Preserve front
-        // faces when an authored transform adds another handedness reversal.
+        // Preserve front faces when a baked transform adds another handedness reversal.
         if (bake.GetDeterminant() < 0)
             for (size_t i = 0; i + 2 < index.size(); i += 3) std::swap(index[i + 1], index[i + 2]);
         std::vector<float> colors;
@@ -739,11 +755,8 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         // Surface effects edit vertex colours after upload, so their meshes stay editable (dynamic) in UE.
         if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) desc.flags |= HDUE_MESH_EDITABLE;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
-        // Native geometry keeps its own dimensions; only its placement transform comes from Hydra.
-        if (!nativeAsset.empty())
-            rowMajor(inverse * data.transform * basis, desc.transform);
-        else
-            packet.genericMeshes.push_back(id);
+        if (!baked) rowMajor(inverse * data.transform * basis, desc.transform);
+        if (nativeAsset.empty()) packet.genericMeshes.push_back(id);
         packet.meshes.push_back(desc);
         if (HdUETraceScene())
             TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
@@ -1065,6 +1078,12 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         }
         backend.require(lightingApi.upsert(session, &update), "upsert_lights");
     }
+    if (!packet.moves.empty()) {
+        backend.require(
+            backend.motion_api().set_transforms(session, packet.moves.data(), uint32_t(packet.moves.size())),
+            "set_transforms");
+        trace("hdUE scene submit: %zu meshes moved, geometry kept\n", packet.moves.size());
+    }
     const auto& assetApi = backend.asset_api();
     if (!packet.sceneAssets.empty() && !assetApi.upsert)
         throw std::runtime_error("Backend has no native scene asset extension");
@@ -1177,11 +1196,10 @@ class Pass final : public HdRenderPass {
                 for (size_t i = 0; i < mesh.instances.size(); ++i)
                     push(place(mesh.instances[i],
                                mesh.velocities.size() == mesh.instances.size() ? &mesh.velocities[i] : nullptr));
-            } else if (!asset(nativeMeshes, id).empty())
+            } else if (!asset(nativeMeshes, id).empty() || !HdUEShears(mesh.transform))
                 push(place(mesh.transform, nullptr));
             else
-                push(mesh.transform.GetInverse() *
-                     place(mesh.transform, nullptr));  // generic meshes are submitted in world space
+                push(mesh.transform.GetInverse() * place(mesh.transform, nullptr));  // baked into world space
             ids.push_back(&id);
         }
         // Deforming meshes are resubmitted with their points at t, before set_transforms moves them.

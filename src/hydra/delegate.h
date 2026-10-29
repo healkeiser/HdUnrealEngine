@@ -1,6 +1,7 @@
 #pragma once
 #include "hdue/backend.hpp"
 #include "picking.h"
+#include "placement.h"
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderBuffer.h"
@@ -103,6 +104,12 @@ struct HdUEMeshData {
     }
     std::shared_ptr<const HdUEPickMesh> pickMesh;
 };
+// Whether placing an uploaded mesh at transform needs no new geometry: a non-instanced mesh uploaded in local space,
+// moved without shear (HdUEShears). The motion extension then moves its UE actor.
+inline bool HdUEPlacedOnly(const HdUEMeshData& mesh, const GfMatrix4d& transform) {
+    return mesh.transform != transform && !mesh.instanced && mesh.sceneAsset.empty() && !HdUEShears(mesh.transform) &&
+           !HdUEShears(transform);
+}
 // A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.
 struct HdUEVolumeData {
     std::string id;
@@ -193,6 +200,8 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
+    // Meshes whose transform alone changed: placed through the motion extension, their geometry stays in UE.
+    std::set<std::string> movedMeshes;
     TfTokenVector renderTags;  // sorted; the render pass's last tags (empty: everything)
     static bool tagShown(const TfTokenVector& tags, const TfToken& tag) {
         return tags.empty() || std::binary_search(tags.begin(), tags.end(), tag);
