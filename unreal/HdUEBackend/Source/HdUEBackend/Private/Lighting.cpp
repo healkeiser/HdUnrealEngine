@@ -148,8 +148,14 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
     ULightComponent* Light=nullptr;
     if(Distant) Light=NewObject<UDirectionalLightComponent>(Actor);
     else if(D.type==HDUE_RECT_LIGHT || D.type==HDUE_DISK_LIGHT) Light=NewObject<URectLightComponent>(Actor);
-    else if(D.type==HDUE_SPHERE_LIGHT && D.cone_angle<90) Light=NewObject<USpotLightComponent>(Actor);
+    // ShapingAPI's default cone (90) already cuts emission beyond it: a sphere light is a spot up to 90 degrees.
+    else if(D.type==HDUE_SPHERE_LIGHT && D.cone_angle<=90) Light=NewObject<USpotLightComponent>(Actor);
     else Light=NewObject<UPointLightComponent>(Actor);
+    static bool ConeWarned=false;
+    if(!ConeWarned && D.cone_angle<90 && (D.type==HDUE_RECT_LIGHT || D.type==HDUE_DISK_LIGHT || D.type==HDUE_CYLINDER_LIGHT)) {
+        ConeWarned=true;
+        UE_LOG(LogTemp, Warning, TEXT("hdUE light %s: shaping cones on rect, disk and cylinder lights are ignored (UE spots are sphere lights)."), *Definition.Id);
+    }
     Light->SetMobility(EComponentMobility::Movable); Actor->SetRootComponent(Light); Actor->AddInstanceComponent(Light);
     Light->SetLightColor(FLinearColor(D.color[0],D.color[1],D.color[2]));
     Light->SetDiffuseScale(D.diffuse); Light->SetSpecularScale(D.specular);
@@ -188,7 +194,7 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
         if(D.type==HDUE_CYLINDER_LIGHT) {Point->SetSourceLength(D.length_cm); Actor->SetActorRotation(FRotationMatrix::MakeFromZX(Axis(D,0),Axis(D,1)).Rotator());}
     }
     if(auto* Spot=Cast<USpotLightComponent>(Light)) {
-        Spot->SetOuterConeAngle(FMath::Clamp(D.cone_angle,.01f,89.f));
+        Spot->SetOuterConeAngle(FMath::Clamp(D.cone_angle,.01f,89.9f));
         Spot->SetInnerConeAngle(FMath::Clamp(D.cone_angle*(1-D.cone_softness),0.f,Spot->OuterConeAngle));
     }
     if(auto* Sun=Cast<UDirectionalLightComponent>(Light)) Sun->LightSourceAngle=D.angle_degrees;

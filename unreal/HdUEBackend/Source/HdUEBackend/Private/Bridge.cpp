@@ -10,6 +10,7 @@
 #include "UELibraryAPI.h"
 #undef UELIBRARY_DLL_EXPORT
 #include "Scene.h"
+#include "Message.h"
 #include "VirtualTextureResidency.h"
 #include "NativePicking.h"
 #include "hdue/material_api.h"
@@ -27,6 +28,7 @@
 #include "Engine/World.h"
 #include "CanvasTypes.h"
 #include "ContentStreaming.h"
+#include "Scalability.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/ConfigCacheIni.h"
 #include "HAL/PlatformTLS.h"
@@ -208,6 +210,20 @@ HdueResult CheckReady() {
     if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
     return Runtime.State == HDUE_STATE_READY ? HDUE_OK : HDUE_INVALID_STATE;
 }
+#define HDUE_RETURN_UNLESS_READY() if (const HdueResult Ready = CheckReady(); Ready != HDUE_OK) return Ready
+template <class T> bool Sized(const T* Value) { return Value && Value->struct_size == sizeof(T); }
+int32 CVarInt(const TCHAR* Name) {
+    const IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name);
+    return CVar ? CVar->GetInt() : 0;
+}
+void SetCVar(const TCHAR* Name, int32 Value) {
+    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name)) CVar->Set(Value, ECVF_SetByCode);
+}
+// -hdUEInteractive: a viewport (Houdini). Without it the host renders offline frames (husk).
+bool IsInteractive() {
+    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
+    return Interactive;
+}
 // Finished frames are guarded by the session's FrameMutex, so any thread may read them: hosts that run UE on a thread
 // of their own (hdUE in Houdini's UI) read frames from their UI thread. Null when not ready or not this session.
 TSharedPtr<FSession, ESPMode::ThreadSafe> ReadableSession(HdueSession Handle) {
@@ -235,7 +251,7 @@ void ReleaseResidency(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) 
 }
 
 HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
-    if (!Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    if (!Sized(Status)) return HDUE_INVALID_ARGUMENT;
     // Any thread: a read-only snapshot. Hosts that run UE on a thread of their own (hdUE in Houdini's UI) still read it
     // from the UI thread; requiring the owner thread made every such read fail ("Cannot read UE status").
     HdueStatus Result{};
@@ -255,16 +271,14 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     if (Result.rhi_ready && CheckOwner() == HDUE_OK) RayTracing = HasRayTracing();
     if (Result.rhi_ready && RayTracing) Result.render_mode_mask |= 1u << HDUE_PATH_TRACED;
     if (CheckOwner() == HDUE_OK) { // the error text is the UE thread's to read (other threads get the state only)
-        FTCHARToUTF8 Message(*Runtime.Error);
-        const int32 Count = FMath::Min(Message.Length(), int32(sizeof(Result.message) - 1));
-        FMemory::Memcpy(Result.message, Message.Get(), Count);
+        HdueCopyMessage(Result.message, Runtime.Error);
     }
     *Status = Result;
     return HDUE_OK;
 }
 
 HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
-    if (!Desc || Desc->struct_size != sizeof(*Desc) || !Desc->instance_handle || !Desc->window_handle ||
+    if (!Sized(Desc) || !Desc->instance_handle || !Desc->window_handle ||
         !Desc->project_path || !Desc->map_path) return HDUE_INVALID_ARGUMENT;
     if (Runtime.State != HDUE_STATE_COLD) return HDUE_INVALID_STATE;
     Runtime.Owner = FPlatformTLS::GetCurrentThreadId();
@@ -319,24 +333,41 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     // the OnScreenDebug show flag does not cover them.
     GAreScreenMessagesEnabled = false;
     GEngine->bSuppressMapWarnings = true;
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground"))) CVar->Set(0, ECVF_SetByCode);
+    SetCVar(TEXT("t.IdleWhenNotForeground"), 0);
     // Alpha output: keep coverage in scene colour through post-processing (toggleable at runtime in UE 5.8), so the
     // beauty carries alpha 0 where no geometry is (background, sky hidden from camera rays).
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PostProcessing.PropagateAlpha"))) CVar->Set(1, ECVF_SetByCode);
+    SetCVar(TEXT("r.PostProcessing.PropagateAlpha"), 1);
+    if (!IsInteractive()) {
+        // Offline hosts (husk) get Movie Render Queue's Game Overrides: Cinematic scalability (keeping the screen
+        // percentage), fully loaded texture streaming (Draw waits for it) and no GPU timeout for long Path Tracer
+        // dispatches. Lumen's surface cache updates every frame so bounce lighting converges within the warmup frames
+        // (Sponza: 16 warmup frames come within ~15% of 128 in the shade, at the same frame time). Set before any
+        // session, so authored hdUE:cvar:* values override them.
+        Scalability::FQualityLevels Levels = Scalability::GetQualityLevels();
+        const float Resolution = Levels.ResolutionQuality;
+        Levels.SetFromSingleQualityLevelRelativeToMax(0);
+        Levels.ResolutionQuality = Resolution;
+        Scalability::SetQualityLevels(Levels);
+        for (const auto& [Name, Value] : {TPair<const TCHAR*, int32>{TEXT("r.Streaming.FullyLoadUsedTextures"), 1},
+                {TEXT("r.Streaming.FramesForFullUpdate"), 0}, {TEXT("r.Streaming.SyncStatesWhenBlocking"), 1}, {TEXT("r.D3D12.GPUTimeout"), 0},
+                {TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2}, {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2},
+                {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000}, {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
+            SetCVar(Name, Value);
+    }
     Runtime.State = HDUE_STATE_READY;
     Runtime.Error.Empty();
     return HDUE_OK;
 }
 
 HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     ReleaseResidency(Session);
     HdueSharedFrames::Reset();
     Session->Scene.Reset();
-    // Drain callbacks before releasing rooted UObjects or the persistent view.
-    FlushRenderingCommands();
+    // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
+    // or the persistent view go.
     ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) { for (auto& R : Session->Readbacks) R.Reset(); for (auto& R : Session->DepthReadbacks) R.Reset(); });
     FlushRenderingCommands();
     Session->InFlight.Reset();
@@ -350,8 +381,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
 }
 
 HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Handle) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!Desc || Desc->struct_size != sizeof(*Desc) || !Handle || !Desc->width || !Desc->height ||
+    HDUE_RETURN_UNLESS_READY();
+    if (!Sized(Desc) || !Handle || !Desc->width || !Desc->height ||
         Desc->width > 8192 || Desc->height > 8192) return HDUE_INVALID_ARGUMENT;
     if (Runtime.Session) return Fail(HDUE_INVALID_STATE, TEXT("The initial backend supports one active session."));
     auto Session = MakeShared<FSession, ESPMode::ThreadSafe>();
@@ -372,8 +403,8 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
 }
 
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Request || Request->struct_size != sizeof(*Request) || !Request->generation ||
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Request) || !Request->generation ||
         Request->mode > HDUE_PATH_TRACED || Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
         (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) || Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
             !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0)) ||
@@ -440,56 +471,23 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         Session->Preparing = Session->Residency->Status().phase != HDUE_RESIDENCY_READY;
     }
     Runtime.World->SetShouldTick(Request->mode == HDUE_REALTIME);
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.SamplesPerPixel"))) CVar->Set(int32(Request->samples_per_pixel), ECVF_SetByCode);
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.FrameIndependentTemporalSeed"))) CVar->Set(0, ECVF_SetByCode);
-    if (IConsoleVariable* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.VisibleLights")))
-        CVar->Set(Session->Scene->Lighting->BackgroundVisible()?2:0,ECVF_SetByCode);
+    SetCVar(TEXT("r.PathTracing.SamplesPerPixel"), int32(Request->samples_per_pixel));
+    SetCVar(TEXT("r.PathTracing.FrameIndependentTemporalSeed"), 0);
+    SetCVar(TEXT("r.PathTracing.VisibleLights"), Session->Scene->Lighting->BackgroundVisible() ? 2 : 0);
     return HDUE_OK;
 }
 
-void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
-    const auto& Request = Session->Request;
-    // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
-    const bool Aov = Request.aov != HDUE_AOV_COLOR;
-    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
-    FString IdError;
-    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID ? 1 : Request.aov == HDUE_AOV_INSTANCE_ID ? 2 : 0, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
-    if (Session->Preparing) {
-        const auto Residency = Session->Residency;
-        ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
-    }
+FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, float ScreenFraction, EViewModeIndex ViewMode, bool Orthographic) {
     FEngineShowFlags Flags(ESFIM_Game);
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
-    // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the anti-aliasing
-    // method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage (100).
-    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
-    // Offline hosts (husk) render a few warmup frames per image: update Lumen's surface cache every frame so its bounce
-    // lighting converges within them (measured on Sponza: 16 warmup frames then come within ~15% of 128 in the shade, at the same frame time).
-    static const bool OfflineLumen = [] {
-        if (Interactive) return false;
-        for (const auto& [Name, Value] : {TPair<const TCHAR*, int32>{TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2},
-                {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2}, {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000},
-                {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
-            if (IConsoleVariable* Variable = IConsoleManager::Get().FindConsoleVariable(Name)) Variable->Set(Value, ECVF_SetByCode);
-        return true;
-    }();
-    const bool Moving = Interactive && CVarInteractiveResolution.GetValueOnGameThread() && !PathTracing && !Aov &&
-        FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
-    const float ScreenFraction = PathTracing || Aov ? 1.f : Moving ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
-        : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
     Flags.SetScreenPercentage(ScreenFraction != 1.f);
-    // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
-    // frames that can (adding latency).
-    if (Interactive && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
     Flags.SetOnScreenDebug(false); // UE draws warnings (e.g. exposure clipping) into the frame otherwise
-    Flags.SetTonemapper(!Aov && Session->Tonemapper);
-    Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // off: exposure 1 whatever the settings
+    Flags.SetTonemapper(!Aov && Session.Tonemapper);
+    Flags.SetEyeAdaptation(!Aov && Session.Tonemapper); // off: exposure 1 whatever the settings
     Flags.SetRefraction(true);
-    // Debug views replace the realtime beauty only, as UE's viewport View Mode menu does.
-    const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
     if (ViewMode != VMI_Lit) {
-        ApplyViewMode(ViewMode, !Request.orthographic, Flags);
+        ApplyViewMode(ViewMode, !Orthographic, Flags);
         EngineShowFlagOverride(ESFIM_Game, ViewMode, Flags, true);
     }
     if (Aov) {
@@ -498,22 +496,91 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         // Volumes composite into scene color and would overwrite surface channels and IDs.
         Flags.SetHeterogeneousVolumes(false);
     }
-    auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
-    FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene, Flags)
-        .SetRealtimeUpdate(true).SetResolveScene(true)
-        .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60,
-            Request.time_seconds, Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
-    // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and Movie
-    // Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the shadows.
-    Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
-    Family.ViewMode = ViewMode;
+    return Flags;
+}
+
+void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FSession& Session, bool PathTracing, bool Aov) {
+    const auto& Request = Session.Request;
+    View.StartFinalPostprocessSettings(Options.ViewOrigin);
+    auto& Settings = View.FinalPostProcessSettings;
+    // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend on
+    // auto exposure (two identical Sponza renders with it differed by 7%).
+    Settings.AutoExposureMethod = AEM_Manual;
+    Settings.AutoExposureBias = 0;
+    Settings.bMegaLights=!PathTracing;
+    Settings.DynamicGlobalIlluminationMethod = Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
+    Settings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
+    Settings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
+    Settings.PathTracingMaxBounces = Session.Scene->HasRefractiveMaterials() ? 16 : 8;
+    Settings.LumenFrontLayerTranslucencyReflections = true;
+    if (!IsInteractive()) {
+        // Offline frames use Lumen's final-frame quality (UE's defaults are game quality); authored values override it.
+        Settings.LumenFinalGatherQuality = FMath::Max(Settings.LumenFinalGatherQuality, 2.f);
+        Settings.LumenSceneLightingQuality = FMath::Max(Settings.LumenSceneLightingQuality, 2.f);
+        Settings.LumenSceneDetail = FMath::Max(Settings.LumenSceneDetail, 2.f);
+    }
+    if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 && Request.focal_length_cm > 0) {
+        // UE derives the focal length from the sensor height and vertical FOV (FPhysicalCocModel);
+        // pick the sensor width that yields the USD camera's focal length.
+        Settings.DepthOfFieldFstop = Request.fstop;
+        Settings.DepthOfFieldFocalDistance = Request.focus_distance_cm;
+        Settings.DepthOfFieldSensorWidth = float(20.0 * Request.focal_length_cm * Session.Width / Session.Height / Options.ProjectionMatrix.M[1][1]);
+        Settings.DepthOfFieldSqueezeFactor = 1.f;
+        Settings.PathTracingEnableReferenceDOF = true;
+    } else {
+        Settings.DepthOfFieldFocalDistance = 0.f;
+        Settings.DepthOfFieldFstop = 0.f;
+    }
+    if (!Aov) {
+        View.OverridePostProcessSettings(Session.PostProcess, 1.f);
+        // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera cuts), so
+        // offline warmup frames and a viewport that stops drawing once converged settle on it. Authored speeds adapt the
+        // realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
+        Settings.AutoExposureBias += Session.ExposureStops;
+        if (PathTracing || !IsInteractive() || (!Session.PostProcess.bOverride_AutoExposureSpeedUp && !Session.PostProcess.bOverride_AutoExposureSpeedDown))
+            Settings.AutoExposureSpeedUp = Settings.AutoExposureSpeedDown = -1.f;
+    } else {
+        Settings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
+        Settings.ReflectionMethod = EReflectionMethod::None;
+        if (!Session.AovMaterial.IsValid()) {
+            auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
+            if (Parent) Session.AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
+        }
+        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID ? nullptr : Session.AovMaterial.Get()) {
+            for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
+                Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
+            FPostProcessSettings Blend;
+            Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
+            View.OverridePostProcessSettings(Blend, 1.f);
+        }
+    }
+    if (View.Family->ViewMode != VMI_Lit && Session.DebugMaterial) {
+        FPostProcessSettings Blend;
+        Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Session.DebugMaterial.Get()));
+        View.OverridePostProcessSettings(Blend, 1.f);
+    }
+    View.EndFinalPostprocessSettings(Options);
+    if (!Aov && Session.Tonemapper) {
+        // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
+        // Manual exposure puts the scene near -AutoExposureBias EV (auto exposure within five stops of it); physically dim
+        // scenes (large bias) fell below the default window and their cached indirect lighting underflowed to black.
+        // Centre the window on the exposure.
+        static IConsoleVariable* PreExposure = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
+        const float Wanted = FMath::Clamp(2.f - Settings.AutoExposureBias, -16.f, 16.f);
+        if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
+    }
+}
+
+// The camera's view of the session's request, with its post-process settings.
+void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool Aov) {
+    const auto& Request = Session.Request;
     FSceneViewInitOptions Options;
     Options.ViewFamily = &Family;
-    Options.SceneViewStateInterface = Aov ? Session->AovViewState : Session->ViewState;
-    Options.SetViewRectangle(FIntRect(0, 0, Session->Width, Session->Height));
+    Options.SceneViewStateInterface = Aov ? Session.AovViewState : Session.ViewState;
+    Options.SetViewRectangle(FIntRect(0, 0, Session.Width, Session.Height));
     Options.ViewOrigin = FVector(Request.eye[0], Request.eye[1], Request.eye[2]);
-    IStreamingManager::Get().AddViewInformation(Options.ViewOrigin, float(Session->Width),
-        Request.orthographic ? float(Session->Width) : float(Session->Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
+    IStreamingManager::Get().AddViewInformation(Options.ViewOrigin, float(Session.Width),
+        Request.orthographic ? float(Session.Width) : float(Session.Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
         1.f, false, 1.f, nullptr, Runtime.World);
     const FVector Target(Request.target[0], Request.target[1], Request.target[2]);
     const FVector Up(Request.up[0], Request.up[1], Request.up[2]);
@@ -526,7 +593,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             FPlane(0, 0, -1 / Range, 0), FPlane(Request.projection_offset[0], Request.projection_offset[1], Request.far_clip_cm / Range, 1));
     } else {
         Options.ProjectionMatrix = FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
-            double(Session->Width), double(Session->Height), double(Request.near_clip_cm));
+            double(Session.Width), double(Session.Height), double(Request.near_clip_cm));
         // Hydra's conformed window and lens shift (aperture offsets).
         if (Request.projection_scale[0] > 0 && Request.projection_scale[1] > 0) {
             Options.ProjectionMatrix.M[0][0] = Request.projection_scale[0]; Options.ProjectionMatrix.M[1][1] = Request.projection_scale[1];
@@ -540,9 +607,10 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // Each Path Tracer request draws its own random sequence (FrameIndependentTemporalSeed 0 counts samples from 0):
     // motion blur sub-frames are separate requests, and the same sequence in each left static areas at spp / sub-frames.
     View->PathTracerSeedOffset = int32(Request.generation * Request.samples_per_pixel);
-    View->bCameraCut = Session->CameraCut && Session->Draws == 0;
-    if (ViewMode != VMI_Lit) {
+    View->bCameraCut = Session.CameraCut && Session.Draws == 0;
+    if (Family.ViewMode != VMI_Lit) {
         // The material overrides UGameViewportClient::Draw sets for these view modes.
+        const FEngineShowFlags& Flags = Family.EngineShowFlags;
         const FVector4f Brightness(GEngine->LightingOnlyBrightness.R, GEngine->LightingOnlyBrightness.G, GEngine->LightingOnlyBrightness.B, 0.f);
         if (Flags.OverrideDiffuseAndSpecular) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(.1f, .1f, .1f, 0.f); }
         else if (Flags.LightingOnlyOverride) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(0.f); }
@@ -550,80 +618,23 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             View->DiffuseOverrideParameter = FVector4f(0.f); View->SpecularOverrideParameter = FVector4f(1.f, 1.f, 1.f, 0.f);
             View->NormalOverrideParameter = FVector4f(0.f, 0.f, 1.f, 0.f); View->RoughnessOverrideParameter = FVector2f(0.f);
         }
-        if (Session->DebugMember) View->*Session->DebugMember = Session->DebugName;
+        if (Session.DebugMember) View->*Session.DebugMember = Session.DebugName;
     }
-    View->StartFinalPostprocessSettings(Options.ViewOrigin);
-    // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend on
-    // auto exposure (two identical Sponza renders with it differed by 7%).
-    View->FinalPostProcessSettings.AutoExposureMethod = AEM_Manual;
-    View->FinalPostProcessSettings.AutoExposureBias = 0;
-    View->FinalPostProcessSettings.bMegaLights=!PathTracing;
-    View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
-    View->FinalPostProcessSettings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
-    View->FinalPostProcessSettings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
-    View->FinalPostProcessSettings.PathTracingMaxBounces = Session->Scene->HasRefractiveMaterials() ? 16 : 8;
-    View->FinalPostProcessSettings.LumenFrontLayerTranslucencyReflections = true;
-    if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 && Request.focal_length_cm > 0) {
-        // UE derives the focal length from the sensor height and vertical FOV (FPhysicalCocModel);
-        // pick the sensor width that yields the USD camera's focal length.
-        View->FinalPostProcessSettings.DepthOfFieldFstop = Request.fstop;
-        View->FinalPostProcessSettings.DepthOfFieldFocalDistance = Request.focus_distance_cm;
-        View->FinalPostProcessSettings.DepthOfFieldSensorWidth = float(20.0 * Request.focal_length_cm * Session->Width / Session->Height / Options.ProjectionMatrix.M[1][1]);
-        View->FinalPostProcessSettings.DepthOfFieldSqueezeFactor = 1.f;
-        View->FinalPostProcessSettings.PathTracingEnableReferenceDOF = true;
-    } else {
-        View->FinalPostProcessSettings.DepthOfFieldFocalDistance = 0.f;
-        View->FinalPostProcessSettings.DepthOfFieldFstop = 0.f;
-    }
-    if (!Aov) {
-        View->OverridePostProcessSettings(Session->PostProcess, 1.f);
-        auto& Exposure = View->FinalPostProcessSettings;
-        Exposure.AutoExposureBias += Session->ExposureStops;
-        // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera cuts), so
-        // offline warmup frames and a viewport that stops drawing once converged settle on it. Authored speeds adapt the
-        // realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
-        if (PathTracing || !Interactive || (!Session->PostProcess.bOverride_AutoExposureSpeedUp && !Session->PostProcess.bOverride_AutoExposureSpeedDown))
-            Exposure.AutoExposureSpeedUp = Exposure.AutoExposureSpeedDown = -1.f;
-    }
-    if (Aov) {
-        View->FinalPostProcessSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
-        View->FinalPostProcessSettings.ReflectionMethod = EReflectionMethod::None;
-        if (!Session->AovMaterial.IsValid()) {
-            auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
-            if (Parent) Session->AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
-        }
-        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID ? nullptr : Session->AovMaterial.Get()) {
-            for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
-                Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
-            FPostProcessSettings Blend;
-            Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
-            View->OverridePostProcessSettings(Blend, 1.f);
-        }
-    }
-    if (ViewMode != VMI_Lit && Session->DebugMaterial) {
-        FPostProcessSettings Blend;
-        Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Session->DebugMaterial.Get()));
-        View->OverridePostProcessSettings(Blend, 1.f);
-    }
-    View->EndFinalPostprocessSettings(Options);
-    if (!Aov && Session->Tonemapper) {
-        // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
-        // Manual exposure puts the scene near -AutoExposureBias EV (auto exposure within five stops of it); physically dim
-        // scenes (large bias) fell below the default window and their cached indirect lighting underflowed to black.
-        // Centre the window on the exposure.
-        static IConsoleVariable* PreExposure = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
-        const float Wanted = FMath::Clamp(2.f - View->FinalPostProcessSettings.AutoExposureBias, -16.f, 16.f);
-        if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
-    }
+    ApplyPostProcess(*View, Options, Session, PathTracing, Aov);
     Family.Views.Add(View);
-    Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, ScreenFraction, 1.0f));
+}
+
+// Renders the family and queues what reads it back: the host's shared ring, and the CPU readback when a slot is free.
+void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, FSceneViewFamily& Family, FTextureRenderTargetResource* Resource,
+        bool PathTracing, bool Aov, bool Moving, float ScreenFraction) {
+    const auto& Request = Session->Request;
     FCanvas Canvas(Resource, nullptr, Runtime.World, Runtime.World->GetFeatureLevel());
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
     // Offline frames (husk) wait for PSO compilation: r.PSOPrecache.ProxyCreationStrategy=2 draws meshes whose PSOs
     // are still compiling with the default material, and nothing else would stop such a frame from converging.
-    const uint32 Compiling = Interactive ? 0 : FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
+    const uint32 Compiling = IsInteractive() ? 0 : FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
     if (Compiling) {
         static uint64 Logged = 0;
         if (Logged != Request.generation) { Logged = Request.generation; UE_LOG(LogTemp, Display, TEXT("hdUE request %llu waits for %u PSO compilations"), Request.generation, Compiling); }
@@ -643,13 +654,13 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     int32 FreeSlot = -1;
     for (int32 Slot = 0; Slot < FSession::ReadbackSlots && FreeSlot < 0; ++Slot)
         if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; })) FreeSlot = Slot;
-    const bool Room = FreeSlot >= 0 && Session->InFlight.Num() < (Interactive ? FSession::ReadbackSlots : 1);
+    const bool Room = FreeSlot >= 0 && Session->InFlight.Num() < (IsInteractive() ? FSession::ReadbackSlots : 1);
     // A host reading the shared ring (hdue/gpu_api.h) gets every draw from there: the readback then only gives CPU
     // consumers (Map, the Python viewer) the converged image.
     if (HdueGpuOptions Shared{}; !Aov && HdueSharedFrames::Enabled(Session->Handle, Shared)) Job->Shared = Shared;
     const bool Sharing = Job->Shared.enabled != 0;
     const bool Converging = PathTracing ? Job->DrawIndex >= Request.samples_per_pixel : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames);
-    const bool ReadBack = Room && (Sharing ? Converging : Interactive || Job->DrawIndex == 1 || Session->Preparing ||
+    const bool ReadBack = Room && (Sharing ? Converging : IsInteractive() || Job->DrawIndex == 1 || Session->Preparing ||
         Now - Session->LastReadback >= 0.25 || Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
     Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
@@ -681,6 +692,54 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         Readback->EnqueueCopy(Commands, Resource->GetRenderTargetTexture());
         if(Job->DepthEnabled && !Job->DepthQueued.Load()) { Job->Failed.Store(true); Job->Complete.Store(true); }
     });
+}
+
+void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
+    const auto& Request = Session->Request;
+    // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
+    const bool Aov = Request.aov != HDUE_AOV_COLOR;
+    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
+    FString IdError;
+    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID ? 1 : Request.aov == HDUE_AOV_INSTANCE_ID ? 2 : 0, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
+    if (Session->Preparing) {
+        const auto Residency = Session->Residency;
+        ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
+    }
+    // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the anti-aliasing
+    // method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage (100).
+    const bool Moving = IsInteractive() && CVarInteractiveResolution.GetValueOnGameThread() && !PathTracing && !Aov &&
+        FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
+    const float ScreenFraction = PathTracing || Aov ? 1.f : Moving ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
+        : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
+    // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
+    // frames that can (adding latency).
+    if (IsInteractive() && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
+    // Debug views replace the realtime beauty only, as UE's viewport View Mode menu does.
+    const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
+    auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
+    FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene,
+            ShowFlags(*Session, PathTracing, Aov, ScreenFraction, ViewMode, Request.orthographic != 0))
+        .SetRealtimeUpdate(true).SetResolveScene(true)
+        .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60,
+            Request.time_seconds, Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
+    // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and Movie
+    // Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the shadows.
+    Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
+    Family.ViewMode = ViewMode;
+    AddView(Family, *Session, PathTracing, Aov);
+    Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, ScreenFraction, 1.0f));
+    if (!IsInteractive() && (!PathTracing || !Session->Draws)) {
+        // Movie Render Queue's flush before each frame: the textures this view uses at full resolution, and pending
+        // virtual texture tiles (the Path Tracer prepares its own residency).
+        IStreamingManager::Get().UpdateResourceStreaming(Runtime.World->GetDeltaSeconds(), true);
+        IStreamingManager::Get().BlockTillAllRequestsFinished();
+        if (!PathTracing && UseVirtualTexturing(GMaxRHIShaderPlatform)) {
+            ENQUEUE_RENDER_COMMAND(HdueLoadVirtualTextureTiles)([Module = &Renderer(), FeatureLevel = Runtime.World->GetFeatureLevel()](FRHICommandListImmediate& Commands) {
+                Module->LoadPendingVirtualTextureTiles(Commands, FeatureLevel);
+            });
+        }
+    }
+    RenderAndReadBack(Session, Family, Resource, PathTracing, Aov, Moving, ScreenFraction);
 }
 
 void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, const TSharedPtr<FReadbackJob, ESPMode::ThreadSafe>& Job) {
@@ -747,7 +806,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
 }
 
 HdueResult HDUE_CALL Tick() {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (UELibrary_Tick() != 0) return Fail(HDUE_ENGINE_ERROR, TEXT("UELibrary_Tick failed."));
     const auto Session = Runtime.Session;
     if (Session) {Session->Scene->Assets.Tick(); Session->Scene->Lighting->Tick(); Session->Scene->TickConversions();}
@@ -795,7 +854,7 @@ HdueResult HDUE_CALL Tick() {
 
 HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
     const auto Session = ReadableSession(Handle);
-    if (!Session || !Frame || Frame->struct_size != sizeof(*Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+    if (!Session || !Sized(Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     // The newest beauty frame, possibly for an earlier request of this scene (a previous camera while navigating): the
     // caller decides from its generation whether to show it. A scene change cancels the request, and with it the frame.
@@ -805,8 +864,8 @@ HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
 }
 
 HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || !Desc->id) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id) return HDUE_INVALID_ARGUMENT;
     const uint64 Count = uint64(Desc->width) * Desc->height * Desc->depth;
     if (Desc->width > 2048 || Desc->height > 2048 || Desc->depth > 2048 || Count > (uint64(1) << 28) || (Count && !Desc->density) ||
         !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0) return HDUE_INVALID_ARGUMENT;
@@ -819,7 +878,7 @@ HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc
 }
 
 HdueResult HDUE_CALL RemoveVolume(HdueSession Handle, const char* Id) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->RemoveVolume(UTF8_TO_TCHAR(Id));
     Runtime.Session->HasRequest = false;
@@ -827,7 +886,7 @@ HdueResult HDUE_CALL RemoveVolume(HdueSession Handle, const char* Id) {
 }
 
 HdueResult HDUE_CALL SetTransforms(HdueSession Handle, const HdueMeshTransform* Meshes, uint32 Count) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || (Count && !Meshes)) return HDUE_INVALID_ARGUMENT;
     for (uint32 Index = 0; Index < Count; ++Index) {
         const auto& Mesh = Meshes[Index];
@@ -913,8 +972,8 @@ static void SetDebugView(FSession& Session, const FString& Text) {
 }
 
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
         (Desc->material_count && !Desc->materials)) return HDUE_INVALID_ARGUMENT;
     FPostProcessSettings Settings;
     TSet<FString> Variables;
@@ -958,7 +1017,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
 
 HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
     const auto Session = ReadableSession(Handle);
-    if (!Session || !Frame || Frame->struct_size != sizeof(*Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+    if (!Session || !Sized(Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     if (!Session->HasRequest || Session->Request.aov == HDUE_AOV_COLOR || !Session->AovFrame.frame_id ||
         Session->AovFrame.generation != Session->Request.generation) return HDUE_PENDING;
@@ -987,12 +1046,12 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
 }
 
 HdueResult HDUE_CALL ConfigureGpuFrames(HdueSession Handle, const HdueGpuOptions* Options) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Options) return HDUE_INVALID_ARGUMENT;
     return HdueSharedFrames::Configure(Handle, *Options);
 }
 HdueResult HDUE_CALL PollGpuFrame(HdueSession Handle, HdueFrameInfo* Frame) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Frame) return HDUE_INVALID_ARGUMENT;
     return HdueSharedFrames::Poll(Handle, *Frame);
 }
@@ -1002,7 +1061,7 @@ HdueResult HDUE_CALL AcquireGpuFrame(HdueSession Handle, HdueGpuFrame* Frame) {
 }
 
 HdueResult HDUE_CALL EnableDepth(HdueSession Handle,uint32 Enabled) {
-    if(CheckReady()!=HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if(!ValidSession(Handle) || Enabled>1) return HDUE_INVALID_ARGUMENT;
     const auto Session=Runtime.Session;
     if(Session->DepthEnabled==bool(Enabled)) return HDUE_OK;
@@ -1025,7 +1084,7 @@ HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,u
 }
 
 HdueResult HDUE_CALL WindowMessage(uint64 Hwnd, uint32 Message, uint64 Wparam, int64 Lparam, int64* Result) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!Result) return HDUE_INVALID_ARGUMENT;
     // Offscreen UE has no window to route messages to (UELibrary_WndProc dereferences it); hosts fall back to DefWindowProc.
     static const bool Offscreen = FParse::Param(FCommandLine::Get(), TEXT("RenderOffscreen"));
@@ -1034,8 +1093,8 @@ HdueResult HDUE_CALL WindowMessage(uint64 Hwnd, uint32 Message, uint64 Wparam, i
     return HDUE_OK;
 }
 HdueResult HDUE_CALL ApplyScene(HdueSession Handle, const HdueSceneBatch* Batch) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Batch || Batch->struct_size != sizeof(*Batch)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Batch)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     Session->HasRequest = false;
     ReleaseResidency(Session);
@@ -1045,14 +1104,14 @@ HdueResult HDUE_CALL ApplyScene(HdueSession Handle, const HdueSceneBatch* Batch)
     return HDUE_OK;
 }
 HdueResult HDUE_CALL UpsertLights(HdueSession Handle,const HdueLightBatch* Batch) {
-    if(CheckReady()!=HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if(!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
     if(!Runtime.Session->Scene->Lighting->Apply(*Batch,Runtime.Error)) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->HasRequest=false; ReleaseResidency(Runtime.Session); Runtime.World->SetShouldTick(true);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL ApplySurface(HdueSession Handle, const HdueSurfaceBatch* Batch) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
     const auto Result = Runtime.Session->Scene->ApplySurface(*Batch, Runtime.Error);
     if (Result != HDUE_OK) return Result;
@@ -1062,20 +1121,18 @@ HdueResult HDUE_CALL ApplySurface(HdueSession Handle, const HdueSurfaceBatch* Ba
     return HDUE_OK;
 }
 HdueResult HDUE_CALL SurfaceStatus(HdueSession Handle, HdueSurfaceStatus* Status) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
     *Status = Runtime.Session->Scene->SurfaceStatus(); return HDUE_OK;
 }
 HdueResult HDUE_CALL LightingStatus(HdueSession Handle,HdueLightingStatus* Status) {
-    if(CheckReady()!=HDUE_OK) return CheckReady();
-    if(!ValidSession(Handle) || !Status || Status->struct_size!=sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if(!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
     HdueLightingStatus Result{}; Result.struct_size=sizeof(Result);
     const auto Session=Runtime.Session;
     Session->Scene->Lighting->Status(Result);
-    static const auto* ProjectCVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.MegaLights.EnableForProject"));
-    static const auto* AllowedCVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.MegaLights.Allowed"));
-    if(ProjectCVar) Result.mega_lights_project=ProjectCVar->GetInt()!=0;
-    if(AllowedCVar) Result.mega_lights_allowed=AllowedCVar->GetInt()!=0;
+    Result.mega_lights_project=CVarInt(TEXT("r.MegaLights.EnableForProject"))!=0;
+    Result.mega_lights_allowed=CVarInt(TEXT("r.MegaLights.Allowed"))!=0;
     FScopeLock Lock(&Session->FrameMutex);
     if(Session->HasRequest && Session->Frame.generation==Session->BeautyRequest.generation) {
         Result.frame_id=Session->Frame.frame_id; Result.generation=Session->Frame.generation; Result.mega_lights_active=Session->MegaLightsActive;
@@ -1100,8 +1157,8 @@ HdueResult HDUE_CALL Shutdown() {
     return HDUE_OK;
 }
 HdueResult HDUE_CALL PickNative(HdueSession Handle, const HdueNativeRay* Ray, HdueNativeHit* Hit, char* Id, uint32 Capacity) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Ray || !Hit || Ray->struct_size != sizeof(*Ray) || Hit->struct_size != sizeof(*Hit) ||
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Ray) || !Sized(Hit) ||
         !FMath::IsFinite(Ray->minimum_cm) || !FMath::IsFinite(Ray->maximum_cm) || Ray->minimum_cm < 0 || Ray->maximum_cm < Ray->minimum_cm) return HDUE_INVALID_ARGUMENT;
     for (int32 I = 0; I < 3; ++I) if (!FMath::IsFinite(Ray->origin[I]) || !FMath::IsFinite(Ray->direction[I])) return HDUE_INVALID_ARGUMENT;
     if (FVector(Ray->direction[0], Ray->direction[1], Ray->direction[2]).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
@@ -1119,25 +1176,24 @@ HdueResult HDUE_CALL PickNative(HdueSession Handle, const HdueNativeRay* Ray, Hd
     return HDUE_OK;
 }
 HdueResult HDUE_CALL GetPickMaterialInfo(const char* Path, HduePickMaterialInfo* Info) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!Info || Info->struct_size != sizeof(*Info)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!Sized(Info)) return HDUE_INVALID_ARGUMENT;
     FString Error;
     const auto Code = HdueGetPickMaterialInfo(Path, *Info, Error);
     return Code == HDUE_OK ? HDUE_OK : Fail(Code, *Error);
 }
 HdueResult HDUE_CALL GetRendererInfo(HdueRendererInfo* Info) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!Info || Info->struct_size != sizeof(*Info)) return HDUE_INVALID_ARGUMENT;
-    const auto Value = [](const TCHAR* Name) { const IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(Name); return V ? V->GetInt() : 0; };
+    HDUE_RETURN_UNLESS_READY();
+    if (!Sized(Info)) return HDUE_INVALID_ARGUMENT;
     Info->substrate_enabled = Substrate::IsSubstrateEnabled();
     Info->adaptive_gbuffer = Info->substrate_enabled && !Substrate::IsSubstrateBlendableGBufferEnabled(EShaderPlatform(GMaxRHIShaderPlatform));
-    Info->project_closures_per_pixel = Value(TEXT("r.Substrate.ProjectClosuresPerPixel"));
-    Info->bytes_per_pixel = Value(TEXT("r.Substrate.BytesPerPixel"));
+    Info->project_closures_per_pixel = CVarInt(TEXT("r.Substrate.ProjectClosuresPerPixel"));
+    Info->bytes_per_pixel = CVarInt(TEXT("r.Substrate.BytesPerPixel"));
     return HDUE_OK;
 }
 HdueResult HDUE_CALL SetMaterialParameters(HdueSession Handle, const HdueMaterialUpdate* Update) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Update || Update->struct_size != sizeof(*Update)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Update)) return HDUE_INVALID_ARGUMENT;
     FString Error;
     const auto Code = Runtime.Session->Scene->SetMaterialParameters(*Update, Error);
     if (Code != HDUE_OK) return Fail(Code, *Error);
@@ -1148,15 +1204,15 @@ HdueResult HDUE_CALL SetMaterialParameters(HdueSession Handle, const HdueMateria
     return HDUE_OK;
 }
 HdueResult HDUE_CALL GetMaterialStats(HdueSession Handle, const char* Id, HdueMaterialStats* Stats) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Stats || Stats->struct_size != sizeof(*Stats)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Stats)) return HDUE_INVALID_ARGUMENT;
     FString Error;
     const auto Code = Runtime.Session->Scene->GetMaterialStats(Id, *Stats, Error);
     return Code == HDUE_OK ? HDUE_OK : Fail(Code, *Error);
 }
 HdueResult HDUE_CALL ConfigureResidency(HdueSession Handle, const HdueResidencyOptions* Options) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Options || Options->struct_size != sizeof(*Options) ||
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Options) ||
         !FMath::IsFinite(Options->timeout_seconds) || Options->timeout_seconds <= 0) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
@@ -1164,15 +1220,15 @@ HdueResult HDUE_CALL ConfigureResidency(HdueSession Handle, const HdueResidencyO
     return HDUE_OK;
 }
 HdueResult HDUE_CALL GetResidencyStatus(HdueSession Handle, HdueResidencyStatus* Status) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
     *Status = Runtime.Session->Residency ? Runtime.Session->Residency->Status() : HdueResidencyStatus{};
     Status->struct_size = sizeof(*Status);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL UpsertAsset(HdueSession Handle, const HdueAssetDesc* Desc) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc)) return HDUE_INVALID_ARGUMENT;
     const auto S=Runtime.Session;
     const auto Code=S->Scene->Assets.Upsert(*Desc,Runtime.Error);
     if (Code != HDUE_OK) return Code;
@@ -1180,20 +1236,20 @@ HdueResult HDUE_CALL UpsertAsset(HdueSession Handle, const HdueAssetDesc* Desc) 
     return HDUE_OK;
 }
 HdueResult HDUE_CALL RemoveAsset(HdueSession Handle, const char* Id) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.Remove(UTF8_TO_TCHAR(Id));
     Runtime.Session->HasRequest=false; ReleaseResidency(Runtime.Session); Runtime.World->SetShouldTick(true);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL AssetStatus(HdueSession Handle, const char* Id, HdueAssetStatus* Status) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Id || !Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Id || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
     return Runtime.Session->Scene->Assets.GetStatus(UTF8_TO_TCHAR(Id),*Status);
 }
 HdueResult HDUE_CALL AssetSceneStatus(HdueSession Handle, HdueAssetSceneStatus* Status) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.GetSceneStatus(*Status); return HDUE_OK;
 }
 }
@@ -1248,12 +1304,11 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32 Version, 
 // Resizes the session's render target in place, keeping its scene: recreating the session for a new viewport size
 // rebuilt every mesh, material and texture (seconds on large scenes, e.g. leaving a camera in Houdini).
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Handle, uint32 Width, uint32 Height) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
+    HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Width || !Height || Width > 8192 || Height > 8192) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     if (Session->Width == Width && Session->Height == Height) return HDUE_OK;
-    // In-flight readbacks reference the old target size.
-    FlushRenderingCommands();
+    // In-flight readbacks reference the old target size: release them after the commands already queued.
     ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) { for (auto& R : Session->Readbacks) R.Reset(); for (auto& R : Session->DepthReadbacks) R.Reset(); });
     FlushRenderingCommands();
     Session->InFlight.Reset();
