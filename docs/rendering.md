@@ -194,12 +194,14 @@ The render settings LOP lists every user-facing `FPostProcessSettings` property 
 
 | Folder | Console variables |
 | --- | --- |
-| Scalability | `sg.*Quality` (Low to Cinematic, default Epic): the levels of UE's scalability groups |
+| Scalability | `sg.*Quality` (Low to Cinematic): the levels of UE's scalability groups; Epic in the viewport, Cinematic in husk (see below) |
 | Resolution and Anti-Aliasing | `r.AntiAliasingMethod` (None, FXAA, TAA, TSR), `r.ScreenPercentage` (realtime beauty), `r.HdUE.InteractiveResolution` and `r.HdUE.InteractiveScreenPercentage` (Houdini's viewport renders at 50% while moving) |
 | Lumen | `r.Lumen.HardwareRayTracing`, `r.Lumen.Reflections.HardwareRayTracing`; quality and hit lighting are post-process properties |
 | Shadows | `r.Shadow.Virtual.Enable` (off in this project), resolution biases and soft-shadow rays, `r.Shadow.FilterMethod`, `r.RayTracing.Shadows` |
 | Nanite, MegaLights, Ray Tracing | `r.Nanite`, `r.Nanite.MaxPixelsPerEdge`, `r.MegaLights.NumSamplesPerPixel`, `r.MegaLights.DefaultShadowMethod`, `r.RayTracing.Enable` |
 | Path Tracer | `r.PathTracing.ApproximateCaustics`, `r.PathTracing.FilterWidth` |
+
+Batch renders (husk, the USD Render ROP) apply an offline profile like Movie Render Queue's Game Overrides: Cinematic scalability (the screen percentage stays), all used textures fully streamed in before frames count (`r.Streaming.FullyLoadUsedTextures`, pending virtual-texture tiles loaded), `r.D3D12.GPUTimeout 0` so long Path Tracer dispatches are not reset by Windows, and Lumen final gather, scene lighting and scene detail quality of at least 2. Authored `hdUE:cvar:*` and `hdUE:postProcess:*` values win. The Houdini viewport keeps UE's interactive defaults.
 
 Other console variables work as attributes too. `scripts/Test-RenderSettings.ps1 -RuntimeConfig <config>` renders with every generated setting at its default and fails if UE skipped one or if a console variable's generated default differs from UE's value.
 
