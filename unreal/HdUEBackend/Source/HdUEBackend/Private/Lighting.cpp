@@ -258,8 +258,10 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         Light = NewObject<UDirectionalLightComponent>(Actor);
     else if (D.type == HDUE_RECT_LIGHT || D.type == HDUE_DISK_LIGHT)
         Light = NewObject<URectLightComponent>(Actor);
-    // ShapingAPI's default cone (90) already cuts emission beyond it: a sphere light is a spot up to 90 degrees.
-    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle <= 90)
+    // A sphere light is a spot below 90 degrees. ShapingAPI's default cone (90, a hemisphere) stays a point light: UE
+    // clamps spots to 89 degrees with no penumbra, and the Path Tracer then lit a 90-degree cone at 0.2-0.4x Karma, and
+    // cut a straight-down IES beam to 0.63x (the light in a Z-up Cornell box). Light above the horizon is kept (1.15x).
+    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle < 90)
         Light = NewObject<USpotLightComponent>(Actor);
     else
         Light = NewObject<UPointLightComponent>(Actor);
