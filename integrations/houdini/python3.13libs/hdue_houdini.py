@@ -12,7 +12,7 @@ import traceback
 from pathlib import Path
 
 import hou
-from pxr import Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
+from pxr import Plug, Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT = Path(__file__).resolve().parents[3]
 # Appended: hdUE's modules must not shadow Houdini's or another package's.
@@ -92,9 +92,11 @@ class Host:
             self.log_dir / "ue.log",
             start=False,
         )
-        self.api = Viewport(
-            self.runtime, os.environ["HDUE_HOUDINI_PLUGIN"]
-        )  # set by the package and Launch-Houdini.ps1
+        # The delegate DLL Houdini registered (PXR_PLUGINPATH_NAME): the host's diagnostics live in the same module.
+        plugin = Plug.Registry().GetPluginForType(Tf.Type.FindByName(PLUGIN))
+        if plugin is None:
+            raise RuntimeError(PLUGIN + " is not on PXR_PLUGINPATH_NAME")
+        self.api = Viewport(self.runtime, plugin.path)
         from hdue_materialx import PreparedMaterials
         from substrate_live import LivePreparation
 
