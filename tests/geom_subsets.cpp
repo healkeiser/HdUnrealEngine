@@ -80,6 +80,7 @@ int main() {
         mesh.id = "/Mesh";
         mesh.scenePath = "/Source/Mesh";
         mesh.material = "/Looks/Default";
+        mesh.renderTag = TfToken("geometry");
         mesh.indices = indices;
         mesh.sourceCorners = welded;
         for (const uint32_t corner : welded) {
@@ -97,6 +98,7 @@ int main() {
                 require(index < part.points.size() && part.sourceCorners.size() == part.points.size());
         require(parts[0].material == mesh.material && parts[1].material == "/Looks/Red");
         require(parts[1].id == "/Mesh/Quad" && parts[1].scenePath == mesh.scenePath);
+        require(parts[0].renderTag == mesh.renderTag && parts[1].renderTag == mesh.renderTag);  // purposes
         for (const auto& part : parts)
             for (size_t i = 0; i < part.points.size(); ++i)
                 require(part.points[i][0] == part.uv[i][0] && part.normals[i] == GfVec3f(0, 1, 0) &&

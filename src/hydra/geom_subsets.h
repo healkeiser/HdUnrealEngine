@@ -34,6 +34,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
     prototype.sceneAsset = mesh.sceneAsset;
     prototype.transform = mesh.transform;
     prototype.visible = mesh.visible;
+    prototype.renderTag = mesh.renderTag;  // a part without its purpose was hidden by the render-tag filter
     prototype.bindingPath = mesh.bindingPath;
     prototype.maskErrors = mesh.maskErrors;
     prototype.sourceId = mesh.sourceId;
