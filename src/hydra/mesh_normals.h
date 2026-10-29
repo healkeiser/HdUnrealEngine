@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 PXR_NAMESPACE_OPEN_SCOPE
+// Area-weighted normals per point.
 inline std::vector<GfVec3f> HdUEComputeSmoothNormals(const VtVec3fArray& points, const VtVec3iArray& triangles) {
     std::vector<GfVec3d> sums(points.size(),GfVec3d(0));
     for (const auto& triangle:triangles) {
@@ -20,8 +21,6 @@ inline std::vector<GfVec3f> HdUEComputeSmoothNormals(const VtVec3fArray& points,
         for (int corner:{0,1,2}) sums[triangle[corner]]+=area;
     }
     for (auto& normal:sums) if (normal.GetLengthSq()>1e-24) normal.Normalize();
-    std::vector<GfVec3f> expanded; expanded.reserve(triangles.size()*3);
-    for (const auto& triangle:triangles) for (int corner:{0,1,2}) expanded.emplace_back(sums[triangle[corner]]);
-    return expanded;
+    return std::vector<GfVec3f>(sums.begin(),sums.end());
 }
 PXR_NAMESPACE_CLOSE_SCOPE

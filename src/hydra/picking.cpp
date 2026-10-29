@@ -4,18 +4,20 @@
 #include <stdexcept>
 
 PXR_NAMESPACE_OPEN_SCOPE
-HdUEPickMesh::HdUEPickMesh(const std::vector<GfVec3f>& points) {
-    if (points.size() % 3) throw std::invalid_argument("Pick mesh must contain expanded triangles");
-    triangles_.resize(points.size() / 3);
+HdUEPickMesh::HdUEPickMesh(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices) {
+    if (indices.size() % 3 || std::any_of(indices.begin(), indices.end(), [&](uint32_t i) { return i >= points.size(); }))
+        throw std::invalid_argument("Pick mesh must contain indexed triangles");
+    triangles_.resize(indices.size() / 3);
     std::iota(triangles_.begin(), triangles_.end(), 0u);
-    if (!triangles_.empty()) build(points, 0, uint32_t(triangles_.size()));
+    if (!triangles_.empty()) build(points, indices, 0, uint32_t(triangles_.size()));
 }
-uint32_t HdUEPickMesh::build(const std::vector<GfVec3f>& points, uint32_t begin, uint32_t end) {
+uint32_t HdUEPickMesh::build(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices, uint32_t begin, uint32_t end) {
+    const auto corner = [&](uint32_t tri, int c) { return points[indices[size_t(tri) * 3 + c]]; };
     const uint32_t index = uint32_t(nodes_.size());
     nodes_.emplace_back();
     GfRange3d bounds;
     for (uint32_t i = begin; i < end; ++i)
-        for (uint32_t c = 0; c < 3; ++c) bounds.UnionWith(GfVec3d(points[size_t(triangles_[i]) * 3 + c]));
+        for (int c = 0; c < 3; ++c) bounds.UnionWith(GfVec3d(corner(triangles_[i], c)));
     nodes_[index].bounds = bounds;
     if (end - begin <= 8) {
         nodes_[index].begin = begin; nodes_[index].count = end - begin;
@@ -24,18 +26,17 @@ uint32_t HdUEPickMesh::build(const std::vector<GfVec3f>& points, uint32_t begin,
         const int axis = size[0] > size[1] ? (size[0] > size[2] ? 0 : 2) : (size[1] > size[2] ? 1 : 2);
         const uint32_t middle = begin + (end - begin) / 2;
         const auto centroid = [&](uint32_t tri) {
-            const size_t p = size_t(tri) * 3;
-            return double(points[p][axis]) + points[p + 1][axis] + points[p + 2][axis];
+            return double(corner(tri, 0)[axis]) + corner(tri, 1)[axis] + corner(tri, 2)[axis];
         };
         std::nth_element(triangles_.begin() + begin, triangles_.begin() + middle, triangles_.begin() + end,
             [&](uint32_t a, uint32_t b) { return centroid(a) < centroid(b); });
-        const uint32_t left = build(points, begin, middle);
-        const uint32_t right = build(points, middle, end);
+        const uint32_t left = build(points, indices, begin, middle);
+        const uint32_t right = build(points, indices, middle, end);
         nodes_[index].left = left; nodes_[index].right = right;
     }
     return index;
 }
-bool HdUEPickMesh::intersect(const std::vector<GfVec3f>& points, const GfRay& ray,
+bool HdUEPickMesh::intersect(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices, const GfRay& ray,
                             double minimum, double maximum, HdUEPickHit* hit, bool twoSided) const {
     if (nodes_.empty() || !hit || minimum > maximum) return false;
     std::vector<uint32_t> stack; stack.reserve(64); stack.push_back(0);
@@ -48,7 +49,7 @@ bool HdUEPickMesh::intersect(const std::vector<GfVec3f>& points, const GfRay& ra
         for (uint32_t i = node.begin; i < node.begin + node.count; ++i) {
             const uint32_t tri = triangles_[i]; const size_t p = size_t(tri) * 3;
             double distance = 0; GfVec3d barycentric; bool front = false;
-            if (ray.Intersect(GfVec3d(points[p]), GfVec3d(points[p + 1]), GfVec3d(points[p + 2]),
+            if (ray.Intersect(GfVec3d(points[indices[p]]), GfVec3d(points[indices[p + 1]]), GfVec3d(points[indices[p + 2]]),
                               &distance, &barycentric, &front, maximum) && distance >= minimum && (front || twoSided)) {
                 maximum = distance;
                 *hit = {distance, tri, barycentric}; found = true;

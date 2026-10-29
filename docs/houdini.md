@@ -117,7 +117,7 @@ COP evaluation and EXR export run outside LOP cooks. Dirty and time-dependent ou
 
 Copernicus color outputs use 32-bit float linear Rec.709 with the default OCIO configuration. Inputs marked `raw` bypass conversion. Custom configurations must supply the corresponding output colorspace. Legacy COP color-plane export requires integer frames.
 
-Rendering currently connects these textures to base color. Direct MaterialX Image-to-Standard Surface/OpenPBR base-color connections receive a basic Preview Surface fallback while retaining the MaterialX terminal. Dynamic normal/roughness textures, alpha-to-opacity wiring, COP UDIM collections, and texture replacement inside cooked native materials are not implemented.
+MaterialX Image nodes and UsdUVTexture read these textures in every input hdUE translates (see [MaterialX surfaces](rendering.md#materialx-surfaces)); the basic Preview Surface fallback added to MaterialX-only materials is kept for other Hydra renderers. COP UDIM collections, alpha-to-opacity wiring, COP UDIM collections, and texture replacement inside cooked native materials are not implemented.
 
 Embedded `opdef:` images are also supported. Houdini extracts the original image bytes into immutable content-hash files without changing the source definition or USD asset. MaterialX preparation automatically extracts these images when `houdini_root` is configured; `Import-UsdMaterialX.ps1 -HoudiniRoot` can select it explicitly.
 

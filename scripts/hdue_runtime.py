@@ -7,7 +7,7 @@ import threading
 
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
-ABI_VERSION = 7  # HDUE_ABI_VERSION
+ABI_VERSION = 8  # HDUE_ABI_VERSION
 
 
 class InitDesc(C.Structure):

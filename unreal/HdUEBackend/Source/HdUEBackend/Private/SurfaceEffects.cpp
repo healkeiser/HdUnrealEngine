@@ -2,6 +2,7 @@
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
+#include "DynamicMesh/NonManifoldMappingSupport.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "MaterialShared.h"
@@ -48,8 +49,11 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
         }
         if (D.amount<=0.f && !(D.flags & (HDUE_WET_MASK_PREVIEW|HDUE_SURFACE_GRAPH))) continue;
         const auto& Mesh = Component->GetDynamicMesh()->GetMeshRef();
-        if (D.mask_count && D.mask_count != uint32(Mesh.VertexCount())) {
-            Error = TEXT("Wet mask count does not match expanded vertices: ") + Id; return HDUE_INVALID_ARGUMENT;
+        // Masks are per uploaded vertex; BuildDynamicMesh's copies of non-manifold vertices map back to theirs.
+        const UE::Geometry::FNonManifoldMappingSupport Sources(Mesh);
+        int32 Uploaded = 0; for (const int32 V : Mesh.VertexIndicesItr()) Uploaded += !Sources.IsNonManifoldVertexID(V);
+        if (D.mask_count && D.mask_count != uint32(Uploaded)) {
+            Error = TEXT("Wet mask count does not match the mesh's vertices: ") + Id; return HDUE_INVALID_ARGUMENT;
         }
         auto New = MakeShared<FWet>();
         if (D.mask_count) {
@@ -112,10 +116,11 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
             Mesh.Attributes()->EnablePrimaryColors();
             auto* Colors = Mesh.Attributes()->PrimaryColors();
             Colors->ClearElements();
+            const FNonManifoldMappingSupport Sources(Mesh);
             for (int32 T : Mesh.TriangleIndicesItr()) {
                 auto Vertices = Mesh.GetTriangle(T);
                 FIndex3i Elements;
-                for (int C=0; C<3; ++C) Elements[C] = Colors->AppendElement(FVector4f(P.Wet->Mask[Vertices[C]], 0.f, 0.f, 1.f));
+                for (int C=0; C<3; ++C) Elements[C] = Colors->AppendElement(FVector4f(P.Wet->Mask[Sources.GetOriginalNonManifoldVertexID(Vertices[C])], 0.f, 0.f, 1.f));
                 Colors->SetTriangle(T, Elements);
             }
             P.Component->FastNotifyColorsUpdated();

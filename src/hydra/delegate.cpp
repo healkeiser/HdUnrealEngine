@@ -27,7 +27,6 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
-#include <numeric>
 #include <limits>
 #include <algorithm>
 #include <sstream>
@@ -41,6 +40,8 @@
 #include <OpenImageDenoise/oidn.hpp>
 #endif
 #include <windows.h>
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hd/driver.h"
 #if defined(HDUE_HOUDINI)
 #define HDUE_VIEWPORT_EXPORTS 1 // hdue_run_ui_tasks is defined below
 #include "../houdini/diagnostics.h"
@@ -59,6 +60,16 @@ FILE* traceSink() {
     }();
     return sink;
 }
+void trace(const char* format, ...);
+}
+void HdUETraceThread(const char* call) {
+    static const bool enabled = TfGetenvBool("HDUE_TRACE_THREADS", false);
+    if (!enabled) return;
+    static std::mutex mutex; static std::set<std::pair<std::string, DWORD>> seen;
+    std::lock_guard lock(mutex);
+    if (seen.emplace(call, GetCurrentThreadId()).second) trace("hdUE thread %lu: %s\n", GetCurrentThreadId(), call);
+}
+namespace {
 void trace(const char* format, ...) {
     static const bool enabled = TfGetenvBool("HDUE_TRACE_TIMING", false);
     if (!enabled) return;
@@ -76,7 +87,7 @@ struct HdUESelfHost {
     std::unique_ptr<hdue::Backend> backend;
     HWND window = nullptr;
     DWORD thread = 0;
-    std::atomic<int> delegates{0};
+    std::atomic<int> delegates{0}, paused{0};
     // Houdini's UI (HDUE_HOUDINI_UI, set by hdue_houdini): UE ticks continuously on this thread while a delegate
     // exists, Execute only submits and polls, and UE outlives individual viewports until hdue_shutdown_ue.
     bool continuous = false;
@@ -254,7 +265,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             {
                 std::unique_lock lock(host.queueMutex);
                 const auto due = [&host] { return host.stopping || !host.queue.empty(); };
-                const bool ticking = host.continuous && host.delegates > 0;
+                const bool ticking = host.continuous && host.delegates > host.paused; // UE idles while every viewport is paused
                 if (ticking) host.queueReady.wait_for(lock, std::chrono::milliseconds(2), due);
                 else host.queueReady.wait(lock, due);
                 if (host.stopping && host.queue.empty()) return;
@@ -406,6 +417,14 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         desc.occlusion = data.occlusion; desc.clearcoat = data.clearcoat; desc.clearcoat_roughness = data.clearcoatRoughness; desc.ior = data.ior;
         for (int i = 0; i < 3; ++i) desc.specular_color[i] = data.specularColor[i];
         if (data.specularWorkflow) desc.flags |= HDUE_MATERIAL_SPECULAR_WORKFLOW;
+        desc.subsurface = data.subsurface; desc.sheen = data.sheen; desc.sheen_roughness = data.sheenRoughness;
+        for (int i = 0; i < 3; ++i) {
+            desc.subsurface_color[i] = data.subsurfaceColor[i]; desc.subsurface_radius[i] = data.subsurfaceRadius[i] * units;
+            desc.sheen_color[i] = data.sheenColor[i]; desc.coat_color[i] = data.coatColor[i];
+        }
+        if (data.thinWalled) desc.flags |= HDUE_MATERIAL_THIN_WALLED;
+        if (data.subsurfaceBaseTexture) desc.flags |= HDUE_MATERIAL_SUBSURFACE_BASE_TEXTURE;
+        if (data.sheenBaseTexture) desc.flags |= HDUE_MATERIAL_SHEEN_BASE_TEXTURE;
         packet.materials.push_back(desc);
         if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
     }
@@ -456,7 +475,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             }
             if (data.uv.size() == data.points.size()) { uv.push_back(data.uv[i][0]); uv.push_back(1 - data.uv[i][1]); }
         }
-        std::vector<uint32_t> index(data.points.size()); std::iota(index.begin(), index.end(), 0u);
+        auto index = data.indices;
         // World transforms are baked into dynamic vertices. Preserve front
         // faces when an authored transform adds another handedness reversal.
         if (bake.GetDeterminant() < 0)
@@ -661,8 +680,11 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     if (batch.reset_scene || batch.mesh_count || batch.material_count || batch.light_count || batch.removed_count) {
         const auto applyStart = std::chrono::steady_clock::now();
         backend.require(backend.api().apply_scene(session, &batch), "apply_scene");
-        trace("hdUE scene submit: UE apply %.1f ms (%u meshes, %u materials, %u lights)\n",
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(), batch.mesh_count, batch.material_count, batch.light_count);
+        uint64_t vertices = 0, triangles = 0;
+        for (const auto& mesh : packet.meshes) { vertices += mesh.vertex_count; triangles += mesh.index_count / 3; }
+        trace("hdUE scene submit: UE apply %.1f ms (%u meshes: %llu vertices, %llu triangles; %u materials, %u lights)\n",
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(), batch.mesh_count,
+            (unsigned long long)vertices, (unsigned long long)triangles, batch.material_count, batch.light_count);
         double syncMs = 0; int syncs = 0; HdUETakeMeshSyncStats(syncMs, syncs);
         if (syncs) trace("hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads\n", syncs, syncMs);
     }
@@ -706,6 +728,8 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
     }
     trace("hdUE scene prepare: %.1f ms under the state lock\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     HdueSurfaceStatus surface{sizeof(HdueSurfaceStatus)};
+    if (!packet.meshes.empty() || !packet.materials.empty())
+        state.setStage("Uploading scene: " + std::to_string(packet.meshes.size()) + " meshes, " + std::to_string(packet.materials.size()) + " materials");
     try {
         sendScene(state, packet);
         if (packet.surfaceUpdate) {
@@ -719,6 +743,7 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
         packet.giveBack(state);
         throw;
     }
+    state.setStage("Rendering");
     std::lock_guard lock(state.mutex);
     finishScene(state, packet, surface);
 }
@@ -890,6 +915,7 @@ public:
         const HdCamera* GetCamera() const { return camera; }
     };
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
+        HdUETraceThread("Execute");
         const auto pass = std::make_shared<const PassSnapshot>(PassSnapshot{state->GetAovBindings(), state->GetWorldToViewMatrix(),
             state->GetProjectionMatrix(), state->GetCamera()});
         // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
@@ -909,7 +935,9 @@ public:
             host.post([this, pass, tags] {
                 executeQueued_ = false; executeOnce(pass, tags);
                 // Between Executes, keep publishing frames UE finishes for the last camera.
-                selfHost().pumps[this] = [this, pass, tags] { if (!executeQueued_ && !IsConverged()) executeOnce(pass, tags); };
+                selfHost().pumps[this] = [this, pass, tags] {
+                    if (!executeQueued_ && !IsConverged() && !state_->paused) executeOnce(pass, tags);
+                };
             });
             return;
         }
@@ -1094,7 +1122,11 @@ public:
             // continuous camera input can discard every image before presentation.
             HdueFrameInfo frame{}; frame.struct_size = sizeof(frame);
             const auto result = s.backend->api().poll_frame(s.session, &frame);
-            if (result == HDUE_OK && frame.generation == s.generation && frame.frame_id != lastFrame_) {
+            // The newest finished frame always shows, as in UE's own viewport: one for a previous camera, setting or scene
+            // stays up until the current request's frames arrive, so the viewport never blanks or stalls. Only frames of
+            // the current request count as converged.
+            if (result == HDUE_OK && frame.generation <= s.generation && frame.frame_id != lastFrame_) {
+                if (frame.generation != s.generation) frame.converged = 0;
                 const auto copyStart = Clock::now();
                 std::vector<float> pixels = buffer->takeSpare(size_t(frame.required_bytes / sizeof(float)));
                 const auto copy = s.backend->api().copy_frame(s.session, frame.frame_id, pixels.data(), frame.required_bytes);
@@ -1178,7 +1210,9 @@ public:
                     buffer->GetWidth(), buffer->GetHeight(), aovs_.size(), aovSlot_, aovInFlight_, aovsDone_, s.error.c_str());
                 std::fflush(stderr);
             }
-            const bool deferCamera = needsRequest && !changed && !settingsChanged && s.generation && !s.lastFrame.frame_id;
+            // Batch hosts (husk) coalesce camera updates until a frame arrives; Houdini's viewport requests the newest
+            // camera at once and keeps showing finished frames meanwhile, so navigation runs at UE's frame rate.
+            const bool deferCamera = !selfHost().continuous && needsRequest && !changed && !settingsChanged && s.generation && !s.lastFrame.frame_id;
             if (deferCamera) {
                 // Read the newest matrices on the next Execute; never queue every
                 // mouse event or invalidate an in-flight camera image repeatedly.
@@ -1402,9 +1436,12 @@ HdUERenderDelegate::~HdUERenderDelegate() {
         } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE: %s", e.what()); }
         return;
     }
+    if (selfHosted_ && state_->paused) --host.paused;
     if (--host.delegates > 0) return;
     if (host.continuous) {
-        // Houdini's UI keeps UE for the next viewport (one UE lifetime per process); hdue_shutdown_ue ends it.
+        // Houdini's UI keeps UE for the next viewport (one UE lifetime per process); hdue_shutdown_ue ends it. A paused
+        // (deactivated) delegate can outlive that shutdown: its session ended with UE.
+        if (!host.worker.joinable()) return;
         host.run([&] {
             std::lock_guard lock(state_->mutex);
             if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
@@ -1480,8 +1517,28 @@ HdBprim* HdUERenderDelegate::CreateBprim(const TfToken& type, const SdfPath& id)
 }
 HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return CreateBprim(type, SdfPath::EmptyPath()); }
 void HdUERenderDelegate::DestroyBprim(HdBprim* p) { delete p; }
+void HdUERenderDelegate::CommitResources(HdChangeTracker*) { HdUETraceThread("CommitResources"); }
+void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
+    HdUETraceThread("SetDrivers");
+    for (const auto* driver : drivers) {
+        std::string kind = driver->driver.GetTypeName();
+        if (driver->driver.IsHolding<Hgi*>()) if (auto* hgi = driver->driver.UncheckedGet<Hgi*>()) kind += " " + hgi->GetAPIName().GetString();
+        trace("hdUE driver %s: %s\n", driver->name.GetText(), kind.c_str());
+    }
+}
+bool HdUERenderDelegate::Pause() { return setPaused(true); }
+bool HdUERenderDelegate::Resume() { return setPaused(false); }
+bool HdUERenderDelegate::setPaused(bool paused) {
+    if (state_->paused.exchange(paused) == paused) return true;
+    auto& host = selfHost();
+    if (selfHosted_) host.paused += paused ? 1 : -1;
+    host.queueReady.notify_one(); // the UE thread re-evaluates whether to tick
+    return true;
+}
 HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const {
-    if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat32Vec4,false,VtValue(GfVec4f(0)));
+    // Half float: UE renders in it, and Houdini's viewport uploads the CPU colour buffer on every redraw (a 2.5 MP
+    // float32 image cost its UI thread ~100 ms per frame).
+    if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat16Vec4,false,VtValue(GfVec4f(0)));
     if(const auto aov=HdUEAovId(name); aov==HDUE_AOV_PRIM_ID || aov==HDUE_AOV_INSTANCE_ID)
         return HdAovDescriptor(HdFormatInt32,false,VtValue(-1));
     if(const auto aov=HdUEAovId(name)) return aov==HDUE_AOV_ALBEDO || aov==HDUE_AOV_NORMAL
@@ -1500,6 +1557,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) {
     if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
     if(key.GetString().starts_with("hdUE:")) { SetRenderSetting(TfToken(key.GetString().substr(5)),value); return; }
+    if (key == TfToken("houdini:render_pause")) { setPaused(value.IsHolding<bool>() ? value.UncheckedGet<bool>() : value.IsHolding<int>() && value.UncheckedGet<int>()); return; }
     if (key==TfToken("stageMetersPerUnit")) {
         SetRenderSetting(TfToken("metersPerUnit"),value); return;
     }
@@ -1577,8 +1635,12 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
                 std::lock_guard lock(state->statsMutex); state->stats = std::move(fresh); state->statsPending = false;
             });
         }
-        std::lock_guard lock(state_->statsMutex);
-        return state_->stats;
+        VtDictionary stats;
+        { std::lock_guard lock(state_->statsMutex); stats = state_->stats; }
+        auto error = host.error();
+        if (const auto it = stats.find("error"); error.empty() && it != stats.end() && it->second.IsHolding<std::string>()) error = it->second.UncheckedGet<std::string>();
+        stats["rendererStage"] = VtValue(!error.empty() ? error : state_->currentStage());
+        return stats;
     }
     VtDictionary stats;
     try { ueRun([&] { stats = renderStats(*state_); }); } catch (const std::exception& e) { stats["error"] = VtValue(std::string(e.what())); }
@@ -1594,7 +1656,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     VtDictionary nativeAssetIds;
     int triangles = 0;
     for (const auto& [id, mesh] : state.meshes) {
-        triangles += int(mesh.points.size() / 3);
+        triangles += int(mesh.indices.size() / 3);
         if (!mesh.sceneAsset.empty()) nativeAssetIds[mesh.scenePath]=VtValue(id);
     }
     int translucentMaterials = 0;
@@ -1736,18 +1798,18 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
     }
     for (auto& [id, mesh] : state_->meshes) {
         if (!mesh.visible || mesh.points.empty() || !asset(*state_, "nativeMeshAssets", id).empty() || std::abs(mesh.transform.GetDeterminant()) < 1e-20) continue;
-        if (!mesh.pickMesh) mesh.pickMesh = std::make_shared<HdUEPickMesh>(mesh.points); // lazily, on the first pick
+        if (!mesh.pickMesh) mesh.pickMesh = std::make_shared<HdUEPickMesh>(mesh.points, mesh.indices); // lazily, on the first pick
         const auto material = asset(*state_, "nativeMaterialAssets", mesh.material);
         const bool twoSided = !material.empty() && (state_->pickMaterialFlags.at(material) & HDUE_PICK_MATERIAL_TWO_SIDED);
         const auto inverse = mesh.transform.GetInverse();
         // Preserve the ray parameter through nonuniform/negative scale.
         const GfRay local(inverse.Transform(origin), inverse.TransformDir(direction));
         HdUEPickHit hit;
-        if (!mesh.pickMesh->intersect(mesh.points, local, minimum, maximum, &hit, twoSided)) continue;
+        if (!mesh.pickMesh->intersect(mesh.points, mesh.indices, local, minimum, maximum, &hit, twoSided)) continue;
         maximum = hit.distance;
         const GfVec3d point = origin + direction * hit.distance;
         GfVec3d normal(0);
-        for (int c = 0; c < 3; ++c) normal += GfVec3d(mesh.normals[size_t(hit.triangle) * 3 + c]) * hit.barycentric[c];
+        for (int c = 0; c < 3; ++c) normal += GfVec3d(mesh.normals[mesh.indices[size_t(hit.triangle) * 3 + c]]) * hit.barycentric[c];
         normal = inverse.GetTranspose().TransformDir(normal).GetNormalized();
         if (twoSided && GfDot(normal, direction) > 0) normal = -normal;
         store(mesh.scenePath, point, normal, hit.distance, mesh.sceneAsset.empty() ? "usd" : "ue-asset-bounds");

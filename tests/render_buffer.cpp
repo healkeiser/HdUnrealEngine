@@ -1,3 +1,4 @@
+#include "pxr/base/gf/half.h"
 #include "delegate.h"
 #include "depth.h"
 #include <iostream>
@@ -36,7 +37,17 @@ int main(int argc, char** argv) {
         }
         HdUERenderBuffer buffer(SdfPath("/test"));
         check(!buffer.Allocate(GfVec3i(-1, 1, 1), HdFormatFloat32Vec4, false), "negative allocation accepted");
-        check(!buffer.Allocate(GfVec3i(2, 1, 1), HdFormatFloat16Vec4, false), "unsupported format accepted");
+        check(!buffer.Allocate(GfVec3i(2, 1, 1), HdFormatUNorm8Vec4, false), "unsupported format accepted");
+        {
+            // The viewport colour AOV is half float: float images are encoded (and flipped) on publish.
+            HdUERenderBuffer half(SdfPath("/half"));
+            check(half.Allocate(GfVec3i(1, 2, 1), HdFormatFloat16Vec4, false), "half-float allocation rejected");
+            HdueFrameInfo info{}; info.width = 1; info.height = 2;
+            half.publish(info, {0.5f, 1.f, 2.f, 1.f, 3.f, 0.f, 0.f, 1.f});
+            const auto* texels = static_cast<const GfHalf*>(half.Map());
+            check(texels && float(texels[0]) == 3.f && float(texels[4]) == 0.5f && float(texels[6]) == 2.f, "half-float image not encoded bottom-up");
+            half.Unmap();
+        }
         check(buffer.Allocate(GfVec3i(2, 1, 1), HdFormatFloat32Vec4, false), "valid allocation rejected");
         HdueFrameInfo frame{}; frame.width = 2; frame.height = 1; frame.converged = 1;
         buffer.publish(frame, std::vector<float>(8, 1));

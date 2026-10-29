@@ -3,9 +3,9 @@
     "valid": "env:HDUE_HOUDINI_ENABLE",
     "menulabel": "Unreal Engine (hdUE)",
     "menupriority": 30,
-    "allowbackgroundupdate": false,
+    "allowbackgroundupdate": true,
     "viewportrenderer": false,
-    "destroyifdeactivated": true,
+    "destroyifdeactivated": false,
     "pauseonupdate": false,
     "defaultpurposes": ["default", "render"],
     "drawmodesupport": false,
@@ -13,7 +13,7 @@
     "needsselection": true,
     "depthstyle": "linear",
     "aovsupport": true,
-    "statsdatapaths": {"rendererStage": "error", "totalClockTime": "totalClockTime", "percentDone": "percentDone"},
+    "statsdatapaths": {"rendererStage": "rendererStage", "totalClockTime": "totalClockTime", "percentDone": "percentDone"},
     "viewstats": ["nativeActors", "nativeMeshes", "completedSamples"]
   }
 }

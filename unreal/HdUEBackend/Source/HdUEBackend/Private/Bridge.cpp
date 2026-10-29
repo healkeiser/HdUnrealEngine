@@ -64,6 +64,7 @@ struct FReadbackJob {
     uint64 Generation = 0;
     uint32 Samples = 0;
     uint32 DrawIndex = 0;
+    uint32 FullResIndex = 0; // 0 for a reduced-resolution draw (camera moving); only full-resolution draws converge
     double Started = 0;
     HdueRenderRequest Request{};
     double RequestedAt = 0;
@@ -84,7 +85,7 @@ struct FSession {
     HdueRenderRequest Request{};
     bool HasRequest = false;
     bool CameraCut = true;
-    uint32 Draws = 0;
+    uint32 Draws = 0, FullResDraws = 0;
     double LastReadback = 0; // when the last draw was read back; intermediate draws skip it
     double RequestedAt = 0;
     // Readbacks in flight, oldest first. Interactive hosts keep up to three so frames overlap their GPU->CPU copies;
@@ -358,10 +359,10 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     // reset, and every Path Tracer request starts a fresh accumulation.
     const bool Aov = Request->aov != HDUE_AOV_COLOR;
     const auto& Previous = Session->BeautyRequest;
+    // Settings changes (Lumen, samples, warmup, post) keep it too: rebuilding it blanked and reconverged the image,
+    // where UE's own viewport changes instantly.
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
-        Previous.time_seconds == Request->time_seconds && Previous.lumen_enabled == Request->lumen_enabled &&
-        Previous.samples_per_pixel == Request->samples_per_pixel && Previous.warmup_frames == Request->warmup_frames &&
-        Previous.aov == Request->aov;
+        Previous.time_seconds == Request->time_seconds && Previous.aov == Request->aov;
     if (Aov) {
         if (!Session->AovViewState) Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     } else if (!KeepHistory) {
@@ -373,7 +374,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     Session->Request = *Request;
     if (!Aov) Session->BeautyRequest = *Request;
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
-    Session->Draws = 0;
+    Session->Draws = 0; Session->FullResDraws = 0;
     Session->HasRequest = true;
     Session->RequestedAt = FPlatformTime::Seconds();
     Runtime.Error.Empty();
@@ -405,7 +406,14 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     FEngineShowFlags Flags(ESFIM_Game);
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
-    Flags.SetScreenPercentage(false);
+    // Interactive realtime navigation renders at half resolution, upsampled by TSR, until requests stop for 250 ms.
+    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
+    const bool Moving = Interactive && !PathTracing && !Aov && FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
+    const float ScreenFraction = Moving ? 0.5f : 1.f;
+    Flags.SetScreenPercentage(Moving);
+    // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
+    // frames that can (adding latency).
+    if (Interactive && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
     Flags.SetOnScreenDebug(false); // UE draws warnings (e.g. exposure clipping) into the frame otherwise
     Flags.SetTonemapper(!Aov && Session->Tonemapper);
     Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // AEM_Manual: applies AutoExposureBias, never adapts
@@ -500,11 +508,12 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
     }
     Family.Views.Add(View);
-    Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, 1.0f));
+    Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, ScreenFraction, 1.0f));
     FCanvas Canvas(Resource, nullptr, Runtime.World, Runtime.World->GetFeatureLevel());
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
+    Job->FullResIndex = Moving ? 0 : ++Session->FullResDraws;
     Job->Started = FPlatformTime::Seconds();
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
@@ -516,7 +525,6 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // followed by more draws until it can be read back.
     // Interactive hosts (-hdUEInteractive: Houdini's viewport) read back every draw they can, so navigation shows
     // frames at UE's rate rather than four progress images a second.
-    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
     int32 FreeSlot = -1;
     for (int32 Slot = 0; Slot < FSession::ReadbackSlots && FreeSlot < 0; ++Slot)
         if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; })) FreeSlot = Slot;
@@ -589,7 +597,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
             Info.required_bytes = uint64(Width) * Height * 4 * sizeof(float);
             Info.completed_samples = Job->Samples;
             Info.converged = !Job->Preparing && (Request.mode == HDUE_PATH_TRACED
-                ? Job->Samples >= Request.samples_per_pixel : Job->DrawIndex >= FMath::Max(1u, Request.warmup_frames));
+                ? Job->Samples >= Request.samples_per_pixel : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames));
             Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
             Info.readback_ms = (Now - Job->Started) * 1000;
             FScopeLock Lock(&Session->FrameMutex);
@@ -643,7 +651,7 @@ HdueResult HDUE_CALL Tick() {
             Session->ViewState->Destroy();
             Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
             Session->Preparing = false;
-            Session->Draws = 0;
+            Session->Draws = 0; Session->FullResDraws = 0;
             Session->CameraCut = true;
         }
     }
@@ -661,7 +669,9 @@ HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
     if (!ValidSession(Handle) || !Frame || Frame->struct_size != sizeof(*Frame)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     FScopeLock Lock(&Session->FrameMutex);
-    if (!Session->HasRequest || !Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_PENDING;
+    // The newest beauty frame, possibly for an earlier request of this scene (a previous camera while navigating): the
+    // caller decides from its generation whether to show it. A scene change cancels the request, and with it the frame.
+    if (!Session->HasRequest || !Session->Frame.frame_id) return HDUE_PENDING;
     *Frame = Session->Frame;
     return HDUE_OK;
 }
@@ -781,7 +791,7 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
         FMemory::Memcpy(Buffer, Session->AovPixels.GetData(), Session->AovFrame.required_bytes);
         return HDUE_OK;
     }
-    if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id || Session->Frame.generation != Session->BeautyRequest.generation) return HDUE_STALE_FRAME;
+    if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id) return HDUE_STALE_FRAME;
     if (Capacity < Session->Frame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
     // A 1080p RGBA float frame is 33 MB: copy it in parallel chunks.
     const uint64 Bytes = Session->Frame.required_bytes, Chunk = 1 << 20;
@@ -808,7 +818,7 @@ HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,u
     const auto Session=Runtime.Session;
     FScopeLock Lock(&Session->FrameMutex);
     if(!Session->DepthEnabled) return HDUE_NOT_SUPPORTED;
-    if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id || Session->Frame.generation!=Session->BeautyRequest.generation) return HDUE_STALE_FRAME;
+    if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id) return HDUE_STALE_FRAME;
     const uint64 Bytes=uint64(Session->Width)*Session->Height*sizeof(float);
     if(Capacity<Bytes) return HDUE_BUFFER_TOO_SMALL;
     if(Session->DepthPixels.Num()!=int64(Session->Width)*Session->Height) return HDUE_PENDING;
@@ -1046,7 +1056,7 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
     Session->ViewState->Destroy();
     Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     if (Session->AovViewState) { Session->AovViewState->Destroy(); Session->AovViewState = nullptr; }
-    Session->Draws = 0; Session->CameraCut = true;
+    Session->Draws = 0; Session->FullResDraws = 0; Session->CameraCut = true;
     {
         FScopeLock Lock(&Session->FrameMutex);
         Session->Frame = {}; Session->AovFrame = {}; Session->Pixels.Reset(); Session->DepthPixels.Reset();

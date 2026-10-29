@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 7u
+#define HDUE_ABI_VERSION 8u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -134,11 +134,15 @@ typedef struct HdueFrameInfo {
 
 enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2,
     HDUE_CAMERA_DISTANT_LIGHT = 3 };
-/* UsdPreviewSurface inputs that can be driven by a UsdUVTexture. */
+/* Material inputs that can be driven by a texture (UsdUVTexture, MaterialX image). */
 enum { HDUE_TEXTURE_BASE_COLOR = 0, HDUE_TEXTURE_EMISSIVE = 1, HDUE_TEXTURE_METALLIC = 2,
     HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_DISPLACEMENT = 6,
     HDUE_TEXTURE_OCCLUSION = 7, HDUE_TEXTURE_CLEARCOAT = 8, HDUE_TEXTURE_CLEARCOAT_ROUGHNESS = 9, HDUE_TEXTURE_SPECULAR_COLOR = 10,
     HDUE_TEXTURE_SLOT_COUNT = 11 };
+/* Colour slots hold (sRGB-encoded, for 8-bit files) colours; the others hold linear data. */
+static inline int hdue_texture_is_color(uint32_t slot) {
+    return slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE || slot == HDUE_TEXTURE_SPECULAR_COLOR;
+}
 typedef struct HdueTextureDesc {
     const char* file; /* Null or empty: the slot uses its constant. */
     /* value = texel * scale + bias. Scalar slots first reduce the texel with channel_mask. */
@@ -163,9 +167,19 @@ typedef struct HdueMaterialDesc {
     /* UsdPreviewSurface: occlusion, clear coat, index of refraction, and specularColor for the specular workflow. */
     float occlusion, clearcoat, clearcoat_roughness, ior;
     float specular_color[3];
+    /* ABI 8, MaterialX standard_surface / OpenPBR; zero for UsdPreviewSurface. subsurface or sheen > 0 selects the
+     * layered Standard Surface parent. Colours are linear Rec.709; subsurface_radius is the mean free path in cm. */
+    float subsurface, subsurface_color[3], subsurface_radius[3];
+    float sheen, sheen_color[3], sheen_roughness;
+    float coat_color[3];
 } HdueMaterialDesc;
 /* useSpecularWorkflow: diffuse and F0 come from diffuseColor and specularColor instead of metallic and ior. */
 #define HDUE_MATERIAL_SPECULAR_WORKFLOW 2u
+/* thin_walled: a two-sided thin shell (cloth, leaves) that transmits its subsurface colour. */
+#define HDUE_MATERIAL_THIN_WALLED 4u
+/* subsurface_color / sheen_color are multiplied by the base color texture (the input reads the base color's image). */
+#define HDUE_MATERIAL_SUBSURFACE_BASE_TEXTURE 8u
+#define HDUE_MATERIAL_SHEEN_BASE_TEXTURE 16u
 /* Multiply the base color by the mesh's colors / instance_colors (displayColor primvars). */
 #define HDUE_MATERIAL_VERTEX_COLOR 1u
 typedef struct HdueMeshDesc {

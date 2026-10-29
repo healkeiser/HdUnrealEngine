@@ -7,6 +7,8 @@
 #include "Components/RectLightComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
+#include "DynamicMesh/MeshNormals.h"
+#include "DynamicMesh/NonManifoldMappingSupport.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
@@ -24,6 +26,8 @@
 #include "TextureResource.h"
 #include "DynamicMeshToMeshDescription.h"
 #include "StaticMeshAttributes.h"
+#include "ImageCore.h"
+#include "ImageCoreUtils.h"
 #include "NaniteBuilder.h"
 #include "Rendering/NaniteResources.h"
 #include "StaticMeshResources.h"
@@ -200,13 +204,77 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
     if (!On) BindMaterials();
     return true;
 }
+namespace {
+// A decoded image and its mip levels down to 1x1, in the pixel format its texture uses. Transient textures get no
+// mips of their own: one level aliased fine detail (moire on fabric) and read full-size texels at any distance.
+// The next mip level: a 2x2 box filter (edge texels repeat on odd sizes). 8-bit sRGB averages in linear light through
+// lookup tables; UE's general ResizeImage filtered every texel in float and more than doubled texture load time.
+void HalveImage(const FImage& Source, FImage& Target) {
+    const int32 SW = Source.SizeX, SH = Source.SizeY, TW = Target.SizeX, TH = Target.SizeY;
+    const auto Tap = [&](int32 X, int32 Y) { return int64(FMath::Min(Y, SH - 1)) * SW + FMath::Min(X, SW - 1); };
+    if (Source.Format == ERawImageFormat::BGRA8) {
+        static const auto Tables = [] {
+            struct { float ToLinear[256]; uint8 ToSRGB[4096]; } T;
+            for (int32 I = 0; I < 256; ++I) T.ToLinear[I] = FLinearColor::FromSRGBColor(FColor(I, 0, 0)).R;
+            for (int32 I = 0; I < 4096; ++I) T.ToSRGB[I] = FLinearColor(I / 4095.f, 0, 0).ToFColor(true).R;
+            return T;
+        }();
+        const bool SRGB = Source.GammaSpace == EGammaSpace::sRGB;
+        const FColor* In = reinterpret_cast<const FColor*>(Source.RawData.GetData());
+        FColor* Out = reinterpret_cast<FColor*>(Target.RawData.GetData());
+        ParallelFor(TH, [&](int32 Y) {
+            for (int32 X = 0; X < TW; ++X) {
+                const FColor Texels[4] = {In[Tap(2 * X, 2 * Y)], In[Tap(2 * X + 1, 2 * Y)], In[Tap(2 * X, 2 * Y + 1)], In[Tap(2 * X + 1, 2 * Y + 1)]};
+                const auto Average = [&](uint8 FColor::*Channel, bool Linear) {
+                    if (!Linear) return uint8((Texels[0].*Channel + Texels[1].*Channel + Texels[2].*Channel + Texels[3].*Channel + 2) / 4);
+                    float Sum = 0; for (const FColor& Texel : Texels) Sum += Tables.ToLinear[Texel.*Channel];
+                    return Tables.ToSRGB[FMath::Clamp(int32(Sum * (4095.f / 4.f) + .5f), 0, 4095)];
+                };
+                Out[int64(Y) * TW + X] = FColor(Average(&FColor::R, SRGB), Average(&FColor::G, SRGB), Average(&FColor::B, SRGB), Average(&FColor::A, false));
+            }
+        });
+        return;
+    }
+    FImageCore::ResizeImage(Source, Target); // float and other formats: rare, keep UE's filter
+}
+TArray<FImage> MipChain(FImage&& Image) {
+    ERawImageFormat::Type Raw;
+    FImageCoreUtils::GetPixelFormatForRawImageFormat(Image.Format, &Raw);
+    TArray<FImage> Chain;
+    if (Image.Format == Raw) Chain.Add(MoveTemp(Image));
+    else Image.CopyTo(Chain.AddDefaulted_GetRef(), Raw, Image.GammaSpace);
+    while (Chain.Last().SizeX > 1 || Chain.Last().SizeY > 1) {
+        const FImage& Previous = Chain.Last();
+        FImage Next(FMath::Max(1, Previous.SizeX / 2), FMath::Max(1, Previous.SizeY / 2), Raw, Previous.GammaSpace);
+        HalveImage(Previous, Next);
+        Chain.Add(MoveTemp(Next));
+    }
+    return Chain;
+}
+UTexture2D* MippedTexture(const TArray<FImage>& Chain) {
+    UTexture2D* Texture = UTexture2D::CreateTransient(Chain[0].SizeX, Chain[0].SizeY, FImageCoreUtils::GetPixelFormatForRawImageFormat(Chain[0].Format));
+    if (!Texture) return nullptr;
+    Texture->bNotOfflineProcessed = true;
+    auto& Mips = Texture->GetPlatformData()->Mips;
+    for (int32 Level = 0; Level < Chain.Num(); ++Level) {
+        if (Level) Mips.Add(new FTexture2DMipMap(Chain[Level].SizeX, Chain[Level].SizeY, 1));
+        auto& Bulk = Mips[Level].BulkData;
+        void* Data = Bulk.Lock(LOCK_READ_WRITE);
+        if (Level) Data = Bulk.Realloc(Chain[Level].RawData.Num());
+        FMemory::Memcpy(Data, Chain[Level].RawData.GetData(), Chain[Level].RawData.Num());
+        Bulk.Unlock();
+    }
+    Texture->UpdateResource();
+    return Texture;
+}
+}
 UTexture2D* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
     const FString Key = File + (SRGB ? TEXT("|srgb") : TEXT("|raw"));
     if (const auto* Cached = PreviewTextures.Find(Key)) return Cached->Get();
     const double ImportStart = FPlatformTime::Seconds();
     // Images decoded in parallel by Apply; files outside a batch (lights) decode here.
     UTexture2D* Texture = nullptr;
-    if (FImage* Decoded = DecodedImages.Find(File)) Texture = FImageUtils::CreateTexture2DFromImage(*Decoded);
+    if (const TArray<FImage>* Decoded = DecodedImages.Find(File)) Texture = MippedTexture(*Decoded);
     else Texture = FImageUtils::ImportFileAsTexture2D(File);
     TextureSeconds += FPlatformTime::Seconds() - ImportStart; ++TextureImports;
     if (!Texture) { Error = FString::Printf(TEXT("Failed to import texture %s."), *File); return nullptr; }
@@ -316,7 +384,11 @@ void FHdueScene::TickConversions() {
 }
 
 namespace {
-// One Hydra mesh as an FDynamicMesh3; pure CPU work, so Apply builds a batch's meshes in parallel.
+// One Hydra mesh as an FDynamicMesh3; pure CPU work, so Apply builds a batch's meshes in parallel. Each vertex has
+// one normal, UV and colour element, shared by its triangles (element ID = vertex ID). A triangle FDynamicMesh3
+// rejects on shared vertices (a non-manifold edge, or a repeated or opposite-wound copy as on two-sided cards) gets
+// copies of its vertices, as FMeshDescriptionToDynamicMesh does; FNonManifoldMappingSupport maps copies back to
+// their source vertex (surface masks are per source vertex).
 UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
     using namespace UE::Geometry;
     FDynamicMesh3 Mesh;
@@ -327,25 +399,29 @@ UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
     auto* Colors = Mesh.Attributes()->PrimaryColors();
     auto* NormalOverlay = Mesh.Attributes()->PrimaryNormals();
     auto* UVOverlay = Mesh.Attributes()->PrimaryUV();
-    for (uint32 V = 0; V < Desc.vertex_count; ++V) Mesh.AppendVertex(FVector3d(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]));
+    const auto Append = [&](uint32 V) {
+        NormalOverlay->AppendElement(Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FVector3f::ZeroVector);
+        UVOverlay->AppendElement(Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector);
+        Colors->AppendElement(Desc.colors ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f) : FVector4f(1.f, 1.f, 1.f, 1.f));
+        return Mesh.AppendVertex(FVector3d(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]));
+    };
+    for (uint32 V = 0; V < Desc.vertex_count; ++V) Append(V);
+    TArray<int32> Sources; // per vertex, once a copy exists
     for (uint32 I = 0; I < Desc.index_count; I += 3) {
-        const FIndex3i Vertices(Desc.indices[I], Desc.indices[I + 1], Desc.indices[I + 2]);
-        const int32 Triangle = Mesh.AppendTriangle(Vertices);
-        if (Triangle < 0) continue;
-        const FVector3f FaceNormal = FVector3f(Mesh.GetTriNormal(Triangle));
-        FIndex3i NormalIds, UVIds, ColorIds;
-        for (int C = 0; C < 3; ++C) {
-            const auto V = Vertices[C];
-            const FVector3f Normal = Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FaceNormal;
-            const FVector2f UV = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
-            NormalIds[C] = NormalOverlay->AppendElement(Normal);
-            UVIds[C] = UVOverlay->AppendElement(UV);
-            ColorIds[C] = Colors->AppendElement(Desc.colors ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f) : FVector4f(1.f, 1.f, 1.f, 1.f));
+        FIndex3i Vertices(Desc.indices[I], Desc.indices[I + 1], Desc.indices[I + 2]);
+        int32 Triangle = Mesh.AppendTriangle(Vertices);
+        if (Triangle == FDynamicMesh3::NonManifoldID || Triangle == FDynamicMesh3::DuplicateTriangleID) {
+            if (Sources.IsEmpty()) for (uint32 V = 0; V < Desc.vertex_count; ++V) Sources.Add(int32(V));
+            for (int C = 0; C < 3; ++C) { Sources.Add(Vertices[C]); Vertices[C] = Append(Desc.indices[I + C]); }
+            Triangle = Mesh.AppendTriangle(Vertices);
         }
-        NormalOverlay->SetTriangle(Triangle, NormalIds);
-        UVOverlay->SetTriangle(Triangle, UVIds);
-        Colors->SetTriangle(Triangle, ColorIds);
+        if (Triangle < 0) continue; // degenerate: a repeated vertex
+        NormalOverlay->SetTriangle(Triangle, Vertices);
+        UVOverlay->SetTriangle(Triangle, Vertices);
+        Colors->SetTriangle(Triangle, Vertices);
     }
+    if (!Desc.normals) FMeshNormals::InitializeOverlayToPerTriangleNormals(NormalOverlay);
+    if (!Sources.IsEmpty()) FNonManifoldMappingSupport::AttachNonManifoldVertexMappingData(Sources, Mesh);
     return Mesh;
 }
 }
@@ -354,17 +430,19 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         (Batch.light_count && !Batch.lights) || (Batch.removed_count && !Batch.removed_ids)) {
         Error = TEXT("Missing scene batch data."); return false;
     }
-    // Validate all mesh array bounds before mutating the scene.
-    for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
+    // Validate mesh array bounds before mutating the scene. An invalid mesh is skipped (and its previous version
+    // removed) with a warning naming it; the rest of the batch still applies. Arrays are int32-addressed in UE.
+    TArray<bool> ValidMeshes; ValidMeshes.Init(true, int32(Batch.mesh_count));
+    ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
         const auto& Mesh = Batch.meshes[Index];
-        if (!Mesh.id || Mesh.index_count % 3 || Mesh.vertex_count > 10000000 || (Mesh.instance_transforms && Mesh.instance_count > 10000000) ||
-            (Mesh.vertex_count && !Mesh.positions) || (Mesh.index_count && !Mesh.indices)) {
-            Error = TEXT("Invalid mesh descriptor."); return false;
-        }
-        for (uint32 I = 0; I < Mesh.index_count; ++I) {
-            if (Mesh.indices[I] >= Mesh.vertex_count) { Error = TEXT("Mesh index out of range."); return false; }
-        }
-    }
+        const TCHAR* Problem = !Mesh.id ? TEXT("no ID") : Mesh.index_count % 3 ? TEXT("index count is not a multiple of 3")
+            : Mesh.vertex_count > uint32(MAX_int32 / 3) || Mesh.index_count > uint32(MAX_int32) || (Mesh.instance_transforms && Mesh.instance_count > uint32(MAX_int32 / 16))
+            ? TEXT("too large for 32-bit arrays") : (Mesh.vertex_count && !Mesh.positions) || (Mesh.index_count && !Mesh.indices) ? TEXT("missing positions or indices") : nullptr;
+        for (uint32 I = 0; !Problem && I < Mesh.index_count; ++I) if (Mesh.indices[I] >= Mesh.vertex_count) Problem = TEXT("index out of range");
+        if (!Problem) return;
+        ValidMeshes[Index] = false;
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped mesh %s (%u vertices, %u indices): %s."), Mesh.id ? UTF8_TO_TCHAR(Mesh.id) : TEXT("without ID"), Mesh.vertex_count, Mesh.index_count, Problem);
+    });
     if (IdMode) { FString Ignored; SetIdMode(0, Ignored); }
     if (Batch.reset_scene) {
         Lighting->Clear();
@@ -397,16 +475,18 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 if (!Desc.textures[Slot].file || !*Desc.textures[Slot].file) continue;
                 const FString File = UTF8_TO_TCHAR(Desc.textures[Slot].file);
-                const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE || Slot == HDUE_TEXTURE_SPECULAR_COLOR;
+                const bool Color = hdue_texture_is_color(Slot) != 0;
                 if (!PreviewTextures.Contains(File + (Color ? TEXT("|srgb") : TEXT("|raw"))) && !DecodedImages.Contains(File)) Files.AddUnique(File);
             }
         }
         if (Files.Num()) {
             const double DecodeStart = FPlatformTime::Seconds();
-            TArray<FImage> Images; Images.SetNum(Files.Num());
-            TArray<uint8> Loaded; Loaded.SetNumZeroed(Files.Num());
-            ParallelFor(Files.Num(), [&](int32 Index) { Loaded[Index] = FImageUtils::LoadImage(*Files[Index], Images[Index]) ? 1 : 0; });
-            for (int32 Index = 0; Index < Files.Num(); ++Index) if (Loaded[Index]) DecodedImages.Add(Files[Index], MoveTemp(Images[Index]));
+            TArray<TArray<FImage>> Chains; Chains.SetNum(Files.Num());
+            ParallelFor(Files.Num(), [&](int32 Index) {
+                FImage Image;
+                if (FImageUtils::LoadImage(*Files[Index], Image)) Chains[Index] = MipChain(MoveTemp(Image));
+            });
+            for (int32 Index = 0; Index < Files.Num(); ++Index) if (Chains[Index].Num()) DecodedImages.Add(Files[Index], MoveTemp(Chains[Index]));
             TextureSeconds += FPlatformTime::Seconds() - DecodeStart;
         }
     }
@@ -429,10 +509,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             // UsdPreviewSurface: opacityThreshold > 0 is cutout; otherwise partial opacity is see-through.
             const bool Masked = Desc.opacity_threshold > 0.f;
             const bool Translucent = !Masked && (Opacity < 1.f || HasTexture(HDUE_TEXTURE_OPACITY));
-            const TCHAR* ParentPath = Masked ? TEXT("/Game/HdUE/M_PreviewSurfaceMasked.M_PreviewSurfaceMasked")
-                : Translucent ? TEXT("/Game/HdUE/M_PreviewSurfaceTranslucent.M_PreviewSurfaceTranslucent")
-                : TEXT("/Game/HdUE/M_PreviewSurface.M_PreviewSurface");
-            auto* Parent = LoadObject<UMaterialInterface>(nullptr, ParentPath);
+            // MaterialX subsurface and sheen need the layered Standard Surface parents (UE's Substrate standard_surface,
+            // several slabs per pixel); everything else stays on the single-slab Preview Surface parents.
+            const bool Layered = !Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f);
+            const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
+            const FString ParentName = Layered ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""), Thin ? TEXT("Thin") : TEXT(""))
+                : Masked ? TEXT("M_PreviewSurfaceMasked") : Translucent ? TEXT("M_PreviewSurfaceTranslucent") : TEXT("M_PreviewSurface");
+            auto* Parent = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/HdUE/%s.%s"), *ParentName, *ParentName));
             if (Parent) {
                 auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
                 static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {TEXT("BaseColor"), TEXT("Emissive"), TEXT("Metallic"), TEXT("Roughness"), TEXT("Opacity"), TEXT("Normal"), TEXT("Displacement"),
@@ -456,7 +539,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                         Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
                         continue;
                     }
-                    const bool Color = Slot == HDUE_TEXTURE_BASE_COLOR || Slot == HDUE_TEXTURE_EMISSIVE || Slot == HDUE_TEXTURE_SPECULAR_COLOR;
+                    const bool Color = hdue_texture_is_color(Slot) != 0;
                     UTexture2D* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), Color, Error);
                     if (!Image) return false;
                     Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image);
@@ -475,6 +558,19 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 const float F0 = FMath::Square((Ior - 1.f) / (Ior + 1.f));
                 Instance->SetScalarParameterValue(TEXT("SpecularLevel"), FMath::Clamp(F0 / 0.08f, 0.f, 1.f));
                 Instance->SetScalarParameterValue(TEXT("UseSpecularWorkflow"), (Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW) ? 1.f : 0.f);
+                if (Layered) {
+                    const auto Color = [](const float* C) { return FLinearColor(C[0], C[1], C[2], 1); };
+                    Instance->SetScalarParameterValue(TEXT("SpecularIOR"), Ior);
+                    Instance->SetVectorParameterValue(TEXT("CoatColor"), Color(Desc.coat_color));
+                    Instance->SetScalarParameterValue(TEXT("Subsurface"), Desc.subsurface);
+                    Instance->SetVectorParameterValue(TEXT("SubsurfaceColor"), Color(Desc.subsurface_color));
+                    Instance->SetVectorParameterValue(TEXT("SubsurfaceRadius"), Color(Desc.subsurface_radius));
+                    Instance->SetScalarParameterValue(TEXT("SubsurfaceBaseTexture"), (Desc.flags & HDUE_MATERIAL_SUBSURFACE_BASE_TEXTURE) ? 1.f : 0.f);
+                    Instance->SetScalarParameterValue(TEXT("Sheen"), Desc.sheen);
+                    Instance->SetVectorParameterValue(TEXT("SheenColor"), Color(Desc.sheen_color));
+                    Instance->SetScalarParameterValue(TEXT("SheenRoughness"), Desc.sheen_roughness);
+                    Instance->SetScalarParameterValue(TEXT("SheenBaseTexture"), (Desc.flags & HDUE_MATERIAL_SHEEN_BASE_TEXTURE) ? 1.f : 0.f);
+                }
                 Instance->SetScalarParameterValue(TEXT("UseVertexColor"), (Desc.flags & HDUE_MATERIAL_VERTEX_COLOR) ? 1.f : 0.f);
                 Material = Instance;
             }
@@ -506,7 +602,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     };
     ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
         const auto& Desc = Batch.meshes[Index];
-        if (Desc.native_asset && *Desc.native_asset) return;
+        if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
         BuiltMeshes[Index] = BuildDynamicMesh(Desc);
         if (StaticGenerated(Desc)) {
             FStaticMeshAttributes Attributes(Descriptions[Index]); Attributes.Register();
@@ -516,6 +612,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     });
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Desc = Batch.meshes[Index];
+        if (!ValidMeshes[int32(Index)]) { if (Desc.id) Remove(UTF8_TO_TCHAR(Desc.id)); continue; }
         const FString Id = UTF8_TO_TCHAR(Desc.id);
         AActor* Actor = Actors.FindRef(Id);
         const bool Native = Desc.native_asset && *Desc.native_asset;

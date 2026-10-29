@@ -6,16 +6,21 @@
 #include <algorithm>
 
 PXR_NAMESPACE_OPEN_SCOPE
-// The bridge has one material per mesh. Partition expanded triangles by their
-// coarse USD face, preserving face-varying attributes and the original pick path.
+// The bridge has one material per mesh. Partition indexed triangles by their coarse USD face; each part keeps
+// its own copy of the vertices it uses (shared vertices are duplicated across parts), and the original pick path.
 inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
     HdUEMeshData mesh, const HdMeshTopology& topology, const VtIntArray& faceParams) {
     if (topology.GetGeomSubsets().empty() || !mesh.sceneAsset.empty()) {
         std::vector<HdUEMeshData> result; result.emplace_back(std::move(mesh)); return result;
     }
-    if (mesh.points.size() != faceParams.size() * 3 || mesh.normals.size() != mesh.points.size() ||
-        (!mesh.uv.empty() && mesh.uv.size() != mesh.points.size()))
-        throw std::invalid_argument("Invalid expanded subset attributes");
+    const size_t vertices = mesh.points.size();
+    const auto sized = [&](size_t size) { return size == vertices; };
+    if (mesh.indices.size() != faceParams.size() * 3 || !sized(mesh.normals.size()) || !sized(mesh.sourceCorners.size()) ||
+        (!mesh.uv.empty() && !sized(mesh.uv.size())) || (!mesh.colors.empty() && !sized(mesh.colors.size())) ||
+        !std::all_of(mesh.indices.begin(), mesh.indices.end(), [&](uint32_t index) { return index < vertices; }) ||
+        !std::all_of(mesh.deformOffsets.begin(), mesh.deformOffsets.end(), [&](const auto& offsets) { return sized(offsets.size()); }) ||
+        !std::all_of(mesh.masks.begin(), mesh.masks.end(), [&](const auto& mask) { return sized(mask.second.size()); }))
+        throw std::invalid_argument("Invalid indexed subset attributes");
     std::vector<int> owners(topology.GetFaceVertexCounts().size(), 0);
     HdUEMeshData prototype;
     prototype.id=mesh.id; prototype.material=mesh.material; prototype.scenePath=mesh.scenePath;
@@ -39,23 +44,33 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
             owners[face] = owner;
         }
     }
-    for (auto& part : parts) {
-        part.points.clear(); part.normals.clear(); part.uv.clear(); part.colors.clear(); part.pickMesh.reset();
-    }
+    // Each part's local index of a mesh vertex, valid where stamp holds the part.
+    std::vector<uint32_t> local(vertices);
+    std::vector<int> stamp(vertices, -1);
+    std::vector<std::vector<uint32_t>> triangles(parts.size());
     for (size_t triangle = 0; triangle < faceParams.size(); ++triangle) {
         const int face = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(faceParams[triangle]);
         if (face < 0 || size_t(face) >= owners.size()) throw std::invalid_argument("Invalid subset coarse face");
-        auto& part = parts[owners[face]];
-        for (size_t corner = triangle * 3; corner < triangle * 3 + 3; ++corner) {
-            part.points.push_back(mesh.points[corner]); part.normals.push_back(mesh.normals[corner]);
-            if (!mesh.uv.empty()) part.uv.push_back(mesh.uv[corner]);
-            if (!mesh.colors.empty()) part.colors.push_back(mesh.colors[corner]);
-            part.sourceCorners.push_back(uint32_t(corner));
-            for (size_t k = 0; k < mesh.deformOffsets.size(); ++k) part.deformOffsets[k].push_back(mesh.deformOffsets[k][corner]);
-            for (const auto& [name, values] : mesh.masks) part.masks[name].push_back(values.at(corner));
+        triangles[size_t(owners[face])].push_back(uint32_t(triangle));
+    }
+    for (size_t owner = 0; owner < parts.size(); ++owner) {
+        auto& part = parts[owner];
+        part.indices.reserve(triangles[owner].size() * 3);
+        for (const uint32_t triangle : triangles[owner]) for (size_t corner = triangle * 3; corner < triangle * 3 + 3; ++corner) {
+            const uint32_t vertex = mesh.indices[corner];
+            if (stamp[vertex] != int(owner)) {
+                stamp[vertex] = int(owner); local[vertex] = uint32_t(part.points.size());
+                part.points.push_back(mesh.points[vertex]); part.normals.push_back(mesh.normals[vertex]);
+                if (!mesh.uv.empty()) part.uv.push_back(mesh.uv[vertex]);
+                if (!mesh.colors.empty()) part.colors.push_back(mesh.colors[vertex]);
+                part.sourceCorners.push_back(mesh.sourceCorners[vertex]);
+                for (size_t k = 0; k < mesh.deformOffsets.size(); ++k) part.deformOffsets[k].push_back(mesh.deformOffsets[k][vertex]);
+                for (const auto& [name, values] : mesh.masks) part.masks[name].push_back(values[vertex]);
+            }
+            part.indices.push_back(local[vertex]);
         }
     }
-    parts.erase(std::remove_if(parts.begin(), parts.end(), [](const auto& part) { return part.points.empty(); }), parts.end());
+    parts.erase(std::remove_if(parts.begin(), parts.end(), [](const auto& part) { return part.indices.empty(); }), parts.end());
     return parts;
 }
 PXR_NAMESPACE_CLOSE_SCOPE

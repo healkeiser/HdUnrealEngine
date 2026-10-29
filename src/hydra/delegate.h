@@ -41,12 +41,14 @@ struct HdUEMotionSamples {
 };
 struct HdUEMeshData {
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
+    // Indexed triangles: three indices per triangle into the per-vertex arrays (points, normals, uv, colors, masks).
     std::vector<GfVec3f> points, normals;
     std::vector<GfVec2f> uv;
-    std::vector<GfVec3f> colors; // per corner; empty unless displayColor varies
+    std::vector<GfVec3f> colors; // empty unless displayColor varies
+    std::vector<uint32_t> indices;
     std::map<std::string, std::vector<float>> masks;
     std::map<std::string, std::string> maskErrors;
-    std::vector<uint32_t> sourceCorners;
+    std::vector<uint32_t> sourceCorners; // per vertex: a triangulated corner (3 * triangle + corner) of the source mesh
     GfMatrix4d transform{1};
     bool visible = true;
     int primId = -1; // HdRprim::GetPrimId, written by the ID pass
@@ -58,7 +60,7 @@ struct HdUEMeshData {
     // transform or each instance. Both factors are relative to the current frame (identity at t = 0).
     HdUEMotionSamples motionLeft, motionRight;
     std::vector<GfVec3f> velocities; // per instance, world units per frame
-    // Deformation blur: per-corner point offsets at frame-relative times (piecewise linear); empty unless points move.
+    // Deformation blur: per-vertex point offsets at frame-relative times (piecewise linear); empty unless points move.
     std::vector<float> deformTimes;
     std::vector<std::vector<GfVec3f>> deformOffsets;
     bool moving() const { return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !deformTimes.empty(); }
@@ -94,6 +96,10 @@ struct HdUEMaterialData {
     float occlusion = 1, clearcoat = 0, clearcoatRoughness = 0.01f, ior = 1.5f;
     GfVec3f specularColor{0};
     bool specularWorkflow = false;
+    // MaterialX standard_surface / OpenPBR; subsurfaceRadius is the mean free path in scene units.
+    float subsurface = 0, sheen = 0, sheenRoughness = .3f;
+    GfVec3f subsurfaceColor{1}, subsurfaceRadius{1}, sheenColor{1}, coatColor{1};
+    bool thinWalled = false, subsurfaceBaseTexture = false, sheenBaseTexture = false; // HDUE_MATERIAL_*
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false; // HDUE_MATERIAL_VERTEX_COLOR
@@ -122,6 +128,12 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
     std::map<std::string, HdUEMotionSamples> cameraMotion; // absolute camera transforms by camera id
+    std::atomic<bool> paused{false}; // Pause()/houdini:render_pause: no frames are requested or drawn
+    // What the renderer is doing, for Houdini's viewport (rendererStage). Its own lock: the UI reads it while the UE
+    // thread is busy uploading, when the stats refresh queued on that thread cannot run.
+    void setStage(std::string text) { std::lock_guard lock(stageMutex); stage = std::move(text); }
+    std::string currentStage() const { std::lock_guard lock(stageMutex); return stage; }
+    mutable std::mutex stageMutex; std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex; // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
     std::set<std::string> dirtyVolumes;
     std::map<std::string, uint64_t> geometryRevisions;
@@ -191,6 +203,9 @@ struct HdUEState : HdRenderParam {
     GfVec3d convert(const GfVec3d& point, bool direction = false) const { return converter()(point, direction); }
 };
 
+// HDUE_TRACE_THREADS=1: traces the first call of each Hydra entry point from each thread (with HDUE_TRACE_TIMING's sink).
+HDUE_HYDRA_API void HdUETraceThread(const char* call);
+
 class HDUE_HYDRA_API HdUERenderBuffer final : public HdRenderBuffer {
 public:
     explicit HdUERenderBuffer(const SdfPath& id);
@@ -205,8 +220,9 @@ public:
     bool IsMapped() const override;
     void Resolve() override {}
     bool IsConverged() const override;
+    // Publishes a top-down float image (channels per the format), stored bottom-up in the buffer's format.
     void publish(const HdueFrameInfo&, std::vector<float> pixels);
-    std::vector<float> takeSpare(size_t size); // a previous frame's allocation, sized for the next publish
+    std::vector<float> takeSpare(size_t size); // a previous frame's float allocation, sized for the next publish
     void invalidate();
     std::string allocationError() const { std::lock_guard lock(mutex_); return allocationError_; }
 protected:
@@ -217,8 +233,9 @@ private:
     HdFormat format_ = HdFormatFloat32Vec4;
     bool converged_ = false, multiSampled_ = false;
     std::string allocationError_;
-    std::shared_ptr<std::vector<float>> pixels_, pinned_;
-    std::vector<float> spare_;
+    std::shared_ptr<std::vector<uint8_t>> pixels_, pinned_; // in format_
+    std::vector<uint8_t> spareBytes_; // the replaced frame's storage, reused unless a Map still holds it
+    std::vector<float> spare_; // the last published float image, handed back by takeSpare
 };
 
 class HDUE_HYDRA_API HdUERenderDelegate final : public HdRenderDelegate {
@@ -228,9 +245,16 @@ public:
     const TfTokenVector& GetSupportedRprimTypes() const override;
     const TfTokenVector& GetSupportedSprimTypes() const override;
     const TfTokenVector& GetSupportedBprimTypes() const override;
+    // MaterialX surfaces first (materials.cpp maps them), then the universal UsdPreviewSurface.
+    TfTokenVector GetMaterialRenderContexts() const override { return {TfToken("mtlx"), TfToken()}; }
     HdRenderParam* GetRenderParam() const override { return state_.get(); }
     HdResourceRegistrySharedPtr GetResourceRegistry() const override { return registry_; }
     HdRenderPassSharedPtr CreateRenderPass(HdRenderIndex*, const HdRprimCollection&) override;
+    // Houdini pauses a deactivated viewport renderer (and on houdini:render_pause) instead of destroying it.
+    bool IsPauseSupported() const override { return true; }
+    bool Pause() override;
+    bool Resume() override;
+
     HdInstancer* CreateInstancer(HdSceneDelegate*, const SdfPath&) override;
     void DestroyInstancer(HdInstancer*) override;
     HdRprim* CreateRprim(const TfToken&, const SdfPath&) override;
@@ -241,7 +265,8 @@ public:
     HdBprim* CreateBprim(const TfToken&, const SdfPath&) override;
     HdBprim* CreateFallbackBprim(const TfToken&) override;
     void DestroyBprim(HdBprim*) override;
-    void CommitResources(HdChangeTracker*) override {}
+    void CommitResources(HdChangeTracker*) override;
+    void SetDrivers(const HdDriverVector& drivers) override;
     HdAovDescriptor GetDefaultAovDescriptor(const TfToken&) const override;
     HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
     void SetRenderSetting(const TfToken&, const VtValue&) override;
@@ -250,6 +275,7 @@ public:
 private:
     std::shared_ptr<HdUEState> state_;
     HdResourceRegistrySharedPtr registry_;
+    bool setPaused(bool paused);
     static VtDictionary renderStats(HdUEState& state);
     bool selfHosted_ = false; // this delegate counts towards the UE runtime it started (husk)
 };

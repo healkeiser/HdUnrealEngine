@@ -33,6 +33,10 @@
 #include "Materials/MaterialExpressionPerInstanceCustomData.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Materials/MaterialExpressionFloor.h"
+#include "Materials/MaterialExpressionMaterialFunctionCall.h"
+#include "Materials/MaterialExpressionFunctionInput.h"
+#include "Materials/MaterialExpressionStaticBool.h"
+#include "Materials/MaterialFunction.h"
 #include "Engine/VolumeTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
@@ -113,9 +117,11 @@ UTexture2D* CreateLinearWhite() {
     Texture->PostEditChange();
     return SaveAsset(Texture) ? Texture : nullptr;
 }
-// UsdPreviewSurface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar
-// inputs then dot <Slot>Mask), so an untextured input is Scale 0, Bias constant.
-UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite) {
+// Surface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar inputs then dot
+// <Slot>Mask), so an untextured input is Scale 0, Bias constant. Preview Surface masters shade
+// one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
+// same inputs to UE's Substrate standard_surface function, whose slabs and layers cost more per pixel.
+UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite, bool Layered = false, bool Thin = false) {
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
@@ -125,7 +131,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         return false;
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided &&
-        Material->GetEditorOnlyData()->WorldPositionOffset.Expression && HasParameter(Material, TEXT("PreviewSurfaceVersion3")) && Material->bUsedWithNanite)
+        Material->GetEditorOnlyData()->WorldPositionOffset.Expression && HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion1") : TEXT("PreviewSurfaceVersion3")) && Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -218,28 +224,62 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         auto* Expression = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
         Expression->ParameterName = Parameter; Expression->DefaultValue = Value; return Expression;
     };
-    // Metalness workflow, with ior as the dielectric specular level (the backend converts ior to it).
-    auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
-    Conversion->BaseColor.Connect(0, BaseColor); Conversion->Metallic.Connect(0, Metallic);
-    Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
-    // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
-    auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
-    Scalar(TEXT("PreviewSurfaceVersion3"), 3.f); // unconnected marker: bump the name when this graph changes, to regenerate
-    auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    Albedo->A.Connect(0, Conversion); Albedo->B.Connect(0, BaseColor); Albedo->Alpha.Connect(0, UseSpecular);
-    auto* F0 = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    F0->A.Connect(1, Conversion); F0->B.Connect(0, SpecularColor); F0->Alpha.Connect(0, UseSpecular);
-    auto* Slab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
-    Slab->DiffuseAlbedo.Connect(0, Albedo); Slab->F0.Connect(0, F0);
-    Slab->Roughness.Connect(0, Roughness); Slab->Normal.Connect(0, UnitNormal); Slab->EmissiveColor.Connect(0, Emissive);
+    UMaterialExpression* Front = nullptr;
     auto* Data = Material->GetEditorOnlyData();
     Data->BaseColor.Expression = nullptr; Data->Metallic.Expression = nullptr; Data->Roughness.Expression = nullptr;
-    // Clear coat as UE converts its own: a second specular lobe on the slab (Substrate haziness), with clearcoatRoughness
-    // and weighted by clearcoat. An approximation of a coat layer, without the coat's absorption over the base.
-    Slab->SecondRoughness.Connect(0, ClearcoatRoughness);
-    Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
-    auto* Layered = Slab;
-    Data->FrontMaterial.Connect(0, Layered);
+    if (Layered) {
+        Scalar(TEXT("StandardSurfaceVersion1"), 1.f); // unconnected marker: bump the name when this graph changes, to regenerate
+        auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
+        Call->SetMaterialFunction(LoadObject<UMaterialFunction>(nullptr, TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Opaque.Substrate-StandardSurface-Opaque")));
+        const auto Input = [&](const TCHAR* Input, UMaterialExpression* Expression) {
+            for (auto& Function : Call->FunctionInputs)
+                if (Function.ExpressionInput && Function.ExpressionInput->InputName == Input) { Function.Input.Connect(0, Expression); return; }
+            UE_LOG(LogTemp, Error, TEXT("Substrate standard_surface has no input %s"), Input);
+        };
+        const auto Constant = [&](float Value) { auto* Expression = Add(NewObject<UMaterialExpressionConstant>(Material)); Expression->R = Value; return Expression; };
+        // subsurface_color and sheen_color: a tint, times the base colour texture when they read its image.
+        const auto Tinted = [&](const TCHAR* Parameter) {
+            auto* Follow = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+            Follow->ConstA = 1.f; Follow->B.Connect(0, Surface); Follow->Alpha.Connect(0, Scalar(*(FString(Parameter) + TEXT("BaseTexture")), 0.f));
+            auto* Color = Add(NewObject<UMaterialExpressionMultiply>(Material));
+            Color->A.Connect(0, Vector(FString(Parameter) + TEXT("Color"), FLinearColor::White)); Color->B.Connect(0, Follow);
+            return Color;
+        };
+        // The delegate folds the base, specular and emission weights into their colours.
+        Input(TEXT("base"), Constant(1.f)); Input(TEXT("base_color"), BaseColor); Input(TEXT("metalness"), Metallic);
+        Input(TEXT("specular"), Constant(1.f)); Input(TEXT("specular_color"), SpecularColor); Input(TEXT("specular_roughness"), Roughness);
+        Input(TEXT("specular_IOR"), Scalar(TEXT("SpecularIOR"), 1.5f));
+        Input(TEXT("coat"), Clearcoat); Input(TEXT("coat_color"), Vector(TEXT("CoatColor"), FLinearColor::White)); Input(TEXT("coat_roughness"), ClearcoatRoughness);
+        Input(TEXT("sheen"), Scalar(TEXT("Sheen"), 0.f)); Input(TEXT("sheen_color"), Tinted(TEXT("Sheen"))); Input(TEXT("sheen_roughness"), Scalar(TEXT("SheenRoughness"), .3f));
+        Input(TEXT("subsurface"), Scalar(TEXT("Subsurface"), 0.f)); Input(TEXT("subsurface_color"), Tinted(TEXT("Subsurface")));
+        Input(TEXT("subsurface_radius"), Vector(TEXT("SubsurfaceRadius"), FLinearColor::White)); Input(TEXT("subsurface_scale"), Constant(1.f));
+        Input(TEXT("emission"), Constant(1.f)); Input(TEXT("emission_color"), Emissive);
+        Input(TEXT("normal"), UnitNormal);
+        auto* ThinWalled = Add(NewObject<UMaterialExpressionStaticBool>(Material)); ThinWalled->Value = Thin;
+        Input(TEXT("thin_walled"), ThinWalled);
+        Front = Call;
+    } else {
+        // Metalness workflow, with ior as the dielectric specular level (the backend converts ior to it).
+        auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
+        Conversion->BaseColor.Connect(0, BaseColor); Conversion->Metallic.Connect(0, Metallic);
+        Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
+        // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
+        auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
+        Scalar(TEXT("PreviewSurfaceVersion3"), 3.f); // unconnected marker: bump the name when this graph changes, to regenerate
+        auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+        Albedo->A.Connect(0, Conversion); Albedo->B.Connect(0, BaseColor); Albedo->Alpha.Connect(0, UseSpecular);
+        auto* F0 = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+        F0->A.Connect(1, Conversion); F0->B.Connect(0, SpecularColor); F0->Alpha.Connect(0, UseSpecular);
+        auto* Slab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
+        Slab->DiffuseAlbedo.Connect(0, Albedo); Slab->F0.Connect(0, F0);
+        Slab->Roughness.Connect(0, Roughness); Slab->Normal.Connect(0, UnitNormal); Slab->EmissiveColor.Connect(0, Emissive);
+        // Clear coat as UE converts its own: a second specular lobe on the slab (Substrate haziness), with clearcoatRoughness
+        // and weighted by clearcoat. An approximation of a coat layer, without the coat's absorption over the base.
+        Slab->SecondRoughness.Connect(0, ClearcoatRoughness);
+        Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
+        Front = Slab;
+    }
+    Data->FrontMaterial.Connect(0, Front);
     Data->AmbientOcclusion.Connect(0, Occlusion);
     Data->WorldPositionOffset.Connect(0, Offset);
     Material->BlendMode = Blend;
@@ -255,7 +295,7 @@ UMaterial* CreatePreviewSurface(const TCHAR* Name, EBlendMode Blend, UTexture* L
         Material->OpacityMaskClipValue = .5f;
     } else if (Blend == BLEND_TranslucentGreyTransmittance) {
         auto* Weight = Add(NewObject<UMaterialExpressionSubstrateWeight>(Material));
-        Weight->A.Connect(0, Layered); Weight->Weight.Connect(0, Opacity);
+        Weight->A.Connect(0, Front); Weight->Weight.Connect(0, Opacity);
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
@@ -493,9 +533,14 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
 {
     UTexture2D* LinearWhite = CreateLinearWhite();
     if (!LinearWhite) return 3;
-    UMaterial* Preview = CreatePreviewSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
-    UMaterial* Masked = CreatePreviewSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
-    UMaterial* Translucent = CreatePreviewSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
+    UMaterial* Preview = CreateSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
+    UMaterial* Masked = CreateSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
+    UMaterial* Translucent = CreateSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
+    // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's function).
+    for (const bool Thin : {false, true})
+        for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked})
+            if (!CreateSurface(*FString::Printf(TEXT("M_StandardSurface%s%s"), Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""), Thin ? TEXT("Thin") : TEXT("")),
+                    Blend, LinearWhite, true, Thin)) return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);

@@ -191,7 +191,7 @@ class Host:
         if self.closed: return
         self.running=False; self.timer.stop()
         self.live_substrate.close()
-        # destroyifdeactivated removes Hydra sessions before UE shutdown.
+        # Switch viewers away so their sessions end before UE shuts down (deactivated hdUE delegates only pause).
         try:
             for viewer in hou.ui.paneTabs():
                 if isinstance(viewer,hou.SceneViewer) and viewer.currentHydraRenderer() in (LABEL,PLUGIN):

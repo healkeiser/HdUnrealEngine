@@ -1,12 +1,15 @@
 #include "delegate.h"
 #include "pxr/base/work/loops.h"
+#include "pxr/base/gf/half.h"
 #include <algorithm>
+#include <cstring>
 PXR_NAMESPACE_OPEN_SCOPE
 HdUERenderBuffer::HdUERenderBuffer(const SdfPath& id) : HdRenderBuffer(id) {}
 bool HdUERenderBuffer::Allocate(const GfVec3i& dimensions, HdFormat format, bool multi) {
     std::lock_guard lock(mutex_);
     if (maps_ || dimensions[0] < 1 || dimensions[1] < 1 || dimensions[0] > 8192 || dimensions[1] > 8192 ||
-        dimensions[2] != 1 || (format != HdFormatFloat32Vec4 && format != HdFormatFloat32Vec3 && format != HdFormatFloat32 && format != HdFormatInt32)) {
+        dimensions[2] != 1 || (format != HdFormatFloat32Vec4 && format != HdFormatFloat16Vec4 && format != HdFormatFloat32Vec3 &&
+        format != HdFormatFloat32 && format != HdFormatInt32)) {
         allocationError_="dimensions="+std::to_string(dimensions[0])+","+std::to_string(dimensions[1])+","+std::to_string(dimensions[2])+
             " format="+std::to_string(int(format))+" multisampled="+std::to_string(multi)+" maps="+std::to_string(maps_);
         return false;
@@ -16,7 +19,7 @@ bool HdUERenderBuffer::Allocate(const GfVec3i& dimensions, HdFormat format, bool
     // UE publishes already resolved progressive images. Map and Resolve see
     // that same completed image, including Houdini's multiSampled request.
     multiSampled_=multi;
-    pixels_ = std::make_shared<std::vector<float>>(size_t(width_) * height_ * HdGetComponentCount(format_), 0.0f);
+    pixels_ = std::make_shared<std::vector<uint8_t>>(size_t(width_) * height_ * HdDataSizeOfFormat(format_), uint8_t(0));
     converged_ = false;
     return true;
 }
@@ -38,17 +41,25 @@ void HdUERenderBuffer::_Deallocate() { std::lock_guard lock(mutex_); pixels_.res
 }
 void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pixels) {
     std::lock_guard lock(mutex_);
-    const size_t channels=HdGetComponentCount(format_);
+    const size_t channels=HdGetComponentCount(format_), bytes=HdDataSizeOfFormat(format_);
     if (frame.width != width_ || frame.height != height_ || pixels.size() != size_t(width_) * height_ * channels) return;
-    // UE's C ABI is top-down. Hydra/Hdx CPU AOVs use a lower-left origin.
+    std::vector<uint8_t> out;
+    out.swap(spareBytes_);
+    out.resize(size_t(width_) * height_ * bytes);
+    // UE's C ABI is top-down; Hydra/Hdx CPU AOVs use a lower-left origin. Flip while encoding, one pass.
+    const bool half = HdGetComponentFormat(format_) == HdFormatFloat16;
     const size_t row = size_t(width_) * channels;
-    WorkParallelForN(height_ / 2, [&](size_t begin, size_t end) {
-        for (size_t y = begin; y < end; ++y)
-            std::swap_ranges(pixels.begin() + y * row, pixels.begin() + (y + 1) * row, pixels.begin() + (height_ - 1 - y) * row);
+    WorkParallelForN(height_, [&](size_t begin, size_t end) {
+        for (size_t y = begin; y < end; ++y) {
+            const float* source = pixels.data() + y * row;
+            uint8_t* target = out.data() + (height_ - 1 - y) * row * (bytes / channels);
+            if (half) for (size_t i = 0; i < row; ++i) reinterpret_cast<GfHalf*>(target)[i] = GfHalf(source[i]);
+            else std::memcpy(target, source, row * sizeof(float));
+        }
     });
-    // Keep the replaced frame's allocation for the next one unless a Map still holds it.
-    if (pixels_ && pixels_.use_count() == 1 && pixels_->size() == pixels.size()) spare_ = std::move(*pixels_);
-    pixels_ = std::make_shared<std::vector<float>>(std::move(pixels));
+    if (pixels_ && pixels_.use_count() == 1) spareBytes_.swap(*pixels_);
+    pixels_ = std::make_shared<std::vector<uint8_t>>(std::move(out));
+    spare_ = std::move(pixels);
     converged_ = frame.converged != 0;
 }
 std::vector<float> HdUERenderBuffer::takeSpare(size_t size) {
