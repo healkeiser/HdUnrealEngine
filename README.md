@@ -82,34 +82,52 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 0.1 s | 2.0 s | 7.8 s | 49.7 s | 56x / 4x | 0.60 / 1.00 |
-| Glossy materials | 0.1 s | 2.3 s | 6.2 s | 32.1 s | 41x / 3x | 0.72 / 1.20 |
-| Depth of field | 0.1 s | 2.4 s | 7.9 s | 49.9 s | 57x / 3x | 0.60 / 1.00 |
-| Motion blur | 0.2 s | 2.8 s | 22.6 s | 52.9 s | 119x / 8x | 0.59 / 1.00 |
-| Subdivision surfaces | 0.1 s | 3.4 s | 7.9 s | 49.6 s | 87x / 2x | 0.60 / 1.00 |
-| Instances, points, curves | 0.1 s | 2.1 s | 10.8 s | 51.2 s | 98x / 5x | 0.60 / 1.02 |
-| Volumes (OpenVDB) | 0.1 s | 2.3 s | 28.9 s | 60.0 s | 262x / 13x | 0.71 / 1.29 |
-| IES profile (experimental) | 0.2 s | 2.3 s | 9.8 s | 65.8 s | 49x / 4x | 0.00 / 0.00 |
-| Lens shift | 0.2 s | 1.9 s | 5.8 s | 33.9 s | 29x / 3x | 0.54 / 1.02 |
-| Orthographic camera | 0.2 s | 2.7 s | 7.5 s | 45.6 s | 47x / 3x | 0.56 / 1.03 |
-| Camera exposure | 0.2 s | 2.3 s | 8.8 s | 57.4 s | 42x / 4x | 0.60 / 1.00 |
-| Unreal post-processing | 0.1 s | 1.9 s | 18.3 s | 49.8 s | 141x / 9x | n/a |
-| **All 12** | **1.8 s** | **28.6 s** | **142.3 s** | **598.1 s** | **78x / 5x** | |
+| Global illumination | 0.1 s | 2.2 s | 7.8 s | 49.7 s | 65x / 3x | 0.79 / 1.00 |
+| Glossy materials | 0.1 s | 2.2 s | 6.2 s | 32.1 s | 44x / 3x | 0.96 / 1.21 |
+| Depth of field | 0.1 s | 2.2 s | 7.9 s | 49.9 s | 57x / 4x | 0.78 / 1.00 |
+| Motion blur | 0.2 s | 2.3 s | 22.6 s | 52.9 s | 125x / 10x | 0.84 / 1.01 |
+| Subdivision surfaces | 0.1 s | 2.5 s | 7.9 s | 49.6 s | 52x / 3x | 0.79 / 1.00 |
+| Instances, points, curves | 0.1 s | 2.2 s | 10.8 s | 51.2 s | 77x / 5x | 0.79 / 1.01 |
+| Volumes (OpenVDB) | 0.1 s | 2.7 s | 28.9 s | 60.0 s | 222x / 11x | 0.91 / 1.30 |
+| IES profile | 0.1 s | 2.1 s | 9.8 s | 65.8 s | 66x / 5x | 0.88 / 1.08 |
+| Light linking | 0.1 s | 2.3 s | 9.7 s | 64.6 s | 69x / 4x | 1.54 / 1.00 |
+| Clearcoat | 0.3 s | 2.2 s | 6.2 s | 38.8 s | 20x / 3x | 0.85 / 1.00 |
+| Render region | 0.1 s | 2.1 s | 2.4 s | 14.2 s | 20x / 1x | 0.78 / 1.03 |
+| Lens shift | 0.2 s | 2.2 s | 5.8 s | 33.9 s | 36x / 3x | 0.77 / 1.02 |
+| Orthographic camera | 0.1 s | 2.2 s | 7.5 s | 45.6 s | 53x / 3x | 0.71 / 1.04 |
+| Camera exposure | 0.1 s | 2.3 s | 8.8 s | 57.4 s | 74x / 4x | 0.79 / 1.00 |
+| Unreal post-processing | 0.1 s | 2.3 s | 18.3 s | 49.8 s | 141x / 8x | n/a |
+| **All 15** | **2.3 s** | **34.1 s** | **160.6 s** | **715.7 s** | **70x / 5x** | |
 
-| Scene | hdUE Lumen &#124; hdUE Path Tracer &#124; Karma XPU &#124; Karma CPU |
-| --- | --- |
-| **Global illumination**<br>The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light. | ![Global illumination](docs/images/gallery/cornell.png) |
-| **Glossy materials**<br>Glossy metal on the tall box and a glossy dielectric ball. | ![Glossy materials](docs/images/gallery/glossy.png) |
-| **Depth of field**<br>Thin-lens depth of field focused on the tall box (USD lens units: tenths of a scene unit). | ![Depth of field](docs/images/gallery/depth_of_field.png) |
-| **Motion blur**<br>A ball crossing the box during a half-frame shutter. | ![Motion blur](docs/images/gallery/motion_blur.png) |
-| **Subdivision surfaces**<br>A Catmull-Clark cube (USD default scheme) with a red GeomSubset on two faces, refined to level 3 in hdUE. | ![Subdivision surfaces](docs/images/gallery/subdivision.png) |
-| **Instances, points, curves**<br>A PointInstancer, Points and a cubic BasisCurves helix, with per-instance and per-curve colours. | ![Instances, points, curves](docs/images/gallery/instances.png) |
-| **Volumes (OpenVDB)**<br>A fog sphere (OpenVDB, density field) in the middle of the box. | ![Volumes (OpenVDB)](docs/images/gallery/volume.png) |
-| **IES profile (experimental)**<br>The ceiling light replaced by a point light with an IES profile (experimental in hdUE). | ![IES profile (experimental)](docs/images/gallery/ies.png) |
-| **Lens shift**<br>Horizontal and vertical aperture offsets (lens shift). | ![Lens shift](docs/images/gallery/lens_shift.png) |
-| **Orthographic camera**<br>Orthographic projection with a 6.2 m window. | ![Orthographic camera](docs/images/gallery/orthographic.png) |
-| **Camera exposure**<br>Camera exposure of +1 stop. | ![Camera exposure](docs/images/gallery/exposure.png) |
-| **Unreal post-processing**<br>UE's tonemapper (+2.5 stops), bloom, vignette, chromatic aberration, lens flares, film grain and a warm grade on the hdUE beauty; Karma renders the linear image. | ![Unreal post-processing](docs/images/gallery/post_processing.png) |
+![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
+
+![Glossy materials: Glossy metal on the tall box and a glossy dielectric ball.](docs/images/gallery/glossy.png)
+
+![Depth of field: Thin-lens depth of field focused on the tall box (USD lens units: tenths of a scene unit).](docs/images/gallery/depth_of_field.png)
+
+![Motion blur: A ball crossing the box during a half-frame shutter.](docs/images/gallery/motion_blur.png)
+
+![Subdivision surfaces: A Catmull-Clark cube (USD default scheme) with a red GeomSubset on two faces, refined to level 3 in hdUE.](docs/images/gallery/subdivision.png)
+
+![Instances, points, curves: A PointInstancer, Points and a cubic BasisCurves helix, with per-instance and per-curve colours.](docs/images/gallery/instances.png)
+
+![Volumes (OpenVDB): A fog sphere (OpenVDB, density field) in the middle of the box.](docs/images/gallery/volume.png)
+
+![IES profile: The ceiling light replaced by a point light with an IES profile.](docs/images/gallery/ies.png)
+
+![Light linking: A warm light linked only to the tall box and a cool one only to the short box; the ceiling light lights everything. Lumen still bounces the linked lights onto every surface: UE’s lighting channels only restrict direct light.](docs/images/gallery/light_linking.png)
+
+![Clearcoat: Preview Surface clearcoat: red lacquer (clearcoat 1 over a rough red base, left) next to the same base without a coat (right).](docs/images/gallery/clearcoat.png)
+
+![Render region: A render region: dataWindowNDC (0.25, 0.15)-(0.75, 0.65) renders only that part of the 512 x 512 frame, as husk tiles do.](docs/images/gallery/render_region.png)
+
+![Lens shift: Horizontal and vertical aperture offsets (lens shift).](docs/images/gallery/lens_shift.png)
+
+![Orthographic camera: Orthographic projection with a 6.2 m window.](docs/images/gallery/orthographic.png)
+
+![Camera exposure: Camera exposure of +1 stop.](docs/images/gallery/exposure.png)
+
+![Unreal post-processing: UE's tonemapper (+2.5 stops), bloom, vignette, chromatic aberration, lens flares, film grain and a warm grade on the hdUE beauty; Karma renders the linear image.](docs/images/gallery/post_processing.png)
 <!-- gallery:end -->
 
 ### Sponza
@@ -128,11 +146,9 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | < 0.1 s | 3.3 s | 24.7 s | 508.3 s | n/a / 7x | 0.83 / 0.96 |
+| Main view | 0.2 s | 2.1 s | 24.7 s | 508.3 s | 107x / 12x | 0.80 / 0.86 |
 
-| Scene | hdUE Lumen &#124; hdUE Path Tracer &#124; Karma XPU &#124; Karma CPU |
-| --- | --- |
-| **Main view**<br>`/root/PhysCamera001` (Intel's Render_Main_A view), exposure +4.5 stops as authored. | ![Main view](docs/images/gallery/sponza/PhysCamera001.png) |
+![Main view: `/root/PhysCamera001` (Intel's Render_Main_A view), exposure +4.5 stops as authored.](docs/images/gallery/sponza/PhysCamera001.png)
 <!-- sponza:end -->
 
 <!-- FEATURES -->
@@ -142,12 +158,12 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 |------|--------------|---------|
 | **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings and Light LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
 | **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames, about 0.25 s per simple 1080p Lumen frame | |
-| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform) | True or adaptive displacement (Preview Surface displacement moves existing vertices along normals), adaptive subdivision, varying `displayOpacity` |
+| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested), UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs) | True or adaptive displacement (Preview Surface displacement moves existing vertices along normals), adaptive subdivision, varying `displayOpacity` |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
-| **Materials** | UsdPreviewSurface with every texture input and cutouts; MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals) |
-| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, portals; IES profiles are experimental (applied and oriented, but brightness and falloff do not match Karma yet) |
-| **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`) | Lens distortion |
-| **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer (Houdini build) | LPE AOVs, cryptomatte, deep output |
+| **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); primvar readers; MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals) |
+| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI, `poleAxis`), UsdLux units, spot cones, IES profiles (`normalize`, `angleScale`), light and shadow linking (up to three linked collections, UE's lighting channels) | Portals, light filters, shadow colour |
+| **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`), render regions, husk tiles, overscan, pixel aspect ratio | Lens distortion, a finite far clip |
+| **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer (Houdini build) | LPE AOVs other than the beauty (written black, with a warning), cryptomatte, deep output |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 
 <!-- ARCHITECTURE -->

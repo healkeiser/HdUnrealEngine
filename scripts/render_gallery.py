@@ -38,7 +38,10 @@ CORNELL_SCENES = [
     ("subdivision", "Subdivision surfaces", "variants/subdivision.usda"),
     ("instances", "Instances, points, curves", "variants/instances.usda"),
     ("volume", "Volumes (OpenVDB)", "variants/volume.usda"),
-    ("ies", "IES profile (experimental)", "variants/ies.usda"),
+    ("ies", "IES profile", "variants/ies.usda"),
+    ("light_linking", "Light linking", "variants/light_linking.usda"),
+    ("clearcoat", "Clearcoat", "variants/clearcoat.usda"),
+    ("render_region", "Render region", "variants/render_region.usda"),
     ("lens_shift", "Lens shift", "variants/lens_shift.usda"),
     ("orthographic", "Orthographic camera", "variants/orthographic.usda"),
     ("exposure", "Camera exposure", "variants/exposure.usda"),
@@ -76,7 +79,7 @@ SETS = {  # out folder, images folder, README markers
 
 def dev_environment():
     profile = ROOT / ".local" / "runtime-houdini.json"
-    build = next((ROOT / "build").glob("houdini-*"))
+    build = ROOT / "build" / "houdini"
     os.environ["HOUDINI_PATH"] = f'{ROOT / "integrations" / "houdini"};&'
     os.environ["PXR_PLUGINPATH_NAME"] = str(build / "resources")
     os.environ["HDUE_HOUDINI_ENABLE"] = "1"
@@ -191,11 +194,12 @@ def Scope "Render"
 
 
 def pixels(path):
+    """The full display window: a render region's pixels in place, black around them."""
     buf = oiio.ImageBuf(str(path))
-    spec = buf.spec()
+    full = buf.spec().roi_full
     return (
-        buf.get_pixels(oiio.FLOAT)
-        .reshape(spec.height, spec.width, spec.nchannels)[..., :3]
+        buf.get_pixels(oiio.FLOAT, full)
+        .reshape(full.height, full.width, buf.spec().nchannels)[..., :3]
         .astype(np.float64)
     )
 
@@ -206,33 +210,98 @@ def display(image, tonemapped):
     return np.clip(image / (1 + image), 0, 1) ** (1 / 2.2)
 
 
-def panel_image(target, panels):
-    """panels: list of (image, label, tonemapped), side by side with a caption bar each."""
-    tiles = [display(image, tonemapped) for image, _, tonemapped in panels]
+# Layout of the comparison images, in pixels: a title bar, then the renders on a dark sheet with gutters, each with
+# a caption under it (renderer in its colour, then settings, time and brightness).
+MARGIN, GUTTER, TITLE, CAPTION = 28, 18, 78, 62
+# The charts' dark theme (scripts/gallery_charts.py: GitHub's dark page colours), its engine hues (hdUE blue, Karma
+# orange) and its marker per mode, so images and charts read as one set.
+hex_colour = lambda h: tuple(int(h[i : i + 2], 16) / 255 for i in (1, 3, 5))
+BACKGROUND, PANEL = hex_colour("#0d1117"), hex_colour("#161b22")
+TEXT, MUTED = hex_colour("#f0f6fc"), hex_colour("#9198a1")
+ENGINES = {"hdue": hex_colour("#3987e5"), "karma": hex_colour("#d95926")}
+SERIES = {  # renderer key: engine, marker (as in the charts)
+    "lumen": ("hdue", "o"),
+    "pathtraced": ("hdue", "D"),
+    "xpu": ("karma", "^"),
+    "karma": ("karma", "s"),
+}
+
+
+def font(bold=False):
+    """DejaVu Sans, matplotlib's font, which the charts use."""
+    import matplotlib
+
+    folder = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf"
+    return str(folder / ("DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"))
+
+
+def wrap(text, size, width):
+    """Greedy line breaks for DejaVu Sans at size px (about 0.55 em per character)."""
+    lines, line = [], ""
+    for word in text.split():
+        if line and (len(line) + 1 + len(word)) * size * 0.55 > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    return [*lines, line] if line else lines
+
+
+def marker(sheet, x, y, shape, colour, size=16):
+    """The charts' legend marker, filled, centred on (x, y)."""
+    r = size / 2
+    yy, xx = np.mgrid[-r:r:1, -r:r:1] + 0.5
+    inside = {
+        "o": xx**2 + yy**2 <= r * r,
+        "D": abs(xx) + abs(yy) <= r,
+        "^": (yy >= -r + 1) & (abs(xx) <= (yy + r) * 0.58),
+        "s": (abs(xx) <= r * 0.85) & (abs(yy) <= r * 0.85),
+    }[shape]
+    top, left = int(y - r), int(x - r)
+    sheet[top : top + size, left : left + size][inside] = colour
+
+
+def panel_image(target, title, doc, panels):
+    """panels: list of (image, renderer key, name, detail, tonemapped). Four square frames sit side by side; wide
+    ones go in a 2 x 2 grid so they stay readable.
+    """
+    tiles = [display(image, tonemapped) for image, *_, tonemapped in panels]
     height, width = tiles[0].shape[:2]
-    # Wide frames side by side get too small to read; four of them go in a 2 x 2 grid.
     columns = 2 if len(tiles) == 4 and width > 1.4 * height else len(tiles)
-    grid = [
-        np.concatenate(tiles[r : r + columns], axis=1)
-        for r in range(0, len(tiles), columns)
-    ]
-    strip = np.concatenate(grid, axis=0).astype(np.float32)
+    rows = -(-len(tiles) // columns)
+    sheet_width = 2 * MARGIN + columns * width + (columns - 1) * GUTTER
+    doc_lines = wrap(doc, 18, sheet_width - 2 * MARGIN)
+    header = TITLE + 24 * max(0, len(doc_lines) - 1)
+    sheet_height = (
+        header + rows * (height + CAPTION) + (rows - 1) * GUTTER + MARGIN
+    )
+    sheet = np.empty((sheet_height, sheet_width, 3), np.float32)
+    sheet[:] = BACKGROUND
+    places = []
+    for i, tile in enumerate(tiles):
+        x = MARGIN + (i % columns) * (width + GUTTER)
+        y = header + (i // columns) * (height + CAPTION + GUTTER)
+        engine, shape = SERIES[panels[i][1]]
+        sheet[y : y + height + CAPTION, x : x + width] = PANEL
+        sheet[y : y + height, x : x + width] = tile
+        sheet[y + height : y + height + 3, x : x + width] = ENGINES[engine]
+        marker(sheet, x + 22, y + height + 24, shape, ENGINES[engine])
+        places.append((x, y + height))
     buf = oiio.ImageBuf(
-        oiio.ImageSpec(strip.shape[1], strip.shape[0], 3, oiio.FLOAT)
+        oiio.ImageSpec(sheet_width, sheet_height, 3, oiio.FLOAT)
     )
-    buf.set_pixels(oiio.ROI(), strip)
-    font = str(
-        Path(os.environ.get("SystemRoot", os.environ.get("WINDIR", "")))
-        / "Fonts"
-        / "segoeui.ttf"
-    )
-    for i, (_, label, _) in enumerate(panels):
-        x, y = (i % columns) * width, (i // columns) * height
-        oiio.ImageBufAlgo.render_box(
-            buf, x, y, x + width - 1, y + 34, (0, 0, 0), True
+    buf.set_pixels(oiio.ROI(), sheet)
+    oiio.ImageBufAlgo.render_text(buf, MARGIN, 40, title, 26, font(True), TEXT)
+    for n, line in enumerate(doc_lines):
+        oiio.ImageBufAlgo.render_text(
+            buf, MARGIN, 64 + 24 * n, line, 17, font(), MUTED
+        )
+    for (x, y), (_, key, name, detail, _) in zip(places, panels, strict=True):
+        oiio.ImageBufAlgo.render_text(
+            buf, x + 38, y + 31, name, 18, font(True), TEXT
         )
         oiio.ImageBufAlgo.render_text(
-            buf, x + 10, y + 25, label, 20, font, (1, 1, 1)
+            buf, x + 14, y + 53, detail, 15, font(), MUTED
         )
     buf.set_write_format(oiio.UINT8)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -273,23 +342,46 @@ def duration(seconds):
     return "< 0.1 s" if seconds < 0.05 else f"{seconds:.1f} s"
 
 
-def label(key, seconds, samples):
-    detail = "16 warmup frames" if key == "lumen" else f"{samples} spp"
-    return f"{dict((k, l) for k, l, _, _ in RENDERERS)[key]}  ·  {detail}  ·  {duration(seconds)}"
+def detail(key, render, reference, samples, compared=True):
+    """Settings, time per frame and brightness against Karma CPU (the reference itself says so)."""
+    parts = [
+        "16 warmup frames" if key == "lumen" else f"{samples} spp",
+        duration(render["seconds"]),
+    ]
+    if key == "karma":
+        parts.append("reference")
+    elif compared and reference:
+        parts.append(f"{render['luminance'] / reference:.2f}× Karma CPU")
+    return "   ·   ".join(parts)
 
 
 def compose(which, name, entry, samples):
     out, images, _ = SETS[which]
+    renders = entry["renders"]
+    reference = renders.get("karma", {}).get("luminance")
+    names = dict((k, l) for k, l, _, _ in RENDERERS)
+    # UE's tone curve makes the post-processing images display-linear: their brightness is not comparable.
+    tonemapped = lambda key: name == "post_processing" and key in (
+        "lumen",
+        "pathtraced",
+    )
     panels = [
         (
             pixels(out / f"{name}_{key}.exr"),
-            label(key, entry["renders"][key]["seconds"], samples),
-            name == "post_processing" and key in ("lumen", "pathtraced"),
+            key,
+            names[key],
+            detail(key, renders[key], reference, samples, not tonemapped(key)),
+            tonemapped(key),
         )
         for key, _, _, _ in RENDERERS
-        if key in entry["renders"]
+        if key in renders
     ]
-    panel_image(images / f"{name}.png", panels)
+    panel_image(
+        images / f"{name}.png",
+        entry["title"],
+        entry["doc"].replace("`", ""),
+        panels,
+    )
 
 
 def settings_of(layer):
@@ -598,15 +690,12 @@ def section(which, results, machine):
     folder = (
         "images/gallery/" if which == "cornell" else "images/gallery/sponza/"
     )
+    # Each image carries its title, description and per-render details.
     images = [
-        "| Scene | " + " &#124; ".join(l for _, l, _, _ in present) + " |",
-        "| --- | --- |",
+        f"![{results[name]['title']}: {results[name]['doc']}]({folder}{name}.png)"
+        for name in order
     ]
-    for name in order:
-        images.append(
-            f"| **{results[name]['title']}**<br>{results[name]['doc']} | ![{results[name]['title']}]({folder}{name}.png) |"
-        )
-    return setup + "\n\n" + "\n".join(summary) + "\n\n" + "\n".join(images)
+    return setup + "\n\n" + "\n".join(summary) + "\n\n" + "\n\n".join(images)
 
 
 def write_docs(machine):

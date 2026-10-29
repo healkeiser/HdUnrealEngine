@@ -1,6 +1,6 @@
 #usda 1.0
 (
-    doc = "The ceiling light replaced by a point light with an IES profile (experimental in hdUE)."
+    doc = "The ceiling light replaced by a point light with an IES profile."
     defaultPrim = "cornell_box"
     metersPerUnit = 1
     upAxis = "Z"
