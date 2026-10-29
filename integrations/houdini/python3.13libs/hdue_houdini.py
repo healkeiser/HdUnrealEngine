@@ -496,11 +496,14 @@ class NativeAssets:
                 elif layer.GetObjectAtPath(path): edit.Add(path,Sdf.Path.emptyPath)
             layer.Apply(edit)
 
+RENDER_SETTINGS_TYPES=('rendersettings','hdue_rendersettings')
+
 def render_settings_node(input_node,mode='realtime',samples=64):
-    """A standard Render Settings LOP at /Render/rendersettings (Houdini's default path) with hdUE's mode and samples authored."""
-    node=input_node.parent().createNode('rendersettings','hdUE_render_settings')
+    """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda) at /Render/rendersettings (Houdini's default path) with hdUE's mode and samples authored."""
+    if not hou.nodeType(hou.lopNodeTypeCategory(),RENDER_SETTINGS_TYPES[1]):  # hython without the integration on HOUDINI_PATH
+        hou.hda.installFile(str(Path(__file__).resolve().parents[1]/'otls'/'hdue_rendersettings.hda'))
+    node=input_node.parent().createNode(RENDER_SETTINGS_TYPES[1],'hdUE_render_settings')
     node.setInput(0,input_node)
-    node.parm('primpath').set('/Render/rendersettings')
     # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
     stage=input_node.stage()
     camera=next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None
@@ -558,7 +561,7 @@ def set_render_setting(prefix,value):
     viewer=scene_viewer(); network=viewer.pwd()
     display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
     node=display
-    while node and node.type().name()!='rendersettings':
+    while node and node.type().name() not in RENDER_SETTINGS_TYPES:
         inputs=node.inputs(); node=inputs[0] if inputs else None
     if node: _render_property(node,prefix,value)
     else:

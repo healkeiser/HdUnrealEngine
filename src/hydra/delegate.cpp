@@ -187,6 +187,10 @@ void ueRun(const std::function<void()>& f) {
     if (task->error) std::rethrow_exception(task->error);
 }
 }
+// Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
+TfToken HdUEBeauty(const TfToken& name) {
+    return name == TfToken("Ci") || name == TfToken("C") || name == TfToken("beauty") ? HdAovTokens->color : name;
+}
 // Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
 uint32_t HdUEAovId(const TfToken& name) {
     static const std::pair<TfToken, uint32_t> names[] = {{TfToken("albedo"), HDUE_AOV_ALBEDO}, {TfToken("baseColor"), HDUE_AOV_ALBEDO},
@@ -1088,8 +1092,7 @@ public:
                 // ponytail: every light path expression renders the full beauty; split lobes if LPE AOVs are needed.
                 if(sourceType==TfToken("lpe")) name=HdAovTokens->color;
                 else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
-                // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
-                if(name==TfToken("Ci") || name==TfToken("C") || name==TfToken("beauty")) name=HdAovTokens->color;
+                name=HdUEBeauty(name);
                 if(name==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 // Houdini's viewport binds primId/instanceId for its selection highlight. Rendering them swaps every
@@ -1649,7 +1652,8 @@ bool HdUERenderDelegate::setPaused(bool paused) {
 HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const {
     // Half float: UE renders in it, and Houdini's viewport uploads the CPU colour buffer on every redraw (a 2.5 MP
     // float32 image cost its UI thread ~100 ms per frame).
-    if(name==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat16Vec4,false,VtValue(GfVec4f(0)));
+    // Viewports drop AOVs without a descriptor, so the beauty's other names need one too.
+    if(HdUEBeauty(name)==HdAovTokens->color) return HdAovDescriptor(HdFormatFloat16Vec4,false,VtValue(GfVec4f(0)));
     if(const auto aov=HdUEAovId(name); aov==HDUE_AOV_PRIM_ID || aov==HDUE_AOV_INSTANCE_ID)
         return HdAovDescriptor(HdFormatInt32,false,VtValue(-1));
     if(const auto aov=HdUEAovId(name)) return aov==HDUE_AOV_ALBEDO || aov==HDUE_AOV_NORMAL
