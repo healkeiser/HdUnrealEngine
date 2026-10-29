@@ -9,7 +9,7 @@ public class HdUEBackend : ModuleRules
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
         PrivateDependencyModuleNames.AddRange(new[] { "RHI", "RenderCore", "Renderer", "Projects", "GeometryFramework", "GeometryCore", "MeshConversion", "MeshDescription", "StaticMeshDescription", "ImageWrapper", "ImageCore", "AssetRegistry", "IESFile", "NaniteBuilder" });
         // Block compression of runtime textures (ispc_texcomp.dll, delay-loaded and staged with the runtime).
-        AddEngineThirdPartyPrivateStaticDependencies(Target, "IntelISPCTexComp");
+        AddEngineThirdPartyPrivateStaticDependencies(Target, "IntelISPCTexComp", "MikkTSpace");
         if (Target.Type != TargetType.Editor)
         {
             // Pinned monolithic source target; private VT access is isolated in VirtualTextureResidency.cpp.

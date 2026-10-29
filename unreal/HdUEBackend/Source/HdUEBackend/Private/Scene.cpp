@@ -35,6 +35,7 @@
 #include "Rendering/NaniteResources.h"
 #include "StaticMeshResources.h"
 #include "Tasks/Task.h"
+#include "mikktspace.h"
 
 FHdueScene::FHdueScene(UWorld* InWorld) : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld) {}
 FHdueScene::~FHdueScene() {
@@ -413,7 +414,7 @@ void FHdueScene::BindMaterials() {
 namespace {
 bool Interactive_() { static const bool Value = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive")); return Value; }
 // One Hydra vertex for static and Nanite meshes (any thread). Hydra meshes carry no tangents: the frame around the normal
-// is arbitrary. Colours stay linear in 8 bits, as dynamic meshes store them.
+// is arbitrary until HydraTangents derives it from the UVs. Colours stay linear in 8 bits, as dynamic meshes store them.
 FVector3f HydraNormal(const HdueMeshDesc& Desc, uint32 V) {
     return Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FVector3f::UpVector;
 }
@@ -427,6 +428,29 @@ FStaticMeshBuildVertex HydraVertex(const HdueMeshDesc& Desc, uint32 V, FVector3f
     Vertex.UVs[0] = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
     Vertex.Color = Desc.colors ? FLinearColor(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2]).ToFColor(false) : FColor::White;
     return Vertex;
+}
+// MikkTSpace tangents from UV 0 (any thread), as UE's Nanite builder computes them for indexed vertices: normal maps are
+// baked against this frame. A vertex shared by triangles keeps the last triangle's tangent.
+struct FTangentMesh { TArray<FStaticMeshBuildVertex>& Vertices; const TArray<uint32>& Indices; };
+FStaticMeshBuildVertex& CornerOf(const SMikkTSpaceContext* Context, int Face, int Vert) {
+    const auto* Mesh = static_cast<FTangentMesh*>(Context->m_pUserData);
+    return Mesh->Vertices[Mesh->Indices[Face * 3 + Vert]];
+}
+void HydraTangents(TArray<FStaticMeshBuildVertex>& Vertices, const TArray<uint32>& Indices) {
+    SMikkTSpaceInterface Interface = {};
+    Interface.m_getNumFaces = [](const SMikkTSpaceContext* Context) { return static_cast<FTangentMesh*>(Context->m_pUserData)->Indices.Num() / 3; };
+    Interface.m_getNumVerticesOfFace = [](const SMikkTSpaceContext*, int) { return 3; };
+    Interface.m_getPosition = [](const SMikkTSpaceContext* Context, float Out[3], int Face, int Vert) { FMemory::Memcpy(Out, &CornerOf(Context, Face, Vert).Position, 12); };
+    Interface.m_getNormal = [](const SMikkTSpaceContext* Context, float Out[3], int Face, int Vert) { FMemory::Memcpy(Out, &CornerOf(Context, Face, Vert).TangentZ, 12); };
+    Interface.m_getTexCoord = [](const SMikkTSpaceContext* Context, float Out[2], int Face, int Vert) { FMemory::Memcpy(Out, &CornerOf(Context, Face, Vert).UVs[0], 8); };
+    Interface.m_setTSpaceBasic = [](const SMikkTSpaceContext* Context, const float Tangent[3], float Sign, int Face, int Vert) {
+        FStaticMeshBuildVertex& Vertex = CornerOf(Context, Face, Vert);
+        Vertex.TangentX = FVector3f(Tangent[0], Tangent[1], Tangent[2]);
+        Vertex.TangentY = -Sign * Vertex.TangentZ.Cross(Vertex.TangentX); // UE's V runs down
+    };
+    FTangentMesh Mesh{Vertices, Indices};
+    SMikkTSpaceContext Context = {&Interface, &Mesh, true};
+    genTangSpaceDefault(&Context);
 }
 // Nanite data for one generated mesh (any thread). Every page is a root page: outside the editor, UE streams non-root
 // pages only from cooked files on disk, and these meshes exist only in memory.
@@ -512,6 +536,9 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
         Bounds += Vertices[I].Position;
         Colored |= Vertices[I].Color != FColor::White;
     }
+    // UV tangents (~4 us per triangle) come with the cards: interactive hosts show the first build sooner and get them
+    // with the background rebuild.
+    if (Cards && Desc.uv) HydraTangents(Vertices, Indices);
     FConversion Result{MakeUnique<FStaticMeshRenderData>(), FBoxSphereBounds(FBox(Bounds)), nullptr};
     Result.RenderData->AllocateLODResources(1);
     if (Indices.IsEmpty()) return Result;
@@ -791,12 +818,17 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     if (NaniteMeshes) Nanite::IBuilderModule::Get(); // load the builder on this thread before worker tasks use it
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
     TArray<FConversion> StaticData; StaticData.SetNum(Batch.mesh_count);
-    ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
+    // Largest meshes first, one per task: the last large mesh started bounds the batch.
+    TArray<int32> Order; Order.SetNumUninitialized(Batch.mesh_count);
+    for (int32 Index = 0; Index < Order.Num(); ++Index) Order[Index] = Index;
+    Order.Sort([&](int32 A, int32 B) { return Batch.meshes[A].index_count > Batch.meshes[B].index_count; });
+    ParallelFor(Order.Num(), [&](int32 Task) {
+        const int32 Index = Order[Task];
         const auto& Desc = Batch.meshes[Index];
         if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
         if (StaticGenerated(Desc)) StaticData[Index] = BuildStatic(Desc, !Interactive_());
         else BuiltMeshes[Index] = BuildDynamicMesh(Desc);
-    });
+    }, EParallelForFlags::Unbalanced);
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Desc = Batch.meshes[Index];
         if (!ValidMeshes[int32(Index)]) { if (Desc.id) Remove(UTF8_TO_TCHAR(Desc.id)); continue; }
