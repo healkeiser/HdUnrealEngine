@@ -84,6 +84,31 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
             if (p.name == name) return HdInterpolation(i);
     return HdInterpolationConstant;
 }
+// The material of a prim without a bound one (mesh, points, curves): its displayColor, or white times its vertex
+// colours, and its displayOpacity. Karma shades these with a default surface whose diffuse albedo is 0.4 x
+// displayColor, with a rough dielectric specular (measured against a bound UsdPreviewSurface under a distant light);
+// this slab (roughness 0.5) keeps 95% of its albedo after its specular, hence 0.42. The material's id is the prim's
+// with ".displayColor".
+HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh) {
+    constexpr float KarmaDefaultAlbedo = .42f;
+    HdUEMaterialData material;
+    material.id = mesh.id + ".displayColor";
+    const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
+    material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
+    if (material.vertexColor)
+        material.color = GfVec3f(KarmaDefaultAlbedo);
+    else if (!color.empty())
+        material.color = HdUEFromSceneLinear(color[0]) * KarmaDefaultAlbedo;
+    const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
+    if (!opacity.empty()) {
+        // The generic ABI carries one opacity per material. Constant primvars (and identical values in other domains)
+        // are exact.
+        if (!std::all_of(opacity.begin(), opacity.end(), [&](float a) { return a == opacity[0]; }))
+            TF_WARN("Varying displayOpacity is unsupported at %s; using its first value", id.GetText());
+        if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
+    }
+    return material;
+}
 // Varying colors only: a uniform displayColor stays the material's constant color.
 std::vector<GfVec3f> HdUEVaryingColors(std::vector<GfVec3f> colors, size_t count) {
     if (colors.size() != count ||
@@ -551,23 +576,8 @@ public:
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
-        if (mesh.material.empty() && mesh.sceneAsset.empty()) {
-            auto& material = displayColor.emplace();
-            material.id = mesh.id + ".displayColor";
-            const auto color = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
-            if (!color.empty()) material.color = HdUEFromSceneLinear(color[0]);
-            material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
-            if (material.vertexColor) material.color = GfVec3f(1);
-            const auto opacity = value(delegate->Get(GetId(), HdTokens->displayOpacity), VtFloatArray());
-            if (!opacity.empty()) {
-                // The generic ABI carries one opacity per material. Constant
-                // primvars (and identical values in other domains) are exact.
-                if (!std::all_of(opacity.begin(), opacity.end(), [&](float a) { return a == opacity[0]; }))
-                    TF_WARN("Varying displayOpacity is unsupported at %s; using its first value", GetId().GetText());
-                if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
-            }
-            mesh.material = material.id;
-        }
+        if (mesh.material.empty() && mesh.sceneAsset.empty())
+            mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh)).id;
         std::vector<HdUEMeshData> parts;
         try {
             parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters);
@@ -690,14 +700,7 @@ protected:
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
     std::lock_guard lock(state.mutex);
     if (mesh.material.empty()) {
-        HdUEMaterialData material;
-        material.id = mesh.id + ".displayColor";
-        const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
-        if (!color.empty()) material.color = color[0];
-        material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
-        if (material.vertexColor) material.color = GfVec3f(1);
-        const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
-        if (!opacity.empty() && std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
+        const auto material = displayColorMaterial(delegate, id, mesh);
         mesh.material = material.id;
         const auto previous = state.materials.find(material.id);
         if (previous == state.materials.end() || previous->second.color != material.color ||

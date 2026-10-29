@@ -451,18 +451,34 @@ void WriteCache(const FString& Path, FTexturePlatformData& Data) {
     if (!Written || !IFileManager::Get().Move(*Path, *Temporary, true, true, false, true))
         IFileManager::Get().Delete(*Temporary, false, false, true);
 }
-FString TextureKey(const FString& File, bool SRGB) { return File + (SRGB ? TEXT("|srgb") : TEXT("|raw")); }
+// sourceColorSpace decides sRGB decoding of 8-bit texels; auto leaves it to the slot (colour or data).
+bool TextureSRGB(const HdueTextureDesc& Texture, int32 Slot) {
+    return Texture.encoding == HDUE_TEXTURE_ENCODING_AUTO ? hdue_texture_is_color(Slot) != 0
+                                                          : Texture.encoding == HDUE_TEXTURE_ENCODING_SRGB;
+}
+// Black is clamp here; the parent material masks texels outside [0,1] (<Slot>Black).
+TextureAddress TextureWrap(uint32 Wrap) {
+    return Wrap == HDUE_WRAP_REPEAT ? TA_Wrap : Wrap == HDUE_WRAP_MIRROR ? TA_Mirror : TA_Clamp;
+}
+// One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture).
+FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot) {
+    return FString::Printf(TEXT("%s|%s|%d|%d"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
+                           int32(TextureWrap(Texture.wrap[0])), int32(TextureWrap(Texture.wrap[1])));
+}
 // Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
 bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
 }  // namespace
 // A texture Apply prepared, created on this thread (UObjects and render resources need it) on first use.
-const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
-    FPreviewTexture* Texture = PreviewTextures.Find(TextureKey(File, SRGB));
+const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key, FString& Error) {
+    FPreviewTexture* Texture = PreviewTextures.Find(Key);
     if (Texture && Texture->Pending) {
         const double CreateStart = FPlatformTime::Seconds();
         auto* Created = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient);
         Created->bNotOfflineProcessed = true;
-        Created->SRGB = SRGB && !IsFloatFormat(Texture->Pending->PixelFormat);  // float images are already linear
+        // float images are already linear
+        Created->SRGB = Texture->SRGB && !IsFloatFormat(Texture->Pending->PixelFormat);
+        Created->AddressX = TextureAddress(Texture->Address[0]);
+        Created->AddressY = TextureAddress(Texture->Address[1]);
         // UpdateResource hands the mips to the render thread. Discardable bulk data moves them there: copying them
         // (FTexturePlatformData::TryLoadMips) was 99% of texture creation, ~680 ms for Sponza's 111 textures, and kept
         // a CPU copy of every texture for the scene's lifetime. ponytail: the resource can't be rebuilt from this
@@ -475,7 +491,7 @@ const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Fil
         ++TextureImports;
     }
     if (!Texture || !Texture->Texture) {
-        Error = FString::Printf(TEXT("Failed to import texture %s."), *File);
+        Error = FString::Printf(TEXT("Failed to import texture %s."), *Key);
         return nullptr;
     }
     return Texture;
@@ -831,37 +847,40 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         // thread took most of a large scene's load (111 Sponza textures, ~19 s), and uncompressed they held ~9 GB.
         // PreviewTexture creates the UTexture2Ds on this thread. A texture is rebuilt when inputs read channels its
         // BC4/BC5 repacking left out.
-        TMap<FString, uint8> Files;  // variants to build: bit 0 raw, bit 1 sRGB
+        TMap<FString, TArray<FString>> Files;  // each file's variants to build (sRGB decoding, wrap), by key
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
             if (Desc.native_asset && *Desc.native_asset) continue;
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 const auto& Texture = Desc.textures[Slot];
                 if (!Texture.file || !*Texture.file) continue;
-                const FString File = UTF8_TO_TCHAR(Texture.file);
-                const bool SRGB = hdue_texture_is_color(Slot) != 0, Vector = !ScalarSlot(Slot);
+                const FString File = UTF8_TO_TCHAR(Texture.file), Key = TextureKey(File, Texture, Slot);
+                const bool Vector = !ScalarSlot(Slot);
                 uint8 Read = 0;
                 for (int32 Channel = 0; Channel < 4; ++Channel)
                     if (!Vector && Texture.channel_mask[Channel] != 0.f) Read |= 1 << Channel;
-                FPreviewTexture& Entry = PreviewTextures.FindOrAdd(TextureKey(File, SRGB));
+                FPreviewTexture& Entry = PreviewTextures.FindOrAdd(Key);
                 if (Entry.Texture && (Entry.Read | Read) == Entry.Read && (Entry.Vector || !Vector)) continue;
                 Entry.Read |= Read;
                 Entry.Vector |= Vector;
-                Files.FindOrAdd(File) |= 1 << int32(SRGB);
+                Entry.SRGB = TextureSRGB(Texture, Slot);
+                for (int32 Axis = 0; Axis < 2; ++Axis) Entry.Address[Axis] = uint8(TextureWrap(Texture.wrap[Axis]));
+                Files.FindOrAdd(File).AddUnique(Key);
             }
         }
         if (Files.Num()) {
             const double PrepareStart = FPlatformTime::Seconds();
-            const TArray<TPair<FString, uint8>> Work = Files.Array();
+            const TArray<TPair<FString, TArray<FString>>> Work = Files.Array();
             ParallelFor(Work.Num(), [&](int32 Index) {
                 FImage Image;
-                for (const bool SRGB : {false, true}) {
-                    if (!(Work[Index].Value & (1 << int32(SRGB)))) continue;
-                    FPreviewTexture& Entry = PreviewTextures[TextureKey(Work[Index].Key, SRGB)];
+                const TArray<FString>& Keys = Work[Index].Value;
+                for (int32 Variant = 0; Variant < Keys.Num(); ++Variant) {
+                    FPreviewTexture& Entry = PreviewTextures[Keys[Variant]];
+                    const bool SRGB = Entry.SRGB;
                     const FString Cache = CachePath(Work[Index].Key, Entry, SRGB);
                     if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
                     if (!Image.RawData.Num() && !FImageUtils::LoadImage(*Work[Index].Key, Image)) return;
-                    const bool Last = SRGB || !(Work[Index].Value & 2);
+                    const bool Last = Variant + 1 == Keys.Num();
                     Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB);
                     if (!Cache.IsEmpty() && IsBlockCompressedFormat(Entry.Pending->PixelFormat))
                         WriteCache(Cache, *Entry.Pending);
@@ -898,10 +917,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             // UsdPreviewSurface: opacityThreshold > 0 is cutout; otherwise partial opacity is see-through.
             const bool Masked = Desc.opacity_threshold > 0.f;
             const bool Translucent = !Masked && (Opacity < 1.f || HasTexture(HDUE_TEXTURE_OPACITY));
-            // MaterialX subsurface and sheen need the layered Standard Surface parents (UE's Substrate
-            // standard_surface, several slabs per pixel); everything else stays on the single-slab Preview Surface
-            // parents.
-            const bool Layered = !Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f);
+            // MaterialX subsurface and sheen, and clear coats, need the layered Standard Surface parents (UE's
+            // Substrate standard_surface: a coat slab vertically layered over the base, several slabs per pixel);
+            // everything else stays on the single-slab Preview Surface parents. The specular workflow and see-through
+            // materials keep the base slab's second specular lobe (haziness) as their coat.
+            const bool Coat = (Desc.clearcoat > 0.f || HasTexture(HDUE_TEXTURE_CLEARCOAT)) &&
+                              !(Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW);
+            const bool Layered = !Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f || Coat);
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
             const FString ParentName =
                 Layered       ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
@@ -939,8 +961,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const FPreviewTexture* Image = nullptr;
                     if (HasTexture(Slot)) {
                         FString TextureError;
-                        Image =
-                            PreviewTexture(UTF8_TO_TCHAR(Texture.file), hdue_texture_is_color(Slot) != 0, TextureError);
+                        Image = PreviewTexture(TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot), TextureError);
                         if (!Image)
                             UE_LOG(LogTemp, Warning, TEXT("hdUE material %s: %s; %s stays untextured."),
                                    UTF8_TO_TCHAR(Desc.id), *TextureError, *Name);
@@ -962,6 +983,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), Stored(Texture.scale));
                     Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Stored(Texture.bias));
                     Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), Stored(Texture.channel_mask));
+                    if (Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK)
+                        Instance->SetVectorParameterValue(
+                            *(Name + TEXT("Black")),
+                            FLinearColor(Texture.wrap[0] == HDUE_WRAP_BLACK ? 1.f : 0.f,
+                                         Texture.wrap[1] == HDUE_WRAP_BLACK ? 1.f : 0.f, 0, 0));
                 }
                 static const float Identity[6] = {1, 0, 0, 0, 1, 0};
                 const bool Unset = Algo::AllOf(Desc.uv_transform, [](float Value) { return Value == 0.f; });

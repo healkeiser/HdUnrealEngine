@@ -45,7 +45,7 @@ Points render as one shared sphere instanced per point, sized by `widths` (0.1 w
 
 Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float2` reads (`varname`, such as `st`, or `map1` from 3ds Max exports), or from `st` when the material names none. A mesh carries one UV set, chosen through its own binding.
 
-Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5); Karma's default for unbound geometry is darker, so compare renderers with bound materials.
+Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5) with a diffuse albedo of 0.42 × `displayColor`, matching Karma's default surface, which reflects 0.4 × `displayColor` diffusely (measured against a bound white Preview Surface under a distant light; a `displayColor`-only box in the Cornell scene renders at 1.07 × Karma, it was 2.8 ×).
 
 ## Preview Surface inputs
 
@@ -53,15 +53,17 @@ Every `UsdPreviewSurface` input is translated, as a constant or a `UsdUVTexture`
 
 | Input | In UE |
 | --- | --- |
-| `diffuseColor`, `emissiveColor` | Base colour and emission (colour textures sampled as sRGB) |
+| `diffuseColor`, `emissiveColor` | Base colour and emission |
 | `metallic`, `roughness` | Metalness workflow |
 | `ior` | Dielectric reflectance, F0 = ((ior - 1) / (ior + 1))² |
 | `useSpecularWorkflow`, `specularColor` | Specular workflow: diffuse and F0 straight from `diffuseColor` and `specularColor` |
-| `clearcoat`, `clearcoatRoughness` | A second specular lobe weighted by `clearcoat` (Substrate haziness), as UE converts its own clear coat; there is no coat absorption over the base |
-| `opacity`, `opacityThreshold` | See-through (translucent) or cutout (masked) |
+| `clearcoat`, `clearcoatRoughness` | A white coat layered over the base (the layered Standard Surface parent, coat IOR 1.5), only on materials with `clearcoat` above 0. With `useSpecularWorkflow` or partial opacity it stays a second specular lobe on the base (Substrate haziness) |
+| `opacity`, `opacityThreshold` | See-through (translucent) or cutout (masked). `opacityMode` is not read: partial opacity is presence (it scales specular and emission too), so thin glass loses part of its Fresnel reflections (rims at 0.8 × Karma, which keeps them in both modes) |
 | `normal` | Tangent-space normal map (USD's +Y up) |
 | `occlusion` | Ambient occlusion |
 | `displacement` | World Position Offset along the normal (see [Displacement](#displacement)) |
+
+`UsdUVTexture` `wrapS`/`wrapT` (MaterialX `uaddressmode`/`vaddressmode`) are honoured: `repeat`, `clamp`, `mirror`, and `black`, which clamps and reads the input's `bias` outside [0, 1]. `useMetadata`, the default, does not read the file's wrap metadata and falls back to `black`, as the spec says for files without it (Karma does the same). `sourceColorSpace` (or the file's `colorSpace` metadata) decides whether 8-bit texels are sRGB-decoded: `raw` and linear spaces read linear, `sRGB` decodes, `auto` decodes colour inputs only.
 
 ## MaterialX surfaces
 
@@ -71,7 +73,7 @@ Surfaces: `ND_standard_surface_surfaceshader`, `ND_open_pbr_surface_surfaceshade
 
 | Node | Translation |
 | --- | --- |
-| `ND_image_*`, `ND_tiledimage_*` (`uvtiling`, `uvoffset`), `UsdUVTexture` | The texture; `colorspace` / `sourceColorSpace` `raw` skips the OCIO conversion of colour images, as for Preview Surface |
+| `ND_image_*`, `ND_tiledimage_*` (`uvtiling`, `uvoffset`), `UsdUVTexture` | The texture, with its `colorspace` / `sourceColorSpace` and address modes, as for Preview Surface |
 | `ND_geompropvalue_vector2`, `UsdPrimvarReader_float2` | Selects the mesh's UV set (`geomprop` / `varname`, such as `map1`) |
 | `ND_extract_*` | Selects a channel (alpha cutouts: `ND_image_color4` → `ND_extract_color4` index 3) |
 | `ND_convert_*`, `ND_dot_*` | Passed through |
@@ -95,7 +97,7 @@ Any other node (`ND_mix_*`, `ND_place2d_*`, procedurals, ...) leaves the input a
 | `transmission` (`transmission_weight`) | Approximated as see-through coverage, opacity × (1 − transmission); no refraction |
 | `normal` (`geometry_normal`) | Tangent-space normal map |
 
-Materials with `subsurface` or `sheen` above 0 render with the layered Standard Surface parents: UE's own `Substrate-StandardSurface-Opaque` material function (the one UE's Interchange uses for MaterialX), fed the same texture slots, in four cooked variants (opaque or masked, solid or thin-walled; `thin_walled` is a static input of the function). Everything else, including standard_surface materials without subsurface or sheen, uses the single-slab Preview Surface parents. The layered function mixes metal and dielectric slabs and layers coat and sheen vertically, so it costs several Substrate closures per pixel where Preview Surface costs one; keeping it to the materials that need it bounds that cost. In the Sponza gallery shot (960 x 540, Lumen, curtains covering about half the frame), the layered curtains cost about 1 to 2 ms per frame over the same curtains on Preview Surface (husk, 1500 realtime frames, measured twice).
+Materials with `subsurface`, `sheen` or a clear coat above 0 render with the layered Standard Surface parents: UE's own `Substrate-StandardSurface-Opaque` material function (the one UE's Interchange uses for MaterialX), fed the same texture slots, in four cooked variants (opaque or masked, solid or thin-walled; `thin_walled` is a static input of the function). Everything else, including standard_surface materials without subsurface, sheen or coat, uses the single-slab Preview Surface parents. The layered function mixes metal and dielectric slabs and layers coat and sheen vertically, so it costs several Substrate closures per pixel where Preview Surface costs one; keeping it to the materials that need it bounds that cost. In the Sponza gallery shot (960 x 540, Lumen, curtains covering about half the frame), the layered curtains cost about 1 to 2 ms per frame over the same curtains on Preview Surface (husk, 1500 realtime frames, measured twice).
 
 Limits: `subsurface_color` and `sheen_color` follow an image only when it is `base_color`'s (the usual authoring; their tint is kept), else they use their constant. Subsurface uses Substrate's per-material mean free path; UE subsurface profiles are not created at runtime. One UV transform per material, from the first textured input. `diffuse_roughness`, anisotropy, thin film, `coat_IOR`, `coat_normal`, `transmission_*` colours and dispersion are not translated. Transmissive materials, see-through materials and translucent sorting follow the Preview Surface translucent parent, which has no subsurface or sheen.
 
@@ -105,12 +107,12 @@ UE renders in linear Rec.709. In the Houdini build, hdUE converts at its boundar
 
 - The beauty is published in the config's `scene_linear` role. With an ACES pipeline whose `scene_linear` is ACEScg, renders come out in ACEScg, as Karma's do. Houdini 22's default config uses linear Rec.709 for `scene_linear`, so nothing is converted there.
 - Authored colours (Preview Surface diffuse and emissive colours, `displayColor`, light colours) are read as `scene_linear` values and converted to linear Rec.709 for UE.
-- With UE's tonemapper on, the beauty is display-linear Rec.709 (see [post-processing](#unreal-post-processing)) and is converted the same way, so the default view shows UE's image.
+- With UE's tonemapper on, the beauty is display-linear Rec.709 (see [post-processing](#unreal-post-processing)). It is still converted to `scene_linear`'s primaries, a matrix with no tone curve, so an un-tone-mapped view shows UE's image in any config; skipping the conversion would shift hues under an ACEScg `scene_linear`. ACES or AgX views tone-map it a second time, and hdUE warns once. It stays in the `color` AOV: a separate tone-mapped AOV would need a second, untone-mapped render of every frame.
 - `HDUE_COLOR_MANAGEMENT=0` turns the conversion off.
 
-- Linear colour textures (EXR, HDR in the base colour and emissive inputs, unless `sourceColorSpace = "raw"`) are read as `scene_linear` and converted once to linear Rec.709 with OpenImageIO, into a cache under the temp folder (`hdue_ocio`), keyed by path, file time and colour space.
+- Colour textures (base colour, emissive, specular colour) are converted from their authored colour space: MaterialX `colorspace` (`acescg`, `lin_rec709`, `srgb_texture`, ...) or the file's `colorSpace` metadata, resolved by name through the OCIO config. Float images (EXR, HDR) with none, or `auto`, are read as `scene_linear`. Conversions run once with OpenImageIO, into a cache under the temp folder (`hdue_ocio`), keyed by path, file time and colour space; a name the config does not know is warned about once and used as is.
 
-8-bit colour textures are read as sRGB-encoded Rec.709, which is what sRGB textures are in any config. Per-file colour space metadata other than `raw` is not read yet.
+`raw` and sRGB-encoded spaces (`sRGB`, `srgb_texture`) are not converted: UE decodes sRGB 8-bit texels to linear Rec.709 itself. An 8-bit image in a linear space other than Rec.709 (`acescg`) is converted to a half-float copy. Measured: an ACEScg EXR on a MaterialX image renders at 1.03 × Karma. Karma ignores `colorSpace` metadata on a `UsdUVTexture` file; hdUE converts it.
 
 ## Alpha
 

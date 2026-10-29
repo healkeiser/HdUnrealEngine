@@ -115,7 +115,12 @@ struct HdUEVolumeData {
 struct HdUETextureData {
     std::string file;
     GfVec4f scale{1}, bias{0}, mask{1, 0, 0, 0};
-    bool sceneLinear = false;  // a colour image, converted from the OCIO scene_linear role
+    // A colour image, converted with OCIO from colorSpace (its authored colour space; empty: scene_linear for float
+    // images) to linear Rec.709 (HdUELinearRec709Texture).
+    bool convert = false;
+    std::string colorSpace;
+    uint32_t wrap[2] = {HDUE_WRAP_REPEAT, HDUE_WRAP_REPEAT};
+    uint32_t encoding = HDUE_TEXTURE_ENCODING_AUTO;
 };
 // op: (Houdini COP) and opdef: (embedded HDA) images exist only inside the host, which exports them and maps each
 // path to its file (render setting opTextures). Materials and lights keep these paths; they are resolved when packed.

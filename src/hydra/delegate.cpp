@@ -554,7 +554,9 @@ HdueMaterialParameter materialParameter(ScenePacket& packet, const std::string& 
     return p;
 }
 // The file for a texture path: host images (op:, opdef:) through the host's map, empty until it exported them.
-std::string textureFile(HdUEState& state, const std::string& file, bool sceneLinear = false) {
+// Colour images are converted to linear Rec.709 from colorSpace (HdUELinearRec709Texture).
+std::string textureFile(HdUEState& state, const std::string& file, bool convert = false,
+                        const std::string& colorSpace = {}) {
     if (!HdUEHostTexture(file)) return file;
     const auto files = state.setting<VtDictionary>("opTextures", {});
     const auto it = files.find(file);
@@ -569,8 +571,8 @@ std::string textureFile(HdUEState& state, const std::string& file, bool sceneLin
                 " untextured: only Houdini's viewport evaluates op: paths. Save the image to a file for husk.");
         return {};
     }
-    return sceneLinear ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>())
-                       : it->second.UncheckedGet<std::string>();
+    return convert ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>(), colorSpace)
+                   : it->second.UncheckedGet<std::string>();
 }
 void prepareMaterials(HdUEState& state, ScenePacket& packet) {
     const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
@@ -593,7 +595,10 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         for (int slot = 0; slot < HDUE_TEXTURE_SLOT_COUNT; ++slot) {
             const auto& texture = data.textures[slot];
             auto& out = desc.textures[slot];
-            out.file = packet.own(textureFile(state, texture.file, texture.sceneLinear));
+            out.file = packet.own(textureFile(state, texture.file, texture.convert, texture.colorSpace));
+            out.wrap[0] = texture.wrap[0];
+            out.wrap[1] = texture.wrap[1];
+            out.encoding = texture.encoding;
             // Displacement is a distance: scene units to UE centimetres.
             const float scale = slot == HDUE_TEXTURE_DISPLACEMENT ? units : 1.f;
             for (int i = 0; i < 4; ++i) {
@@ -1966,6 +1971,16 @@ public:
                     // display values.
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
+                    // The tone-mapped beauty is display-linear. It is still converted to scene_linear's primaries
+                    // (only a matrix), so an un-tone-mapped view shows UE's image in any config; ACES or AgX views
+                    // would apply a second tone curve.
+                    static std::once_flag displayReferred;
+                    if (s.setting<bool>("tonemapper", false))
+                        std::call_once(displayReferred, [] {
+                            TF_WARN(
+                                "hdUE: with the Unreal tonemapper on, the beauty is UE's display-referred image; "
+                                "view it with an un-tone-mapped view (not ACES or AgX, which tone-map it again)");
+                        });
                     const auto settings = s.settingsSnapshot();
                     for (const auto& [key, value] : settings) {
                         if (TfStringStartsWith(key.GetString(), "postProcess:"))

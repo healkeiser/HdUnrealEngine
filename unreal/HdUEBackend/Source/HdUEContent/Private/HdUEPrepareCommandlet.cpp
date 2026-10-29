@@ -33,6 +33,9 @@
 #include "Materials/MaterialExpressionPerInstanceCustomData.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Materials/MaterialExpressionFloor.h"
+#include "Materials/MaterialExpressionAbs.h"
+#include "Materials/MaterialExpressionSaturate.h"
+#include "Materials/MaterialExpressionOneMinus.h"
 #include "Materials/MaterialExpressionMaterialFunctionCall.h"
 #include "Materials/MaterialExpressionFunctionInput.h"
 #include "Materials/MaterialExpressionStaticBool.h"
@@ -145,7 +148,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
         Material->TwoSided && Material->GetEditorOnlyData()->WorldPositionOffset.Expression &&
-        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion1") : TEXT("PreviewSurfaceVersion3")) &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion2") : TEXT("PreviewSurfaceVersion4")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
@@ -180,6 +183,12 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
     UV->A.Connect(0, Rows[0]);
     UV->B.Connect(0, Rows[1]);
+    // Wrap mode black: textures are clamped, and <Slot>Black (per axis, 0 or 1) zeroes texels outside [0,1], so the
+    // input reads its bias there: texel * Scale * (1 - saturate(dot(|floor(uv)|, Black.rg))).
+    auto* Tile = Add(NewObject<UMaterialExpressionFloor>(Material));
+    Tile->Input.Connect(0, UV);
+    auto* Outside = Add(NewObject<UMaterialExpressionAbs>(Material));
+    Outside->Input.Connect(0, Tile);
     const auto Slot = [&](const FString& Slot, FLinearColor Default, bool Color, bool Scalar) -> UMaterialExpression* {
         auto* Sample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
         Sample->ParameterName = *(Slot + TEXT("Texture"));
@@ -188,9 +197,22 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Sample->Texture =
             Color ? LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
                   : LinearWhite;
+        auto* BlackAxes = Add(NewObject<UMaterialExpressionComponentMask>(Material));
+        BlackAxes->Input.Connect(0, Vector(Slot + TEXT("Black"), FLinearColor(0, 0, 0, 0)));
+        BlackAxes->R = BlackAxes->G = 1;
+        auto* Outer = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+        Outer->A.Connect(0, Outside);
+        Outer->B.Connect(0, BlackAxes);
+        auto* Clamped = Add(NewObject<UMaterialExpressionSaturate>(Material));
+        Clamped->Input.Connect(0, Outer);
+        auto* Inside = Add(NewObject<UMaterialExpressionOneMinus>(Material));
+        Inside->Input.Connect(0, Clamped);
+        auto* Scale = Add(NewObject<UMaterialExpressionMultiply>(Material));
+        Scale->A.Connect(5, Vector(Slot + TEXT("Scale"), FLinearColor(0, 0, 0, 0)));
+        Scale->B.Connect(0, Inside);
         auto* Scaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
         Scaled->A.Connect(5, Sample);
-        Scaled->B.Connect(5, Vector(Slot + TEXT("Scale"), FLinearColor(0, 0, 0, 0)));
+        Scaled->B.Connect(0, Scale);
         auto* Biased = Add(NewObject<UMaterialExpressionAdd>(Material));
         Biased->A.Connect(0, Scaled);
         Biased->B.Connect(5, Vector(Slot + TEXT("Bias"), Default));
@@ -276,7 +298,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     Data->Metallic.Expression = nullptr;
     Data->Roughness.Expression = nullptr;
     if (Layered) {
-        Scalar(TEXT("StandardSurfaceVersion1"),
+        Scalar(TEXT("StandardSurfaceVersion2"),
                1.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
         Call->SetMaterialFunction(LoadObject<UMaterialFunction>(
@@ -339,8 +361,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
         // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
         auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
-        Scalar(TEXT("PreviewSurfaceVersion3"),
-               3.f);  // unconnected marker: bump the name when this graph changes, to regenerate
+        Scalar(TEXT("PreviewSurfaceVersion4"),
+               4.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
         Albedo->A.Connect(0, Conversion);
         Albedo->B.Connect(0, BaseColor);
