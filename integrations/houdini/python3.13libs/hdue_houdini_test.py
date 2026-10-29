@@ -205,15 +205,19 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         # QWidget.grab must not re-enter Houdini's Vulkan/GL viewport painting.
         import hdefereval
         from PySide6 import QtGui
-        viewer=integration.scene_viewer(); path=self.output/name
+        viewer=integration.scene_viewer(); path=self.output/name; done=[]
         def flipbook():
             settings=viewer.flipbookSettings().stash()
             settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
             settings.beautyPassOnly(False)
             settings.useResolution(False); settings.output(str(path))
             viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
+            done.append(True)
         hdefereval.execute_deferred(flipbook)
         while not path.is_file(): yield
+        # The flipbook's nested event loop ends on the renderer's next update; the test must not go on (or quit) inside it.
+        self.update()
+        while not done: yield
         image=QtGui.QImage(str(path)).convertToFormat(QtGui.QImage.Format_RGBA8888)
         while image.isNull():
             yield
@@ -239,7 +243,12 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         if action=='pan': camera.setTranslation(position+hou.Vector3(-dx,dy,0)*abs(position[2])/500.)
         elif action=='orbit': camera.setRotation(hou.hmath.buildRotate(hou.Vector3(-dy*.3,0,0)).extractRotationMatrix3()*camera.rotation()*hou.hmath.buildRotate(hou.Vector3(0,-dx*.3,0)).extractRotationMatrix3())
         elif action=='dolly': camera.setTranslation(hou.Vector3(position[0],position[1],position[2]*math.exp(dy*.008)))
-        viewport.draw()
+        self.update()
+
+    def update(self):
+        # Houdini runs a converged renderer's next update on viewport interaction only, not on viewport.draw(): a
+        # scripted camera edit or a finished flipbook waits for it. Pausing and resuming runs one.
+        viewer=integration.scene_viewer(); viewer.setRendererPaused(True); viewer.setRendererPaused(False)
 
     def depth_contracts(self):
         from hdue_viewport import DepthApi,Frame

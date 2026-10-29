@@ -991,11 +991,21 @@ public:
         const GfMatrix4d& GetWorldToViewMatrix() const { return view; }
         const GfMatrix4d& GetProjectionMatrix() const { return projection; }
         const HdCamera* GetCamera() const { return camera; }
+        GfVec4f lens; std::vector<GfVec2i> sizes;
+        bool same(const PassSnapshot& o) const {
+            return aovs == o.aovs && view == o.view && projection == o.projection && camera == o.camera && lens == o.lens && sizes == o.sizes;
+        }
     };
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
         HdUETraceThread("Execute");
-        const auto pass = std::make_shared<const PassSnapshot>(PassSnapshot{state->GetAovBindings(), state->GetWorldToViewMatrix(),
-            state->GetProjectionMatrix(), state->GetCamera()});
+        const auto* camera = state->GetCamera();
+        PassSnapshot snapshot{state->GetAovBindings(), state->GetWorldToViewMatrix(), state->GetProjectionMatrix(), camera,
+            camera ? GfVec4f(camera->GetFStop(), camera->GetFocusDistance(), camera->GetFocalLength(), camera->GetLinearExposureScale()) : GfVec4f(0)};
+        for (const auto& aov : snapshot.aovs) {
+            const auto* b = aov.renderBuffer ? aov.renderBuffer : static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer, aov.renderBufferId));
+            snapshot.sizes.emplace_back(b ? int(b->GetWidth()) : 0, b ? int(b->GetHeight()) : 0);
+        }
+        const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
         // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
         auto& host = selfHost();
@@ -1009,8 +1019,12 @@ public:
             // Calls arriving while one is queued are coalesced, so the queued call and the pump always render the
             // newest camera: keeping the camera of the call that was queued lost Houdini's last move (it then saw a
             // converged image and stopped calling).
-            { std::lock_guard lock(latestMutex_); latestPass_ = pass; latestTags_ = tags; }
-            converged_ = false;
+            // Only a new camera, AOV or size restarts convergence (scene and settings changes are in IsConverged): Houdini
+            // calls again while a pass is not converged, so resetting it on every call kept Houdini redrawing without end
+            // and a flipbook waiting for convergence until its own timeout.
+            bool moved;
+            { std::lock_guard lock(latestMutex_); moved = !latestPass_ || !latestPass_->same(*pass); latestPass_ = pass; latestTags_ = tags; }
+            if (moved) converged_ = false;
             const auto eye = pass->view.GetInverse().ExtractTranslation();
             const bool skipped = executeQueued_.exchange(true);
             trace("hdUE execute posted=%d eye=(%.2f, %.2f, %.2f)\n", int(!skipped), eye[0], eye[1], eye[2]);
