@@ -529,16 +529,14 @@ def _settings_prim(stage):
     return next((child for child in root.GetChildren() if child.IsA(UsdRender.Settings)),None) if root else None
 
 def render_settings_node(input_node,mode='realtime',samples=64):
-    """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda). It edits the stage's own render settings prim when the
-    input has one (the viewport renders with that prim, so a second one would change nothing), keeping its camera and
-    authored hdUE mode and samples; else it creates /Render/rendersettings (Houdini's default path) with them."""
+    """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda) at /Render/rendersettings (Houdini's default path), the
+    stage's default render settings. A loaded scene's own render settings prim gives it its camera and hdUE mode and samples."""
     if not hou.nodeType(hou.lopNodeTypeCategory(),RENDER_SETTINGS_TYPES[1]):  # hython without the integration on HOUDINI_PATH
         hou.hda.installFile(str(Path(__file__).resolve().parents[1]/'otls'/'hdue_rendersettings.hda'))
     node=input_node.parent().createNode(RENDER_SETTINGS_TYPES[1],'hdUE_render_settings')
     node.setInput(0,input_node)
     stage=input_node.stage()
     existing=_settings_prim(stage) if stage else None
-    if existing: node.parm('primpath').set(str(existing.GetPath()))
     # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
     targets=UsdRender.Settings(existing).GetCameraRel().GetForwardedTargets() if existing else []
     camera=stage.GetPrimAtPath(targets[0]) if targets else         next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None
@@ -558,7 +556,9 @@ def _render_property(node,prefix,value):
         template=(hou.StringParmTemplate if isinstance(value,str) else hou.IntParmTemplate)(hou.encode(attribute),attribute,1,tags=tags)
         control=hou.StringParmTemplate(hou.encode(attribute+'_control'),attribute,1,default_value=('none',))
         group=node.parmTemplateGroup(); group.append(control); group.append(template); node.setParmTemplateGroup(group)
-    find(True).set('set'); find(False).set(value)
+    control=find(True) # hdUE Render Settings has none: it authors what differs from its default
+    if control: control.set('set')
+    find(False).set(value)
 
 def render_options(stage):
     """hdUE render mode and samples from the stage's render settings prim, else the defaults."""

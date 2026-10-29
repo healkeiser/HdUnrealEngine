@@ -52,12 +52,17 @@ assert integration.render_options(stage)==('realtime',64)
 render=integration.render_settings_node(node)
 assert not render.errors(),render.errors()
 settings=render.stage().GetPrimAtPath('/Render/rendersettings')
-assert settings.GetAttribute('hdUE:renderMode').Get()=='realtime'
-assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'unset controls must not author'
+assert render.stage().GetMetadata('renderSettingsPrimPath')=='/Render/rendersettings'
+assert integration.render_options(render.stage())==('realtime',64)
+assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'settings at their defaults must not author'
+assert not [p.name() for p in render.parms() if '_control' in p.name()],'no USD control menus, as Karma Render Settings'
+render.parm(hou.text.encode('hdUE:lumenEnabled')).set(0)
+assert render.stage().GetPrimAtPath('/Render/rendersettings').GetAttribute('hdUE:lumenEnabled').Get() is False,'a changed setting authors'
+render.parm(hou.text.encode('hdUE:lumenEnabled')).set(1)
 integration._render_property(render,'xn__hdUErenderMode','pathtraced')
 assert integration.render_options(render.stage())==('pathtraced',64)
 
-# A scene with its own render settings is edited in place: the viewport renders with that prim, not a second one.
+# A scene with its own render settings: the node's prim becomes the default, with the scene's camera and hdUE values.
 authored=Path(tempfile.mkdtemp())/'authored_settings.usda'
 authored.write_text('#usda 1.0\ndef Camera "other" {}\ndef Camera "shot" {}\ndef Scope "Render" {\n'
     '    def RenderSettings "Settings" {\n        rel camera = </shot>\n        token hdUE:renderMode = "pathtraced"\n'
@@ -65,9 +70,11 @@ authored.write_text('#usda 1.0\ndef Camera "other" {}\ndef Camera "shot" {}\ndef
 authored_source=network.createNode('sublayer'); authored_source.parm('filepath1').set(str(authored))
 edited=integration.render_settings_node(authored_source)
 assert not edited.errors(),edited.errors()
-assert not edited.stage().GetPrimAtPath('/Render/rendersettings'),'a second settings prim changes nothing'
+assert edited.stage().GetMetadata('renderSettingsPrimPath')=='/Render/rendersettings'
 assert integration.render_options(edited.stage())==('pathtraced',256)
-assert [str(t) for t in UsdRender.Settings(edited.stage().GetPrimAtPath('/Render/Settings')).GetCameraRel().GetForwardedTargets()]==['/shot']
+assert [str(t) for t in UsdRender.Settings(edited.stage().GetPrimAtPath('/Render/rendersettings')).GetCameraRel().GetForwardedTargets()]==['/shot']
+edited.parm(hou.text.encode('hdUE:renderMode')).set('realtime')
+assert integration.render_options(edited.stage())==('realtime',64),'the default value renders, not the scene prim (samples apply to the Path Tracer only)'
 
 # Native asset bounds live in the viewport overrides (session-only), sized in the stage's own units.
 assets=integration.NativeAssets()

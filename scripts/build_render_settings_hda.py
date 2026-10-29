@@ -17,6 +17,7 @@ It restarts itself in hython, with the integration and the delegate's plugInfo.j
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -99,9 +100,9 @@ def relaunch():
 
 def help_page(group, name=NAME, label=LABEL, icon=ICON,
               summary="Renders the stage with Unreal Engine (hdUE): render settings, camera, resolution, output and AOVs.",
-              overview="Like Karma Render Settings, it creates the render settings prim, its render product and render vars. "
-                       "Each setting's menu button chooses whether this node authors it; unauthored settings keep hdUE's defaults "
-                       "(see docs/rendering.md in the hdUE repository). In Image Output, it can also render the render products "
+              overview="Like Karma Render Settings, it creates the render settings prim, its render product and render vars, and "
+                       "makes that prim the stage's default render settings. It authors the hdUE settings changed from their "
+                       "defaults; the others keep hdUE's defaults (see docs/rendering.md in the hdUE repository). In Image Output, it can also render the render products "
                        "and add the render vars authored upstream, by hdUE Render Products and hdUE Standard Render Vars."):
     """The node's help card (wiki markup), one entry per parameter from its help text, under its tabs and sections."""
     import hou
@@ -140,7 +141,12 @@ def build():
     product = subnet.createNode("renderproduct", "renderproduct")
     product.setInput(0, last)
     settings.setInput(0, switch(subnet, "enable_builtin", source, product, 'strcmp(chs("../outputproducts"), "upstream") != 0'))
-    subnet.node("output0").setInput(0, settings)
+    # As Karma Render Settings: the viewport and husk render with this prim even where the input brings its own.
+    default = subnet.createNode("configurelayer", "default_settings")
+    default.setInput(0, settings)
+    default.parm("setrendersettings").setExpression('ch("../setlayerrendersettings")')
+    default.parm("rendersettings").set('`chs("../primpath")`')
+    subnet.node("output0").setInput(0, default)
     product.parm("orderedVars").set(VARS + "C" + "".join(f' `ifs(ch("../aov_{a[0]}"), "{VARS}{a[0]}", "")`' for a in AOVS)
                                     + ' `ifs(ch("../importvars"), "(" + chs("../upstreamvars") + ")", "")`')
     product.parm("productName").set('`chs("../picture")`')
@@ -151,6 +157,10 @@ def build():
     group = hou.ParmTemplateGroup()
     group.append(hou.StringParmTemplate("primpath", "Render Settings Prim", 1, default_value=("/Render/rendersettings",),
                                         help="Path of the UsdRenderSettings prim this node creates or edits."))
+    group.append(hou.ToggleParmTemplate(
+        "setlayerrendersettings", "Set as Default Render Settings Prim", default_value=True,
+        help="Makes this prim the stage's default render settings (renderSettingsPrimPath), which the viewport and husk "
+             "render with, also where the input stage brings render settings of its own."))
     for name, text in TOP_HELP.items():
         template = settings.parmTemplateGroup().find(name)
         template.setHelp(text)
@@ -182,7 +192,7 @@ def build():
     for tab in renderer.parmTemplates():
         if tab.label() == "Engine Quality":
             group.append(output)
-        group.append(tab)
+        group.append(without_controls(tab))
     subnet.setParmTemplateGroup(group)
     # The internal Render Settings LOP follows the asset's parameters.
     settings.parm("primpath").set('`chs("../primpath")`')
@@ -192,9 +202,40 @@ def build():
             for parm, source in zip(settings.parmTuple(template.name()), subnet.parmTuple(template.name())):
                 if not parm.isLocked():
                     parm.set(source)
+    # No USD control menus, as Karma Render Settings: the internal controls author what differs from its default.
+    for template in group.entriesWithoutFolders():
+        control = settings.parm(hou.text.encode(hou.text.decode(template.name()) + "_control")) if template.name().startswith("xn__hdUE") else None
+        if control:
+            control.setExpression(control_expression(template, subnet.parmTuple(template.name())))
 
     save(subnet, HDA, NAME, LABEL, ICON, group, help_page(group),
          "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n")
+
+
+def without_controls(template):
+    """The renderer tab without its USD control menus, and without the conditions on them."""
+    import hou
+
+    if template.type() == hou.parmTemplateType.Folder:
+        template.setParmTemplates([without_controls(t) for t in template.parmTemplates() if "_control" not in t.name()])
+    elif "_control" in template.conditionals().get(hou.parmCondType.DisableWhen, ""):
+        rest = re.sub(r"\{[^}]*_control[^}]*\}", "", template.conditionals()[hou.parmCondType.DisableWhen]).strip()
+        template.setConditional(hou.parmCondType.DisableWhen, rest)
+    return template
+
+
+def control_expression(template, parms):
+    """An internal control expression: Set while the asset's value differs from its default, else Do Nothing, so
+    unchanged settings keep hdUE's defaults (UE's post-process and engine defaults are not all fixed values)."""
+    import hou
+
+    defaults = template.defaultValue() if isinstance(template.defaultValue(), tuple) else (template.defaultValue(),)
+    if isinstance(template, hou.StringParmTemplate):
+        quoted = [d.replace("\\", "\\\\").replace('"', '\\"') for d in defaults]
+        checks = [f'strcmp(chs("../{p.name()}"), "{d}") != 0' for p, d in zip(parms, quoted)]
+    else:
+        checks = [f'ch("../{p.name()}") != {int(d) if isinstance(d, bool) else d}' for p, d in zip(parms, defaults)]
+    return 'ifs(' + " || ".join(checks) + ', "set", "none")'
 
 
 def primlist(name, label, default, kind, text, conditionals=None, show_label=True):
