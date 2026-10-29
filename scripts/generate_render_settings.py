@@ -787,7 +787,7 @@ def ds_parm(setting, indent, viewport):
     }[kind]
     usd_type = {
         "toggle": "bool",
-        "menu": "string",
+        "menu": "token",  # as Karma's menus
         "string": "string",
         "int": "int",
         "intmenu": "int",

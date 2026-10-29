@@ -2,7 +2,7 @@
 
 ## Render settings
 
-Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **Unreal Engine** tab of Render Settings LOPs, or the hdUE Render Settings LOP, in Houdini; see [Houdini](houdini.md#solaris-viewport)). String settings accept `string` or `token`, numbers accept any numeric type.
+Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **Unreal Engine** tab of Render Settings LOPs, or the hdUE Render Settings LOP, in Houdini; see [Houdini](houdini.md#solaris-viewport)). `hdue:*`, the spelling of hdUE's light and prim attributes, is accepted too. String settings accept `string` or `token` (Houdini's menus author tokens), numbers accept any numeric type. Houdini's viewport and husk read the same prim, so they render the same settings.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -22,6 +22,10 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 | `hdUE:domeResolution` | 512 | Environment cubemap face size |
 | `hdUE:autoViewerLight`, `hdUE:viewerLightIntensity` | | Review light for scenes without lights |
 | `hdUE:upAxis` | stage | Up axis override |
+| `hdUE:materialxLibrary`, `hdUE:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied in Houdini's viewport; husk keeps the Preview Surface fallback and warns |
+| `hdUE:viewportIdAovs` | 0 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight |
+
+In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.
 
 ## Geometry
 

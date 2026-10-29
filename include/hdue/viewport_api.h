@@ -21,11 +21,9 @@ typedef struct HdueViewportStatus {
     char error[512];
 } HdueViewportStatus;
 HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(HdueViewportStatus* status);
-typedef struct HdueViewportOptions {
-    uint32_t struct_size, mode, samples, lumen, auto_light, z_up;
-    double meters_per_unit, time_seconds;
-} HdueViewportOptions;
-HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(const HdueViewportOptions* options);
+/* The viewed stage's up axis (0 Y, 1 Z), which Houdini does not pass to the viewport's delegate. Render mode,
+ * samples, units and time come through Hydra (the render settings prim, stageMetersPerUnit, houdini:frame). */
+HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_up_axis(uint32_t z_up);
 /* Called by the host on the thread that owns UE, after each tick: runs UE work that delegates executing on
  * other threads (Live Render) queued, and records this thread as the owner. */
 HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks(void);
