@@ -12,9 +12,9 @@ This writes `out\package\hdUE-<version>-houdini22.0-win64` (about 1.2 GB unpacke
 
 The backend links Unreal Engine Developer modules (`bBuildDeveloperTools` in `HdUEBackend.Target.cs`, for runtime Nanite and Lumen cards), which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows distributing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio or to other Unreal Engine licensees, never as a public download. `Package-Houdini.ps1` refuses to run without `-UnrealLicenseesOnly` while the target enables Developer tools.
 
-On the target machine (Houdini 22.0, Windows x64, a DirectX 12 GPU with hardware ray tracing; no UE, Visual Studio or OpenUSD needed), unzip the folder to a writable location, because UE writes its shader cache and logs into `runtime\Windows\HdUEBackend\Saved`. Then run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`, which sets `HDUE_HOUDINI_ENABLE`, `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_PLUGIN`, appends the plugin to `PXR_PLUGINPATH_NAME`, and adds the integration to `HOUDINI_PATH`. For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. Houdini, hython and husk all pick it up.
+On the target machine (Houdini 22.0, Windows x64, a DirectX 12 GPU with hardware ray tracing; no UE, Visual Studio or OpenUSD needed), unzip the folder anywhere; it may be shared and read-only, since UE writes its shader cache and logs per user (`HDUE_USER_DIR`, `$HOUDINI_USER_PREF_DIR/hdUE`) and the host logs under `$HOUDINI_TEMP_DIR/hdUE`. Then run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json` (Windows only, loaded once), which sets `HDUE_HOUDINI_ENABLE`, `HDUE_USER_DIR`, `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_PLUGIN`, appends the plugin to `PXR_PLUGINPATH_NAME`, and adds the integration to `HOUDINI_PATH`. For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. Houdini, hython and husk all pick it up.
 
-The package's `uiready.py` replaces Houdini's own (which only pre-warms the info window), as with any package that ships one.
+The package's `uiready.py` runs alongside Houdini's own (Houdini runs every `uiready.py` on its path). It only watches the Scene Viewers: hdUE's Python host, which prepares materials and `op:` images, starts the first time a viewer selects hdUE, so sessions that never use hdUE load nothing.
 
 ## Solaris viewport
 
@@ -39,7 +39,7 @@ As with Karma, render vars and products can also be authored upstream, by two mo
 
 In hdUE Render Settings' Image Output tab, **Render Products** chooses the built-in product (the default, unchanged when the node is used alone), the upstream products (`/Render/** & %type:RenderProduct` by default), or both; **Import Upstream Render Vars** adds the upstream render vars to the built-in product, as Karma's *Import Render Vars From Second Input* does (hdUE takes them from the first input). Built-in vars share `/Render/Products/Vars` with hdUE Standard Render Vars' default, so an enabled built-in AOV replaces the upstream var of the same name (its format included). husk writes every product of the render settings.
 
-Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. The delegate provides `primId` and `instanceId` AOVs, so Solaris draws its native selection highlight on hdUE images. Click picking through those AOVs has not been verified separately; the Scene Graph Tree is the reliable way to select prims. The current target is one active hdUE viewport.
+Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. Solaris draws its selection highlight over hdUE images with Houdini's GL overlay (`needsselection`); the `primId` and `instanceId` AOVs are opt-in in the viewport (see below). Click picking through those AOVs has not been verified separately; the Scene Graph Tree is the reliable way to select prims. The current target is one active hdUE viewport.
 
 ### Performance
 
@@ -91,7 +91,7 @@ UE Substrate materials are authored like Karma's: an **hdUE Substrate Builder** 
 
 ## Rendering to disk with husk
 
-husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), ticks it from the render pass, and shuts it down with the last delegate. UE allows one lifetime per process, which matches one husk invocation rendering a frame range.
+husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), and ticks it from the render pass. UE allows one lifetime per process, so it stays until the process exits: husk `--restart-delegate` creates its next delegates on the same UE.
 
 ```powershell
 husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 24 -o render.$F4.exr scene.usd
@@ -106,17 +106,17 @@ $env:HDUE_HOUDINI_ENABLE = '1'
 $env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
 ```
 
-UE renders offscreen (`-RenderOffscreen`), in husk, Live Render, the Solaris viewport and usdview alike: it opens no window, and frames come from GPU readback as before. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging. UE's log reaches the host console as UTF-8 (`-stdout`) and is written in full to `HdUEBackendSavedogs`.
+UE renders offscreen (`-RenderOffscreen`), in husk, Live Render, the Solaris viewport and usdview alike: it opens no window. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging. UE's log reaches the host console as UTF-8 (`-stdout`) and is written in full to `HdUEBackend\Saved\Logs` (under `HDUE_USER_DIR` when set).
 
 UE starts once per husk process, and Hydra resends only what changes between frames, so render a frame range in one husk call (and give farm tasks chunks of frames) rather than one process per frame. On an RTX 4090, a 1080p Lumen frame of a simple scene with the default 16 warmup frames takes about 0.3 s including the EXR write, after about 3 s of UE startup per process. Realtime mode (`hdUE:renderMode = realtime`) is meant for final frames too; heavier scenes cost more, mostly on the GPU. When husk owns UE, the delegate ticks it continuously instead of once per husk poll, and only the first, the converged and (for progress) one draw per 250 ms are read back from the GPU.
 
-husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate's `percentDone` stat: Path Tracer samples, or 100 once the realtime warmup converges. If none of the requested render vars is one hdUE renders, the frame fails with an error instead of waiting forever.
+husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate's `percentDone` stat: Path Tracer samples, or 100 once the realtime warmup converges. Render vars hdUE does not render (light path expressions other than the beauty, `C.*[LO]` or `C.*`; primvar vars) receive their clear value with a warning. If none of the requested render vars is one hdUE renders, or the frame fails, the delegate reports `huskErrorStatus`, so husk exits with a non-zero code for farm managers.
 
 A USD Render ROP passes its environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers. Unsaved SOP volumes are written next to the USD file by the ROP and render from there.
 
 ## Live Render and Copernicus
 
-The Live Render LOP accepts **HdUEHoudiniRendererPlugin** as its render delegate. It renders inside the Houdini process on its own threads, while UE belongs to Houdini's UI thread (or, when nothing in the process has started UE, to a thread hdUE starts for it, as in husk). The delegate queues its UE work for that thread, which runs it after each UE tick; a render whose work is not picked up within 5 s fails with an error rather than blocking. A File COP with **Source: Live Render** can start and stop it for compositing in Copernicus.
+The Live Render LOP accepts **HdUEHoudiniRendererPlugin** as its render delegate. It renders inside the Houdini process on its own threads, while UE runs on the thread hdUE started for it. The delegate queues its UE work for that thread, which runs it after each UE tick; a render whose work is not picked up within 5 s fails with an error rather than blocking. A File COP with **Source: Live Render** can start and stop it for compositing in Copernicus.
 
 The backend supports one render session per process, so a Live Render and an hdUE Solaris viewport cannot run at the same time (from the code; not tested). The Live Render has been checked to render and converge with its AOVs; the image reaching the File COP has not been verified by the automated tests (in the scripted test the File COP stayed empty with Karma too), so check it in the UI.
 

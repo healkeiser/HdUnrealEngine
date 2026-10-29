@@ -1,4 +1,5 @@
-"""Houdini 22.0.466 Solaris host. All UE operations belong to the UI thread."""
+"""Houdini 22.0 Solaris host: housekeeping for the hdUE viewport (material preparation, op: images, asset proxies,
+redraws). UE runs on the delegate's own thread; the host starts when a Scene Viewer first selects hdUE."""
 import atexit
 import json
 import os
@@ -12,12 +13,20 @@ import hou
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT=Path(__file__).resolve().parents[3]
-sys.path.insert(0,str(ROOT/'scripts'))
+# Appended: hdUE's modules must not shadow Houdini's or another package's.
+if str(ROOT/'scripts') not in sys.path: sys.path.append(str(ROOT/'scripts'))
 PLUGIN='HdUEHoudiniRendererPlugin'
 LABEL='Unreal Engine (hdUE)'
 _host=None
 _failure=None
 _catalog_cache={}
+_watcher=None
+
+def log_directory():
+    """HDUE_HOUDINI_LOG_DIR, else a per-process folder under Houdini's temp directory (never the install folder)."""
+    directory=os.environ.get('HDUE_HOUDINI_LOG_DIR')
+    if directory: return Path(directory)
+    return Path(hou.text.expandString('$HOUDINI_TEMP_DIR'))/'hdUE'/str(os.getpid())
 
 def _report(message):
     print('hdUE Houdini: '+message,flush=True)
@@ -43,8 +52,9 @@ class Host:
         from hdue_viewport import Viewport
         if hou.applicationVersion()[:2]!=(22,0): raise RuntimeError('This package requires Houdini 22.0')
         self.owner=threading.get_ident()
-        self.log_dir=Path(os.environ.get('HDUE_HOUDINI_LOG_DIR',str(ROOT/'out/houdini-22.0.466/session')))
+        self.log_dir=log_directory()
         self.log_dir.mkdir(parents=True,exist_ok=True)
+        self.failures=0
         config=runtime_config()
         os.environ['HDUE_BACKEND_DLL']=config['backend_dll']
         hou.putenv('HDUE_BACKEND_DLL',config['backend_dll'])
@@ -93,8 +103,10 @@ class Host:
             self.materials_dirty=self.textures_dirty=True
 
     def write_state(self,error=None):
-        # Diagnostics only: UE boots on hdUE's own thread, so its status can be unavailable for a while; that must not
-        # stop the host's timer (any exception in tick() does).
+        # Diagnostics for tests and support only (HDUE_HOUDINI_LOG_DIR): no file write every 2 s otherwise.
+        if not os.environ.get('HDUE_HOUDINI_LOG_DIR'): return
+        # UE boots on hdUE's own thread, so its status can be unavailable for a while; that must not stop the host's
+        # timer (any exception in tick() does).
         try: runtime_state=self.runtime.status().state
         except RuntimeError as failure: runtime_state=str(failure)
         data=dict(houdini=hou.applicationVersionString(),usd=Usd.GetVersion(),pid=os.getpid(),
@@ -178,9 +190,14 @@ class Host:
                     if data: self.viewer.present(state,*data)
             if time.monotonic()-self.last_state>2:
                 self.last_state=time.monotonic(); self.write_state()
+            self.failures=0
         except BaseException:
-            _failure=traceback.format_exc()
-            self.running=False; self.timer.stop()
+            # Shown in Houdini's status bar; the host retries, and stops only after repeated failures.
+            _failure=traceback.format_exc(); self.failures+=1
+            if self.failures>=5: self.running=False; self.timer.stop()
+            message='hdUE host '+('stopped' if not self.running else 'error')+': '+_failure.splitlines()[-1]
+            try: hou.ui.setStatusMessage(message,hou.severityType.Error)
+            except BaseException: pass
             if self.viewer: self.viewer.status.setText(_failure.splitlines()[-1])
             self.write_state(_failure); _report(_failure)
         finally:
@@ -223,7 +240,8 @@ class Host:
         try:
             for viewer in hou.ui.paneTabs():
                 if isinstance(viewer,hou.SceneViewer) and viewer.currentHydraRenderer() in (LABEL,PLUGIN):
-                    viewer.setHydraRenderer('Houdini VK')
+                    others=[name for name in viewer.hydraRenderers() if name not in (LABEL,PLUGIN)]
+                    viewer.setHydraRenderer(others[0] if others else 'Houdini GL')
         except BaseException: _report(traceback.format_exc())
         if self.viewer: self.viewer.hide()
         self.runtime.close()
@@ -235,6 +253,21 @@ class Host:
         close()
         self.closed=True; self.write_state()
 
+def _hdue_selected():
+    try: return any(isinstance(tab,hou.SceneViewer) and tab.currentHydraRenderer() in (LABEL,PLUGIN) for tab in hou.ui.paneTabs())
+    except hou.Error: return False
+
+def start_when_selected():
+    """uiready.py: a cheap 500 ms watch; the host (DLL loads, material preparation, its 16 ms timer) starts only when a
+    Scene Viewer selects hdUE, so sessions that never use hdUE pay nothing. Tests and launches with a scene start now."""
+    global _watcher
+    if any(os.environ.get(name) for name in ('HDUE_HOUDINI_TEST','HDUE_HOUDINI_INPUT','HDUE_HOUDINI_HIP')): return start()
+    from PySide6 import QtCore
+    def poll():
+        if _hdue_selected():
+            _watcher.stop(); start()
+    _watcher=QtCore.QTimer(); _watcher.timeout.connect(poll); _watcher.start(500)
+
 def start():
     global _host,_failure
     if _host: return _host
@@ -242,7 +275,7 @@ def start():
         import hdue_substrate
         hdue_substrate.install()
         _host=Host()
-        _report('UE 5.8.4 ready on the Houdini UI thread')
+        _report('hdUE host started (UE runs on its own thread)')
         input_usd=os.environ.get('HDUE_HOUDINI_INPUT')
         if input_usd: open_usd(input_usd)
         elif os.environ.get('HDUE_HOUDINI_HIP'):
@@ -251,39 +284,17 @@ def start():
             QtCore.QTimer.singleShot(500,lambda:hdefereval.execute_deferred(activate_saved_hip))
         test=os.environ.get('HDUE_HOUDINI_TEST')
         if test:
-            if test=='substrate-live':
-                import hdue_substrate_live_test
-                hdue_substrate_live_test.start(_host)
-            elif test=='substrate-textures':
-                import hdue_substrate_texture_test
-                hdue_substrate_texture_test.start(_host)
-            elif test=='substrate':
-                import hdue_substrate_test
-                hdue_substrate_test.start(_host)
-            elif test=='surfaces':
-                import hdue_surface_test
-                hdue_surface_test.start(_host)
-            elif test=='references':
-                import hdue_reference_test
-                hdue_reference_test.start(_host)
-            elif test=='lighting':
-                import hdue_lighting_test
-                hdue_lighting_test.start(_host)
-            elif test=='materials':
-                import hdue_materialx_test
-                hdue_materialx_test.start(_host)
-            elif test=='optextures':
-                import hdue_op_texture_test
-                hdue_op_texture_test.start(_host)
-            elif test=='viewport':
-                import hdue_solaris_probe
-                hdue_solaris_probe.start(_host)
-            else:
-                import hdue_houdini_test
-                hdue_houdini_test.start(_host)
+            import importlib
+            module={'substrate-live':'hdue_substrate_live_test','substrate-textures':'hdue_substrate_texture_test',
+                    'substrate':'hdue_substrate_test','surfaces':'hdue_surface_test','references':'hdue_reference_test',
+                    'lighting':'hdue_lighting_test','materials':'hdue_materialx_test','optextures':'hdue_op_texture_test',
+                    'viewport':'hdue_solaris_probe'}.get(test,'hdue_houdini_test')
+            importlib.import_module(module).start(_host)
     except BaseException:
         _failure=traceback.format_exc(); _report(_failure)
-        path=Path(os.environ.get('HDUE_HOUDINI_LOG_DIR',str(ROOT/'out/houdini-22.0.466/session')))
+        try: hou.ui.setStatusMessage('hdUE host failed to start: '+_failure.splitlines()[-1],hou.severityType.Error)
+        except BaseException: pass
+        path=log_directory()
         path.mkdir(parents=True,exist_ok=True)
         (path/'startup-error.txt').write_text(_failure,encoding='utf-8')
     return _host

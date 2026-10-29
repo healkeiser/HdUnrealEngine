@@ -49,3 +49,25 @@ jobs:
       - name: Local path settings
         shell: pwsh
         run: ./tests/local_paths.ps1
+      - name: Python unit tests (usd-core, no Houdini)
+        shell: pwsh
+        run: |
+          foreach ($t in 'substrate_live_test','scene_space_test','substrate_graph_test','surface_effects_test','asset_controls_test') {
+              uv run --python 3.11 --with usd-core --with numpy python "tests/$t.py"
+              if ($LASTEXITCODE) { throw "$t failed" }
+          }
+      - name: Package installer (Windows PowerShell 5.1, as Install.cmd runs it)
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'hdue'; $packages = Join-Path $env:RUNNER_TEMP 'packages'
+          New-Item -ItemType Directory -Force "$root/plugin/Release", "$root/integrations/houdini" | Out-Null
+          '{}' | Set-Content "$root/runtime.json"; '' | Set-Content "$root/plugin/Release/hdUE_Houdini22.dll"
+          '{}' | Set-Content "$root/integrations/houdini/UsdRenderers.json"
+          Copy-Item packaging/houdini/*.ps1 $root
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Install.ps1" -PackagesDirectory $packages
+          if ($LASTEXITCODE) { throw 'Install.ps1 failed' }
+          $package = Get-Content "$packages/hdUE.json" -Raw | ConvertFrom-Json
+          if ($package.hpath -ne '$HDUE/integrations/houdini' -or -not $package.load_package_once -or $package.enable -notmatch "houdini_os == 'windows'" -or
+              ($package.env | Where-Object { $_.PXR_PLUGINPATH_NAME }).PXR_PLUGINPATH_NAME.method -ne 'append') { throw "Unexpected package: $($package | ConvertTo-Json -Depth 5)" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Uninstall.ps1" -PackagesDirectory $packages
+          if (Test-Path "$packages/hdUE.json") { throw 'Uninstall.ps1 left the package file' }

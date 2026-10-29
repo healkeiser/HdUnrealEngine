@@ -230,9 +230,6 @@ struct HdUEState : HdRenderParam {
     GfVec3d convert(const GfVec3d& point, bool direction = false) const { return converter()(point, direction); }
 };
 
-// HDUE_TRACE_THREADS=1: traces the first call of each Hydra entry point from each thread (with HDUE_TRACE_TIMING's sink).
-HDUE_HYDRA_API void HdUETraceThread(const char* call);
-
 class HDUE_HYDRA_API HdUERenderBuffer final : public HdRenderBuffer {
 public:
     explicit HdUERenderBuffer(const SdfPath& id);

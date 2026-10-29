@@ -21,23 +21,41 @@ if (-not $SkipBuild) {
 & (Join-Path $PSScriptRoot 'Stage-Runtime.ps1') -EngineRoot $EngineRoot *> (Join-Path $RunRoot 'stage.log')
 $Native = Join-Path $RunRoot 'native'
 $Hydra = Join-Path $RunRoot 'hydra'
-& (Join-Path $PSScriptRoot 'Test-Backend.ps1') -Mode both -Cycles 3 -OutputDirectory $Native *> (Join-Path $RunRoot 'native.log')
-& (Join-Path $PSScriptRoot 'Test-Hydra.ps1') -OpenUsdRoot $OpenUsdRoot -Mode both -Cycles 2 -SelfTest -OutputDirectory $Hydra *> (Join-Path $RunRoot 'hydra.log')
+# Each step must exit 0 (native failures do not always throw) and leave passing evidence.
+function Invoke-Step([string]$Name, [scriptblock]$Step) {
+    & $Step *> (Join-Path $RunRoot "$Name.log")
+    if ($LASTEXITCODE) { throw "$Name failed (exit $LASTEXITCODE). Evidence: $RunRoot" }
+}
+function Read-Passed([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { throw "Missing evidence: $Path" }
+    $Data = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if (-not $Data.passed) { throw "Failed evidence: $Path" }
+    $Data
+}
+Invoke-Step native { & (Join-Path $PSScriptRoot 'Test-Backend.ps1') -Mode both -Cycles 3 -OutputDirectory $Native }
+Invoke-Step hydra { & (Join-Path $PSScriptRoot 'Test-Hydra.ps1') -OpenUsdRoot $OpenUsdRoot -Mode both -Cycles 2 -SelfTest -OutputDirectory $Hydra }
+$NativeMetrics = Read-Passed (Join-Path $Native 'metrics.json')
+$HydraMetrics = Read-Passed (Join-Path $Hydra 'metrics.json')
 & uv run --quiet (Join-Path $PSScriptRoot 'compare_pfm.py') (Join-Path $Native 'cycle-0-pathtraced.pfm') (Join-Path $Hydra 'cycle-0-pathtraced.pfm') --output (Join-Path $RunRoot 'reference-comparison.json')
 if ($LASTEXITCODE) { throw "Native UE versus Hydra image comparison failed. Evidence: $RunRoot" }
 if ($WithUsdview) {
-    & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'usdview')
-    & (Join-Path $PSScriptRoot 'Test-Camera.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera')
-    & (Join-Path $PSScriptRoot 'Test-BufferPerf.ps1') -OpenUsdRoot $OpenUsdRoot -OutputFile (Join-Path $RunRoot 'buffer.json')
+    Invoke-Step usdview { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'usdview') }
+    Invoke-Step camera { & (Join-Path $PSScriptRoot 'Test-Camera.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera') }
+    Invoke-Step buffer { & (Join-Path $PSScriptRoot 'Test-BufferPerf.ps1') -OpenUsdRoot $OpenUsdRoot -OutputFile (Join-Path $RunRoot 'buffer.json') }
+    # These suites check their own counts and throw; their evidence must exist.
+    foreach ($File in 'usdviewerified.json', 'cameraerified.json', 'buffer.json') {
+        if (-not (Test-Path -LiteralPath (Join-Path $RunRoot $File))) { throw "Missing evidence: $File" }
+    }
 }
+$Version = Get-Content -Raw -LiteralPath (Join-Path $EngineRoot 'Engine\Build\Build.version') | ConvertFrom-Json
 $Evidence = [ordered]@{
-    passed = $true
-    engine = '5.8.4'
-    openusd = '26.03'
-    native_frames = 9
-    hydra_frames = 34
-    path_tracing_samples = 64
-    source_commit = 'f45729c0b6f097038e72b52d366a62baeca3275b'
+    passed = $true # every step above threw otherwise
+    engine = "$($Version.MajorVersion).$($Version.MinorVersion).$($Version.PatchVersion)"
+    native_frames = @($NativeMetrics.frames).Count
+    hydra_frames = @($HydraMetrics.frames).Count
+    path_tracing_samples = (@($NativeMetrics.frames) | Where-Object { $_.mode -eq 'pathtraced' } | Select-Object -Last 1).samples
+    engine_commit = 'f45729c0b6f097038e72b52d366a62baeca3275b' # 5.8.4-release, as Setup-Engine.ps1 checks out
+    hdue_commit = (git -C $TaskRoot rev-parse HEAD)
     native_metrics = (Join-Path $Native 'metrics.json')
     hydra_metrics = (Join-Path $Hydra 'metrics.json')
     comparison = (Join-Path $RunRoot 'reference-comparison.json')

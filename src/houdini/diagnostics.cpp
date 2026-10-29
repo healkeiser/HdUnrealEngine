@@ -107,13 +107,14 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(c
     if(!state || !Delegate) return HDUE_PENDING;
     if(!onHostThread(*state)) return HDUE_WRONG_THREAD;
     using namespace PXR_NS;
-    Delegate->SetRenderSetting(TfToken("renderMode"),VtValue(std::string(options->mode?"pathtraced":"realtime")));
-    Delegate->SetRenderSetting(TfToken("samplesPerPixel"),VtValue(int(options->samples)));
-    Delegate->SetRenderSetting(TfToken("lumenEnabled"),VtValue(bool(options->lumen)));
-    Delegate->SetRenderSetting(TfToken("autoViewerLight"),VtValue(bool(options->auto_light)));
-    Delegate->SetRenderSetting(TfToken("upAxis"),VtValue(std::string(options->z_up?"Z":"Y")));
-    Delegate->SetRenderSetting(TfToken("metersPerUnit"),VtValue(options->meters_per_unit));
-    Delegate->SetRenderSetting(TfToken("timeSeconds"),VtValue(options->time_seconds));
+    // The host is authoritative: like hdUE:<name>, not a bare host setting (husk's renderMode).
+    Delegate->SetRenderSetting(TfToken("renderMode"),VtValue(std::string(options->mode?"pathtraced":"realtime")),true);
+    Delegate->SetRenderSetting(TfToken("samplesPerPixel"),VtValue(int(options->samples)),true);
+    Delegate->SetRenderSetting(TfToken("lumenEnabled"),VtValue(bool(options->lumen)),true);
+    Delegate->SetRenderSetting(TfToken("autoViewerLight"),VtValue(bool(options->auto_light)),true);
+    Delegate->SetRenderSetting(TfToken("upAxis"),VtValue(std::string(options->z_up?"Z":"Y")),true);
+    Delegate->SetRenderSetting(TfToken("metersPerUnit"),VtValue(options->meters_per_unit),true);
+    Delegate->SetRenderSetting(TfToken("timeSeconds"),VtValue(options->time_seconds),true);
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(HdueViewportStatus* status) {

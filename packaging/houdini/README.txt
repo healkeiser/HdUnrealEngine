@@ -17,7 +17,7 @@ Uninstall
 
 Requirements
   - Houdini 22.0 (USD 26.05), Windows 10/11 x64.
-  - A DirectX 12 GPU with SM6 (ray tracing for the Path Tracer mode).
+  - A DirectX 12 GPU with hardware ray tracing.
   - Microsoft Visual C++ 2015-2022 x64 redistributable (installed with Houdini).
 
 License

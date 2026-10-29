@@ -64,13 +64,6 @@ FILE* traceSink() {
 }
 void trace(const char* format, ...);
 }
-void HdUETraceThread(const char* call) {
-    static const bool enabled = TfGetenvBool("HDUE_TRACE_THREADS", false);
-    if (!enabled) return;
-    static std::mutex mutex; static std::set<std::pair<std::string, DWORD>> seen;
-    std::lock_guard lock(mutex);
-    if (seen.emplace(call, GetCurrentThreadId()).second) trace("hdUE thread %lu: %s\n", GetCurrentThreadId(), call);
-}
 namespace {
 void trace(const char* format, ...) {
     static const bool enabled = TfGetenvBool("HDUE_TRACE_TIMING", false);
@@ -268,7 +261,10 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
             const std::string arguments = std::string(host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive" : "-RenderOffscreen -stdout -hdUEInteractive")
                                                                       : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout")) +
-                                          " " + TfGetenv("HDUE_UE_ARGS");
+                                          " " + TfGetenv("HDUE_UE_ARGS") +
+                                          // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user,
+                                          // not in a possibly shared or read-only install folder.
+                                          (TfGetenv("HDUE_USER_DIR").empty() ? "" : " -userdir=\"" + TfGetenv("HDUE_USER_DIR") + "\"");
             init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
             host.backend->initialize(init);
@@ -1016,7 +1012,6 @@ public:
         }
     };
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
-        HdUETraceThread("Execute");
         const auto* camera = state->GetCamera();
         PassSnapshot snapshot{state->GetAovBindings(), {}, state->GetWorldToViewMatrix(), state->GetProjectionMatrix()};
         if (camera) {
@@ -1670,9 +1665,8 @@ void HdUERenderDelegate::DestroyBprim(HdBprim* p) {
     if (dynamic_cast<HdUERenderBuffer*>(p) && selfHost().worker.joinable()) { selfHost().post([p] { delete p; }); return; }
     delete p;
 }
-void HdUERenderDelegate::CommitResources(HdChangeTracker*) { HdUETraceThread("CommitResources"); }
+void HdUERenderDelegate::CommitResources(HdChangeTracker*) {}
 void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
-    HdUETraceThread("SetDrivers");
     for (const auto* driver : drivers) {
         std::string kind = driver->driver.GetTypeName();
         if (driver->driver.IsHolding<Hgi*>()) if (auto* hgi = driver->driver.UncheckedGet<Hgi*>()) kind += " " + hgi->GetAPIName().GetString();

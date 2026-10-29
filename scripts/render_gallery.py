@@ -311,7 +311,7 @@ def section(which, results, machine):
         order = [name for name in SPONZA_CAMERAS if name in results]
         intro = ("[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) "
                  '(Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials '
-                 'with 96 textures, normal maps and alpha cutouts, from its main camera. hdUE runs no denoiser, so its Path Tracer '
+                 'with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer '
                  'image shows more noise than Karma at the same sample count. The scene has no lights, so '
                  f'[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome.')
         addons = sorted({a for entry in results.values() for a in entry.get('addons', [])})

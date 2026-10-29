@@ -115,7 +115,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 ### Sponza
 
 <!-- sponza:start -->
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. hdUE runs no denoiser, so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 x 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 x 540:
 
 - **hdUE Lumen**: realtime mode, 16 warmup frames.
 - **hdUE Path Tracer**: 256 samples per pixel, up to 8 bounces.
@@ -142,12 +142,12 @@ Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSpon
 |------|--------------|---------|
 | **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings and Light LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
 | **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames, about 0.25 s per simple 1080p Lumen frame | |
-| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform) | Displacement, adaptive subdivision, varying `displayOpacity` |
+| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves, PointInstancers (nested), `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform) | True or adaptive displacement (Preview Surface displacement moves existing vertices along normals), adaptive subdivision, varying `displayOpacity` |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
 | **Materials** | UsdPreviewSurface with every texture input and cutouts; MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals) |
 | **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI), UsdLux units, spot cones | Light linking, portals; IES profiles are experimental (applied and oriented, but brightness and falloff do not match Karma yet) |
 | **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`) | Lens distortion |
-| **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer | LPE AOVs, cryptomatte, deep output |
+| **Output** | Beauty, depth, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer (Houdini build) | LPE AOVs, cryptomatte, deep output |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 
 <!-- ARCHITECTURE -->
@@ -196,7 +196,7 @@ flowchart LR
     class C1,C2,C3 unrealNode
 ```
 
-The delegate and UE share the host process. UE only accepts calls from the thread that started it: in Houdini that is the UI thread, which hdUE's Python host ticks; under husk, hdUE starts UE on a thread of its own. Delegates running on other threads (Live Render) queue their UE work for that thread. See [Architecture and ABI](docs/architecture.md).
+The delegate and UE share the host process. UE only accepts calls from the thread that started it, so hdUE starts UE on a thread of its own, in Houdini's UI as under husk. Delegates running on other threads (Live Render) queue their UE work for that thread. See [Architecture and ABI](docs/architecture.md).
 
 <!-- INSTALLATION -->
 ## Installation
@@ -240,7 +240,7 @@ The package file sets the first three; the rest are for development and debuggin
 | Variable | Description |
 |----------|-------------|
 | `HDUE_RUNTIME_CONFIG` | Runtime profile (`backend_dll`, `runtime_project`) the delegate starts UE from |
-| `HDUE_HOUDINI_ENABLE` | `1` starts hdUE's UI-thread host in Houdini |
+| `HDUE_HOUDINI_ENABLE` | `1` lets hdUE's Python host start in Houdini's UI when a viewer selects hdUE |
 | `HDUE_HOUDINI_PLUGIN` | Delegate DLL the Houdini host loads |
 | `HDUE_BACKEND_DLL` | Backend DLL, overriding the runtime profile |
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |

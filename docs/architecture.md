@@ -25,11 +25,11 @@ Hydra changes are batched and applied on the UE owner thread. Rendering and read
 
 ## ABI
 
-`include/hdue/bridge.h` is the base ABI (`HDUE_ABI_VERSION` 7; its function table stays 96 bytes). It uses fixed-width POD fields, UTF-8 strings, opaque handles, and caller-owned buffers. UE, USD, STL objects, exceptions, and memory ownership do not cross the DLL boundary. The delegate and backend must come from the same build: version 7 added the camera projection, depth of field and focal length to `HdueRenderRequest`, and version 6 added per-vertex and per-instance colors to `HdueMeshDesc`.
+`include/hdue/bridge.h` is the base ABI (`HDUE_ABI_VERSION` 8; its function table stays 96 bytes). It uses fixed-width POD fields, UTF-8 strings, opaque handles, and caller-owned buffers. UE, USD, STL objects, exceptions, and memory ownership do not cross the DLL boundary. The delegate and backend must come from the same build: version 8 added indexed meshes and runtime MaterialX, version 7 added the camera projection, depth of field and focal length to `HdueRenderRequest`, and version 6 added per-vertex and per-instance colors to `HdueMeshDesc`.
 
 Optional versioned extensions provide native assets, picking, material parameters, lighting/HDRI diagnostics, virtual-texture residency, depth, AOVs (`aov_api.h`), volumes (`volume_api.h`), motion-blur transforms (`motion_api.h`), post-processing (`postprocess_api.h`), lighting (`lighting_api.h`, version 2 adds IES profiles), shared GPU frames (`gpu_api.h`), and viewport diagnostics. Calls validate versions, sizes, capacities, generations, and the owning thread.
 
-UE initializes once per process. Delegate destruction releases scene resources; process shutdown stops UE. GPU readbacks use fences. Completed images are returned without waiting synchronously for another Tick; stale generations are discarded. AOV maps pin immutable snapshots until Unmap. Color uses RGBA float and HDR output uses PFM. Shared GPU images remain a future optimization.
+UE initializes once per process and stays until it exits, so later delegates (husk `--restart-delegate`, the next viewport) reuse it. Delegate destruction releases scene resources; process shutdown stops UE. GPU readbacks use fences. Completed images are returned without waiting synchronously for another Tick; stale generations are discarded. AOV maps pin immutable snapshots until Unmap. Color uses RGBA float and HDR output uses PFM. The Solaris viewport takes frames as shared GPU images (`gpu_api.h`) instead of readbacks.
 
 ## Motion blur
 

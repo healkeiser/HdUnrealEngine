@@ -61,7 +61,7 @@ class Viewer(QtWidgets.QDialog):
     def __init__(self,host):
         super().__init__(hou.qt.mainWindow())
         self.host=host
-        self.setWindowTitle('hdUE — Houdini 22.0.466')
+        self.setWindowTitle('hdUE — Houdini '+hou.applicationVersionString())
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         self.resize(1000,680)
         layout=QtWidgets.QVBoxLayout(self)
