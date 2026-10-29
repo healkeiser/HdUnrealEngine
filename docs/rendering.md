@@ -154,6 +154,10 @@ Each level multiplies the face count by four. Level 3 matches Karma's surfaces c
 
 Cameras use Hydra's projection as is, so the conformed window, aperture offsets (lens shift) and orthographic projection match Karma; orthographic depth spans the camera's clipping range.
 
+Framing is honoured: UE renders exactly the data window into the render buffer, with the projection remapped to it (Hydra's `CameraUtilFraming`, or under husk the render settings' `resolution`, `dataWindowNDC`, `pixelAspectRatio` and `aspectRatioConformPolicy`). Crops, husk tiles, overscan and non-square pixels therefore match Karma, and depth, AOVs and IDs follow the same window. Realtime effects that work in screen space (Lumen screen traces, bloom, temporal anti-aliasing) only see the data window, so tile edges can differ slightly from a full frame; the Path Tracer does not.
+
+Perspective views keep UE's infinite reversed-Z far plane, so the camera's far clip is not applied: UE's Path Tracer starts primary rays with an unbounded `TMax` (`PathTracing.usf`), so a finite far plane would hide geometry only in realtime mode. The near clip is applied in both.
+
 `fStop` and `focusDistance` drive UE's physical depth of field. Lens attributes follow USD's convention of tenths of a scene unit, as Hydra and Karma read them (a `focalLength` of 35 in a metres stage is a 3.5 m lens). The Path Tracer ray-traces the thin lens (reference DOF); realtime uses UE's post-process DOF, which approximates it and clamps very large blur.
 
 The camera's `exposure` (Hydra's linear exposure scale) scales the beauty, as Karma does, and leaves AOVs untouched; with UE's tonemapper on it is added to `AutoExposureBias` instead. Split diopters and lens distortion are not translated.

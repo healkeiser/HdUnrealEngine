@@ -97,6 +97,8 @@ husk and the USD Render ROP load the same delegate. When no host has started UE,
 husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 24 -o render.$F4.exr scene.usd
 ```
 
+Render settings' data window (`dataWindowNDC`: crops and overscan), `pixelAspectRatio` and husk's tiling (`--tile-count`, `--tile-index`, `--autotile`) are honoured: each render covers only its data window (see [Cameras](rendering.md#cameras)).
+
 From a source checkout without the package, set the environment first:
 
 ```powershell
