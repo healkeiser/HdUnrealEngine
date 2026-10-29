@@ -5,10 +5,12 @@
 Like HtoA, Redshift or V-Ray, hdUE ships as one relocatable folder plus a Houdini package file. On the build machine:
 
 ```powershell
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly
 ```
 
-This writes `out\package\hdUE-<version>-houdini22.0-win64` (about 1.2 GB unpacked, 0.9 GB zipped; PDBs are left out) and the matching `.zip`. The folder holds the delegate (`plugin\`), the Solaris integration, the Python helpers, the samples, the staged UE runtime (`runtime\`) and a `runtime.json` with paths relative to itself.
+This writes `out\package\hdUE-<version>-houdini22.0-win64` (about 1.2 GB unpacked, 0.9 GB zipped; PDBs are left out) and the matching `.zip`. The folder holds the delegate (`plugin\`), the Solaris integration, the Python helpers, the samples, the staged UE runtime (`runtime\`), a `runtime.json` with paths relative to itself, and the license terms: `LICENSE` (hdUE, MIT), `LICENSE-PACKAGE.txt` (end-user terms for the Unreal Engine runtime), `THIRD_PARTY_NOTICES.md` and `licenses\` (the engine's `Engine/Source/ThirdParty/Licenses`). The smoke test, import libraries and the D3D12/Vulkan debug layers are left out.
+
+The backend links Unreal Engine Developer modules (`bBuildDeveloperTools` in `HdUEBackend.Target.cs`, for runtime Nanite and Lumen cards), which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows distributing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio or to other Unreal Engine licensees, never as a public download. `Package-Houdini.ps1` refuses to run without `-UnrealLicenseesOnly` while the target enables Developer tools.
 
 On the target machine (Houdini 22.0, Windows x64, a DirectX 12 GPU with hardware ray tracing; no UE, Visual Studio or OpenUSD needed), unzip the folder to a writable location, because UE writes its shader cache and logs into `runtime\Windows\HdUEBackend\Saved`. Then run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`, which sets `HDUE_HOUDINI_ENABLE`, `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_PLUGIN`, appends the plugin to `PXR_PLUGINPATH_NAME`, and adds the integration to `HOUDINI_PATH`. For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. Houdini, hython and husk all pick it up.
 

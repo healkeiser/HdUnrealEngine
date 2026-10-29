@@ -4,11 +4,22 @@ param(
     [string]$OutputDirectory='',
     [string]$RuntimeConfig='',
     [string]$BuildDirectory='',
-    [switch]$Zip
+    [switch]$Zip,
+    # The backend links Developer modules (Engine Tools): the Unreal Engine EULA (6(d)) allows such a package only
+    # through Fab or a fork of Epic's UnrealEngine GitHub network, never as a public download.
+    [switch]$UnrealLicenseesOnly
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $TaskRoot=Split-Path -Parent $PSScriptRoot
+# ponytail: checks the target source, not the DLL the runtime profile names; rebuild the backend after changing it.
+$Target=Get-Content -LiteralPath (Join-Path $TaskRoot 'unreal\HdUEBackend\Source\HdUEBackend.Target.cs') -Raw
+if ($Target -match 'bBuildDeveloperTools\s*=\s*true' -and -not $UnrealLicenseesOnly) {
+    throw 'The backend is built with Developer modules (bBuildDeveloperTools): pass -UnrealLicenseesOnly and distribute the package only through Fab or a fork of the UnrealEngine GitHub network.'
+}
+$EngineRoot=Get-HdUELocalPath -Key engine_root
+$EngineLicenses=Join-Path $EngineRoot 'Engine\Source\ThirdParty\Licenses'
+if (-not (Test-Path -LiteralPath $EngineLicenses)) {throw "Missing $EngineLicenses."}
 $BuildDirectory=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory -Optional
 $Build=if ($BuildDirectory) {[IO.Path]::GetFullPath($BuildDirectory)} else {Join-Path $TaskRoot 'build\houdini-22.0.466'}
 if (-not $RuntimeConfig) {
@@ -44,9 +55,10 @@ New-Item -ItemType Directory -Force -Path $Package | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $Package 'plugin\Release'),(Join-Path $Package 'plugin\resources') | Out-Null
 Copy-Item -LiteralPath $Delegate -Destination (Join-Path $Package 'plugin\Release')
 Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json') -Destination (Join-Path $Package 'plugin\resources')
-# Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out.
+# Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out. So do the smoke
+# test, import libraries and the D3D12/Vulkan debug layers: debugging aids, not part of the product.
 $RuntimeTarget=Join-Path $Package 'runtime\Windows'
-& robocopy $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb /NFL /NDL /NJH /NJS | Out-Null
+& robocopy $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp d3d12SDKLayers.dll VkLayer_* /NFL /NDL /NJH /NJS | Out-Null
 if ($LASTEXITCODE -ge 8) {throw 'Runtime copy failed.'}
 $BinTarget=Join-Path $RuntimeTarget ([IO.Path]::GetRelativePath($RuntimeRoot,(Split-Path $BackendDll)))
 Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
@@ -54,7 +66,11 @@ $Relative={param($Path) 'runtime/Windows/'+([IO.Path]::GetRelativePath($RuntimeR
 $Runtime=[ordered]@{version=1; backend_dll=(& $Relative $BackendDll); runtime_project=(& $Relative $Project)}
 [IO.File]::WriteAllText((Join-Path $Package 'runtime.json'),($Runtime | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
 Copy-Item -Path (Join-Path $TaskRoot 'packaging\houdini\*') -Destination $Package
-Copy-Item -LiteralPath (Join-Path $TaskRoot 'LICENSE') -Destination $Package -ErrorAction SilentlyContinue
+# License terms: hdUE's MIT license, the package terms the Unreal Engine EULA requires (4(c), 7(a)) and the
+# third-party licenses Unreal Engine ships with (7(b)).
+Copy-Item -LiteralPath (Join-Path $TaskRoot 'LICENSE'),(Join-Path $TaskRoot 'THIRD_PARTY_NOTICES.md') -Destination $Package
+& robocopy $EngineLicenses (Join-Path $Package 'licenses') /E /NFL /NDL /NJH /NJS | Out-Null
+if ($LASTEXITCODE -ge 8) {throw 'License copy failed.'}
 $global:LASTEXITCODE=0
 Write-Output "Package ready: $Package"
 if ($Zip) {

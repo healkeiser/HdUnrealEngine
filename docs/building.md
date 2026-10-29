@@ -60,7 +60,7 @@ Individual steps:
 .\scripts\Stage-Runtime.ps1     # cook and stage the runtime
 .\scripts\Build-Houdini.ps1     # Houdini delegate (no OpenUSD needed)
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly  # licensees only: see docs/houdini.md
 ```
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.

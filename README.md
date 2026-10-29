@@ -203,8 +203,11 @@ The delegate and UE share the host process. UE only accepts calls from the threa
 
 Requires Houdini 22.0 on Windows x64 and a DirectX 12 GPU with hardware ray tracing. Unreal Engine, Visual Studio and OpenUSD are not needed.
 
-1. Download `hdUE-<version>-houdini22.0-win64.zip` from [Releases](https://github.com/healkeiser/hdUE/releases).
-2. Unzip it somewhere writable: UE writes its shader cache and logs next to the runtime.
+> [!NOTE]
+> There is no public binary download. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. [Build the package from source](docs/building.md) with your own Unreal Engine access.
+
+1. Build `hdUE-<version>-houdini22.0-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/houdini.md#installing-on-another-machine)).
+2. Copy it somewhere writable: UE writes its shader cache and logs next to the runtime.
 3. Run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`.
 4. Restart Houdini.
 
@@ -258,7 +261,7 @@ Building needs the Unreal Engine 5.8.4 source, Visual Studio 2022, OpenUSD 26.03
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
 .\scripts\Verify.ps1 -WithUsdview      # native, Hydra and usdview regression
 .\scripts\Test-Houdini.ps1             # Solaris regression in a GUI Houdini
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly
 ```
 
 [CI](.github/workflows/ci.yml) builds the client library, runs the C ABI layout test, the repository scope tests, Python byte-compilation and a PowerShell parse check. GitHub's runners have no UE, Houdini or ray-tracing GPU, so the rendering suites above run locally.
@@ -305,4 +308,4 @@ Project Link: [hdUE](https://github.com/healkeiser/hdUE)
 
 Original hdUE code, documentation, and project-generated synthetic samples are available under the [MIT License](LICENSE).
 
-Unreal Engine, Houdini, third-party libraries, and separately supplied content retain their respective licenses. The MIT license does not grant rights to vendor SDKs, engine code, binaries, or third-party assets. Building, using, or distributing those components requires compliance with their applicable terms. See [Third-party notices](THIRD_PARTY_NOTICES.md).
+Unreal Engine, Houdini, third-party libraries, and separately supplied content retain their respective licenses. A built package also carries `LICENSE-PACKAGE.txt` (the end-user terms the Unreal Engine EULA requires for its runtime) and the Unreal Engine third-party licenses under `licenses\`. The MIT license does not grant rights to vendor SDKs, engine code, binaries, or third-party assets. Building, using, or distributing those components requires compliance with their applicable terms. See [Third-party notices](THIRD_PARTY_NOTICES.md).

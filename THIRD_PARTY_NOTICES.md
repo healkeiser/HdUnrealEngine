@@ -35,3 +35,11 @@ SDK-provided packages can differ from standalone dependencies. The license files
 For any release that includes third-party code, binaries, runtimes, or assets, include the complete applicable license texts, copyright notices, disclaimers, and any required source or relinking materials for those exact components, including their transitive dependencies. Links in this document are an inventory for this source repository, not a complete notice bundle for a binary release.
 
 Distributing a backend that contains Unreal Engine code is subject to the Epic EULA in addition to hdUE's MIT license. Check Sections 4 and 5 for the applicable distribution terms and Section 6(d) if a package includes Engine Tools, including Editor or Developer modules. Houdini SDK redistribution and Qt licensing likewise depend on the components and distribution method selected. An attribution notice alone does not authorize redistribution.
+
+What `scripts/Package-Houdini.ps1` does about it:
+
+- Ships `LICENSE` (hdUE, MIT), `LICENSE-PACKAGE.txt` (the end-user terms EULA sections 4(c) and 7(a) require: use only as part of hdUE, no extraction or reuse of the runtime, the disclaimer for the Licensed Technology, Microsoft's redistributable terms), this file, and `licenses\`, a copy of the engine's `Engine/Source/ThirdParty/Licenses` (section 7(b)). The copy is the whole collection, a superset of what the runtime links.
+- Leaves out the backend smoke test, import libraries, `d3d12SDKLayers.dll` and the Vulkan layers.
+- Refuses to package while `HdUEBackend.Target.cs` sets `bBuildDeveloperTools`, unless `-UnrealLicenseesOnly` states that the package goes only through Fab or a fork of Epic's UnrealEngine GitHub network. The backend links the Developer module `NaniteBuilder` and compiles MeshUtilities' Lumen card builder (`MeshCards.cpp`), both Engine Tools under section 6(d).
+
+No binary package is published on this repository's GitHub releases.

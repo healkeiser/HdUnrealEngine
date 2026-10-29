@@ -1,0 +1,48 @@
+hdUE package license terms
+==========================
+
+This package contains two kinds of software under different terms. By installing
+or using it you agree to both.
+
+1. hdUE
+-------
+The hdUE code (the Hydra delegate, the Houdini integration, its Python scripts,
+installers, documentation and project-generated samples) is licensed under the
+MIT License in LICENSE.
+
+2. Unreal Engine and third-party components
+-------------------------------------------
+The runtime folder contains Unreal(R) Engine object code and content (the
+backend DLL and runtime\Windows\Engine) and the third-party components Unreal
+Engine ships with. They are NOT covered by the MIT License. They are licensed
+to the hdUE developers under the Unreal Engine End User License Agreement
+(https://www.unrealengine.com/eula/unreal) and are provided to you only as an
+inseparable part of hdUE, on these terms:
+
+  a. You may use them only to run hdUE inside the host applications it
+     supports (Houdini, husk, usdview).
+  b. You may not extract, copy, load, call or redistribute any of them on their
+     own or as part of any other product, nor use them to build software of
+     your own; this includes the backend DLL, its C interface and the cooked
+     Unreal Engine content.
+  c. You may not reverse engineer, decompile or disassemble them, except where
+     applicable law or a third-party license expressly permits it.
+  d. They are provided "AS IS". Epic Games, Inc., its licensors and the hdUE
+     developers make no representations and give no warranties or conditions
+     of any kind, express or implied, about them, and accept no liability for
+     any damages arising from them, to the fullest extent permitted by law.
+  e. Microsoft redistributable files (D3D12Core.dll, xaudio2_9redist.dll,
+     WinPixEventRuntime.dll, dbghelp.dll) are licensed under Microsoft's terms;
+     Microsoft and its suppliers are protected by this section as much as by
+     those terms.
+
+Third-party licenses and notices: licenses\ (the Unreal Engine collection from
+Engine/Source/ThirdParty/Licenses) and THIRD_PARTY_NOTICES.md.
+
+Unreal(R) is a trademark or registered trademark of Epic Games, Inc. in the
+United States of America and elsewhere.
+
+Unreal(R) Engine, Copyright 1998 - 2026, Epic Games, Inc. All rights reserved.
+
+hdUE is not made, sponsored or endorsed by Epic Games, Inc. or Side Effects
+Software Inc.

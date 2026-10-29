@@ -20,6 +20,13 @@ Requirements
   - A DirectX 12 GPU with SM6 (ray tracing for the Path Tracer mode).
   - Microsoft Visual C++ 2015-2022 x64 redistributable (installed with Houdini).
 
+License
+  hdUE itself is MIT (LICENSE). The runtime folder holds Unreal Engine code and
+  content under LICENSE-PACKAGE.txt: use it only to run hdUE; do not extract or
+  reuse it. Third-party licenses: licenses\ and THIRD_PARTY_NOTICES.md.
+  This package contains Unreal Engine Developer modules: share it only with
+  Unreal Engine licensees (Unreal Engine EULA, section 6(d)).
+
 Options
   Install.ps1 -PackagesDirectory <dir>   write hdUE.json somewhere else
                                          (for example a studio HOUDINI_PACKAGE_DIR).
