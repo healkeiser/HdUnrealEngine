@@ -254,7 +254,6 @@ uint32_t HdUEAovId(const TfToken& name) {
     return 0;
 }
 namespace {
-const bool selfHostVisible = TfGetenvBool("HDUE_SHOW_WINDOW", false);
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     const auto& host = selfHost();
     if (host.backend && host.backend->initialized()) {
@@ -320,28 +319,10 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                                           nullptr, instance, nullptr);
             if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
             host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
-            HdueInitDesc init{};
-            init.struct_size = sizeof(init);
-            init.instance_handle = reinterpret_cast<uint64_t>(instance);
-            init.window_handle = reinterpret_cast<uint64_t>(host.window);
-            init.project_path = project.c_str();
-            init.map_path = "/Game/HdUETest";
-            // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
-            // Without -stdout, UE echoes Display/Warning/Error lines with wprintf, which reached the host's console
-            // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
-            // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
-            const std::string arguments =
-                std::string(host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive"
-                                                               : "-RenderOffscreen -stdout -hdUEInteractive")
-                                            : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout")) +
-                " " + TfGetenv("HDUE_UE_ARGS") +
-                // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user,
-                // not in a possibly shared or read-only install folder.
-                (TfGetenv("HDUE_USER_DIR").empty() ? "" : " -userdir=\"" + TfGetenv("HDUE_USER_DIR") + "\"");
-            init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
-            // initialize returns once UE's world and RHI are up (the backend is then ready), or throws.
-            host.backend->initialize(init);
+            // Returns once UE's world and RHI are up (the backend is then ready), or throws.
+            host.backend->boot(reinterpret_cast<uint64_t>(instance), reinterpret_cast<uint64_t>(host.window), project,
+                               host.continuous);
             std::atexit([] { shutdownSelfHost(); });
             started->set_value();
         } catch (const std::exception& e) {

@@ -40,6 +40,9 @@ public:
     // without it (the caller recreates the session instead).
     HdueResult resize_session(HdueSession session, uint32_t width, uint32_t height) const;
     void initialize(const HdueInitDesc& desc);
+    // initialize with the command line every host starts UE with: the cooked map, headless (HDUE_SHOW_WINDOW=1 shows
+    // the window), -stdout, HDUE_UE_ARGS, -userdir from HDUE_USER_DIR, and -hdUEInteractive for Houdini's UI.
+    void boot(uint64_t instance, uint64_t window, const std::string& project, bool interactive);
     void shutdown();
     bool initialized() const { return initialized_; }
     std::string status_message() const;
