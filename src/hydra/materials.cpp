@@ -82,7 +82,6 @@ struct Source {
     VtValue constant;
     HdUETextureData texture;
     int channel = -1;
-    bool raw = false;      // the image's colour space is raw: no OCIO conversion
     bool primvar = false;  // a vec3 primvar reader: the mesh's vertex colours
 };
 // The vec3 primvar a reader node reads (UsdPrimvarReader_float3 varname, MaterialX geompropvalue geomprop); empty
@@ -100,7 +99,7 @@ public:
         : network_(network), shader_(shader), data_(data) {}
     // Reads an input's constant into out (which holds the fallback). With texture, an image driving the input fills it
     // and returns true; without, a textured input keeps its constant, with a warning. Colour images are converted
-    // from scene_linear (OCIO) to linear Rec.709 unless tagged raw.
+    // from their authored colour space (OCIO) to linear Rec.709.
     template <class T>
     bool read(const char* input, T& out, HdUETextureData* texture = nullptr, bool color = false) {
         out = value(param(shader_, input), out);
@@ -131,9 +130,10 @@ public:
         }
         *texture = source.texture;
         // A host image (op:) exists only once the host exported it: converted when the scene is packed.
-        if (color && !source.raw) {
-            texture->sceneLinear = true;
-            texture->file = HdUELinearRec709Texture(texture->file);
+        if (color) {
+            texture->convert = true;
+            if (!HdUEHostTexture(texture->file))
+                texture->file = HdUELinearRec709Texture(texture->file, texture->colorSpace);
         }
         if (source.channel >= 0) {
             texture->mask = GfVec4f(0);
@@ -191,11 +191,34 @@ private:
             t.file = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
             if (t.file.empty()) return;
             source.image = &node;
-            // UsdUVTexture's sourceColorSpace; MaterialX's colorspace attribute, which Hydra passes as colorSpace:file.
-            const auto space = TfStringToLower(
-                token(param(node, type == "UsdUVTexture" ? "sourceColorSpace" : "colorSpace:file")).GetString());
-            source.raw = space.find("raw") != std::string::npos;
-            if (type == "UsdUVTexture") {
+            const bool usd = type == "UsdUVTexture";
+            // UsdUVTexture's sourceColorSpace (raw, sRGB, auto), else the file's colorSpace metadata, which Hydra
+            // passes as colorSpace:file, as it does MaterialX's colorspace attribute (srgb_texture, lin_rec709,
+            // acescg, ...). It selects sRGB decoding of 8-bit texels (auto: by slot) and, for colour inputs, the OCIO
+            // conversion.
+            t.colorSpace = usd ? token(param(node, "sourceColorSpace")).GetString() : "";
+            if (t.colorSpace.empty() || TfStringToLower(t.colorSpace) == "auto")
+                t.colorSpace = token(param(node, "colorSpace:file")).GetString();
+            const auto space = TfStringToLower(t.colorSpace);
+            t.encoding = HdUESRGBColorSpace(space)          ? HDUE_TEXTURE_ENCODING_SRGB
+                         : space.empty() || space == "auto" ? HDUE_TEXTURE_ENCODING_AUTO
+                                                            : HDUE_TEXTURE_ENCODING_LINEAR;
+            // wrapS/wrapT; MaterialX u/vaddressmode (constant reads its default, 0 unless authored: black).
+            // ponytail: useMetadata (UsdUVTexture's default) does not read the file's wrap metadata; it falls back
+            // to black, as the spec says for files without it.
+            const auto wrap = [&](const char* input, const char* fallback) {
+                auto mode = token(param(node, input)).GetString();
+                if (mode.empty()) mode = fallback;
+                return mode == "repeat" || mode == "periodic" ? HDUE_WRAP_REPEAT
+                       : mode == "clamp"                      ? HDUE_WRAP_CLAMP
+                       : mode == "mirror"                     ? HDUE_WRAP_MIRROR
+                                                              : HDUE_WRAP_BLACK;
+            };
+            if (!starts("ND_tiledimage_")) {
+                t.wrap[0] = wrap(usd ? "wrapS" : "uaddressmode", usd ? "useMetadata" : "periodic");
+                t.wrap[1] = wrap(usd ? "wrapT" : "vaddressmode", usd ? "useMetadata" : "periodic");
+            }
+            if (usd) {
                 affine(value(param(node, "scale"), GfVec4f(1)), value(param(node, "bias"), GfVec4f(0)));
                 // A single-channel output (r, g, b, a) selects that channel; rgb keeps all.
                 const auto& output = link.upstreamOutputName.GetString();
@@ -267,6 +290,12 @@ void readPreviewSurface(SurfaceReader& r, HdUEMaterialData& data) {
     int specularWorkflow = 0;
     r.read("useSpecularWorkflow", specularWorkflow);
     data.specularWorkflow = specularWorkflow != 0;
+    // The metalness workflow ignores specularColor. A clear coat renders through the layered Standard Surface parent,
+    // whose specular_color tints the base's specular: white.
+    if (!data.specularWorkflow) {
+        data.specularColor = GfVec3f(1);
+        data.textures[HDUE_TEXTURE_SPECULAR_COLOR] = {};
+    }
 }
 
 // standard_surface and OpenPBR share their model; only input names and defaults differ.

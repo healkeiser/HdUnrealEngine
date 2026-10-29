@@ -15,7 +15,12 @@ bool HdUESceneLinearIsRec709();
 void HdUEToSceneLinear(std::vector<float>& rgba);
 // A scene_linear colour (authored in USD) to linear Rec.709 for UE.
 GfVec3f HdUEFromSceneLinear(const GfVec3f& color);
-// A linear colour texture (EXR, HDR) authored in scene_linear, as a cached copy in linear Rec.709 for UE; other files
-// (8-bit sRGB textures, data) and identity configs return the path unchanged.
-std::string HdUELinearRec709Texture(const std::string& file);
+// Texture colour-space names (UsdUVTexture sourceColorSpace, MaterialX colorspace): raw data, and sRGB-encoded
+// (sRGB, srgb_texture, "sRGB - Texture"; not lin_srgb), which UE decodes to linear Rec.709 itself.
+bool HdUERawColorSpace(const std::string& space);
+bool HdUESRGBColorSpace(const std::string& space);
+// A colour texture as linear Rec.709 for UE: a cached EXR converted through OCIO from space, its authored colour
+// space; empty or auto means scene_linear, and only for float images (EXR, HDR). raw, sRGB-encoded and linear
+// Rec.709 files, spaces the config does not know, and builds without OCIO return the path unchanged.
+std::string HdUELinearRec709Texture(const std::string& file, const std::string& space = {});
 PXR_NAMESPACE_CLOSE_SCOPE

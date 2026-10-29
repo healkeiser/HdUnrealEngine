@@ -53,7 +53,9 @@ public:
         TStrongObjectPtr<UTexture2D> Texture;
         TArray<uint8, TInlineAllocator<2>> Channels;
         uint8 Read = 0;
-        bool Vector = false;  // channels scalar inputs read (bit per RGBA channel); read by a colour/normal input
+        bool Vector = false;    // channels scalar inputs read (bit per RGBA channel); read by a colour/normal input
+        bool SRGB = false;      // 8-bit texels are sRGB-decoded
+        uint8 Address[2] = {};  // TextureAddress for u and v (wrapS, wrapT): sampler state, part of the key
         TUniquePtr<FTexturePlatformData> Pending;  // built on workers by Apply; PreviewTexture gives it to Texture
     };
     explicit FHdueScene(UWorld* InWorld);
@@ -107,7 +109,7 @@ private:
     };
     static FConversion BuildStatic(const HdueMeshDesc& Desc, bool Cards);
     TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic;  // background card and Nanite builds
-    const FPreviewTexture* PreviewTexture(const FString& File, bool SRGB, FString& Error);
+    const FPreviewTexture* PreviewTexture(const FString& Key, FString& Error);
     struct FWet {
         FString Asset;
         UMaterialInterface* Base = nullptr;

@@ -35,6 +35,8 @@ _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 176, "RenderRequest C ABI layout");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 56, "Scene batch C ABI layout");
+_Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");
+_Static_assert(sizeof(HdueMaterialDesc) == 968, "Material C ABI layout (ABI 9)");
 _Static_assert(sizeof(HdueApi) == 96, "Function table C ABI layout");
 _Static_assert(sizeof(HdueNativeRay) == 72, "Native ray C ABI layout");
 _Static_assert(sizeof(HdueNativeHit) == 72, "Native hit C ABI layout");

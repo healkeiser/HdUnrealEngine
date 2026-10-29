@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 8u
+#define HDUE_ABI_VERSION 9u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -160,16 +160,25 @@ enum {
     HDUE_TEXTURE_SPECULAR_COLOR = 10,
     HDUE_TEXTURE_SLOT_COUNT = 11
 };
-/* Colour slots hold (sRGB-encoded, for 8-bit files) colours; the others hold linear data. */
+/* Colour slots hold (sRGB-encoded, for 8-bit files) colours; the others hold linear data. With
+ * HDUE_TEXTURE_ENCODING_AUTO, this decides whether an 8-bit texture is sRGB-decoded. */
 static inline int hdue_texture_is_color(uint32_t slot) {
     return slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE || slot == HDUE_TEXTURE_SPECULAR_COLOR;
 }
+/* ABI 9: UsdUVTexture wrapS / wrapT. BLACK reads (0,0,0,0) outside [0,1], so the value is the slot's bias. */
+enum { HDUE_WRAP_REPEAT = 0, HDUE_WRAP_CLAMP = 1, HDUE_WRAP_MIRROR = 2, HDUE_WRAP_BLACK = 3 };
+/* ABI 9: how 8-bit texels decode (UsdUVTexture sourceColorSpace). AUTO follows hdue_texture_is_color; float
+ * images are always linear. */
+enum { HDUE_TEXTURE_ENCODING_AUTO = 0, HDUE_TEXTURE_ENCODING_SRGB = 1, HDUE_TEXTURE_ENCODING_LINEAR = 2 };
 typedef struct HdueTextureDesc {
     const char* file; /* Null or empty: the slot uses its constant. */
     /* value = texel * scale + bias. Scalar slots first reduce the texel with channel_mask. */
     float scale[4];
     float bias[4];
     float channel_mask[4];
+    uint32_t wrap[2];  /* HDUE_WRAP_* for u (wrapS) and v (wrapT) */
+    uint32_t encoding; /* HDUE_TEXTURE_ENCODING_* */
+    uint32_t reserved;
 } HdueTextureDesc;
 typedef struct HdueMaterialDesc {
     const char* id;

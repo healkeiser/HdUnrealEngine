@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/stringUtils.h"
 #if defined(HDUE_HOUDINI)
 #include <OpenColorIO/OpenColorIO.h>
 #include <OpenImageIO/imagebuf.h>
@@ -12,6 +13,7 @@ namespace OCIO = OCIO_NAMESPACE;
 #include <filesystem>
 #include <functional>
 #include <mutex>
+#include <set>
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
@@ -19,6 +21,7 @@ struct ColorManagement {
     std::string sceneLinear = "Linear Rec.709 (sRGB)", rec709 = "Linear Rec.709 (sRGB)";
     bool identity = true;
 #if defined(HDUE_HOUDINI)
+    OCIO::ConstConfigRcPtr config;  // null: no colour management (disabled, or no linear Rec.709 space)
     OCIO::ConstCPUProcessorRcPtr toScene, fromScene;
 #endif
 };
@@ -43,6 +46,7 @@ const ColorManagement& management() {
                 return;
             }
             result.rec709 = rec709->getName();
+            result.config = config;
             if (std::string(rec709->getName()) == scene->getName()) return;
             result.toScene = config->getProcessor(rec709, scene)->getDefaultCPUProcessor();
             result.fromScene = config->getProcessor(scene, rec709)->getDefaultCPUProcessor();
@@ -84,17 +88,44 @@ GfVec3f HdUEFromSceneLinear(const GfVec3f& color) {
     return color;
 #endif
 }
-std::string HdUELinearRec709Texture(const std::string& file) {
+bool HdUERawColorSpace(const std::string& space) {
+    const auto lower = TfStringToLower(space);
+    return lower.find("raw") != std::string::npos || lower == "data";
+}
+bool HdUESRGBColorSpace(const std::string& space) {
+    const auto lower = TfStringToLower(space);
+    return lower.find("srgb") != std::string::npos && lower.find("lin") == std::string::npos;
+}
+std::string HdUELinearRec709Texture(const std::string& file, const std::string& space) {
 #if defined(HDUE_HOUDINI)
     const auto& m = management();
     auto extension = std::filesystem::path(file).extension().string();
     for (auto& c : extension) c = char(tolower(c));
-    if (m.identity || (extension != ".exr" && extension != ".hdr")) return file;
+    const bool floating = extension == ".exr" || extension == ".hdr";
+    const bool unnamed = space.empty() || TfStringToLower(space) == "auto";
+    if (!m.config || HdUERawColorSpace(space) || HdUESRGBColorSpace(space) || (unnamed && !floating)) return file;
+    const std::string from = unnamed ? m.sceneLinear : space;
+    try {
+        const auto source = m.config->getColorSpace(from.c_str());
+        if (!source) {
+            static std::mutex mutex;
+            static std::set<std::string> warned;
+            std::lock_guard lock(mutex);
+            if (warned.insert(from).second)
+                TF_WARN("hdUE: the OCIO config has no colour space %s; textures tagged with it are used as is",
+                        from.c_str());
+            return file;
+        }
+        if (source->isData() || m.config->getProcessor(source->getName(), m.rec709.c_str())->isNoOp()) return file;
+    } catch (const OCIO::Exception& error) {
+        TF_WARN("hdUE: %s: %s", from.c_str(), error.what());
+        return file;
+    }
     std::error_code error;
     const auto stamp = std::filesystem::last_write_time(file, error);
     if (error) return file;
-    const auto key =
-        std::hash<std::string>{}(file + "|" + m.sceneLinear + "|" + std::to_string(stamp.time_since_epoch().count()));
+    const auto key = std::hash<std::string>{}(file + "|" + from + "|" + m.rec709 + "|" +
+                                              std::to_string(stamp.time_since_epoch().count()));
     const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
     const auto cached = folder / (std::to_string(key) + ".exr");
     if (std::filesystem::exists(cached, error)) return cached.string();
@@ -102,15 +133,18 @@ std::string HdUELinearRec709Texture(const std::string& file) {
     std::lock_guard lock(convert);
     if (std::filesystem::exists(cached, error)) return cached.string();
     std::filesystem::create_directories(folder, error);
+    // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept 8-bit.
     OIIO::ImageBuf source(file), converted;
-    if (!OIIO::ImageBufAlgo::colorconvert(converted, source, m.sceneLinear, m.rec709) ||
-        !converted.write(cached.string())) {
-        TF_WARN("hdUE: could not convert %s from %s to %s; using it as is", file.c_str(), m.sceneLinear.c_str(),
+    if (!source.read(0, 0, true, OIIO::TypeDesc::FLOAT) ||
+        !OIIO::ImageBufAlgo::colorconvert(converted, source, from, m.rec709) ||
+        !converted.write(cached.string(), OIIO::TypeDesc::HALF)) {
+        TF_WARN("hdUE: could not convert %s from %s to %s; using it as is", file.c_str(), from.c_str(),
                 m.rec709.c_str());
         return file;
     }
     return cached.string();
 #else
+    (void)space;
     return file;
 #endif
 }

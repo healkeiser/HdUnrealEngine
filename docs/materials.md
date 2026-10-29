@@ -1,6 +1,6 @@
 # Materials
 
-UsdPreviewSurface renders through `M_PreviewSurface` with every texture input and cutout opacity. MaterialX standard_surface and OpenPBR graphs render directly, mapped at render time onto the same parents (with UE's Substrate standard_surface for subsurface and sheen): see [MaterialX surfaces](rendering.md#materialx-surfaces). Arbitrary MaterialX and Substrate graphs are prepared ahead of time into native UE materials, as below. COP and embedded textures are described in the [Houdini page](houdini.md#cop-and-embedded-textures).
+UsdPreviewSurface renders through `M_PreviewSurface` with every texture input (with its wrap modes and colour space) and cutout opacity. MaterialX standard_surface and OpenPBR graphs render directly, mapped at render time onto the same parents (with UE's Substrate standard_surface for subsurface, sheen and clear coats): see [MaterialX surfaces](rendering.md#materialx-surfaces). Arbitrary MaterialX and Substrate graphs are prepared ahead of time into native UE materials, as below. COP and embedded textures are described in the [Houdini page](houdini.md#cop-and-embedded-textures).
 
 ## MaterialX and Substrate
 
