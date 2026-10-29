@@ -33,6 +33,14 @@ AOVS = [("depth", "Depth", "float", "float"), ("albedo", "Albedo", "color3f", "c
         ("instanceId", "Instance ID", "int", "int")]
 AOV_HELP = ("Rendered after the beauty converges, from the same camera without Lumen, path tracing, anti-aliasing "
             "or post effects: one short raster render per AOV and frame.")
+# Render Settings LOP parameters the asset shows above its tabs (they have no help of their own).
+TOP_HELP = {
+    "camera": "Camera prim the render looks through (husk, USD Render ROP; the viewport uses its own camera unless you look through this one).",
+    "res_mode": "How the resolution is chosen: set both sizes, or set one and compute the other from the camera's aperture.",
+    "resolution": "Image size in pixels.",
+    "resolutionMenu": "Common image sizes.",
+    "pixelAspectRatio": "Width of a pixel relative to its height.",
+}
 TOOL = """<?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
   <tool name="$HDA_DEFAULT_TOOL" label="$HDA_LABEL" icon="$HDA_ICON">
@@ -60,6 +68,29 @@ def relaunch():
                PXR_PLUGINPATH_NAME=os.pathsep.join([str(houdini / "bin/usd_plugins"), str(houdini / "houdini/dso/usd_plugins"),
                                                     str(build / "resources")]))
     sys.exit(subprocess.run([str(houdini / "bin/hython.exe"), __file__], env=env).returncode)
+
+
+def help_page(group):
+    """The node's help card (wiki markup), one entry per parameter from its help text, under its tabs and sections."""
+    import hou
+
+    lines = [f"= {LABEL} =", "", '#type: node', '#context: lop', f'#internal: {NAME}', '#icon: LOP/rendersettings', "",
+             '"""Renders the stage with Unreal Engine (hdUE): render settings, camera, resolution, output and AOVs."""', "",
+             "Like Karma Render Settings, it creates the render settings prim, its render product and render vars. "
+             "Each setting's menu button chooses whether this node authors it; unauthored settings keep hdUE's defaults "
+             "(see docs/rendering.md in the hdUE repository).", "", "@parameters", ""]
+
+    def walk(templates, depth):
+        for template in templates:
+            if template.type() == hou.parmTemplateType.Folder:
+                if template.parmTemplates():
+                    lines.extend([("==" if depth == 0 else "===") + f" {template.label()} " + ("==" if depth == 0 else "==="), ""])
+                    walk(template.parmTemplates(), depth + 1)
+            elif template.help() and "_control" not in template.name():
+                lines.extend([f"{template.label()}:", f"    #id: {template.name()}", f"    {template.help()}", ""])
+
+    walk(group.entries(), 0)
+    return "\n".join(lines)
 
 
 def build():
@@ -98,8 +129,10 @@ def build():
     group = hou.ParmTemplateGroup()
     group.append(hou.StringParmTemplate("primpath", "Render Settings Prim", 1, default_value=("/Render/rendersettings",),
                                         help="Path of the UsdRenderSettings prim this node creates or edits."))
-    for name in ("camera", "res_mode", "resolution", "resolutionMenu", "pixelAspectRatio"):
-        group.append(settings.parmTemplateGroup().find(name))
+    for name, text in TOP_HELP.items():
+        template = settings.parmTemplateGroup().find(name)
+        template.setHelp(text)
+        group.append(template)
     output = hou.FolderParmTemplate("hdUE_ImageOutputTab", "Image Output", folder_type=hou.folderType.Tabs)
     output.addParmTemplate(hou.StringParmTemplate("picture", "Output Picture", 1, default_value=("$HIP/render/$HIPNAME.$OS.$F4.exr",),
                                                   string_type=hou.stringParmType.FileReference,
@@ -128,6 +161,7 @@ def build():
     definition.setParmTemplateGroup(group)  # the subnet's spare parameters are not carried over
     definition.setIcon("LOP_rendersettings")
     definition.addSection("Tools.shelf", TOOL)
+    definition.addSection("Help", help_page(group))
     definition.addSection("OnCreated", "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n")
     definition.setExtraFileOption("OnCreated/IsPython", True)
     definition.save(str(HDA), asset)

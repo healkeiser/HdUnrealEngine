@@ -18,6 +18,7 @@
             [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
             language python \
         } \
+        help    "How this node edits the setting: Set or Create authors the value, Set If Exists changes it only where it is authored, Block removes it, Do Nothing keeps the input's." \
         parmtag { "sidefx::look" "icon" } \
     }
 
@@ -33,6 +34,7 @@
             [ "return loputils.createEditPropertiesControlMenu(kwargs, 'int')" ] \
             language python \
         } \
+        help    "How this node edits the setting: Set or Create authors the value, Set If Exists changes it only where it is authored, Block removes it, Do Nothing keeps the input's." \
         parmtag { "sidefx::look" "icon" } \
         hidewhen HIDE \
     }
