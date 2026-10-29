@@ -41,11 +41,20 @@ Fixed on `feature/package` (commits `3a639f9` to `96c0ed4`), each verified with 
 - **Unreal backend:** UE-06/UE-08 (offline profile; Lumen stays 0.66x Karma on Cornell, so LGT-02 is not a quality setting), UE-07 (denoiser cvar no longer forced), UE-13, UE-14 (editor-only plugins), UE-18.
 - **Cleanup:** most of 06; from 07 EFF-01/02/04/05/06/07/09/10/11/14/15, SIM-03/06/08 (partly)/12/14/15, REU-01/02/04/05/06/08/12, ALT-21. Formatting and lint: Black, Ruff, clang-format, clang-tidy, PSScriptAnalyzer, actionlint in CI.
 
+Second round (larger features, `801456f` to `4679bb4`):
+
+- **Framing:** HYD-05/HOU-08 (data window, crops, husk tiles, overscan, pixel aspect).
+- **Lights:** LGT-04 (light and shadow linking through UE's three lighting channels; limits documented), LGT-06 (dome `poleAxis`), LGT-08 (IES `angleScale`), LGT-09/HYD-18 (warnings for shadow color, filters, plugin lights). IES on Z-up stages: a 90-degree spot rendered wrong in UE's Path Tracer; sphere lights become spots only below 90 degrees (1.013x Karma).
+- **Materials and color:** MAT-02, MAT-03, MAT-04 (coat lobe on the layered parent), COL-01 (primaries only, with a warning about ACES/AgX views), COL-03; unbound `displayColor` matched to Karma's default surface (1.07x, was 2.78x). C ABI 9, lighting extension 3.
+- **Parity:** HOU-02 in part (render settings through Hydra, the options side channel removed, cooked libraries as `hdUE:materialxLibrary`/`hdUE:substrateLibrary`, husk warns about `op:` images and missing cooked libraries), HOU-15 (`houdini:interactive`), HOU-16, ALT-01, ALT-03, ALT-17.
+- **Lumen gap (LGT-02):** husk passed no stage units, so metre scenes reached UE at 1 cm per unit and Lumen built no surface-cache cards. Fixed, plus offline hit lighting: Cornell Lumen 0.66x -> 0.76x Karma (0.85x at 128 warmup frames).
+
 Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook).
-- **Larger features:** LGT-04 (light linking), HOU-02/ALT-01..04 (viewport/husk parity: move host work into the delegate), HYD-07 rest (local-space upload), HYD-14, HYD-18, LGT-06 (poleAxis, needs an ABI field), MAT-02/03/04/05/07/08, COL-01/03, LGT-08/09, UE-10/11/15/16/17, SIM-01 (one API table), ALT-05..20, BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04, HOU-09, HOU-11, HOU-15..17.
-- **Investigate:** LGT-02 (Lumen 0.66x Karma; test the surface-cache hypothesis), and a new one: meshes with only `displayColor` (no material) render about 2.4x brighter than Karma.
+- **Not feasible as specified:** MAT-05 (`transparent` opacity renders dark in UE's Path Tracer; Karma renders it like `presence`), HYD-15 far clip (UE's Path Tracer ignores a finite far plane), `hdue:asset` on Xform/Scope and cooked MaterialX/Substrate preparation in husk (host-only Python), ALT-04, ALT-12.
+- **Remaining:** SIM-01 (one API table), HYD-07 rest (local-space upload), HYD-14, MAT-07, MAT-08, UE-10/11/15/16/17, ALT-05..20, BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04, HOU-09, HOU-11, HOU-17.
+- **Investigate:** with `PathTracingMaxBounces=1`, hdUE's Path Tracer renders the floor and box tops black where Karma's direct-only render lights them.
 
 ## Then
 

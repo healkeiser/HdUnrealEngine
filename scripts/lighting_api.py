@@ -44,8 +44,8 @@ class Lighting:
         get.argtypes = [U32, U32, C.POINTER(Api)]
         get.restype = Result
         api = Api()
-        runtime.check(get(2, C.sizeof(api), C.byref(api)), "lighting API")
-        if api.struct_size != C.sizeof(api) or api.abi_version != 2:
+        runtime.check(get(3, C.sizeof(api), C.byref(api)), "lighting API")
+        if api.struct_size != C.sizeof(api) or api.abi_version != 3:
             raise RuntimeError("Unsupported lighting ABI")
         self.get_status = runtime.bind(
             C.CFUNCTYPE(Result, U64, C.POINTER(Status)), api.get_status
