@@ -9,7 +9,7 @@ import time
 import traceback
 
 import hou
-from pxr import Gf, Sdf, Usd, UsdGeom, UsdRender
+from pxr import Gf, Sdf, Tf, Usd, UsdGeom, UsdRender
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -61,6 +61,9 @@ class Host:
         self.prepared_output=ViewportPreparation()
         self.material_error=None
         self.last_materials=None
+        # Material preparation walks the stage (~70 ms on Sponza, then Hydra work): only after a change outside the
+        # render settings, which the viewer stage's change notices tell apart. A render-setting tweak no longer pays it.
+        self.watched_stage=None; self.stage_listener=None; self.materials_dirty=True
         self.viewer=None
         self.last_options=None
         self.closed=False
@@ -78,6 +81,16 @@ class Host:
         QtWidgets.QApplication.instance().aboutToQuit.connect(self.close)
         atexit.register(self.close)
         self.write_state()
+
+    def watch_stage(self,stage):
+        if self.watched_stage is not None and stage==self.watched_stage: return
+        self.watched_stage=stage; self.materials_dirty=True
+        self.stage_listener=Tf.Notice.Register(Usd.Notice.ObjectsChanged,self.stage_changed,stage)
+
+    def stage_changed(self,notice,stage):
+        if self.materials_dirty: return
+        paths=list(notice.GetResyncedPaths())+list(notice.GetChangedInfoOnlyPaths())
+        if any(not path.HasPrefix(RENDER_ROOT) for path in paths): self.materials_dirty=True
 
     def write_state(self,error=None):
         # Diagnostics only: UE boots on hdUE's own thread, so its status can be unavailable for a while; that must not
@@ -144,9 +157,10 @@ class Host:
                         self.material_problem(str(error),state['session']); stage=None
                     if stage:
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
-                        materials_key=(state['session'],_stage_key(node),hou.frame())
-                        if state['session'] and materials_key!=self.last_materials:
-                            self.last_materials=materials_key
+                        self.watch_stage(stage)
+                        materials_key=(state['session'],_settings_values(node),hou.frame())
+                        if state['session'] and (self.materials_dirty or materials_key!=self.last_materials):
+                            self.last_materials=materials_key; self.materials_dirty=False
                             try:
                                 preview=node.parm('hdue_wet_mask_preview')
                                 self.prepared_materials.settings['wetMaskPreview']=bool(preview.eval()) if preview else False
@@ -265,13 +279,19 @@ def start():
         (path/'startup-error.txt').write_text(_failure,encoding='utf-8')
     return _host
 
+RENDER_ROOT=Sdf.Path('/Render')
+
+
+def _settings_values(settings):
+    return tuple(parm.eval() for parm in settings.parms() if parm.name().startswith('hdue_'))
+
+
 def _stage_key(settings):
     """Changes whenever the viewed stage or the hdUE settings change: the displayed LOP's cook count and the settings values."""
     viewer=scene_viewer()
     network=viewer.pwd()
     display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
-    values=tuple(parm.eval() for parm in settings.parms() if parm.name().startswith('hdue_'))
-    return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,values)
+    return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,_settings_values(settings))
 
 
 def scene_viewer():

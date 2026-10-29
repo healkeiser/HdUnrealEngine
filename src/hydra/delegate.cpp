@@ -288,7 +288,12 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 if (host.stopping && host.queue.empty()) return;
                 if (!host.queue.empty()) { task = std::move(host.queue.front()); host.queue.pop_front(); }
             }
-            if (task) task();
+            if (task) {
+                const auto start = std::chrono::steady_clock::now();
+                task();
+                const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                if (ms > 20) trace("hdUE slow task: %.1f ms\n", ms);
+            }
             else {
                 const auto start = std::chrono::steady_clock::now();
                 try { host.tick(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE tick: %s", e.what()); }
@@ -1380,6 +1385,7 @@ public:
                 const auto requested=s.backend->api().request_render(s.session, &request);
                 if (const double requestMs = ms(requestStart, Clock::now()); requestMs > 50) trace("hdUE slow request_render: %.1f ms (result %d)\n", requestMs, int(requested));
                 if(requested==HDUE_PENDING) {
+                    trace("hdUE request pending (UE not ready)\n");
                     if (!needsRequest) { subframeDue_ = true; converged_ = false; s.error.clear(); return; } // retry the sub-frame
                     s.assetRequestPending=true; converged_=false; s.lastFrame={};
                     buffer->invalidate(); if(depth) depth->invalidate(); s.error.clear(); return;
@@ -1662,6 +1668,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     std::lock_guard settingsLock(state_->settingsMutex);
     if (const auto old=state_->settings.find(key); old!=state_->settings.end() && old->second==value) return;
     HdRenderDelegate::SetRenderSetting(key, value);
+    trace("hdUE setting changed: %s\n", key.GetText());
     // Settings that re-upload prims compare against their effective previous value (unset = the default), so the first
     // value a host sends does not re-upload a scene it already matches.
     const auto previousDictionary = state_->setting<VtDictionary>(key.GetText(), {});

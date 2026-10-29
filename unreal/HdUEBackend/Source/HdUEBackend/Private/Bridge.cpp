@@ -360,11 +360,17 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         return Fail(HDUE_ENGINE_ERROR, TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
-    if (!Session->Scene->SurfaceReady()) return HDUE_PENDING;
+    // Pending: the caller retries each tick. The reason is logged once per request generation.
+    const auto Pending = [&](const TCHAR* Reason) {
+        static uint64 Logged = 0;
+        if (Logged != Request->generation) { Logged = Request->generation; UE_LOG(LogTemp, Display, TEXT("hdUE request %llu pending: %s"), Request->generation, Reason); }
+        return HDUE_PENDING;
+    };
+    if (!Session->Scene->SurfaceReady()) return Pending(TEXT("surface effects"));
     if(!Session->Scene->Lighting->GetError().IsEmpty()) return Fail(HDUE_ENGINE_ERROR,*Session->Scene->Lighting->GetError());
-    if(!Session->Scene->Lighting->Ready()) return HDUE_PENDING;
+    if(!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
     HdueAssetSceneStatus Assets{}; Session->Scene->Assets.GetSceneStatus(Assets);
-    if (Assets.loading) return HDUE_PENDING;
+    if (Assets.loading) return Pending(TEXT("native assets"));
     if (Assets.failed) return Fail(HDUE_ENGINE_ERROR, UTF8_TO_TCHAR(Assets.message));
     ReleaseResidency(Session);
     // A moving realtime camera needs Lumen's persistent temporal history. Scene
