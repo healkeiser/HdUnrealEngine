@@ -5,7 +5,7 @@ import sys
 import tempfile
 import json
 import hou
-from pxr import Sdf,UsdGeom
+from pxr import Sdf,UsdGeom,UsdRender
 
 root=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root/'integrations/houdini/python3.13libs'))
@@ -56,6 +56,18 @@ assert settings.GetAttribute('hdUE:renderMode').Get()=='realtime'
 assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'unset controls must not author'
 integration._render_property(render,'xn__hdUErenderMode','pathtraced')
 assert integration.render_options(render.stage())==('pathtraced',64)
+
+# A scene with its own render settings is edited in place: the viewport renders with that prim, not a second one.
+authored=Path(tempfile.mkdtemp())/'authored_settings.usda'
+authored.write_text('#usda 1.0\ndef Camera "other" {}\ndef Camera "shot" {}\ndef Scope "Render" {\n'
+    '    def RenderSettings "Settings" {\n        rel camera = </shot>\n        token hdUE:renderMode = "pathtraced"\n'
+    '        int hdUE:samplesPerPixel = 256\n    }\n}\n',encoding='utf-8')
+authored_source=network.createNode('sublayer'); authored_source.parm('filepath1').set(str(authored))
+edited=integration.render_settings_node(authored_source)
+assert not edited.errors(),edited.errors()
+assert not edited.stage().GetPrimAtPath('/Render/rendersettings'),'a second settings prim changes nothing'
+assert integration.render_options(edited.stage())==('pathtraced',256)
+assert [str(t) for t in UsdRender.Settings(edited.stage().GetPrimAtPath('/Render/Settings')).GetCameraRel().GetForwardedTargets()]==['/shot']
 
 # Native asset bounds live in the viewport overrides (session-only), sized in the stage's own units.
 assets=integration.NativeAssets()

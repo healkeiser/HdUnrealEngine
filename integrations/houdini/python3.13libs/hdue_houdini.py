@@ -520,18 +520,32 @@ class NativeAssets:
 
 RENDER_SETTINGS_TYPES=('rendersettings','hdue_rendersettings')
 
+def _settings_prim(stage):
+    """The render settings prim a viewport renders with: the stage's renderSettingsPrimPath, else the first under /Render."""
+    path=stage.GetMetadata('renderSettingsPrimPath')
+    prim=stage.GetPrimAtPath(path) if path else None
+    if prim: return prim
+    root=stage.GetPrimAtPath('/Render')
+    return next((child for child in root.GetChildren() if child.IsA(UsdRender.Settings)),None) if root else None
+
 def render_settings_node(input_node,mode='realtime',samples=64):
-    """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda) at /Render/rendersettings (Houdini's default path) with hdUE's mode and samples authored."""
+    """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda). It edits the stage's own render settings prim when the
+    input has one (the viewport renders with that prim, so a second one would change nothing), keeping its camera and
+    authored hdUE mode and samples; else it creates /Render/rendersettings (Houdini's default path) with them."""
     if not hou.nodeType(hou.lopNodeTypeCategory(),RENDER_SETTINGS_TYPES[1]):  # hython without the integration on HOUDINI_PATH
         hou.hda.installFile(str(Path(__file__).resolve().parents[1]/'otls'/'hdue_rendersettings.hda'))
     node=input_node.parent().createNode(RENDER_SETTINGS_TYPES[1],'hdUE_render_settings')
     node.setInput(0,input_node)
-    # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
     stage=input_node.stage()
-    camera=next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None
+    existing=_settings_prim(stage) if stage else None
+    if existing: node.parm('primpath').set(str(existing.GetPath()))
+    # The LOP's default camera, /cameras/camera1, rarely exists in loaded scenes; husk would render black.
+    targets=UsdRender.Settings(existing).GetCameraRel().GetForwardedTargets() if existing else []
+    camera=stage.GetPrimAtPath(targets[0]) if targets else         next((prim for prim in stage.Traverse() if prim.IsA(UsdGeom.Camera)),None) if stage else None
     if camera: node.parm('camera').set(str(camera.GetPath()))
-    for name,value in (('xn__hdUErenderMode',mode),('xn__hdUEsamplesPerPixel',samples)):
-        _render_property(node,name,value)
+    for name,value in (('renderMode',mode),('samplesPerPixel',samples)):
+        attr=existing.GetAttribute('hdUE:'+name) if existing else None
+        _render_property(node,'xn__hdUE'+name,attr.Get() if attr and attr.HasAuthoredValue() else value)
     return node
 
 def _render_property(node,prefix,value):
@@ -548,11 +562,7 @@ def _render_property(node,prefix,value):
 
 def render_options(stage):
     """hdUE render mode and samples from the stage's render settings prim, else the defaults."""
-    path=stage.GetMetadata('renderSettingsPrimPath')
-    prim=stage.GetPrimAtPath(path) if path else None
-    if not prim:
-        root=stage.GetPrimAtPath('/Render')
-        prim=next((child for child in root.GetChildren() if child.IsA(UsdRender.Settings)),None) if root else None
+    prim=_settings_prim(stage)
     def get(name,default):
         attr=prim.GetAttribute('hdUE:'+name) if prim else None
         return attr.Get() if attr and attr.HasAuthoredValue() else default
