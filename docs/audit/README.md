@@ -30,6 +30,23 @@ Spot-checked against the code while consolidating; all held.
 9. **Houdini build pinning (BLD-01).** The plugin is built against one 22.0 daily build but loads into any 22.0.x without an ABI check, and the repo disagrees on which build (22.0.466 vs 22.0.368).
 10. **Tests that lie or don't run (TST-01, TST-02, TST-03).** `Verify.ps1` writes `passed = $true` and constant counts; 23 Python tests that pass outside Houdini are not in CI; no image baselines, which is how a black IES scene shipped in the gallery.
 
+## Status (2026-10-29)
+
+Fixed on `feature/package` (commits `3a639f9` to `96c0ed4`), each verified with native tests, `Verify.ps1`, husk and `Test-Houdini.ps1`:
+
+- **Act first:** HYD-01 (camera and buffers copied or checked on the UE thread), HYD-02 (render tags), HYD-03 and HYD-06 (channel conversion, unsupported vars cleared with a warning, several beauty vars), HOU-03 (UE kept between delegates: `husk --restart-delegate` works), HOU-06 (`huskErrorStatus`), LGT-01/LGT-03/UE-12 (IES: 1.015x Karma XPU, was 0.00), UE-04 (Path Tracer seed per request), UE-05 (offline frames wait for PSOs), HOU-01 (host starts when a viewer selects hdUE), TST-01/TST-02 (unit tests in CI; `Verify.ps1` evidence measured). The licensing part of item 1 was handled before this pass; BLD-01 is half done (one build folder name; no ABI check against the running Houdini build yet).
+- **Hydra:** HYD-04 (subdiv tags, face-varying refinement), HYD-07 (partial: volumes and non-instanced meshes skip topology work on transform/visibility changes), HYD-08 (ExtComputations: skinned meshes pose in husk), HYD-09 (primvar readers), HYD-10 (curve widths, pinned, ribbons), HYD-11, HYD-12 (disableMotionBlur), HYD-13, HYD-15 (sent; the backend still uses an infinite projection), HYD-16 (descriptors, Stop/Restart, enableSceneLights), HYD-17 (subsets, instancer primvars).
+- **Houdini:** HOU-04, HOU-05, HOU-07, HOU-10, HOU-12, HOU-13, HOU-14, HOU-18 (partly), PKG-02 (tests out of the package, script allow-list), PKG-03 (`HDUE_USER_DIR`), PKG-04, PKG-05, BLD-04, BLD-05 (`.ruff_cache`), TST-05, TST-06, DOC-01..08.
+- **Materials, lights, color:** LGT-05 (per-light fallbacks), LGT-07 (sphere cone <= 90), MAT-01 (missing textures), MAT-06 (F0 clamp), COL-02 (light textures through OCIO).
+- **Unreal backend:** UE-06/UE-08 (offline profile; Lumen stays 0.66x Karma on Cornell, so LGT-02 is not a quality setting), UE-07 (denoiser cvar no longer forced), UE-13, UE-14 (editor-only plugins), UE-18.
+- **Cleanup:** most of 06; from 07 EFF-01/02/04/05/06/07/09/10/11/14/15, SIM-03/06/08 (partly)/12/14/15, REU-01/02/04/05/06/08/12, ALT-21. Formatting and lint: Black, Ruff, clang-format, clang-tidy, PSScriptAnalyzer, actionlint in CI.
+
+Open:
+
+- **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook).
+- **Larger features:** HYD-05/HOU-08 (framing, data window), LGT-04 (light linking), HOU-02/ALT-01..04 (viewport/husk parity: move host work into the delegate), HYD-07 rest (local-space upload), HYD-14, HYD-18, LGT-06 (poleAxis, needs an ABI field), MAT-02/03/04/05/07/08, COL-01/03, LGT-08/09, UE-10/11/15/16/17, SIM-01 (one API table), ALT-05..20, BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04, HOU-09, HOU-11, HOU-15..17.
+- **Investigate:** LGT-02 (Lumen 0.66x Karma; test the surface-cache hypothesis), and a new one: meshes with only `displayColor` (no material) render about 2.4x brighter than Karma.
+
 ## Then
 
 - **Lumen 0.6x Karma (LGT-02).** Units and exposure match the Path Tracer; the deficit is indirect light. Hypothesis: zero-thickness Cornell walls and a light 1 mm under the ceiling starve Lumen's surface cache. Test with the Lumen Scene debug view and a light moved 5 cm down before changing code. Also: offline Lumen runs at game quality (UE-06, UE-08).
