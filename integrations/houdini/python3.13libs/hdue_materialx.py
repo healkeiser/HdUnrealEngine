@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 import hou
+from hdue_op_textures import opdef_stamp
 from materialx_controls import MaterialXLibrary
 
 
@@ -18,7 +19,7 @@ class PreparedMaterials:
         self.settings={}
         self.file=None
         self.library=None
-        self.embedded={}
+        self.embedded={}; self.checked={}
         self.applied=None
         self.substrate=None
         self.substrate_file=None
@@ -45,7 +46,7 @@ class PreparedMaterials:
         if identity!=self.file:
             self.file=None
             self.library=None
-            self.embedded={}
+            self.embedded={}; self.checked={}
             self.settings={}
             if identity:
                 controller=SimpleNamespace(_dataModel=self.model,_stageView=self)
@@ -56,8 +57,12 @@ class PreparedMaterials:
                 self.embedded=data.get('embedded_textures',{})
             self.file=identity
         for uri,entry in self.embedded.items():
+            # Hashed again only when the HDA holding it changes: this runs on every frame change.
+            stamp=opdef_stamp(uri)
+            if self.checked.get(uri)==stamp: continue
             if hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()!=entry['sha256']:
                 raise ValueError('Embedded texture changed; prepare/import/cook again: '+uri)
+            self.checked[uri]=stamp
         self.model.stage=stage; self.model.currentFrame=time
         self._renderer=session
         if self.library:

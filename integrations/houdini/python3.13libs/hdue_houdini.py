@@ -75,7 +75,7 @@ class Host:
         # the viewer stage's change notices tell apart. Render settings, cameras and transforms (playback) do not pay it.
         self.watched_stage=None; self.stage_listener=None; self.materials_dirty=self.textures_dirty=True; self.materials_animated=False
         self.viewer=None
-        self.last_options=None
+        self.last_options=None; self.options_key=None
         self.closed=False
         self.last_state=time.monotonic()
         self.last_textures=None
@@ -125,7 +125,7 @@ class Host:
 
     def tick(self):
         global _failure
-        if self.closed or not self.running: return
+        if not self.running: return
         try:
             state=self.api.status()
             self.live_substrate.tick()
@@ -141,13 +141,14 @@ class Host:
                     except (hou.Error,ValueError,RuntimeError) as error:
                         self.material_problem(str(error),state['session']); stage=None
                     if stage:
-                        self.sync_scene(state['session'],_stage_key(node),
+                        values=_settings_values(node); key=_stage_key(values)
+                        self.sync_scene(state['session'],key,
                                         any(node.evalParm(name) for name in ('hdue_materialx_library','hdue_substrate_library')))
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
                         self.watch_stage(stage)
                         # Preparation reads materials and wet opinions at the current frame: redo it per frame only if they are animated.
                         if self.materials_dirty: self.materials_animated=_materials_animated(stage)
-                        materials_key=(state['session'],_settings_values(node),hou.frame() if self.materials_animated else None)
+                        materials_key=(state['session'],values,hou.frame() if self.materials_animated else None)
                         if state['session'] and (self.materials_dirty or materials_key!=self.last_materials):
                             self.last_materials=materials_key; self.materials_dirty=False
                             try:
@@ -164,9 +165,11 @@ class Host:
                                 self.material_error=None
                             except (ValueError,OSError,hou.Error) as error:
                                 self.material_problem(str(error),state['session'])
-                        mode,samples=render_options(stage)
-                        options=(state['session'],mode=='pathtraced',samples,
-                                 UsdGeom.GetStageMetersPerUnit(stage),UsdGeom.GetStageUpAxis(stage)=='Z',hou.frame()/hou.fps())
+                        # The stage only changes when the displayed LOP cooks or the settings change (the stage key).
+                        if key!=self.options_key:
+                            mode,samples=render_options(stage); self.options_key=key
+                            self.stage_options=(mode=='pathtraced',samples,UsdGeom.GetStageMetersPerUnit(stage),UsdGeom.GetStageUpAxis(stage)=='Z')
+                        options=(state['session'],*self.stage_options,hou.frame()/hou.fps())
                         if options!=self.last_options and self.api.options(*options[1:]):
                             self.last_options=options; scene_viewer().curViewport().draw()
             if self.assets.authored:
@@ -201,7 +204,7 @@ class Host:
             if self.viewer: self.viewer.status.setText(_failure.splitlines()[-1])
             self.write_state(_failure); _report(_failure)
         finally:
-            if self.running and not self.closed: self.timer.start(16)
+            if self.running: self.timer.start(16)
 
     def sync_scene(self,session,key,materials=False):
         """What the delegate cannot read from USD by itself, kept out of the LOP graph: images of op:/opdef: texture
@@ -325,13 +328,13 @@ def _settings_values(settings):
     return tuple(parm.eval() for parm in settings.parms() if parm.name().startswith('hdue_'))
 
 
-def _stage_key(settings):
+def _stage_key(values):
     """Changes whenever the viewed stage or the hdUE settings change: the displayed LOP's cook count and the settings values."""
     viewer=scene_viewer()
     network=viewer.pwd()
-    if not isinstance(network,hou.LopNetwork): return (None,None,0,_settings_values(settings)) # no Hydra view outside LOPs
+    if not isinstance(network,hou.LopNetwork): return (None,None,0,values) # no Hydra view outside LOPs
     display=network.displayNode()
-    return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,_settings_values(settings))
+    return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,values)
 
 
 def scene_viewer():

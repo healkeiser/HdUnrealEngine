@@ -40,17 +40,14 @@ class Viewport:
         self.set=self.library.hdue_set_viewport_options; self.set.argtypes=[C.POINTER(Options)]; self.set.restype=Result
         self.set_materials=self.library.hdue_set_viewport_materials
         self.set_materials.argtypes=[C.POINTER(Materials)]; self.set_materials.restype=Result
-        self.run_ui_tasks=getattr(self.library,'hdue_run_ui_tasks',None)
-        if self.run_ui_tasks: self.run_ui_tasks.argtypes=[]; self.run_ui_tasks.restype=None
         # Owner-only backend calls (runtime.bind) run on the UE thread the delegate runs.
         runtime.run_on_ue_thread=self.library.hdue_run_on_ue_thread
         runtime.run_on_ue_thread.argtypes=[Task,C.py_object]; runtime.run_on_ue_thread.restype=Result
         self.set_textures=self.library.hdue_set_viewport_textures
         self.set_textures.argtypes=[C.POINTER(Textures)]; self.set_textures.restype=Result
         if C.sizeof(Texture)!=16 or C.sizeof(Textures)!=32: raise RuntimeError('Invalid viewport texture ABI')
-        self.set_surfaces=getattr(self.library,'hdue_set_viewport_surfaces',None)
-        if self.set_surfaces:
-            self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result
+        self.set_surfaces=self.library.hdue_set_viewport_surfaces
+        self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result
         if C.sizeof(Wet)!=48 or C.sizeof(Surfaces)!=40: raise RuntimeError('Invalid viewport surface ABI')
         if C.sizeof(Material)!=32 or C.sizeof(Materials)!=32: raise RuntimeError('Invalid viewport material ABI')
         api=Api(); runtime.check(runtime.library.hdue_get_api(ABI_VERSION,C.sizeof(api),C.byref(api)),'readback API')
@@ -127,9 +124,6 @@ class Viewport:
         return True
 
     def surfaces(self,session,bindings,preview=False,error=''):
-        if not self.set_surfaces:
-            if bindings or error: raise RuntimeError('Wet surfaces require the current delegate build; restart with the updated runtime.')
-            return True
         data=(Wet*len(bindings))()
         for i,(path,b) in enumerate(sorted(bindings.items())):
             data[i]=Wet(path.encode(),b['asset'].encode(),b['previewAsset'].encode(),b['maskPrimvar'].encode(),b['amount'],b['roughness'],2 if b.get('graph') else 0,0)
