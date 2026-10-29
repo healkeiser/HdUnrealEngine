@@ -80,10 +80,14 @@ class Host:
         self.write_state()
 
     def write_state(self,error=None):
+        # Diagnostics only: UE boots on hdUE's own thread, so its status can be unavailable for a while; that must not
+        # stop the host's timer (any exception in tick() does).
+        try: runtime_state=self.runtime.status().state
+        except RuntimeError as failure: runtime_state=str(failure)
         data=dict(houdini=hou.applicationVersionString(),usd=Usd.GetVersion(),pid=os.getpid(),
                   owner=self.owner,ready=self.runtime.ready,closed=self.closed,
                   ticks=self.runtime.ticks,ue_initializations=self.runtime.initializations,
-                  runtime_state=self.runtime.status().state,error=error,texture_error=self.texture_error,material_error=self.material_error,
+                  runtime_state=runtime_state,error=error,texture_error=self.texture_error,material_error=self.material_error,
                   substrate_preparation=self.live_substrate.status())
         (self.log_dir/'runtime-state.json').write_text(json.dumps(data,indent=2),encoding='utf-8')
 

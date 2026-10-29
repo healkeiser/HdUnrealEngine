@@ -4,6 +4,7 @@
 #include "hdue/lighting_api.h"
 #include "Lighting.h"
 #include "EnvironmentBackground.h"
+#include "SharedFrames.h"
 #include "MegaLights/MegaLights.h"
 #define UELIBRARY_DLL_EXPORT
 #include "UELibraryAPI.h"
@@ -75,7 +76,16 @@ struct FReadbackJob {
     bool MegaLightsActive=false;
     FTextureRHIRef Environment;
     float EnvironmentScale=1;
+    float ScreenFraction = 1;
+    // hdue/gpu_api.h: the draw also goes to the shared ring (enabled set), into a slot the render thread picks.
+    HdueGpuOptions Shared{};
+    int32 SharedSlot = -1;
 };
+// Whether a draw completes its request: the Path Tracer's samples, or the realtime warmup at full resolution.
+bool Converges(const FReadbackJob& Job) {
+    return !Job.Preparing && (Job.Request.mode == HDUE_PATH_TRACED
+        ? Job.Samples >= Job.Request.samples_per_pixel : Job.FullResIndex >= FMath::Max(1u, Job.Request.warmup_frames));
+}
 struct FSession {
     TUniquePtr<FHdueScene> Scene;
     HdueSession Handle = 0;
@@ -144,6 +154,8 @@ public:
         if(!Inputs.SceneTextures) return;
         FRDGTextureRef Source=Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
         if(!Source) return;
+        if(Job->Shared.depth)
+            HdueSharedFrames::WriteDepth(GraphBuilder,View,Source,Job->SharedSlot,Job->Request,Job->Shared.depth_scale,Job->ScreenFraction);
         if(!Job->DepthEnabled) return;
         const FIntPoint Size(Session->Width,Session->Height);
         auto Desc=FRDGTextureDesc::Create2D(Size,PF_R32_FLOAT,FClearValueBinding::None,
@@ -285,6 +297,7 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     if (!ValidSession(Handle)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     ReleaseResidency(Session);
+    HdueSharedFrames::Reset();
     Session->Scene.Reset();
     // Drain callbacks before releasing rooted UObjects or the persistent view.
     FlushRenderingCommands();
@@ -529,8 +542,14 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     for (int32 Slot = 0; Slot < FSession::ReadbackSlots && FreeSlot < 0; ++Slot)
         if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; })) FreeSlot = Slot;
     const bool Room = FreeSlot >= 0 && Session->InFlight.Num() < (Interactive ? FSession::ReadbackSlots : 1);
-    const bool ReadBack = Room && (Interactive || Job->DrawIndex == 1 || Session->Preparing || Now - Session->LastReadback >= 0.25 ||
-        Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
+    // A host reading the shared ring (hdue/gpu_api.h) gets every draw from there: the readback then only gives CPU
+    // consumers (Map, the Python viewer) the converged image.
+    if (HdueGpuOptions Shared{}; !Aov && HdueSharedFrames::Enabled(Session->Handle, Shared)) Job->Shared = Shared;
+    const bool Sharing = Job->Shared.enabled != 0;
+    const bool Converging = PathTracing ? Job->DrawIndex >= Request.samples_per_pixel : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames);
+    const bool ReadBack = Room && (Sharing ? Converging : Interactive || Job->DrawIndex == 1 || Session->Preparing ||
+        Now - Session->LastReadback >= 0.25 || Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
+    Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
     if(!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
         Job->Environment=Session->Scene->Lighting->EnvironmentTexture();
@@ -538,18 +557,27 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     }
     if (ReadBack) { Job->Slot = FreeSlot; Session->InFlight.Add(Job); Session->LastReadback = Now; }
     Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session,Job));
+    if (Sharing) {
+        const uint32 Width = Session->Width, Height = Session->Height;
+        ENQUEUE_RENDER_COMMAND(HdueSharedSlot)([Job, Width, Height](FRHICommandListImmediate& Commands) {
+            Job->SharedSlot = HdueSharedFrames::BeginFrame(Commands, Width, Height, Job->Shared.depth != 0);
+        });
+    }
     Renderer().BeginRenderingViewFamily(&Canvas, &Family);
     Canvas.Flush_GameThread();
-    if (!ReadBack) return;
+    if (!ReadBack && !Sharing) return;
     const auto State = Session->ViewState;
-    ENQUEUE_RENDER_COMMAND(HdueCopyColor)([Session, Job, Resource, State, PathTracing](FRHICommandListImmediate& Commands) {
+    ENQUEUE_RENDER_COMMAND(HdueCopyColor)([Session, Job, Resource, State, PathTracing, ReadBack](FRHICommandListImmediate& Commands) {
+#if RHI_RAYTRACING
+        Job->Samples = PathTracing ? State->GetPathTracingSampleIndex() : 0;
+#endif
+        if (Job->Shared.enabled)
+            HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot, Job->Shared.color_scale, Job->Generation, Converges(*Job));
+        if (!ReadBack) return;
         auto& Readback = Session->Readbacks[Job->Slot];
         if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));
         Readback->EnqueueCopy(Commands, Resource->GetRenderTargetTexture());
         if(Job->DepthEnabled && !Job->DepthQueued.Load()) { Job->Failed.Store(true); Job->Complete.Store(true); }
-#if RHI_RAYTRACING
-        Job->Samples = PathTracing ? State->GetPathTracingSampleIndex() : 0;
-#endif
     });
 }
 
@@ -596,8 +624,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, cons
             Info.generation = Job->Generation; Info.frame_id = FrameId;
             Info.required_bytes = uint64(Width) * Height * 4 * sizeof(float);
             Info.completed_samples = Job->Samples;
-            Info.converged = !Job->Preparing && (Request.mode == HDUE_PATH_TRACED
-                ? Job->Samples >= Request.samples_per_pixel : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames));
+            Info.converged = Converges(*Job);
             Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
             Info.readback_ms = (Now - Job->Started) * 1000;
             FScopeLock Lock(&Session->FrameMutex);
@@ -800,6 +827,21 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
         FMemory::Memcpy(static_cast<uint8*>(Buffer) + Offset, reinterpret_cast<const uint8*>(Session->Pixels.GetData()) + Offset, FMath::Min(Chunk, Bytes - Offset));
     });
     return HDUE_OK;
+}
+
+HdueResult HDUE_CALL ConfigureGpuFrames(HdueSession Handle, const HdueGpuOptions* Options) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Options) return HDUE_INVALID_ARGUMENT;
+    return HdueSharedFrames::Configure(Handle, *Options);
+}
+HdueResult HDUE_CALL PollGpuFrame(HdueSession Handle, HdueFrameInfo* Frame) {
+    if (CheckReady() != HDUE_OK) return CheckReady();
+    if (!ValidSession(Handle) || !Frame) return HDUE_INVALID_ARGUMENT;
+    return HdueSharedFrames::Poll(Handle, *Frame);
+}
+// Any thread (the host's graphics thread): touches only the shared ring's own locked state.
+HdueResult HDUE_CALL AcquireGpuFrame(HdueSession Handle, HdueGpuFrame* Frame) {
+    return Frame ? HdueSharedFrames::Acquire(Handle, *Frame) : HDUE_INVALID_ARGUMENT;
 }
 
 HdueResult HDUE_CALL EnableDepth(HdueSession Handle,uint32 Enabled) {
@@ -1068,6 +1110,12 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32 Vers
     if (!Api || Capacity < sizeof(HduePostProcessApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_POSTPROCESS_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(HduePostProcessApi), HDUE_POSTPROCESS_ABI_VERSION, SetPostProcess};
+    return HDUE_OK;
+}
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_gpu_api(uint32 Version, uint32 Capacity, HdueGpuApi* Api) {
+    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_GPU_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(*Api), HDUE_GPU_ABI_VERSION, ConfigureGpuFrames, PollGpuFrame, AcquireGpuFrame};
     return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version,uint32 Capacity,HdueDepthApi* Api) {

@@ -10,6 +10,7 @@
 #include "hdue/volume_api.h"
 #include "hdue/lighting_api.h"
 #include "hdue/surface_api.h"
+#include "hdue/gpu_api.h"
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -34,6 +35,7 @@ public:
     const HdueVolumeApi& volume_api() const { return volumeApi_; }
     const HdueLightingApi& lighting_api() const { return lightingApi_; }
     const HdueSurfaceApi& surface_api() const { return surfaceApi_; }
+    const HdueGpuApi& gpu_api() const { return gpuApi_; }
     // hdue_resize_session: resize a session's render target, keeping its scene. HDUE_INVALID_STATE on runtimes
     // without it (the caller recreates the session instead).
     HdueResult resize_session(HdueSession session, uint32_t width, uint32_t height) const;
@@ -56,6 +58,7 @@ private:
     HdueVolumeApi volumeApi_{};
     HdueLightingApi lightingApi_{};
     HdueSurfaceApi surfaceApi_{};
+    HdueGpuApi gpuApi_{};
     bool initialized_ = false;
 };
 

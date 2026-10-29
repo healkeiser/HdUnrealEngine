@@ -22,7 +22,9 @@ Color and real UE depth share a frame ID and generation. Solaris receives linear
 
 ### Performance
 
-In the Houdini UI, UE runs on its own thread and ticks continuously; the viewport only posts camera and scene changes and picks up finished frames, so a slow UE tick never blocks Houdini. Frames are read back as fast as one readback at a time allows, and the host redraws the viewport when one arrives.
+In the Houdini UI, UE runs on its own thread and ticks continuously; the viewport only posts camera and scene changes and picks up finished frames, so a slow UE tick never blocks Houdini. The host redraws the viewport when a frame arrives.
+
+- **GPU frames.** Houdini's OpenGL viewport takes UE's frames without leaving the GPU (`include/hdue/gpu_api.h`, `src/hydra/gpu_frames.cpp`). UE writes each draw into a ring of three shared D3D12 textures (RGBA16F colour with straight alpha and the camera exposure applied, R32F linear depth in stage units, bottom row first) and signals a shared fence; on each redraw, GL waits for that fence on the GPU, copies the newest frame into HgiGL textures and hands them to Houdini's `HdxAovInputTask`, so nothing is read back or uploaded. A second fence tells UE when GL has finished reading a slot. The CPU render buffers then receive only converged frames (for `Map()`: the Python viewer, scripts). Motion blur, the denoiser and an OCIO config whose `scene_linear` is not linear Rec.709 keep the CPU path, as do husk, usdview and Live Render. It needs the GL driver's `GL_EXT_memory_object_win32` and `GL_EXT_semaphore_win32` and Houdini's GL on UE's GPU; otherwise, or with `HDUE_GPU_FRAMES=0`, frames are read back as before.
 
 - **Image resolution.** Display Options > Render > Image Resolution set to *Render Settings Prim* renders at the render settings' resolution; the viewport size is cheaper while navigating.
 - **Selection IDs.** Solaris asks for `primId` and `instanceId` for its selection highlight. Rendering them swaps every material twice per converged view, so the viewport leaves them out unless `HDUE_VIEWPORT_ID_AOVS=1`; selection then works from the Scene Graph Tree but is not highlighted in the hdUE image.

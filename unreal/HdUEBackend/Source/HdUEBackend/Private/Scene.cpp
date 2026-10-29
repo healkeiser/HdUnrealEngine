@@ -27,7 +27,12 @@
 #include "DynamicMeshToMeshDescription.h"
 #include "StaticMeshAttributes.h"
 #include "ImageCore.h"
+#include "RenderUtils.h"
 #include "ImageCoreUtils.h"
+#include "ispc_texcomp.h"
+#include "UObject/Package.h"
+#include "HAL/FileManager.h"
+#include "Hash/CityHash.h"
 #include "NaniteBuilder.h"
 #include "Rendering/NaniteResources.h"
 #include "StaticMeshResources.h"
@@ -251,36 +256,142 @@ TArray<FImage> MipChain(FImage&& Image) {
     }
     return Chain;
 }
-UTexture2D* MippedTexture(const TArray<FImage>& Chain) {
-    UTexture2D* Texture = UTexture2D::CreateTransient(Chain[0].SizeX, Chain[0].SizeY, FImageCoreUtils::GetPixelFormatForRawImageFormat(Chain[0].Format));
-    if (!Texture) return nullptr;
-    Texture->bNotOfflineProcessed = true;
-    auto& Mips = Texture->GetPlatformData()->Mips;
-    for (int32 Level = 0; Level < Chain.Num(); ++Level) {
-        if (Level) Mips.Add(new FTexture2DMipMap(Chain[Level].SizeX, Chain[Level].SizeY, 1));
-        auto& Bulk = Mips[Level].BulkData;
-        void* Data = Bulk.Lock(LOCK_READ_WRITE);
-        if (Level) Data = Bulk.Realloc(Chain[Level].RawData.Num());
-        FMemory::Memcpy(Data, Chain[Level].RawData.GetData(), Chain[Level].RawData.Num());
-        Bulk.Unlock();
+// Block compression by ispc_texcomp.dll, delay-loaded from the engine's third-party binaries (staged with the runtime).
+// Without it, textures stay uncompressed.
+bool BlockCompression() {
+    static const bool Loaded = FPlatformProcess::GetDllHandle(*(FPaths::EngineDir() / TEXT("Binaries/ThirdParty/Intel/ISPCTexComp/Win64-Release/ispc_texcomp.dll"))) != nullptr;
+    return Loaded;
+}
+// The block format for what a texture's materials read: one or two channels read only by scalar inputs are repacked
+// into BC4/BC5 (Texture.Channels names their source channels); colour, normals and three- or four-channel data are BC7.
+EPixelFormat BlockFormat(FHdueScene::FPreviewTexture& Texture) {
+    Texture.Channels.Reset();
+    if (Texture.Vector) return PF_BC7;
+    for (uint8 Channel = 0; Channel < 4; ++Channel) if (Texture.Read & (1 << Channel)) Texture.Channels.Add(Channel);
+    if (Texture.Channels.Num() == 1) return PF_BC4;
+    if (Texture.Channels.Num() == 2) return PF_BC5;
+    Texture.Channels.Reset();
+    return PF_BC7;
+}
+// One BGRA8 mip level as Format's blocks, a row of blocks per task. Blocks past the image (mips below 4x4, odd sizes)
+// repeat its edge texels.
+void CompressMip(const FImage& Mip, EPixelFormat Format, const FHdueScene::FPreviewTexture& Texture, uint8* Out) {
+    const int32 BlocksX = FMath::DivideAndRoundUp(Mip.SizeX, 4), BlocksY = FMath::DivideAndRoundUp(Mip.SizeY, 4);
+    const int32 Texel = Format == PF_BC4 ? 1 : Format == PF_BC5 ? 2 : 4; // encoder input: R8, RG8 or RGBA8
+    static const uint8 RGBA[4] = {0, 1, 2, 3}, Bytes[4] = {2, 1, 0, 3}; // byte of each RGBA channel in an FColor
+    const uint8* Source = Texture.Channels.IsEmpty() ? RGBA : Texture.Channels.GetData();
+    bc7_enc_settings Settings;
+    // ultrafast: ~60 Mpixel/s per core; veryfast was 12x slower (5 s of a Sponza load on 32 cores).
+    if (Texture.Read & 8) GetProfile_alpha_ultrafast(&Settings); else GetProfile_ultrafast(&Settings);
+    const uint8* In = Mip.RawData.GetData();
+    ParallelFor(BlocksY, [&](int32 Row) {
+        TArray<uint8> Strip; Strip.SetNumUninitialized(BlocksX * 16 * Texel);
+        uint8* Packed = Strip.GetData();
+        for (int32 Y = 0; Y < 4; ++Y) {
+            const uint8* Line = In + int64(FMath::Min(Row * 4 + Y, Mip.SizeY - 1)) * Mip.SizeX * 4;
+            for (int32 X = 0; X < BlocksX * 4; ++X, Packed += Texel)
+                for (int32 C = 0; C < Texel; ++C) Packed[C] = Line[FMath::Min(X, Mip.SizeX - 1) * 4 + Bytes[Source[C]]];
+        }
+        rgba_surface Surface{Strip.GetData(), BlocksX * 4, 4, BlocksX * 4 * Texel};
+        uint8* Blocks = Out + int64(Row) * BlocksX * GPixelFormats[Format].BlockBytes;
+        if (Format == PF_BC4) CompressBlocksBC4(&Surface, Blocks);
+        else if (Format == PF_BC5) CompressBlocksBC5(&Surface, Blocks);
+        else CompressBlocksBC7(&Surface, Blocks, &Settings);
+    });
+}
+// A texture's mipped (and, for 8-bit images, block-compressed) platform data, on a worker thread. BC needs whole 4x4
+// blocks at the top level; other sizes and float images (EXR/HDR) stay uncompressed.
+TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPreviewTexture& Texture, bool SRGB) {
+    if (!ERawImageFormat::IsHDR(Image.Format) && Image.Format != ERawImageFormat::BGRA8) { // grey, 16-bit
+        FImage Converted; Image.CopyTo(Converted, ERawImageFormat::BGRA8, Image.GammaSpace); Image = MoveTemp(Converted);
     }
-    Texture->UpdateResource();
-    return Texture;
+    const TArray<FImage> Chain = MipChain(MoveTemp(Image));
+    const bool Compress = Chain[0].Format == ERawImageFormat::BGRA8 && Chain[0].SizeX % 4 == 0 && Chain[0].SizeY % 4 == 0 && BlockCompression();
+    auto Data = MakeUnique<FTexturePlatformData>();
+    Data->SizeX = Chain[0].SizeX; Data->SizeY = Chain[0].SizeY; Data->SetNumSlices(1);
+    Data->PixelFormat = Compress ? BlockFormat(Texture) : FImageCoreUtils::GetPixelFormatForRawImageFormat(Chain[0].Format);
+    if (!Compress) Texture.Channels.Reset();
+    const FPixelFormatInfo& Info = GPixelFormats[Data->PixelFormat];
+    for (const FImage& Level : Chain) {
+        auto* Mip = new FTexture2DMipMap(Level.SizeX, Level.SizeY, 1);
+        Data->Mips.Add(Mip);
+        const int64 Size = int64(FMath::DivideAndRoundUp(Level.SizeX, Info.BlockSizeX)) * FMath::DivideAndRoundUp(Level.SizeY, Info.BlockSizeY) * Info.BlockBytes;
+        Mip->BulkData.Lock(LOCK_READ_WRITE);
+        auto* Out = static_cast<uint8*>(Mip->BulkData.Realloc(Size));
+        if (Compress) CompressMip(Level, Data->PixelFormat, Texture, Out);
+        else FMemory::Memcpy(Out, Level.RawData.GetData(), Size);
+        Mip->BulkData.Unlock();
+    }
+    return Data;
 }
+// Block-compressed textures cached in %LOCALAPPDATA%/hdUE/TextureCache, keyed by the file, its time and size, and what
+// the materials read: reloading a scene skips decoding its images, most of a texture load.
+// ponytail: never evicted; delete the folder to reclaim space.
+constexpr int32 CacheVersion = 2;
+FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB) {
+    static const FString Root = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")), TEXT("hdUE"), TEXT("TextureCache"));
+    const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
+    if (!Stat.bIsValid) return FString();
+    const FString Key = FString::Printf(TEXT("%s|%lld|%lld|%d|%d|%d|%d"), *FPaths::ConvertRelativePathToFull(File), Stat.ModificationTime.GetTicks(),
+        Stat.FileSize, SRGB, Texture.Read, Texture.Vector, CacheVersion);
+    return Root / FString::Printf(TEXT("%016llx.bin"), CityHash64(reinterpret_cast<const char*>(*Key), Key.Len() * sizeof(TCHAR)));
 }
-UTexture2D* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
-    const FString Key = File + (SRGB ? TEXT("|srgb") : TEXT("|raw"));
-    if (const auto* Cached = PreviewTextures.Find(Key)) return Cached->Get();
-    const double ImportStart = FPlatformTime::Seconds();
-    // Images decoded in parallel by Apply; files outside a batch (lights) decode here.
-    UTexture2D* Texture = nullptr;
-    if (const TArray<FImage>* Decoded = DecodedImages.Find(File)) Texture = MippedTexture(*Decoded);
-    else Texture = FImageUtils::ImportFileAsTexture2D(File);
-    TextureSeconds += FPlatformTime::Seconds() - ImportStart; ++TextureImports;
-    if (!Texture) { Error = FString::Printf(TEXT("Failed to import texture %s."), *File); return nullptr; }
-    // Float images (EXR/HDR) are already linear; only 8-bit images carry the sRGB choice.
-    if (Texture->SRGB != SRGB && Texture->GetPixelFormat() == PF_B8G8R8A8) { Texture->SRGB = SRGB; Texture->UpdateResource(); }
-    PreviewTextures.Add(Key, TStrongObjectPtr<UTexture2D>(Texture));
+// The cached platform data (mip sizes and blocks straight into bulk data), or null.
+TUniquePtr<FTexturePlatformData> ReadCache(const FString& Path, FHdueScene::FPreviewTexture& Texture) {
+    TUniquePtr<FArchive> In(IFileManager::Get().CreateFileReader(*Path, FILEREAD_Silent));
+    if (!In) return nullptr;
+    int32 Version = 0, SizeX = 0, SizeY = 0, Format = 0, Mips = 0;
+    *In << Version << SizeX << SizeY << Format << Mips;
+    if (In->IsError() || Version != CacheVersion || Format != BlockFormat(Texture)) return nullptr;
+    auto Data = MakeUnique<FTexturePlatformData>();
+    Data->SizeX = SizeX; Data->SizeY = SizeY; Data->SetNumSlices(1); Data->PixelFormat = EPixelFormat(Format);
+    for (int32 Level = 0; Level < Mips && !In->IsError(); ++Level) {
+        int32 Width = 0, Height = 0; int64 Size = 0;
+        *In << Width << Height << Size;
+        if (In->IsError() || Size <= 0 || Size > In->TotalSize()) return nullptr;
+        auto* Mip = new FTexture2DMipMap(Width, Height, 1);
+        Data->Mips.Add(Mip);
+        Mip->BulkData.Lock(LOCK_READ_WRITE);
+        In->Serialize(Mip->BulkData.Realloc(Size), Size);
+        Mip->BulkData.Unlock();
+    }
+    return In->IsError() || Data->Mips.IsEmpty() ? nullptr : MoveTemp(Data);
+}
+void WriteCache(const FString& Path, FTexturePlatformData& Data) {
+    const FString Temporary = Path + FGuid::NewGuid().ToString(); // renamed when complete: readers never see a partial file
+    TUniquePtr<FArchive> Out(IFileManager::Get().CreateFileWriter(*Temporary, FILEWRITE_Silent));
+    if (!Out) return;
+    int32 Version = CacheVersion, Format = Data.PixelFormat, Mips = Data.Mips.Num();
+    *Out << Version << Data.SizeX << Data.SizeY << Format << Mips;
+    for (FTexture2DMipMap& Mip : Data.Mips) {
+        int32 Width = Mip.SizeX, Height = Mip.SizeY; // 16-bit fields
+        int64 Size = Mip.BulkData.GetBulkDataSize();
+        *Out << Width << Height << Size;
+        Out->Serialize(Mip.BulkData.Lock(LOCK_READ_ONLY), Size);
+        Mip.BulkData.Unlock();
+    }
+    const bool Written = Out->Close() && !Out->IsError();
+    Out.Reset();
+    if (!Written || !IFileManager::Get().Move(*Path, *Temporary, true, true, false, true)) IFileManager::Get().Delete(*Temporary, false, false, true);
+}
+FString TextureKey(const FString& File, bool SRGB) { return File + (SRGB ? TEXT("|srgb") : TEXT("|raw")); }
+// Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
+bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
+}
+// A texture Apply prepared, created on this thread (UObjects and render resources need it) on first use.
+const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& File, bool SRGB, FString& Error) {
+    FPreviewTexture* Texture = PreviewTextures.Find(TextureKey(File, SRGB));
+    if (Texture && Texture->Pending) {
+        const double CreateStart = FPlatformTime::Seconds();
+        auto* Created = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient);
+        Created->bNotOfflineProcessed = true;
+        Created->SRGB = SRGB && !IsFloatFormat(Texture->Pending->PixelFormat); // float images are already linear
+        Created->SetPlatformData(Texture->Pending.Release());
+        Created->UpdateResource();
+        Texture->Texture.Reset(Created);
+        TextureSeconds += FPlatformTime::Seconds() - CreateStart; ++TextureImports;
+    }
+    if (!Texture || !Texture->Texture) { Error = FString::Printf(TEXT("Failed to import texture %s."), *File); return nullptr; }
     return Texture;
 }
 void FHdueScene::BindMaterials() {
@@ -339,34 +450,54 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
 }
 }
 
+namespace {
+// UE's fast BuildFromMeshDescriptions path, split so the CPU half runs off the game thread (30-60 ms per mesh there
+// stalled frames for the first minutes after a load) and Nanite data is attached before the GPU resources exist.
+UStaticMesh* NewStaticMesh(UObject* Outer) {
+    auto* Mesh = NewObject<UStaticMesh>(Outer);
+    FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f); // texture streaming reads UV density
+    Mesh->GetStaticMaterials().Add(Slot);
+    return Mesh;
+}
+// Any thread: reads only the mesh's material slots.
+TUniquePtr<FStaticMeshRenderData> BuildRenderData(const UStaticMesh& Mesh, const FMeshDescription& Description) {
+    auto Data = MakeUnique<FStaticMeshRenderData>();
+    Data->AllocateLODResources(1);
+    const_cast<UStaticMesh&>(Mesh).BuildFromMeshDescription(Description, Data->LODResources[0]);
+    return Data;
+}
+// Game thread.
+void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> RenderData, const FBoxSphereBounds& Bounds, Nanite::FResources* Nanite) {
+    Built->SetRenderData(MoveTemp(RenderData));
+    FStaticMeshRenderData& Data = *Built->GetRenderData();
+    if (Nanite) {
+        // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
+        Data.LODResources[0].BuffersSize = FMath::Max<uint32>(Data.LODResources[0].BuffersSize, 1);
+        *Data.NaniteResourcesPtr = MoveTemp(*Nanite);
+    }
+    if (Built->bSupportRayTracing && IsRayTracingAllowed()) Data.InitializeRayTracingRepresentationFromRenderingLODs();
+    Built->InitResources();
+    Data.Bounds = Bounds;
+    Built->CalculateExtendedBounds();
+    Data.ScreenSize[0].Default = 1.f;
+}
+}
+
 // Replaces one dynamic mesh queued by Apply with a static mesh (cached draw commands, static ray-tracing geometry),
 // with Nanite data when its build has finished.
 void FHdueScene::TickConversions() {
+    RetiredConversions.RemoveAll([](const FPendingConversion& Retired) { return Retired.Task.IsCompleted(); });
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
-        if (!It.Value().IsCompleted()) continue; // not built yet
+        if (!It.Value().Task.IsCompleted()) continue; // not built yet
         AActor* Actor = Actors.FindRef(It.Key());
         auto* Dynamic = IsValid(Actor) ? Cast<UDynamicMeshComponent>(Actor->GetRootComponent()) : nullptr;
         if (!Dynamic) { It.RemoveCurrent(); continue; }
-        const TSharedPtr<FConversion> Conversion = It.Value().GetResult();
-        auto* Built = NewObject<UStaticMesh>(Actor);
-        FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f); // texture streaming UV density
-        Built->GetStaticMaterials().Add(Slot);
-        UStaticMesh::FBuildMeshDescriptionsParams Params;
-        Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
-        Built->BuildFromMeshDescriptions({&Conversion->Description}, Params);
+        const TSharedPtr<FConversion> Conversion = It.Value().Task.GetResult();
         const UMaterialInterface* Material = Dynamic->GetMaterial(0);
         const bool NaniteMaterial = !Material || !IsTranslucentBlendMode(*Material); // Nanite draws opaque and masked only
-        if (Conversion->Nanite && NaniteMaterial && Built->GetRenderData()) {
-            // The fast build made LOD0 (fallback, ray tracing) and empty Nanite resources; swap in the built ones.
-            // Only the Nanite resources: LOD0's CPU copies are gone, so its buffers can't be re-created.
-            // Nanite's ray-tracing fallback only counts LODs with a BuffersSize, which only cooking sets.
-            FStaticMeshLODResources& LOD0 = Built->GetRenderData()->LODResources[0];
-            LOD0.BuffersSize = FMath::Max<uint32>(LOD0.BuffersSize, 1);
-            Nanite::FResources& Nanite = *Built->GetRenderData()->NaniteResourcesPtr;
-            Nanite.ReleaseResources();
-            FlushRenderingCommands();
-            Nanite = MoveTemp(*Conversion->Nanite);
-            Nanite.InitResources(Built);
+        UStaticMesh* Built = It.Value().Mesh.Get();
+        FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds, NaniteMaterial ? Conversion->Nanite.Get() : nullptr);
+        if (Conversion->Nanite && NaniteMaterial) {
             static int32 NaniteMeshes = 0, Tried = 0;
             ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
             if (Tried % 50 == 1 || PendingStatic.Num() == 1)
@@ -465,29 +596,46 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     const double ApplyStart = FPlatformTime::Seconds();
     RetiredMaterials.Reset(); // replaced by the previous Apply; frames that used them have long finished
     TextureSeconds = 0; TextureImports = 0;
+    double PrepareSeconds = 0;
     {
-        // Decode this batch's new texture files in parallel: decoding them one by one on this thread took most of
-        // a large scene's load (111 Sponza textures, ~19 s). Creating the UTexture2Ds stays on this thread.
-        TArray<FString> Files;
+        // Decode, mip and block-compress this batch's new textures on all cores: decoding them one by one on this
+        // thread took most of a large scene's load (111 Sponza textures, ~19 s), and uncompressed they held ~9 GB.
+        // PreviewTexture creates the UTexture2Ds on this thread. A texture is rebuilt when inputs read channels its
+        // BC4/BC5 repacking left out.
+        TMap<FString, uint8> Files; // variants to build: bit 0 raw, bit 1 sRGB
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
             if (Desc.native_asset && *Desc.native_asset) continue;
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
-                if (!Desc.textures[Slot].file || !*Desc.textures[Slot].file) continue;
-                const FString File = UTF8_TO_TCHAR(Desc.textures[Slot].file);
-                const bool Color = hdue_texture_is_color(Slot) != 0;
-                if (!PreviewTextures.Contains(File + (Color ? TEXT("|srgb") : TEXT("|raw"))) && !DecodedImages.Contains(File)) Files.AddUnique(File);
+                const auto& Texture = Desc.textures[Slot];
+                if (!Texture.file || !*Texture.file) continue;
+                const FString File = UTF8_TO_TCHAR(Texture.file);
+                const bool SRGB = hdue_texture_is_color(Slot) != 0, Vector = !ScalarSlot(Slot);
+                uint8 Read = 0;
+                for (int32 Channel = 0; Channel < 4; ++Channel) if (!Vector && Texture.channel_mask[Channel] != 0.f) Read |= 1 << Channel;
+                FPreviewTexture& Entry = PreviewTextures.FindOrAdd(TextureKey(File, SRGB));
+                if (Entry.Texture && (Entry.Read | Read) == Entry.Read && (Entry.Vector || !Vector)) continue;
+                Entry.Read |= Read; Entry.Vector |= Vector;
+                Files.FindOrAdd(File) |= 1 << int32(SRGB);
             }
         }
         if (Files.Num()) {
-            const double DecodeStart = FPlatformTime::Seconds();
-            TArray<TArray<FImage>> Chains; Chains.SetNum(Files.Num());
-            ParallelFor(Files.Num(), [&](int32 Index) {
+            const double PrepareStart = FPlatformTime::Seconds();
+            const TArray<TPair<FString, uint8>> Work = Files.Array();
+            ParallelFor(Work.Num(), [&](int32 Index) {
                 FImage Image;
-                if (FImageUtils::LoadImage(*Files[Index], Image)) Chains[Index] = MipChain(MoveTemp(Image));
+                for (const bool SRGB : {false, true}) {
+                    if (!(Work[Index].Value & (1 << int32(SRGB)))) continue;
+                    FPreviewTexture& Entry = PreviewTextures[TextureKey(Work[Index].Key, SRGB)];
+                    const FString Cache = CachePath(Work[Index].Key, Entry, SRGB);
+                    if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
+                    if (!Image.RawData.Num() && !FImageUtils::LoadImage(*Work[Index].Key, Image)) return;
+                    const bool Last = SRGB || !(Work[Index].Value & 2);
+                    Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB);
+                    if (!Cache.IsEmpty() && IsBlockCompressedFormat(Entry.Pending->PixelFormat)) WriteCache(Cache, *Entry.Pending);
+                }
             });
-            for (int32 Index = 0; Index < Files.Num(); ++Index) if (Chains[Index].Num()) DecodedImages.Add(Files[Index], MoveTemp(Chains[Index]));
-            TextureSeconds += FPlatformTime::Seconds() - DecodeStart;
+            PrepareSeconds = FPlatformTime::Seconds() - PrepareStart;
         }
     }
     for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
@@ -539,13 +687,19 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                         Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
                         continue;
                     }
-                    const bool Color = hdue_texture_is_color(Slot) != 0;
-                    UTexture2D* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), Color, Error);
+                    const FPreviewTexture* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), hdue_texture_is_color(Slot) != 0, Error);
                     if (!Image) return false;
-                    Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image);
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(Texture.scale[0], Texture.scale[1], Texture.scale[2], Texture.scale[3]));
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), FLinearColor(Texture.bias[0], Texture.bias[1], Texture.bias[2], Texture.bias[3]));
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), FLinearColor(Texture.channel_mask[0], Texture.channel_mask[1], Texture.channel_mask[2], Texture.channel_mask[3]));
+                    // A repacked texture (BC4/BC5) stores the channels this input reads first.
+                    const auto Stored = [&](const float* Value) {
+                        if (Image->Channels.IsEmpty()) return FLinearColor(Value[0], Value[1], Value[2], Value[3]);
+                        float Packed[4] = {};
+                        for (int32 Channel = 0; Channel < Image->Channels.Num(); ++Channel) Packed[Channel] = Value[Image->Channels[Channel]];
+                        return FLinearColor(Packed[0], Packed[1], Packed[2], Packed[3]);
+                    };
+                    Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image->Texture.Get());
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), Stored(Texture.scale));
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Stored(Texture.bias));
+                    Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), Stored(Texture.channel_mask));
                 }
                 static const float Identity[6] = {1, 0, 0, 0, 1, 0};
                 const bool Unset = Algo::AllOf(Desc.uv_transform, [](float Value) { return Value == 0.f; });
@@ -650,31 +804,31 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         } else {
             using namespace UE::Geometry;
             if (Static) {
-                auto* Built = NewObject<UStaticMesh>(Actor);
-                // Texture streaming reads UV density; cooked meshes get it from the editor.
-                FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f);
-                Built->GetStaticMaterials().Add(Slot);
-                UStaticMesh::FBuildMeshDescriptionsParams Params;
-                Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
-                Built->BuildFromMeshDescriptions({&Descriptions[Index]}, Params);
+                auto* Built = NewStaticMesh(Actor);
+                FinishStaticMesh(Built, BuildRenderData(*Built, Descriptions[Index]), Descriptions[Index].GetBounds(), nullptr);
                 if (Instanced) InstanceMesh = Built;
                 else Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
             } else {
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
-                PendingStatic.Remove(Id);
+                // A conversion still running keeps its mesh alive until it finishes (its worker uses it).
+                if (FPendingConversion Previous; PendingStatic.RemoveAndCopyValue(Id, Previous) && !Previous.Task.IsCompleted()) RetiredConversions.Add(MoveTemp(Previous));
                 if (ConvertLater(Desc)) {
                     // The static mesh description and Nanite data are built on background workers, from a copy of the
                     // descriptor's arrays: done here, they doubled the time to the first frame (and normal-priority
                     // Nanite tasks starved its rendering for 15 s).
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    PendingStatic.Add(Id, UE::Tasks::Launch(TEXT("HdueConversion"), [Copy]() -> TSharedPtr<FConversion> {
+                    UStaticMesh* Mesh = NewStaticMesh(Actor);
+                    PendingStatic.Add(Id, {TStrongObjectPtr<UStaticMesh>(Mesh), UE::Tasks::Launch(TEXT("HdueConversion"), [Copy, Mesh]() -> TSharedPtr<FConversion> {
                         TSharedPtr<FConversion> Result = MakeShared<FConversion>();
-                        UE::Geometry::FDynamicMesh3 Mesh = BuildDynamicMesh(Copy->Desc);
-                        FStaticMeshAttributes Attributes(Result->Description); Attributes.Register();
-                        FDynamicMeshToMeshDescription().Convert(&Mesh, Result->Description);
+                        UE::Geometry::FDynamicMesh3 Dynamic = BuildDynamicMesh(Copy->Desc);
+                        FMeshDescription Description;
+                        FStaticMeshAttributes Attributes(Description); Attributes.Register();
+                        FDynamicMeshToMeshDescription().Convert(&Dynamic, Description);
+                        Result->RenderData = BuildRenderData(*Mesh, Description);
+                        Result->Bounds = Description.GetBounds();
                         if (NaniteMeshes) Result->Nanite = BuildNanite(Copy->Desc);
                         return Result;
-                    }, UE::Tasks::ETaskPriority::BackgroundLow));
+                    }, UE::Tasks::ETaskPriority::BackgroundLow)});
                 }
             }
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
@@ -725,11 +879,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         if (auto* Rect = Cast<URectLightComponent>(Light)) { Rect->SetSourceWidth(Desc.width_cm); Rect->SetSourceHeight(Desc.height_cm); Rect->SetAttenuationRadius(100000); }
     }
     const double MeshesDone = FPlatformTime::Seconds();
-    DecodedImages.Reset(); // their textures exist now
     BindMaterials();
     if (Batch.material_count || Batch.mesh_count)
-        UE_LOG(LogTemp, Display, TEXT("hdUE apply: %u materials %.0f ms (%d texture imports %.0f ms), %u meshes %.0f ms, bind %.0f ms"),
-            Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, TextureSeconds * 1000, Batch.mesh_count,
+        UE_LOG(LogTemp, Display, TEXT("hdUE apply: %u materials %.0f ms (%d textures: prepare %.0f ms, create %.0f ms), %u meshes %.0f ms, bind %.0f ms"),
+            Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, PrepareSeconds * 1000, TextureSeconds * 1000, Batch.mesh_count,
             (MeshesDone - MaterialsDone) * 1000, (FPlatformTime::Seconds() - MeshesDone) * 1000);
     return true;
 }

@@ -16,11 +16,13 @@ target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty
 target_compile_definitions(hdue_hdk INTERFACE HDUE_HOUDINI=1
     _SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
 add_library(hdUE SHARED src/houdini/diagnostics.cpp src/houdini/volume_fields.cpp src/hydra/delegate.cpp src/hydra/color_management.cpp src/hydra/materials.cpp src/hydra/prims.cpp
-    src/hydra/render_buffer.cpp src/hydra/plugin.cpp src/hydra/picking.cpp src/hydra/implicit_surfaces.cpp)
+    src/hydra/render_buffer.cpp src/hydra/plugin.cpp src/hydra/picking.cpp src/hydra/implicit_surfaces.cpp src/hydra/gpu_frames.cpp)
 set_target_properties(hdUE PROPERTIES OUTPUT_NAME hdUE_Houdini22)
 target_compile_definitions(hdUE PRIVATE HDUE_HYDRA_EXPORTS)
 target_include_directories(hdUE PUBLIC src/hydra)
-target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk)
+# gpu_frames.cpp: HgiGL textures and the GL interop entry points HgiGL loaded through garch.
+target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk opengl32
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hgi.lib" "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_garch.lib")
 target_compile_options(hdUE PRIVATE /W3 /utf-8 /bigobj)
 set(HDUE_PLUGIN_NAME hdUEHoudini22)
 set(HDUE_PLUGIN_TYPE HdUEHoudiniRendererPlugin)

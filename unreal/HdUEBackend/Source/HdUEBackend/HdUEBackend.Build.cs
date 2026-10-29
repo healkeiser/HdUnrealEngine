@@ -8,6 +8,8 @@ public class HdUEBackend : ModuleRules
         PublicIncludePaths.Add(Path.GetFullPath(Path.Combine(ModuleDirectory, "../../../../include")));
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
         PrivateDependencyModuleNames.AddRange(new[] { "RHI", "RenderCore", "Renderer", "Projects", "GeometryFramework", "GeometryCore", "MeshConversion", "MeshDescription", "StaticMeshDescription", "ImageWrapper", "ImageCore", "AssetRegistry", "IESFile", "NaniteBuilder" });
+        // Block compression of runtime textures (ispc_texcomp.dll, delay-loaded and staged with the runtime).
+        AddEngineThirdPartyPrivateStaticDependencies(Target, "IntelISPCTexComp");
         if (Target.Type != TargetType.Editor)
         {
             // Pinned monolithic source target; private VT access is isolated in VirtualTextureResidency.cpp.
@@ -15,6 +17,9 @@ public class HdUEBackend : ModuleRules
             PrivateIncludePaths.Add(Path.Combine(GetModuleDirectory("Renderer"), "Internal"));
             PrivateDependencyModuleNames.Add("UELibrary");
             PrivateDefinitions.Add("HDUE_BRIDGE_EXPORTS=1");
+            // Shared frame textures and fences (SharedFrames.cpp, hdue/gpu_api.h).
+            PrivateDependencyModuleNames.Add("D3D12RHI");
+            AddEngineThirdPartyPrivateStaticDependencies(Target, "DX12");
         }
     }
 }

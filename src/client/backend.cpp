@@ -23,6 +23,13 @@ Backend::Backend(const std::filesystem::path& dll) {
             candidate.struct_size == sizeof(candidate) && candidate.abi_version == HDUE_SURFACE_ABI_VERSION &&
             candidate.apply && candidate.get_status) surfaceApi_ = candidate;
     }
+    const auto gpu=reinterpret_cast<HdueGetGpuApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_gpu_api"));
+    if(gpu) {
+        HdueGpuApi candidate{};
+        if(gpu(HDUE_GPU_ABI_VERSION,sizeof(candidate),&candidate)==HDUE_OK &&
+            candidate.struct_size==sizeof(candidate) && candidate.abi_version==HDUE_GPU_ABI_VERSION &&
+            candidate.configure && candidate.poll_gpu_frame && candidate.acquire_gpu_frame) gpuApi_=candidate;
+    }
     const auto lighting=reinterpret_cast<HdueGetLightingApiFn>(GetProcAddress(static_cast<HMODULE>(module_),"hdue_get_lighting_api"));
     if(lighting) {
         HdueLightingApi candidate{};

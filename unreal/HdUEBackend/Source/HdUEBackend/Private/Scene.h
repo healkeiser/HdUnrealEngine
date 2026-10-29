@@ -1,5 +1,6 @@
 #pragma once
 #include "ImageCore.h"
+#include "Engine/Texture.h"
 #include "MeshDescription.h"
 #include "Tasks/Task.h"
 #include "Rendering/NaniteResources.h"
@@ -33,6 +34,14 @@ class FHdueLighting;
 
 class FHdueScene {
 public:
+    // A texture of the Preview Surface parents and the channels it was built for. Scalar inputs that read one or two
+    // channels get them repacked into BC4/BC5: Channels holds the source channel of each stored channel (empty: as read).
+    struct FPreviewTexture {
+        TStrongObjectPtr<UTexture2D> Texture;
+        TArray<uint8, TInlineAllocator<2>> Channels;
+        uint8 Read = 0; bool Vector = false; // channels scalar inputs read (bit per RGBA channel); read by a colour/normal input
+        TUniquePtr<FTexturePlatformData> Pending; // built on workers by Apply; PreviewTexture gives it to Texture
+    };
     explicit FHdueScene(UWorld* InWorld);
     ~FHdueScene();
     bool Apply(const HdueSceneBatch& Batch, FString& Error);
@@ -69,14 +78,16 @@ private:
     TMap<FString, FVolume> Volumes;
     int32 IdMode = 0;
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits matter.
-    TMap<FString, TStrongObjectPtr<UTexture2D>> PreviewTextures;
+    TMap<FString, FPreviewTexture> PreviewTextures;
     double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
-    TMap<FString, TArray<FImage>> DecodedImages; // mip chains decoded in parallel at the start of Apply, consumed by PreviewTexture
     // Dynamic meshes TickConversions turns into static (and Nanite) meshes, with their background builds.
-    struct FConversion { FMeshDescription Description; TSharedPtr<Nanite::FResources> Nanite; };
-    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic;
-    UTexture2D* PreviewTexture(const FString& File, bool SRGB, FString& Error);
+    // The worker builds the static mesh's render data (and Nanite data) for Mesh, created on the game thread.
+    struct FConversion { TUniquePtr<FStaticMeshRenderData> RenderData; FBoxSphereBounds Bounds; TSharedPtr<Nanite::FResources> Nanite; };
+    struct FPendingConversion { TStrongObjectPtr<UStaticMesh> Mesh; UE::Tasks::TTask<TSharedPtr<FConversion>> Task; };
+    TMap<FString, FPendingConversion> PendingStatic;
+    TArray<FPendingConversion> RetiredConversions; // replaced while their worker ran
+    const FPreviewTexture* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;
         UMaterialInterface* Base = nullptr;

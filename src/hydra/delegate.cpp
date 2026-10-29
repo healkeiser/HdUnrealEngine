@@ -46,6 +46,8 @@
 #define HDUE_VIEWPORT_EXPORTS 1 // hdue_run_ui_tasks is defined below
 #include "../houdini/diagnostics.h"
 #include "hdue/viewport_api.h"
+#include "gpu_frames.h"
+#include "pxr/imaging/hgi/tokens.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -137,6 +139,20 @@ struct HdUESelfHost {
     }
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
+// Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
+// also an exit handler, registered once UE runs so it precedes UE's own: a process leaving with UE alive (husk with
+// HDUE_HOUDINI_UI, Houdini without its hdUE host) otherwise ran UE's teardown on the main thread and hung.
+void shutdownSelfHost() {
+    auto& host = selfHost();
+    if (!host.backend) return;
+    host.run([&] {
+        try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { std::fprintf(stderr, "hdUE shutdown: %s\n", e.what()); }
+        if (host.window) DestroyWindow(host.window);
+        host.window = nullptr;
+    });
+    host.stop();
+    host.backend.reset();
+}
 // When a host (Houdini's UI thread) owns UE, delegates executing on other threads (Live Render) queue their
 // UE work here; the host runs it from hdue_run_ui_tasks after each tick.
 struct HdUEOwnerQueue {
@@ -254,6 +270,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             }
             if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
                 throw std::runtime_error(std::string("hdUE: UE did not become ready: ") + status.message);
+            if (host.continuous) std::atexit([] { shutdownSelfHost(); });
             started->set_value();
         } catch (const std::exception& e) {
             { std::lock_guard lock(host.bootMutex); host.bootError = e.what(); }
@@ -812,6 +829,47 @@ class Pass final : public HdRenderPass {
     std::vector<float> beautyPixels_; // top-down RGBA of the converged beauty, before denoising
     HdueFrameInfo beautyFrame_{};
     bool denoisePending_ = false;
+#if defined(HDUE_HOUDINI)
+    // Houdini's GL viewport takes every frame from the backend's shared GPU ring (gpu_frames.h); the CPU buffers then
+    // receive only converged frames, for Map (the Python viewer, scripts). The CPU path stays for what it computes
+    // after readback: motion blur sub-frame averaging, the denoiser and a non-identity OCIO scene_linear.
+    HdueGpuOptions gpuOptions_{};
+    HdUERenderBuffer* gpuBuffers_[2] = {};
+    uint64_t gpuFrame_ = 0;
+    void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth, bool denoising) {
+        const auto frames = s.locked([&] { return s.gpuFrames; });
+        const auto& api = s.backend->gpu_api();
+        const bool tonemapper = s.setting<bool>("tonemapper", false);
+        HdueGpuOptions options{sizeof(options)};
+        options.enabled = frames && !frames->failed() && api.configure && subframes_ <= 1 && !denoising &&
+            (tonemapper || HdUESceneLinearIsRec709());
+        options.depth = depth != nullptr;
+        options.color_scale = tonemapper ? 1.f : lens_[3]; // camera exposure, as the CPU path applies it
+        options.depth_scale = float(1 / centimetersPerUnit_);
+        if (std::memcmp(&options, &gpuOptions_, sizeof(options)) || gpuBuffers_[0] != &buffer || gpuBuffers_[1] != depth) {
+            if (api.configure && api.configure(s.session, &options) != HDUE_OK && options.enabled) { // not a D3D12 runtime
+                options.enabled = 0; s.backend->require(api.configure(s.session, &options), "configure_gpu_frames");
+            }
+            for (auto* bound : {&buffer, depth}) if (bound) bound->setResource(nullptr);
+            if (options.enabled) {
+                frames->setSession(s.session);
+                buffer.setResource([frames, target = &buffer] { return frames->color(target->GetWidth(), target->GetHeight()); });
+                if (depth) depth->setResource([frames] { return frames->depth(); });
+            }
+            gpuOptions_ = options; gpuBuffers_[0] = &buffer; gpuBuffers_[1] = depth;
+        }
+        if (!options.enabled) return;
+        HdueFrameInfo frame{}; frame.struct_size = sizeof(frame);
+        const auto polled = api.poll_gpu_frame(s.session, &frame);
+        if (polled == HDUE_NOT_SUPPORTED) { // UE cannot share textures here; its draws are all read back again
+            buffer.setResource(nullptr); if (depth) depth->setResource(nullptr);
+            gpuOptions_.enabled = 0; return;
+        }
+        if (polled != HDUE_PENDING) s.backend->require(polled, "poll_gpu_frame");
+        // The host redraws the viewport when publishedFrames changes.
+        if (polled == HDUE_OK && frame.frame_id != gpuFrame_) { gpuFrame_ = frame.frame_id; ++s.publishedFrames; }
+    }
+#endif
     static std::vector<float> topDown(HdUERenderBuffer& buffer, size_t channels) {
         std::vector<float> out;
         const auto* data = static_cast<const float*>(buffer.Map());
@@ -1078,6 +1136,9 @@ public:
                 s.width = desc.width; s.height = desc.height; s.firstBatch = true;
                 s.geometryRevisions.clear(); s.surfaceStatus={sizeof(HdueSurfaceStatus)};
                 depthEnabled_=false;
+#if defined(HDUE_HOUDINI)
+                gpuOptions_={};
+#endif
                 for (const auto& [id, data] : s.meshes) s.dirtyMeshes.insert(id);
                 for (const auto& [id, data] : s.materials) s.dirtyMaterials.insert(id);
                 for (const auto& [id, data] : s.lights) s.dirtyLights.insert(id);
@@ -1352,6 +1413,9 @@ public:
                 }
             }
             if (denoisePending_ && aovsDone_) { denoise(*buffer); denoisePending_ = false; }
+#if defined(HDUE_HOUDINI)
+            syncGpuFrames(s, *buffer, depth, denoising);
+#endif
             { std::lock_guard lock(s.mutex); s.error.clear(); }
             const double total = ms(start, Clock::now());
             if (timing && (traced.frame_id || requested || aovMs > 0 || total > 5)) {
@@ -1425,6 +1489,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
 HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)
     HdUEUnregisterViewport(this);
+    if (const auto frames = state_->locked([&] { return state_->gpuFrames; })) frames->release(); // GL objects, on Houdini's GL thread
 #endif
     auto& host = selfHost();
     if (!selfHosted_) {
@@ -1524,6 +1589,13 @@ void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
         std::string kind = driver->driver.GetTypeName();
         if (driver->driver.IsHolding<Hgi*>()) if (auto* hgi = driver->driver.UncheckedGet<Hgi*>()) kind += " " + hgi->GetAPIName().GetString();
         trace("hdUE driver %s: %s\n", driver->name.GetText(), kind.c_str());
+#if defined(HDUE_HOUDINI)
+        // Houdini's GL viewport composites UE's frames from shared GPU textures (gpu_frames.h); HDUE_GPU_FRAMES=0
+        // keeps the CPU buffers.
+        if (driver->driver.IsHolding<Hgi*>()) if (auto* hgi = driver->driver.UncheckedGet<Hgi*>();
+            hgi && hgi->GetAPIName() == HgiTokens->OpenGL && selfHost().continuous && TfGetenvBool("HDUE_GPU_FRAMES", true))
+            state_->locked([&] { if (!state_->gpuFrames) state_->gpuFrames = std::make_shared<HdUEGpuFrames>(hgi, state_->backend); });
+#endif
     }
 }
 bool HdUERenderDelegate::Pause() { return setPaused(true); }
@@ -1820,17 +1892,7 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 #if defined(HDUE_HOUDINI)
 // Ends UE that hdUE runs on its own thread in Houdini's UI (hdue_houdini calls this when Houdini quits).
-extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_shutdown_ue() {
-    auto& host = PXR_NS::selfHost();
-    if (!host.backend) return;
-    host.run([&] {
-        try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { std::fprintf(stderr, "hdUE shutdown: %s\n", e.what()); }
-        if (host.window) DestroyWindow(host.window);
-        host.window = nullptr;
-    });
-    host.stop();
-    host.backend.reset();
-}
+extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_shutdown_ue() { PXR_NS::shutdownSelfHost(); }
 extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks() {
     auto& queue = PXR_NS::ownerQueue();
     queue.owner = GetCurrentThreadId();

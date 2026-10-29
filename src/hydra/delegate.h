@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <array>
+#include <functional>
 #include <map>
 #include <set>
 #include <mutex>
@@ -23,6 +24,7 @@
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
+class HdUEGpuFrames;
 // Matrix samples at frame-relative times around the current frame (motion blur).
 struct HdUEMotionSamples {
     std::vector<float> times;
@@ -152,6 +154,7 @@ struct HdUEState : HdRenderParam {
     std::shared_ptr<const VtDictionary> wetBindings = std::make_shared<const VtDictionary>();
     std::shared_ptr<hdue::Backend> backend;
     HdueSession session = 0;
+    std::shared_ptr<HdUEGpuFrames> gpuFrames; // Houdini's GL viewport (gpu_frames.h); set under mutex by SetDrivers
     uint64_t aovGeneration = 0; // AOV requests (hdue/aov_api.h); generation stays the beauty's
     uint32_t width = 0, height = 0;
     uint64_t revision = 1, submittedRevision = 0, generation = 0;
@@ -225,6 +228,10 @@ public:
     std::vector<float> takeSpare(size_t size); // a previous frame's float allocation, sized for the next publish
     void invalidate();
     std::string allocationError() const { std::lock_guard lock(mutex_); return allocationError_; }
+    // HdxAovInputTask composites a GPU texture from GetResource instead of mapping and uploading the CPU pixels.
+    // resource runs on the host's graphics thread; empty (or an empty result) keeps the CPU path.
+    VtValue GetResource(bool) const override;
+    void setResource(std::function<VtValue()> resource) { std::lock_guard lock(mutex_); resource_ = std::move(resource); }
 protected:
     void _Deallocate() override;
 private:
@@ -236,6 +243,7 @@ private:
     std::shared_ptr<std::vector<uint8_t>> pixels_, pinned_; // in format_
     std::vector<uint8_t> spareBytes_; // the replaced frame's storage, reused unless a Map still holds it
     std::vector<float> spare_; // the last published float image, handed back by takeSpare
+    std::function<VtValue()> resource_;
 };
 
 class HDUE_HYDRA_API HdUERenderDelegate final : public HdRenderDelegate {

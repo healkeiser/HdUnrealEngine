@@ -35,6 +35,11 @@ void* HdUERenderBuffer::Map() {
 }
 void HdUERenderBuffer::Unmap() { std::lock_guard lock(mutex_); if (maps_ && --maps_ == 0) pinned_.reset(); }
 bool HdUERenderBuffer::IsMapped() const { std::lock_guard lock(mutex_); return maps_ > 0; }
+VtValue HdUERenderBuffer::GetResource(bool) const {
+    std::function<VtValue()> resource;
+    { std::lock_guard lock(mutex_); resource = resource_; }
+    return resource ? resource() : VtValue();
+}
 bool HdUERenderBuffer::IsConverged() const { std::lock_guard lock(mutex_); return converged_; }
 void HdUERenderBuffer::invalidate() { std::lock_guard lock(mutex_); converged_ = false; }
 void HdUERenderBuffer::_Deallocate() { std::lock_guard lock(mutex_); pixels_.reset(); if (!maps_) pinned_.reset(); width_ = height_ = 0; converged_ = false;

@@ -1,0 +1,35 @@
+#include "/Engine/Public/Platform.ush"
+
+// hdue/gpu_api.h: frames written for the host's graphics API, bottom row first (GL texture layout).
+uint2 Size;
+
+float ColorScale;
+Texture2D<float4> SourceColor;
+RWTexture2D<float4> OutputColor;
+
+[numthreads(8,8,1)]
+void ColorCS(uint3 Id:SV_DispatchThreadID) {
+    if(any(Id.xy>=Size)) return;
+    float4 Color=SourceColor.Load(int3(Id.x,Size.y-1-Id.y,0));
+    // UE keeps 1 - coverage in alpha (r.PostProcessing.PropagateAlpha); hosts expect straight alpha.
+    OutputColor[Id.xy]=float4(Color.rgb*ColorScale,1-Color.a);
+}
+
+int2 ViewMin;
+float2 ViewScale; // scene depth pixels per output pixel (navigation renders at a reduced screen percentage)
+float NearClip;
+float FarClip;
+uint Orthographic;
+float DepthScale;
+Texture2D<float> SceneDepth;
+RWTexture2D<float> OutputDepth;
+
+[numthreads(8,8,1)]
+void DepthCS(uint3 Id:SV_DispatchThreadID) {
+    if(any(Id.xy>=Size)) return;
+    float2 Source=(float2(Id.x,Size.y-1-Id.y)+.5)*ViewScale;
+    float Z=SceneDepth.Load(int3(ViewMin+int2(Source),0));
+    // Reversed Z: an infinite perspective stores Near / distance, an orthographic camera a linear range.
+    float Distance=Orthographic ? FarClip-Z*(FarClip-NearClip) : NearClip/Z;
+    OutputDepth[Id.xy]=Z>0 ? Distance*DepthScale : 3.402823466e+38;
+}

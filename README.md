@@ -241,6 +241,7 @@ The package file sets the first three; the rest are for development and debuggin
 | `HDUE_HOUDINI_PLUGIN` | Delegate DLL the Houdini host loads |
 | `HDUE_BACKEND_DLL` | Backend DLL, overriding the runtime profile |
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |
+| `HDUE_GPU_FRAMES` | `0` reads Houdini viewport frames back to the CPU instead of sharing GPU textures |
 | `HDUE_TRACE_PASS` | `1` prints one line per render pass to stderr |
 | `HDUE_TRACE_SETTINGS` | `1` prints every render setting the delegate receives |
 | `HDUE_TRACE_SCENE` | `1` prints scene submissions |
