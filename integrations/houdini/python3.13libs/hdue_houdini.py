@@ -9,7 +9,7 @@ import time
 import traceback
 
 import hou
-from pxr import Sdf, Tf, Usd, UsdGeom, UsdRender, UsdShade
+from pxr import Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -61,9 +61,9 @@ class Host:
         self.texture_files={}; self.pushed_textures=None
         self.material_error=None
         self.last_materials=None
-        # Material preparation walks the stage (~70 ms on Sponza, then Hydra work): only after a change outside the
-        # render settings, which the viewer stage's change notices tell apart. A render-setting tweak no longer pays it.
-        self.watched_stage=None; self.stage_listener=None; self.materials_dirty=True
+        # Material and op: texture preparation walk the stage (~70 ms each on Sponza): only after a shading change, which
+        # the viewer stage's change notices tell apart. Render settings, cameras and transforms (playback) do not pay it.
+        self.watched_stage=None; self.stage_listener=None; self.materials_dirty=self.textures_dirty=True; self.materials_animated=False
         self.viewer=None
         self.last_options=None
         self.closed=False
@@ -84,13 +84,13 @@ class Host:
 
     def watch_stage(self,stage):
         if self.watched_stage is not None and stage==self.watched_stage: return
-        self.watched_stage=stage; self.materials_dirty=True
+        self.watched_stage=stage; self.materials_dirty=self.textures_dirty=True
         self.stage_listener=Tf.Notice.Register(Usd.Notice.ObjectsChanged,self.stage_changed,stage)
 
     def stage_changed(self,notice,stage):
-        if self.materials_dirty: return
-        paths=list(notice.GetResyncedPaths())+list(notice.GetChangedInfoOnlyPaths())
-        if any(not path.HasPrefix(RENDER_ROOT) for path in paths): self.materials_dirty=True
+        if self.materials_dirty and self.textures_dirty: return
+        if any(_shading_change(stage,path,False) for path in notice.GetResyncedPaths()) or            any(_shading_change(stage,path,True) for path in notice.GetChangedInfoOnlyPaths()):
+            self.materials_dirty=self.textures_dirty=True
 
     def write_state(self,error=None):
         # Diagnostics only: UE boots on hdUE's own thread, so its status can be unavailable for a while; that must not
@@ -133,7 +133,9 @@ class Host:
                                         any(node.evalParm(name) for name in ('hdue_materialx_library','hdue_substrate_library')))
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
                         self.watch_stage(stage)
-                        materials_key=(state['session'],_settings_values(node),hou.frame())
+                        # Preparation reads materials and wet opinions at the current frame: redo it per frame only if they are animated.
+                        if self.materials_dirty: self.materials_animated=_materials_animated(stage)
+                        materials_key=(state['session'],_settings_values(node),hou.frame() if self.materials_animated else None)
                         if state['session'] and (self.materials_dirty or materials_key!=self.last_materials):
                             self.last_materials=materials_key; self.materials_dirty=False
                             try:
@@ -198,8 +200,9 @@ class Host:
                 # "Infinite recursion in evaluation"). The viewed stage is already composed.
                 if display and display.needsToCook(): return
                 if display: redraw=self.assets.sync(network,display,stage,materials)
-            if key!=self.last_textures or cache().dirty('viewport'):
-                self.last_textures=key
+            self.last_textures=key
+            if self.textures_dirty or cache().dirty('viewport'):
+                self.textures_dirty=False
                 self.texture_files=prepare_stage(stage)
             if session and (session,self.texture_files)!=self.pushed_textures and self.api.textures(session,self.texture_files):
                 self.pushed_textures=(session,dict(self.texture_files)); redraw=True
@@ -286,6 +289,25 @@ def start():
     return _host
 
 RENDER_ROOT=Sdf.Path('/Render')
+VIEWER_CAMERA=Sdf.Path('/__HoudiniFreeCamera__')
+SHADING_PROPERTIES=('material:binding','hdue:surface:wet:')
+
+
+def _shading_change(stage,path,info_only):
+    """Whether a changed path can change prepared materials or op: textures. Houdini rewrites its free viewport camera
+    on every camera move, and cameras and transforms change every frame of playback: only shading prims, bindings and
+    wet opinions count for value changes; any structure change outside the render settings does."""
+    if path.HasPrefix(RENDER_ROOT) or path.HasPrefix(VIEWER_CAMERA): return False
+    if not info_only: return True
+    if path.IsPropertyPath() and path.name.startswith(SHADING_PROPERTIES): return True
+    prim=stage.GetPrimAtPath(path.GetPrimPath())
+    return bool(prim) and (prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.Shader) or prim.IsA(UsdShade.NodeGraph) or prim.HasAPI(UsdLux.LightAPI))
+
+
+def _materials_animated(stage):
+    """Whether a material, shader or hdUE wet opinion has time samples."""
+    return any(attr.ValueMightBeTimeVarying() for prim in stage.Traverse() for attr in prim.GetAttributes()
+               if prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.Shader) or attr.GetName().startswith('hdue:surface:wet:'))
 
 
 def _settings_values(settings):
