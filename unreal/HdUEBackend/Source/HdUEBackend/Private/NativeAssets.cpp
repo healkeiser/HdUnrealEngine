@@ -1,4 +1,5 @@
 #include "NativeAssets.h"
+#include "Message.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "AssetRegistry/AssetData.h"
@@ -13,12 +14,6 @@
 #include "GameFramework/Actor.h"
 #include "Misc/PackageName.h"
 
-namespace {
-void Message(char* Dest, const FString& Text) {
-    FTCHARToUTF8 U(*Text); const int N = FMath::Min(U.Length(), 511);
-    FMemory::Memcpy(Dest, U.Get(), N); Dest[N] = 0;
-}
-}
 FHdueNativeAssets::~FHdueNativeAssets() { Reset(); }
 void FHdueNativeAssets::Actors(const FEntry& E, TArray<AActor*>& Out) {
     if (E.Actor.IsValid()) {
@@ -151,7 +146,7 @@ void FHdueNativeAssets::Tick() {
     }
 }
 void FHdueNativeAssets::Stats(const FEntry& E, HdueAssetStatus& S) {
-    S={}; S.struct_size=sizeof(S); S.kind=E.Kind; S.state=E.State; Message(S.message,E.Error);
+    S={}; S.struct_size=sizeof(S); S.kind=E.Kind; S.state=E.State; HdueCopyMessage(S.message,E.Error);
     FBox Box(ForceInit); TArray<AActor*> List; Actors(E,List); S.actors=List.Num();
     for (auto* A : List) {
         TArray<UMeshComponent*> Meshes; A->GetComponents(Meshes); S.meshes+=Meshes.Num();
@@ -172,6 +167,6 @@ void FHdueNativeAssets::GetSceneStatus(HdueAssetSceneStatus& S) const {
         HdueAssetStatus E; Stats(*Pair.Value,E);
         S.loading+=E.state==HDUE_ASSET_LOADING; S.failed+=E.state==HDUE_ASSET_FAILED;
         S.actors+=E.actors; S.meshes+=E.meshes; S.lights+=E.lights;
-        if (E.state==HDUE_ASSET_FAILED && !S.message[0]) Message(S.message,Pair.Key+TEXT(": ")+Pair.Value->Error);
+        if (E.state==HDUE_ASSET_FAILED && !S.message[0]) HdueCopyMessage(S.message,Pair.Key+TEXT(": ")+Pair.Value->Error);
     }
 }

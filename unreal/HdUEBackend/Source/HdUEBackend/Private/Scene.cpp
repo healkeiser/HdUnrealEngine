@@ -780,10 +780,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Instance->SetVectorParameterValue(TEXT("UVRow0"), FLinearColor(M[0], M[1], M[2], 0));
                 Instance->SetVectorParameterValue(TEXT("UVRow1"), FLinearColor(M[3], M[4], M[5], 0));
                 if (Masked) Instance->SetScalarParameterValue(TEXT("OpacityThreshold"), Desc.opacity_threshold);
-                // ior -> dielectric F0 = ((ior - 1) / (ior + 1))^2; UE's Specular 0.5 is F0 0.04, so Specular = F0 / 0.08.
+                // ior -> dielectric F0 = ((ior - 1) / (ior + 1))^2; UE's Specular 0.5 is F0 0.04, so Specular = F0 / 0.08, left
+                // above 1 for ior > 1.8 (diamond): ComputeF0 does not saturate it.
                 const float Ior = Desc.ior > 0.f ? Desc.ior : 1.5f;
                 const float F0 = FMath::Square((Ior - 1.f) / (Ior + 1.f));
-                Instance->SetScalarParameterValue(TEXT("SpecularLevel"), FMath::Clamp(F0 / 0.08f, 0.f, 1.f));
+                Instance->SetScalarParameterValue(TEXT("SpecularLevel"), F0 / 0.08f);
                 Instance->SetScalarParameterValue(TEXT("UseSpecularWorkflow"), (Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW) ? 1.f : 0.f);
                 if (Layered) {
                     const auto Color = [](const float* C) { return FLinearColor(C[0], C[1], C[2], 1); };

@@ -1,4 +1,5 @@
 #include "VirtualTextureResidency.h"
+#include "Message.h"
 #if !WITH_EDITOR
 #include "Engine/Texture2D.h"
 #include "TextureResource.h"
@@ -31,10 +32,7 @@ FHdueVirtualTextureResidency::~FHdueVirtualTextureResidency() { check(Locks.IsEm
 HdueResidencyStatus FHdueVirtualTextureResidency::Status() const { FScopeLock Lock(&Mutex); return Progress; }
 void FHdueVirtualTextureResidency::Fail(const FString& Message) {
     Progress.phase = HDUE_RESIDENCY_FAILED;
-    FTCHARToUTF8 Utf8(*Message);
-    const int32 Length = FMath::Min(Utf8.Length(), int32(sizeof(Progress.message) - 1));
-    FMemory::Memcpy(Progress.message, Utf8.Get(), Length);
-    Progress.message[Length] = 0;
+    HdueCopyMessage(Progress.message, Message);
 }
 void FHdueVirtualTextureResidency::Release() {
     check(IsInRenderingThread());
