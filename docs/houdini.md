@@ -20,7 +20,7 @@ Pick **Unreal Engine (hdUE)** in the viewport's renderer menu. Renderer settings
 
 | Tab | Sections |
 | --- | --- |
-| Rendering | Rendering (render mode, Path Tracer samples, warmup, denoiser), Path Tracing, Geometry |
+| Rendering | Rendering (render mode, Path Tracer samples, warmup, denoiser, [debug view](rendering.md#debug-views)), Path Tracing, Geometry |
 | Lighting | Lighting (Lumen, environment cube, viewer light), Global Illumination, Reflections, Rendering Features |
 | Camera Effects | Motion Blur, Camera, Depth of Field |
 | Post-Processing | Tonemapper, then everything that needs it: Bloom, Exposure, Color Grading, Film, Chromatic Aberration, Dirt Mask, Local Exposure, Lens Flares, Image Effects, Film Grain |

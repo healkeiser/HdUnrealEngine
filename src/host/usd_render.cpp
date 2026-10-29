@@ -399,7 +399,9 @@ int wmain(int argc, wchar_t** argv) {
         HdueInitDesc init{}; init.struct_size = sizeof(init); init.instance_handle = reinterpret_cast<uint64_t>(instance);
         init.window_handle = reinterpret_cast<uint64_t>(window); init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
         // Headless, as hdUE is inside Houdini (HDUE_SHOW_WINDOW=1 shows UE's window).
-        if (!TfGetenvBool("HDUE_SHOW_WINDOW", false)) init.extra_arguments = "-RenderOffscreen";
+        // HDUE_UE_ARGS appends UE command-line arguments, as for the delegate (-hdUEInteractive: Nanite meshes).
+        const auto arguments = (TfGetenvBool("HDUE_SHOW_WINDOW", false) ? std::string() : std::string("-RenderOffscreen ")) + TfGetenv("HDUE_UE_ARGS");
+        init.extra_arguments = arguments.c_str();
         const auto start = Clock::now(); runtime.initialize(init);
         const double initMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         PlugRegistry::GetInstance().RegisterPlugins(utf8(options.plugins));

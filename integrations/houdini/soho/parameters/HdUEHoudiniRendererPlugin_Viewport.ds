@@ -56,6 +56,18 @@
             hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
         }
         parm {
+            name "xn__hdUEdebugView_6wa"
+            label "Debug View"
+            type string
+            size 1
+            default { "off" }
+            menu { "off" "Lit" "unlit" "Unlit" "lightingOnly" "Lighting Only" "detailLighting" "Detail Lighting" "reflections" "Reflections" "lightComplexity" "Light Complexity" "buffer:BaseColor" "Buffer: Base Color" "buffer:Metallic" "Buffer: Metallic" "buffer:Roughness" "Buffer: Roughness" "buffer:Specular" "Buffer: Specular" "buffer:WorldNormal" "Buffer: World Normal" "buffer:SceneDepth" "Buffer: Scene Depth" "buffer:ShadingModel" "Buffer: Shading Model" "nanite:Mask" "Nanite: Mask" "nanite:Triangles" "Nanite: Triangles" "nanite:Clusters" "Nanite: Clusters" "nanite:Primitives" "Nanite: Primitives" "nanite:Instances" "Nanite: Instances" "nanite:Overdraw" "Nanite: Overdraw" "lumen:Overview" "Lumen: Overview" "lumen:LumenScene" "Lumen: Lumen Scene" "lumen:SurfaceCache" "Lumen: Surface Cache" "lumen:GeometryNormals" "Lumen: Geometry Normals" "lumen:ReflectionView" "Lumen: Reflection View" "vsm:mip" "Virtual Shadow Map: Mip Level" "vsm:vpage" "Virtual Shadow Map: Virtual Page" "vsm:cache" "Virtual Shadow Map: Cached Page" }
+            help "Shows one of UE's viewport view modes instead of the lit image, as its View Mode menu does: buffers, Nanite, Lumen and Virtual Shadow Map (with Virtual Shadow Maps on) visualizations. Realtime only; AOVs are unaffected."
+            parmtag { "spare_category" "Rendering" }
+            parmtag { "uiscope" "viewport" }
+            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+        }
+        parm {
             name "xn__hdUEmotionBlur_tya"
             label "Motion Blur"
             type toggle
