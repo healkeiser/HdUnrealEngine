@@ -177,6 +177,7 @@ struct FRuntime {
     uint64 NextSession = 1;
     uint64 NextFrame = 1;
     TSharedPtr<FSession, ESPMode::ThreadSafe> Session;
+    FCriticalSection SessionLock; // Session is replaced on the owner thread and copied by frame readers on any thread
 };
 FRuntime Runtime;
 IRendererModule& Renderer() { return FModuleManager::GetModuleChecked<IRendererModule>(TEXT("Renderer")); }
@@ -192,6 +193,13 @@ HdueResult CheckOwner() {
 HdueResult CheckReady() {
     if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
     return Runtime.State == HDUE_STATE_READY ? HDUE_OK : HDUE_INVALID_STATE;
+}
+// Finished frames are guarded by the session's FrameMutex, so any thread may read them: hosts that run UE on a thread
+// of their own (hdUE in Houdini's UI) read frames from their UI thread. Null when not ready or not this session.
+TSharedPtr<FSession, ESPMode::ThreadSafe> ReadableSession(HdueSession Handle) {
+    if (Runtime.State != HDUE_STATE_READY) return nullptr;
+    FScopeLock Lock(&Runtime.SessionLock);
+    return Runtime.Session.IsValid() && Runtime.Session->Handle == Handle ? Runtime.Session : nullptr;
 }
 bool ValidSession(HdueSession Handle) {
     return Runtime.Session.IsValid() && Runtime.Session->Handle == Handle;
@@ -214,7 +222,8 @@ void ReleaseResidency(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) 
 
 HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     if (!Status || Status->struct_size != sizeof(*Status)) return HDUE_INVALID_ARGUMENT;
-    if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
+    // Any thread: a read-only snapshot. Hosts that run UE on a thread of their own (hdUE in Houdini's UI) still read it
+    // from the UI thread; requiring the owner thread made every such read fail ("Cannot read UE status").
     HdueStatus Result{};
     Result.struct_size = sizeof(Result);
     Result.state = Runtime.State;
@@ -226,9 +235,11 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     if (Result.rhi_ready) Result.dedicated_video_memory_bytes = GRHIGlobals.GpuInfo.DedicatedVideoMemory;
     Result.render_mode_mask = 1u << HDUE_REALTIME;
     if (Result.rhi_ready && HasRayTracing()) Result.render_mode_mask |= 1u << HDUE_PATH_TRACED;
-    FTCHARToUTF8 Message(*Runtime.Error);
-    const int32 Count = FMath::Min(Message.Length(), int32(sizeof(Result.message) - 1));
-    FMemory::Memcpy(Result.message, Message.Get(), Count);
+    if (CheckOwner() == HDUE_OK) { // the error text is the UE thread's to read (other threads get the state only)
+        FTCHARToUTF8 Message(*Runtime.Error);
+        const int32 Count = FMath::Min(Message.Length(), int32(sizeof(Result.message) - 1));
+        FMemory::Memcpy(Result.message, Message.Get(), Count);
+    }
     *Status = Result;
     return HDUE_OK;
 }
@@ -309,7 +320,7 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     if (Session->AovViewState) { Session->AovViewState->Destroy(); Session->AovViewState = nullptr; }
     Session->Target->RemoveFromRoot();
     Session->Target = nullptr;
-    Runtime.Session.Reset();
+    { FScopeLock Lock(&Runtime.SessionLock); Runtime.Session.Reset(); }
     return HDUE_OK;
 }
 
@@ -331,7 +342,7 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
     Session->Target->UpdateResourceImmediate(true);
     Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     *Handle = Session->Handle;
-    Runtime.Session = Session;
+    { FScopeLock Lock(&Runtime.SessionLock); Runtime.Session = Session; }
     return HDUE_OK;
 }
 
@@ -698,9 +709,8 @@ HdueResult HDUE_CALL Tick() {
 }
 
 HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Frame || Frame->struct_size != sizeof(*Frame)) return HDUE_INVALID_ARGUMENT;
-    const auto Session = Runtime.Session;
+    const auto Session = ReadableSession(Handle);
+    if (!Session || !Frame || Frame->struct_size != sizeof(*Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     // The newest beauty frame, possibly for an earlier request of this scene (a previous camera while navigating): the
     // caller decides from its generation whether to show it. A scene change cancels the request, and with it the frame.
@@ -804,9 +814,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
 }
 
 HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Frame || Frame->struct_size != sizeof(*Frame)) return HDUE_INVALID_ARGUMENT;
-    const auto Session = Runtime.Session;
+    const auto Session = ReadableSession(Handle);
+    if (!Session || !Frame || Frame->struct_size != sizeof(*Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     if (!Session->HasRequest || Session->Request.aov == HDUE_AOV_COLOR || !Session->AovFrame.frame_id ||
         Session->AovFrame.generation != Session->Request.generation) return HDUE_PENDING;
@@ -815,9 +824,8 @@ HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
 }
 
 HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer, uint64 Capacity) {
-    if (CheckReady() != HDUE_OK) return CheckReady();
-    if (!ValidSession(Handle) || !Buffer) return HDUE_INVALID_ARGUMENT;
-    const auto Session = Runtime.Session;
+    const auto Session = ReadableSession(Handle);
+    if (!Session || !Buffer) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     if (Session->HasRequest && FrameId && FrameId == Session->AovFrame.frame_id && Session->AovFrame.generation == Session->Request.generation) {
         if (Capacity < Session->AovFrame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
@@ -861,9 +869,8 @@ HdueResult HDUE_CALL EnableDepth(HdueSession Handle,uint32 Enabled) {
     return HDUE_OK;
 }
 HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,uint64 Capacity) {
-    if(CheckReady()!=HDUE_OK) return CheckReady();
-    if(!ValidSession(Handle) || !Buffer) return HDUE_INVALID_ARGUMENT;
-    const auto Session=Runtime.Session;
+    const auto Session=ReadableSession(Handle);
+    if(!Session || !Buffer) return Runtime.State!=HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     if(!Session->DepthEnabled) return HDUE_NOT_SUPPORTED;
     if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id) return HDUE_STALE_FRAME;

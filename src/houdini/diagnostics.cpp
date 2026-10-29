@@ -12,12 +12,21 @@ PXR_NAMESPACE_OPEN_SCOPE
 void HdUERegisterViewport(const std::shared_ptr<HdUEState>& state,HdUERenderDelegate* delegate) { Viewport=state; Delegate=delegate; }
 void HdUEUnregisterViewport(HdUERenderDelegate* delegate) { if(Delegate==delegate) { Delegate=nullptr; Viewport.reset(); } }
 PXR_NAMESPACE_CLOSE_SCOPE
+namespace {
+// The hdUE host (Houdini's UI thread) calls these. Its first call claims the viewport state; calls from any other
+// thread are refused, as Houdini owns its UI objects there.
+bool onHostThread(PXR_NS::HdUEState& state) {
+    std::lock_guard lock(state.mutex);
+    if (!state.createThread) state.createThread=GetCurrentThreadId();
+    return GetCurrentThreadId()==state.createThread;
+}
+}
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_surfaces(const HdueViewportSurfaces* update) {
     if (!update || update->struct_size!=sizeof(*update) || update->abi_version!=2 || update->mask_preview>1 ||
         update->binding_count>100000 || (update->binding_count && !update->bindings)) return HDUE_INVALID_ARGUMENT;
     const auto state=Viewport.lock();
     if (!state || !Delegate) return HDUE_PENDING;
-    if (GetCurrentThreadId()!=state->createThread) return HDUE_WRONG_THREAD;
+    if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     if (!update->session || update->session!=state->session) return HDUE_INVALID_STATE;
     using namespace PXR_NS;
     VtDictionary bindings;
@@ -41,7 +50,7 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials
         update->material_count>65536 || (update->material_count && !update->materials)) return HDUE_INVALID_ARGUMENT;
     const auto state=Viewport.lock();
     if (!state || !Delegate) return HDUE_PENDING;
-    if (GetCurrentThreadId()!=state->createThread) return HDUE_WRONG_THREAD;
+    if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     if (!update->session || update->session!=state->session) return HDUE_INVALID_STATE;
     using namespace PXR_NS;
     VtDictionary assets, overrides;
@@ -77,7 +86,7 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(c
         options->lumen>1 || options->auto_light>1 || options->z_up>1 || !std::isfinite(options->meters_per_unit) || options->meters_per_unit<=0 || !std::isfinite(options->time_seconds)) return HDUE_INVALID_ARGUMENT;
     const auto state=Viewport.lock();
     if(!state || !Delegate) return HDUE_PENDING;
-    if(GetCurrentThreadId()!=state->createThread) return HDUE_WRONG_THREAD;
+    if(!onHostThread(*state)) return HDUE_WRONG_THREAD;
     using namespace PXR_NS;
     Delegate->SetRenderSetting(TfToken("renderMode"),VtValue(std::string(options->mode?"pathtraced":"realtime")));
     Delegate->SetRenderSetting(TfToken("samplesPerPixel"),VtValue(int(options->samples)));

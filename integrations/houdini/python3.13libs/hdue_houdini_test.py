@@ -69,7 +69,8 @@ class Test:
             yield
         kernel=C.WinDLL('kernel32'); kernel.GetCurrentThreadId.restype=C.c_uint32
         owner=kernel.GetCurrentThreadId()
-        if s['create_thread']!=owner or s['execute_thread']!=owner: raise AssertionError('UE work left the UI thread: '+repr(s))
+        # The host talks to hdUE from Houdini's UI thread; UE itself runs on hdUE's own thread, never on the UI's.
+        if s['create_thread']!=owner or s['execute_thread']==owner: raise AssertionError('UE work ran on the UI thread: '+repr(s))
         frame,pixels=data
         alpha=pixels[3::4]
         s['backend_alpha_min']=min(alpha); s['backend_alpha_max']=max(alpha)

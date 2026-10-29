@@ -1491,8 +1491,9 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
         }
     }
 #if defined(HDUE_HOUDINI)
-    state_->createThread=GetCurrentThreadId();
-    if (!ownerQueue().owner || ownerQueue().owner == state_->createThread) HdUERegisterViewport(state_,this);
+    // Houdini's viewport delegate registers for the hdUE host (diagnostics.cpp). With background scene updates Houdini
+    // creates it on a worker thread, so the creating thread no longer identifies it: houdini:viewport does (SetRenderSetting).
+    if (!ownerQueue().owner || ownerQueue().owner == GetCurrentThreadId()) HdUERegisterViewport(state_,this);
 #endif
     for (const auto& desc : GetRenderSettingDescriptors()) {
         if (!state_->settings.count(desc.key)) state_->settings[desc.key]=desc.defaultValue;
@@ -1654,6 +1655,9 @@ template <class Prims> void dirtyChangedEntries(const VtDictionary& before, cons
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) {
     if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
     if(key.GetString().starts_with("hdUE:")) { SetRenderSetting(TfToken(key.GetString().substr(5)),value); return; }
+#if defined(HDUE_HOUDINI)
+    if (key == TfToken("houdini:viewport") && value.IsHolding<bool>() && value.UncheckedGet<bool>()) HdUERegisterViewport(state_,this);
+#endif
     if (key == TfToken("houdini:render_pause")) { setPaused(value.IsHolding<bool>() ? value.UncheckedGet<bool>() : value.IsHolding<int>() && value.UncheckedGet<int>()); return; }
     if (key==TfToken("stageMetersPerUnit")) {
         SetRenderSetting(TfToken("metersPerUnit"),value); return;

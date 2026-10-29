@@ -171,10 +171,15 @@ int wmain(int argc, wchar_t** argv) {
         backend.require(backend.material_api().get_renderer_info(&renderer_info), "get_renderer_info");
         check(renderer_info.substrate_enabled && renderer_info.adaptive_gbuffer && renderer_info.project_closures_per_pixel >= 4 && renderer_info.bytes_per_pixel >= 128,
             "Expected Substrate Adaptive GBuffer with the configured material budget");
-        HdueResult other_thread = HDUE_OK;
-        std::thread worker([&] { HdueStatus s{}; s.struct_size = sizeof(s); other_thread = backend.api().get_status(&s); });
+        // UE calls belong to its owner thread; get_status is a read-only snapshot any thread may take.
+        HdueResult other_thread = HDUE_OK, other_status = HDUE_WRONG_THREAD;
+        std::thread worker([&] {
+            other_thread = backend.api().tick();
+            HdueStatus s{}; s.struct_size = sizeof(s); other_status = backend.api().get_status(&s);
+        });
         worker.join();
         check(other_thread == HDUE_WRONG_THREAD, "UE owner-thread contract is not enforced");
+        check(other_status == HDUE_OK, "UE status must be readable from any thread");
         std::filesystem::create_directories(options.output);
         std::ofstream metrics(options.output / "metrics.json");
         check(bool(metrics), "Cannot write metrics");

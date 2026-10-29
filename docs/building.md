@@ -65,6 +65,23 @@ Individual steps:
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
 
+### Bundled PSO cache
+
+UE compiles a pipeline state object (PSO) the first time a draw or dispatch needs one. Material PSOs are precached when meshes are created, but global and post-processing passes (Lumen, the Path Tracer, the tonemapper, AOV passes) are not, so the first frame of each mode compiled 40-60 PSOs on the render thread. The runtime instead ships a PSO cache that it compiles on worker threads from startup on, while the scene uploads:
+
+```powershell
+.\scripts\Prepare-Content.ps1                 # cook with stable shader keys (Config/DefaultEngine.ini: NeedsShaderStableKeys)
+.\scripts\Stage-Runtime.ps1
+.\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
+.\scripts\Record-PipelineCache.ps1 -RuntimeConfig .local\runtime.json -HoudiniRuntimeConfig .local\runtime-houdini.json `
+    -InputUsd <representative scene.usda> -CameraPath <camera>
+.\scripts\Stage-Runtime.ps1                   # ships the recooked cache
+```
+
+`Record-PipelineCache.ps1` turns on PSO logging in the staged runtime (`r.ShaderPipelineCache.LogPSO`), renders the native smoke test, the Hydra self-test, and the smoke scene and `-InputUsd` in Lumen and Path Tracer modes with default settings, the tonemapper off and Lumen off, then, with `-HoudiniRuntimeConfig`, shows `-InputUsd` in Houdini's hdUE viewport for `-HoudiniSeconds` (90) and quits Houdini. It merges the recordings (`Saved/CollectedPSOs`) with the cook's stable shader keys into `unreal/HdUEBackend/Build/Windows/PipelineCaches/HdUEBackend_PCD3D_SM6.spc` (`ShaderPipelineCacheTools expand`) and recooks; the cook builds `Content/PipelineCaches/Windows/HdUEBackend_PCD3D_SM6.stable.upipelinecache` from it. The runtime log then shows `FShaderPipelineCache HdUEBackend completed N tasks`, and `Encountered a new graphics PSO` only for PSOs the recording missed. Record again after changing shaders, materials or engine rendering settings: PSOs whose shaders changed are skipped. `DefaultGame.ini` pins the cache's `GameVersion`, since the launcher editor that cooks and the source-built runtime report different changelists and UE skips a cache from another version. The `.spc` is generated from local content and is not version controlled.
+
+The cache only moves PSO creation earlier; the GPU driver's own shader cache keeps the compiled pipelines across runs.
+
 The monolithic DLL requires a source engine. A matching editor installation can prepare content. `Apply-ResidencyPatch.ps1` makes two small engine edits, validating the engine version and each insertion point: one friend declaration for virtual-texture residency, and an editor-only guard around NaniteBuilder's displacement-texture read (`NaniteDisplace.cpp`) so the runtime can build Nanite meshes. UELibrary and Launch are otherwise unchanged.
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.

@@ -290,7 +290,8 @@ def _stage_key(settings):
     """Changes whenever the viewed stage or the hdUE settings change: the displayed LOP's cook count and the settings values."""
     viewer=scene_viewer()
     network=viewer.pwd()
-    display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
+    if not isinstance(network,hou.LopNetwork): return (None,None,0,_settings_values(settings)) # no Hydra view outside LOPs
+    display=network.displayNode()
     return (viewer.currentHydraRenderer(),display.path() if display else None,display.cookCount() if display else 0,_settings_values(settings))
 
 

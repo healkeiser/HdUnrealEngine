@@ -121,10 +121,14 @@ class Viewport:
         return True
 
     def depth_pixels(self,status):
-        frame=status['frame']
-        if not frame['frame_id']: return None
-        pixels=(C.c_float*(frame['width']*frame['height']))()
-        code=self.copy_depth(status['session'],frame['frame_id'],pixels,C.sizeof(pixels))
+        # The depth of UE's newest frame, by UE's own frame id: the viewport status tracks the frames Houdini shows,
+        # which (with GPU frames) are numbered separately.
+        f=Frame(); f.struct_size=C.sizeof(f)
+        code=self.poll(status['session'],C.byref(f))
+        if code==1 or not f.frame_id: return None
+        self.runtime.check(code,'poll image')
+        pixels=(C.c_float*(f.width*f.height))()
+        code=self.copy_depth(status['session'],f.frame_id,pixels,C.sizeof(pixels))
         if code in (1,HDUE_STALE_FRAME): return None
         self.runtime.check(code,'copy depth image')
         return pixels
