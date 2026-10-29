@@ -578,7 +578,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         light.angle_degrees = source ? source->angle : .53f;
         light.cube_resolution = domeResolution;
         light.texture_format = source ? source->textureFormat : HDUE_ENVIRONMENT_AUTOMATIC;
-        light.texture_file = packet.own(source ? textureFile(state, source->texture) : "");
+        light.texture_file = packet.own(source ? textureFile(state, source->texture, true) : ""); // scene_linear, as material colours
         light.ies_file = packet.own(source ? source->ies : ""); light.ies_angle_scale = source ? source->iesAngleScale : 0;
         light.ies_normalize = source && source->iesNormalize;
         for (int c = 0; c < 3; ++c) { light.position_cm[c] = legacy.position[c]; light.color[c] = legacy.color[c]; }
@@ -1144,8 +1144,12 @@ public:
                 };
                 TfToken name=aov.aovName;
                 const auto sourceType=setting("sourceType"), sourceName=setting("sourceName");
-                // The only light path expression hdUE renders is the whole beauty; primvar vars are not rendered.
-                if(sourceType==TfToken("lpe")) name=TfStringReplace(sourceName.GetString()," ","")=="C.*" ? HdAovTokens->color : TfToken();
+                // The only light path expressions hdUE renders are the whole beauty (Karma's C.*[LO], or C.*); primvar vars
+                // are not rendered.
+                if(sourceType==TfToken("lpe")) {
+                    const auto lpe=TfStringReplace(sourceName.GetString()," ","");
+                    name=lpe=="C.*" || lpe=="C.*[LO]" || lpe=="C.*[OL]" ? HdAovTokens->color : TfToken();
+                }
                 else if(sourceType==TfToken("primvar")) name=TfToken();
                 else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
                 name=HdUEBeauty(name);
@@ -1875,6 +1879,8 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     if (state.setting<bool>("sceneLightsEnabled", true))
         for (const auto& [id, light] : state.lights) if (!light.viewer && active(light)) ++sceneLights;
     const auto error = residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error;
+    // husk prints only the exit code: say why.
+    if (!error.empty() && !selfHost().continuous) std::fprintf(stderr, "hdUE error: %s\n", error.c_str());
     return { {"error", VtValue(error)}, {"generation", VtValue(state.generation)},
         // husk exits with this code (farm managers judge frames by it); Houdini's UI keeps rendering after an error.
         {"huskErrorStatus", VtValue(int(!error.empty() && !selfHost().continuous))},

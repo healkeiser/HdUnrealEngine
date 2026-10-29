@@ -749,13 +749,19 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                     const auto& Texture = Desc.textures[Slot];
                     const FString Name = Slots[Slot];
-                    if (!HasTexture(Slot)) {
+                    // A texture that cannot be read leaves its input untextured, with a warning, instead of failing every
+                    // material of the batch. ponytail: the input's constant, not UsdUVTexture's fallback; carry it if needed.
+                    const FPreviewTexture* Image = nullptr;
+                    if (HasTexture(Slot)) {
+                        FString TextureError;
+                        Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), hdue_texture_is_color(Slot) != 0, TextureError);
+                        if (!Image) UE_LOG(LogTemp, Warning, TEXT("hdUE material %s: %s; %s stays untextured."), UTF8_TO_TCHAR(Desc.id), *TextureError, *Name);
+                    }
+                    if (!Image) {
                         Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(0, 0, 0, 0));
                         Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
                         continue;
                     }
-                    const FPreviewTexture* Image = PreviewTexture(UTF8_TO_TCHAR(Texture.file), hdue_texture_is_color(Slot) != 0, Error);
-                    if (!Image) return false;
                     // A repacked texture (BC4/BC5) stores the channels this input reads first.
                     const auto Stored = [&](const float* Value) {
                         if (Image->Channels.IsEmpty()) return FLinearColor(Value[0], Value[1], Value[2], Value[3]);

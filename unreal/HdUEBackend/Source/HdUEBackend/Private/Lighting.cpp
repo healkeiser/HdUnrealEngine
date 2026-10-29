@@ -71,8 +71,13 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch,FString& Error) {
     for(uint32 I=0;I<Batch.light_count;++I) {
         const auto& D=Batch.lights[I];
         if(D.struct_size!=sizeof(D) || D.type>HDUE_CYLINDER_LIGHT || D.visible>1 || (D.flags&~31u) || !Text(D.id) ||
-            D.texture_format>HDUE_ENVIRONMENT_LATLONG || D.cube_resolution<32 || D.cube_resolution>2048 || !FMath::IsPowerOfTwo(D.cube_resolution)) {
-            Error=TEXT("Unsupported light descriptor or environment format/resolution."); return false;
+            D.cube_resolution<32 || D.cube_resolution>2048 || !FMath::IsPowerOfTwo(D.cube_resolution)) {
+            Error=TEXT("Unsupported light descriptor or environment resolution."); return false;
+        }
+        if(D.texture_format>HDUE_ENVIRONMENT_LATLONG) {
+            // angular, mirroredBall and cubeMapVerticalCross: this light only stays dark.
+            UE_LOG(LogTemp, Warning, TEXT("hdUE light %s: only latlong (automatic) dome images are supported; light skipped."), UTF8_TO_TCHAR(D.id));
+            continue;
         }
         for(double Value:D.axes) if(!FMath::IsFinite(Value)) {Error=TEXT("Nonfinite light orientation."); return false;}
         for(double Value:D.position_cm) if(!FMath::IsFinite(Value)) {Error=TEXT("Nonfinite light position."); return false;}
@@ -82,37 +87,47 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch,FString& Error) {
         if(FMath::Abs(Frame(D).Determinant())<1e-8 || D.angle_degrees>180 || D.cone_angle>180 || D.cone_softness>1) {
             Error=TEXT("Degenerate light frame or invalid cone/angle."); return false;
         }
-        if(D.type==HDUE_DOME_LIGHT && (D.diffuse!=1 || D.specular!=1)) {
-            Error=TEXT("Dome diffuse/specular multipliers must both be 1; UE uses a combined sky environment."); return false;
-        }
         FDefinition Definition; Definition.Data=D; Definition.Id=UTF8_TO_TCHAR(D.id);
         Definition.File=D.texture_file?UTF8_TO_TCHAR(D.texture_file):TEXT(""); Definition.Data.id=nullptr; Definition.Data.texture_file=nullptr;
         Definition.Ies=D.ies_file?UTF8_TO_TCHAR(D.ies_file):TEXT(""); Definition.Data.ies_file=nullptr;
-        if(!Definition.Ies.IsEmpty() && (D.type==HDUE_DOME_LIGHT || D.type==HDUE_DISTANT_LIGHT || D.type==HDUE_CAMERA_DISTANT_LIGHT)) {
-            Error=TEXT("IES profiles apply to local lights only."); return false;
-        }
-        if(!Definition.Ies.IsEmpty() && !Profile(Definition.Ies,Error)) return false;
         if(Ids.Contains(Definition.Id)) {Error=TEXT("Duplicate light ID."); return false;} Ids.Add(Definition.Id);
+        // Valid UsdLux that UE cannot show degrades this light only, with a warning, as Karma and Storm ignore what
+        // they do not support; one such light no longer turns off every other light.
+        const auto Ignore=[&](const TCHAR* What) {UE_LOG(LogTemp, Warning, TEXT("hdUE light %s: %s; ignored."), *Definition.Id, What);};
+        if(D.type==HDUE_DOME_LIGHT && (D.diffuse!=1 || D.specular!=1)) {
+            Ignore(TEXT("dome diffuse/specular multipliers (UE's sky light has one environment)")); Definition.Data.diffuse=Definition.Data.specular=1;
+        }
+        if(!Definition.Ies.IsEmpty() && (D.type==HDUE_DOME_LIGHT || D.type==HDUE_DISTANT_LIGHT || D.type==HDUE_CAMERA_DISTANT_LIGHT)) {
+            Ignore(TEXT("an IES profile on a distant or dome light")); Definition.Ies.Empty();
+        }
+        if(FString ProfileError; !Definition.Ies.IsEmpty() && !Profile(Definition.Ies,ProfileError)) {Ignore(*ProfileError); Definition.Ies.Empty();}
+        if(!Definition.File.IsEmpty() && D.type!=HDUE_DOME_LIGHT && D.type!=HDUE_RECT_LIGHT) {
+            Ignore(TEXT("an image on a light other than DomeLight and RectLight")); Definition.File.Empty();
+        }
         if(!Definition.File.IsEmpty()) {
             const auto Stat=IFileManager::Get().GetStatData(*Definition.File);
-            if(!Stat.bIsValid || Stat.bIsDirectory) {Error=TEXT("Light image is not a readable file: ")+Definition.File; return false;}
             auto* Cached=Images.Find(Definition.File);
-            if(!Cached || Cached->Modified!=Stat.ModificationTime || Cached->Size!=Stat.FileSize) {
+            FString ImageError;
+            if(!Stat.bIsValid || Stat.bIsDirectory) ImageError=TEXT("its image is not a readable file: ")+Definition.File;
+            else if(!Cached || Cached->Modified!=Stat.ModificationTime || Cached->Size!=Stat.FileSize) {
                 FImage Image;
-                if(!FImageUtils::LoadImage(*Definition.File,Image) || Image.NumSlices!=1 || Image.SizeX>32768 || Image.SizeY>16384) {
-                    Error=TEXT("Cannot decode light image: ")+Definition.File; return false;
-                }
                 FImageEntry Entry; Entry.Modified=Stat.ModificationTime; Entry.Size=Stat.FileSize; Entry.Image=MakeShared<FImage>();
-                Image.CopyTo(*Entry.Image,ERawImageFormat::RGBA32F,EGammaSpace::Linear);
-                for(const auto& Pixel:Entry.Image->AsRGBA32F()) if(!FMath::IsFinite(Pixel.R) || !FMath::IsFinite(Pixel.G) || !FMath::IsFinite(Pixel.B)) {
-                    Error=TEXT("Nonfinite HDR light image: ")+Definition.File; return false;
+                if(!FImageUtils::LoadImage(*Definition.File,Image) || Image.NumSlices!=1 || Image.SizeX>32768 || Image.SizeY>16384)
+                    ImageError=TEXT("cannot decode its image: ")+Definition.File;
+                else {
+                    Image.CopyTo(*Entry.Image,ERawImageFormat::RGBA32F,EGammaSpace::Linear);
+                    for(const auto& Pixel:Entry.Image->AsRGBA32F()) if(!FMath::IsFinite(Pixel.R) || !FMath::IsFinite(Pixel.G) || !FMath::IsFinite(Pixel.B)) {
+                        ImageError=TEXT("its HDR image has nonfinite pixels: ")+Definition.File; break;
+                    }
                 }
-                Images.Add(Definition.File,MoveTemp(Entry)); LightTextures.Remove(Definition.File);
+                if(ImageError.IsEmpty()) {Images.Add(Definition.File,MoveTemp(Entry)); LightTextures.Remove(Definition.File);}
             }
-            const auto& Image=*Images[Definition.File].Image;
-            // Sampling is UV-normalized, so other aspects stretch over the sphere as in Karma and Storm.
-            if(D.type==HDUE_DOME_LIGHT && Image.SizeX!=Image.SizeY*2) UE_LOG(LogTemp, Warning, TEXT("hdUE dome image %s is %dx%d, not 2:1; stretching it as a latitude-longitude map."), *Definition.File, Image.SizeX, Image.SizeY);
-            if(D.type!=HDUE_DOME_LIGHT && D.type!=HDUE_RECT_LIGHT) {Error=TEXT("Image emission is supported on DomeLight and RectLight."); return false;}
+            if(!ImageError.IsEmpty()) {Ignore(*ImageError); Definition.File.Empty();}
+            else {
+                const auto& Image=*Images[Definition.File].Image;
+                // Sampling is UV-normalized, so other aspects stretch over the sphere as in Karma and Storm.
+                if(D.type==HDUE_DOME_LIGHT && Image.SizeX!=Image.SizeY*2) UE_LOG(LogTemp, Warning, TEXT("hdUE dome image %s is %dx%d, not 2:1; stretching it as a latitude-longitude map."), *Definition.File, Image.SizeX, Image.SizeY);
+            }
         }
         Pending.Add(MoveTemp(Definition));
     }
@@ -211,9 +226,12 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition,FString& Error) {
         if(D.ies_angle_scale!=0) UE_LOG(LogTemp, Warning, TEXT("hdUE: shaping:ies:angleScale is not supported (%s)"), *Definition.Id);
         UTextureLightProfile* Texture=Profile(Definition.Ies,Error);
         if(!Texture) return false;
+        // UsdLux scales the light by the profile's candela values (iesSample * L). UE's texture holds them over their
+        // maximum (IESLoader), which it keeps in Brightness: multiply it back. bUseIESBrightness would instead replace
+        // the USD intensity. normalize keeps the unshaped light's power: divide by the profile's mean over the sphere.
         Local->SetIESTexture(Texture); Local->bUseIESBrightness=false;
-        // normalize keeps the light's total power: scale by the profile's sphere-integration multiplier.
-        if(D.ies_normalize && Texture->TextureMultiplier>0) Intensity*=Texture->TextureMultiplier;
+        const float Mean=Profiles[Definition.Ies].Mean;
+        Intensity*=D.ies_normalize ? (Mean>0 ? 1/Mean : 1.f) : Texture->Brightness;
     }
     Light->SetIntensity(Intensity); Light->RegisterComponent(); Actor->SetActorHiddenInGame(!D.visible);
     return true;
@@ -240,7 +258,16 @@ UTextureLightProfile* FHdueLighting::Profile(const FString& File,FString& Error)
     Texture->CompressionSettings=TC_HDR; Texture->Filter=TF_Bilinear;
     Texture->Brightness=Converter.GetBrightness(); Texture->TextureMultiplier=Converter.GetMultiplier();
     Texture->UpdateResource();
+    // Mean of the normalized profile over the sphere: columns are vertical angles 0..180 degrees (IESLoader), each
+    // weighted by its solid angle; rows are horizontal angles.
+    const auto* Texels=reinterpret_cast<const FFloat16Color*>(Converter.GetRawData().GetData());
+    double Sum=0,Weight=0;
+    for(int32 X=0;X<Width;++X) {
+        const double W=FMath::Sin((X+.5)/Width*UE_DOUBLE_PI);
+        for(int32 Y=0;Y<Height;++Y) {Sum+=W*Texels[int64(Y)*Width+X].R.GetFloat(); Weight+=W;}
+    }
     auto& Entry=Profiles.FindOrAdd(File); Entry.Modified=Stat.ModificationTime; Entry.Size=Stat.FileSize; Entry.Texture.Reset(Texture);
+    Entry.Mean=float(Weight>0?Sum/Weight:0);
     return Texture;
 }
 bool FHdueLighting::RebuildEnvironment(FString& Error) {

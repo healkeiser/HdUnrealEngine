@@ -36,7 +36,7 @@ private:
     TMap<FString,AActor*> Actors;
     TMap<FString,FImageEntry> Images;
     TMap<FString,TStrongObjectPtr<UTexture2D>> LightTextures;
-    struct FProfileEntry {FDateTime Modified; int64 Size=0; TStrongObjectPtr<UTextureLightProfile> Texture;};
+    struct FProfileEntry {FDateTime Modified; int64 Size=0; TStrongObjectPtr<UTextureLightProfile> Texture; float Mean=0;}; // Mean: of the max-normalized profile over the sphere
     TMap<FString,FProfileEntry> Profiles; // IES files by path
     UTextureLightProfile* Profile(const FString& File,FString& Error);
     AActor* SkyActor=nullptr;

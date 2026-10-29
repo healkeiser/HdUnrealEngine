@@ -19,6 +19,8 @@
 #include "hdue/postprocess_api.h"
 #include "hdue/volume_api.h"
 #include "RenderUtils.h"
+#include "ShaderPipelineCache.h"
+#include "PipelineStateCache.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -439,7 +441,6 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     }
     Runtime.World->SetShouldTick(Request->mode == HDUE_REALTIME);
     if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.SamplesPerPixel"))) CVar->Set(int32(Request->samples_per_pixel), ECVF_SetByCode);
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.Denoiser"))) CVar->Set(0, ECVF_SetByCode);
     if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.FrameIndependentTemporalSeed"))) CVar->Set(0, ECVF_SetByCode);
     if (IConsoleVariable* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.PathTracing.VisibleLights")))
         CVar->Set(Session->Scene->Lighting->BackgroundVisible()?2:0,ECVF_SetByCode);
@@ -536,6 +537,9 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     FSceneView* View = new FSceneView(Options);
     View->bIsGameView = true;
     View->bIsOfflineRender = PathTracing;
+    // Each Path Tracer request draws its own random sequence (FrameIndependentTemporalSeed 0 counts samples from 0):
+    // motion blur sub-frames are separate requests, and the same sequence in each left static areas at spp / sub-frames.
+    View->PathTracerSeedOffset = int32(Request.generation * Request.samples_per_pixel);
     View->bCameraCut = Session->CameraCut && Session->Draws == 0;
     if (ViewMode != VMI_Lit) {
         // The material overrides UGameViewportClient::Draw sets for these view modes.
@@ -617,11 +621,18 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
-    Job->FullResIndex = Moving ? 0 : ++Session->FullResDraws;
+    // Offline frames (husk) wait for PSO compilation: r.PSOPrecache.ProxyCreationStrategy=2 draws meshes whose PSOs
+    // are still compiling with the default material, and nothing else would stop such a frame from converging.
+    const uint32 Compiling = Interactive ? 0 : FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
+    if (Compiling) {
+        static uint64 Logged = 0;
+        if (Logged != Request.generation) { Logged = Request.generation; UE_LOG(LogTemp, Display, TEXT("hdUE request %llu waits for %u PSO compilations"), Request.generation, Compiling); }
+    }
+    Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;
     Job->Started = FPlatformTime::Seconds();
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
-    Job->Preparing = Session->Preparing;
+    Job->Preparing = Session->Preparing || Compiling; // ponytail: Path Tracer samples drawn meanwhile still count; restart its accumulation if that shows
     // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the first
     // draw (an immediate preview), the one that should converge, and otherwise at most every 250 ms for progress.
     const double Now = FPlatformTime::Seconds();
