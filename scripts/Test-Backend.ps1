@@ -6,6 +6,7 @@ param(
     [string]$OutputDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Game = Join-Path $TaskRoot 'out\runtime\Windows\HdUEBackend'
 $Bin = Join-Path $Game 'Binaries\Win64'
@@ -20,8 +21,7 @@ if ($RuntimeConfig) {
     }
     $BackendDll=$Profile.backend_dll; $RuntimeProject=$Profile.runtime_project
 }
-$RunOutput = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot ('out\backend-smoke\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
-if (Test-Path -LiteralPath $RunOutput) { throw 'Test output directory already exists; fresh evidence is required.' }
+$RunOutput = New-HdUERun -Name backend-smoke -Path $OutputDirectory
 $Arguments = @('--backend', $BackendDll, '--project', $RuntimeProject,
     '--output', $RunOutput, '--mode', $Mode, '--cycles', $Cycles)
 if ($Visible) { $Arguments += '--visible' }

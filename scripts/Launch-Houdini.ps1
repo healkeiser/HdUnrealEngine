@@ -7,13 +7,14 @@ param(
     [string]$BuildDirectory='',
     [string]$MaterialXLibrary='',
     [string]$SubstrateLibrary='',
-    [ValidateSet('integration','viewport','optextures','materials','lighting','references','surfaces','substrate','substrate-textures','substrate-live')][string]$TestKind='integration',
-    [switch]$Test
+    # Runs that in-Houdini test (tests/houdini) and waits for it; empty: an interactive session.
+    [ValidateSet('','integration','viewport','optextures','materials','lighting','references','surfaces','substrate','substrate-textures','substrate-live')][string]$TestKind='',
+    [int]$TimeoutSeconds=420
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $HoudiniRoot=Get-HdUELocalPath -Key houdini_root -Value $HoudiniRoot
-$BuildDirectory=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory -Optional
+$DelegateBuild=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory
 $TaskRoot=Split-Path -Parent $PSScriptRoot
 $HoudiniExe=Join-Path $HoudiniRoot 'bin\houdini.exe'
 $Version=(Get-Item -LiteralPath $HoudiniExe).VersionInfo
@@ -29,9 +30,8 @@ if ($HipFile) {
     if ($InputUsd) {throw 'Choose either -HipFile or -InputUsd.'}
     $HipFile=(Resolve-Path -LiteralPath $HipFile).Path
 }
-if (-not $LogDirectory) {$LogDirectory=Join-Path $TaskRoot ('out\houdini-22.0.466\session-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))}
+if (-not $LogDirectory) {$LogDirectory=New-HdUERun -Name houdini-session -Create}
 New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
-$DelegateBuild=if ($BuildDirectory) {[IO.Path]::GetFullPath($BuildDirectory)} else {Join-Path $TaskRoot 'build\houdini-22.0.466'}
 $Dll=Join-Path $DelegateBuild 'Release\hdUE_Houdini22.dll'
 if (-not (Test-Path -LiteralPath $Dll)) {throw 'Run Build-Houdini.ps1 first.'}
 $Names=@('HFS','PATH','PYTHONPATH','HOUDINI_PATH','PXR_PLUGINPATH_NAME','HOUDINI_USER_PREF_DIR','HOUDINI_NO_START_PAGE_SPLASH','HDUE_HOUDINI_ENABLE','HDUE_RUNTIME_CONFIG','HDUE_HOUDINI_INPUT','HDUE_HOUDINI_HIP','HDUE_HOUDINI_LOG_DIR','HDUE_HOUDINI_TEST','HDUE_HOUDINI_PLUGIN','HDUE_MATERIALX_LIBRARY','HDUE_SUBSTRATE_LIBRARY')
@@ -40,7 +40,8 @@ try {
     $env:HFS=$HoudiniRoot
     $env:PATH="$HoudiniRoot\bin;$HoudiniRoot\python313;$env:PATH"
     $env:PYTHONPATH='' # Houdini must use its own Python/USD, not standalone usdview.
-    $env:HOUDINI_PATH="$TaskRoot\integrations\houdini;"+$(if ($Previous.HOUDINI_PATH) {$Previous.HOUDINI_PATH} else {'&'})
+    # The in-Houdini tests are not shipped: their folder is on HOUDINI_PATH only for test runs.
+    $env:HOUDINI_PATH="$TaskRoot\integrations\houdini;"+$(if ($TestKind) {"$TaskRoot\tests\houdini;"})+$(if ($Previous.HOUDINI_PATH) {$Previous.HOUDINI_PATH} else {'&'})
     $env:PXR_PLUGINPATH_NAME="$HoudiniRoot\bin\usd_plugins;$HoudiniRoot\houdini\dso\usd_plugins;$DelegateBuild\resources"
     $env:HDUE_HOUDINI_PLUGIN=$Dll
     $env:HDUE_MATERIALX_LIBRARY=if ($MaterialXLibrary) {[IO.Path]::GetFullPath($MaterialXLibrary)} else {''}
@@ -50,8 +51,8 @@ try {
     $env:HDUE_HOUDINI_INPUT=if ($InputUsd) {[IO.Path]::GetFullPath($InputUsd)} else {''}
     $env:HDUE_HOUDINI_HIP=$HipFile
     if ($LogDirectory) {$env:HDUE_HOUDINI_LOG_DIR=[IO.Path]::GetFullPath($LogDirectory)}
-    $env:HDUE_HOUDINI_TEST=if ($Test) {$TestKind} else {''}
-    if ($Test) {
+    $env:HDUE_HOUDINI_TEST=$TestKind
+    if ($TestKind) {
         # Documented batch-startup UI flag. This does not answer consent
         # questions or change any telemetry/privacy preference.
         $env:HOUDINI_NO_START_PAGE_SPLASH='1'
@@ -65,8 +66,8 @@ try {
     if ($HipFile) {$LaunchArguments+='"'+$HipFile+'"'}
     $Process=Start-Process -FilePath $HoudiniExe -ArgumentList $LaunchArguments -PassThru -RedirectStandardOutput (Join-Path $LogDirectory 'houdini.log') -RedirectStandardError (Join-Path $LogDirectory 'houdini-error.log')
     Write-Output "Houdini PID $($Process.Id), logs: $LogDirectory"
-    if ($Test) {
-        if (-not $Process.WaitForExit(420000)) {throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR."}
+    if ($TestKind) {
+        if (-not $Process.WaitForExit($TimeoutSeconds*1000)) {throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR."}
         if ($Process.ExitCode) {throw 'Houdini / hdUE exited with an error.'}
         if (Test-Path -LiteralPath (Join-Path $env:HDUE_HOUDINI_LOG_DIR 'test-error.txt')) {throw 'Solaris integration test failed; see test-error.txt.'}
     }

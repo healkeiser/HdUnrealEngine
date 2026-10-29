@@ -1,13 +1,11 @@
 """Native Solaris verification for a caller-supplied cooked MaterialX library."""
 import ctypes as C
-import json
-from pathlib import Path
 import threading
-import hou
+import numpy as np
 from pxr import UsdGeom,UsdShade
 from PySide6 import QtGui
 import hdue_houdini as integration
-from hdue_houdini_test import Test as ViewportTest
+from hdue_houdini_test import Test as ViewportTest, flipbook
 from hdue_viewport import Materials
 from material_api import MaterialApi
 
@@ -62,7 +60,7 @@ class Test(ViewportTest):
             edit.setDisplayFlag(True)
             integration.set_mode('realtime')
             edited=yield from self.image('03-subset-rebound',0,self.frames[-1]['generation'])
-            if sum(abs(a-b) for a,b in zip(original,edited))/len(original)<.0001:
+            if float(np.abs(original-edited).mean())<.0001:
                 raise AssertionError('GeomSubset material edit did not reach the image')
             edit.parm('python').set('import hou\nstage=hou.pwd().editableStage()\nstage.OverridePrim('+repr(str(subset.GetPath()))+').SetActive(False)')
             edit.cook(force=True); viewer.curViewport().draw()
@@ -73,15 +71,8 @@ class Test(ViewportTest):
                 raise AssertionError('Stale subset partitions survived restoration')
 
     def capture(self,name):
-        import hdefereval
-        viewer=integration.scene_viewer(); path=self.output/name
-        def flipbook():
-            settings=viewer.flipbookSettings().stash()
-            settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
-            settings.beautyPassOnly(False); settings.useResolution(False); settings.output(str(path))
-            viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
-        hdefereval.execute_deferred(flipbook)
-        while not path.is_file(): yield
+        path=self.output/name
+        yield from flipbook(path)
         image=QtGui.QImage(str(path))
         if image.isNull(): raise AssertionError('Solaris compositor capture failed')
         self.captures.append(dict(file=name,width=image.width(),height=image.height()))

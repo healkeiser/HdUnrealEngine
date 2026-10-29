@@ -5,23 +5,13 @@
 import argparse
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from pxr import Usd
-from materialx_controls import MaterialXLibrary
+from materialx_controls import MaterialXLibrary, OfflineView
 
 
 def export(stage, library, time, substrate=None):
-    class Signal:
-        def connect(self, callback): pass
-    class View:
-        _renderer = object()
-        def __init__(self): self.settings = {}
-        def GetRendererSetting(self, name): return self.settings.get(name)
-        def SetRendererSetting(self, name, value): self.settings[name] = value
-    view = View()
-    model = SimpleNamespace(stage=stage, currentFrame=time, signalStageReplaced=Signal(), signalPrimsChanged=Signal())
-    controller = SimpleNamespace(_stageView=view, _dataModel=model)
-    prepared = MaterialXLibrary(library, controller) if library else None
+    view = OfflineView(stage, time, object())
+    prepared = MaterialXLibrary(library, view) if library else None
     if prepared and not prepared.sync(): raise ValueError(prepared.preparation_error)
     view.settings["wetProfiles"] = {
         path: entry.get("surface_effects", {}).get("wet", {}) for path, entry in prepared.bound_entries.items()} if prepared else {}

@@ -1,8 +1,6 @@
 """Wet overrides and live mask updates through the real Solaris event loop."""
 import ctypes as C
 import threading
-import hou
-from pxr import UsdGeom
 import hdue_houdini as integration
 from hdue_materialx_test import Test as MaterialTest
 from hdue_viewport import Surfaces

@@ -12,15 +12,12 @@ edit of the .ds, and commit the result:
     python scripts/build_render_settings_hda.py
 
 It restarts itself in hython, with the integration and the delegate's plugInfo.json registered
-(HDUE_HOUDINI_ROOT, HFS or houdini_root; HDUE_HOUDINI_BUILD_ROOT, houdini_build_root or build/houdini-22.0.466).
+(HDUE_HOUDINI_ROOT, HFS or houdini_root; HDUE_HOUDINI_BUILD_ROOT, houdini_build_root or build/houdini).
 """
-import json
 import os
 from pathlib import Path
 import re
 import shutil
-import subprocess
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "integrations/houdini"
@@ -88,14 +85,11 @@ loptoolutils.genericTool(kwargs, '$HDA_NAME')]]></script>
 
 def relaunch():
     """Run this file in hython with the hdUE integration and delegate registered."""
-    paths = ROOT / ".local/paths.json"
-    local = json.loads(paths.read_text()) if paths.exists() else {}
-    houdini = Path(os.environ.get("HDUE_HOUDINI_ROOT") or os.environ.get("HFS") or local["houdini_root"])
-    build = Path(os.environ.get("HDUE_HOUDINI_BUILD_ROOT") or local.get("houdini_build_root") or ROOT / "build/houdini-22.0.466")
-    env = dict(os.environ, HOUDINI_PATH=f"{INTEGRATION};&", HDUE_HOUDINI_ENABLE="1", HDUE_BUILD_HDA="1",
-               PXR_PLUGINPATH_NAME=os.pathsep.join([str(houdini / "bin/usd_plugins"), str(houdini / "houdini/dso/usd_plugins"),
-                                                    str(build / "resources")]))
-    sys.exit(subprocess.run([str(houdini / "bin/hython.exe"), __file__], env=env).returncode)
+    from local_paths import local_path, relaunch as run_in_hython
+    houdini = local_path("houdini_root")
+    run_in_hython(__file__, HOUDINI_PATH=f"{INTEGRATION};&", HDUE_HOUDINI_ENABLE="1",
+                  PXR_PLUGINPATH_NAME=os.pathsep.join([str(houdini / "bin/usd_plugins"), str(houdini / "houdini/dso/usd_plugins"),
+                                                       str(local_path("houdini_build_root") / "resources")]))
 
 
 def help_page(group, name=NAME, label=LABEL, icon=ICON,

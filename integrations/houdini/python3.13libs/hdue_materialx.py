@@ -1,24 +1,17 @@
 """Reuse the checked cooked MaterialX registry in a Solaris viewport."""
 import hashlib
 from pathlib import Path
-from types import SimpleNamespace
 import hou
-from materialx_controls import MaterialXLibrary
+from hdue_op_textures import opdef_stamp
+from materialx_controls import MaterialXLibrary,OfflineView
 
 
-class Signal:
-    def connect(self, callback):
-        pass
-
-
-class PreparedMaterials:
+class PreparedMaterials(OfflineView):
     def __init__(self,live=None):
-        self.model=SimpleNamespace(stage=None,currentFrame=None,signalStageReplaced=Signal(),signalPrimsChanged=Signal())
-        self._renderer=None
-        self.settings={}
+        super().__init__()
         self.file=None
         self.library=None
-        self.embedded={}
+        self.embedded={}; self.checked={}
         self.applied=None
         self.substrate=None
         self.substrate_file=None
@@ -31,12 +24,6 @@ class PreparedMaterials:
         if key!=self.published_error and api.surfaces(session,{},error=message):
             self.published_error=key
 
-    def GetRendererSetting(self,name):
-        return self.settings.get(name)
-
-    def SetRendererSetting(self,name,value):
-        self.settings[name]=value
-
     def sync(self,stage,time,file,session,api,substrate_file=None):
         identity=None
         if file:
@@ -45,20 +32,23 @@ class PreparedMaterials:
         if identity!=self.file:
             self.file=None
             self.library=None
-            self.embedded={}
+            self.embedded={}; self.checked={}
             self.settings={}
             if identity:
-                controller=SimpleNamespace(_dataModel=self.model,_stageView=self)
-                self.library=MaterialXLibrary(path,controller)
+                self.library=MaterialXLibrary(path,self)
                 # Original embedded resources must still match the cooked images.
                 import json
                 data=json.loads(path.read_text(encoding='utf-8-sig'))
                 self.embedded=data.get('embedded_textures',{})
             self.file=identity
         for uri,entry in self.embedded.items():
+            # Hashed again only when the HDA holding it changes: this runs on every frame change.
+            stamp=opdef_stamp(uri)
+            if self.checked.get(uri)==stamp: continue
             if hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()!=entry['sha256']:
                 raise ValueError('Embedded texture changed; prepare/import/cook again: '+uri)
-        self.model.stage=stage; self.model.currentFrame=time
+            self.checked[uri]=stamp
+        self._dataModel.stage=stage; self._dataModel.currentFrame=time
         self._renderer=session
         if self.library:
             self.library.invalidate()

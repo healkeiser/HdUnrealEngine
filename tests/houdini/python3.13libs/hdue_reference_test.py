@@ -2,7 +2,6 @@
 import os
 import numpy as np
 import hou
-from pxr import UsdGeom
 import hdue_houdini as integration
 from hdue_houdini_test import Test as ViewportTest
 from material_api import MaterialApi
@@ -46,7 +45,7 @@ class Test(ViewportTest):
         moved=yield from self.image('02-reference-translated',0,generation)
         self.depth_changed('01-reference-lumen','02-reference-translated')
         if self.frames[-1]['scene_submissions']<=submissions: raise AssertionError('Reference transform did not submit geometry')
-        if sum(abs(a-b) for a,b in zip(first,moved))/len(first)<.001:
+        if float(np.abs(first-moved).mean())<.001:
             raise AssertionError('Reference transform did not change the image')
         generation=self.frames[-1]['generation']
         integration.set_mode('pathtraced')
@@ -55,7 +54,7 @@ class Test(ViewportTest):
         move(2)
         traced_moved=yield from self.image('04-reference-pathtraced-edited',1,self.frames[-1]['generation'])
         self.depth_changed('03-reference-pathtraced','04-reference-pathtraced-edited')
-        if sum(abs(a-b) for a,b in zip(traced,traced_moved))/len(traced)<.001:
+        if float(np.abs(traced-traced_moved).mean())<.001:
             raise AssertionError('Reference transform did not change the Path Tracer image')
 
     def depth_changed(self,before,after):

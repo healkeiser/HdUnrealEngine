@@ -23,6 +23,15 @@ try {
     $Rejected=$false
     try { Get-HdUELocalPath -Key engine_root | Out-Null } catch { $Rejected=$_.Exception.Message -like 'Configure engine_root*' }
     if (-not $Rejected) {throw 'Missing required configuration was accepted'}
+    $PreviousBuild=$env:HDUE_HOUDINI_BUILD_ROOT; $env:HDUE_HOUDINI_BUILD_ROOT=''
+    try {
+        if ((Get-HdUELocalPath -Key houdini_build_root) -ne (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\houdini')) {throw 'Default Houdini build folder failed'}
+    } finally {$env:HDUE_HOUDINI_BUILD_ROOT=$PreviousBuild}
+    $Run=New-HdUERun -Name unused -Path (Join-Path $Fixture 'run') -Create
+    if (-not (Test-Path -LiteralPath $Run -PathType Container)) {throw 'Run directory was not created'}
+    $Rejected=$false
+    try { New-HdUERun -Name unused -Path $Run | Out-Null } catch { $Rejected=$true }
+    if (-not $Rejected) {throw 'An existing run directory was accepted'}
     [Environment]::SetEnvironmentVariable($Probe,'temporary','Process')
     Restore-HdUEEnvironment -Snapshot @{$Probe=$null}
     if ($null -ne [Environment]::GetEnvironmentVariable($Probe,'Process')) {throw 'Unset environment value was not restored'}

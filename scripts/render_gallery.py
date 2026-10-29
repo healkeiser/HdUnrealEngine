@@ -157,13 +157,10 @@ def panel_image(target, panels):
     temporary = target.with_name(f'.{target.stem}.tmp.png')
     if not buf.write(str(temporary)):
         raise RuntimeError(buf.geterror())
-    for attempt in range(20):  # an image viewer or Explorer thumbnail can hold the old file for a moment
-        try:
-            os.replace(temporary, target)
-            return
-        except PermissionError:
-            time.sleep(0.5)
-    raise RuntimeError(f'{target} is locked by another program')
+    try:
+        os.replace(temporary, target)
+    except PermissionError as error:
+        raise RuntimeError(f'{target} is locked by another program (an image viewer?); close it and run again') from error
 
 
 def hardware():

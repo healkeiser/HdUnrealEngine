@@ -1,7 +1,7 @@
 """Caller-owned ctypes mirror of the optional lighting diagnostics ABI."""
 import ctypes as C
 
-U32,U64,Result=C.c_uint32,C.c_uint64,C.c_int32
+from hdue_runtime import U32, U64, Result
 
 class Status(C.Structure):
     _fields_=[(n,U32) for n in ('struct_size','light_count','dome_count','environment_pending',

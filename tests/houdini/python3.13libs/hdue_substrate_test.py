@@ -1,7 +1,5 @@
 """Verify VOP authoring, native shaders and live Solaris Substrate updates."""
-import ctypes as C
-import hou
-from pxr import UsdGeom
+import numpy as np
 import hdue_houdini as integration
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
@@ -41,7 +39,7 @@ class Test(MaterialTest):
         generation=self.api.status()['generation']
         network.node('amount').parm('value').set(.35)
         changed=yield from self.image('03-vop-coverage',1,generation)
-        if sum(abs(a-b) for a,b in zip(original,changed))/len(original)<1e-6:
+        if float(np.abs(original-changed).mean())<1e-6:
             raise AssertionError('Published VOP parameter did not change the image')
         after=surface.status(session)
         if before['geometry_uploads']!=after['geometry_uploads'] or before['mask_uploads']!=after['mask_uploads']:

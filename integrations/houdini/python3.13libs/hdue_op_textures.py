@@ -1,5 +1,6 @@
 """Resolve Houdini COP images without sending Houdini objects across the UE ABI."""
 import hashlib
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -28,6 +29,18 @@ def _source(uri, validate=False):
     return node, output
 
 
+def opdef_stamp(uri):
+    """Changes when an opdef: image can have changed: its HDA library file on disk. Embedded definitions (no file)
+    fall back to hashing the bytes."""
+    node_type = hou.nodeType(uri[len('opdef:'):].split('?', 1)[0].strip('/'))
+    definition = node_type.definition() if node_type else None
+    path = definition.libraryFilePath() if definition else ''
+    if not os.path.isfile(path):
+        return hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()
+    stat = os.stat(path)
+    return path, stat.st_mtime_ns, stat.st_size
+
+
 class Cache:
     def __init__(self):
         self.directory = tempfile.TemporaryDirectory(prefix='hdue-cop-')
@@ -53,12 +66,14 @@ class Cache:
 
     def resolve(self, uri, raw=False):
         if uri.startswith('opdef:'):
+            # Raw/color interpretation does not alter embedded source bytes: one entry, re-read only when the HDA changes.
+            stamp = opdef_stamp(uri)
+            previous = self.entries.get(uri)
+            if previous and previous['stamp'] == stamp:
+                return previous['path']
             from houdini_resources import embedded_image
-            entry=embedded_image(uri,self.directory.name)
-            # Raw/color interpretation does not alter embedded source bytes.
-            for interpretation in (False,True):
-                self.entries[(uri,interpretation)]=dict(stamp=entry['sha256'],path=entry['path'])
-            return entry['path']
+            self.entries[uri] = dict(stamp=stamp, path=embedded_image(uri, self.directory.name)['path'])
+            return self.entries[uri]['path']
         node, output = _source(uri)
         key = (uri, raw)
         previous = self.entries.get(key)
@@ -113,10 +128,7 @@ class Cache:
         for uri in self.bindings.get(key, ()):
             try:
                 if uri.startswith('opdef:'):
-                    stamp=hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()
-                    if not any((uri,raw) in self.entries for raw in (False,True)):
-                        return True
-                    if any(self.entries[(uri,raw)]['stamp']!=stamp for raw in (False,True) if (uri,raw) in self.entries):
+                    if uri not in self.entries or self.entries[uri]['stamp'] != opdef_stamp(uri):
                         return True
                     continue
                 node, _ = _source(uri)

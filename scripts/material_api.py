@@ -1,7 +1,7 @@
 """ctypes mirror of the optional, caller-owned hdUE material C ABI."""
 import ctypes as C
 
-U32, U64, Result = C.c_uint32, C.c_uint64, C.c_int32
+from hdue_runtime import U32, U64, Result
 
 
 class RendererInfo(C.Structure):

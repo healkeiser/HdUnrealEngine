@@ -11,8 +11,7 @@ $EngineRoot=Get-HdUELocalPath -Key engine_root -Value $EngineRoot
 $EditorRoot=Get-HdUELocalPath -Key editor_root -Value $EditorRoot
 $OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
-$RunRoot = Join-Path $TaskRoot ('out\verification\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
-New-Item -ItemType Directory -Path $RunRoot | Out-Null
+$RunRoot = New-HdUERun -Name verification -Create
 if (-not $SkipBuild) {
     & (Join-Path $PSScriptRoot 'Build-Host.ps1') -OpenUsdRoot $OpenUsdRoot *> (Join-Path $RunRoot 'host-build.log')
     & (Join-Path $PSScriptRoot 'Prepare-Content.ps1') -EditorRoot $EditorRoot *> (Join-Path $RunRoot 'content-build.log')
@@ -40,10 +39,10 @@ $HydraMetrics = Read-Passed (Join-Path $Hydra 'metrics.json')
 if ($LASTEXITCODE) { throw "Native UE versus Hydra image comparison failed. Evidence: $RunRoot" }
 if ($WithUsdview) {
     Invoke-Step usdview { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'usdview') }
-    Invoke-Step camera { & (Join-Path $PSScriptRoot 'Test-Camera.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera') }
+    Invoke-Step camera { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check camera -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera') }
     Invoke-Step buffer { & (Join-Path $PSScriptRoot 'Test-BufferPerf.ps1') -OpenUsdRoot $OpenUsdRoot -OutputFile (Join-Path $RunRoot 'buffer.json') }
     # These suites check their own counts and throw; their evidence must exist.
-    foreach ($File in 'usdviewerified.json', 'cameraerified.json', 'buffer.json') {
+    foreach ($File in 'usdview\verified.json', 'camera\verified.json', 'buffer.json') {
         if (-not (Test-Path -LiteralPath (Join-Path $RunRoot $File))) { throw "Missing evidence: $File" }
     }
 }

@@ -15,10 +15,8 @@ $ErrorActionPreference='Stop'
 $EditorRoot=Get-HdUELocalPath -Key editor_root -Value $EditorRoot
 $OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot=Split-Path -Parent $PSScriptRoot
-$RunOutput=if ($OutputDirectory) {[IO.Path]::GetFullPath($OutputDirectory)} else {Join-Path $TaskRoot ('out\usd-materialx-import\'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))}
-if (Test-Path -LiteralPath $RunOutput) {throw 'Choose a fresh USD MaterialX output directory.'}
 $InputUsd=(Resolve-Path -LiteralPath $InputUsd).Path
-New-Item -ItemType Directory -Path $RunOutput -Force | Out-Null
+$RunOutput=New-HdUERun -Name usd-materialx-import -Path $OutputDirectory -Create
 $PreviousPath=$env:PATH
 $PreviousPythonPath=$env:PYTHONPATH
 try {

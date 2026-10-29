@@ -2,10 +2,28 @@
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from pxr import Gf, Sdf, UsdShade
 from usd_materialx_graph import graph_data, graph_signature, rebase_graph
 from materialx_textures import validate_texture_sets
+
+
+class OfflineView:
+    """usdview's stage view and data model as MaterialXLibrary reads them, for hosts without usdview. It is its own
+    controller; renderer settings land in .settings."""
+    def __init__(self, stage=None, time=None, renderer=None):
+        self.settings = {}
+        self._renderer = renderer
+        signal = SimpleNamespace(connect=lambda callback: None)
+        self._dataModel = SimpleNamespace(stage=stage, currentFrame=time, signalStageReplaced=signal, signalPrimsChanged=signal)
+        self._stageView = self
+
+    def GetRendererSetting(self, name):
+        return self.settings.get(name)
+
+    def SetRendererSetting(self, name, value):
+        self.settings[name] = value
 
 
 class MaterialXLibrary:

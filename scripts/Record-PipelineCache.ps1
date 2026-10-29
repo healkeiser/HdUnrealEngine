@@ -27,8 +27,7 @@ if ($RuntimeConfig) {
 $Game = Split-Path -Parent $RuntimeProject
 $Keys = @(Get-ChildItem -LiteralPath (Join-Path $TaskRoot 'unreal\HdUEBackend\Saved\Cooked\Windows\HdUEBackend\Metadata\PipelineCaches') -Filter '*.shk' -ErrorAction SilentlyContinue)
 if (-not $Keys) { throw 'No stable shader keys: run Prepare-Content.ps1 (NeedsShaderStableKeys) and Stage-Runtime.ps1 first.' }
-$RunRoot = Join-Path $TaskRoot ('out\pipeline-cache\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
-New-Item -ItemType Directory -Path $RunRoot | Out-Null
+$RunRoot = New-HdUERun -Name pipeline-cache -Create
 $Recorded = Join-Path $Game 'Saved\CollectedPSOs'
 if (Test-Path -LiteralPath $Recorded) { Remove-Item -LiteralPath $Recorded -Recurse -Force }
 

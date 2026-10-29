@@ -54,7 +54,7 @@ class ResidencyTest(SmokeTest):
             # screen footprint too (4K tiles, even at a 1280x720 viewport).
             self.launcher.select_mode("pathtraced")
             cold=yield from self.wait_preparing(0)
-            api=ResidencyApi(self.launcher.runtime.library)
+            api=ResidencyApi(self.launcher.runtime)
             api.configure(cold["sessionHandle"],timeout_seconds=0.3)
             model.currentFrame=Usd.TimeCode(model.currentFrame.GetValue()+1)
             self.view.updateGL()

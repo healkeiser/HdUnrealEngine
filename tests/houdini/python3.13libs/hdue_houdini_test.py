@@ -5,15 +5,31 @@ import math
 import os
 import time
 import traceback
-from array import array
-from pathlib import Path
 import hou
 import numpy as np
 from PySide6 import QtCore
 import hdue_houdini as integration
-from hdue_viewport import Viewport
+from hdue_viewer import write_pfm
 
 _test=None
+
+
+def flipbook(path):
+    """Capture the Solaris compositor to path with a native flipbook (QWidget.grab must not re-enter Houdini's
+    Vulkan/GL viewport painting); yields until the file exists, then returns a list that fills when the flipbook ends."""
+    import hdefereval
+    viewer=integration.scene_viewer(); done=[]
+    def capture():
+        settings=viewer.flipbookSettings().stash()
+        settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
+        settings.beautyPassOnly(False); settings.useResolution(False); settings.output(str(path))
+        viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
+        done.append(True)
+    hdefereval.execute_deferred(capture)
+    while not path.is_file(): yield
+    return done
+
+
 class Test:
     def __init__(self,host):
         self.host=host; self.output=host.log_dir; self.frames=[]; self.capture_errors=[]; self.deadline=time.monotonic()+300
@@ -64,17 +80,17 @@ class Test:
                 data=self.api.pixels(s)
                 if data:
                     frame,pixels=data
-                    rgb=array('f',(pixels[i+c] for i in range(0,len(pixels),4) for c in range(3)))
-                    if not all(math.isfinite(v) for v in rgb): raise AssertionError('Non-finite image')
-                    if max(rgb)>.01: break
+                    rgb=np.ctypeslib.as_array(pixels).reshape(frame.height,frame.width,4)[...,:3].copy()
+                    if not np.isfinite(rgb).all(): raise AssertionError('Non-finite image')
+                    if rgb.max()>.01: break
             yield
         kernel=C.WinDLL('kernel32'); kernel.GetCurrentThreadId.restype=C.c_uint32
         owner=kernel.GetCurrentThreadId()
         # The host talks to hdUE from Houdini's UI thread; UE itself runs on hdUE's own thread, never on the UI's.
         if s['create_thread']!=owner or s['execute_thread']==owner: raise AssertionError('UE work ran on the UI thread: '+repr(s))
         frame,pixels=data
-        alpha=pixels[3::4]
-        s['backend_alpha_min']=min(alpha); s['backend_alpha_max']=max(alpha)
+        alpha=np.ctypeslib.as_array(pixels)[3::4]
+        s['backend_alpha_min']=float(alpha.min()); s['backend_alpha_max']=float(alpha.max())
         if mode==1 and frame.completed_samples<64: raise AssertionError('PT converged early')
         depth=self.api.depth_pixels(s)
         if depth is None: raise AssertionError('Converged color has no matching depth')
@@ -84,13 +100,8 @@ class Test:
             raise AssertionError('Missing or constant UE scene depth')
         s['depth_cm_min']=float(hits.min()); s['depth_cm_max']=float(hits.max())
         s['depth_hits']=int(len(hits)); s['depth_background']=int(depth.size-len(hits))
-        with (self.output/(label+'-depth.pfm')).open('wb') as f:
-            f.write(f'Pf\n{frame.width} {frame.height}\n-1.0\n'.encode())
-            f.write(np.ascontiguousarray(depth[::-1],dtype='<f4').tobytes())
-        with (self.output/(label+'.pfm')).open('wb') as f:
-            f.write(f'PF\n{frame.width} {frame.height}\n-1.0\n'.encode())
-            row=frame.width*3
-            for y in reversed(range(frame.height)): f.write(rgb[y*row:(y+1)*row].tobytes())
+        write_pfm(self.output/(label+'-depth.pfm'),depth)
+        write_pfm(self.output/(label+'.pfm'),rgb)
         self.frames.append(dict(label=label,**s))
         integration._report('Verified '+label+': '+repr(s))
         return rgb
@@ -117,7 +128,7 @@ class Test:
         yield from self.capture('01-lumen-solaris.png')
         self.navigate('pan',-60,20)
         moved=yield from self.image('02-camera-translation',0,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(first,moved))/len(first)<.001: raise AssertionError('Camera did not change the image')
+        if np.abs(first-moved).mean()<.001: raise AssertionError('Camera did not change the image')
         node=viewer.currentNode()
         integration._report('Settings node: '+str(node))
         # The smoke cube is animated and the viewport camera has a shutter; this test checks
@@ -135,7 +146,7 @@ class Test:
         edit.parm('python').set('from pxr import UsdGeom, Gf\nstage=hou.pwd().editableStage()\nUsdGeom.Xformable(stage.GetPrimAtPath("/World/Cube")).AddTranslateOp(opSuffix="hdueTest").Set(Gf.Vec3d(60,0,0))')
         edit.setDisplayFlag(True); edit.setCurrent(True,clear_all_selected=True)
         transformed=yield from self.image('04-transform-edit',1,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(traced,transformed))/len(traced)<.001: raise AssertionError('Transform did not change the image')
+        if np.abs(traced-transformed).mean()<.001: raise AssertionError('Transform did not change the image')
         native=edit.parent().createNode('pythonscript','hdUE_native_test'); native.setInput(0,edit)
         native.parm('python').set('''from pxr import UsdGeom,Sdf,Gf
 s=hou.pwd().editableStage()
@@ -187,10 +198,10 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         if self.frames[-1]['session']==old or self.host.runtime.initializations!=1: raise AssertionError('Incorrect UE/delegate lifetime')
         self.navigate('orbit',35,15)
         orbited=yield from self.image('08-camera-orbit',1,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(before,orbited))/len(before)<.001: raise AssertionError('Orbit did not change the image')
+        if np.abs(before-orbited).mean()<.001: raise AssertionError('Orbit did not change the image')
         self.navigate('dolly',0,-35)
         dolly=yield from self.image('09-camera-dolly',1,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(orbited,dolly))/len(dolly)<.001: raise AssertionError('Dolly did not change the image')
+        if np.abs(orbited-dolly).mean()<.001: raise AssertionError('Dolly did not change the image')
         yield from self.capture('09-native-pathtraced-solaris.png')
         previous=self.frames[-1]['generation']; old_size=(self.frames[-1]['frame']['width'],self.frames[-1]['frame']['height'])
         hou.qt.mainWindow().showNormal(); hou.qt.mainWindow().resize(1800,1100)
@@ -201,20 +212,9 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         yield from self.capture('10-resize-solaris.png')
 
     def capture(self,name,selected=False):
-        # Native flipbook dispatch captures the actual Solaris compositor.
-        # QWidget.grab must not re-enter Houdini's Vulkan/GL viewport painting.
-        import hdefereval
         from PySide6 import QtGui
-        viewer=integration.scene_viewer(); path=self.output/name; done=[]
-        def flipbook():
-            settings=viewer.flipbookSettings().stash()
-            settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
-            settings.beautyPassOnly(False)
-            settings.useResolution(False); settings.output(str(path))
-            viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
-            done.append(True)
-        hdefereval.execute_deferred(flipbook)
-        while not path.is_file(): yield
+        path=self.output/name
+        done=yield from flipbook(path)
         # The flipbook's nested event loop ends on the renderer's next update; the test must not go on (or quit) inside it.
         self.update()
         while not done: yield
@@ -222,20 +222,18 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         while image.isNull():
             yield
             image=QtGui.QImage(str(path)).convertToFormat(QtGui.QImage.Format_RGBA8888)
-        pixels=bytes(image.constBits()); stride=image.bytesPerLine()
-        lit=sum(sum(pixels[y*stride+x*4:y*stride+x*4+3])>45
-                for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
-        red=sum(pixels[y*stride+x*4]>20 and pixels[y*stride+x*4]>pixels[y*stride+x*4+1]*1.5 and pixels[y*stride+x*4]>pixels[y*stride+x*4+2]*1.5
-                for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
-        blue=sum(pixels[y*stride+x*4+2]>30 and pixels[y*stride+x*4+2]>pixels[y*stride+x*4]*1.5 and pixels[y*stride+x*4+2]>pixels[y*stride+x*4+1]*1.3
-                for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
+        pixels=np.frombuffer(bytes(image.constBits()),dtype=np.uint8).reshape(image.height(),image.bytesPerLine())[:,:image.width()*4].reshape(image.height(),image.width(),4).copy()
+        r,g,b=np.moveaxis(pixels[50:image.height()-30:2,30:image.width()-30:2,:3].astype(float),-1,0)
+        lit=int((r+g+b>45).sum())
+        red=int(((r>20)&(r>g*1.5)&(r>b*1.5)).sum())
+        blue=int(((b>30)&(b>r*1.5)&(b>g*1.3)).sum())
         # Houdini's selection highlight tints the selected red cube.
         if lit<image.width()*image.height()*.005 or (not selected and red<image.width()*image.height()*.0001):
             raise AssertionError(f'Solaris did not display the red cube: {name}, lit={lit}, red={red}')
         if self.frames[-1]['meshes']>=4 and blue<image.width()*image.height()*.0001:
             raise AssertionError('Solaris did not display the native blue meshes: '+name)
         self.captures.append(dict(file=name,width=image.width(),height=image.height(),lit_pixels=lit,red_pixels=red,blue_pixels=blue))
-        return np.frombuffer(pixels,dtype=np.uint8).reshape(image.height(),stride)[:,:image.width()*4].reshape(image.height(),image.width(),4).copy()
+        return pixels
 
     def navigate(self,action,dx,dy):
         viewport=integration.scene_viewer().curViewport(); camera=viewport.defaultCamera()

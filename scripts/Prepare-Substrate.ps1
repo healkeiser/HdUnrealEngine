@@ -12,8 +12,7 @@ if ((-not $InputUsd -and -not $GraphJob) -or ($InputUsd -and $GraphJob)) {throw 
 $HoudiniRoot=Get-HdUELocalPath houdini_root -Value $HoudiniRoot -Optional:([bool]$GraphJob)
 $EditorRoot=Get-HdUELocalPath editor_root -Value $EditorRoot
 $TaskRoot=Split-Path -Parent $PSScriptRoot
-$RunOutput=if ($OutputDirectory) {[IO.Path]::GetFullPath($OutputDirectory)} else {Join-Path $TaskRoot ('out\substrate-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))}
-if (Test-Path -LiteralPath $RunOutput) {throw 'Choose a fresh Substrate output directory.'}
+$RunOutput=New-HdUERun -Name substrate -Path $OutputDirectory
 if (-not $Destination.StartsWith('/Game/HdUE/')) {throw 'Substrate assets must be prepared below /Game/HdUE/.'}
 $Arguments=if ($GraphJob) {@('export-job',[IO.Path]::GetFullPath($GraphJob),'--output',$RunOutput,'--destination',$Destination)} else {@('export',[IO.Path]::GetFullPath($InputUsd),'--output',$RunOutput,'--destination',$Destination)}
 if ($MaterialXLibrary) {$Arguments+=@('--library',[IO.Path]::GetFullPath($MaterialXLibrary))}
@@ -24,10 +23,7 @@ if ($GraphJob) {
 }
 if ($LASTEXITCODE) {throw 'Substrate graph export failed.'}
 $Project=Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
-if (-not $SkipBuild) {
-    & (Join-Path $EditorRoot 'Engine\Build\BatchFiles\Build.bat') HdUEBackendEditor Win64 Development "-Project=$Project" -gather -WaitMutex -NoHotReload *> (Join-Path $RunOutput 'build.log')
-    if ($LASTEXITCODE) {throw 'Substrate commandlet build failed.'}
-}
+if (-not $SkipBuild) {Build-HdUEEditor $EditorRoot *> (Join-Path $RunOutput 'build.log')}
 $Editor=Join-Path $EditorRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $Manifests=Get-Content -LiteralPath (Join-Path $RunOutput 'export.json') -Raw | ConvertFrom-Json
 $Compiled=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
