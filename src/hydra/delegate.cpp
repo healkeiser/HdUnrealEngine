@@ -340,19 +340,8 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 (TfGetenv("HDUE_USER_DIR").empty() ? "" : " -userdir=\"" + TfGetenv("HDUE_USER_DIR") + "\"");
             init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
+            // initialize returns once UE's world and RHI are up (the backend is then ready), or throws.
             host.backend->initialize(init);
-            // UE reports ready only after its first ticks.
-            HdueStatus status{};
-            status.struct_size = sizeof(status);
-            for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready);
-                 ++i) {
-                host.tick();
-                host.backend->require(host.backend->api().get_status(&status), "get_status");
-                if (status.state == HDUE_STATE_FAILED) break;
-                Sleep(10);
-            }
-            if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
-                throw std::runtime_error(std::string("hdUE: UE did not become ready: ") + status.message);
             std::atexit([] { shutdownSelfHost(); });
             started->set_value();
         } catch (const std::exception& e) {
