@@ -7,7 +7,6 @@ import argparse
 import json
 import math
 from pathlib import Path
-import struct
 import sys
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -56,18 +55,14 @@ def generate(folder):
 
 
 def check(folder,renders):
+    from compare_pfm import read
     checks=json.loads((folder/'expected.json').read_text()); results=[]
     metrics=json.loads((renders/'metrics.json').read_text()); assert metrics['passed']
     for frame in metrics['frames']:
-        path=renders/(frame['label']+'.pfm')
-        with path.open('rb') as file:
-            assert file.readline().strip()==b'PF'
-            width,height=map(int,file.readline().split()); scale=float(file.readline()); pixels=file.read()
+        pixels=read(renders/(frame['label']+'.pfm')); height,width,_=pixels.shape
         for item in checks:
             x,z=item['center']; px=round(width*(.5+x/288)); py=round(height*(.5+z/162)) # bottom-up PFM
-            samples=[struct.unpack_from(('<' if scale<0 else '>')+'3f',pixels,((py+dy)*width+px+dx)*12)
-                     for dx in range(-2,3) for dy in range(-2,3)]
-            actual=[sum(p[c] for p in samples)/len(samples) for c in range(3)]
+            actual=[float(v) for v in pixels[py-2:py+3,px-2:px+3].mean(axis=(0,1))]
             error=max(abs(a-b) for a,b in zip(actual,item['expected']))
             if not all(math.isfinite(v) for v in actual) or error>.035:
                 raise AssertionError(f"{frame['mode']} {item['name']}: expected {item['expected']}, got {actual}")

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import threading
 import hou
+import numpy as np
 from pxr import UsdGeom,UsdShade
 from PySide6 import QtGui
 import hdue_houdini as integration
@@ -62,7 +63,7 @@ class Test(ViewportTest):
             edit.setDisplayFlag(True)
             integration.set_mode('realtime')
             edited=yield from self.image('03-subset-rebound',0,self.frames[-1]['generation'])
-            if sum(abs(a-b) for a,b in zip(original,edited))/len(original)<.0001:
+            if float(np.abs(original-edited).mean())<.0001:
                 raise AssertionError('GeomSubset material edit did not reach the image')
             edit.parm('python').set('import hou\nstage=hou.pwd().editableStage()\nstage.OverridePrim('+repr(str(subset.GetPath()))+').SetActive(False)')
             edit.cook(force=True); viewer.curViewport().draw()

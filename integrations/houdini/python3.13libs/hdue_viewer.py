@@ -7,6 +7,14 @@ import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 
 
+def write_pfm(path,image):
+    """A float image (rows top-down; 3 channels, or 2D for one) as little-endian PFM, whose rows run bottom-up."""
+    height,width=image.shape[:2]
+    with Path(path).open('wb') as output:
+        output.write(f'{"PF" if image.ndim==3 else "Pf"}\n{width} {height}\n-1.0\n'.encode('ascii'))
+        output.write(np.ascontiguousarray(image[::-1],dtype='<f4').tobytes())
+
+
 class Canvas(QtWidgets.QWidget):
     def __init__(self,parent):
         super().__init__(parent)
@@ -111,10 +119,7 @@ class Viewer(QtWidgets.QDialog):
 
     def write_hdr(self,path):
         if self.linear is None: raise RuntimeError('No completed image')
-        height,width,_=self.linear.shape
-        with Path(path).open('wb') as output:
-            output.write(f'PF\n{width} {height}\n-1.0\n'.encode('ascii'))
-            output.write(np.ascontiguousarray(self.linear[::-1,:,:3],dtype='<f4').tobytes())
+        write_pfm(path,self.linear[:,:,:3])
 
     def save_hdr(self):
         if self.linear is None: return

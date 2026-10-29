@@ -2,6 +2,7 @@
 import ctypes as C
 import threading
 import hou
+import numpy as np
 from pxr import UsdGeom
 from lighting_api import Lighting,Status
 import hdue_houdini as integration
@@ -55,7 +56,7 @@ class Test(ViewportTest):
         edit.setDisplayFlag(True); integration.set_mode('realtime')
         rotated=yield from self.image('03-hdri-rotated',0,self.frames[-1]['generation'])
         self.lighting(0)
-        if sum(abs(a-b) for a,b in zip(original,rotated))/len(original)<.001:
+        if float(np.abs(original-rotated).mean())<.001:
             raise AssertionError('HDRI edit did not change the image')
         edit.parm('python').set(prefix+'UsdGeom.Imageable(stage.GetPrimAtPath('+repr(path)+')).MakeInvisible()')
         yield from self.image('04-hdri-hidden',0,self.frames[-1]['generation'])

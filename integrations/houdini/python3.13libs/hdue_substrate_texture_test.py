@@ -1,5 +1,6 @@
 """Exercise directly connected textures in an owned editable Solaris HIP."""
 import hou
+import numpy as np
 from pxr import UsdGeom
 import hdue_houdini as integration
 from hdue_materialx_test import Test as MaterialTest
@@ -27,17 +28,17 @@ class Test(MaterialTest):
         network.node('uv').parmTuple('scale').set((3,1))
         network.node('uv').parmTuple('offset').set((.3,0))
         uv=yield from self.image('01b-live-uv-lumen',0,self.frames[-1]['generation'])
-        difference=sum(abs(a-b) for a,b in zip(initial,uv))/len(uv)
+        difference=float(np.abs(initial-uv).mean())
         if difference<1e-4: raise AssertionError('Direct UV scale/offset did not update the image')
         self.stats['live_uv_difference']=difference
         network.node('roughness').parm('channel').set('r')
         network.node('coat').parm('roughness').set(.35)
         network.node('coat').parmTuple('f0').set((.15,.08,.03))
         slab=yield from self.image('01c-live-slab-channel-lumen',0,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(uv,slab))/len(slab)<1e-4: raise AssertionError('Direct Slab/channel controls did not update')
+        if float(np.abs(uv-slab).mean())<1e-4: raise AssertionError('Direct Slab/channel controls did not update')
         network.node('normal').parm('flip_green').set(0)
         flipped=yield from self.image('01d-live-flip-green-lumen',0,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(slab,flipped))/len(slab)<1e-6: raise AssertionError('Flip Green did not update')
+        if float(np.abs(slab-flipped).mean())<1e-6: raise AssertionError('Flip Green did not update')
         network.node('uv').parmTuple('scale').set((2,1)); network.node('uv').parmTuple('offset').set((.125,0))
         network.node('roughness').parm('channel').set('g'); network.node('coat').parm('roughness').set(.06)
         network.node('coat').parmTuple('f0').set((.02,.02,.02)); network.node('normal').parm('flip_green').set(1)
@@ -47,7 +48,7 @@ class Test(MaterialTest):
         original=yield from self.image('02-texture-pathtraced',1,self.frames[-1]['generation'])
         network.node('uv').parmTuple('offset').set((.4,0)); network.node('coat').parm('roughness').set(.35)
         direct=yield from self.image('02b-direct-controls-pathtraced',1,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(original,direct))/len(direct)<1e-4: raise AssertionError('Automatic parameters did not update Path Tracer')
+        if float(np.abs(original-direct).mean())<1e-4: raise AssertionError('Automatic parameters did not update Path Tracer')
         network.node('uv').parmTuple('offset').set((.125,0)); network.node('coat').parm('roughness').set(.06)
         original=yield from self.image('02c-direct-controls-restored',1,self.frames[-1]['generation'])
         before=surface.status(session); generation=self.api.status()['generation']
@@ -55,7 +56,7 @@ class Test(MaterialTest):
         for i in range(100): network.node('normal_strength').parm('value').set(1-(i+1)/100)
         if author.cookCount()!=cooks: raise AssertionError('A VOP callback forced cooks during a parameter-edit burst')
         flat=yield from self.image('03-normal-strength-zero',1,generation)
-        difference=sum(abs(a-b) for a,b in zip(original,flat))/len(original)
+        difference=float(np.abs(original-flat).mean())
         if difference<1e-5: raise AssertionError('Normal Map strength had no visible effect')
         after=surface.status(session)
         if before['geometry_uploads']!=after['geometry_uploads'] or before['mask_uploads']!=after['mask_uploads']:

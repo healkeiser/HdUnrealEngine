@@ -24,21 +24,12 @@ def collect(stage,time,entries):
 
 def export(scene,library,output,destination,time):
     from prepare_renderer_settings import export as material_settings
-    from materialx_controls import MaterialXLibrary
-    from types import SimpleNamespace
+    from materialx_controls import MaterialXLibrary,OfflineView
     stage=Usd.Stage.Open(str(scene.resolve()))
     entries={}
     if library:
         # The same resolver/identity rules are used by both interactive hosts.
-        class Signal:
-            def connect(self,callback): pass
-        class View:
-            _renderer=object()
-            def __init__(self): self.settings={}
-            def GetRendererSetting(self,name): return self.settings.get(name)
-            def SetRendererSetting(self,name,value): self.settings[name]=value
-        view=View(); model=SimpleNamespace(stage=stage,currentFrame=time,signalStageReplaced=Signal(),signalPrimsChanged=Signal())
-        prepared=MaterialXLibrary(library,SimpleNamespace(_dataModel=model,_stageView=view))
+        prepared=MaterialXLibrary(library,OfflineView(stage,time,object()))
         if not prepared.sync(): raise ValueError(prepared.preparation_error)
         entries=prepared.bound_entries
     export_records(collect(stage,time,entries),output,destination)

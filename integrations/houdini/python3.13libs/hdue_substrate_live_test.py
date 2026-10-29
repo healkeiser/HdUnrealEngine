@@ -2,6 +2,7 @@
 import os
 import time
 import hou
+import numpy as np
 import hdue_houdini as integration
 import hdue_substrate
 from hdue_materialx_test import Test as MaterialTest
@@ -28,13 +29,13 @@ class Test(MaterialTest):
         ticks=self.host.runtime.ticks
         yield from self.ready(1)
         added=yield from self.image('02-node-added-lumen',0,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(original,added))/len(added)<1e-4:
+        if float(np.abs(original-added).mean())<1e-4:
             raise AssertionError('The newly compiled topology did not change the image')
         if self.host.runtime.ticks-ticks<20: raise AssertionError('UE did not tick during background preparation')
         started=live.started
         tint.parmTuple('value').set((.02,.6,.04))
         edited=yield from self.image('03-added-node-live-value',0,self.frames[-1]['generation'])
-        if sum(abs(a-b) for a,b in zip(added,edited))/len(edited)<1e-4:
+        if float(np.abs(added-edited).mean())<1e-4:
             raise AssertionError('Generated parameters on the new material did not update live')
         if live.started!=started: raise AssertionError('A live parameter value unnecessarily recompiled the graph')
         integration.set_mode('pathtraced')
