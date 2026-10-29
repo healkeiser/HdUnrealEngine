@@ -412,6 +412,7 @@ HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateCamera(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
+HdSprim* HdUECreateUnsupportedLight(const SdfPath&, const TfToken&);
 void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
 
 HdUEState::~HdUEState() {
@@ -503,7 +504,8 @@ struct ScenePacket {
     std::vector<HdueWetBinding> wet;
     std::vector<const char*> removed, removedAssets;
     std::vector<std::string> genericMeshes;  // non-native meshes, whose geometry revision the upload advances
-    bool autoLight = false, surfaceUpdate = false;
+    bool autoLight = false, surfaceUpdate = false, sendLinks = false;
+    std::map<std::string, uint32_t> linkedLights, linkedObjects;  // prepareLinks
     int cameraLights = 0;
     uint32_t nativeLights = 0;
 };
@@ -724,6 +726,64 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
     }
 }
+// Light linking on UE's three lighting channels: each lightLink collection gets a channel. Unlinked lights keep every
+// channel; channel 0 is then every object's, so they still reach objects outside all collections. UE has no per-light
+// shadow exclusion: an object stops casting only when it is outside every shadow-casting light's shadowLink.
+void prepareLinks(HdUEState& state, ScenePacket& packet) {
+    std::set<TfToken> links, shadowLinks;
+    bool base = false, shadows = false, allShadows = false;
+    static std::once_flag domeWarned, channelsWarned, shadowWarned;
+    for (const auto& [id, light] : state.lights) {
+        if (!active(light)) continue;
+        if (light.type == HDUE_DOME_LIGHT && !light.lightLink.IsEmpty())
+            std::call_once(domeWarned, [&] {
+                TF_WARN("hdUE: UE sky lights light everything; lightLink ignored (%s)", id.c_str());
+            });
+        else if (light.type != HDUE_DOME_LIGHT)
+            light.lightLink.IsEmpty() ? void(base = true) : void(links.insert(light.lightLink));
+        if (light.flags & HDUE_LIGHT_SHADOWS) {
+            shadows = true;
+            light.shadowLink.IsEmpty() ? void(allShadows = true) : void(shadowLinks.insert(light.shadowLink));
+        }
+    }
+    if (links.size() > 3) base = true;  // lights beyond the channels light everything
+    std::map<TfToken, uint32_t> channels;
+    for (const auto& link : links)
+        if (channels.size() < 3u - base) channels.emplace(link, 1u << (channels.size() + base));
+    if (channels.size() < links.size())
+        std::call_once(channelsWarned, [&] {
+            TF_WARN(
+                "hdUE: %zu light-link collections; UE has 3 lighting channels, so %zu linked lights light everything",
+                links.size(), links.size() - channels.size());
+        });
+    if (!shadowLinks.empty() && (allShadows || shadowLinks.size() > 1))
+        std::call_once(shadowWarned, [] {
+            TF_WARN("hdUE: shadow linking only removes the shadows of objects outside every light's shadowLink");
+        });
+    for (const auto& [id, light] : state.lights) {
+        const auto channel = channels.find(light.lightLink);
+        packet.linkedLights[id] = channel == channels.end() ? 0 : channel->second;
+        const auto sent = state.linkedLights.find(id);
+        if ((sent == state.linkedLights.end() ? 0 : sent->second) != packet.linkedLights[id])
+            packet.dirtyLights.insert(id);
+    }
+    if (!channels.empty() || (shadows && !allShadows))
+        for (const auto& [id, mesh] : state.meshes) {
+            uint32_t flags = channels.empty() ? HDUE_LINK_CHANNELS : base;
+            bool casts = !shadows || allShadows;
+            for (const auto& category : mesh.categories) {
+                if (const auto channel = channels.find(category); channel != channels.end()) flags |= channel->second;
+                casts |= shadowLinks.count(category) > 0;
+            }
+            if (!casts) flags |= HDUE_LINK_NO_SHADOW;
+            if (flags != HDUE_LINK_CHANNELS) packet.linkedObjects[id] = flags;
+        }
+    for (const auto& [id, flags] : packet.linkedObjects) trace("hdUE link %s flags=%u\n", id.c_str(), flags);
+    for (const auto& [id, channels] : packet.linkedLights)
+        trace("hdUE light %s channels=%u (%s)\n", id.c_str(), channels, state.lights[id].lightLink.GetText());
+    packet.sendLinks =
+        packet.linkedObjects != (packet.firstBatch ? decltype(packet.linkedObjects){} : state.linkedObjects);
+}
 void prepareLights(HdUEState& state, ScenePacket& packet) {
     const double viewerIntensity =
         state.setting<double>("viewerLightIntensity", state.setting<float>("viewerLightIntensity", 4.f));
@@ -761,6 +821,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         light.ies_file = packet.own(source ? source->ies : "");
         light.ies_angle_scale = source ? source->iesAngleScale : 0;
         light.ies_normalize = source && source->iesNormalize;
+        if (source) light.lighting_channels = packet.linkedLights[source->id];
         for (int c = 0; c < 3; ++c) {
             light.position_cm[c] = legacy.position[c];
             light.color[c] = legacy.color[c];
@@ -924,6 +985,7 @@ void prepareScene(HdUEState& state, ScenePacket& packet) {
     prepareSurfaceEffects(state, packet);
     prepareMaterials(state, packet);
     prepareMeshes(state, packet);
+    prepareLinks(state, packet);
     prepareLights(state, packet);
     prepareVolumes(state, packet);
     for (const auto& id : packet.removedIds) packet.removed.push_back(packet.own(id));
@@ -963,9 +1025,21 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         if (syncs)
             trace("hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads\n", syncs, syncMs);
     }
-    if (lightingApi.upsert && !packet.extendedLights.empty()) {
+    if (lightingApi.upsert && (!packet.extendedLights.empty() || packet.sendLinks)) {
         HdueLightBatch update{sizeof(HdueLightBatch), uint32_t(packet.extendedLights.size()),
                               packet.extendedLights.data()};
+        std::vector<const char*> ids;
+        std::vector<uint32_t> links;
+        for (const auto& [id, flags] : packet.linkedObjects) {
+            ids.push_back(id.c_str());
+            links.push_back(flags);
+        }
+        if (packet.sendLinks) {
+            update.flags = HDUE_LIGHT_BATCH_LINKS;
+            update.object_count = uint32_t(ids.size());
+            update.object_ids = ids.data();
+            update.object_links = links.data();
+        }
         backend.require(lightingApi.upsert(session, &update), "upsert_lights");
     }
     const auto& assetApi = backend.asset_api();
@@ -1000,6 +1074,8 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
     state.viewerLights = packet.cameraLights + (packet.autoLight ? 2 : 0);
     if (packet.surfaceUpdate) state.surfaceStatus = surface;
     state.submittedNativeLights = packet.nativeLights;
+    state.linkedLights = packet.linkedLights;
+    if (packet.sendLinks) state.linkedObjects = packet.linkedObjects;
     ++state.sceneSubmissions;
     state.submittedRevision = packet.revision;
     state.firstBatch = false;
@@ -2226,7 +2302,8 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
     static TfTokenVector t{
         HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,    HdPrimTypeTokens->extComputation,
         HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
-        HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,   HdPrimTypeTokens->cylinderLight};
+        HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,   HdPrimTypeTokens->cylinderLight,
+        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight")};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -2265,6 +2342,8 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == HdPrimTypeTokens->domeLight) return HdUECreateLight(id, HDUE_DOME_LIGHT);
     if (type == HdPrimTypeTokens->diskLight) return HdUECreateLight(id, HDUE_DISK_LIGHT);
     if (type == HdPrimTypeTokens->cylinderLight) return HdUECreateLight(id, HDUE_CYLINDER_LIGHT);
+    if (type == HdPrimTypeTokens->meshLight || type == HdPrimTypeTokens->pluginLight || type == TfToken("portalLight"))
+        return HdUECreateUnsupportedLight(id, type);
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {

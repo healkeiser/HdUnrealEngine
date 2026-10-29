@@ -4,6 +4,7 @@
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdsi/implicitSurfaceSceneIndex.h"
+#include "pxr/imaging/hdsi/lightLinkingSceneIndex.h"
 PXR_NAMESPACE_OPEN_SCOPE
 class HdUE_ImplicitSurfaceSceneIndexPlugin final : public HdSceneIndexPlugin {
 protected:
@@ -18,11 +19,26 @@ protected:
                                                HdPrimTypeTokens->capsule, toMesh, HdPrimTypeTokens->plane, toMesh));
     }
 };
-TF_REGISTRY_FUNCTION(TfType) { HdSceneIndexPluginRegistry::Define<HdUE_ImplicitSurfaceSceneIndexPlugin>(); }
+// Light linking: the stage scene index carries lightLink/shadowLink as collections; this resolves them into the
+// category ids lights report (GetLightParamValue lightLink/shadowLink) and the categories of each prim (GetCategories).
+class HdUE_LightLinkingSceneIndexPlugin final : public HdSceneIndexPlugin {
+protected:
+    HdSceneIndexBaseRefPtr _AppendSceneIndex(const HdSceneIndexBaseRefPtr& input,
+                                             const HdContainerDataSourceHandle&) override {
+        return HdsiLightLinkingSceneIndex::New(input, nullptr);
+    }
+};
+TF_REGISTRY_FUNCTION(TfType) {
+    HdSceneIndexPluginRegistry::Define<HdUE_ImplicitSurfaceSceneIndexPlugin>();
+    HdSceneIndexPluginRegistry::Define<HdUE_LightLinkingSceneIndexPlugin>();
+}
 TF_REGISTRY_FUNCTION(HdSceneIndexPlugin) {
     // The renderer display name from plugInfo.json.
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
         "Unreal Engine (hdUE)", TfToken("HdUE_ImplicitSurfaceSceneIndexPlugin"), nullptr, 0,
+        HdSceneIndexPluginRegistry::InsertionOrderAtStart);
+    HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
+        "Unreal Engine (hdUE)", TfToken("HdUE_LightLinkingSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
 }
 PXR_NAMESPACE_CLOSE_SCOPE

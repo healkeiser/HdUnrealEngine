@@ -38,6 +38,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
     prototype.maskErrors = mesh.maskErrors;
     prototype.sourceId = mesh.sourceId;
     prototype.primId = mesh.primId;
+    prototype.categories = mesh.categories;
     prototype.instanced = mesh.instanced;
     prototype.instances = mesh.instances;
     prototype.instanceColors = mesh.instanceColors;

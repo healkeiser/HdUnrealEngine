@@ -75,6 +75,7 @@ public:
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
     void RemoveVolume(const FString& Id);
     void SetTransforms(const FString& Id, uint32 Count, const double* Matrices);  // hdue/motion_api.h
+    void ApplyLinks();  // Lighting's object table to every mesh (after a light batch replaced it)
     FHdueNativeAssets Assets;
     TUniquePtr<FHdueLighting> Lighting;
 

@@ -1295,6 +1295,7 @@ HdueResult HDUE_CALL UpsertLights(HdueSession Handle, const HdueLightBatch* Batc
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
     if (!Runtime.Session->Scene->Lighting->Apply(*Batch, Runtime.Error)) return HDUE_INVALID_ARGUMENT;
+    if (Batch->flags & HDUE_LIGHT_BATCH_LINKS) Runtime.Session->Scene->ApplyLinks();
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
     Runtime.World->SetShouldTick(true);

@@ -380,6 +380,7 @@ public:
         }
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         mesh.primId = GetPrimId();
+        mesh.categories = delegate->GetCategories(GetId());
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
@@ -611,8 +612,10 @@ public:
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
                  previous->second.instanceColors != part.instanceColors);
             const auto id = part.id;
+            // Link categories change no geometry: the next upload recomputes the light-link table (prepareLinks).
             const bool maskChanged = previous == missing || previous->second.masks != part.masks ||
-                                     previous->second.maskErrors != part.maskErrors;
+                                     previous->second.maskErrors != part.maskErrors ||
+                                     previous->second.categories != part.categories;
             state->meshes[id] = std::move(part);
             state->removed.erase(id);
             state->erasedMeshes.erase(id);
@@ -718,13 +721,15 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
                             previous->second.indices == mesh.indices
                         ? previous->second.pickMesh
                         : nullptr;  // built on first pick
+    const bool relinked = previous != state.meshes.end() && previous->second.categories != mesh.categories;
     const auto key = mesh.id;
     state.meshes[key] = std::move(mesh);
     state.removed.erase(key);
     if (changed) {
         state.dirtyMeshes.insert(key);
         ++state.revision;
-    }
+    } else if (relinked)
+        ++state.revision;
 }
 HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     HdUEMeshData mesh;
@@ -735,6 +740,7 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.visible = delegate->GetVisible(prim.GetId());
     mesh.renderTag = delegate->GetRenderTag(prim.GetId());
     mesh.primId = prim.GetPrimId();
+    mesh.categories = delegate->GetCategories(prim.GetId());
     return mesh;
 }
 // Placements of an rprim under a Hydra instancer (its own transform first), or empty when not instanced.
@@ -1208,6 +1214,21 @@ public:
         }
         data.iesAngleScale = value(get("shaping:ies:angleScale"), 0.f);
         data.iesNormalize = value(get("shaping:ies:normalize"), false);
+        data.lightLink = value(get("lightLink"), TfToken());
+        data.shadowLink = value(get("shadowLink"), TfToken());
+        // DomeLight_1 poleAxis: UsdImaging resolves it (and "scene" against the stage up axis) into domeOffset, a
+        // rotation of the dome alone, applied in its local space before its transform.
+        if (const auto offset = get("domeOffset"); type_ == HDUE_DOME_LIGHT && offset.IsHolding<GfMatrix4d>())
+            data.transform = offset.UncheckedGet<GfMatrix4d>() * data.transform;
+        // Valid UsdLux that UE cannot show: warned once per process, as Karma ignores what it does not support.
+        static std::once_flag filtersWarned, shadowColorWarned;
+        if (!value(get("filters"), SdfPathVector()).empty())
+            std::call_once(filtersWarned,
+                           [&] { TF_WARN("hdUE: light filters are not supported (%s)", GetId().GetText()); });
+        if (value(get("shadow:color"), GfVec3f(0)) != GfVec3f(0))
+            std::call_once(shadowColorWarned, [&] {
+                TF_WARN("hdUE: shadow:color is not supported; shadows stay black (%s)", GetId().GetText());
+            });
         auto texture = get("texture:file");
         if (applicationLight.IsHolding<GlfSimpleLight>() &&
             applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
@@ -1256,7 +1277,8 @@ public:
             old->second.angle == data.angle && old->second.coneAngle == data.coneAngle &&
             old->second.coneSoftness == data.coneSoftness && old->second.textureFormat == data.textureFormat &&
             old->second.ies == data.ies && old->second.iesAngleScale == data.iesAngleScale &&
-            old->second.iesNormalize == data.iesNormalize) {
+            old->second.iesNormalize == data.iesNormalize && old->second.lightLink == data.lightLink &&
+            old->second.shadowLink == data.shadowLink) {
             *bits = Clean;
             return;
         }
@@ -1324,6 +1346,23 @@ void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
             if (auto* delegate = index->GetSceneDelegateForRprim(id)) mesh->RefreshSelectedMasks(delegate, state);
 }
 HdSprim* HdUECreateLight(const SdfPath& id, uint32_t type) { return new Light(id, type); }
+// Mesh, plugin and portal lights render nothing in hdUE. Hydra drops Sprim types a delegate does not support, silently;
+// accepting them says so once per type.
+HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
+    struct Unsupported final : HdLight {
+        TfToken type;
+        Unsupported(const SdfPath& id, const TfToken& type) : HdLight(id), type(type) {}
+        HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
+        void Sync(HdSceneDelegate*, HdRenderParam*, HdDirtyBits* bits) override {
+            static std::mutex mutex;
+            static std::set<TfToken> warned;
+            if (std::lock_guard lock(mutex); !GetId().IsEmpty() && warned.insert(type).second)
+                TF_WARN("hdUE: %s is not supported and renders nothing (%s)", type.GetText(), GetId().GetText());
+            *bits = Clean;
+        }
+    };
+    return new Unsupported(id, type);
+}
 // Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
 void HdUETakeMeshSyncStats(double& milliseconds, int& count) {
     milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0;
