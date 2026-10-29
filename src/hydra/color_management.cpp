@@ -7,7 +7,7 @@
 #if defined(HDUE_HOUDINI)
 #include <OpenColorIO/OpenColorIO.h>
 #include <OpenImageIO/imagebuf.h>
-#include <OpenImageIO/imagebufalgo.h>
+#include <chrono>
 namespace OCIO = OCIO_NAMESPACE;
 #endif
 #include <filesystem>
@@ -17,11 +17,14 @@ namespace OCIO = OCIO_NAMESPACE;
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
+// UE's working space, by its name in OCIO's built-in config: OCIO relates it to the host config through the config's
+// interchange role (ACES2065-1), whatever the config calls its own linear Rec.709 space, if it has one.
+constexpr const char* Rec709 = "Linear Rec.709 (sRGB)";
 struct ColorManagement {
-    std::string sceneLinear = "Linear Rec.709 (sRGB)", rec709 = "Linear Rec.709 (sRGB)";
+    std::string sceneLinear = Rec709;
     bool identity = true;
 #if defined(HDUE_HOUDINI)
-    OCIO::ConstConfigRcPtr config;  // null: no colour management (disabled, or no linear Rec.709 space)
+    OCIO::ConstConfigRcPtr config;  // null: no colour management (disabled, or not relatable to linear Rec.709)
     OCIO::ConstCPUProcessorRcPtr toScene, fromScene;
 #endif
 };
@@ -36,23 +39,14 @@ const ColorManagement& management() {
             const auto scene = config->getColorSpace(OCIO::ROLE_SCENE_LINEAR);
             if (!scene) return;
             result.sceneLinear = scene->getName();
-            // UE's working space: linear Rec.709 under any of its usual names or aliases.
-            OCIO::ConstColorSpaceRcPtr rec709;
-            for (const char* name :
-                 {"lin_rec709", "Linear Rec.709 (sRGB)", "lin_srgb", "Utility - Linear - sRGB", "linear", "Linear"})
-                if ((rec709 = config->getColorSpace(name))) break;
-            if (!rec709) {
-                TF_WARN("hdUE: OCIO config has no linear Rec.709 colour space; output stays linear Rec.709");
-                return;
-            }
-            result.rec709 = rec709->getName();
-            result.config = config;
-            if (std::string(rec709->getName()) == scene->getName()) return;
-            result.toScene = config->getProcessor(rec709, scene)->getDefaultCPUProcessor();
-            result.fromScene = config->getProcessor(scene, rec709)->getDefaultCPUProcessor();
+            result.toScene = OCIO::Config::GetProcessorFromBuiltinColorSpace(Rec709, config, scene->getName())
+                                 ->getDefaultCPUProcessor();
+            result.fromScene = OCIO::Config::GetProcessorToBuiltinColorSpace(config, scene->getName(), Rec709)
+                                   ->getDefaultCPUProcessor();
             result.identity = result.toScene->isNoOp();
+            result.config = config;
         } catch (const OCIO::Exception& error) {
-            TF_WARN("hdUE: OCIO colour management disabled: %s", error.what());
+            TF_WARN("hdUE: OCIO colour management disabled (output stays linear Rec.709): %s", error.what());
         }
 #endif
     });
@@ -105,6 +99,7 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
     const bool unnamed = space.empty() || TfStringToLower(space) == "auto";
     if (!m.config || HdUERawColorSpace(space) || HdUESRGBColorSpace(space) || (unnamed && !floating)) return file;
     const std::string from = unnamed ? m.sceneLinear : space;
+    OCIO::ConstCPUProcessorRcPtr processor;
     try {
         const auto source = m.config->getColorSpace(from.c_str());
         if (!source) {
@@ -116,7 +111,10 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
                         from.c_str());
             return file;
         }
-        if (source->isData() || m.config->getProcessor(source->getName(), m.rec709.c_str())->isNoOp()) return file;
+        if (source->isData()) return file;
+        processor = OCIO::Config::GetProcessorToBuiltinColorSpace(m.config, source->getName(), Rec709)
+                        ->getDefaultCPUProcessor();
+        if (processor->isNoOp()) return file;
     } catch (const OCIO::Exception& error) {
         TF_WARN("hdUE: %s: %s", from.c_str(), error.what());
         return file;
@@ -124,22 +122,40 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
     std::error_code error;
     const auto stamp = std::filesystem::last_write_time(file, error);
     if (error) return file;
-    const auto key = std::hash<std::string>{}(file + "|" + from + "|" + m.rec709 + "|" +
+    const auto key = std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + "|" +
                                               std::to_string(stamp.time_since_epoch().count()));
     const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
     const auto cached = folder / (std::to_string(key) + ".exr");
-    if (std::filesystem::exists(cached, error)) return cached.string();
     static std::mutex convert;
     std::lock_guard lock(convert);
-    if (std::filesystem::exists(cached, error)) return cached.string();
+    // UE copies textures when they load, so the cache only saves converting again. Each process first evicts the
+    // conversions it has not used for a week, and a hit counts as a use.
+    static std::once_flag evict;
+    std::call_once(evict, [&] {
+        const auto expired = std::filesystem::file_time_type::clock::now() - std::chrono::hours(24 * 7);
+        for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+            std::error_code ignored;
+            if (entry.last_write_time(ignored) < expired) std::filesystem::remove(entry.path(), ignored);
+        }
+    });
+    if (std::filesystem::exists(cached, error)) {
+        std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), error);
+        return cached.string();
+    }
     std::filesystem::create_directories(folder, error);
     // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept 8-bit.
-    OIIO::ImageBuf source(file), converted;
-    if (!source.read(0, 0, true, OIIO::TypeDesc::FLOAT) ||
-        !OIIO::ImageBufAlgo::colorconvert(converted, source, from, m.rec709) ||
-        !converted.write(cached.string(), OIIO::TypeDesc::HALF)) {
-        TF_WARN("hdUE: could not convert %s from %s to %s; using it as is", file.c_str(), from.c_str(),
-                m.rec709.c_str());
+    OIIO::ImageBuf image(file);
+    const bool read = image.read(0, 0, true, OIIO::TypeDesc::FLOAT) && image.localpixels() && image.nchannels() >= 3;
+    if (read) {
+        const auto& spec = image.spec();
+        const auto pixel = std::ptrdiff_t(spec.nchannels * sizeof(float));
+        OCIO::PackedImageDesc pixels(image.localpixels(), spec.width, spec.height * spec.depth,
+                                     std::min(spec.nchannels, 4), OCIO::BIT_DEPTH_F32, sizeof(float), pixel,
+                                     pixel * spec.width);
+        processor->apply(pixels);
+    }
+    if (!read || !image.write(cached.string(), OIIO::TypeDesc::HALF)) {
+        TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", file.c_str(), from.c_str());
         return file;
     }
     return cached.string();
