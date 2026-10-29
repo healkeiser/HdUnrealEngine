@@ -578,6 +578,10 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         Settings.LumenFinalGatherQuality = FMath::Max(Settings.LumenFinalGatherQuality, 2.f);
         Settings.LumenSceneLightingQuality = FMath::Max(Settings.LumenSceneLightingQuality, 2.f);
         Settings.LumenSceneDetail = FMath::Max(Settings.LumenSceneDetail, 2.f);
+        // Hit lighting: bounce rays shade their hits instead of reading the surface cache, which undershot the Cornell
+        // box's indirect light (0.77 of Karma's frame mean with it, 0.66 without; about 2 ms more per 1024² frame).
+        // Without hardware ray tracing UE keeps the surface cache.
+        Settings.LumenRayLightingMode = ELumenRayLightingModeOverride::HitLighting;
     }
     if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 &&
         Request.focal_length_cm > 0) {
