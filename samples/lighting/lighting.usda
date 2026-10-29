@@ -79,7 +79,8 @@ def Xform "World"
         def SphereLight "Point00"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (2, 1.5, 0)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -88,7 +89,8 @@ def Xform "World"
         def SphereLight "Point01"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.9318516525781366, 1.9, 0.5176380902050415)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -97,7 +99,8 @@ def Xform "World"
         def SphereLight "Point02"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.7320508075688774, 2.3, 0.9999999999999999)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -106,7 +109,8 @@ def Xform "World"
         def SphereLight "Point03"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.4142135623730951, 1.5, 1.4142135623730951)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -115,7 +119,8 @@ def Xform "World"
         def SphereLight "Point04"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.0000000000000002, 1.9, 1.7320508075688772)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -124,7 +129,8 @@ def Xform "World"
         def SphereLight "Point05"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (0.5176380902050415, 2.3, 1.9318516525781366)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -133,7 +139,8 @@ def Xform "World"
         def SphereLight "Point06"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.2246467991473532e-16, 1.5, 2)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -142,7 +149,8 @@ def Xform "World"
         def SphereLight "Point07"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-0.5176380902050413, 1.9, 1.9318516525781366)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -151,7 +159,8 @@ def Xform "World"
         def SphereLight "Point08"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-0.9999999999999996, 2.3, 1.7320508075688774)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -160,7 +169,8 @@ def Xform "World"
         def SphereLight "Point09"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.414213562373095, 1.5, 1.4142135623730951)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -169,7 +179,8 @@ def Xform "World"
         def SphereLight "Point10"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.7320508075688774, 1.9, 0.9999999999999999)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -178,7 +189,8 @@ def Xform "World"
         def SphereLight "Point11"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.9318516525781364, 2.3, 0.517638090205042)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -187,7 +199,8 @@ def Xform "World"
         def SphereLight "Point12"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-2, 1.5, 2.4492935982947064e-16)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -196,7 +209,8 @@ def Xform "World"
         def SphereLight "Point13"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.9318516525781366, 1.9, -0.5176380902050416)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -205,7 +219,8 @@ def Xform "World"
         def SphereLight "Point14"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.7320508075688776, 2.3, -0.9999999999999994)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -214,7 +229,8 @@ def Xform "World"
         def SphereLight "Point15"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.4142135623730958, 1.5, -1.4142135623730943)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -223,7 +239,8 @@ def Xform "World"
         def SphereLight "Point16"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-1.0000000000000009, 1.9, -1.732050807568877)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -232,7 +249,8 @@ def Xform "World"
         def SphereLight "Point17"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-0.5176380902050413, 2.3, -1.9318516525781366)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -241,7 +259,8 @@ def Xform "World"
         def SphereLight "Point18"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (-3.6739403974420594e-16, 1.5, -2)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -250,7 +269,8 @@ def Xform "World"
         def SphereLight "Point19"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (0.5176380902050406, 1.9, -1.9318516525781368)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -259,7 +279,8 @@ def Xform "World"
         def SphereLight "Point20"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.0000000000000002, 2.3, -1.7320508075688772)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -268,7 +289,8 @@ def Xform "World"
         def SphereLight "Point21"
         {
             color3f inputs:color = (1, 0.25, 0.1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.4142135623730947, 1.5, -1.4142135623730954)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -277,7 +299,8 @@ def Xform "World"
         def SphereLight "Point22"
         {
             color3f inputs:color = (0.1, 0.3, 1)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.7320508075688767, 1.9, -1.0000000000000009)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -286,7 +309,8 @@ def Xform "World"
         def SphereLight "Point23"
         {
             color3f inputs:color = (0.3, 1, 0.2)
-            float inputs:intensity = 50
+            float inputs:intensity = 1
+            float inputs:exposure = 5.644
             float inputs:radius = 0.08
             double3 xformOp:translate = (1.9318516525781362, 2.3, -0.5176380902050431)
             uniform token[] xformOpOrder = ["xformOp:translate"]
@@ -295,7 +319,8 @@ def Xform "World"
         def RectLight "Rect"
         {
             float inputs:height = 1.2
-            float inputs:intensity = 20
+            float inputs:intensity = 1
+            float inputs:exposure = 4.322
             asset inputs:texture:file = @emitter.hdr@
             float inputs:width = 0.8
             matrix4d xformOp:transform = ( (0.447213595499958, 0, 0.894427190999916, -0), (0.5962847939999439, 0.7453559924999299, -0.29814239699997197, 0), (-0.6666666666666666, 0.6666666666666666, 0.3333333333333333, 0), (-2, 2.5, 1, 0.9999999999999999) )
@@ -304,7 +329,8 @@ def Xform "World"
 
         def DiskLight "Disk"
         {
-            float inputs:intensity = 8
+            float inputs:intensity = 1
+            float inputs:exposure = 3
             float inputs:radius = 0.4
             matrix4d xformOp:transform = ( (-0.7071067811865475, 0, -0.7071067811865475, 0), (-0.6154574548966636, 0.4923659639173309, 0.6154574548966636, -0), (0.3481553119113957, 0.8703882797784891, -0.3481553119113957, 0), (0.9999999999999998, 2.999999999999999, -0.9999999999999998, 1) )
             uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -312,7 +338,8 @@ def Xform "World"
 
         def CylinderLight "Tube"
         {
-            float inputs:intensity = 20
+            float inputs:intensity = 1
+            float inputs:exposure = 4.322
             float inputs:length = 1.5
             float inputs:radius = 0.04
             double3 xformOp:translate = (0, 2, -2)
@@ -323,7 +350,8 @@ def Xform "World"
             prepend apiSchemas = ["ShapingAPI"]
         )
         {
-            float inputs:intensity = 40
+            float inputs:intensity = 1
+            float inputs:exposure = 5.322
             float inputs:radius = 0.1
             float inputs:shaping:cone:angle = 30
             float inputs:shaping:cone:softness = 0.3

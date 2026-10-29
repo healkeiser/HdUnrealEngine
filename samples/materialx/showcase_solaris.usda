@@ -731,7 +731,8 @@ def Xform "MaterialXShowcase"
     def RectLight "Key"
     {
         float inputs:height = 150
-        float inputs:intensity = 9000
+        float inputs:intensity = 1
+        float inputs:exposure = 13.14
         float inputs:width = 300
         matrix4d xformOp:transform = ( (0.8137334712067349, -0.5812381937190964, 2.7755575615628907e-17, 0), (0.37607967367983214, 0.5265115431517651, 0.7624629000632213, 0), (-0.4431725588105707, -0.620441582334799, 0.6470319358634333, 0), (-250, -350, 500, 1) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )
@@ -741,7 +742,8 @@ def Xform "MaterialXShowcase"
     def RectLight "Fill"
     {
         float inputs:height = 250
-        float inputs:intensity = 4500
+        float inputs:intensity = 1
+        float inputs:exposure = 12.14
         float inputs:width = 150
         matrix4d xformOp:transform = ( (0.4061384660534475, 0.9138115486202569, 0, 0), (-0.20781069222970558, 0.09236030765764694, 0.9737988959556252, -0), (0.8898686771579066, -0.39549718984795856, 0.22741088416257615, 0), (449.99999999999994, -200, 249.99999999999994, 0.9999999999999998) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )
@@ -750,7 +752,8 @@ def Xform "MaterialXShowcase"
 
     def DistantLight "AnisotropyKey"
     {
-        float inputs:intensity = 2
+        float inputs:intensity = 1
+        float inputs:exposure = 1
         bool inputs:normalize = 1
         matrix4d xformOp:transform = ( (0.8137334712067349, -0.5812381937190964, 2.7755575615628907e-17, 0), (0.37607967367983214, 0.5265115431517651, 0.7624629000632213, 0), (-0.4431725588105707, -0.620441582334799, 0.6470319358634333, 0), (-250, -350, 500, 1) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )

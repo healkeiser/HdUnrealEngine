@@ -108,7 +108,8 @@ def "Lights"
     def RectLight "Key"
     {
         float inputs:height = 150
-        float inputs:intensity = 8
+        float inputs:intensity = 1
+        float inputs:exposure = 3
         float inputs:width = 200
         matrix4d xformOp:transform = ( (0.7808688094430305, -0.6246950475544243, 2.775557561562892e-17, 0), (0.4877119539831601, 0.6096399424789501, 0.6248809410409238, 0), (-0.3903600291794133, -0.4879500364742666, 0.7807200583588267, 0), (-200.00000000000006, -250, 450.0000000000001, 1) )
         uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -117,7 +118,8 @@ def "Lights"
     def RectLight "Fill"
     {
         float inputs:height = 150
-        float inputs:intensity = 4
+        float inputs:intensity = 1
+        float inputs:exposure = 2
         float inputs:width = 200
         matrix4d xformOp:transform = ( (-0.37139067635410367, 0.9284766908852594, 0, 0), (-0.5536365323582665, -0.22145461294330657, 0.8027729719194866, 0), (0.74535599249993, 0.29814239699997197, 0.5962847939999439, -0), (250, 100, 250.00000000000003, 1.0000000000000002) )
         uniform token[] xformOpOrder = ["xformOp:transform"]

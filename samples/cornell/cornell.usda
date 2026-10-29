@@ -24,7 +24,8 @@ over "cornell_box"
         # Same quad and radiance as the emissive light mesh (17, 12, 4), sampled directly by both renderers.
         float inputs:width = 1.3
         float inputs:height = 1.05
-        float inputs:intensity = 17
+        float inputs:intensity = 1
+        float inputs:exposure = 4.087
         color3f inputs:color = (1, 0.70588, 0.23529)
         double3 xformOp:translate = (2.78, 5.487, 2.795)
         float3 xformOp:rotateXYZ = (-90, 0, 0)
