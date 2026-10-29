@@ -452,16 +452,11 @@ def _hdue_selected():
 
 def start_when_selected():
     """uiready.py: a cheap 500 ms watch; the host (DLL loads, material preparation, its 16 ms timer) starts only when a
-    Scene Viewer selects hdUE, so sessions that never use hdUE pay nothing. Tests and launches with a scene start now.
+    Scene Viewer selects hdUE, so sessions that never use hdUE pay nothing. Launches with a scene start now.
     """
     global _watcher
     if any(
-        os.environ.get(name)
-        for name in (
-            "HDUE_HOUDINI_TEST",
-            "HDUE_HOUDINI_INPUT",
-            "HDUE_HOUDINI_HIP",
-        )
+        os.environ.get(name) for name in ("HDUE_HOUDINI_INPUT", "HDUE_HOUDINI_HIP")
     ):
         return start()
     from PySide6 import QtCore
@@ -496,11 +491,6 @@ def start():
             QtCore.QTimer.singleShot(
                 500, lambda: hdefereval.execute_deferred(activate_saved_hip)
             )
-        if os.environ.get("HDUE_HOUDINI_TEST"):
-            # tests/houdini (on HOUDINI_PATH for test runs only) picks the test.
-            import hdue_tests
-
-            hdue_tests.start(_host)
     except BaseException:
         _failure = traceback.format_exc()
         _report(_failure)
