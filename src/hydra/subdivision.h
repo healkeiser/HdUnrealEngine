@@ -8,6 +8,7 @@
 #include "pxr/imaging/pxOsd/tokens.h"
 #include <opensubdiv/far/primvarRefiner.h>
 #include <opensubdiv/far/topologyRefiner.h>
+#include <algorithm>
 #include <memory>
 #include <numeric>
 #include <vector>
@@ -16,20 +17,26 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdUESubdivision {
 public:
-    // Null unless the scheme subdivides and level > 0.
-    static std::unique_ptr<HdUESubdivision> Create(const HdMeshTopology& coarse, int level) {
+    // Null unless the scheme subdivides and level > 0. The coarse topology carries its subdiv tags (creases, corners,
+    // boundary and face-varying rules). fvarIndices are authored face-varying primvar indices, refined as channels 1..n.
+    static std::unique_ptr<HdUESubdivision> Create(const HdMeshTopology& coarse, int level, std::vector<VtIntArray> fvarIndices = {}) {
         const auto scheme = coarse.GetScheme();
         if (level <= 0 || (scheme != PxOsdOpenSubdivTokens->catmullClark && scheme != PxOsdOpenSubdivTokens->loop)) return nullptr;
-        // hdUE flattens face-varying primvars to one value per face corner, so channel 0 is the identity.
-        VtIntArray corners(coarse.GetFaceVertexIndices().size());
+        // Channel 0 is the identity, for face-varying primvars flattened to one value per face corner.
+        const size_t cornerCount = coarse.GetFaceVertexIndices().size();
+        VtIntArray corners(cornerCount);
         std::iota(corners.begin(), corners.end(), 0);
-        auto refiner = PxOsdRefinerFactory::Create(coarse.GetPxOsdMeshTopology(), std::vector<VtIntArray>{corners});
+        fvarIndices.erase(std::remove_if(fvarIndices.begin(), fvarIndices.end(), [&](const VtIntArray& indices) {
+            return indices.size() != cornerCount || std::any_of(indices.begin(), indices.end(), [](int i) { return i < 0; });
+        }), fvarIndices.end());
+        fvarIndices.insert(fvarIndices.begin(), corners);
+        auto refiner = PxOsdRefinerFactory::Create(coarse.GetPxOsdMeshTopology(), fvarIndices);
         if (!refiner) return nullptr;
         OpenSubdiv::Far::TopologyRefiner::UniformOptions options(level);
         options.fullTopologyInLastLevel = true;
         refiner->RefineUniform(options);
         auto result = std::unique_ptr<HdUESubdivision>(new HdUESubdivision);
-        result->refiner_ = refiner; result->level_ = level;
+        result->refiner_ = refiner; result->level_ = level; result->fvarIndices_ = std::move(fvarIndices);
         const auto& last = refiner->GetLevel(level);
         VtIntArray counts(last.GetNumFaces()), indices, holes;
         for (int f = 0; f < last.GetNumFaces(); ++f) {
@@ -61,15 +68,22 @@ public:
         return result;
     }
     const HdMeshTopology& topology() const { return topology_; }
+    // The face-varying channel refining values with these authored indices; 0 (flattened values) when none was built.
+    int channel(const VtIntArray& indices) const {
+        for (size_t c = 1; c < fvarIndices_.size(); ++c) if (fvarIndices_[c] == indices) return int(c);
+        return 0;
+    }
     // Values for the refined topology in the same interpolation; empty when the count does not match the coarse mesh.
-    template<class T> VtArray<T> refine(const VtArray<T>& values, HdInterpolation domain) const {
+    // Face-varying values come back one per refined face corner, whichever channel indexes them.
+    template<class T> VtArray<T> refine(const VtArray<T>& values, HdInterpolation domain, int channel = 0) const {
         if (domain == HdInterpolationConstant || domain == HdInterpolationInstance) return values;
         const auto expected = [&](int l) {
             const auto& level = refiner_->GetLevel(l);
-            return domain == HdInterpolationUniform ? level.GetNumFaces() : domain == HdInterpolationFaceVarying ? level.GetNumFVarValues(0) : level.GetNumVertices();
+            return domain == HdInterpolationUniform ? level.GetNumFaces() : domain == HdInterpolationFaceVarying ? level.GetNumFVarValues(channel) : level.GetNumVertices();
         };
-        if (int(values.size()) != expected(0)) return {};
-        std::vector<Element<T>> src(values.begin(), values.end()), dst;
+        // An indexed channel counts values up to its largest index; authored values past it are unused.
+        if (channel ? int(values.size()) < expected(0) : int(values.size()) != expected(0)) return {};
+        std::vector<Element<T>> src(values.begin(), values.begin() + expected(0)), dst;
         OpenSubdiv::Far::PrimvarRefiner refiner(*refiner_);
         for (int l = 1; l <= level_; ++l) {
             dst.assign(expected(l), Element<T>{});
@@ -78,14 +92,14 @@ public:
             if (domain == HdInterpolationVertex) refiner.Interpolate(l, in, out);
             else if (domain == HdInterpolationVarying) refiner.InterpolateVarying(l, in, out);
             else if (domain == HdInterpolationUniform) refiner.InterpolateFaceUniform(l, in, out);
-            else refiner.InterpolateFaceVarying(l, in, out);
+            else refiner.InterpolateFaceVarying(l, in, out, channel);
             src.swap(dst);
         }
         VtArray<T> result;
         if (domain == HdInterpolationFaceVarying) {
             // Back to one value per refined face corner, in the order of the refined topology.
             const auto& last = refiner_->GetLevel(level_);
-            for (int f = 0; f < last.GetNumFaces(); ++f) for (int value : last.GetFaceFVarValues(f, 0)) result.push_back(src[value].value);
+            for (int f = 0; f < last.GetNumFaces(); ++f) for (int value : last.GetFaceFVarValues(f, channel)) result.push_back(src[value].value);
         } else {
             result.reserve(src.size());
             for (const auto& element : src) result.push_back(element.value);
@@ -103,6 +117,7 @@ private:
     HdUESubdivision() = default;
     PxOsdTopologyRefinerSharedPtr refiner_;
     int level_ = 0;
+    std::vector<VtIntArray> fvarIndices_;
     HdMeshTopology topology_;
 };
 

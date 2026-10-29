@@ -69,7 +69,14 @@ struct Source {
     HdUETextureData texture;
     int channel = -1;
     bool raw = false; // the image's colour space is raw: no OCIO conversion
+    bool primvar = false; // a vec3 primvar reader: the mesh's vertex colours
 };
+// The vec3 primvar a reader node reads (UsdPrimvarReader_float3 varname, MaterialX geompropvalue geomprop); empty otherwise.
+TfToken colorPrimvar(const HdMaterialNode2& node) {
+    const auto& type = node.nodeTypeId.GetString();
+    if (type == "UsdPrimvarReader_float3") return token(param(node, "varname"));
+    return TfStringStartsWith(type, "ND_geompropvalue_color3") || TfStringStartsWith(type, "ND_geompropvalue_vector3") ? token(param(node, "geomprop")) : TfToken();
+}
 class SurfaceReader {
 public:
     SurfaceReader(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) : network_(network), shader_(shader), data_(data) {}
@@ -82,6 +89,14 @@ public:
         if (!link) return false;
         Source source;
         trace(*link, source);
+        if (source.primvar) {
+            // The base colour multiplies the mesh's vertex colours (HDUE_MATERIAL_VERTEX_COLOR), which carry the primvar.
+            if constexpr (std::is_same_v<T, GfVec3f>) if (texture == &data_.textures[HDUE_TEXTURE_BASE_COLOR]) {
+                data_.vertexColor = true; out = transformed(GfVec3f(1), source.texture); return false;
+            }
+            warnOnce(TfStringPrintf("primvar readers drive only the base colour; %s uses its constant", input));
+            return false;
+        }
         if (!source.image) {
             if (!source.constant.IsEmpty()) out = transformed(value(source.constant, out), source.texture);
             return false;
@@ -141,7 +156,8 @@ private:
             }
             return;
         }
-        if (starts("ND_constant_")) source.constant = param(node, "value");
+        if (!colorPrimvar(node).IsEmpty()) source.primvar = true;
+        else if (starts("ND_constant_")) source.constant = param(node, "value");
         else if (starts("ND_convert_") || starts("ND_dot_")) upstream("in");
         else if (starts("ND_extract_")) { source.channel = value(param(node, "index"), 0); upstream("in"); }
         else if (starts("ND_normalmap")) {
@@ -311,15 +327,17 @@ public:
 }
 
 // The UV primvar a material reads (UsdPrimvarReader_float2 varname or MaterialX geompropvalue geomprop: exporters
-// name it map1, UVMap, ...); empty when none.
-TfToken HdUEMaterialUvPrimvar(HdSceneDelegate* delegate, const SdfPath& material) {
-    if (material.IsEmpty()) return TfToken();
+// name it map1, UVMap, ...) and the vec3 primvar it reads as vertex colours (displayColor, Cd, ...); empty when none.
+std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material) {
+    std::pair<TfToken, TfToken> names;
+    if (material.IsEmpty()) return names;
     for (const auto& [path, node] : network(delegate, material).nodes) {
         const char* input = node.nodeTypeId == TfToken("UsdPrimvarReader_float2") ? "varname"
             : node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? "geomprop" : nullptr;
-        if (input && !token(param(node, input)).IsEmpty()) return token(param(node, input));
+        if (input && names.first.IsEmpty()) names.first = token(param(node, input));
+        if (names.second.IsEmpty()) names.second = colorPrimvar(node);
     }
-    return TfToken();
+    return names;
 }
 HdSprim* HdUECreateMaterial(const SdfPath& id) { return new Material(id); }
 PXR_NAMESPACE_CLOSE_SCOPE
