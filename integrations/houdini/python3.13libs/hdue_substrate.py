@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import hou
-from pxr import Sdf
+from pxr import Sdf,UsdShade
 
 ROOT=Path(__file__).resolve().parents[3]
 import sys
@@ -12,6 +12,7 @@ from substrate_graph import NODES,validate,author,outputs,ERROR_ATTRIBUTE
 PREFIX='hdue::substrate_'
 HDA_VERSION='1.3'
 REVISION_PARM='hdue_graph_revision'
+HDA=Path(__file__).resolve().parents[1]/'otls/hdue_substrate.hda'
 
 
 def _revision_parameter():
@@ -23,79 +24,9 @@ def _revision_parameter():
 def type_name(kind): return PREFIX+kind+'::'+HDA_VERSION
 
 
-def _connector(network,name,kind,value_type,default=None):
-    node=network.createNode('subnetconnector',name)
-    node.parm('connectorkind').set(kind); node.parm('parmname').set(name); node.parm('parmlabel').set(name.replace('_',' ').title())
-    node.parm('parmtype').set({'surface':'bsdf','color3':'color','color4':'coloralpha','vector2':'float2'}.get(value_type,value_type))
-    if kind=='input' and default is not None:
-        if value_type=='float': node.parm('floatdef').set(default)
-        elif value_type=='color3': node.parmTuple('colordef').set(default)
-        elif value_type=='vector2': node.parmTuple('float2def').set(default)
-        elif value_type=='color4': node.parmTuple('color4def').set(default)
-    return node
-
-
-def _parameter(name,kind,default):
-    label=name.replace('_',' ').title()
-    if kind=='string': return hou.StringParmTemplate(name,label,1,default_value=(default,))
-    if kind=='asset': return hou.StringParmTemplate(name,label,1,default_value=(default,),string_type=hou.stringParmType.FileReference)
-    if kind=='bool': return hou.ToggleParmTemplate(name,label,default_value=default)
-    if kind=='color3': return hou.FloatParmTemplate(name,label,3,default_value=default,naming_scheme=hou.parmNamingScheme.RGBA,
-                                                    look=hou.parmLook.ColorSquare)
-    if kind in ('vector2','color4'): return hou.FloatParmTemplate(name,label,2 if kind=='vector2' else 4,default_value=default)
-    return hou.FloatParmTemplate(name,label,1,default_value=(default,))
-
-
-def install(file=None):
-    """Build portable HDA definitions from source in an ignored output folder."""
-    category=hou.vopNodeTypeCategory()
-    expected=[type_name(k) for k in [*NODES,'builder']]
-    if all(hou.nodeType(category,n) for n in expected): return
-    target=Path(file) if file else ROOT/'out/substrate-builder/hdue_substrate.hda'
-    target=target.resolve(); target.parent.mkdir(parents=True,exist_ok=True)
-    if target.is_file():
-        hou.hda.installFile(str(target))
-        if all(hou.nodeType(category,n) for n in expected): return
-    # Generate in a private temporary subnet and remove only that node.
-    scratch=hou.node('/mat').createNode('subnet','hdue_definition_build')
-    try:
-        for kind,definition in NODES.items():
-            if hou.nodeType(category,type_name(kind)): continue
-            node=scratch.createNode('subnet',kind)
-            for name,(value_type,default) in definition['inputs'].items(): _connector(node,name,'input',value_type,default)
-            for port,value_type in outputs(definition).items(): _connector(node,port,'output',value_type)
-            group=node.parmTemplateGroup()
-            for source in ('inputs','properties'):
-                for name,(value_type,default) in definition[source].items():
-                    if default is not None:
-                        parameter=_parameter(name,value_type,default)
-                        menus={'color_space':('srgb','raw'),'address':('wrap','clamp','mirror'),'channel':('r','g','b','a')}
-                        if name in menus:
-                            parameter.setMenuItems(menus[name]); parameter.setMenuLabels(tuple(s.upper() for s in menus[name]))
-                        group.append(parameter)
-            node.setParmTemplateGroup(group)
-            for source in ('inputs','properties'):
-                for name,(value_type,default) in definition[source].items():
-                    if default is None: continue
-                    if value_type in ('color3','vector2','color4'): node.parmTuple(name).set(default)
-                    else: node.parm(name).set(default)
-            asset=node.createDigitalAsset(name=type_name(kind),hda_file_name=str(target),description=definition['label'],
-                                           min_num_inputs=0,max_num_inputs=len(definition['inputs']))
-            # VOP asset creation generates a DialogScript from connectors and
-            # resets numeric defaults. Apply the typed parameter defaults after
-            # creating the definition so new instances and Reset to Default agree.
-            asset.type().definition().setParmTemplateGroup(group)
-            asset.type().definition().addSection('HDUE.Substrate.json',json.dumps(dict(version=1,operation=kind)))
-            asset.setMaterialFlag(False); asset.destroy()
-        if not hou.nodeType(category,type_name('builder')):
-            node=scratch.createNode('subnet','builder')
-            _connector(node,'surface','output','surface')
-            asset=node.createDigitalAsset(name=type_name('builder'),hda_file_name=str(target),description='hdUE Substrate Builder',
-                                           min_num_inputs=0,max_num_inputs=0)
-            asset.type().definition().addSection('HDUE.Substrate.json',json.dumps(dict(version=1,operation='builder')))
-            asset.setMaterialFlag(False); asset.destroy()
-    finally: scratch.destroy()
-    hou.hda.installFile(str(target))
+def install():
+    """Load the shipped Substrate VOPs where the integration is not on HOUDINI_PATH (plain hython)."""
+    if not hou.nodeType(hou.vopNodeTypeCategory(),type_name('builder')): hou.hda.installFile(str(HDA))
 
 
 def create(parent=None,preset='slab',material='/Looks/Base'):
@@ -103,11 +34,9 @@ def create(parent=None,preset='slab',material='/Looks/Base'):
     parent=parent or hou.node('/mat')
     with hou.undos.group('Create Substrate Builder'):
         network=parent.createNode(type_name('builder'),'substrate_builder')
-        network.allowEditingOfContents(); network.setMaterialFlag(False)
         output=next(n for n in network.children() if n.type().name()=='subnetconnector')
-        if preset=='slab':
-            slab=network.createNode(type_name('slab'),'slab'); output.setInput(0,slab)
-        elif preset=='wet':
+        if preset=='wet':
+            network.node('slab').destroy()
             base=network.createNode(type_name('materialx'),'base'); base.parm('material').set(material)
             water=network.createNode(type_name('slab'),'water')
             water.parmTuple('diffuse_albedo').set((0,0,0)); f0=((1.33-1)/(1.33+1))**2
@@ -122,7 +51,7 @@ def create(parent=None,preset='slab',material='/Looks/Base'):
             layer=network.createNode(type_name('vertical'),'layer'); layer.setInput(0,weight); layer.setInput(1,base)
             layer.parm('thickness').set(.01)
             output.setInput(0,layer)
-        else:
+        elif preset!='slab':
             network.destroy(); raise ValueError('Unknown Substrate preset: '+preset)
         network.layoutChildren(); network.moveToGoodPosition(); network.setCurrent(True,clear_all_selected=True)
     return network
@@ -167,47 +96,49 @@ def graph(network):
     return validate(dict(version=1,output=root,nodes=nodes))
 
 
-def author_lop(network,material_path='/Looks/Substrate',input_node=None,prim_paths=()):
-    if not Sdf.Path.IsValidPathString(material_path) or not Sdf.Path(material_path).IsAbsolutePath() or not Sdf.Path(material_path).IsPrimPath():
-        raise ValueError('Expected an absolute USD material prim path')
-    validate(graph(network))
-    parent=input_node.parent() if input_node else hou.node('/stage')
-    with hou.undos.group('Author Substrate material'):
-        node=parent.createNode('pythonscript','hdUE_substrate_material')
-        if input_node: node.setInput(0,input_node)
-        group=node.parmTemplateGroup()
-        group.append(hou.StringParmTemplate('hdue_builder','Substrate VOP network',1,default_value=(network.path(),),string_type=hou.stringParmType.NodeReference))
-        group.append(hou.StringParmTemplate('hdue_material','USD material',1,default_value=(material_path,)))
-        group.append(hou.StringParmTemplate('hdue_bindings','Bind prim paths',1,default_value=(' '.join(prim_paths),)))
-        group.append(_revision_parameter())
-        node.setParmTemplateGroup(group)
-        node.parm('python').set('import hdue_substrate\nhdue_substrate.cook(hou.pwd())')
-        node.setDisplayFlag(True); node.setCurrent(True,clear_all_selected=True); node.moveToGoodPosition()
-    return node
-
-
-def cook(node):
-    from pxr import UsdShade
-    network=hou.node(node.evalParm('hdue_builder'))
-    if not network: raise ValueError('Substrate VOP network not found')
-    # Evaluating the connected VOP parameters and wiring inside this Python LOP
-    # records native Houdini parameter dependencies. Wiring notifications only
-    # dirty a hidden revision parm; they never force a cook from an event handler.
-    _watch_structure(network,node)
-    node.evalParm(REVISION_PARM)
-    stage=node.editableStage(); path=node.evalParm('hdue_material')
-    try:
-        current=graph(network)
-        material=author(stage,path,current)
+def translate(stage,path,network,replace=True):
+    """Author the builder's graph as the material at path. An incomplete graph, an ordinary editing state,
+    authors its error on the material instead, so the stage stays valid and later repairs are observed."""
+    try: return author(stage,path,graph(network),replace)
     except ValueError as error:
-        # Incomplete wiring is an ordinary editing state. A failed Python LOP
-        # can lose the stage and prevent the host from observing later repairs.
         existing=stage.GetPrimAtPath(path)
-        if existing and existing.GetAttribute('hdue:substrate:version').Get()!=1: raise
+        if replace and existing and existing.GetAttribute('hdue:substrate:version').Get()!=1: raise
         material=UsdShade.Material.Define(stage,path)
         material.GetPrim().CreateAttribute('hdue:substrate:version',Sdf.ValueTypeNames.Int).Set(1)
         material.GetPrim().CreateAttribute(ERROR_ATTRIBUTE,Sdf.ValueTypeNames.String).Set(str(error))
-        return
+        return material
+
+
+def author_lop(network,material_path='/Looks/Substrate',input_node=None,prim_paths=()):
+    """A Material Library LOP authoring the builder at material_path, bound to prim_paths: the builder's own
+    library when it is in one, else a new one after input_node that references it."""
+    if not Sdf.Path.IsValidPathString(material_path) or not Sdf.Path(material_path).IsAbsolutePath() or not Sdf.Path(material_path).IsPrimPath():
+        raise ValueError('Expected an absolute USD material prim path')
+    validate(graph(network))
+    library=network.parent()
+    with hou.undos.group('Author Substrate material'):
+        if library.type().name()=='materiallibrary': node=network.name()
+        else:
+            parent=input_node.parent() if input_node else hou.node('/stage')
+            library=parent.createNode('materiallibrary','hdUE_substrate_material'); node=network.path()
+            if input_node: library.setInput(0,input_node)
+            library.moveToGoodPosition()
+        library.parm('materials').set(1)
+        library.setParms(dict(matnode1=node,matpath1=material_path,assign1=bool(prim_paths),geopath1=' '.join(prim_paths)))
+        library.setDisplayFlag(True); library.setCurrent(True,clear_all_selected=True)
+    return library
+
+
+def cook(node):
+    """Legacy: scenes saved before Material Library translation author through a Python LOP calling this."""
+    network=hou.node(node.evalParm('hdue_builder'))
+    if not network: raise ValueError('Substrate VOP network not found')
+    # Wiring notifications dirty a hidden revision parm; they never force a cook from an event handler.
+    _watch_structure(network,node)
+    node.evalParm(REVISION_PARM)
+    stage=node.editableStage()
+    material=translate(stage,node.evalParm('hdue_material'),network)
+    if material.GetPrim().GetAttribute(ERROR_ATTRIBUTE).Get(): return
     for path in node.evalParm('hdue_bindings').split():
         prim=stage.GetPrimAtPath(path)
         if not prim: raise ValueError('Substrate binding target not found: '+path)

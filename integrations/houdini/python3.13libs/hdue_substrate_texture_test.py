@@ -89,7 +89,7 @@ class Test(MaterialTest):
                     from pxr import UsdShade,Usd
                     exported=read(UsdShade.Material(author.stage().GetPrimAtPath('/Looks/Textured')),Usd.TimeCode.Default())
                     raise AssertionError('Disconnect not published: '+repr(dict(kind=label,cooks=author.cookCount(),
-                        revision=author.evalParm(hdue_substrate.REVISION_PARM),direct=signature(hdue_substrate.graph(network)),
+                        direct=signature(hdue_substrate.graph(network)),
                         exported=signature(exported),callbacks=repr(consumer.eventCallbacks()),host_error=self.host.material_error)))
                 yield
             for _ in range(12): yield

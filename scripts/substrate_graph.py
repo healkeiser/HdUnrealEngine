@@ -172,13 +172,15 @@ def signature(graph):
     return hashlib.sha256(json.dumps(graph,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def author(stage,path,graph):
+def author(stage,path,graph,replace=True):
+    """Author graph as the material at path; replace=False writes into a material the caller just defined (Material Library)."""
     from pxr import Gf
     validate(graph)
     existing=stage.GetPrimAtPath(path)
-    if existing and existing.GetAttribute('hdue:substrate:version').Get()!=1:
-        raise ValueError('Refusing to replace a material not owned by Substrate Builder: '+path)
-    if existing: stage.RemovePrim(path)
+    if replace and existing:
+        if existing.GetAttribute('hdue:substrate:version').Get()!=1:
+            raise ValueError('Refusing to replace a material not owned by Substrate Builder: '+path)
+        stage.RemovePrim(path)
     material=UsdShade.Material.Define(stage,path)
     if material.GetPrim().GetAttribute(ERROR_ATTRIBUTE): material.GetPrim().GetAttribute(ERROR_ATTRIBUTE).Block()
     material.GetPrim().CreateAttribute('hdue:substrate:version',Sdf.ValueTypeNames.Int).Set(1)

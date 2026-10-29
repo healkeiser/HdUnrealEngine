@@ -2,10 +2,12 @@
 <shelfDocument>
   <toolshelf name="hdUE" label="hdUE"><memberTool name="hdue_substrate_builder"/><memberTool name="hdue_substrate_publish"/><memberTool name="hdue_substrate_water"/></toolshelf>
   <tool name="hdue_substrate_builder" label="Substrate Builder" icon="HDUE_hdue">
+    <helpText><![CDATA[Creates an hdUE Substrate Builder in /mat. It is also in the TAB menu (hdUE), in /mat and in Material Library LOPs.]]></helpText>
     <script scriptType="python"><![CDATA[import hdue_substrate
 hdue_substrate.create()]]></script>
   </tool>
   <tool name="hdue_substrate_publish" label="Author Substrate USD" icon="HDUE_hdue">
+    <helpText><![CDATA[Adds a Material Library LOP after the displayed LOP that authors the selected Substrate Builder at /Looks/<name>, bound to the selected prims.]]></helpText>
     <script scriptType="python"><![CDATA[import hdue_substrate
 hdue_substrate.publish()]]></script>
   </tool>
