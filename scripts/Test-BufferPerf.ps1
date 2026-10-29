@@ -4,7 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
+$OpenUsdRoot = Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Destination = if ($OutputFile) { [IO.Path]::GetFullPath($OutputFile) } else { Join-Path $TaskRoot ('out\buffer\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '.json') }
 if (Test-Path -LiteralPath $Destination) { throw 'Buffer benchmark requires a fresh output file.' }
@@ -21,6 +21,7 @@ try {
     $Result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Destination -Encoding utf8
     $Result.measurements | ConvertTo-Json
     Write-Output "Buffer benchmark: $Destination"
-} finally {
+}
+finally {
     $env:PATH = $PreviousPath
 }

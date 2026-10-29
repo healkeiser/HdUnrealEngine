@@ -44,6 +44,7 @@ public:
     bool initialized() const { return initialized_; }
     std::string status_message() const;
     void require(HdueResult result, const char* operation) const;
+
 private:
     void* module_ = nullptr;
     HdueApi api_{};
@@ -64,5 +65,4 @@ private:
 
 void write_pfm(const std::filesystem::path& path, const HdueFrameInfo& frame, const float* rgba);
 std::optional<uint64_t> gpu_memory_bytes();
-}
-
+}  // namespace hdue

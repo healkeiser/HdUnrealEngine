@@ -20,10 +20,15 @@ public:
     HdUEPickMesh(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices);
     bool intersect(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices, const GfRay& ray,
                    double minimum, double maximum, HdUEPickHit* hit, bool twoSided = false) const;
+
 private:
-    struct Node { GfRange3d bounds; uint32_t begin = 0, count = 0, left = 0, right = 0; };
+    struct Node {
+        GfRange3d bounds;
+        uint32_t begin = 0, count = 0, left = 0, right = 0;
+    };
     std::vector<uint32_t> triangles_;
     std::vector<Node> nodes_;
-    uint32_t build(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices, uint32_t begin, uint32_t end);
+    uint32_t build(const std::vector<GfVec3f>& points, const std::vector<uint32_t>& indices, uint32_t begin,
+                   uint32_t end);
 };
 PXR_NAMESPACE_CLOSE_SCOPE

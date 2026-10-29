@@ -7,9 +7,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$EngineRoot=Get-HdUELocalPath -Key engine_root -Value $EngineRoot
-$EditorRoot=Get-HdUELocalPath -Key editor_root -Value $EditorRoot
-$OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
+$EngineRoot = Get-HdUELocalPath -Key engine_root -Value $EngineRoot
+$EditorRoot = Get-HdUELocalPath -Key editor_root -Value $EditorRoot
+$OpenUsdRoot = Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $RunRoot = New-HdUERun -Name verification -Create
 if (-not $SkipBuild) {
@@ -48,16 +48,16 @@ if ($WithUsdview) {
 }
 $Version = Get-Content -Raw -LiteralPath (Join-Path $EngineRoot 'Engine\Build\Build.version') | ConvertFrom-Json
 $Evidence = [ordered]@{
-    passed = $true # every step above threw otherwise
-    engine = "$($Version.MajorVersion).$($Version.MinorVersion).$($Version.PatchVersion)"
-    native_frames = @($NativeMetrics.frames).Count
-    hydra_frames = @($HydraMetrics.frames).Count
+    passed               = $true # every step above threw otherwise
+    engine               = "$($Version.MajorVersion).$($Version.MinorVersion).$($Version.PatchVersion)"
+    native_frames        = @($NativeMetrics.frames).Count
+    hydra_frames         = @($HydraMetrics.frames).Count
     path_tracing_samples = (@($NativeMetrics.frames) | Where-Object { $_.mode -eq 'pathtraced' } | Select-Object -Last 1).samples
-    engine_commit = 'f45729c0b6f097038e72b52d366a62baeca3275b' # 5.8.4-release, as Setup-Engine.ps1 checks out
-    hdue_commit = (git -C $TaskRoot rev-parse HEAD)
-    native_metrics = (Join-Path $Native 'metrics.json')
-    hydra_metrics = (Join-Path $Hydra 'metrics.json')
-    comparison = (Join-Path $RunRoot 'reference-comparison.json')
+    engine_commit        = 'f45729c0b6f097038e72b52d366a62baeca3275b' # 5.8.4-release, as Setup-Engine.ps1 checks out
+    hdue_commit          = (git -C $TaskRoot rev-parse HEAD)
+    native_metrics       = (Join-Path $Native 'metrics.json')
+    hydra_metrics        = (Join-Path $Hydra 'metrics.json')
+    comparison           = (Join-Path $RunRoot 'reference-comparison.json')
 }
 if ($WithUsdview) {
     $Evidence.usdview_verification = (Join-Path $RunRoot 'usdview\verified.json')

@@ -16,9 +16,9 @@ typedef struct HdueMeshTransform {
 } HdueMeshTransform;
 typedef struct HdueMotionApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *set_transforms)(HdueSession session, const HdueMeshTransform* meshes, uint32_t count);
+    HdueResult(HDUE_CALL* set_transforms)(HdueSession session, const HdueMeshTransform* meshes, uint32_t count);
 } HdueMotionApi;
-typedef HdueResult (HDUE_CALL *HdueGetMotionApiFn)(uint32_t version, uint32_t capacity, HdueMotionApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetMotionApiFn)(uint32_t version, uint32_t capacity, HdueMotionApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32_t version, uint32_t capacity, HdueMotionApi* api);
 #ifdef __cplusplus
 }

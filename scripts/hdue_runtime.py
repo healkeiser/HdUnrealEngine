@@ -1,36 +1,65 @@
 """Main-thread UELibrary owner for Python hosts. ABI: include/hdue/bridge.h."""
+
 import ctypes as C
-from ctypes import wintypes as W
 import os
-from pathlib import Path
 import threading
+from ctypes import wintypes as W
+from pathlib import Path
 
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
 ABI_VERSION = 8  # HDUE_ABI_VERSION
-Task = C.CFUNCTYPE(None, C.py_object)  # hdue_run_on_ue_thread's task, called with the Python callable to run
+Task = C.CFUNCTYPE(
+    None, C.py_object
+)  # hdue_run_on_ue_thread's task, called with the Python callable to run
 _run_task = Task(lambda work: work())
 
 
 class InitDesc(C.Structure):
-    _fields_ = [("struct_size", U32), ("reserved", U32), ("instance", U64),
-                ("window", U64), ("project", C.c_char_p), ("map", C.c_char_p),
-                ("arguments", C.c_char_p)]
+    _fields_ = [
+        ("struct_size", U32),
+        ("reserved", U32),
+        ("instance", U64),
+        ("window", U64),
+        ("project", C.c_char_p),
+        ("map", C.c_char_p),
+        ("arguments", C.c_char_p),
+    ]
 
 
 class Status(C.Structure):
-    _fields_ = [(name, U32) for name in (
-        "struct_size", "state", "world_ready", "rhi_ready", "engine_major",
-        "engine_minor", "engine_patch", "render_mode_mask")] + [
-        ("video_memory", U64), ("message", C.c_char * 512)]
+    _fields_ = [
+        (name, U32)
+        for name in (
+            "struct_size",
+            "state",
+            "world_ready",
+            "rhi_ready",
+            "engine_major",
+            "engine_minor",
+            "engine_patch",
+            "render_mode_mask",
+        )
+    ] + [("video_memory", U64), ("message", C.c_char * 512)]
 
 
 class Api(C.Structure):
     _fields_ = [("struct_size", U32), ("abi_version", U32)] + [
-        (name, C.c_void_p) for name in (
-            "initialize", "get_status", "tick", "create_session", "destroy_session",
-            "request_render", "poll_frame", "copy_frame", "window_message",
-            "shutdown", "apply_scene")]
+        (name, C.c_void_p)
+        for name in (
+            "initialize",
+            "get_status",
+            "tick",
+            "create_session",
+            "destroy_session",
+            "request_render",
+            "poll_frame",
+            "copy_frame",
+            "window_message",
+            "shutdown",
+            "apply_scene",
+        )
+    ]
 
 
 # Keep DLLs and the callback alive until process exit, including after shutdown.
@@ -40,8 +69,13 @@ _process_libraries = []
 class Runtime:
     def __init__(self, library, project, log=None, start=True):
         """start=False attaches to UE that hdUE's delegate runs on its own thread (Houdini's UI): status and errors
-        only; ticking and shutdown belong to that thread."""
-        if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (48, 552, 96):
+        only; ticking and shutdown belong to that thread.
+        """
+        if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (
+            48,
+            552,
+            96,
+        ):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()
         self.ready = False
@@ -49,23 +83,30 @@ class Runtime:
         self.closed = False
         self.ticks = 0
         self._initializations = 0
-        self.backend_name=Path(library).name
+        self.backend_name = Path(library).name
         self.library = C.CDLL(str(Path(library).resolve()), winmode=0x1100)
         _process_libraries.append(self.library)
         get_api = self.library.hdue_get_api
         get_api.argtypes = [U32, U32, C.POINTER(Api)]
         get_api.restype = Result
         api = Api()
-        if get_api(ABI_VERSION, C.sizeof(api), C.byref(api)) or api.abi_version != ABI_VERSION or api.struct_size != 96:
+        if (
+            get_api(ABI_VERSION, C.sizeof(api), C.byref(api))
+            or api.abi_version != ABI_VERSION
+            or api.struct_size != 96
+        ):
             raise RuntimeError("Incompatible hdUE C ABI")
         if any(not getattr(api, name) for name, _ in Api._fields_[2:]):
             raise RuntimeError("Incomplete hdUE C ABI")
-        self.initialize = C.CFUNCTYPE(Result, C.POINTER(InitDesc))(api.initialize)
+        self.initialize = C.CFUNCTYPE(Result, C.POINTER(InitDesc))(
+            api.initialize
+        )
         self.get_status = C.CFUNCTYPE(Result, C.POINTER(Status))(api.get_status)
         self.tick_fn = C.CFUNCTYPE(Result)(api.tick)
         self.shutdown_fn = C.CFUNCTYPE(Result)(api.shutdown)
-        self.window_message = C.CFUNCTYPE(Result, U64, U32, U64, I64,
-                                         C.POINTER(I64))(api.window_message)
+        self.window_message = C.CFUNCTYPE(
+            Result, U64, U32, U64, I64, C.POINTER(I64)
+        )(api.window_message)
         self.attached = not start
         self.run_on_ue_thread = None  # attached: the delegate's hdue_run_on_ue_thread, set by whoever loads the delegate
         if self.attached:
@@ -76,7 +117,9 @@ class Runtime:
         kernel.GetModuleHandleW.restype = W.HMODULE
         self.kernel = kernel
         instance = kernel.GetModuleHandleW(None)
-        proc_type = C.WINFUNCTYPE(C.c_ssize_t, W.HWND, W.UINT, W.WPARAM, W.LPARAM)
+        proc_type = C.WINFUNCTYPE(
+            C.c_ssize_t, W.HWND, W.UINT, W.WPARAM, W.LPARAM
+        )
         self.user.DefWindowProcW.argtypes = [W.HWND, W.UINT, W.WPARAM, W.LPARAM]
         self.user.DefWindowProcW.restype = C.c_ssize_t
 
@@ -88,44 +131,100 @@ class Runtime:
         def window_proc(hwnd, message, wparam, lparam):
             if visible and self.ready:
                 result = I64()
-                if self.window_message(hwnd, message, wparam, lparam, C.byref(result)) == 0:
+                if (
+                    self.window_message(
+                        hwnd, message, wparam, lparam, C.byref(result)
+                    )
+                    == 0
+                ):
                     return result.value
             return self.user.DefWindowProcW(hwnd, message, wparam, lparam)
 
         class WindowClass(C.Structure):
-            _fields_ = [("style", W.UINT), ("proc", proc_type), ("class_extra", C.c_int),
-                        ("window_extra", C.c_int), ("instance", W.HINSTANCE),
-                        ("icon", W.HANDLE), ("cursor", W.HANDLE), ("background", W.HANDLE),
-                        ("menu", W.LPCWSTR), ("name", W.LPCWSTR)]
+            _fields_ = [
+                ("style", W.UINT),
+                ("proc", proc_type),
+                ("class_extra", C.c_int),
+                ("window_extra", C.c_int),
+                ("instance", W.HINSTANCE),
+                ("icon", W.HANDLE),
+                ("cursor", W.HANDLE),
+                ("background", W.HANDLE),
+                ("menu", W.LPCWSTR),
+                ("name", W.LPCWSTR),
+            ]
 
         self.window_proc = window_proc
-        self.window_class = WindowClass(instance=instance, proc=window_proc, name="HdUEUsdviewHost")
+        self.window_class = WindowClass(
+            instance=instance, proc=window_proc, name="HdUEUsdviewHost"
+        )
         self.user.RegisterClassW.argtypes = [C.POINTER(WindowClass)]
         self.user.RegisterClassW.restype = W.ATOM
-        self.user.CreateWindowExW.argtypes = [W.DWORD, W.LPCWSTR, W.LPCWSTR, W.DWORD,
-            C.c_int, C.c_int, C.c_int, C.c_int, W.HWND, W.HMENU, W.HINSTANCE, C.c_void_p]
+        self.user.CreateWindowExW.argtypes = [
+            W.DWORD,
+            W.LPCWSTR,
+            W.LPCWSTR,
+            W.DWORD,
+            C.c_int,
+            C.c_int,
+            C.c_int,
+            C.c_int,
+            W.HWND,
+            W.HMENU,
+            W.HINSTANCE,
+            C.c_void_p,
+        ]
         self.user.CreateWindowExW.restype = W.HWND
         self.user.DestroyWindow.argtypes = [W.HWND]
         self.user.UnregisterClassW.argtypes = [W.LPCWSTR, W.HINSTANCE]
         if not self.user.RegisterClassW(C.byref(self.window_class)):
             raise C.WinError(C.get_last_error())
-        self.window = self.user.CreateWindowExW(0, self.window_class.name, "hdUE / UE runtime",
-            0x00CF0000, 0, 0, 640, 360, None, None, instance, None)
+        self.window = self.user.CreateWindowExW(
+            0,
+            self.window_class.name,
+            "hdUE / UE runtime",
+            0x00CF0000,
+            0,
+            0,
+            640,
+            360,
+            None,
+            None,
+            instance,
+            None,
+        )
         if not self.window:
             raise C.WinError(C.get_last_error())
         # -stdout: without it UE echoes its log with wprintf, which reaches the host's console as UTF-16.
-        arguments = ("-stdout" if visible else "-stdout -RenderOffscreen") + (f' -abslog="{Path(log).resolve()}"' if log else "")
+        arguments = ("-stdout" if visible else "-stdout -RenderOffscreen") + (
+            f' -abslog="{Path(log).resolve()}"' if log else ""
+        )
         project_bytes = str(Path(project).resolve()).encode("utf-8")
-        desc = InitDesc(C.sizeof(InitDesc), 0, instance, self.window, project_bytes,
-                        b"/Game/HdUETest", arguments.encode("utf-8"))
+        desc = InitDesc(
+            C.sizeof(InitDesc),
+            0,
+            instance,
+            self.window,
+            project_bytes,
+            b"/Game/HdUETest",
+            arguments.encode("utf-8"),
+        )
         self.attempted = True
         self._initializations += 1
         try:
             self.check(self.initialize(C.byref(desc)), "initialize")
             status = self.status()
-            if (status.state, status.world_ready, status.rhi_ready) != (2, 1, 1):
+            if (status.state, status.world_ready, status.rhi_ready) != (
+                2,
+                1,
+                1,
+            ):
                 raise RuntimeError("UE World and rendering RHI are not ready")
-            if (status.engine_major, status.engine_minor, status.engine_patch) != (5, 8, 4):
+            if (
+                status.engine_major,
+                status.engine_minor,
+                status.engine_patch,
+            ) != (5, 8, 4):
                 raise RuntimeError("Expected UE 5.8.4")
             self.ready = True
         except BaseException:
@@ -153,20 +252,27 @@ class Runtime:
     def check(self, result, operation):
         if result:
             # UE's error text is readable on UE's thread only.
-            raise RuntimeError(f"{operation} failed ({result}): " +
-                               self.on_ue_thread(self.status).message.decode("utf-8", "replace"))
+            raise RuntimeError(
+                f"{operation} failed ({result}): "
+                + self.on_ue_thread(self.status).message.decode(
+                    "utf-8", "replace"
+                )
+            )
 
     def on_ue_thread(self, call, *args):
         """call(*args) on the thread that owns UE: hdUE's UE thread when attached, since the backend accepts no other.
-        The caller waits with the GIL released, so call may be Python."""
+        The caller waits with the GIL released, so call may be Python.
+        """
         if not (self.attached and self.run_on_ue_thread):
             return call(*args)
         outcome = []
+
         def work():
             try:
                 outcome.append((True, call(*args)))
             except BaseException as error:
                 outcome.append((False, error))
+
         code = self.run_on_ue_thread(_run_task, work)
         if code:
             raise RuntimeError(f"hdUE's UE thread did not run {call} ({code})")
@@ -178,7 +284,8 @@ class Runtime:
     def bind(self, prototype, pointer):
         """A backend C function from an API table, called on the thread that owns UE (see on_ue_thread). Functions
         that any thread may call (status, finished frames) are bound with the prototype directly instead.
-        .direct is the unmarshalled function."""
+        .direct is the unmarshalled function.
+        """
         function = prototype(pointer)
         bound = lambda *args: self.on_ue_thread(function, *args)
         bound.direct = function
@@ -193,8 +300,10 @@ class Runtime:
 
     def module_handles(self):
         self.assert_owner()
-        return {name: self.kernel.GetModuleHandleW(name)
-                for name in ("hdUE.dll", self.backend_name)}
+        return {
+            name: self.kernel.GetModuleHandleW(name)
+            for name in ("hdUE.dll", self.backend_name)
+        }
 
     def close(self):
         self.assert_owner()
@@ -211,5 +320,7 @@ class Runtime:
                     raise RuntimeError("UE did not reach STOPPED")
         finally:
             self.user.DestroyWindow(self.window)
-            self.user.UnregisterClassW(self.window_class.name, self.window_class.instance)
+            self.user.UnregisterClassW(
+                self.window_class.name, self.window_class.instance
+            )
             self.closed = True

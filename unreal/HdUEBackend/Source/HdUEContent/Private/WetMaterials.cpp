@@ -14,52 +14,63 @@
 #include "UObject/SavePackage.h"
 
 namespace {
-template<class T> T* Add(UMaterial* M) {
+template <class T>
+T* Add(UMaterial* M) {
     auto* E = NewObject<T>(M);
     M->GetExpressionCollection().AddExpression(E);
     return E;
 }
 auto Scalar(UMaterial* M, const TCHAR* Name, float Value) {
     auto* E = Add<UMaterialExpressionScalarParameter>(M);
-    E->ParameterName = Name; E->DefaultValue = Value;
+    E->ParameterName = Name;
+    E->DefaultValue = Value;
     return E;
 }
 auto Constant(UMaterial* M, float Value) {
-    auto* E = Add<UMaterialExpressionConstant>(M); E->R = Value; return E;
+    auto* E = Add<UMaterialExpressionConstant>(M);
+    E->R = Value;
+    return E;
 }
 UMaterialExpression* Coverage(UMaterial* M) {
     auto* Amount = Scalar(M, TEXT("HdUE_WetAmount"), 1.f);
     auto* UseMask = Scalar(M, TEXT("HdUE_WetUseMask"), 0.f);
     auto* Color = Add<UMaterialExpressionVertexColor>(M);
     auto* Mask = Add<UMaterialExpressionLinearInterpolate>(M);
-    Mask->ConstA = 1.f; Mask->B.Connect(1, Color); Mask->Alpha.Connect(0, UseMask);
-    auto* SaturateAmount = Add<UMaterialExpressionSaturate>(M); SaturateAmount->Input.Connect(0, Amount);
-    auto* SaturateMask = Add<UMaterialExpressionSaturate>(M); SaturateMask->Input.Connect(0, Mask);
+    Mask->ConstA = 1.f;
+    Mask->B.Connect(1, Color);
+    Mask->Alpha.Connect(0, UseMask);
+    auto* SaturateAmount = Add<UMaterialExpressionSaturate>(M);
+    SaturateAmount->Input.Connect(0, Amount);
+    auto* SaturateMask = Add<UMaterialExpressionSaturate>(M);
+    SaturateMask->Input.Connect(0, Mask);
     auto* Product = Add<UMaterialExpressionMultiply>(M);
-    Product->A.Connect(0, SaturateAmount); Product->B.Connect(0, SaturateMask);
+    Product->A.Connect(0, SaturateAmount);
+    Product->B.Connect(0, SaturateMask);
     return Product;
 }
 bool Save(UMaterial* M) {
     M->PostEditChange();
     FAssetRegistryModule::AssetCreated(M);
-    FSavePackageArgs Args; Args.TopLevelFlags = RF_Public | RF_Standalone;
-    const auto File = FPackageName::LongPackageNameToFilename(M->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs Args;
+    Args.TopLevelFlags = RF_Public | RF_Standalone;
+    const auto File =
+        FPackageName::LongPackageNameToFilename(M->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
     return UPackage::SavePackage(M->GetOutermost(), M, *File, Args);
 }
 UMaterial* Duplicate(UMaterial* Base, const TCHAR* Suffix) {
     const auto PackageName = Base->GetOutermost()->GetName() + Suffix;
     auto* Package = CreatePackage(*PackageName);
     Package->FullyLoad();
-    const auto Name=FPackageName::GetLongPackageAssetName(PackageName);
-    if (auto* Previous=FindObject<UMaterial>(Package,*Name)) {
+    const auto Name = FPackageName::GetLongPackageAssetName(PackageName);
+    if (auto* Previous = FindObject<UMaterial>(Package, *Name)) {
         Previous->ClearFlags(RF_Public | RF_Standalone);
-        Previous->Rename(nullptr,GetTransientPackage(),REN_DontCreateRedirectors | REN_NonTransactional);
+        Previous->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
     }
     // ImportAsMaterials replaces the base on each preparation; the derivative
     // is regenerated too, rather than retaining an obsolete imported graph.
     return DuplicateObject<UMaterial>(Base, Package, *Name);
 }
-}
+}  // namespace
 TSharedPtr<FJsonObject> HdUEPrepareWetMaterials(UMaterial* Base) {
     auto Record = MakeShared<FJsonObject>();
     Record->SetNumberField(TEXT("version"), 1);
@@ -81,9 +92,11 @@ TSharedPtr<FJsonObject> HdUEPrepareWetMaterials(UMaterial* Base) {
     Clear->Constant = FLinearColor(1.e6f, 1.e6f, 1.e6f);
     Slab->SSSMFP.Connect(0, Clear);
     auto* Weight = Add<UMaterialExpressionSubstrateWeight>(Wet);
-    Weight->A.Connect(0, Slab); Weight->Weight.Connect(0, Coverage(Wet));
+    Weight->A.Connect(0, Slab);
+    Weight->Weight.Connect(0, Coverage(Wet));
     auto* Layer = Add<UMaterialExpressionSubstrateVerticalLayering>(Wet);
-    Layer->Top.Connect(0, Weight); Layer->Base = Original;
+    Layer->Top.Connect(0, Weight);
+    Layer->Base = Original;
     Layer->Thickness.Connect(0, Constant(Wet, .01f));
     Layer->bUseParameterBlending = false;
     Wet->GetEditorOnlyData()->FrontMaterial.Connect(0, Layer);

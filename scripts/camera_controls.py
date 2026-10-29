@@ -1,4 +1,5 @@
 """Keep usdview navigation usable when a USD camera has no focus distance."""
+
 import math
 
 from pxr import Gf, UsdGeom
@@ -17,12 +18,20 @@ def ensure_navigation_distance(view):
     position = frustum.position
     direction = frustum.ComputeViewDirection().GetNormalized()
     near = max(float(camera._camera.clippingRange.GetMin()), 0.0)
-    meters_per_unit = UsdGeom.GetStageMetersPerUnit(model.stage) if model.stage else 0.01
-    fallback = 1.0 / meters_per_unit if math.isfinite(meters_per_unit) and meters_per_unit > 0 else 100.0
+    meters_per_unit = (
+        UsdGeom.GetStageMetersPerUnit(model.stage) if model.stage else 0.01
+    )
+    fallback = (
+        1.0 / meters_per_unit
+        if math.isfinite(meters_per_unit) and meters_per_unit > 0
+        else 100.0
+    )
     distance = max(near * 10, fallback)
     bounds = view.getSelectionBBox().ComputeAlignedRange()
     if bounds.IsEmpty() and model.stage:
-        bounds = model.computeWorldBound(model.stage.GetPseudoRoot()).ComputeAlignedRange()
+        bounds = model.computeWorldBound(
+            model.stage.GetPseudoRoot()
+        ).ComputeAlignedRange()
     if not bounds.IsEmpty():
         projected = Gf.Dot(bounds.GetMidpoint() - position, direction)
         radius = bounds.GetSize().GetLength() * 0.5

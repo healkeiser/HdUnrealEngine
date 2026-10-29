@@ -7,7 +7,7 @@ param(
 # checks the UE log: no setting may be skipped, and each console variable's default must be the value UE had.
 $ErrorActionPreference = 'Stop'
 $TaskRoot = Split-Path -Parent $PSScriptRoot
-$Run = if ($OutputDirectory) {[IO.Path]::GetFullPath($OutputDirectory)} else {Join-Path $TaskRoot ('out\settings\' + (Get-Date -Format 'yyyyMMdd-HHmmss'))}
+$Run = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot ('out\settings\' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 New-Item -ItemType Directory -Force -Path $Run | Out-Null
 $Settings = Join-Path $Run 'settings.json'
 & python (Join-Path $PSScriptRoot 'generate_render_settings.py') --defaults-json $Settings
@@ -15,7 +15,7 @@ if ($LASTEXITCODE) { throw 'Generating the default settings failed.' }
 $Project = (Get-Content -Raw -LiteralPath $RuntimeConfig | ConvertFrom-Json).runtime_project
 if (-not [IO.Path]::IsPathRooted($Project)) { $Project = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($RuntimeConfig))) $Project }
 $Log = Join-Path (Split-Path -Parent $Project) 'Saved\Logs\HdUEBackend.log'
-$Arguments = @{RuntimeConfig = $RuntimeConfig; RendererSettings = $Settings; OutputDirectory = (Join-Path $Run 'render'); Mode = 'both'; Cycles = 1}
+$Arguments = @{RuntimeConfig = $RuntimeConfig; RendererSettings = $Settings; OutputDirectory = (Join-Path $Run 'render'); Mode = 'both'; Cycles = 1 }
 if ($InputUsd) { $Arguments.InputUsd = $InputUsd }
 & (Join-Path $PSScriptRoot 'Test-Hydra.ps1') @Arguments
 $Lines = Get-Content -LiteralPath $Log

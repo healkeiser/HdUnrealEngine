@@ -12,9 +12,9 @@ extern "C" {
  * beauty generations. All calls use the runtime owner thread. */
 typedef struct HdueAovApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *poll_aov)(HdueSession session, HdueFrameInfo* frame);
+    HdueResult(HDUE_CALL* poll_aov)(HdueSession session, HdueFrameInfo* frame);
 } HdueAovApi;
-typedef HdueResult (HDUE_CALL *HdueGetAovApiFn)(uint32_t version, uint32_t capacity, HdueAovApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetAovApiFn)(uint32_t version, uint32_t capacity, HdueAovApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32_t version, uint32_t capacity, HdueAovApi* api);
 #ifdef __cplusplus
 }

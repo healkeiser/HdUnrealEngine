@@ -30,10 +30,10 @@ typedef struct HdueSurfaceStatus {
 } HdueSurfaceStatus;
 typedef struct HdueSurfaceApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *apply)(HdueSession, const HdueSurfaceBatch*);
-    HdueResult (HDUE_CALL *get_status)(HdueSession, HdueSurfaceStatus*);
+    HdueResult(HDUE_CALL* apply)(HdueSession, const HdueSurfaceBatch*);
+    HdueResult(HDUE_CALL* get_status)(HdueSession, HdueSurfaceStatus*);
 } HdueSurfaceApi;
-typedef HdueResult (HDUE_CALL *HdueGetSurfaceApiFn)(uint32_t, uint32_t, HdueSurfaceApi*);
+typedef HdueResult(HDUE_CALL* HdueGetSurfaceApiFn)(uint32_t, uint32_t, HdueSurfaceApi*);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_surface_api(uint32_t, uint32_t, HdueSurfaceApi*);
 #ifdef __cplusplus
 }

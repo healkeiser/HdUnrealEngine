@@ -4,7 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$EngineRoot=Get-HdUELocalPath -Key engine_root -Value $EngineRoot
+$EngineRoot = Get-HdUELocalPath -Key engine_root -Value $EngineRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
 $Version = Get-Content -Raw -LiteralPath (Join-Path $EngineRoot 'Engine\Build\Build.version') | ConvertFrom-Json

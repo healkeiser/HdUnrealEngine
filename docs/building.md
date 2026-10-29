@@ -86,7 +86,7 @@ The monolithic DLL requires a source engine. A matching editor installation can 
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
-C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools.
+C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools. Python uses Black and Ruff (`pyproject.toml`: 80 columns, Python 3.11+, Google docstrings): `uvx black scripts tests integrations` and `uvx ruff check --fix ...`. PowerShell uses `Invoke-Formatter` and PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`). `.editorconfig` sets whitespace for everything else. CI checks all of them, and lints the workflow with actionlint.
 
 ## Standalone rendering and usdview
 

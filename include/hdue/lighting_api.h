@@ -5,10 +5,15 @@
 extern "C" {
 #endif
 #define HDUE_LIGHTING_ABI_VERSION 2u
-enum { HDUE_DOME_LIGHT=4, HDUE_DISK_LIGHT=5, HDUE_CYLINDER_LIGHT=6 };
-enum { HDUE_LIGHT_SHADOWS=1, HDUE_LIGHT_NORMALIZE=2, HDUE_LIGHT_POINT=4,
-       HDUE_LIGHT_BACKGROUND=8, HDUE_LIGHT_MEGALIGHTS=16 };
-enum { HDUE_ENVIRONMENT_AUTOMATIC=0, HDUE_ENVIRONMENT_LATLONG=1 };
+enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
+enum {
+    HDUE_LIGHT_SHADOWS = 1,
+    HDUE_LIGHT_NORMALIZE = 2,
+    HDUE_LIGHT_POINT = 4,
+    HDUE_LIGHT_BACKGROUND = 8,
+    HDUE_LIGHT_MEGALIGHTS = 16
+};
+enum { HDUE_ENVIRONMENT_AUTOMATIC = 0, HDUE_ENVIRONMENT_LATLONG = 1 };
 typedef struct HdueLight {
     uint32_t struct_size, type, visible, flags;
     const char* id;
@@ -39,11 +44,11 @@ typedef struct HdueLightingStatus {
 } HdueLightingStatus;
 typedef struct HdueLightingApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *upsert)(HdueSession session, const HdueLightBatch* batch);
-    HdueResult (HDUE_CALL *get_status)(HdueSession session, HdueLightingStatus* status);
+    HdueResult(HDUE_CALL* upsert)(HdueSession session, const HdueLightBatch* batch);
+    HdueResult(HDUE_CALL* get_status)(HdueSession session, HdueLightingStatus* status);
 } HdueLightingApi;
-typedef HdueResult (HDUE_CALL *HdueGetLightingApiFn)(uint32_t version,uint32_t capacity,HdueLightingApi* api);
-HDUE_EXPORT HdueResult HDUE_CALL hdue_get_lighting_api(uint32_t version,uint32_t capacity,HdueLightingApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetLightingApiFn)(uint32_t version, uint32_t capacity, HdueLightingApi* api);
+HDUE_EXPORT HdueResult HDUE_CALL hdue_get_lighting_api(uint32_t version, uint32_t capacity, HdueLightingApi* api);
 #ifdef __cplusplus
 }
 #endif

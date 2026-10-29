@@ -3,77 +3,176 @@
 Use the normal Prepare-Substrate and Test-Hydra pipeline between these steps.
 The check reads linear color AOVs at the centers of nine unlit mesh patches.
 """
+
 import argparse
 import json
 import math
-from pathlib import Path
 import sys
-ROOT=Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(ROOT/'scripts'))
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 def generate(folder):
-    from pxr import Gf,Sdf,Usd,UsdGeom,UsdShade
-    from substrate_graph import author
     from generate_substrate_textures import png
-    folder=folder.resolve(); folder.mkdir(parents=True,exist_ok=False)
-    png(folder/'value.png',lambda x,y,s:(128,64,32,192),size=4)
-    png(folder/'tile.1001.png',lambda x,y,s:(255,0,0,255),size=4)
-    png(folder/'tile.1002.png',lambda x,y,s:(0,255,0,255),size=4)
-    stage=Usd.Stage.CreateNew(str(folder/'checks.usda')); stage.SetDefaultPrim(stage.DefinePrim('/World','Xform'))
-    UsdGeom.SetStageMetersPerUnit(stage,.01); UsdGeom.SetStageUpAxis(stage,'Z')
-    specs=[('srgb',[.21586,.05127,.01444]),('raw',[128/255,64/255,32/255])]
-    specs += [(c,[v/255]*3) for c,v in zip('rgba',(128,64,32,192))]
-    specs += [('direct_a',[192/255]*3),('udim1',[1,0,0]),('udim2',[0,1,0])]
-    checks=[]
-    for i,(name,expected) in enumerate(specs):
-        center=((i%3-1)*60,(1-i//3)*50)
-        nodes={'image':dict(type='texture',properties={'file':'value.png','color_space':'srgb' if name=='srgb' else 'raw'})}
-        source=dict(node='image')
-        if name in 'rgba':
-            nodes['channel']=dict(type='channel',inputs={'value':dict(node='image',output='rgba')},properties={'channel':name})
-            nodes['gray']=dict(type='color_from_float',inputs={'value':dict(node='channel')}); source=dict(node='gray')
-        elif name=='direct_a':
-            nodes['gray']=dict(type='color_from_float',inputs={'value':dict(node='image',output='a')}); source=dict(node='gray')
-        elif name.startswith('udim'):
-            nodes['uv']=dict(type='uv',inputs={'scale':[0.,0.],'offset':[.5 if name=='udim1' else 1.5,.5]})
-            nodes['image']['inputs']={'uv':dict(node='uv')}; nodes['image']['properties']['file']='tile.<UDIM>.png'
-        nodes['surface']=dict(type='unlit',inputs={'emission':source})
-        material=author(stage,'/Looks/'+name,dict(version=1,output='surface',nodes=nodes))
-        mesh=UsdGeom.Mesh.Define(stage,'/World/'+name); x,z=center; radius=16
-        mesh.CreatePointsAttr([(x-radius,0,z-radius),(x+radius,0,z-radius),(x+radius,0,z+radius),(x-radius,0,z+radius)])
-        mesh.CreateFaceVertexCountsAttr([4]); mesh.CreateFaceVertexIndicesAttr([0,1,2,3]); mesh.CreateSubdivisionSchemeAttr('none')
-        mesh.CreateNormalsAttr([(0,-1,0)]*4); mesh.SetNormalsInterpolation('vertex')
-        UsdGeom.PrimvarsAPI(mesh).CreatePrimvar('st',Sdf.ValueTypeNames.TexCoord2fArray,'vertex').Set([(0,0),(1,0),(1,1),(0,1)])
+    from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade
+    from substrate_graph import author
+
+    folder = folder.resolve()
+    folder.mkdir(parents=True, exist_ok=False)
+    png(folder / "value.png", lambda x, y, s: (128, 64, 32, 192), size=4)
+    png(folder / "tile.1001.png", lambda x, y, s: (255, 0, 0, 255), size=4)
+    png(folder / "tile.1002.png", lambda x, y, s: (0, 255, 0, 255), size=4)
+    stage = Usd.Stage.CreateNew(str(folder / "checks.usda"))
+    stage.SetDefaultPrim(stage.DefinePrim("/World", "Xform"))
+    UsdGeom.SetStageMetersPerUnit(stage, 0.01)
+    UsdGeom.SetStageUpAxis(stage, "Z")
+    specs = [
+        ("srgb", [0.21586, 0.05127, 0.01444]),
+        ("raw", [128 / 255, 64 / 255, 32 / 255]),
+    ]
+    specs += [
+        (c, [v / 255] * 3)
+        for c, v in zip("rgba", (128, 64, 32, 192), strict=False)
+    ]
+    specs += [
+        ("direct_a", [192 / 255] * 3),
+        ("udim1", [1, 0, 0]),
+        ("udim2", [0, 1, 0]),
+    ]
+    checks = []
+    for i, (name, expected) in enumerate(specs):
+        center = ((i % 3 - 1) * 60, (1 - i // 3) * 50)
+        nodes = {
+            "image": dict(
+                type="texture",
+                properties={
+                    "file": "value.png",
+                    "color_space": "srgb" if name == "srgb" else "raw",
+                },
+            )
+        }
+        source = dict(node="image")
+        if name in "rgba":
+            nodes["channel"] = dict(
+                type="channel",
+                inputs={"value": dict(node="image", output="rgba")},
+                properties={"channel": name},
+            )
+            nodes["gray"] = dict(
+                type="color_from_float", inputs={"value": dict(node="channel")}
+            )
+            source = dict(node="gray")
+        elif name == "direct_a":
+            nodes["gray"] = dict(
+                type="color_from_float",
+                inputs={"value": dict(node="image", output="a")},
+            )
+            source = dict(node="gray")
+        elif name.startswith("udim"):
+            nodes["uv"] = dict(
+                type="uv",
+                inputs={
+                    "scale": [0.0, 0.0],
+                    "offset": [0.5 if name == "udim1" else 1.5, 0.5],
+                },
+            )
+            nodes["image"]["inputs"] = {"uv": dict(node="uv")}
+            nodes["image"]["properties"]["file"] = "tile.<UDIM>.png"
+        nodes["surface"] = dict(type="unlit", inputs={"emission": source})
+        material = author(
+            stage,
+            "/Looks/" + name,
+            dict(version=1, output="surface", nodes=nodes),
+        )
+        mesh = UsdGeom.Mesh.Define(stage, "/World/" + name)
+        x, z = center
+        radius = 16
+        mesh.CreatePointsAttr(
+            [
+                (x - radius, 0, z - radius),
+                (x + radius, 0, z - radius),
+                (x + radius, 0, z + radius),
+                (x - radius, 0, z + radius),
+            ]
+        )
+        mesh.CreateFaceVertexCountsAttr([4])
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+        mesh.CreateSubdivisionSchemeAttr("none")
+        mesh.CreateNormalsAttr([(0, -1, 0)] * 4)
+        mesh.SetNormalsInterpolation("vertex")
+        UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+            "st", Sdf.ValueTypeNames.TexCoord2fArray, "vertex"
+        ).Set([(0, 0), (1, 0), (1, 1), (0, 1)])
         UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(material)
-        checks.append(dict(name=name,center=center,expected=expected))
-    camera=UsdGeom.Camera.Define(stage,'/Camera')
-    camera.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(Gf.Vec3d(0,-400,0),Gf.Vec3d(0,0,0),Gf.Vec3d(0,0,1)).GetInverse())
-    camera.CreateHorizontalApertureAttr(36); camera.CreateVerticalApertureAttr(20.25); camera.CreateFocalLengthAttr(50)
-    camera.CreateClippingRangeAttr(Gf.Vec2f(1,5000)); stage.GetRootLayer().Save()
-    (folder/'expected.json').write_text(json.dumps(checks,indent=2),encoding='utf-8')
+        checks.append(dict(name=name, center=center, expected=expected))
+    camera = UsdGeom.Camera.Define(stage, "/Camera")
+    camera.AddTransformOp().Set(
+        Gf.Matrix4d()
+        .SetLookAt(Gf.Vec3d(0, -400, 0), Gf.Vec3d(0, 0, 0), Gf.Vec3d(0, 0, 1))
+        .GetInverse()
+    )
+    camera.CreateHorizontalApertureAttr(36)
+    camera.CreateVerticalApertureAttr(20.25)
+    camera.CreateFocalLengthAttr(50)
+    camera.CreateClippingRangeAttr(Gf.Vec2f(1, 5000))
+    stage.GetRootLayer().Save()
+    (folder / "expected.json").write_text(
+        json.dumps(checks, indent=2), encoding="utf-8"
+    )
 
 
-def check(folder,renders):
+def check(folder, renders):
     from compare_pfm import read
-    checks=json.loads((folder/'expected.json').read_text()); results=[]
-    metrics=json.loads((renders/'metrics.json').read_text()); assert metrics['passed']
-    for frame in metrics['frames']:
-        pixels=read(renders/(frame['label']+'.pfm')); height,width,_=pixels.shape
+
+    checks = json.loads((folder / "expected.json").read_text())
+    results = []
+    metrics = json.loads((renders / "metrics.json").read_text())
+    assert metrics["passed"]
+    for frame in metrics["frames"]:
+        pixels = read(renders / (frame["label"] + ".pfm"))
+        height, width, _ = pixels.shape
         for item in checks:
-            x,z=item['center']; px=round(width*(.5+x/288)); py=round(height*(.5+z/162)) # bottom-up PFM
-            actual=[float(v) for v in pixels[py-2:py+3,px-2:px+3].mean(axis=(0,1))]
-            error=max(abs(a-b) for a,b in zip(actual,item['expected']))
-            if not all(math.isfinite(v) for v in actual) or error>.035:
-                raise AssertionError(f"{frame['mode']} {item['name']}: expected {item['expected']}, got {actual}")
-            results.append(dict(mode=frame['mode'],name=item['name'],actual=actual,error=error))
-    result=dict(passed=True,checks=results)
-    (renders/'texture-checks.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
-    print(f'Passed {len(results)} numerical texture checks')
+            x, z = item["center"]
+            px = round(width * (0.5 + x / 288))
+            py = round(height * (0.5 + z / 162))  # bottom-up PFM
+            actual = [
+                float(v)
+                for v in pixels[py - 2 : py + 3, px - 2 : px + 3].mean(
+                    axis=(0, 1)
+                )
+            ]
+            error = max(
+                abs(a - b)
+                for a, b in zip(actual, item["expected"], strict=False)
+            )
+            if not all(math.isfinite(v) for v in actual) or error > 0.035:
+                raise AssertionError(
+                    f"{frame['mode']} {item['name']}: expected {item['expected']}, got {actual}"
+                )
+            results.append(
+                dict(
+                    mode=frame["mode"],
+                    name=item["name"],
+                    actual=actual,
+                    error=error,
+                )
+            )
+    result = dict(passed=True, checks=results)
+    (renders / "texture-checks.json").write_text(
+        json.dumps(result, indent=2), encoding="utf-8"
+    )
+    print(f"Passed {len(results)} numerical texture checks")
 
 
-if __name__=='__main__':
-    parser=argparse.ArgumentParser(); parser.add_argument('mode',choices=('generate','check')); parser.add_argument('folder',type=Path)
-    parser.add_argument('--renders',type=Path); args=parser.parse_args()
-    if args.mode=='generate': generate(args.folder)
-    else: check(args.folder,args.renders)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mode", choices=("generate", "check"))
+    parser.add_argument("folder", type=Path)
+    parser.add_argument("--renders", type=Path)
+    args = parser.parse_args()
+    if args.mode == "generate":
+        generate(args.folder)
+    else:
+        check(args.folder, args.renders)

@@ -6,5 +6,7 @@ UCLASS()
 class UHdUEMaterialXAssetsPipeline : public UInterchangeGenericAssetsPipeline {
     GENERATED_BODY()
 protected:
-    virtual void ExecutePipeline(UInterchangeBaseNodeContainer* Container, const TArray<UInterchangeSourceData*>& Sources, const FString& ContentBasePath) override;
+    virtual void ExecutePipeline(UInterchangeBaseNodeContainer* Container,
+                                 const TArray<UInterchangeSourceData*>& Sources,
+                                 const FString& ContentBasePath) override;
 };

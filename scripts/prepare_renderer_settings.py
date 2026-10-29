@@ -5,20 +5,34 @@
 import argparse
 import json
 from pathlib import Path
-from pxr import Usd
+
 from materialx_controls import MaterialXLibrary, OfflineView
+from pxr import Usd
 
 
 def export(stage, library, time, substrate=None):
     view = OfflineView(stage, time, object())
     prepared = MaterialXLibrary(library, view) if library else None
-    if prepared and not prepared.sync(): raise ValueError(prepared.preparation_error)
-    view.settings["wetProfiles"] = {
-        path: entry.get("surface_effects", {}).get("wet", {}) for path, entry in prepared.bound_entries.items()} if prepared else {}
+    if prepared and not prepared.sync():
+        raise ValueError(prepared.preparation_error)
+    view.settings["wetProfiles"] = (
+        {
+            path: entry.get("surface_effects", {}).get("wet", {})
+            for path, entry in prepared.bound_entries.items()
+        }
+        if prepared
+        else {}
+    )
     if substrate:
         from substrate_library import SubstrateLibrary
-        SubstrateLibrary(substrate).sync(stage,time,prepared.bound_entries if prepared else {},view.settings)
-        view.settings['substratePrepared']=True
+
+        SubstrateLibrary(substrate).sync(
+            stage,
+            time,
+            prepared.bound_entries if prepared else {},
+            view.settings,
+        )
+        view.settings["substratePrepared"] = True
     return dict(version=1, settings=view.settings)
 
 
@@ -30,5 +44,12 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--time", type=float, default=0)
     args = parser.parse_args()
-    result = export(Usd.Stage.Open(str(args.scene.resolve())), args.library, Usd.TimeCode(args.time),args.substrate_library)
-    args.output.write_text(json.dumps(result, default=list, indent=2), encoding="utf-8")
+    result = export(
+        Usd.Stage.Open(str(args.scene.resolve())),
+        args.library,
+        Usd.TimeCode(args.time),
+        args.substrate_library,
+    )
+    args.output.write_text(
+        json.dumps(result, default=list, indent=2), encoding="utf-8"
+    )

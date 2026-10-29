@@ -24,6 +24,44 @@ jobs:
       - name: ABI layout test
         run: ctest --test-dir build -C Release --output-on-failure
 
+  format:
+    name: Formatting and lint
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: false
+      - name: Python (Black, Ruff; pyproject.toml)
+        run: |
+          uvx black@24.10.0 --check scripts tests integrations
+          uvx ruff@0.7.4 check scripts tests integrations
+      - name: C++ and shaders (clang-format)
+        shell: pwsh
+        run: |
+          uvx --from clang-format==19.1.5 clang-format --dry-run --Werror (git ls-files '*.cpp' '*.h' '*.hpp' '*.c')
+          if ($LASTEXITCODE) { exit 1 }
+      - name: PowerShell (PSScriptAnalyzer, Invoke-Formatter)
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.23.0 -Scope CurrentUser -Force
+          $files = Get-ChildItem -Recurse -Include *.ps1 -Path scripts, tests, packaging, integrations
+          $findings = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Settings ./PSScriptAnalyzerSettings.psd1 }
+          $findings | Format-Table -AutoSize
+          $unformatted = $files | Where-Object { $text = [IO.File]::ReadAllText($_.FullName); (Invoke-Formatter -ScriptDefinition $text) -ne $text }
+          $unformatted | ForEach-Object { Write-Output "::error file=$($_.FullName)::not formatted (Invoke-Formatter)" }
+          if ($findings -or $unformatted) { exit 1 }
+
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.4/scripts/download-actionlint.bash) 1.7.4
+          ./actionlint -color
+
   cpp-lint:
     name: clang-tidy (client library)
     runs-on: windows-2022

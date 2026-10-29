@@ -11,5 +11,6 @@ void HdUEDensifyGrid(const openvdb::FloatGrid& grid, int maxResolution, HdUEVolu
 // .bgeo/.bgeo.sc/.vdb file (what the USD Render ROP writes for husk). It takes the VDB (vdb) or native
 // Houdini volume primitive called name, or the index-th one when no primitive has that name.
 // localToWorld is in SOP space. Throws std::runtime_error when the geometry or field is missing.
-void HdUELoadHoudiniField(const std::string& path, const std::string& name, int index, bool vdb, int maxResolution, HdUEVolumeData& volume);
+void HdUELoadHoudiniField(const std::string& path, const std::string& name, int index, bool vdb, int maxResolution,
+                          HdUEVolumeData& volume);
 PXR_NAMESPACE_CLOSE_SCOPE

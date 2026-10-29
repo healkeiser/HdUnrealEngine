@@ -1,0 +1,41 @@
+# Tool configuration only: hdUE's Python runs as scripts (uv run, PEP 723 headers) and inside Houdini.
+[project]
+name = "hdue-tools"
+version = "0"
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 80
+target-version = ["py311", "py312", "py313"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, import order, bugbear, pyupgrade, Google docstrings.
+select = ["F", "E", "W", "I", "B", "UP", "D"]
+ignore = [
+    "E501",    # Black wraps code; long strings and comments stay readable as they are
+    "D1",      # no boilerplate docstrings on every function
+    "D205",    # one-paragraph summaries that wrap
+    "D415",
+    "E402",    # scripts extend sys.path before importing hdUE modules
+    "E731",    # short named lambdas are the local style
+    "E741",
+    "B008",    # Usd.TimeCode.Default() is an immutable default
+    "B023",    # closures here run inside the loop that defines them
+    "UP031",
+    "UP038",   # isinstance with tuples
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests keep handles and values that document what each step returns.
+"*_test.py" = ["F841", "B007", "E712"]
+"tests/**" = ["F841"]
+"scripts/asset_proxy.py" = ["E712"]  # the attribute may hold a non-bool
+"integrations/**" = ["B007"]
+"scripts/render_gallery.py" = ["B007"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

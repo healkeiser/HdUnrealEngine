@@ -29,10 +29,10 @@ typedef struct HdueResidencyApi {
     uint32_t struct_size;
     uint32_t abi_version;
     /* Owner thread. Configure before request_render; changes cancel the current request. */
-    HdueResult (HDUE_CALL *configure)(HdueSession session, const HdueResidencyOptions* options);
-    HdueResult (HDUE_CALL *get_status)(HdueSession session, HdueResidencyStatus* status);
+    HdueResult(HDUE_CALL* configure)(HdueSession session, const HdueResidencyOptions* options);
+    HdueResult(HDUE_CALL* get_status)(HdueSession session, HdueResidencyStatus* status);
 } HdueResidencyApi;
-typedef HdueResult (HDUE_CALL *HdueGetResidencyApiFn)(uint32_t version, uint32_t capacity, HdueResidencyApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetResidencyApiFn)(uint32_t version, uint32_t capacity, HdueResidencyApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32_t version, uint32_t capacity, HdueResidencyApi* api);
 #ifdef __cplusplus
 }

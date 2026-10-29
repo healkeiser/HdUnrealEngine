@@ -41,13 +41,13 @@ typedef struct HdueMaterialStats {
 typedef struct HdueMaterialApi {
     uint32_t struct_size;
     uint32_t abi_version;
-    HdueResult (HDUE_CALL *get_renderer_info)(HdueRendererInfo* info);
+    HdueResult(HDUE_CALL* get_renderer_info)(HdueRendererInfo* info);
     /* Owner thread. Validates the complete batch before changing any value.
        Successful edits cancel the current render; request a newer generation. */
-    HdueResult (HDUE_CALL *set_parameters)(HdueSession session, const HdueMaterialUpdate* update);
-    HdueResult (HDUE_CALL *get_material_stats)(HdueSession session, const char* material_id, HdueMaterialStats* stats);
+    HdueResult(HDUE_CALL* set_parameters)(HdueSession session, const HdueMaterialUpdate* update);
+    HdueResult(HDUE_CALL* get_material_stats)(HdueSession session, const char* material_id, HdueMaterialStats* stats);
 } HdueMaterialApi;
-typedef HdueResult (HDUE_CALL *HdueGetMaterialApiFn)(uint32_t version, uint32_t capacity, HdueMaterialApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetMaterialApiFn)(uint32_t version, uint32_t capacity, HdueMaterialApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_material_api(uint32_t version, uint32_t capacity, HdueMaterialApi* api);
 #ifdef __cplusplus
 }

@@ -59,15 +59,18 @@
 #include "UObject/Package.h"
 #include "Runtime/Launch/Resources/Version.h"
 
-static_assert(ENGINE_MAJOR_VERSION == HDUE_ENGINE_MAJOR &&
-    ENGINE_MINOR_VERSION == HDUE_ENGINE_MINOR && ENGINE_PATCH_VERSION == HDUE_ENGINE_PATCH,
-    "Use the pinned UE 5.8.4 source, not a different installed/source engine.");
+static_assert(ENGINE_MAJOR_VERSION == HDUE_ENGINE_MAJOR && ENGINE_MINOR_VERSION == HDUE_ENGINE_MINOR &&
+                  ENGINE_PATCH_VERSION == HDUE_ENGINE_PATCH,
+              "Use the pinned UE 5.8.4 source, not a different installed/source engine.");
 
 namespace {
 // hdUE's interactive resolution, set like any console variable (hdUE:cvar:r:HdUE:...).
-TAutoConsoleVariable<int32> CVarInteractiveResolution(TEXT("r.HdUE.InteractiveResolution"), 1,
-    TEXT("Interactive hosts: render realtime frames at r.HdUE.InteractiveScreenPercentage while requests keep coming (the camera moves)."));
-TAutoConsoleVariable<float> CVarInteractiveScreenPercentage(TEXT("r.HdUE.InteractiveScreenPercentage"), 50.f,
+TAutoConsoleVariable<int32> CVarInteractiveResolution(
+    TEXT("r.HdUE.InteractiveResolution"), 1,
+    TEXT("Interactive hosts: render realtime frames at r.HdUE.InteractiveScreenPercentage while requests keep coming "
+         "(the camera moves)."));
+TAutoConsoleVariable<float> CVarInteractiveScreenPercentage(
+    TEXT("r.HdUE.InteractiveScreenPercentage"), 50.f,
     TEXT("Screen percentage of interactive realtime frames while moving (r.HdUE.InteractiveResolution)."));
 struct FReadbackJob {
     TAtomic<bool> Complete{false};
@@ -75,17 +78,17 @@ struct FReadbackJob {
     uint64 Generation = 0;
     uint32 Samples = 0;
     uint32 DrawIndex = 0;
-    uint32 FullResIndex = 0; // 0 for a reduced-resolution draw (camera moving); only full-resolution draws converge
+    uint32 FullResIndex = 0;  // 0 for a reduced-resolution draw (camera moving); only full-resolution draws converge
     double Started = 0;
     HdueRenderRequest Request{};
     double RequestedAt = 0;
     bool Preparing = false;
     bool DepthEnabled = false;
-    int32 Slot = -1; // index into FSession::Readbacks / DepthReadbacks
+    int32 Slot = -1;  // index into FSession::Readbacks / DepthReadbacks
     TAtomic<bool> DepthQueued{false};
-    bool MegaLightsActive=false;
+    bool MegaLightsActive = false;
     FTextureRHIRef Environment;
-    float EnvironmentScale=1;
+    float EnvironmentScale = 1;
     float ScreenFraction = 1;
     // hdue/gpu_api.h: the draw also goes to the shared ring (enabled set), into a slot the render thread picks.
     HdueGpuOptions Shared{};
@@ -93,20 +96,21 @@ struct FReadbackJob {
 };
 // Whether a draw completes its request: the Path Tracer's samples, or the realtime warmup at full resolution.
 bool Converges(const FReadbackJob& Job) {
-    return !Job.Preparing && (Job.Request.mode == HDUE_PATH_TRACED
-        ? Job.Samples >= Job.Request.samples_per_pixel : Job.FullResIndex >= FMath::Max(1u, Job.Request.warmup_frames));
+    return !Job.Preparing &&
+           (Job.Request.mode == HDUE_PATH_TRACED ? Job.Samples >= Job.Request.samples_per_pixel
+                                                 : Job.FullResIndex >= FMath::Max(1u, Job.Request.warmup_frames));
 }
 struct FSession {
     TUniquePtr<FHdueScene> Scene;
     HdueSession Handle = 0;
     uint32 Width = 0, Height = 0;
-    UTextureRenderTarget2D* Target = nullptr; // Rooted until DestroySession.
+    UTextureRenderTarget2D* Target = nullptr;  // Rooted until DestroySession.
     FSceneViewStateInterface* ViewState = nullptr;
     HdueRenderRequest Request{};
     bool HasRequest = false;
     bool CameraCut = true;
     uint32 Draws = 0, FullResDraws = 0;
-    double LastReadback = 0; // when the last draw was read back; intermediate draws skip it
+    double LastReadback = 0;  // when the last draw was read back; intermediate draws skip it
     double RequestedAt = 0;
     // Readbacks in flight, oldest first. Interactive hosts keep up to three so frames overlap their GPU->CPU copies;
     // offline hosts one. Each uses a slot's staging buffers (Render Thread only; reused at the session's size).
@@ -118,7 +122,8 @@ struct FSession {
     HdueFrameInfo Frame{};
     TArray<float> Pixels;
     TArray<float> DepthPixels;
-    TArray<float> SparePixels, SpareDepth; // the previous frame's arrays, reused: a fresh 33 MB array page-faults on every frame
+    TArray<float> SparePixels,
+        SpareDepth;  // the previous frame's arrays, reused: a fresh 33 MB array page-faults on every frame
     bool DepthEnabled = false;
     HdueResidencyOptions ResidencyOptions{sizeof(HdueResidencyOptions), 0, 120.0};
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
@@ -129,8 +134,8 @@ struct FSession {
     FName FSceneView::* DebugMember = nullptr;
     FName DebugName;
     TStrongObjectPtr<UMaterialInterface> DebugMaterial;
-    bool MegaLightsActive=false;
-    TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial; // PP_HdUEAov, weights select HDUE_AOV_*.
+    bool MegaLightsActive = false;
+    TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial;  // PP_HdUEAov, weights select HDUE_AOV_*.
     // hdue/postprocess_api.h: beauty overrides; the materials stay referenced while they are blendables.
     FPostProcessSettings PostProcess;
     TArray<TStrongObjectPtr<UMaterialInterface>> PostProcessMaterials;
@@ -146,41 +151,47 @@ struct FSession {
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
 class FHdueDepthCapture final : public FSceneViewExtensionBase {
-    TSharedPtr<FSession,ESPMode::ThreadSafe> Session;
-    TSharedPtr<FReadbackJob,ESPMode::ThreadSafe> Job;
+    TSharedPtr<FSession, ESPMode::ThreadSafe> Session;
+    TSharedPtr<FReadbackJob, ESPMode::ThreadSafe> Job;
+
 public:
-    FHdueDepthCapture(const FAutoRegister& AutoRegister,const TSharedPtr<FSession,ESPMode::ThreadSafe>& InSession,
-        const TSharedPtr<FReadbackJob,ESPMode::ThreadSafe>& InJob) : FSceneViewExtensionBase(AutoRegister),Session(InSession),Job(InJob) {}
+    FHdueDepthCapture(const FAutoRegister& AutoRegister, const TSharedPtr<FSession, ESPMode::ThreadSafe>& InSession,
+                      const TSharedPtr<FReadbackJob, ESPMode::ThreadSafe>& InJob)
+        : FSceneViewExtensionBase(AutoRegister), Session(InSession), Job(InJob) {}
     void SetupViewFamily(FSceneViewFamily&) override {}
-    void SetupView(FSceneViewFamily&,FSceneView&) override {}
+    void SetupView(FSceneViewFamily&, FSceneView&) override {}
     void BeginRenderViewFamily(FSceneViewFamily&) override {}
     bool IsActiveThisFrame_Internal(const FSceneViewExtensionContext&) const override { return false; }
-    void PreRenderViewFamily_RenderThread(FRDGBuilder&,FSceneViewFamily& Family) override {
-        Job->MegaLightsActive=!Family.EngineShowFlags.PathTracing && MegaLights::IsEnabled(Family);
+    void PreRenderViewFamily_RenderThread(FRDGBuilder&, FSceneViewFamily& Family) override {
+        Job->MegaLightsActive = !Family.EngineShowFlags.PathTracing && MegaLights::IsEnabled(Family);
     }
     // The HDRI background goes in right after the base pass, so heterogeneous volumes and
     // translucency composite over it; deferred lighting leaves far-depth pixels alone.
-    void PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder,FSceneView& View,const FRenderTargetBindingSlots& RenderTargets,
+    void PostRenderBasePassDeferred_RenderThread(
+        FRDGBuilder& GraphBuilder, FSceneView& View, const FRenderTargetBindingSlots& RenderTargets,
         TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures) override {
-        if(!Job->Environment.IsValid() || !SceneTextures) return;
-        HdUEDrawEnvironment(GraphBuilder,View,RenderTargets.Output[0].GetTexture(),SceneTextures->GetParameters()->SceneDepthTexture,
-            Job->Environment.GetReference(),Job->EnvironmentScale);
+        if (!Job->Environment.IsValid() || !SceneTextures) return;
+        HdUEDrawEnvironment(GraphBuilder, View, RenderTargets.Output[0].GetTexture(),
+                            SceneTextures->GetParameters()->SceneDepthTexture, Job->Environment.GetReference(),
+                            Job->EnvironmentScale);
     }
-    void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder,const FSceneView& View,const FPostProcessingInputs& Inputs) override {
-        if(!Inputs.SceneTextures) return;
-        FRDGTextureRef Source=Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
-        if(!Source) return;
-        if(Job->Shared.depth)
-            HdueSharedFrames::WriteDepth(GraphBuilder,View,Source,Job->SharedSlot,Job->Request,Job->Shared.depth_scale,Job->ScreenFraction);
-        if(!Job->DepthEnabled) return;
-        const FIntPoint Size(Session->Width,Session->Height);
-        auto Desc=FRDGTextureDesc::Create2D(Size,PF_R32_FLOAT,FClearValueBinding::None,
-            TexCreate_ShaderResource|TexCreate_RenderTargetable);
-        FRDGTextureRef Target=GraphBuilder.CreateTexture(Desc,TEXT("Hdue.DeviceDepth"));
-        AddDrawTexturePass(GraphBuilder,View,Source,Target,View.UnscaledViewRect.Min,FIntPoint::ZeroValue,Size);
-        auto& Readback=Session->DepthReadbacks[Job->Slot];
-        if(!Readback) Readback=MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueDepth"));
-        AddEnqueueCopyPass(GraphBuilder,Readback.Get(),Target);
+    void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View,
+                                         const FPostProcessingInputs& Inputs) override {
+        if (!Inputs.SceneTextures) return;
+        FRDGTextureRef Source = Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
+        if (!Source) return;
+        if (Job->Shared.depth)
+            HdueSharedFrames::WriteDepth(GraphBuilder, View, Source, Job->SharedSlot, Job->Request,
+                                         Job->Shared.depth_scale, Job->ScreenFraction);
+        if (!Job->DepthEnabled) return;
+        const FIntPoint Size(Session->Width, Session->Height);
+        auto Desc = FRDGTextureDesc::Create2D(Size, PF_R32_FLOAT, FClearValueBinding::None,
+                                              TexCreate_ShaderResource | TexCreate_RenderTargetable);
+        FRDGTextureRef Target = GraphBuilder.CreateTexture(Desc, TEXT("Hdue.DeviceDepth"));
+        AddDrawTexturePass(GraphBuilder, View, Source, Target, View.UnscaledViewRect.Min, FIntPoint::ZeroValue, Size);
+        auto& Readback = Session->DepthReadbacks[Job->Slot];
+        if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueDepth"));
+        AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Target);
         Job->DepthQueued.Store(true);
     }
 };
@@ -193,7 +204,7 @@ struct FRuntime {
     uint64 NextSession = 1;
     uint64 NextFrame = 1;
     TSharedPtr<FSession, ESPMode::ThreadSafe> Session;
-    FCriticalSection SessionLock; // Session is replaced on the owner thread and copied by frame readers on any thread
+    FCriticalSection SessionLock;  // Session is replaced on the owner thread and copied by frame readers on any thread
 };
 FRuntime Runtime;
 IRendererModule& Renderer() { return FModuleManager::GetModuleChecked<IRendererModule>(TEXT("Renderer")); }
@@ -203,15 +214,18 @@ HdueResult Fail(HdueResult Code, const TCHAR* Message) {
     return Code;
 }
 HdueResult CheckOwner() {
-    return Runtime.Owner && Runtime.Owner != FPlatformTLS::GetCurrentThreadId()
-        ? HDUE_WRONG_THREAD : HDUE_OK;
+    return Runtime.Owner && Runtime.Owner != FPlatformTLS::GetCurrentThreadId() ? HDUE_WRONG_THREAD : HDUE_OK;
 }
 HdueResult CheckReady() {
     if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
     return Runtime.State == HDUE_STATE_READY ? HDUE_OK : HDUE_INVALID_STATE;
 }
-#define HDUE_RETURN_UNLESS_READY() if (const HdueResult Ready = CheckReady(); Ready != HDUE_OK) return Ready
-template <class T> bool Sized(const T* Value) { return Value && Value->struct_size == sizeof(T); }
+#define HDUE_RETURN_UNLESS_READY() \
+    if (const HdueResult Ready = CheckReady(); Ready != HDUE_OK) return Ready
+template <class T>
+bool Sized(const T* Value) {
+    return Value && Value->struct_size == sizeof(T);
+}
 int32 CVarInt(const TCHAR* Name) {
     const IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name);
     return CVar ? CVar->GetInt() : 0;
@@ -231,9 +245,7 @@ TSharedPtr<FSession, ESPMode::ThreadSafe> ReadableSession(HdueSession Handle) {
     FScopeLock Lock(&Runtime.SessionLock);
     return Runtime.Session.IsValid() && Runtime.Session->Handle == Handle ? Runtime.Session : nullptr;
 }
-bool ValidSession(HdueSession Handle) {
-    return Runtime.Session.IsValid() && Runtime.Session->Handle == Handle;
-}
+bool ValidSession(HdueSession Handle) { return Runtime.Session.IsValid() && Runtime.Session->Handle == Handle; }
 bool HasRayTracing() {
 #if RHI_RAYTRACING
     return IsRayTracingEnabled() && GRHISupportsRayTracing && GRHISupportsRayTracingShaders;
@@ -270,7 +282,7 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     static std::atomic<bool> RayTracing{false};
     if (Result.rhi_ready && CheckOwner() == HDUE_OK) RayTracing = HasRayTracing();
     if (Result.rhi_ready && RayTracing) Result.render_mode_mask |= 1u << HDUE_PATH_TRACED;
-    if (CheckOwner() == HDUE_OK) { // the error text is the UE thread's to read (other threads get the state only)
+    if (CheckOwner() == HDUE_OK) {  // the error text is the UE thread's to read (other threads get the state only)
         HdueCopyMessage(Result.message, Runtime.Error);
     }
     *Status = Result;
@@ -278,8 +290,8 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
 }
 
 HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
-    if (!Sized(Desc) || !Desc->instance_handle || !Desc->window_handle ||
-        !Desc->project_path || !Desc->map_path) return HDUE_INVALID_ARGUMENT;
+    if (!Sized(Desc) || !Desc->instance_handle || !Desc->window_handle || !Desc->project_path || !Desc->map_path)
+        return HDUE_INVALID_ARGUMENT;
     if (Runtime.State != HDUE_STATE_COLD) return HDUE_INVALID_STATE;
     Runtime.Owner = FPlatformTLS::GetCurrentThreadId();
     Runtime.State = HDUE_STATE_STARTING;
@@ -290,12 +302,13 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         return Fail(HDUE_INVALID_ARGUMENT, TEXT("Project not found, or invalid project/map quoting."));
     }
     {
-        // NaniteBuilder and the Lumen card builder delay-load embree4.dll (and its tbb12.dll) by name. Inside a host process
-        // the executable's folder is the host's, so load them from this DLL's folder first (a tbb12 the host already has,
-        // as Houdini does, is kept); later by-name loads then resolve to them. Backslashes: LoadLibraryExW fails on FPaths'.
+        // NaniteBuilder and the Lumen card builder delay-load embree4.dll (and its tbb12.dll) by name. Inside a host
+        // process the executable's folder is the host's, so load them from this DLL's folder first (a tbb12 the host
+        // already has, as Houdini does, is kept); later by-name loads then resolve to them. Backslashes: LoadLibraryExW
+        // fails on FPaths'.
         HMODULE Self = nullptr;
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            reinterpret_cast<LPCWSTR>(&Initialize), &Self);
+                           reinterpret_cast<LPCWSTR>(&Initialize), &Self);
         wchar_t Path[MAX_PATH] = {};
         if (Self && GetModuleFileNameW(Self, Path, MAX_PATH)) {
             for (const TCHAR* Name : {TEXT("tbb12.dll"), TEXT("embree4.dll")}) {
@@ -303,14 +316,18 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
                 FString Dll = FPaths::GetPath(FString(Path)) / Name;
                 FPaths::MakePlatformFilename(Dll);
                 if (!LoadLibraryExW(*Dll, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS))
-                    UE_LOG(LogTemp, Warning, TEXT("hdUE: cannot load %s (error %u): no Nanite or Lumen cards for generated meshes."), *Dll, GetLastError());
+                    UE_LOG(LogTemp, Warning,
+                           TEXT("hdUE: cannot load %s (error %u): no Nanite or Lumen cards for generated meshes."),
+                           *Dll, GetLastError());
             }
         }
     }
-    FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound -NoLoadingScreen -NoSplash -ResX=640 -ResY=360"), *Project, *Map);
+    FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound "
+                                           "-NoLoadingScreen -NoSplash -ResX=640 -ResY=360"),
+                                      *Project, *Map);
     if (Desc->extra_arguments) Command += FString(TEXT(" ")) + UTF8_TO_TCHAR(Desc->extra_arguments);
     const int Code = UELibrary_InitW(reinterpret_cast<HINSTANCE>(Desc->instance_handle),
-        reinterpret_cast<HWND>(Desc->window_handle), *Command);
+                                     reinterpret_cast<HWND>(Desc->window_handle), *Command);
     Runtime.EngineStarted = Code == 0;
     // UELibrary's return value alone does not validate LaunchWindowsStartup.
     if (Code != 0 || !GEngine || !GDynamicRHI || GUsingNullRHI) {
@@ -325,7 +342,8 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     }
     if (!Runtime.World || !Runtime.World->Scene) {
         Runtime.State = HDUE_STATE_FAILED;
-        return Fail(HDUE_ENGINE_ERROR, TEXT("No game World/Scene after UELibrary initialization. Cook and stage the test map first."));
+        return Fail(HDUE_ENGINE_ERROR,
+                    TEXT("No game World/Scene after UELibrary initialization. Cook and stage the test map first."));
     }
     // Only the explicit offscreen view family should render our world.
     if (GEngine->GameViewport) GEngine->GameViewport->bDisableWorldRendering = true;
@@ -349,9 +367,13 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         Levels.ResolutionQuality = Resolution;
         Scalability::SetQualityLevels(Levels);
         for (const auto& [Name, Value] : {TPair<const TCHAR*, int32>{TEXT("r.Streaming.FullyLoadUsedTextures"), 1},
-                {TEXT("r.Streaming.FramesForFullUpdate"), 0}, {TEXT("r.Streaming.SyncStatesWhenBlocking"), 1}, {TEXT("r.D3D12.GPUTimeout"), 0},
-                {TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2}, {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2},
-                {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000}, {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
+                                          {TEXT("r.Streaming.FramesForFullUpdate"), 0},
+                                          {TEXT("r.Streaming.SyncStatesWhenBlocking"), 1},
+                                          {TEXT("r.D3D12.GPUTimeout"), 0},
+                                          {TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2},
+                                          {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2},
+                                          {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000},
+                                          {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
             SetCVar(Name, Value);
     }
     Runtime.State = HDUE_STATE_READY;
@@ -368,22 +390,31 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     Session->Scene.Reset();
     // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
     // or the persistent view go.
-    ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) { for (auto& R : Session->Readbacks) R.Reset(); for (auto& R : Session->DepthReadbacks) R.Reset(); });
+    ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) {
+        for (auto& R : Session->Readbacks) R.Reset();
+        for (auto& R : Session->DepthReadbacks) R.Reset();
+    });
     FlushRenderingCommands();
     Session->InFlight.Reset();
     Session->ViewState->Destroy();
     Session->ViewState = nullptr;
-    if (Session->AovViewState) { Session->AovViewState->Destroy(); Session->AovViewState = nullptr; }
+    if (Session->AovViewState) {
+        Session->AovViewState->Destroy();
+        Session->AovViewState = nullptr;
+    }
     Session->Target->RemoveFromRoot();
     Session->Target = nullptr;
-    { FScopeLock Lock(&Runtime.SessionLock); Runtime.Session.Reset(); }
+    {
+        FScopeLock Lock(&Runtime.SessionLock);
+        Runtime.Session.Reset();
+    }
     return HDUE_OK;
 }
 
 HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Handle) {
     HDUE_RETURN_UNLESS_READY();
-    if (!Sized(Desc) || !Handle || !Desc->width || !Desc->height ||
-        Desc->width > 8192 || Desc->height > 8192) return HDUE_INVALID_ARGUMENT;
+    if (!Sized(Desc) || !Handle || !Desc->width || !Desc->height || Desc->width > 8192 || Desc->height > 8192)
+        return HDUE_INVALID_ARGUMENT;
     if (Runtime.Session) return Fail(HDUE_INVALID_STATE, TEXT("The initial backend supports one active session."));
     auto Session = MakeShared<FSession, ESPMode::ThreadSafe>();
     Session->Handle = Runtime.NextSession++;
@@ -398,45 +429,63 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
     Session->Target->UpdateResourceImmediate(true);
     Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     *Handle = Session->Handle;
-    { FScopeLock Lock(&Runtime.SessionLock); Runtime.Session = Session; }
+    {
+        FScopeLock Lock(&Runtime.SessionLock);
+        Runtime.Session = Session;
+    }
     return HDUE_OK;
 }
 
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
-    if (!ValidSession(Handle) || !Sized(Request) || !Request->generation ||
-        Request->mode > HDUE_PATH_TRACED || Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
-        (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) || Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
-            !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0)) ||
-        (Request->orthographic && (!FMath::IsFinite(Request->near_clip_cm) || !FMath::IsFinite(Request->far_clip_cm) || Request->far_clip_cm <= Request->near_clip_cm ||
-            !(Request->projection_scale[0] > 0) || !(Request->projection_scale[1] > 0))) ||
+    if (!ValidSession(Handle) || !Sized(Request) || !Request->generation || Request->mode > HDUE_PATH_TRACED ||
+        Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
+        (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) ||
+                                    Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
+                                    !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0)) ||
+        (Request->orthographic && (!FMath::IsFinite(Request->near_clip_cm) || !FMath::IsFinite(Request->far_clip_cm) ||
+                                   Request->far_clip_cm <= Request->near_clip_cm ||
+                                   !(Request->projection_scale[0] > 0) || !(Request->projection_scale[1] > 0))) ||
         !FMath::IsFinite(Request->projection_scale[0]) || !FMath::IsFinite(Request->projection_scale[1]) ||
         !FMath::IsFinite(Request->projection_offset[0]) || !FMath::IsFinite(Request->projection_offset[1]) ||
-        !FMath::IsFinite(Request->fstop) || !FMath::IsFinite(Request->focus_distance_cm) || !FMath::IsFinite(Request->focal_length_cm) ||
-        !FMath::IsFinite(Request->time_seconds) || Request->aov >= HDUE_AOV_COUNT) return HDUE_INVALID_ARGUMENT;
+        !FMath::IsFinite(Request->fstop) || !FMath::IsFinite(Request->focus_distance_cm) ||
+        !FMath::IsFinite(Request->focal_length_cm) || !FMath::IsFinite(Request->time_seconds) ||
+        Request->aov >= HDUE_AOV_COUNT)
+        return HDUE_INVALID_ARGUMENT;
     for (int32 Index = 0; Index < 3; ++Index) {
-        if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) || !FMath::IsFinite(Request->up[Index])) return HDUE_INVALID_ARGUMENT;
+        if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) ||
+            !FMath::IsFinite(Request->up[Index]))
+            return HDUE_INVALID_ARGUMENT;
     }
     const FVector Eye(Request->eye[0], Request->eye[1], Request->eye[2]);
     const FVector Target(Request->target[0], Request->target[1], Request->target[2]);
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
     if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
     if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
-    if (Request->aov != HDUE_AOV_COLOR && !LoadObject<UMaterialInterface>(nullptr, Request->aov == HDUE_AOV_PRIM_ID || Request->aov == HDUE_AOV_INSTANCE_ID
-            ? TEXT("/Game/HdUE/M_HdUEId.M_HdUEId") : TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
-        return Fail(HDUE_ENGINE_ERROR, TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
+    if (Request->aov != HDUE_AOV_COLOR &&
+        !LoadObject<UMaterialInterface>(nullptr,
+                                        Request->aov == HDUE_AOV_PRIM_ID || Request->aov == HDUE_AOV_INSTANCE_ID
+                                            ? TEXT("/Game/HdUE/M_HdUEId.M_HdUEId")
+                                            : TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov")))
+        return Fail(HDUE_ENGINE_ERROR,
+                    TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
     // Pending: the caller retries each tick. The reason is logged once per request generation.
     const auto Pending = [&](const TCHAR* Reason) {
         static uint64 Logged = 0;
-        if (Logged != Request->generation) { Logged = Request->generation; UE_LOG(LogTemp, Display, TEXT("hdUE request %llu pending: %s"), Request->generation, Reason); }
+        if (Logged != Request->generation) {
+            Logged = Request->generation;
+            UE_LOG(LogTemp, Display, TEXT("hdUE request %llu pending: %s"), Request->generation, Reason);
+        }
         return HDUE_PENDING;
     };
     if (!Session->Scene->SurfaceReady()) return Pending(TEXT("surface effects"));
-    if(!Session->Scene->Lighting->GetError().IsEmpty()) return Fail(HDUE_ENGINE_ERROR,*Session->Scene->Lighting->GetError());
-    if(!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
-    HdueAssetSceneStatus Assets{}; Session->Scene->Assets.GetSceneStatus(Assets);
+    if (!Session->Scene->Lighting->GetError().IsEmpty())
+        return Fail(HDUE_ENGINE_ERROR, *Session->Scene->Lighting->GetError());
+    if (!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
+    HdueAssetSceneStatus Assets{};
+    Session->Scene->Assets.GetSceneStatus(Assets);
     if (Assets.loading) return Pending(TEXT("native assets"));
     if (Assets.failed) return Fail(HDUE_ENGINE_ERROR, UTF8_TO_TCHAR(Assets.message));
     ReleaseResidency(Session);
@@ -449,9 +498,10 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     // image, where UE's own viewport changes instantly and plays Sequencer without camera cuts. Resetting it on every
     // time change froze Houdini's playback on the last image until it stopped.
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
-        Previous.aov == Request->aov;
+                             Previous.aov == Request->aov;
     if (Aov) {
-        if (!Session->AovViewState) Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+        if (!Session->AovViewState)
+            Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     } else if (!KeepHistory) {
         FlushRenderingCommands();
         Session->ViewState->Destroy();
@@ -461,7 +511,8 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     Session->Request = *Request;
     if (!Aov) Session->BeautyRequest = *Request;
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
-    Session->Draws = 0; Session->FullResDraws = 0;
+    Session->Draws = 0;
+    Session->FullResDraws = 0;
     Session->HasRequest = true;
     Session->RequestedAt = FPlatformTime::Seconds();
     Runtime.Error.Empty();
@@ -477,38 +528,47 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     return HDUE_OK;
 }
 
-FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, float ScreenFraction, EViewModeIndex ViewMode, bool Orthographic) {
+FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, float ScreenFraction,
+                           EViewModeIndex ViewMode, bool Orthographic) {
     FEngineShowFlags Flags(ESFIM_Game);
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
     Flags.SetScreenPercentage(ScreenFraction != 1.f);
-    Flags.SetOnScreenDebug(false); // UE draws warnings (e.g. exposure clipping) into the frame otherwise
+    Flags.SetOnScreenDebug(false);  // UE draws warnings (e.g. exposure clipping) into the frame otherwise
     Flags.SetTonemapper(!Aov && Session.Tonemapper);
-    Flags.SetEyeAdaptation(!Aov && Session.Tonemapper); // off: exposure 1 whatever the settings
+    Flags.SetEyeAdaptation(!Aov && Session.Tonemapper);  // off: exposure 1 whatever the settings
     Flags.SetRefraction(true);
     if (ViewMode != VMI_Lit) {
         ApplyViewMode(ViewMode, !Orthographic, Flags);
         EngineShowFlagOverride(ESFIM_Game, ViewMode, Flags, true);
     }
     if (Aov) {
-        Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
-        Flags.SetDepthOfField(false); Flags.SetVignette(false); Flags.SetGrain(false); Flags.SetLensFlares(false);
+        Flags.SetAntiAliasing(false);
+        Flags.SetTemporalAA(false);
+        Flags.SetMotionBlur(false);
+        Flags.SetBloom(false);
+        Flags.SetDepthOfField(false);
+        Flags.SetVignette(false);
+        Flags.SetGrain(false);
+        Flags.SetLensFlares(false);
         // Volumes composite into scene color and would overwrite surface channels and IDs.
         Flags.SetHeterogeneousVolumes(false);
     }
     return Flags;
 }
 
-void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FSession& Session, bool PathTracing, bool Aov) {
+void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FSession& Session, bool PathTracing,
+                      bool Aov) {
     const auto& Request = Session.Request;
     View.StartFinalPostprocessSettings(Options.ViewOrigin);
     auto& Settings = View.FinalPostProcessSettings;
-    // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend on
-    // auto exposure (two identical Sponza renders with it differed by 7%).
+    // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend
+    // on auto exposure (two identical Sponza renders with it differed by 7%).
     Settings.AutoExposureMethod = AEM_Manual;
     Settings.AutoExposureBias = 0;
-    Settings.bMegaLights=!PathTracing;
-    Settings.DynamicGlobalIlluminationMethod = Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
+    Settings.bMegaLights = !PathTracing;
+    Settings.DynamicGlobalIlluminationMethod =
+        Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
     Settings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
     Settings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
     Settings.PathTracingMaxBounces = Session.Scene->HasRefractiveMaterials() ? 16 : 8;
@@ -519,12 +579,14 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         Settings.LumenSceneLightingQuality = FMath::Max(Settings.LumenSceneLightingQuality, 2.f);
         Settings.LumenSceneDetail = FMath::Max(Settings.LumenSceneDetail, 2.f);
     }
-    if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 && Request.focal_length_cm > 0) {
+    if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 &&
+        Request.focal_length_cm > 0) {
         // UE derives the focal length from the sensor height and vertical FOV (FPhysicalCocModel);
         // pick the sensor width that yields the USD camera's focal length.
         Settings.DepthOfFieldFstop = Request.fstop;
         Settings.DepthOfFieldFocalDistance = Request.focus_distance_cm;
-        Settings.DepthOfFieldSensorWidth = float(20.0 * Request.focal_length_cm * Session.Width / Session.Height / Options.ProjectionMatrix.M[1][1]);
+        Settings.DepthOfFieldSensorWidth =
+            float(20.0 * Request.focal_length_cm * Session.Width / Session.Height / Options.ProjectionMatrix.M[1][1]);
         Settings.DepthOfFieldSqueezeFactor = 1.f;
         Settings.PathTracingEnableReferenceDOF = true;
     } else {
@@ -533,11 +595,13 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     }
     if (!Aov) {
         View.OverridePostProcessSettings(Session.PostProcess, 1.f);
-        // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera cuts), so
-        // offline warmup frames and a viewport that stops drawing once converged settle on it. Authored speeds adapt the
-        // realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
+        // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera
+        // cuts), so offline warmup frames and a viewport that stops drawing once converged settle on it. Authored
+        // speeds adapt the realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
         Settings.AutoExposureBias += Session.ExposureStops;
-        if (PathTracing || !IsInteractive() || (!Session.PostProcess.bOverride_AutoExposureSpeedUp && !Session.PostProcess.bOverride_AutoExposureSpeedDown))
+        if (PathTracing || !IsInteractive() ||
+            (!Session.PostProcess.bOverride_AutoExposureSpeedUp &&
+             !Session.PostProcess.bOverride_AutoExposureSpeedDown))
             Settings.AutoExposureSpeedUp = Settings.AutoExposureSpeedDown = -1.f;
     } else {
         Settings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
@@ -546,9 +610,12 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
             if (Parent) Session.AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
         }
-        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID ? nullptr : Session.AovMaterial.Get()) {
+        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID
+                                 ? nullptr
+                                 : Session.AovMaterial.Get()) {
             for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
-                Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index), Index == Request.aov ? 1.f : 0.f);
+                Material->SetScalarParameterValue(*FString::Printf(TEXT("Aov%u"), Index),
+                                                  Index == Request.aov ? 1.f : 0.f);
             FPostProcessSettings Blend;
             Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
             View.OverridePostProcessSettings(Blend, 1.f);
@@ -561,11 +628,12 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     }
     View.EndFinalPostprocessSettings(Options);
     if (!Aov && Session.Tonemapper) {
-        // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
-        // Manual exposure puts the scene near -AutoExposureBias EV (auto exposure within five stops of it); physically dim
-        // scenes (large bias) fell below the default window and their cached indirect lighting underflowed to black.
-        // Centre the window on the exposure.
-        static IConsoleVariable* PreExposure = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
+        // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV +
+        // 8]. Manual exposure puts the scene near -AutoExposureBias EV (auto exposure within five stops of it);
+        // physically dim scenes (large bias) fell below the default window and their cached indirect lighting
+        // underflowed to black. Centre the window on the exposure.
+        static IConsoleVariable* PreExposure =
+            IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
         const float Wanted = FMath::Clamp(2.f - Settings.AutoExposureBias, -16.f, 16.f);
         if (PreExposure && PreExposure->GetFloat() != Wanted) PreExposure->Set(Wanted, ECVF_SetByCode);
     }
@@ -579,44 +647,61 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
     Options.SceneViewStateInterface = Aov ? Session.AovViewState : Session.ViewState;
     Options.SetViewRectangle(FIntRect(0, 0, Session.Width, Session.Height));
     Options.ViewOrigin = FVector(Request.eye[0], Request.eye[1], Request.eye[2]);
-    IStreamingManager::Get().AddViewInformation(Options.ViewOrigin, float(Session.Width),
-        Request.orthographic ? float(Session.Width) : float(Session.Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
+    IStreamingManager::Get().AddViewInformation(
+        Options.ViewOrigin, float(Session.Width),
+        Request.orthographic
+            ? float(Session.Width)
+            : float(Session.Width) / FMath::Tan(FMath::DegreesToRadians(Request.horizontal_fov_degrees * .5f)),
         1.f, false, 1.f, nullptr, Runtime.World);
     const FVector Target(Request.target[0], Request.target[1], Request.target[2]);
     const FVector Up(Request.up[0], Request.up[1], Request.up[2]);
-    Options.ViewRotationMatrix = FRotationMatrix::MakeFromXZ(Target - Options.ViewOrigin, Up).GetTransposed() * FMatrix(
-        FPlane(0, 0, 1, 0), FPlane(1, 0, 0, 0), FPlane(0, 1, 0, 0), FPlane(0, 0, 0, 1));
+    Options.ViewRotationMatrix =
+        FRotationMatrix::MakeFromXZ(Target - Options.ViewOrigin, Up).GetTransposed() *
+        FMatrix(FPlane(0, 0, 1, 0), FPlane(1, 0, 0, 0), FPlane(0, 1, 0, 0), FPlane(0, 0, 0, 1));
     if (Request.orthographic) {
         // Reversed Z over the camera's clipping range: near maps to 1, far to 0.
         const double Range = double(Request.far_clip_cm) - Request.near_clip_cm;
-        Options.ProjectionMatrix = FMatrix(FPlane(Request.projection_scale[0], 0, 0, 0), FPlane(0, Request.projection_scale[1], 0, 0),
-            FPlane(0, 0, -1 / Range, 0), FPlane(Request.projection_offset[0], Request.projection_offset[1], Request.far_clip_cm / Range, 1));
+        Options.ProjectionMatrix =
+            FMatrix(FPlane(Request.projection_scale[0], 0, 0, 0), FPlane(0, Request.projection_scale[1], 0, 0),
+                    FPlane(0, 0, -1 / Range, 0),
+                    FPlane(Request.projection_offset[0], Request.projection_offset[1], Request.far_clip_cm / Range, 1));
     } else {
-        Options.ProjectionMatrix = FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
-            double(Session.Width), double(Session.Height), double(Request.near_clip_cm));
+        Options.ProjectionMatrix =
+            FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
+                                        double(Session.Width), double(Session.Height), double(Request.near_clip_cm));
         // Hydra's conformed window and lens shift (aperture offsets).
         if (Request.projection_scale[0] > 0 && Request.projection_scale[1] > 0) {
-            Options.ProjectionMatrix.M[0][0] = Request.projection_scale[0]; Options.ProjectionMatrix.M[1][1] = Request.projection_scale[1];
+            Options.ProjectionMatrix.M[0][0] = Request.projection_scale[0];
+            Options.ProjectionMatrix.M[1][1] = Request.projection_scale[1];
         }
-        Options.ProjectionMatrix.M[2][0] = Request.projection_offset[0]; Options.ProjectionMatrix.M[2][1] = Request.projection_offset[1];
+        Options.ProjectionMatrix.M[2][0] = Request.projection_offset[0];
+        Options.ProjectionMatrix.M[2][1] = Request.projection_offset[1];
     }
     Options.BackgroundColor = FLinearColor::Black;
     FSceneView* View = new FSceneView(Options);
     View->bIsGameView = true;
     View->bIsOfflineRender = PathTracing;
     // Each Path Tracer request draws its own random sequence (FrameIndependentTemporalSeed 0 counts samples from 0):
-    // motion blur sub-frames are separate requests, and the same sequence in each left static areas at spp / sub-frames.
+    // motion blur sub-frames are separate requests, and the same sequence in each left static areas at spp /
+    // sub-frames.
     View->PathTracerSeedOffset = int32(Request.generation * Request.samples_per_pixel);
     View->bCameraCut = Session.CameraCut && Session.Draws == 0;
     if (Family.ViewMode != VMI_Lit) {
         // The material overrides UGameViewportClient::Draw sets for these view modes.
         const FEngineShowFlags& Flags = Family.EngineShowFlags;
-        const FVector4f Brightness(GEngine->LightingOnlyBrightness.R, GEngine->LightingOnlyBrightness.G, GEngine->LightingOnlyBrightness.B, 0.f);
-        if (Flags.OverrideDiffuseAndSpecular) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(.1f, .1f, .1f, 0.f); }
-        else if (Flags.LightingOnlyOverride) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(0.f); }
-        else if (Flags.ReflectionOverride) {
-            View->DiffuseOverrideParameter = FVector4f(0.f); View->SpecularOverrideParameter = FVector4f(1.f, 1.f, 1.f, 0.f);
-            View->NormalOverrideParameter = FVector4f(0.f, 0.f, 1.f, 0.f); View->RoughnessOverrideParameter = FVector2f(0.f);
+        const FVector4f Brightness(GEngine->LightingOnlyBrightness.R, GEngine->LightingOnlyBrightness.G,
+                                   GEngine->LightingOnlyBrightness.B, 0.f);
+        if (Flags.OverrideDiffuseAndSpecular) {
+            View->DiffuseOverrideParameter = Brightness;
+            View->SpecularOverrideParameter = FVector4f(.1f, .1f, .1f, 0.f);
+        } else if (Flags.LightingOnlyOverride) {
+            View->DiffuseOverrideParameter = Brightness;
+            View->SpecularOverrideParameter = FVector4f(0.f);
+        } else if (Flags.ReflectionOverride) {
+            View->DiffuseOverrideParameter = FVector4f(0.f);
+            View->SpecularOverrideParameter = FVector4f(1.f, 1.f, 1.f, 0.f);
+            View->NormalOverrideParameter = FVector4f(0.f, 0.f, 1.f, 0.f);
+            View->RoughnessOverrideParameter = FVector2f(0.f);
         }
         if (Session.DebugMember) View->*Session.DebugMember = Session.DebugName;
     }
@@ -625,8 +710,9 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
 }
 
 // Renders the family and queues what reads it back: the host's shared ring, and the CPU readback when a slot is free.
-void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, FSceneViewFamily& Family, FTextureRenderTargetResource* Resource,
-        bool PathTracing, bool Aov, bool Moving, float ScreenFraction) {
+void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, FSceneViewFamily& Family,
+                       FTextureRenderTargetResource* Resource, bool PathTracing, bool Aov, bool Moving,
+                       float ScreenFraction) {
     const auto& Request = Session->Request;
     FCanvas Canvas(Resource, nullptr, Runtime.World, Runtime.World->GetFeatureLevel());
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
@@ -634,16 +720,24 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Job->DrawIndex = ++Session->Draws;
     // Offline frames (husk) wait for PSO compilation: r.PSOPrecache.ProxyCreationStrategy=2 draws meshes whose PSOs
     // are still compiling with the default material, and nothing else would stop such a frame from converging.
-    const uint32 Compiling = IsInteractive() ? 0 : FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
+    const uint32 Compiling = IsInteractive() ? 0
+                                             : FShaderPipelineCache::NumPrecompilesRemaining() +
+                                                   PipelineStateCache::NumActivePrecacheRequests();
     if (Compiling) {
         static uint64 Logged = 0;
-        if (Logged != Request.generation) { Logged = Request.generation; UE_LOG(LogTemp, Display, TEXT("hdUE request %llu waits for %u PSO compilations"), Request.generation, Compiling); }
+        if (Logged != Request.generation) {
+            Logged = Request.generation;
+            UE_LOG(LogTemp, Display, TEXT("hdUE request %llu waits for %u PSO compilations"), Request.generation,
+                   Compiling);
+        }
     }
     Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;
     Job->Started = FPlatformTime::Seconds();
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
-    Job->Preparing = Session->Preparing || Compiling; // ponytail: Path Tracer samples drawn meanwhile still count; restart its accumulation if that shows
+    Job->Preparing =
+        Session->Preparing ||
+        Compiling;  // ponytail: Path Tracer samples drawn meanwhile still count; restart its accumulation if that shows
     // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the first
     // draw (an immediate preview), the one that should converge, and otherwise at most every 250 ms for progress.
     const double Now = FPlatformTime::Seconds();
@@ -653,23 +747,33 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     // frames at UE's rate rather than four progress images a second.
     int32 FreeSlot = -1;
     for (int32 Slot = 0; Slot < FSession::ReadbackSlots && FreeSlot < 0; ++Slot)
-        if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; })) FreeSlot = Slot;
+        if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; }))
+            FreeSlot = Slot;
     const bool Room = FreeSlot >= 0 && Session->InFlight.Num() < (IsInteractive() ? FSession::ReadbackSlots : 1);
     // A host reading the shared ring (hdue/gpu_api.h) gets every draw from there: the readback then only gives CPU
     // consumers (Map, the Python viewer) the converged image.
     if (HdueGpuOptions Shared{}; !Aov && HdueSharedFrames::Enabled(Session->Handle, Shared)) Job->Shared = Shared;
     const bool Sharing = Job->Shared.enabled != 0;
-    const bool Converging = PathTracing ? Job->DrawIndex >= Request.samples_per_pixel : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames);
-    const bool ReadBack = Room && (Sharing ? Converging : IsInteractive() || Job->DrawIndex == 1 || Session->Preparing ||
-        Now - Session->LastReadback >= 0.25 || Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
+    const bool Converging = PathTracing ? Job->DrawIndex >= Request.samples_per_pixel
+                                        : Job->FullResIndex >= FMath::Max(1u, Request.warmup_frames);
+    const bool ReadBack =
+        Room &&
+        (Sharing
+             ? Converging
+             : IsInteractive() || Job->DrawIndex == 1 || Session->Preparing || Now - Session->LastReadback >= 0.25 ||
+                   Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
     Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
-    if(!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
-        Job->Environment=Session->Scene->Lighting->EnvironmentTexture();
-        Job->EnvironmentScale=Session->Scene->Lighting->EnvironmentScale();
+    if (!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
+        Job->Environment = Session->Scene->Lighting->EnvironmentTexture();
+        Job->EnvironmentScale = Session->Scene->Lighting->EnvironmentScale();
     }
-    if (ReadBack) { Job->Slot = FreeSlot; Session->InFlight.Add(Job); Session->LastReadback = Now; }
-    Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session,Job));
+    if (ReadBack) {
+        Job->Slot = FreeSlot;
+        Session->InFlight.Add(Job);
+        Session->LastReadback = Now;
+    }
+    Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session, Job));
     if (Sharing) {
         const uint32 Width = Session->Width, Height = Session->Height;
         ENQUEUE_RENDER_COMMAND(HdueSharedSlot)([Job, Width, Height](FRHICommandListImmediate& Commands) {
@@ -680,18 +784,23 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Canvas.Flush_GameThread();
     if (!ReadBack && !Sharing) return;
     const auto State = Session->ViewState;
-    ENQUEUE_RENDER_COMMAND(HdueCopyColor)([Session, Job, Resource, State, PathTracing, ReadBack](FRHICommandListImmediate& Commands) {
+    ENQUEUE_RENDER_COMMAND(HdueCopyColor)(
+        [Session, Job, Resource, State, PathTracing, ReadBack](FRHICommandListImmediate& Commands) {
 #if RHI_RAYTRACING
-        Job->Samples = PathTracing ? State->GetPathTracingSampleIndex() : 0;
+            Job->Samples = PathTracing ? State->GetPathTracingSampleIndex() : 0;
 #endif
-        if (Job->Shared.enabled)
-            HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot, Job->Shared.color_scale, Job->Generation, Converges(*Job));
-        if (!ReadBack) return;
-        auto& Readback = Session->Readbacks[Job->Slot];
-        if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));
-        Readback->EnqueueCopy(Commands, Resource->GetRenderTargetTexture());
-        if(Job->DepthEnabled && !Job->DepthQueued.Load()) { Job->Failed.Store(true); Job->Complete.Store(true); }
-    });
+            if (Job->Shared.enabled)
+                HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot,
+                                             Job->Shared.color_scale, Job->Generation, Converges(*Job));
+            if (!ReadBack) return;
+            auto& Readback = Session->Readbacks[Job->Slot];
+            if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));
+            Readback->EnqueueCopy(Commands, Resource->GetRenderTargetTexture());
+            if (Job->DepthEnabled && !Job->DepthQueued.Load()) {
+                Job->Failed.Store(true);
+                Job->Complete.Store(true);
+            }
+        });
 }
 
 void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
@@ -700,30 +809,41 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const bool Aov = Request.aov != HDUE_AOV_COLOR;
     const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
     FString IdError;
-    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID ? 1 : Request.aov == HDUE_AOV_INSTANCE_ID ? 2 : 0, IdError)) UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
+    if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID       ? 1
+                                   : Request.aov == HDUE_AOV_INSTANCE_ID ? 2
+                                                                         : 0,
+                                   IdError))
+        UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
     if (Session->Preparing) {
         const auto Residency = Session->Residency;
         ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
     }
-    // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the anti-aliasing
-    // method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage (100).
+    // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the
+    // anti-aliasing method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage
+    // (100).
     const bool Moving = IsInteractive() && CVarInteractiveResolution.GetValueOnGameThread() && !PathTracing && !Aov &&
-        FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
-    const float ScreenFraction = PathTracing || Aov ? 1.f : Moving ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
-        : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
+                        FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
+    const float ScreenFraction =
+        PathTracing || Aov ? 1.f
+        : Moving           ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
+                           : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
     // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
     // frames that can (adding latency).
     if (IsInteractive() && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
     // Debug views replace the realtime beauty only, as UE's viewport View Mode menu does.
     const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
     auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
-    FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene,
+    FSceneViewFamilyContext Family(
+        FSceneViewFamily::ConstructionValues(
+            Resource, Runtime.World->Scene,
             ShowFlags(*Session, PathTracing, Aov, ScreenFraction, ViewMode, Request.orthographic != 0))
-        .SetRealtimeUpdate(true).SetResolveScene(true)
-        .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60,
-            Request.time_seconds, Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
-    // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and Movie
-    // Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the shadows.
+            .SetRealtimeUpdate(true)
+            .SetResolveScene(true)
+            .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60, Request.time_seconds,
+                                              Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
+    // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and
+    // Movie Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the
+    // shadows.
     Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
     Family.ViewMode = ViewMode;
     AddView(Family, *Session, PathTracing, Aov);
@@ -734,89 +854,115 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         IStreamingManager::Get().UpdateResourceStreaming(Runtime.World->GetDeltaSeconds(), true);
         IStreamingManager::Get().BlockTillAllRequestsFinished();
         if (!PathTracing && UseVirtualTexturing(GMaxRHIShaderPlatform)) {
-            ENQUEUE_RENDER_COMMAND(HdueLoadVirtualTextureTiles)([Module = &Renderer(), FeatureLevel = Runtime.World->GetFeatureLevel()](FRHICommandListImmediate& Commands) {
-                Module->LoadPendingVirtualTextureTiles(Commands, FeatureLevel);
-            });
+            ENQUEUE_RENDER_COMMAND(HdueLoadVirtualTextureTiles)(
+                [Module = &Renderer(),
+                 FeatureLevel = Runtime.World->GetFeatureLevel()](FRHICommandListImmediate& Commands) {
+                    Module->LoadPendingVirtualTextureTiles(Commands, FeatureLevel);
+                });
         }
     }
     RenderAndReadBack(Session, Family, Resource, PathTracing, Aov, Moving, ScreenFraction);
 }
 
-void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, const TSharedPtr<FReadbackJob, ESPMode::ThreadSafe>& Job) {
+void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
+                  const TSharedPtr<FReadbackJob, ESPMode::ThreadSafe>& Job) {
     const uint64 FrameId = Runtime.NextFrame++;
     const uint32 Width = Session->Width, Height = Session->Height;
     const auto Request = Job->Request;
     const double RequestedAt = Job->RequestedAt;
-    ENQUEUE_RENDER_COMMAND(HduePollReadback)([Session, Job, FrameId, Width, Height, Request, RequestedAt](FRHICommandListImmediate&) {
-        const auto& Readback = Session->Readbacks[Job->Slot];
-        const auto& DepthReadback = Session->DepthReadbacks[Job->Slot];
-        if (Job->Complete.Load() || !Readback || !Readback->IsReady()) return;
-        if(Job->DepthEnabled && (!DepthReadback || !DepthReadback->IsReady())) return;
-        int32 Pitch = 0, BufferHeight = 0;
-        const auto* Data = static_cast<const FFloat16Color*>(Readback->Lock(Pitch, &BufferHeight));
-        int32 DepthPitch=0,DepthHeight=0;
-        const auto* DepthData=Job->DepthEnabled ? static_cast<const float*>(DepthReadback->Lock(DepthPitch,&DepthHeight)) : nullptr;
-        const bool DepthValid=!Job->DepthEnabled || (DepthData && DepthPitch>=int32(Width) && DepthHeight>=int32(Height));
-        if (Data && Pitch >= int32(Width) && BufferHeight >= int32(Height) && DepthValid) {
-            TArray<float> Pixels = MoveTemp(Session->SparePixels);
-            TArray<float> DepthPixels = MoveTemp(Session->SpareDepth);
-            if(Job->DepthEnabled) DepthPixels.SetNumUninitialized(int64(Width)*Height);
-            Pixels.SetNumUninitialized(int64(Width) * Height * 4);
-            ParallelFor(int32(Height), [&](int32 Row) {
-                const uint32 Y = uint32(Row);
-                for (uint32 X = 0; X < Width; ++X) {
-                    const auto& P = Data[uint64(Y) * Pitch + X];
-                    const uint64 Index = (uint64(Y) * Width + X) * 4;
-                    Pixels[Index] = P.R.GetFloat(); Pixels[Index + 1] = P.G.GetFloat();
-                    // UE keeps 1 - coverage in scene colour alpha (r.PostProcessing.PropagateAlpha); output straight alpha.
-                    Pixels[Index + 2] = P.B.GetFloat(); Pixels[Index + 3] = 1.f - P.A.GetFloat();
-                    if(DepthData) {
-                        const float Z=DepthData[uint64(Y)*DepthPitch+X];
-                        DepthPixels[uint64(Y)*Width+X]=!(Z>0.f) || !FMath::IsFinite(Z) ? 0.f
-                            : Request.orthographic ? Request.far_clip_cm-Z*(Request.far_clip_cm-Request.near_clip_cm) : Request.near_clip_cm/Z;
+    ENQUEUE_RENDER_COMMAND(HduePollReadback)(
+        [Session, Job, FrameId, Width, Height, Request, RequestedAt](FRHICommandListImmediate&) {
+            const auto& Readback = Session->Readbacks[Job->Slot];
+            const auto& DepthReadback = Session->DepthReadbacks[Job->Slot];
+            if (Job->Complete.Load() || !Readback || !Readback->IsReady()) return;
+            if (Job->DepthEnabled && (!DepthReadback || !DepthReadback->IsReady())) return;
+            int32 Pitch = 0, BufferHeight = 0;
+            const auto* Data = static_cast<const FFloat16Color*>(Readback->Lock(Pitch, &BufferHeight));
+            int32 DepthPitch = 0, DepthHeight = 0;
+            const auto* DepthData =
+                Job->DepthEnabled ? static_cast<const float*>(DepthReadback->Lock(DepthPitch, &DepthHeight)) : nullptr;
+            const bool DepthValid =
+                !Job->DepthEnabled || (DepthData && DepthPitch >= int32(Width) && DepthHeight >= int32(Height));
+            if (Data && Pitch >= int32(Width) && BufferHeight >= int32(Height) && DepthValid) {
+                TArray<float> Pixels = MoveTemp(Session->SparePixels);
+                TArray<float> DepthPixels = MoveTemp(Session->SpareDepth);
+                if (Job->DepthEnabled) DepthPixels.SetNumUninitialized(int64(Width) * Height);
+                Pixels.SetNumUninitialized(int64(Width) * Height * 4);
+                ParallelFor(int32(Height), [&](int32 Row) {
+                    const uint32 Y = uint32(Row);
+                    for (uint32 X = 0; X < Width; ++X) {
+                        const auto& P = Data[uint64(Y) * Pitch + X];
+                        const uint64 Index = (uint64(Y) * Width + X) * 4;
+                        Pixels[Index] = P.R.GetFloat();
+                        Pixels[Index + 1] = P.G.GetFloat();
+                        // UE keeps 1 - coverage in scene colour alpha (r.PostProcessing.PropagateAlpha); output
+                        // straight alpha.
+                        Pixels[Index + 2] = P.B.GetFloat();
+                        Pixels[Index + 3] = 1.f - P.A.GetFloat();
+                        if (DepthData) {
+                            const float Z = DepthData[uint64(Y) * DepthPitch + X];
+                            DepthPixels[uint64(Y) * Width + X] =
+                                !(Z > 0.f) || !FMath::IsFinite(Z) ? 0.f
+                                : Request.orthographic
+                                    ? Request.far_clip_cm - Z * (Request.far_clip_cm - Request.near_clip_cm)
+                                    : Request.near_clip_cm / Z;
+                        }
                     }
+                });
+                const double Now = FPlatformTime::Seconds();
+                HdueFrameInfo Info{};
+                Info.struct_size = sizeof(Info);
+                Info.width = Width;
+                Info.height = Height;
+                Info.pixel_format = HDUE_RGBA32_FLOAT;
+                Info.color_space = HDUE_SCENE_LINEAR_SRGB;
+                Info.row_stride_bytes = Width * 4 * sizeof(float);
+                Info.generation = Job->Generation;
+                Info.frame_id = FrameId;
+                Info.required_bytes = uint64(Width) * Height * 4 * sizeof(float);
+                Info.completed_samples = Job->Samples;
+                Info.converged = Converges(*Job);
+                Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
+                Info.readback_ms = (Now - Job->Started) * 1000;
+                FScopeLock Lock(&Session->FrameMutex);
+                if (Request.aov != HDUE_AOV_COLOR) {
+                    Session->AovPixels = MoveTemp(Pixels);
+                    Session->AovFrame = Info;
+                } else {
+                    Session->SparePixels = MoveTemp(Session->Pixels);
+                    Session->Pixels = MoveTemp(Pixels);
+                    Session->SpareDepth = MoveTemp(Session->DepthPixels);
+                    Session->DepthPixels = MoveTemp(DepthPixels);
+                    Session->Frame = Info;
+                    Session->MegaLightsActive = Job->MegaLightsActive;
                 }
-            });
-            const double Now = FPlatformTime::Seconds();
-            HdueFrameInfo Info{};
-            Info.struct_size = sizeof(Info); Info.width = Width; Info.height = Height;
-            Info.pixel_format = HDUE_RGBA32_FLOAT; Info.color_space = HDUE_SCENE_LINEAR_SRGB;
-            Info.row_stride_bytes = Width * 4 * sizeof(float);
-            Info.generation = Job->Generation; Info.frame_id = FrameId;
-            Info.required_bytes = uint64(Width) * Height * 4 * sizeof(float);
-            Info.completed_samples = Job->Samples;
-            Info.converged = Converges(*Job);
-            Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
-            Info.readback_ms = (Now - Job->Started) * 1000;
-            FScopeLock Lock(&Session->FrameMutex);
-            if (Request.aov != HDUE_AOV_COLOR) { Session->AovPixels = MoveTemp(Pixels); Session->AovFrame = Info; }
-            else {
-            Session->SparePixels = MoveTemp(Session->Pixels); Session->Pixels = MoveTemp(Pixels);
-            Session->SpareDepth = MoveTemp(Session->DepthPixels); Session->DepthPixels = MoveTemp(DepthPixels);
-            Session->Frame = Info;
-            Session->MegaLightsActive=Job->MegaLightsActive;
+            } else {
+                Job->Failed.Store(true);
             }
-        } else {
-            Job->Failed.Store(true);
-        }
-        if (Data) Readback->Unlock();
-        if(DepthData) DepthReadback->Unlock();
-        Job->Complete.Store(true);
-    });
+            if (Data) Readback->Unlock();
+            if (DepthData) DepthReadback->Unlock();
+            Job->Complete.Store(true);
+        });
 }
 
 HdueResult HDUE_CALL Tick() {
     HDUE_RETURN_UNLESS_READY();
     if (UELibrary_Tick() != 0) return Fail(HDUE_ENGINE_ERROR, TEXT("UELibrary_Tick failed."));
     const auto Session = Runtime.Session;
-    if (Session) {Session->Scene->Assets.Tick(); Session->Scene->Lighting->Tick(); Session->Scene->TickConversions();}
+    if (Session) {
+        Session->Scene->Assets.Tick();
+        Session->Scene->Lighting->Tick();
+        Session->Scene->TickConversions();
+    }
     if (!Session || !Session->HasRequest) return HDUE_OK;
     // A readback in flight no longer stops drawing: waiting on it serialized every draw behind a full-frame GPU->CPU
     // copy (about 270 ms at 2048x1152), so a camera move took seconds and stalled the host's UI thread.
     // Retire finished readbacks, then poll every pending one: render commands run in order, so frames still publish
     // oldest first, and a frame no longer waits a tick per older readback.
     while (Session->InFlight.Num() && Session->InFlight[0]->Complete.Load()) {
-        if (Session->InFlight[0]->Failed.Load()) return Fail(HDUE_ENGINE_ERROR, TEXT("GPU color/depth readback failed, was not queued, or returned an invalid stride."));
+        if (Session->InFlight[0]->Failed.Load())
+            return Fail(HDUE_ENGINE_ERROR,
+                        TEXT("GPU color/depth readback failed, was not queued, or returned an invalid stride."));
         Session->InFlight.RemoveAt(0);
     }
     for (const auto& Job : Session->InFlight) PollReadback(Session, Job);
@@ -827,7 +973,8 @@ HdueResult HDUE_CALL Tick() {
             Runtime.Error = UTF8_TO_TCHAR(Status.message);
             if (!Session->ResidencyFailed) {
                 const auto Residency = Session->Residency;
-                ENQUEUE_RENDER_COMMAND(HdueFailedResidency)([Residency](FRHICommandListImmediate&) { Residency->Release(); });
+                ENQUEUE_RENDER_COMMAND(HdueFailedResidency)(
+                    [Residency](FRHICommandListImmediate&) { Residency->Release(); });
                 Session->ResidencyFailed = true;
             }
             return HDUE_OK;
@@ -839,7 +986,8 @@ HdueResult HDUE_CALL Tick() {
             Session->ViewState->Destroy();
             Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
             Session->Preparing = false;
-            Session->Draws = 0; Session->FullResDraws = 0;
+            Session->Draws = 0;
+            Session->FullResDraws = 0;
             Session->CameraCut = true;
         }
     }
@@ -854,7 +1002,8 @@ HdueResult HDUE_CALL Tick() {
 
 HdueResult HDUE_CALL PollFrame(HdueSession Handle, HdueFrameInfo* Frame) {
     const auto Session = ReadableSession(Handle);
-    if (!Session || !Sized(Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+    if (!Session || !Sized(Frame))
+        return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     // The newest beauty frame, possibly for an earlier request of this scene (a previous camera while navigating): the
     // caller decides from its generation whether to show it. A scene change cancels the request, and with it the frame.
@@ -867,13 +1016,15 @@ HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id) return HDUE_INVALID_ARGUMENT;
     const uint64 Count = uint64(Desc->width) * Desc->height * Desc->depth;
-    if (Desc->width > 2048 || Desc->height > 2048 || Desc->depth > 2048 || Count > (uint64(1) << 28) || (Count && !Desc->density) ||
-        !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0) return HDUE_INVALID_ARGUMENT;
-    for (double Value : Desc->transform) if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
+    if (Desc->width > 2048 || Desc->height > 2048 || Desc->depth > 2048 || Count > (uint64(1) << 28) ||
+        (Count && !Desc->density) || !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0)
+        return HDUE_INVALID_ARGUMENT;
+    for (double Value : Desc->transform)
+        if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     FString Error;
     if (!Session->Scene->UpsertVolume(*Desc, Error)) return Fail(HDUE_ENGINE_ERROR, *Error);
-    Session->HasRequest = false; // restart accumulation, as scene batches do
+    Session->HasRequest = false;  // restart accumulation, as scene batches do
     return HDUE_OK;
 }
 
@@ -902,12 +1053,19 @@ bool ImportPostProcessValue(FProperty* Property, const FString& Text, FPostProce
     const auto* Struct = CastField<FStructProperty>(Property);
     if (Struct && !Text.Contains(TEXT("="))) {
         TArray<FString> Numbers;
-        Text.Replace(TEXT("("), TEXT(" ")).Replace(TEXT(")"), TEXT(" ")).Replace(TEXT(","), TEXT(" ")).ParseIntoArrayWS(Numbers);
+        Text.Replace(TEXT("("), TEXT(" "))
+            .Replace(TEXT(")"), TEXT(" "))
+            .Replace(TEXT(","), TEXT(" "))
+            .ParseIntoArrayWS(Numbers);
         int32 Index = 0;
         for (TFieldIterator<FNumericProperty> Field(Struct->Struct); Field && Index < Numbers.Num(); ++Field, ++Index) {
             if (!Numbers[Index].IsNumeric()) return false;
-            if (Field->IsFloatingPoint()) Field->SetFloatingPointPropertyValue(Field->ContainerPtrToValuePtr<void>(Value), FCString::Atod(*Numbers[Index]));
-            else Field->SetIntPropertyValue(Field->ContainerPtrToValuePtr<void>(Value), FCString::Atoi64(*Numbers[Index]));
+            if (Field->IsFloatingPoint())
+                Field->SetFloatingPointPropertyValue(Field->ContainerPtrToValuePtr<void>(Value),
+                                                     FCString::Atod(*Numbers[Index]));
+            else
+                Field->SetIntPropertyValue(Field->ContainerPtrToValuePtr<void>(Value),
+                                           FCString::Atoi64(*Numbers[Index]));
         }
         return Index > 0 && Index == Numbers.Num();
     }
@@ -922,23 +1080,27 @@ static TMap<FString, FString> ConsoleDefaults, ConsoleValues;
 static void SetConsoleVariable(const FString& Name, FString Text) {
     IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name);
     if (!CVar || CVar->TestFlags(ECVF_ReadOnly)) {
-        UE_LOG(LogTemp, Warning, TEXT("hdUE: console variable %s skipped (%s)"), *Name, CVar ? TEXT("read-only") : TEXT("unknown"));
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: console variable %s skipped (%s)"), *Name,
+               CVar ? TEXT("read-only") : TEXT("unknown"));
         return;
     }
-    if (Text == TEXT("True") || Text == TEXT("False")) Text = Text == TEXT("True") ? TEXT("1") : TEXT("0"); // USD booleans
+    if (Text == TEXT("True") || Text == TEXT("False"))
+        Text = Text == TEXT("True") ? TEXT("1") : TEXT("0");  // USD booleans
     if (const FString* Last = ConsoleValues.Find(Name); Last && *Last == Text) return;
     ConsoleValues.Add(Name, Text);
     const FString Old = CVar->GetString();
     const bool First = !ConsoleDefaults.Contains(Name);
     if (First) ConsoleDefaults.Add(Name, Old);
     CVar->Set(*Text, ECVF_SetByCode);
-    if (First || CVar->GetString() != Old) UE_LOG(LogTemp, Log, TEXT("hdUE: console variable %s = %s (was %s)"), *Name, *CVar->GetString(), *Old);
+    if (First || CVar->GetString() != Old)
+        UE_LOG(LogTemp, Log, TEXT("hdUE: console variable %s = %s (was %s)"), *Name, *CVar->GetString(), *Old);
 }
 
 static void RestoreConsoleVariables(const TSet<FString>& Kept) {
     for (auto It = ConsoleDefaults.CreateIterator(); It; ++It) {
         if (Kept.Contains(It.Key())) continue;
-        if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*It.Key())) CVar->Set(*It.Value(), ECVF_SetByCode);
+        if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*It.Key()))
+            CVar->Set(*It.Value(), ECVF_SetByCode);
         UE_LOG(LogTemp, Log, TEXT("hdUE: console variable %s restored to %s"), *It.Key(), *It.Value());
         ConsoleValues.Remove(It.Key());
         It.RemoveCurrent();
@@ -949,9 +1111,12 @@ static void RestoreConsoleVariables(const TSet<FString>& Kept) {
 // variables take). View modes needing editor-only data or debug material shaders the cook leaves out are not offered.
 static void SetDebugView(FSession& Session, const FString& Text) {
     static const TMap<FString, TPair<EViewModeIndex, FName FSceneView::*>> Modes{
-        {TEXT("off"), {VMI_Lit, nullptr}}, {TEXT("unlit"), {VMI_Unlit, nullptr}},
-        {TEXT("lightingOnly"), {VMI_LightingOnly, nullptr}}, {TEXT("detailLighting"), {VMI_Lit_DetailLighting, nullptr}},
-        {TEXT("reflections"), {VMI_ReflectionOverride, nullptr}}, {TEXT("lightComplexity"), {VMI_LightComplexity, nullptr}},
+        {TEXT("off"), {VMI_Lit, nullptr}},
+        {TEXT("unlit"), {VMI_Unlit, nullptr}},
+        {TEXT("lightingOnly"), {VMI_LightingOnly, nullptr}},
+        {TEXT("detailLighting"), {VMI_Lit_DetailLighting, nullptr}},
+        {TEXT("reflections"), {VMI_ReflectionOverride, nullptr}},
+        {TEXT("lightComplexity"), {VMI_LightComplexity, nullptr}},
         {TEXT("buffer"), {VMI_VisualizeBuffer, &FSceneView::CurrentBufferVisualizationMode}},
         {TEXT("nanite"), {VMI_VisualizeNanite, &FSceneView::CurrentNaniteVisualizationMode}},
         {TEXT("lumen"), {VMI_VisualizeLumen, &FSceneView::CurrentLumenVisualizationMode}},
@@ -963,18 +1128,25 @@ static void SetDebugView(FSession& Session, const FString& Text) {
     Session.DebugView = Mode ? Mode->Key : VMI_Lit;
     Session.DebugMember = Mode ? Mode->Value : nullptr;
     Session.DebugName = Name.IsEmpty() ? NAME_None : FName(*Name);
-    // Cooked runtimes skip FBufferVisualizationData (AllowDebugViewmodes() is false without r.ForceDebugViewModes, which
-    // would cook debug shaders for every material): its buffer materials are blended in as post-process materials instead.
+    // Cooked runtimes skip FBufferVisualizationData (AllowDebugViewmodes() is false without r.ForceDebugViewModes,
+    // which would cook debug shaders for every material): its buffer materials are blended in as post-process materials
+    // instead.
     FString Entry, Path;
-    Session.DebugMaterial.Reset(Kind == TEXT("buffer") && GConfig->GetString(TEXT("Engine.BufferVisualizationMaterials"), *Name, Entry, GEngineIni) &&
-        FParse::Value(*Entry, TEXT("Material="), Path) ? LoadObject<UMaterialInterface>(nullptr, *Path) : nullptr);
-    if (Kind == TEXT("buffer") && !Session.DebugMaterial) UE_LOG(LogTemp, Warning, TEXT("hdUE: debug view '%s' skipped (no cooked buffer material)"), *Text);
+    Session.DebugMaterial.Reset(
+        Kind == TEXT("buffer") &&
+                GConfig->GetString(TEXT("Engine.BufferVisualizationMaterials"), *Name, Entry, GEngineIni) &&
+                FParse::Value(*Entry, TEXT("Material="), Path)
+            ? LoadObject<UMaterialInterface>(nullptr, *Path)
+            : nullptr);
+    if (Kind == TEXT("buffer") && !Session.DebugMaterial)
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: debug view '%s' skipped (no cooked buffer material)"), *Text);
 }
 
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
-        (Desc->material_count && !Desc->materials)) return HDUE_INVALID_ARGUMENT;
+        (Desc->material_count && !Desc->materials))
+        return HDUE_INVALID_ARGUMENT;
     FPostProcessSettings Settings;
     TSet<FString> Variables;
     FString DebugView = TEXT("off");
@@ -984,12 +1156,21 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     for (uint32 Index = 0; Index < Desc->count; ++Index) {
         if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
-        if (Name == TEXT("DebugView")) { DebugView = Text; continue; }
-        if (Name.Contains(TEXT("."))) { SetConsoleVariable(Name, Text); Variables.Add(Name); continue; }
+        if (Name == TEXT("DebugView")) {
+            DebugView = Text;
+            continue;
+        }
+        if (Name.Contains(TEXT("."))) {
+            SetConsoleVariable(Name, Text);
+            Variables.Add(Name);
+            continue;
+        }
         FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
-        auto* Override = CastField<FBoolProperty>(FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
+        auto* Override = CastField<FBoolProperty>(
+            FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
         if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {
-            UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"), *Name, *Text);
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"),
+                   *Name, *Text);
             continue;
         }
         if (Override) Override->SetPropertyValue_InContainer(&Settings, true);
@@ -999,7 +1180,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         const FString Path = Desc->materials[Index] ? UTF8_TO_TCHAR(Desc->materials[Index]) : TEXT("");
         auto* Material = Path.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Path);
         if (!Material || !Material->GetMaterial() || Material->GetMaterial()->MaterialDomain != MD_PostProcess) {
-            UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process material '%s' skipped (missing or not a post-process material)"), *Path);
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: post-process material '%s' skipped (missing or not a post-process material)"), *Path);
             continue;
         }
         Materials.Emplace(Material);
@@ -1017,10 +1199,12 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
 
 HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
     const auto Session = ReadableSession(Handle);
-    if (!Session || !Sized(Frame)) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+    if (!Session || !Sized(Frame))
+        return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
     if (!Session->HasRequest || Session->Request.aov == HDUE_AOV_COLOR || !Session->AovFrame.frame_id ||
-        Session->AovFrame.generation != Session->Request.generation) return HDUE_PENDING;
+        Session->AovFrame.generation != Session->Request.generation)
+        return HDUE_PENDING;
     *Frame = Session->AovFrame;
     return HDUE_OK;
 }
@@ -1029,7 +1213,8 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
     const auto Session = ReadableSession(Handle);
     if (!Session || !Buffer) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
-    if (Session->HasRequest && FrameId && FrameId == Session->AovFrame.frame_id && Session->AovFrame.generation == Session->Request.generation) {
+    if (Session->HasRequest && FrameId && FrameId == Session->AovFrame.frame_id &&
+        Session->AovFrame.generation == Session->Request.generation) {
         if (Capacity < Session->AovFrame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
         FMemory::Memcpy(Buffer, Session->AovPixels.GetData(), Session->AovFrame.required_bytes);
         return HDUE_OK;
@@ -1040,7 +1225,9 @@ HdueResult HDUE_CALL CopyFrame(HdueSession Handle, uint64 FrameId, void* Buffer,
     const uint64 Bytes = Session->Frame.required_bytes, Chunk = 1 << 20;
     ParallelFor(int32((Bytes + Chunk - 1) / Chunk), [&](int32 Index) {
         const uint64 Offset = uint64(Index) * Chunk;
-        FMemory::Memcpy(static_cast<uint8*>(Buffer) + Offset, reinterpret_cast<const uint8*>(Session->Pixels.GetData()) + Offset, FMath::Min(Chunk, Bytes - Offset));
+        FMemory::Memcpy(static_cast<uint8*>(Buffer) + Offset,
+                        reinterpret_cast<const uint8*>(Session->Pixels.GetData()) + Offset,
+                        FMath::Min(Chunk, Bytes - Offset));
     });
     return HDUE_OK;
 }
@@ -1060,33 +1247,34 @@ HdueResult HDUE_CALL AcquireGpuFrame(HdueSession Handle, HdueGpuFrame* Frame) {
     return Frame ? HdueSharedFrames::Acquire(Handle, *Frame) : HDUE_INVALID_ARGUMENT;
 }
 
-HdueResult HDUE_CALL EnableDepth(HdueSession Handle,uint32 Enabled) {
+HdueResult HDUE_CALL EnableDepth(HdueSession Handle, uint32 Enabled) {
     HDUE_RETURN_UNLESS_READY();
-    if(!ValidSession(Handle) || Enabled>1) return HDUE_INVALID_ARGUMENT;
-    const auto Session=Runtime.Session;
-    if(Session->DepthEnabled==bool(Enabled)) return HDUE_OK;
-    Session->HasRequest=false;
+    if (!ValidSession(Handle) || Enabled > 1) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    if (Session->DepthEnabled == bool(Enabled)) return HDUE_OK;
+    Session->HasRequest = false;
     ReleaseResidency(Session);
-    Session->DepthEnabled=bool(Enabled);
+    Session->DepthEnabled = bool(Enabled);
     return HDUE_OK;
 }
-HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,uint64 Capacity) {
-    const auto Session=ReadableSession(Handle);
-    if(!Session || !Buffer) return Runtime.State!=HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+HdueResult HDUE_CALL CopyDepth(HdueSession Handle, uint64 FrameId, float* Buffer, uint64 Capacity) {
+    const auto Session = ReadableSession(Handle);
+    if (!Session || !Buffer) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
     FScopeLock Lock(&Session->FrameMutex);
-    if(!Session->DepthEnabled) return HDUE_NOT_SUPPORTED;
-    if(!Session->HasRequest || !FrameId || FrameId!=Session->Frame.frame_id) return HDUE_STALE_FRAME;
-    const uint64 Bytes=uint64(Session->Width)*Session->Height*sizeof(float);
-    if(Capacity<Bytes) return HDUE_BUFFER_TOO_SMALL;
-    if(Session->DepthPixels.Num()!=int64(Session->Width)*Session->Height) return HDUE_PENDING;
-    FMemory::Memcpy(Buffer,Session->DepthPixels.GetData(),Bytes);
+    if (!Session->DepthEnabled) return HDUE_NOT_SUPPORTED;
+    if (!Session->HasRequest || !FrameId || FrameId != Session->Frame.frame_id) return HDUE_STALE_FRAME;
+    const uint64 Bytes = uint64(Session->Width) * Session->Height * sizeof(float);
+    if (Capacity < Bytes) return HDUE_BUFFER_TOO_SMALL;
+    if (Session->DepthPixels.Num() != int64(Session->Width) * Session->Height) return HDUE_PENDING;
+    FMemory::Memcpy(Buffer, Session->DepthPixels.GetData(), Bytes);
     return HDUE_OK;
 }
 
 HdueResult HDUE_CALL WindowMessage(uint64 Hwnd, uint32 Message, uint64 Wparam, int64 Lparam, int64* Result) {
     HDUE_RETURN_UNLESS_READY();
     if (!Result) return HDUE_INVALID_ARGUMENT;
-    // Offscreen UE has no window to route messages to (UELibrary_WndProc dereferences it); hosts fall back to DefWindowProc.
+    // Offscreen UE has no window to route messages to (UELibrary_WndProc dereferences it); hosts fall back to
+    // DefWindowProc.
     static const bool Offscreen = FParse::Param(FCommandLine::Get(), TEXT("RenderOffscreen"));
     if (Offscreen) return HDUE_INVALID_STATE;
     *Result = UELibrary_WndProc(reinterpret_cast<HWND>(Hwnd), Message, WPARAM(Wparam), LPARAM(Lparam));
@@ -1103,11 +1291,13 @@ HdueResult HDUE_CALL ApplyScene(HdueSession Handle, const HdueSceneBatch* Batch)
     Runtime.Error.Empty();
     return HDUE_OK;
 }
-HdueResult HDUE_CALL UpsertLights(HdueSession Handle,const HdueLightBatch* Batch) {
+HdueResult HDUE_CALL UpsertLights(HdueSession Handle, const HdueLightBatch* Batch) {
     HDUE_RETURN_UNLESS_READY();
-    if(!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
-    if(!Runtime.Session->Scene->Lighting->Apply(*Batch,Runtime.Error)) return HDUE_INVALID_ARGUMENT;
-    Runtime.Session->HasRequest=false; ReleaseResidency(Runtime.Session); Runtime.World->SetShouldTick(true);
+    if (!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
+    if (!Runtime.Session->Scene->Lighting->Apply(*Batch, Runtime.Error)) return HDUE_INVALID_ARGUMENT;
+    Runtime.Session->HasRequest = false;
+    ReleaseResidency(Runtime.Session);
+    Runtime.World->SetShouldTick(true);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL ApplySurface(HdueSession Handle, const HdueSurfaceBatch* Batch) {
@@ -1123,21 +1313,26 @@ HdueResult HDUE_CALL ApplySurface(HdueSession Handle, const HdueSurfaceBatch* Ba
 HdueResult HDUE_CALL SurfaceStatus(HdueSession Handle, HdueSurfaceStatus* Status) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
-    *Status = Runtime.Session->Scene->SurfaceStatus(); return HDUE_OK;
+    *Status = Runtime.Session->Scene->SurfaceStatus();
+    return HDUE_OK;
 }
-HdueResult HDUE_CALL LightingStatus(HdueSession Handle,HdueLightingStatus* Status) {
+HdueResult HDUE_CALL LightingStatus(HdueSession Handle, HdueLightingStatus* Status) {
     HDUE_RETURN_UNLESS_READY();
-    if(!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
-    HdueLightingStatus Result{}; Result.struct_size=sizeof(Result);
-    const auto Session=Runtime.Session;
+    if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
+    HdueLightingStatus Result{};
+    Result.struct_size = sizeof(Result);
+    const auto Session = Runtime.Session;
     Session->Scene->Lighting->Status(Result);
-    Result.mega_lights_project=CVarInt(TEXT("r.MegaLights.EnableForProject"))!=0;
-    Result.mega_lights_allowed=CVarInt(TEXT("r.MegaLights.Allowed"))!=0;
+    Result.mega_lights_project = CVarInt(TEXT("r.MegaLights.EnableForProject")) != 0;
+    Result.mega_lights_allowed = CVarInt(TEXT("r.MegaLights.Allowed")) != 0;
     FScopeLock Lock(&Session->FrameMutex);
-    if(Session->HasRequest && Session->Frame.generation==Session->BeautyRequest.generation) {
-        Result.frame_id=Session->Frame.frame_id; Result.generation=Session->Frame.generation; Result.mega_lights_active=Session->MegaLightsActive;
+    if (Session->HasRequest && Session->Frame.generation == Session->BeautyRequest.generation) {
+        Result.frame_id = Session->Frame.frame_id;
+        Result.generation = Session->Frame.generation;
+        Result.mega_lights_active = Session->MegaLightsActive;
     }
-    *Status=Result; return HDUE_OK;
+    *Status = Result;
+    return HDUE_OK;
 }
 HdueResult HDUE_CALL Shutdown() {
     if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
@@ -1151,18 +1346,25 @@ HdueResult HDUE_CALL Shutdown() {
     // shutdown. This static is constructed after UE's globals, so it is destroyed first: it hands the game thread to
     // the exiting thread.
     static struct FExitingGameThread {
-        ~FExitingGameThread() { FTaskTagScope::SwapTag(ETaskTag::EGameThread); GGameThreadId = FPlatformTLS::GetCurrentThreadId(); }
+        ~FExitingGameThread() {
+            FTaskTagScope::SwapTag(ETaskTag::EGameThread);
+            GGameThreadId = FPlatformTLS::GetCurrentThreadId();
+        }
     } ExitingGameThread;
     Runtime.State = HDUE_STATE_STOPPED;
     return HDUE_OK;
 }
-HdueResult HDUE_CALL PickNative(HdueSession Handle, const HdueNativeRay* Ray, HdueNativeHit* Hit, char* Id, uint32 Capacity) {
+HdueResult HDUE_CALL PickNative(HdueSession Handle, const HdueNativeRay* Ray, HdueNativeHit* Hit, char* Id,
+                                uint32 Capacity) {
     HDUE_RETURN_UNLESS_READY();
-    if (!ValidSession(Handle) || !Sized(Ray) || !Sized(Hit) ||
-        !FMath::IsFinite(Ray->minimum_cm) || !FMath::IsFinite(Ray->maximum_cm) || Ray->minimum_cm < 0 || Ray->maximum_cm < Ray->minimum_cm) return HDUE_INVALID_ARGUMENT;
-    for (int32 I = 0; I < 3; ++I) if (!FMath::IsFinite(Ray->origin[I]) || !FMath::IsFinite(Ray->direction[I])) return HDUE_INVALID_ARGUMENT;
+    if (!ValidSession(Handle) || !Sized(Ray) || !Sized(Hit) || !FMath::IsFinite(Ray->minimum_cm) ||
+        !FMath::IsFinite(Ray->maximum_cm) || Ray->minimum_cm < 0 || Ray->maximum_cm < Ray->minimum_cm)
+        return HDUE_INVALID_ARGUMENT;
+    for (int32 I = 0; I < 3; ++I)
+        if (!FMath::IsFinite(Ray->origin[I]) || !FMath::IsFinite(Ray->direction[I])) return HDUE_INVALID_ARGUMENT;
     if (FVector(Ray->direction[0], Ray->direction[1], Ray->direction[2]).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
-    HdueNativeHit Result{}; Result.struct_size = sizeof(Result);
+    HdueNativeHit Result{};
+    Result.struct_size = sizeof(Result);
     FString ObjectId, Error;
     const auto Code = Runtime.Session->Scene->PickNative(*Ray, Result, ObjectId, Error);
     if (Code != HDUE_OK) return Fail(Code, *Error);
@@ -1186,7 +1388,8 @@ HdueResult HDUE_CALL GetRendererInfo(HdueRendererInfo* Info) {
     HDUE_RETURN_UNLESS_READY();
     if (!Sized(Info)) return HDUE_INVALID_ARGUMENT;
     Info->substrate_enabled = Substrate::IsSubstrateEnabled();
-    Info->adaptive_gbuffer = Info->substrate_enabled && !Substrate::IsSubstrateBlendableGBufferEnabled(EShaderPlatform(GMaxRHIShaderPlatform));
+    Info->adaptive_gbuffer = Info->substrate_enabled &&
+                             !Substrate::IsSubstrateBlendableGBufferEnabled(EShaderPlatform(GMaxRHIShaderPlatform));
     Info->project_closures_per_pixel = CVarInt(TEXT("r.Substrate.ProjectClosuresPerPixel"));
     Info->bytes_per_pixel = CVarInt(TEXT("r.Substrate.BytesPerPixel"));
     return HDUE_OK;
@@ -1212,8 +1415,9 @@ HdueResult HDUE_CALL GetMaterialStats(HdueSession Handle, const char* Id, HdueMa
 }
 HdueResult HDUE_CALL ConfigureResidency(HdueSession Handle, const HdueResidencyOptions* Options) {
     HDUE_RETURN_UNLESS_READY();
-    if (!ValidSession(Handle) || !Sized(Options) ||
-        !FMath::IsFinite(Options->timeout_seconds) || Options->timeout_seconds <= 0) return HDUE_INVALID_ARGUMENT;
+    if (!ValidSession(Handle) || !Sized(Options) || !FMath::IsFinite(Options->timeout_seconds) ||
+        Options->timeout_seconds <= 0)
+        return HDUE_INVALID_ARGUMENT;
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
     Runtime.Session->ResidencyOptions = *Options;
@@ -1229,51 +1433,59 @@ HdueResult HDUE_CALL GetResidencyStatus(HdueSession Handle, HdueResidencyStatus*
 HdueResult HDUE_CALL UpsertAsset(HdueSession Handle, const HdueAssetDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc)) return HDUE_INVALID_ARGUMENT;
-    const auto S=Runtime.Session;
-    const auto Code=S->Scene->Assets.Upsert(*Desc,Runtime.Error);
+    const auto S = Runtime.Session;
+    const auto Code = S->Scene->Assets.Upsert(*Desc, Runtime.Error);
     if (Code != HDUE_OK) return Code;
-    S->HasRequest=false; ReleaseResidency(S); Runtime.World->SetShouldTick(true);
+    S->HasRequest = false;
+    ReleaseResidency(S);
+    Runtime.World->SetShouldTick(true);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL RemoveAsset(HdueSession Handle, const char* Id) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.Remove(UTF8_TO_TCHAR(Id));
-    Runtime.Session->HasRequest=false; ReleaseResidency(Runtime.Session); Runtime.World->SetShouldTick(true);
+    Runtime.Session->HasRequest = false;
+    ReleaseResidency(Runtime.Session);
+    Runtime.World->SetShouldTick(true);
     return HDUE_OK;
 }
 HdueResult HDUE_CALL AssetStatus(HdueSession Handle, const char* Id, HdueAssetStatus* Status) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
-    return Runtime.Session->Scene->Assets.GetStatus(UTF8_TO_TCHAR(Id),*Status);
+    return Runtime.Session->Scene->Assets.GetStatus(UTF8_TO_TCHAR(Id), *Status);
 }
 HdueResult HDUE_CALL AssetSceneStatus(HdueSession Handle, HdueAssetSceneStatus* Status) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Status)) return HDUE_INVALID_ARGUMENT;
-    Runtime.Session->Scene->Assets.GetSceneStatus(*Status); return HDUE_OK;
+    Runtime.Session->Scene->Assets.GetSceneStatus(*Status);
+    return HDUE_OK;
 }
-}
+}  // namespace
 
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint32_t Capacity, HdueApi* Api) {
     if (!Api || Capacity < sizeof(HdueApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = { sizeof(HdueApi), HDUE_ABI_VERSION, Initialize, GetStatus, Tick, CreateSession,
-        DestroySession, RequestRender, PollFrame, CopyFrame, WindowMessage, Shutdown, ApplyScene };
+    *Api = {sizeof(HdueApi), HDUE_ABI_VERSION, Initialize, GetStatus,     Tick,     CreateSession, DestroySession,
+            RequestRender,   PollFrame,        CopyFrame,  WindowMessage, Shutdown, ApplyScene};
     return HDUE_OK;
 }
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_native_pick_api(uint32 Version, uint32 Capacity, HdueNativePickApi* Api) {
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_native_pick_api(uint32 Version, uint32 Capacity,
+                                                                     HdueNativePickApi* Api) {
     if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_NATIVE_PICK_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(*Api), HDUE_NATIVE_PICK_ABI_VERSION, PickNative, GetPickMaterialInfo};
     return HDUE_OK;
 }
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_material_api(uint32 Version, uint32 Capacity, HdueMaterialApi* Api) {
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_material_api(uint32 Version, uint32 Capacity,
+                                                                  HdueMaterialApi* Api) {
     if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_MATERIAL_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(*Api), HDUE_MATERIAL_ABI_VERSION, GetRendererInfo, SetMaterialParameters, GetMaterialStats};
     return HDUE_OK;
 }
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Version, uint32 Capacity, HdueResidencyApi* Api) {
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Version, uint32 Capacity,
+                                                                   HdueResidencyApi* Api) {
     if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_RESIDENCY_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(*Api), HDUE_RESIDENCY_ABI_VERSION, ConfigureResidency, GetResidencyStatus};
@@ -1281,7 +1493,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Versio
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_asset_api(uint32 Version, uint32 Capacity, HdueAssetApi* Api) {
     if (!Api || Version != HDUE_ASSET_ABI_VERSION || Capacity < sizeof(HdueAssetApi)) return HDUE_INVALID_ARGUMENT;
-    *Api={sizeof(HdueAssetApi),HDUE_ASSET_ABI_VERSION,UpsertAsset,RemoveAsset,AssetStatus,AssetSceneStatus}; return HDUE_OK;
+    *Api = {sizeof(HdueAssetApi), HDUE_ASSET_ABI_VERSION, UpsertAsset, RemoveAsset, AssetStatus, AssetSceneStatus};
+    return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_volume_api(uint32 Version, uint32 Capacity, HdueVolumeApi* Api) {
     if (!Api || Capacity < sizeof(HdueVolumeApi)) return HDUE_BUFFER_TOO_SMALL;
@@ -1309,25 +1522,38 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
     const auto Session = Runtime.Session;
     if (Session->Width == Width && Session->Height == Height) return HDUE_OK;
     // In-flight readbacks reference the old target size: release them after the commands already queued.
-    ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) { for (auto& R : Session->Readbacks) R.Reset(); for (auto& R : Session->DepthReadbacks) R.Reset(); });
+    ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) {
+        for (auto& R : Session->Readbacks) R.Reset();
+        for (auto& R : Session->DepthReadbacks) R.Reset();
+    });
     FlushRenderingCommands();
     Session->InFlight.Reset();
-    Session->Width = Width; Session->Height = Height;
+    Session->Width = Width;
+    Session->Height = Height;
     Session->Target->InitCustomFormat(Width, Height, PF_FloatRGBA, true);
     Session->Target->UpdateResourceImmediate(true);
     // Temporal history (Lumen, TSR, Path Tracer samples) is per resolution.
     Session->ViewState->Destroy();
     Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
-    if (Session->AovViewState) { Session->AovViewState->Destroy(); Session->AovViewState = nullptr; }
-    Session->Draws = 0; Session->FullResDraws = 0; Session->CameraCut = true;
+    if (Session->AovViewState) {
+        Session->AovViewState->Destroy();
+        Session->AovViewState = nullptr;
+    }
+    Session->Draws = 0;
+    Session->FullResDraws = 0;
+    Session->CameraCut = true;
     {
         FScopeLock Lock(&Session->FrameMutex);
-        Session->Frame = {}; Session->AovFrame = {}; Session->Pixels.Reset(); Session->DepthPixels.Reset();
+        Session->Frame = {};
+        Session->AovFrame = {};
+        Session->Pixels.Reset();
+        Session->DepthPixels.Reset();
     }
     return HDUE_OK;
 }
 
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32 Version, uint32 Capacity, HduePostProcessApi* Api) {
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32 Version, uint32 Capacity,
+                                                                     HduePostProcessApi* Api) {
     if (!Api || Capacity < sizeof(HduePostProcessApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_POSTPROCESS_ABI_VERSION) return HDUE_ABI_MISMATCH;
     *Api = {sizeof(HduePostProcessApi), HDUE_POSTPROCESS_ABI_VERSION, SetPostProcess};
@@ -1339,20 +1565,23 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_gpu_api(uint32 Version, uin
     *Api = {sizeof(*Api), HDUE_GPU_ABI_VERSION, ConfigureGpuFrames, PollGpuFrame, AcquireGpuFrame};
     return HDUE_OK;
 }
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version,uint32 Capacity,HdueDepthApi* Api) {
-    if(!Api || Capacity<sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if(Version!=HDUE_DEPTH_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api={sizeof(*Api),HDUE_DEPTH_ABI_VERSION,EnableDepth,CopyDepth}; return HDUE_OK;
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version, uint32 Capacity, HdueDepthApi* Api) {
+    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_DEPTH_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(*Api), HDUE_DEPTH_ABI_VERSION, EnableDepth, CopyDepth};
+    return HDUE_OK;
 }
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_lighting_api(uint32 Version,uint32 Capacity,HdueLightingApi* Api) {
-    if(!Api || Capacity<sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if(Version!=HDUE_LIGHTING_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api={sizeof(*Api),HDUE_LIGHTING_ABI_VERSION,UpsertLights,LightingStatus}; return HDUE_OK;
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_lighting_api(uint32 Version, uint32 Capacity,
+                                                                  HdueLightingApi* Api) {
+    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_LIGHTING_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {sizeof(*Api), HDUE_LIGHTING_ABI_VERSION, UpsertLights, LightingStatus};
+    return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_surface_api(uint32 Version, uint32 Capacity, HdueSurfaceApi* Api) {
     if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_SURFACE_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_SURFACE_ABI_VERSION, ApplySurface, SurfaceStatus}; return HDUE_OK;
+    *Api = {sizeof(*Api), HDUE_SURFACE_ABI_VERSION, ApplySurface, SurfaceStatus};
+    return HDUE_OK;
 }
 #endif
-

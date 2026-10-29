@@ -13,8 +13,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
 // Numeric types convert (an int thin_walled, a double ior); a colour on a scalar input uses its mean (opacity).
-template<class T> T value(const VtValue& v, T fallback) {
-    if constexpr (std::is_same_v<T, float>) if (v.IsHolding<GfVec3f>()) { const auto c = v.UncheckedGet<GfVec3f>(); return (c[0] + c[1] + c[2]) / 3; }
+template <class T>
+T value(const VtValue& v, T fallback) {
+    if constexpr (std::is_same_v<T, float>)
+        if (v.IsHolding<GfVec3f>()) {
+            const auto c = v.UncheckedGet<GfVec3f>();
+            return (c[0] + c[1] + c[2]) / 3;
+        }
     if (v.IsHolding<T>()) return v.UncheckedGet<T>();
     return v.CanCast<T>() ? VtValue::Cast<T>(v).template UncheckedGet<T>() : fallback;
 }
@@ -32,7 +37,10 @@ const HdMaterialConnection2* connection(const HdMaterialNode2& node, const char*
 }
 // A scalar broadcasts to all four channels; a vector3 gets w = 1.
 GfVec4f vec4(const VtValue& v) {
-    if (v.IsHolding<GfVec3f>()) { const auto c = v.UncheckedGet<GfVec3f>(); return GfVec4f(c[0], c[1], c[2], 1); }
+    if (v.IsHolding<GfVec3f>()) {
+        const auto c = v.UncheckedGet<GfVec3f>();
+        return GfVec4f(c[0], c[1], c[2], 1);
+    }
     return v.IsHolding<GfVec4f>() ? v.UncheckedGet<GfVec4f>() : GfVec4f(value(v, 1.f));
 }
 GfVec4f mul(const GfVec4f& a, const GfVec4f& b) { return GfCompMult(a, b); }
@@ -45,7 +53,8 @@ void warnOnce(const std::string& message) {
 HdMaterialNetwork2 network(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto resource = delegate->GetMaterialResource(id);
     if (resource.IsHolding<HdMaterialNetwork2>()) return resource.UncheckedGet<HdMaterialNetwork2>();
-    if (resource.IsHolding<HdMaterialNetworkMap>()) return HdConvertToHdMaterialNetwork2(resource.UncheckedGet<HdMaterialNetworkMap>());
+    if (resource.IsHolding<HdMaterialNetworkMap>())
+        return HdConvertToHdMaterialNetwork2(resource.UncheckedGet<HdMaterialNetworkMap>());
     return {};
 }
 // USD/MaterialX texture-space scale, rotation (degrees) and translation, as an affine in UE's flipped-V UV space.
@@ -54,9 +63,14 @@ std::array<float, 6> uvAffine(GfVec2f scale, float degrees, GfVec2f translation)
     // USD order: scale, then rotate, then translate.
     const auto usd = [&](GfVec2f p) {
         p = GfVec2f(p[0] * scale[0], p[1] * scale[1]);
-        return GfVec2f(float(std::cos(radians) * p[0] - std::sin(radians) * p[1]), float(std::sin(radians) * p[0] + std::cos(radians) * p[1])) + translation;
+        return GfVec2f(float(std::cos(radians) * p[0] - std::sin(radians) * p[1]),
+                       float(std::sin(radians) * p[0] + std::cos(radians) * p[1])) +
+               translation;
     };
-    const auto ue = [&](float u, float v) { const auto p = usd(GfVec2f(u, 1 - v)); return GfVec2f(p[0], 1 - p[1]); };
+    const auto ue = [&](float u, float v) {
+        const auto p = usd(GfVec2f(u, 1 - v));
+        return GfVec2f(p[0], 1 - p[1]);
+    };
     const auto origin = ue(0, 0), du = ue(1, 0) - origin, dv = ue(0, 1) - origin;
     return {du[0], dv[0], origin[0], du[1], dv[1], origin[1]};
 }
@@ -68,32 +82,41 @@ struct Source {
     VtValue constant;
     HdUETextureData texture;
     int channel = -1;
-    bool raw = false; // the image's colour space is raw: no OCIO conversion
-    bool primvar = false; // a vec3 primvar reader: the mesh's vertex colours
+    bool raw = false;      // the image's colour space is raw: no OCIO conversion
+    bool primvar = false;  // a vec3 primvar reader: the mesh's vertex colours
 };
-// The vec3 primvar a reader node reads (UsdPrimvarReader_float3 varname, MaterialX geompropvalue geomprop); empty otherwise.
+// The vec3 primvar a reader node reads (UsdPrimvarReader_float3 varname, MaterialX geompropvalue geomprop); empty
+// otherwise.
 TfToken colorPrimvar(const HdMaterialNode2& node) {
     const auto& type = node.nodeTypeId.GetString();
     if (type == "UsdPrimvarReader_float3") return token(param(node, "varname"));
-    return TfStringStartsWith(type, "ND_geompropvalue_color3") || TfStringStartsWith(type, "ND_geompropvalue_vector3") ? token(param(node, "geomprop")) : TfToken();
+    return TfStringStartsWith(type, "ND_geompropvalue_color3") || TfStringStartsWith(type, "ND_geompropvalue_vector3")
+               ? token(param(node, "geomprop"))
+               : TfToken();
 }
 class SurfaceReader {
 public:
-    SurfaceReader(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) : network_(network), shader_(shader), data_(data) {}
+    SurfaceReader(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data)
+        : network_(network), shader_(shader), data_(data) {}
     // Reads an input's constant into out (which holds the fallback). With texture, an image driving the input fills it
     // and returns true; without, a textured input keeps its constant, with a warning. Colour images are converted
     // from scene_linear (OCIO) to linear Rec.709 unless tagged raw.
-    template<class T> bool read(const char* input, T& out, HdUETextureData* texture = nullptr, bool color = false) {
+    template <class T>
+    bool read(const char* input, T& out, HdUETextureData* texture = nullptr, bool color = false) {
         out = value(param(shader_, input), out);
         const auto* link = connection(shader_, input);
         if (!link) return false;
         Source source;
         trace(*link, source);
         if (source.primvar) {
-            // The base colour multiplies the mesh's vertex colours (HDUE_MATERIAL_VERTEX_COLOR), which carry the primvar.
-            if constexpr (std::is_same_v<T, GfVec3f>) if (texture == &data_.textures[HDUE_TEXTURE_BASE_COLOR]) {
-                data_.vertexColor = true; out = transformed(GfVec3f(1), source.texture); return false;
-            }
+            // The base colour multiplies the mesh's vertex colours (HDUE_MATERIAL_VERTEX_COLOR), which carry the
+            // primvar.
+            if constexpr (std::is_same_v<T, GfVec3f>)
+                if (texture == &data_.textures[HDUE_TEXTURE_BASE_COLOR]) {
+                    data_.vertexColor = true;
+                    out = transformed(GfVec3f(1), source.texture);
+                    return false;
+                }
             warnOnce(TfStringPrintf("primvar readers drive only the base colour; %s uses its constant", input));
             return false;
         }
@@ -101,16 +124,30 @@ public:
             if (!source.constant.IsEmpty()) out = transformed(value(source.constant, out), source.texture);
             return false;
         }
-        if (!texture) { warnOnce(TfStringPrintf("textured %s inputs are not translated; %s uses its constant", input, shader_.nodeTypeId.GetText())); return false; }
+        if (!texture) {
+            warnOnce(TfStringPrintf("textured %s inputs are not translated; %s uses its constant", input,
+                                    shader_.nodeTypeId.GetText()));
+            return false;
+        }
         *texture = source.texture;
         // A host image (op:) exists only once the host exported it: converted when the scene is packed.
-        if (color && !source.raw) { texture->sceneLinear = true; texture->file = HdUELinearRec709Texture(texture->file); }
-        if (source.channel >= 0) { texture->mask = GfVec4f(0); texture->mask[source.channel % 4] = 1; }
-        // ponytail: one UV transform per material, from the first textured input; per-texture transforms if assets mix them.
+        if (color && !source.raw) {
+            texture->sceneLinear = true;
+            texture->file = HdUELinearRec709Texture(texture->file);
+        }
+        if (source.channel >= 0) {
+            texture->mask = GfVec4f(0);
+            texture->mask[source.channel % 4] = 1;
+        }
+        // ponytail: one UV transform per material, from the first textured input; per-texture transforms if assets mix
+        // them.
         if (!uvSet_) uvSet_ = uvTransform(*source.image, data_.uvTransform);
         return true;
     }
-    template<class T> bool read(const char* input, T& out, int slot) { return read(input, out, &data_.textures[slot]); }
+    template <class T>
+    bool read(const char* input, T& out, int slot) {
+        return read(input, out, &data_.textures[slot]);
+    }
     // Colours: authored in the OCIO scene_linear role, while UE works in linear Rec.709.
     bool color(const char* input, GfVec3f& out, HdUETextureData* texture = nullptr) {
         const bool textured = read(input, out, texture, true);
@@ -118,12 +155,16 @@ public:
         return textured;
     }
     bool color(const char* input, GfVec3f& out, int slot) { return color(input, out, &data_.textures[slot]); }
+
 private:
     static float transformed(float v, const HdUETextureData& t) { return v * t.scale[0] + t.bias[0]; }
     static GfVec3f transformed(const GfVec3f& v, const HdUETextureData& t) {
         return GfVec3f(v[0] * t.scale[0] + t.bias[0], v[1] * t.scale[1] + t.bias[1], v[2] * t.scale[2] + t.bias[2]);
     }
-    template<class T> static T transformed(const T& v, const HdUETextureData&) { return v; }
+    template <class T>
+    static T transformed(const T& v, const HdUETextureData&) {
+        return v;
+    }
     // Walks upstream through the nodes that only rescale or reselect a value. Value so far = x * scale + bias, where x
     // is the upstream node's output: each node replaces x with its own affine of its input.
     void trace(const HdMaterialConnection2& link, Source& source) {
@@ -132,10 +173,15 @@ private:
         const auto& node = it->second;
         const auto& type = node.nodeTypeId.GetString();
         auto& t = source.texture;
-        const auto affine = [&](const GfVec4f& scale, const GfVec4f& bias) { t.bias += mul(t.scale, bias); t.scale = mul(t.scale, scale); };
+        const auto affine = [&](const GfVec4f& scale, const GfVec4f& bias) {
+            t.bias += mul(t.scale, bias);
+            t.scale = mul(t.scale, scale);
+        };
         const auto upstream = [&](const char* input) {
-            if (const auto* next = connection(node, input)) trace(*next, source);
-            else source.constant = param(node, input);
+            if (const auto* next = connection(node, input))
+                trace(*next, source);
+            else
+                source.constant = param(node, input);
         };
         const auto starts = [&](const char* prefix) { return TfStringStartsWith(type, prefix); };
         if (type == "UsdUVTexture" || starts("ND_image_") || starts("ND_tiledimage_")) {
@@ -146,21 +192,28 @@ private:
             if (t.file.empty()) return;
             source.image = &node;
             // UsdUVTexture's sourceColorSpace; MaterialX's colorspace attribute, which Hydra passes as colorSpace:file.
-            const auto space = TfStringToLower(token(param(node, type == "UsdUVTexture" ? "sourceColorSpace" : "colorSpace:file")).GetString());
+            const auto space = TfStringToLower(
+                token(param(node, type == "UsdUVTexture" ? "sourceColorSpace" : "colorSpace:file")).GetString());
             source.raw = space.find("raw") != std::string::npos;
             if (type == "UsdUVTexture") {
                 affine(value(param(node, "scale"), GfVec4f(1)), value(param(node, "bias"), GfVec4f(0)));
                 // A single-channel output (r, g, b, a) selects that channel; rgb keeps all.
                 const auto& output = link.upstreamOutputName.GetString();
-                if (output.size() == 1 && std::string("rgba").find(output[0]) != std::string::npos) source.channel = int(std::string("rgba").find(output[0]));
+                if (output.size() == 1 && std::string("rgba").find(output[0]) != std::string::npos)
+                    source.channel = int(std::string("rgba").find(output[0]));
             }
             return;
         }
-        if (!colorPrimvar(node).IsEmpty()) source.primvar = true;
-        else if (starts("ND_constant_")) source.constant = param(node, "value");
-        else if (starts("ND_convert_") || starts("ND_dot_")) upstream("in");
-        else if (starts("ND_extract_")) { source.channel = value(param(node, "index"), 0); upstream("in"); }
-        else if (starts("ND_normalmap")) {
+        if (!colorPrimvar(node).IsEmpty())
+            source.primvar = true;
+        else if (starts("ND_constant_"))
+            source.constant = param(node, "value");
+        else if (starts("ND_convert_") || starts("ND_dot_"))
+            upstream("in");
+        else if (starts("ND_extract_")) {
+            source.channel = value(param(node, "index"), 0);
+            upstream("in");
+        } else if (starts("ND_normalmap")) {
             // Tangent-space decode, xy scaled by the node's scale: n = (2 texel - 1) * (k, k, 1).
             const float k = value(param(node, "scale"), 1.f);
             affine(GfVec4f(2 * k, 2 * k, 2, 1), GfVec4f(-k, -k, -1, 0));
@@ -169,7 +222,9 @@ private:
             const char* driven = connection(node, "in1") ? "in1" : "in2";
             affine(vec4(param(node, driven[2] == '1' ? "in2" : "in1")), GfVec4f(0));
             upstream(driven);
-        } else warnOnce(TfStringPrintf("MaterialX node %s is not translated; inputs it drives use their constant", type.c_str()));
+        } else
+            warnOnce(TfStringPrintf("MaterialX node %s is not translated; inputs it drives use their constant",
+                                    type.c_str()));
     }
     // The texture coordinate transform an image applies; false when it reads no coordinates, so a later image may.
     bool uvTransform(const HdMaterialNode2& image, std::array<float, 6>& out) const {
@@ -183,7 +238,7 @@ private:
         if (node == network_.nodes.end()) return true;
         if (node->second.nodeTypeId == TfToken("UsdTransform2d"))
             out = uvAffine(value(param(node->second, "scale"), GfVec2f(1)), value(param(node->second, "rotation"), 0.f),
-                value(param(node->second, "translation"), GfVec2f(0)));
+                           value(param(node->second, "translation"), GfVec2f(0)));
         else if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_place2d"))
             warnOnce("MaterialX place2d is not translated; textures use their mesh UVs");
         return true;
@@ -215,32 +270,84 @@ void readPreviewSurface(SurfaceReader& r, HdUEMaterialData& data) {
 }
 
 // standard_surface and OpenPBR share their model; only input names and defaults differ.
-template<class T> struct Input { const char* name; T fallback; };
-struct MaterialXSurface {
-    Input<float> base; Input<GfVec3f> baseColor; Input<float> metalness, specular; Input<GfVec3f> specularColor;
-    Input<float> specularRoughness, ior, coat; Input<GfVec3f> coatColor; Input<float> coatRoughness, sheen;
-    Input<GfVec3f> sheenColor; Input<float> sheenRoughness, subsurface; Input<GfVec3f> subsurfaceColor, subsurfaceRadius;
-    Input<float> subsurfaceScale, transmission, emission; Input<GfVec3f> emissionColor; Input<float> opacity;
-    Input<bool> thinWalled; const char* normal;
+template <class T>
+struct Input {
+    const char* name;
+    T fallback;
 };
-const MaterialXSurface standardSurface{{"base", .8f}, {"base_color", GfVec3f(1)}, {"metalness", 0}, {"specular", 1},
-    {"specular_color", GfVec3f(1)}, {"specular_roughness", .2f}, {"specular_IOR", 1.5f}, {"coat", 0}, {"coat_color", GfVec3f(1)},
-    {"coat_roughness", .1f}, {"sheen", 0}, {"sheen_color", GfVec3f(1)}, {"sheen_roughness", .3f}, {"subsurface", 0},
-    {"subsurface_color", GfVec3f(1)}, {"subsurface_radius", GfVec3f(1)}, {"subsurface_scale", 1}, {"transmission", 0},
-    {"emission", 0}, {"emission_color", GfVec3f(1)}, {"opacity", 1}, {"thin_walled", false}, "normal"};
+struct MaterialXSurface {
+    Input<float> base;
+    Input<GfVec3f> baseColor;
+    Input<float> metalness, specular;
+    Input<GfVec3f> specularColor;
+    Input<float> specularRoughness, ior, coat;
+    Input<GfVec3f> coatColor;
+    Input<float> coatRoughness, sheen;
+    Input<GfVec3f> sheenColor;
+    Input<float> sheenRoughness, subsurface;
+    Input<GfVec3f> subsurfaceColor, subsurfaceRadius;
+    Input<float> subsurfaceScale, transmission, emission;
+    Input<GfVec3f> emissionColor;
+    Input<float> opacity;
+    Input<bool> thinWalled;
+    const char* normal;
+};
+const MaterialXSurface standardSurface{{"base", .8f},
+                                       {"base_color", GfVec3f(1)},
+                                       {"metalness", 0},
+                                       {"specular", 1},
+                                       {"specular_color", GfVec3f(1)},
+                                       {"specular_roughness", .2f},
+                                       {"specular_IOR", 1.5f},
+                                       {"coat", 0},
+                                       {"coat_color", GfVec3f(1)},
+                                       {"coat_roughness", .1f},
+                                       {"sheen", 0},
+                                       {"sheen_color", GfVec3f(1)},
+                                       {"sheen_roughness", .3f},
+                                       {"subsurface", 0},
+                                       {"subsurface_color", GfVec3f(1)},
+                                       {"subsurface_radius", GfVec3f(1)},
+                                       {"subsurface_scale", 1},
+                                       {"transmission", 0},
+                                       {"emission", 0},
+                                       {"emission_color", GfVec3f(1)},
+                                       {"opacity", 1},
+                                       {"thin_walled", false},
+                                       "normal"};
 // OpenPBR's subsurface_radius is the scalar distance and subsurface_radius_scale the per-channel colour.
-const MaterialXSurface openPbr{{"base_weight", 1}, {"base_color", GfVec3f(.8f)}, {"base_metalness", 0}, {"specular_weight", 1},
-    {"specular_color", GfVec3f(1)}, {"specular_roughness", .3f}, {"specular_ior", 1.5f}, {"coat_weight", 0}, {"coat_color", GfVec3f(1)},
-    {"coat_roughness", 0}, {"fuzz_weight", 0}, {"fuzz_color", GfVec3f(1)}, {"fuzz_roughness", .5f}, {"subsurface_weight", 0},
-    {"subsurface_color", GfVec3f(.8f)}, {"subsurface_radius_scale", GfVec3f(1, .5f, .25f)}, {"subsurface_radius", 1},
-    {"transmission_weight", 0}, {"emission_luminance", 0}, {"emission_color", GfVec3f(1)}, {"geometry_opacity", 1},
-    {"geometry_thin_walled", false}, "geometry_normal"};
+const MaterialXSurface openPbr{{"base_weight", 1},
+                               {"base_color", GfVec3f(.8f)},
+                               {"base_metalness", 0},
+                               {"specular_weight", 1},
+                               {"specular_color", GfVec3f(1)},
+                               {"specular_roughness", .3f},
+                               {"specular_ior", 1.5f},
+                               {"coat_weight", 0},
+                               {"coat_color", GfVec3f(1)},
+                               {"coat_roughness", 0},
+                               {"fuzz_weight", 0},
+                               {"fuzz_color", GfVec3f(1)},
+                               {"fuzz_roughness", .5f},
+                               {"subsurface_weight", 0},
+                               {"subsurface_color", GfVec3f(.8f)},
+                               {"subsurface_radius_scale", GfVec3f(1, .5f, .25f)},
+                               {"subsurface_radius", 1},
+                               {"transmission_weight", 0},
+                               {"emission_luminance", 0},
+                               {"emission_color", GfVec3f(1)},
+                               {"geometry_opacity", 1},
+                               {"geometry_thin_walled", false},
+                               "geometry_normal"};
 
 // Multiplies a slot's constant and texture by a weight (base, specular and emission only scale their colours).
 void weight(HdUEMaterialData& data, int slot, GfVec3f& constant, float weight) {
     constant *= weight;
     auto& t = data.textures[slot];
-    for (int i = 0; i < 3; ++i) { t.scale[i] *= weight; t.bias[i] *= weight; }
+    for (int i = 0; i < 3; ++i) {
+        t.scale[i] *= weight;
+        t.bias[i] *= weight;
+    }
 }
 // Subsurface and sheen colours reuse the base colour texture when they read the same image (the usual authoring);
 // their tint is then relative to the base colour slot. Other images fall back to the input's constant.
@@ -254,8 +361,14 @@ bool baseTextureTint(const HdUEMaterialData& data, const HdUETextureData& textur
     return true;
 }
 void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurface& s) {
-    const auto read = [&](const auto& input, auto& out, auto... slot) { out = input.fallback; return r.read(input.name, out, slot...); };
-    const auto color = [&](const Input<GfVec3f>& input, GfVec3f& out, auto... slot) { out = input.fallback; return r.color(input.name, out, slot...); };
+    const auto read = [&](const auto& input, auto& out, auto... slot) {
+        out = input.fallback;
+        return r.read(input.name, out, slot...);
+    };
+    const auto color = [&](const Input<GfVec3f>& input, GfVec3f& out, auto... slot) {
+        out = input.fallback;
+        return r.color(input.name, out, slot...);
+    };
     float base, specular, subsurfaceScale, transmission, emission;
     read(s.base, base);
     color(s.baseColor, data.color, HDUE_TEXTURE_BASE_COLOR);
@@ -271,10 +384,12 @@ void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurf
     read(s.coatRoughness, data.clearcoatRoughness, HDUE_TEXTURE_CLEARCOAT_ROUGHNESS);
     HdUETextureData texture;
     read(s.sheen, data.sheen);
-    if (color(s.sheenColor, data.sheenColor, &texture)) data.sheenBaseTexture = baseTextureTint(data, texture, data.sheenColor, s.sheenColor.name);
+    if (color(s.sheenColor, data.sheenColor, &texture))
+        data.sheenBaseTexture = baseTextureTint(data, texture, data.sheenColor, s.sheenColor.name);
     read(s.sheenRoughness, data.sheenRoughness);
     read(s.subsurface, data.subsurface);
-    if (color(s.subsurfaceColor, data.subsurfaceColor, &texture)) data.subsurfaceBaseTexture = baseTextureTint(data, texture, data.subsurfaceColor, s.subsurfaceColor.name);
+    if (color(s.subsurfaceColor, data.subsurfaceColor, &texture))
+        data.subsurfaceBaseTexture = baseTextureTint(data, texture, data.subsurfaceColor, s.subsurfaceColor.name);
     read(s.subsurfaceRadius, data.subsurfaceRadius);
     read(s.subsurfaceScale, subsurfaceScale);
     data.subsurfaceRadius *= subsurfaceScale;
@@ -297,16 +412,22 @@ const HdMaterialNode2* surface(const HdMaterialNetwork2& network) {
         const auto node = network.nodes.find(terminal->second.upstreamNode);
         return node == network.nodes.end() ? nullptr : &node->second;
     }
-    for (const auto& [path, node] : network.nodes) if (node.nodeTypeId == TfToken("UsdPreviewSurface")) return &node;
+    for (const auto& [path, node] : network.nodes)
+        if (node.nodeTypeId == TfToken("UsdPreviewSurface")) return &node;
     return nullptr;
 }
 void readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) {
     SurfaceReader reader(network, shader, data);
     const auto& type = shader.nodeTypeId.GetString();
-    if (type == "UsdPreviewSurface" || type == "ND_UsdPreviewSurface_surfaceshader") readPreviewSurface(reader, data);
-    else if (TfStringStartsWith(type, "ND_standard_surface_surfaceshader")) readMaterialX(reader, data, standardSurface);
-    else if (TfStringStartsWith(type, "ND_open_pbr_surface_surfaceshader")) readMaterialX(reader, data, openPbr);
-    else warnOnce(TfStringPrintf("surface shader %s is not translated; its materials render with the default surface", type.c_str()));
+    if (type == "UsdPreviewSurface" || type == "ND_UsdPreviewSurface_surfaceshader")
+        readPreviewSurface(reader, data);
+    else if (TfStringStartsWith(type, "ND_standard_surface_surfaceshader"))
+        readMaterialX(reader, data, standardSurface);
+    else if (TfStringStartsWith(type, "ND_open_pbr_surface_surfaceshader"))
+        readMaterialX(reader, data, openPbr);
+    else
+        warnOnce(TfStringPrintf("surface shader %s is not translated; its materials render with the default surface",
+                                type.c_str()));
 }
 
 class Material final : public HdMaterial {
@@ -314,17 +435,20 @@ public:
     explicit Material(const SdfPath& id) : HdMaterial(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
-        HdUEMaterialData data; data.id = GetId().GetString();
+        HdUEMaterialData data;
+        data.id = GetId().GetString();
         const auto net = network(delegate, GetId());
         if (const auto* shader = surface(net)) readSurface(net, *shader, data);
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->mutex);
-        state->materials[data.id] = data; state->dirtyMaterials.insert(data.id); ++state->revision;
+        state->materials[data.id] = data;
+        state->dirtyMaterials.insert(data.id);
+        ++state->revision;
         *bits = Clean;
     }
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
-}
+}  // namespace
 
 // The UV primvar a material reads (UsdPrimvarReader_float2 varname or MaterialX geompropvalue geomprop: exporters
 // name it map1, UVMap, ...) and the vec3 primvar it reads as vertex colours (displayColor, Cd, ...); empty when none.
@@ -332,8 +456,9 @@ std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, cons
     std::pair<TfToken, TfToken> names;
     if (material.IsEmpty()) return names;
     for (const auto& [path, node] : network(delegate, material).nodes) {
-        const char* input = node.nodeTypeId == TfToken("UsdPrimvarReader_float2") ? "varname"
-            : node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? "geomprop" : nullptr;
+        const char* input = node.nodeTypeId == TfToken("UsdPrimvarReader_float2")    ? "varname"
+                            : node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? "geomprop"
+                                                                                     : nullptr;
         if (input && names.first.IsEmpty()) names.first = token(param(node, input));
         if (names.second.IsEmpty()) names.second = colorPrimvar(node);
     }

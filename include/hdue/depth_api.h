@@ -12,11 +12,11 @@ extern "C" {
  * the runtime owner thread. No allocation or UE type crosses the boundary. */
 typedef struct HdueDepthApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *set_enabled)(HdueSession session, uint32_t enabled);
-    HdueResult (HDUE_CALL *copy_depth)(HdueSession session, uint64_t frame_id, float* output, uint64_t capacity_bytes);
+    HdueResult(HDUE_CALL* set_enabled)(HdueSession session, uint32_t enabled);
+    HdueResult(HDUE_CALL* copy_depth)(HdueSession session, uint64_t frame_id, float* output, uint64_t capacity_bytes);
 } HdueDepthApi;
-typedef HdueResult (HDUE_CALL *HdueGetDepthApiFn)(uint32_t version,uint32_t capacity,HdueDepthApi* api);
-HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32_t version,uint32_t capacity,HdueDepthApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetDepthApiFn)(uint32_t version, uint32_t capacity, HdueDepthApi* api);
+HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32_t version, uint32_t capacity, HdueDepthApi* api);
 #ifdef __cplusplus
 }
 #endif

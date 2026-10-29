@@ -40,21 +40,29 @@
 #include "pxr/base/gf/matrix4d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material); // materials.cpp
+std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material);  // materials.cpp
 namespace {
-template<class T> T value(const VtValue& v, T fallback) { return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback; }
+template <class T>
+T value(const VtValue& v, T fallback) {
+    return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback;
+}
 // Sync's dirty bits end clean on every path: a prim that failed is not synced (and reported) again each frame.
-struct CleanBits { HdDirtyBits* bits; ~CleanBits() { *bits = HdChangeTracker::Clean; } };
-// The mesh's UV and colour primvars: from its own binding, else from its GeomSubsets' bindings; else st, and displayColor
-// when nothing is bound (a bound material reads colours only through a primvar reader).
-// ponytail: one UV set and colour per mesh; per-subset sets if assets mix them.
-std::pair<TfToken, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material, const HdMeshTopology& topology) {
+struct CleanBits {
+    HdDirtyBits* bits;
+    ~CleanBits() { *bits = HdChangeTracker::Clean; }
+};
+// The mesh's UV and colour primvars: from its own binding, else from its GeomSubsets' bindings; else st, and
+// displayColor when nothing is bound (a bound material reads colours only through a primvar reader). ponytail: one UV
+// set and colour per mesh; per-subset sets if assets mix them.
+std::pair<TfToken, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material,
+                                         const HdMeshTopology& topology) {
     auto names = HdUEMaterialPrimvars(delegate, material);
-    for (const auto& subset : topology.GetGeomSubsets()) if (names.first.IsEmpty() || names.second.IsEmpty()) {
-        const auto [uv, color] = HdUEMaterialPrimvars(delegate, subset.materialId);
-        if (names.first.IsEmpty()) names.first = uv;
-        if (names.second.IsEmpty()) names.second = color;
-    }
+    for (const auto& subset : topology.GetGeomSubsets())
+        if (names.first.IsEmpty() || names.second.IsEmpty()) {
+            const auto [uv, color] = HdUEMaterialPrimvars(delegate, subset.materialId);
+            if (names.first.IsEmpty()) names.first = uv;
+            if (names.second.IsEmpty()) names.second = color;
+        }
     if (names.first.IsEmpty()) names.first = TfToken("st");
     if (material.IsEmpty()) names.second = HdTokens->displayColor;
     return names;
@@ -62,34 +70,41 @@ std::pair<TfToken, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPat
 // ExtComputation primvars (UsdSkel skinning through a scene delegate), evaluated on the CPU as HdEmbree does.
 HdExtComputationUtils::ValueStore computedPrimvars(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto descriptors = delegate->GetExtComputationPrimvarDescriptors(id, HdInterpolationVertex);
-    return descriptors.empty() ? HdExtComputationUtils::ValueStore() : HdExtComputationUtils::GetComputedPrimvarValues(descriptors, delegate);
+    return descriptors.empty() ? HdExtComputationUtils::ValueStore()
+                               : HdExtComputationUtils::GetComputedPrimvarValues(descriptors, delegate);
 }
-VtValue primvar(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, const HdExtComputationUtils::ValueStore& computed) {
+VtValue primvar(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name,
+                const HdExtComputationUtils::ValueStore& computed) {
     const auto it = computed.find(name);
     return it == computed.end() ? delegate->Get(id, name) : it->second;
 }
 HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name) {
     for (int i = 0; i < HdInterpolationCount; ++i)
-        for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i))) if (p.name == name) return HdInterpolation(i);
+        for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i)))
+            if (p.name == name) return HdInterpolation(i);
     return HdInterpolationConstant;
 }
 // Varying colors only: a uniform displayColor stays the material's constant color.
 std::vector<GfVec3f> HdUEVaryingColors(std::vector<GfVec3f> colors, size_t count) {
-    if (colors.size() != count || std::all_of(colors.begin(), colors.end(), [&](const GfVec3f& c) { return c == colors[0]; })) return {};
+    if (colors.size() != count ||
+        std::all_of(colors.begin(), colors.end(), [&](const GfVec3f& c) { return c == colors[0]; }))
+        return {};
     return colors;
 }
 // A primvar on the triangulated mesh: per point (vertex, varying, constant) or per triangulated corner, 3 * triangle +
 // corner (faceVarying, uniform). Empty when missing or invalid.
-template<class T> struct Triangulated {
+template <class T>
+struct Triangulated {
     VtArray<T> values;
     bool perCorner = false;
     const T& at(size_t corner, size_t point) const { return values[perCorner ? corner : point]; }
-    bool same(size_t a, size_t b) const { return !perCorner || values[a] == values[b]; } // corners of one point
+    bool same(size_t a, size_t b) const { return !perCorner || values[a] == values[b]; }  // corners of one point
 };
 // computed: the primvar's ExtComputation value (vertex), which replaces the authored one.
-template<class T> Triangulated<T> triangulated(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, size_t pointCount,
-    const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type, const HdUESubdivision* subdivision = nullptr,
-    const VtValue& computed = {}) {
+template <class T>
+Triangulated<T> triangulated(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, size_t pointCount,
+                             const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type,
+                             const HdUESubdivision* subdivision = nullptr, const VtValue& computed = {}) {
     VtIntArray indices;
     const auto raw = computed.IsEmpty() ? delegate->GetIndexedPrimvar(id, name, &indices) : computed;
     if (!raw.IsHolding<VtArray<T>>()) return {};
@@ -97,9 +112,11 @@ template<class T> Triangulated<T> triangulated(HdSceneDelegate* delegate, const 
     const auto domain = computed.IsEmpty() ? interpolation(delegate, id, name) : HdInterpolationVertex;
     // Indexed primvars (primvars:x:indices) arrive unflattened. A subdivision refines face-varying ones through their
     // indices, so values shared across faces stay connected; others are expanded first.
-    const int channel = subdivision && domain == HdInterpolationFaceVarying && !indices.empty() ? subdivision->channel(indices) : 0;
+    const int channel =
+        subdivision && domain == HdInterpolationFaceVarying && !indices.empty() ? subdivision->channel(indices) : 0;
     if (!indices.empty()) {
-        if (std::any_of(indices.begin(), indices.end(), [&](int i) { return i < 0 || size_t(i) >= array.size(); })) return {};
+        if (std::any_of(indices.begin(), indices.end(), [&](int i) { return i < 0 || size_t(i) >= array.size(); }))
+            return {};
         if (!channel) {
             VtArray<T> flat(indices.size());
             for (size_t i = 0; i < indices.size(); ++i) flat[i] = array[indices[i]];
@@ -109,7 +126,8 @@ template<class T> Triangulated<T> triangulated(HdSceneDelegate* delegate, const 
     if (array.empty()) return {};
     if (subdivision && (array = subdivision->refine(array, domain, channel)).empty()) return {};
     Triangulated<T> out;
-    if (domain == HdInterpolationConstant) out.values.assign(pointCount, array[0]);
+    if (domain == HdInterpolationConstant)
+        out.values.assign(pointCount, array[0]);
     else if (domain == HdInterpolationFaceVarying) {
         VtValue output;
         const auto result = util.ComputeTriangulatedFaceVaryingPrimvar(array.cdata(), int(array.size()), type, &output);
@@ -118,39 +136,48 @@ template<class T> Triangulated<T> triangulated(HdSceneDelegate* delegate, const 
         out.perCorner = true;
         if (out.values.size() < triangles.size() * 3) return {};
     } else if (domain == HdInterpolationUniform) {
-        out.values.resize(triangles.size() * 3); out.perCorner = true;
+        out.values.resize(triangles.size() * 3);
+        out.perCorner = true;
         for (size_t tri = 0; tri < triangles.size(); ++tri) {
             const size_t face = size_t(HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(parameters[tri]));
             if (face >= array.size()) return {};
             std::fill_n(out.values.begin() + tri * 3, 3, array[face]);
         }
-    } else if (array.size() >= pointCount) out.values = std::move(array);
+    } else if (array.size() >= pointCount)
+        out.values = std::move(array);
     return out;
 }
 // Motion samples cover one frame either side, enough for any shutter; Pass evaluates them at sub-frame times.
 constexpr float HdUEMotionWindow = 1.f;
 constexpr size_t HdUEMaxMotionSamples = 16;
 // Samples of current^-1-relative factors: left = M(t) * M(0)^-1, right = M(0)^-1 * M(t).
-HdUEMotionSamples HdUERelativeMotion(const float* times, const GfMatrix4d* values, size_t count, const GfMatrix4d& current, bool left) {
+HdUEMotionSamples HdUERelativeMotion(const float* times, const GfMatrix4d* values, size_t count,
+                                     const GfMatrix4d& current, bool left) {
     HdUEMotionSamples out;
     const auto inverse = current.GetInverse();
     for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) {
-        out.times.push_back(times[i]); out.values.push_back(left ? values[i] * inverse : inverse * values[i]);
+        out.times.push_back(times[i]);
+        out.values.push_back(left ? values[i] * inverse : inverse * values[i]);
     }
     if (!out.moving()) out = {};
     return out;
 }
-HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& id, const GfMatrix4d& current, bool left) {
-    float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
-    const size_t count = delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& id, const GfMatrix4d& current,
+                                      bool left) {
+    float times[HdUEMaxMotionSamples];
+    GfMatrix4d values[HdUEMaxMotionSamples];
+    const size_t count =
+        delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
     return HdUERelativeMotion(times, values, count, current, left);
 }
 // USD velocities are per second; motion blur times are in frames.
 double HdUEFramesPerSecond(const HdUEState& state) {
     std::lock_guard lock(state.settingsMutex);
     const auto it = state.settings.find(TfToken("houdini:fps"));
-    const double fps = it == state.settings.end() ? 0 : it->second.IsHolding<double>() ? it->second.UncheckedGet<double>()
-        : it->second.IsHolding<float>() ? it->second.UncheckedGet<float>() : 0;
+    const double fps = it == state.settings.end()       ? 0
+                       : it->second.IsHolding<double>() ? it->second.UncheckedGet<double>()
+                       : it->second.IsHolding<float>()  ? it->second.UncheckedGet<float>()
+                                                        : 0;
     return fps > 0 ? fps : state.setting<double>("framesPerSecond", 24);
 }
 // Instance transforms as hdEmbree composes them: for each index,
@@ -159,34 +186,48 @@ double HdUEFramesPerSecond(const HdUEState& state) {
 class Instancer final : public HdInstancer {
     std::map<TfToken, VtValue> primvars_;
     bool visible_ = true;
-    template<class V> static bool vec3(const VtValue& v, size_t i, GfVec3d& out) {
+    template <class V>
+    static bool vec3(const VtValue& v, size_t i, GfVec3d& out) {
         if (!v.IsHolding<VtArray<V>>() || i >= v.UncheckedGet<VtArray<V>>().size()) return false;
-        const auto& x = v.UncheckedGet<VtArray<V>>()[i]; out = GfVec3d(x[0], x[1], x[2]); return true;
+        const auto& x = v.UncheckedGet<VtArray<V>>()[i];
+        out = GfVec3d(x[0], x[1], x[2]);
+        return true;
     }
     static bool vector3(const VtValue& v, size_t i, GfVec3d& out) {
         return vec3<GfVec3f>(v, i, out) || vec3<GfVec3d>(v, i, out) || vec3<GfVec3h>(v, i, out);
     }
-    template<class Q> static bool quat(const VtValue& v, size_t i, GfQuatd& out) {
+    template <class Q>
+    static bool quat(const VtValue& v, size_t i, GfQuatd& out) {
         if (!v.IsHolding<VtArray<Q>>() || i >= v.UncheckedGet<VtArray<Q>>().size()) return false;
-        const auto& q = v.UncheckedGet<VtArray<Q>>()[i]; const auto im = q.GetImaginary();
-        out = GfQuatd(q.GetReal(), GfVec3d(im[0], im[1], im[2])); return true;
+        const auto& q = v.UncheckedGet<VtArray<Q>>()[i];
+        const auto im = q.GetImaginary();
+        out = GfQuatd(q.GetReal(), GfVec3d(im[0], im[1], im[2]));
+        return true;
     }
     static bool rotation(const VtValue& v, size_t i, GfQuatd& out) {
         if (quat<GfQuath>(v, i, out) || quat<GfQuatf>(v, i, out) || quat<GfQuatd>(v, i, out)) return true;
         if (!v.IsHolding<VtVec4fArray>() || i >= v.UncheckedGet<VtVec4fArray>().size()) return false;
-        const auto& q = v.UncheckedGet<VtVec4fArray>()[i]; out = GfQuatd(q[0], GfVec3d(q[1], q[2], q[3])); return true; // <real, i, j, k>
+        const auto& q = v.UncheckedGet<VtVec4fArray>()[i];
+        out = GfQuatd(q[0], GfVec3d(q[1], q[2], q[3]));
+        return true;  // <real, i, j, k>
     }
-    VtValue primvar(const TfToken& name) const { const auto it = primvars_.find(name); return it == primvars_.end() ? VtValue() : it->second; }
+    VtValue primvar(const TfToken& name) const {
+        const auto it = primvars_.find(name);
+        return it == primvars_.end() ? VtValue() : it->second;
+    }
+
 public:
     Instancer(HdSceneDelegate* delegate, const SdfPath& id) : HdInstancer(delegate, id) {}
     void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
         _UpdateInstancer(delegate, bits);
         if (*bits & HdChangeTracker::DirtyVisibility) visible_ = delegate->GetVisible(GetId());
         if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId())) {
-            std::map<TfToken, VtValue> current; // a primvar removed from the instancer stops applying
+            std::map<TfToken, VtValue> current;  // a primvar removed from the instancer stops applying
             for (const auto& primvar : delegate->GetPrimvarDescriptors(GetId(), HdInterpolationInstance))
-                current[primvar.name] = HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name) || !primvars_.count(primvar.name)
-                    ? delegate->Get(GetId(), primvar.name) : primvars_[primvar.name];
+                current[primvar.name] =
+                    HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name) || !primvars_.count(primvar.name)
+                        ? delegate->Get(GetId(), primvar.name)
+                        : primvars_[primvar.name];
             primvars_.swap(current);
         }
     }
@@ -197,14 +238,17 @@ public:
         const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
         std::vector<GfVec3f> out;
         for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype)) {
-            GfVec3d v(0); vector3(velocities, size_t(index), v);
+            GfVec3d v(0);
+            vector3(velocities, size_t(index), v);
             out.emplace_back(instancer.TransformDir(v));
         }
         return out;
     }
     HdUEMotionSamples ComputeMotion() const {
-        float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
-        const size_t count = GetDelegate()->SampleInstancerTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+        float times[HdUEMaxMotionSamples];
+        GfMatrix4d values[HdUEMaxMotionSamples];
+        const size_t count = GetDelegate()->SampleInstancerTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow,
+                                                                     HdUEMaxMotionSamples, times, values);
         return HdUERelativeMotion(times, values, count, GetDelegate()->GetInstancerTransform(GetId()), false);
     }
     // Per-instance displayColor (instance interpolation), repeated for each parent instance like the transforms.
@@ -212,11 +256,14 @@ public:
         const auto colors = value(primvar(HdTokens->displayColor), VtVec3fArray());
         if (colors.empty() || !visible_) return {};
         std::vector<GfVec3f> out;
-        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype)) out.push_back(size_t(index) < colors.size() ? colors[index] : colors[0]);
+        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype))
+            out.push_back(size_t(index) < colors.size() ? colors[index] : colors[0]);
         if (GetParentId().IsEmpty()) return out;
-        const auto* parent = dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
+        const auto* parent =
+            dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
         const size_t parents = parent ? parent->ComputeInstanceTransforms(GetId()).size() : 0;
-        std::vector<GfVec3f> nested; nested.reserve(parents * out.size());
+        std::vector<GfVec3f> nested;
+        nested.reserve(parents * out.size());
         for (size_t i = 0; i < parents; ++i) nested.insert(nested.end(), out.begin(), out.end());
         return nested;
     }
@@ -224,13 +271,16 @@ public:
         if (!visible_) return {};
         const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
         const auto indices = GetDelegate()->GetInstanceIndices(GetId(), prototype);
-        const auto translations = primvar(HdInstancerTokens->instanceTranslations), rotations = primvar(HdInstancerTokens->instanceRotations);
-        const auto scales = primvar(HdInstancerTokens->instanceScales), matrices = primvar(HdInstancerTokens->instanceTransforms);
+        const auto translations = primvar(HdInstancerTokens->instanceTranslations),
+                   rotations = primvar(HdInstancerTokens->instanceRotations);
+        const auto scales = primvar(HdInstancerTokens->instanceScales),
+                   matrices = primvar(HdInstancerTokens->instanceTransforms);
         VtMatrix4dArray transforms(indices.size());
         for (size_t i = 0; i < indices.size(); ++i) {
             const size_t index = size_t(indices[i]);
             GfMatrix4d m = instancer, step(1);
-            GfVec3d v; GfQuatd q;
+            GfVec3d v;
+            GfQuatd q;
             if (vector3(translations, index, v)) m = step.SetTranslate(v) * m;
             if (rotation(rotations, index, q)) m = GfMatrix4d(1).SetRotate(q) * m;
             if (vector3(scales, index, v)) m = GfMatrix4d(1).SetScale(v) * m;
@@ -239,12 +289,14 @@ public:
             transforms[i] = m;
         }
         if (GetParentId().IsEmpty()) return transforms;
-        const auto* parent = dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
+        const auto* parent =
+            dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
         if (!parent) return transforms;
         const auto parents = parent->ComputeInstanceTransforms(GetId());
         VtMatrix4dArray nested(parents.size() * transforms.size());
         for (size_t i = 0; i < parents.size(); ++i)
-            for (size_t j = 0; j < transforms.size(); ++j) nested[i * transforms.size() + j] = transforms[j] * parents[i];
+            for (size_t j = 0; j < transforms.size(); ++j)
+                nested[i * transforms.size() + j] = transforms[j] * parents[i];
         return nested;
     }
 };
@@ -253,14 +305,19 @@ std::atomic<int64_t> meshSyncMicroseconds{0};
 std::atomic<int> meshSyncs{0};
 struct MeshSyncTimer {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-    ~MeshSyncTimer() { meshSyncMicroseconds += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(); ++meshSyncs; }
+    ~MeshSyncTimer() {
+        meshSyncMicroseconds +=
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
+        ++meshSyncs;
+    }
 };
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
     HdMeshTopology maskTopology_;
     VtVec3iArray maskTriangles_;
     VtIntArray maskParameters_;
-    size_t pointCount_=0;
+    size_t pointCount_ = 0;
+
 public:
     explicit Mesh(const SdfPath& id) : HdMesh(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
@@ -269,18 +326,26 @@ public:
         auto* state = static_cast<HdUEState*>(param);
         // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry.
         if (!emitted_.empty() && GetInstancerId().IsEmpty() &&
-            !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag))) {
+            !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
+                        HdChangeTracker::DirtyRenderTag))) {
             const auto transform = delegate->GetTransform(GetId());
             const bool visible = delegate->GetVisible(GetId());
             const auto renderTag = delegate->GetRenderTag(GetId());
             const auto motion = HdUETransformMotion(delegate, GetId(), transform, true);
             std::lock_guard lock(state->mutex);
-            if (std::all_of(emitted_.begin(), emitted_.end(), [&](const std::string& id) { return state->meshes.count(id); })) {
+            if (std::all_of(emitted_.begin(), emitted_.end(),
+                            [&](const std::string& id) { return state->meshes.count(id); })) {
                 for (const auto& id : emitted_) {
                     auto& part = state->meshes[id];
                     const bool changed = part.transform != transform || part.visible != visible;
-                    part.transform = transform; part.visible = visible; part.renderTag = renderTag; part.motionLeft = motion;
-                    if (changed) { state->dirtyMeshes.insert(id); ++state->revision; }
+                    part.transform = transform;
+                    part.visible = visible;
+                    part.renderTag = renderTag;
+                    part.motionLeft = motion;
+                    if (changed) {
+                        state->dirtyMeshes.insert(id);
+                        ++state->revision;
+                    }
                 }
                 *bits = HdChangeTracker::Clean;
                 return;
@@ -295,14 +360,18 @@ public:
         mesh.transform = delegate->GetTransform(GetId());
         mesh.visible = delegate->GetVisible(GetId());
         mesh.renderTag = delegate->GetRenderTag(GetId());
-        _UpdateInstancer(delegate, bits); // sets GetInstancerId
+        _UpdateInstancer(delegate, bits);  // sets GetInstancerId
         const CleanBits clean{bits};
         if (!GetInstancerId().IsEmpty()) {
             HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), GetInstancerId());
             mesh.instanced = true;
-            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId()))) {
-                for (const auto& instance : instancer->ComputeInstanceTransforms(GetId())) mesh.instances.push_back(mesh.transform * instance);
-                if (mesh.material.empty()) mesh.instanceColors = HdUEVaryingColors(instancer->ComputeInstanceColors(GetId()), mesh.instances.size());
+            if (const auto* instancer =
+                    dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId()))) {
+                for (const auto& instance : instancer->ComputeInstanceTransforms(GetId()))
+                    mesh.instances.push_back(mesh.transform * instance);
+                if (mesh.material.empty())
+                    mesh.instanceColors =
+                        HdUEVaryingColors(instancer->ComputeInstanceColors(GetId()), mesh.instances.size());
                 mesh.motionRight = instancer->ComputeMotion();
                 mesh.velocities = instancer->ComputeInstanceVelocities(GetId());
                 if (mesh.velocities.size() != mesh.instances.size()) mesh.velocities.clear();
@@ -322,71 +391,109 @@ public:
         // indices of their face-varying UVs and colours; authored normals do not apply to them.
         std::unique_ptr<HdUESubdivision> subdivision;
         if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 2) : 0;
-            level > 0 && (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark || topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
+            level > 0 && (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark ||
+                          topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
             topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
             std::vector<VtIntArray> fvarIndices;
-            for (const auto& name : {uvName, colorName}) if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
-                VtIntArray indices; delegate->GetIndexedPrimvar(GetId(), name, &indices);
-                if (!indices.empty()) fvarIndices.push_back(indices);
-            }
+            for (const auto& name : {uvName, colorName})
+                if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
+                    VtIntArray indices;
+                    delegate->GetIndexedPrimvar(GetId(), name, &indices);
+                    if (!indices.empty()) fvarIndices.push_back(indices);
+                }
             subdivision = HdUESubdivision::Create(topology, level, std::move(fvarIndices));
         }
-        if (subdivision) { points = subdivision->refine(points, HdInterpolationVertex); topology = subdivision->topology(); }
+        if (subdivision) {
+            points = subdivision->refine(points, HdInterpolationVertex);
+            topology = subdivision->topology();
+        }
         HdMeshUtil util(&topology, GetId());
         VtVec3iArray triangles;
         VtIntArray parameters;
         util.ComputeTriangleIndices(&triangles, &parameters);
-        maskTopology_=topology; maskTriangles_=triangles; maskParameters_=parameters; pointCount_=points.size();
+        maskTopology_ = topology;
+        maskTriangles_ = triangles;
+        maskParameters_ = parameters;
+        pointCount_ = points.size();
         // Authored normals (subdivision surfaces ignore them, and so do computed points without computed normals); zero
         // or missing ones are generated below.
         const auto computedNormals = computed.find(HdTokens->normals);
-        const auto normals = subdivision || (computed.count(HdTokens->points) && computedNormals == computed.end()) ? Triangulated<GfVec3f>{} :
-            triangulated<GfVec3f>(delegate, GetId(), HdTokens->normals, points.size(), triangles, parameters, util, HdTypeFloatVec3, nullptr,
-                computedNormals == computed.end() ? VtValue() : computedNormals->second);
-        const auto uv = triangulated<GfVec2f>(delegate, GetId(), uvName, points.size(), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
+        const auto normals =
+            subdivision || (computed.count(HdTokens->points) && computedNormals == computed.end())
+                ? Triangulated<GfVec3f>{}
+                : triangulated<GfVec3f>(delegate, GetId(), HdTokens->normals, points.size(), triangles, parameters,
+                                        util, HdTypeFloatVec3, nullptr,
+                                        computedNormals == computed.end() ? VtValue() : computedNormals->second);
+        const auto uv = triangulated<GfVec2f>(delegate, GetId(), uvName, points.size(), triangles, parameters, util,
+                                              HdTypeFloatVec2, subdivision.get());
         // Vertex colours: an unbound mesh's displayColor when it varies (a uniform one stays the material's constant
         // color), or the primvar a bound material's base colour reads.
         Triangulated<GfVec3f> colors;
         if (!colorName.IsEmpty() && mesh.sceneAsset.empty()) {
-            colors = triangulated<GfVec3f>(delegate, GetId(), colorName, points.size(), triangles, parameters, util, HdTypeFloatVec3, subdivision.get());
-            if (mesh.material.empty() && std::all_of(colors.values.begin(), colors.values.end(), [&](const GfVec3f& c) { return c == colors.values[0]; })) colors = {};
+            colors = triangulated<GfVec3f>(delegate, GetId(), colorName, points.size(), triangles, parameters, util,
+                                           HdTypeFloatVec3, subdivision.get());
+            if (mesh.material.empty() && std::all_of(colors.values.begin(), colors.values.end(),
+                                                     [&](const GfVec3f& c) { return c == colors.values[0]; }))
+                colors = {};
         }
         std::shared_ptr<const VtDictionary> selectedBindings;
-        { std::lock_guard lock(state->mutex); selectedBindings=state->wetBindings; }
-        const auto& wetBindings=*selectedBindings;
+        {
+            std::lock_guard lock(state->mutex);
+            selectedBindings = state->wetBindings;
+        }
+        const auto& wetBindings = *selectedBindings;
         std::set<std::string> maskNames;
         const auto needMask = [&](const std::string& path) {
-            HdUEMeshData target; target.bindingPath=path;
-            const auto name=HdUEWetValue<std::string>(HdUEWetSettings(wetBindings,target),"maskPrimvar","");
+            HdUEMeshData target;
+            target.bindingPath = path;
+            const auto name = HdUEWetValue<std::string>(HdUEWetSettings(wetBindings, target), "maskPrimvar", "");
             if (!name.empty()) maskNames.insert(name);
         };
         needMask(mesh.scenePath);
-        for (const auto& subset : topology.GetGeomSubsets()) needMask(SdfPath(mesh.scenePath).AppendChild(subset.id.GetNameToken()).GetString());
-        std::map<std::string, std::vector<float>> masks; // per corner
+        for (const auto& subset : topology.GetGeomSubsets())
+            needMask(SdfPath(mesh.scenePath).AppendChild(subset.id.GetNameToken()).GetString());
+        std::map<std::string, std::vector<float>> masks;  // per corner
         for (const auto& name : maskNames) {
             const TfToken token(name);
-            const auto raw=delegate->Get(GetId(),token);
-            const auto domain=interpolation(delegate,GetId(),token);
-            try { masks[name]=HdUEExpandWetMask(raw,domain,points.size(),topology,triangles,parameters,util); }
-            catch (const std::invalid_argument& error) { mesh.maskErrors[name]=name+": "+error.what(); }
+            const auto raw = delegate->Get(GetId(), token);
+            const auto domain = interpolation(delegate, GetId(), token);
+            try {
+                masks[name] = HdUEExpandWetMask(raw, domain, points.size(), topology, triangles, parameters, util);
+            } catch (const std::invalid_argument& error) {
+                mesh.maskErrors[name] = name + ": " + error.what();
+            }
         }
         // Indexed vertices: corners of a point weld unless a face-varying attribute splits them (UV seams, hard edges).
         // The USD -> UE basis already reverses handedness. UE's clockwise
         // front faces must not receive a second index reversal.
         try {
-            mesh.sourceCorners = HdUEWeldCorners(triangles, points.size(), [&](size_t a, size_t b) {
-                return normals.same(a, b) && uv.same(a, b) && colors.same(a, b) &&
-                    std::all_of(masks.begin(), masks.end(), [&](const auto& mask) { return mask.second[a] == mask.second[b]; });
-            }, mesh.indices);
-        } catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText()); return; }
+            mesh.sourceCorners = HdUEWeldCorners(
+                triangles, points.size(),
+                [&](size_t a, size_t b) {
+                    return normals.same(a, b) && uv.same(a, b) && colors.same(a, b) &&
+                           std::all_of(masks.begin(), masks.end(),
+                                       [&](const auto& mask) { return mask.second[a] == mask.second[b]; });
+                },
+                mesh.indices);
+        } catch (const std::invalid_argument& error) {
+            TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+            return;
+        }
         const size_t vertices = mesh.sourceCorners.size();
         std::vector<uint32_t> vertexPoints(vertices);
-        for (size_t v = 0; v < vertices; ++v) vertexPoints[v] = uint32_t(triangles[mesh.sourceCorners[v] / 3][int(mesh.sourceCorners[v] % 3)]);
+        for (size_t v = 0; v < vertices; ++v)
+            vertexPoints[v] = uint32_t(triangles[mesh.sourceCorners[v] / 3][int(mesh.sourceCorners[v] % 3)]);
         std::vector<GfVec3f> smooth;
-        if (normals.values.empty() || std::any_of(normals.values.begin(), normals.values.end(), [](const auto& n) { return n.GetLengthSq() < 1e-12f; }))
-            try { smooth = HdUEComputeSmoothNormals(points, triangles); }
-            catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText()); return; }
-        mesh.points.reserve(vertices); mesh.normals.reserve(vertices);
+        if (normals.values.empty() || std::any_of(normals.values.begin(), normals.values.end(),
+                                                  [](const auto& n) { return n.GetLengthSq() < 1e-12f; }))
+            try {
+                smooth = HdUEComputeSmoothNormals(points, triangles);
+            } catch (const std::invalid_argument& error) {
+                TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+                return;
+            }
+        mesh.points.reserve(vertices);
+        mesh.normals.reserve(vertices);
         for (size_t v = 0; v < vertices; ++v) {
             const size_t corner = mesh.sourceCorners[v], point = vertexPoints[v];
             mesh.points.push_back(points[point]);
@@ -398,14 +505,22 @@ public:
         }
         {
             // Deformation blur from time-sampled points of the same count, else from per-point velocities.
-            float times[HdUEMaxMotionSamples]; VtValue samples[HdUEMaxMotionSamples];
-            const size_t count = delegate->SamplePrimvar(GetId(), HdTokens->points, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, samples);
+            float times[HdUEMaxMotionSamples];
+            VtValue samples[HdUEMaxMotionSamples];
+            const size_t count = delegate->SamplePrimvar(GetId(), HdTokens->points, -HdUEMotionWindow, HdUEMotionWindow,
+                                                         HdUEMaxMotionSamples, times, samples);
             bool moves = false;
             for (size_t k = 0; k < count && count > 1; ++k) {
                 auto sample = value(samples[k], VtVec3fArray());
                 if (subdivision) sample = subdivision->refine(sample, HdInterpolationVertex);
-                if (sample.size() != points.size()) { mesh.deformTimes.clear(); mesh.deformOffsets.clear(); moves = false; break; }
-                auto& offsets = mesh.deformOffsets.emplace_back(); offsets.reserve(vertices);
+                if (sample.size() != points.size()) {
+                    mesh.deformTimes.clear();
+                    mesh.deformOffsets.clear();
+                    moves = false;
+                    break;
+                }
+                auto& offsets = mesh.deformOffsets.emplace_back();
+                offsets.reserve(vertices);
                 for (const uint32_t point : vertexPoints) {
                     offsets.push_back(sample[point] - points[point]);
                     moves = moves || offsets.back() != GfVec3f(0);
@@ -413,20 +528,26 @@ public:
                 mesh.deformTimes.push_back(times[k]);
             }
             if (!moves) {
-                mesh.deformTimes.clear(); mesh.deformOffsets.clear();
+                mesh.deformTimes.clear();
+                mesh.deformOffsets.clear();
                 auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
                 if (subdivision) velocities = subdivision->refine(velocities, HdInterpolationVertex);
-                if (velocities.size() == points.size() && std::any_of(velocities.begin(), velocities.end(), [](const auto& v) { return v != GfVec3f(0); })) {
+                if (velocities.size() == points.size() &&
+                    std::any_of(velocities.begin(), velocities.end(), [](const auto& v) { return v != GfVec3f(0); })) {
                     const float fps = float(HdUEFramesPerSecond(*state));
-                    mesh.deformTimes = {-1.f, 1.f}; mesh.deformOffsets.resize(2);
+                    mesh.deformTimes = {-1.f, 1.f};
+                    mesh.deformOffsets.resize(2);
                     for (const uint32_t point : vertexPoints) {
                         const auto v = velocities[point] / fps;
-                        mesh.deformOffsets[0].push_back(-v); mesh.deformOffsets[1].push_back(v);
+                        mesh.deformOffsets[0].push_back(-v);
+                        mesh.deformOffsets[1].push_back(v);
                     }
                 }
             }
         }
-        if (HdUETraceScene()) TF_STATUS("hdUE wet sync %s scene=%s requested=%zu masks=%zu",GetId().GetText(),mesh.scenePath.c_str(),maskNames.size(),mesh.masks.size());
+        if (HdUETraceScene())
+            TF_STATUS("hdUE wet sync %s scene=%s requested=%zu masks=%zu", GetId().GetText(), mesh.scenePath.c_str(),
+                      maskNames.size(), mesh.masks.size());
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
@@ -448,12 +569,17 @@ public:
             mesh.material = material.id;
         }
         std::vector<HdUEMeshData> parts;
-        try { parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters); }
-        catch (const std::invalid_argument& error) { TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText()); return; }
+        try {
+            parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters);
+        } catch (const std::invalid_argument& error) {
+            TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+            return;
+        }
         std::lock_guard lock(state->mutex);
         if (displayColor) {
             const auto previous = state->materials.find(displayColor->id);
-            if (previous == state->materials.end() || previous->second.color != displayColor->color || previous->second.opacity != displayColor->opacity ||
+            if (previous == state->materials.end() || previous->second.color != displayColor->color ||
+                previous->second.opacity != displayColor->opacity ||
                 previous->second.vertexColor != displayColor->vertexColor) {
                 state->materials[displayColor->id] = *displayColor;
                 state->dirtyMaterials.insert(displayColor->id);
@@ -467,27 +593,43 @@ public:
             const bool revived = previous == state->meshes.end() && state->erasedMeshes.count(part.id);
             if (revived) previous = state->erasedMeshes.find(part.id);
             const auto missing = revived ? state->erasedMeshes.end() : state->meshes.end();
-            if (previous != missing && previous->second.points == part.points && previous->second.indices == part.indices) part.pickMesh = previous->second.pickMesh;
-            // Pick structures are built on the first pick (HdUERenderDelegate pick): building a BVH for every mesh here,
-            // under the state mutex, serialized scene loads (tens of seconds on Sponza).
-            const bool onlyNativeBounds = previous != missing && !part.sceneAsset.empty() &&
-                previous->second.sceneAsset==part.sceneAsset && previous->second.transform==part.transform && previous->second.visible==part.visible;
-            const bool meshChanged = !onlyNativeBounds && (previous == missing || previous->second.points != part.points ||
-                previous->second.indices != part.indices || previous->second.normals != part.normals || previous->second.uv != part.uv || previous->second.transform != part.transform ||
-                previous->second.material != part.material || previous->second.visible != part.visible || previous->second.sceneAsset != part.sceneAsset ||
-                previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
-                previous->second.colors != part.colors || previous->second.instanceColors != part.instanceColors);
+            if (previous != missing && previous->second.points == part.points &&
+                previous->second.indices == part.indices)
+                part.pickMesh = previous->second.pickMesh;
+            // Pick structures are built on the first pick (HdUERenderDelegate pick): building a BVH for every mesh
+            // here, under the state mutex, serialized scene loads (tens of seconds on Sponza).
+            const bool onlyNativeBounds =
+                previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
+                previous->second.transform == part.transform && previous->second.visible == part.visible;
+            const bool meshChanged =
+                !onlyNativeBounds &&
+                (previous == missing || previous->second.points != part.points ||
+                 previous->second.indices != part.indices || previous->second.normals != part.normals ||
+                 previous->second.uv != part.uv || previous->second.transform != part.transform ||
+                 previous->second.material != part.material || previous->second.visible != part.visible ||
+                 previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
+                 previous->second.instances != part.instances || previous->second.colors != part.colors ||
+                 previous->second.instanceColors != part.instanceColors);
             const auto id = part.id;
-            const bool maskChanged=previous==missing || previous->second.masks!=part.masks || previous->second.maskErrors!=part.maskErrors;
+            const bool maskChanged = previous == missing || previous->second.masks != part.masks ||
+                                     previous->second.maskErrors != part.maskErrors;
             state->meshes[id] = std::move(part);
-            state->removed.erase(id); state->erasedMeshes.erase(id);
-            if (meshChanged) { state->dirtyMeshes.insert(id); ++state->revision; }
-            else if (maskChanged) ++state->revision;
+            state->removed.erase(id);
+            state->erasedMeshes.erase(id);
+            if (meshChanged) {
+                state->dirtyMeshes.insert(id);
+                ++state->revision;
+            } else if (maskChanged)
+                ++state->revision;
             current.insert(id);
         }
-        for (const auto& id : emitted_) if (!current.count(id)) {
-            state->meshes.erase(id); state->dirtyMeshes.erase(id); state->removed.insert(id); ++state->revision;
-        }
+        for (const auto& id : emitted_)
+            if (!current.count(id)) {
+                state->meshes.erase(id);
+                state->dirtyMeshes.erase(id);
+                state->removed.insert(id);
+                ++state->revision;
+            }
         emitted_ = std::move(current);
     }
     void RefreshSelectedMasks(HdSceneDelegate* delegate, HdUEState& state) const {
@@ -496,25 +638,37 @@ public:
         // Fetch only that primvar from the synchronized Hydra delegate, using
         // the cached triangulation and subset corner mapping.
         std::lock_guard lock(state.mutex);
-        const auto& bindings=*state.wetBindings;
+        const auto& bindings = *state.wetBindings;
         std::set<std::string> needed;
-        for (const auto& id:emitted_) {
-            const auto part=state.meshes.find(id); if (part==state.meshes.end()) continue;
-            const auto name=HdUEWetValue<std::string>(HdUEWetSettings(bindings,part->second),"maskPrimvar","");
-            if (!name.empty() && !part->second.masks.count(name) && !part->second.maskErrors.count(name)) needed.insert(name);
+        for (const auto& id : emitted_) {
+            const auto part = state.meshes.find(id);
+            if (part == state.meshes.end()) continue;
+            const auto name = HdUEWetValue<std::string>(HdUEWetSettings(bindings, part->second), "maskPrimvar", "");
+            if (!name.empty() && !part->second.masks.count(name) && !part->second.maskErrors.count(name))
+                needed.insert(name);
         }
-        for (const auto& name:needed) {
-            std::vector<float> values; std::string error;
-            HdMeshUtil util(&maskTopology_,GetId());
-            try { values=HdUEExpandWetMask(delegate->Get(GetId(),TfToken(name)),interpolation(delegate,GetId(),TfToken(name)),pointCount_,
-                maskTopology_,maskTriangles_,maskParameters_,util); }
-            catch (const std::invalid_argument& e) {error=name+": "+e.what();}
-            for (const auto& id:emitted_) {
-                auto part=state.meshes.find(id); if (part==state.meshes.end()) continue;
-                if (!error.empty()) part->second.maskErrors[name]=error;
+        for (const auto& name : needed) {
+            std::vector<float> values;
+            std::string error;
+            HdMeshUtil util(&maskTopology_, GetId());
+            try {
+                values = HdUEExpandWetMask(delegate->Get(GetId(), TfToken(name)),
+                                           interpolation(delegate, GetId(), TfToken(name)), pointCount_, maskTopology_,
+                                           maskTriangles_, maskParameters_, util);
+            } catch (const std::invalid_argument& e) {
+                error = name + ": " + e.what();
+            }
+            for (const auto& id : emitted_) {
+                auto part = state.meshes.find(id);
+                if (part == state.meshes.end()) continue;
+                if (!error.empty())
+                    part->second.maskErrors[name] = error;
                 else {
-                    auto& mask=part->second.masks[name]; mask.clear(); mask.reserve(part->second.points.size());
-                    for (size_t i=0;i<part->second.points.size();++i) mask.push_back(values.at(part->second.sourceCorners[i]));
+                    auto& mask = part->second.masks[name];
+                    mask.clear();
+                    mask.reserve(part->second.points.size());
+                    for (size_t i = 0; i < part->second.points.size(); ++i)
+                        mask.push_back(values.at(part->second.sourceCorners[i]));
                 }
             }
         }
@@ -524,8 +678,11 @@ public:
         for (const auto& id : emitted_) state->erase(id);
         state->erase(GetId().GetString() + ".displayColor");
     }
+
 protected:
-    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override {
+        _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr()));
+    }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
 // Points and curves become triangle meshes: one shared sphere instanced per point, and a capped tube
@@ -533,7 +690,8 @@ protected:
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
     std::lock_guard lock(state.mutex);
     if (mesh.material.empty()) {
-        HdUEMaterialData material; material.id = mesh.id + ".displayColor";
+        HdUEMaterialData material;
+        material.id = mesh.id + ".displayColor";
         const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
         if (!color.empty()) material.color = color[0];
         material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
@@ -542,20 +700,31 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
         if (!opacity.empty() && std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
         mesh.material = material.id;
         const auto previous = state.materials.find(material.id);
-        if (previous == state.materials.end() || previous->second.color != material.color || previous->second.opacity != material.opacity ||
-            previous->second.vertexColor != material.vertexColor) {
-            state.materials[material.id] = material; state.dirtyMaterials.insert(material.id);
+        if (previous == state.materials.end() || previous->second.color != material.color ||
+            previous->second.opacity != material.opacity || previous->second.vertexColor != material.vertexColor) {
+            state.materials[material.id] = material;
+            state.dirtyMaterials.insert(material.id);
         }
     }
     const auto previous = state.meshes.find(mesh.id);
-    const bool changed = previous == state.meshes.end() || previous->second.points != mesh.points || previous->second.indices != mesh.indices || previous->second.normals != mesh.normals ||
-        previous->second.uv != mesh.uv || previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
-        previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
-        previous->second.colors != mesh.colors || previous->second.instanceColors != mesh.instanceColors;
-    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points && previous->second.indices == mesh.indices ? previous->second.pickMesh : nullptr; // built on first pick
+    const bool changed = previous == state.meshes.end() || previous->second.points != mesh.points ||
+                         previous->second.indices != mesh.indices || previous->second.normals != mesh.normals ||
+                         previous->second.uv != mesh.uv || previous->second.transform != mesh.transform ||
+                         previous->second.material != mesh.material || previous->second.visible != mesh.visible ||
+                         previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
+                         previous->second.colors != mesh.colors ||
+                         previous->second.instanceColors != mesh.instanceColors;
+    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points &&
+                            previous->second.indices == mesh.indices
+                        ? previous->second.pickMesh
+                        : nullptr;  // built on first pick
     const auto key = mesh.id;
-    state.meshes[key] = std::move(mesh); state.removed.erase(key);
-    if (changed) { state.dirtyMeshes.insert(key); ++state.revision; }
+    state.meshes[key] = std::move(mesh);
+    state.removed.erase(key);
+    if (changed) {
+        state.dirtyMeshes.insert(key);
+        ++state.revision;
+    }
 }
 HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     HdUEMeshData mesh;
@@ -569,7 +738,8 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     return mesh;
 }
 // Placements of an rprim under a Hydra instancer (its own transform first), or empty when not instanced.
-std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const SdfPath& id, const SdfPath& instancerId, const GfMatrix4d& transform) {
+std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const SdfPath& id, const SdfPath& instancerId,
+                                               const GfMatrix4d& transform) {
     std::vector<GfMatrix4d> out;
     if (instancerId.IsEmpty()) return out;
     HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), instancerId);
@@ -587,16 +757,23 @@ void HdUEAppendSphere(HdUEMeshData& mesh) {
     constexpr int Slices = 8, Stacks = 6;
     const auto base = uint32_t(mesh.points.size());
     const auto vertex = [&](int stack, int slice) { return base + uint32_t(stack * (Slices + 1) + slice); };
-    for (int stack = 0; stack <= Stacks; ++stack) for (int slice = 0; slice <= Slices; ++slice) {
-        const double theta = 3.14159265358979323846 * stack / Stacks, phi = 2 * 3.14159265358979323846 * slice / Slices;
-        const GfVec3f point(float(std::sin(theta) * std::cos(phi)), float(std::cos(theta)), float(std::sin(theta) * std::sin(phi)));
-        mesh.points.push_back(point); mesh.normals.push_back(point); mesh.uv.emplace_back(0.f, 0.f);
-    }
-    for (int stack = 0; stack < Stacks; ++stack) for (int slice = 0; slice < Slices; ++slice) {
-        const uint32_t a = vertex(stack, slice), b = vertex(stack + 1, slice), c = vertex(stack + 1, slice + 1), d = vertex(stack, slice + 1);
-        // Counter-clockwise seen from outside, as USD front faces are.
-        mesh.indices.insert(mesh.indices.end(), {a, c, b, a, d, c});
-    }
+    for (int stack = 0; stack <= Stacks; ++stack)
+        for (int slice = 0; slice <= Slices; ++slice) {
+            const double theta = 3.14159265358979323846 * stack / Stacks,
+                         phi = 2 * 3.14159265358979323846 * slice / Slices;
+            const GfVec3f point(float(std::sin(theta) * std::cos(phi)), float(std::cos(theta)),
+                                float(std::sin(theta) * std::sin(phi)));
+            mesh.points.push_back(point);
+            mesh.normals.push_back(point);
+            mesh.uv.emplace_back(0.f, 0.f);
+        }
+    for (int stack = 0; stack < Stacks; ++stack)
+        for (int slice = 0; slice < Slices; ++slice) {
+            const uint32_t a = vertex(stack, slice), b = vertex(stack + 1, slice), c = vertex(stack + 1, slice + 1),
+                           d = vertex(stack, slice + 1);
+            // Counter-clockwise seen from outside, as USD front faces are.
+            mesh.indices.insert(mesh.indices.end(), {a, c, b, a, d, c});
+        }
 }
 class Points final : public HdPoints {
 public:
@@ -605,7 +782,8 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto mesh = HdUEShapeBase(*this, delegate);
         _UpdateInstancer(delegate, bits);
-        const auto points = value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
+        const auto points =
+            value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
         HdUEAppendSphere(mesh);
         mesh.instanced = true;
@@ -617,48 +795,66 @@ public:
             colors = HdUEVaryingColors(std::vector<GfVec3f>(authored.begin(), authored.end()), points.size());
         }
         // Points move with their prim (or instancer) transform and their velocities.
-        mesh.motionRight = GetInstancerId().IsEmpty() ? HdUETransformMotion(delegate, GetId(), mesh.transform, false) : HdUEMotionSamples{};
+        mesh.motionRight = GetInstancerId().IsEmpty() ? HdUETransformMotion(delegate, GetId(), mesh.transform, false)
+                                                      : HdUEMotionSamples{};
         const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
         const float fps = float(HdUEFramesPerSecond(*static_cast<HdUEState*>(param)));
         // Every point of every placement (nested under a Hydra instancer when there is one).
-        for (const auto& placement : placements) for (size_t i = 0; i < points.size(); ++i) {
-            if (velocities.size() == points.size()) mesh.velocities.emplace_back(GfVec3f(placement.TransformDir(GfVec3d(velocities[i]))) / fps);
-            const double radius = .5 * HdUEWidth(widths, i, .1f);
-            mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placement);
-            if (!colors.empty()) mesh.instanceColors.push_back(colors[i]);
-            mesh.instanceIds.push_back(GetInstancerId().IsEmpty() ? -1 : int32_t(&placement - placements.data()));
-        }
+        for (const auto& placement : placements)
+            for (size_t i = 0; i < points.size(); ++i) {
+                if (velocities.size() == points.size())
+                    mesh.velocities.emplace_back(GfVec3f(placement.TransformDir(GfVec3d(velocities[i]))) / fps);
+                const double radius = .5 * HdUEWidth(widths, i, .1f);
+                mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) *
+                                         GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placement);
+                if (!colors.empty()) mesh.instanceColors.push_back(colors[i]);
+                mesh.instanceIds.push_back(GetInstancerId().IsEmpty() ? -1 : int32_t(&placement - placements.data()));
+            }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
     }
     void Finalize(HdRenderParam* param) override {
         auto* state = static_cast<HdUEState*>(param);
-        state->erase(GetId().GetString()); state->erase(GetId().GetString() + ".displayColor");
+        state->erase(GetId().GetString());
+        state->erase(GetId().GetString() + ".displayColor");
     }
+
 protected:
-    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override {
+        _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr()));
+    }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
 // One primvar along one curve, by interpolation: per control vertex (blended with the basis weights), per segment end
 // (varying: linear across each segment), else one value (uniform, constant, or the fallback).
-template<class T> struct CurvePrimvar {
+template <class T>
+struct CurvePrimvar {
     std::vector<T> cvs, ends;
     T value;
 };
 class Curves final : public HdBasisCurves {
     // Samples along one curve: cubic segments are evaluated in their basis; linear curves keep their vertices.
-    struct Sample { GfVec3d point; size_t first, segment; double u, weights[4]; };
+    struct Sample {
+        GfVec3d point;
+        size_t first, segment;
+        double u, weights[4];
+    };
     static size_t segments(size_t n, const TfToken& type, const TfToken& basis, bool periodic) {
         if (type == HdTokens->linear || n < 4) return periodic || !n ? n : n - 1;
         if (basis == HdTokens->bezier) return periodic ? n / 3 : (n - 1) / 3;
         return periodic ? n : n - 3;
     }
-    static std::vector<Sample> samples(const std::vector<GfVec3d>& cv, const TfToken& type, const TfToken& basis, bool periodic) {
+    static std::vector<Sample> samples(const std::vector<GfVec3d>& cv, const TfToken& type, const TfToken& basis,
+                                       bool periodic) {
         const size_t n = cv.size();
         std::vector<Sample> out;
         if (type == HdTokens->linear || n < 4) {
             for (size_t i = 0; i < n; ++i) out.push_back({cv[i], i, i, 0, {1, 0, 0, 0}});
-            if (periodic && n > 2) { out.push_back(out.front()); out.back().segment = n - 1; out.back().u = 1; }
+            if (periodic && n > 2) {
+                out.push_back(out.front());
+                out.back().segment = n - 1;
+                out.back().u = 1;
+            }
             return out;
         }
         const bool bezier = basis == HdTokens->bezier;
@@ -670,9 +866,22 @@ class Curves final : public HdBasisCurves {
                 const double u = double(t) / Steps, u2 = u * u, u3 = u2 * u, m = 1 - u;
                 Sample sample{GfVec3d(0), first, s, u};
                 double* b = sample.weights;
-                if (bezier) { b[0] = m * m * m; b[1] = 3 * u * m * m; b[2] = 3 * u2 * m; b[3] = u3; }
-                else if (basis == HdTokens->catmullRom) { b[0] = .5 * (-u3 + 2 * u2 - u); b[1] = .5 * (3 * u3 - 5 * u2 + 2); b[2] = .5 * (-3 * u3 + 4 * u2 + u); b[3] = .5 * (u3 - u2); }
-                else { b[0] = m * m * m / 6; b[1] = (3 * u3 - 6 * u2 + 4) / 6; b[2] = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6; b[3] = u3 / 6; } // bspline
+                if (bezier) {
+                    b[0] = m * m * m;
+                    b[1] = 3 * u * m * m;
+                    b[2] = 3 * u2 * m;
+                    b[3] = u3;
+                } else if (basis == HdTokens->catmullRom) {
+                    b[0] = .5 * (-u3 + 2 * u2 - u);
+                    b[1] = .5 * (3 * u3 - 5 * u2 + 2);
+                    b[2] = .5 * (-3 * u3 + 4 * u2 + u);
+                    b[3] = .5 * (u3 - u2);
+                } else {
+                    b[0] = m * m * m / 6;
+                    b[1] = (3 * u3 - 6 * u2 + 4) / 6;
+                    b[2] = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6;
+                    b[3] = u3 / 6;
+                }  // bspline
                 for (size_t k = 0; k < 4; ++k) sample.point += b[k] * cv[(first + k) % n];
                 out.push_back(sample);
             }
@@ -681,8 +890,10 @@ class Curves final : public HdBasisCurves {
     }
     // vertices: the curve's points; pinned curves get USD's phantom end points (2 P0 - P1, 2 Pn-1 - Pn-2) on every
     // vertex primvar. Varying values start at varying, count per curve.
-    template<class T, class A> static CurvePrimvar<T> curvePrimvar(const VtArray<A>& values, HdInterpolation domain, const std::vector<size_t>& vertices,
-        bool pinned, size_t curve, size_t varying, size_t count, T fallback) {
+    template <class T, class A>
+    static CurvePrimvar<T> curvePrimvar(const VtArray<A>& values, HdInterpolation domain,
+                                        const std::vector<size_t>& vertices, bool pinned, size_t curve, size_t varying,
+                                        size_t count, T fallback) {
         CurvePrimvar<T> out{{}, {}, values.empty() ? fallback : T(values[0])};
         const auto get = [&](size_t i) { return i < values.size() ? T(values[i]) : out.value; };
         if (domain == HdInterpolationVertex) {
@@ -690,21 +901,28 @@ class Curves final : public HdBasisCurves {
             if (pinned && out.cvs.size() > 1) {
                 const size_t n = out.cvs.size();
                 const T first = 2. * out.cvs[0] - out.cvs[1], last = 2. * out.cvs[n - 1] - out.cvs[n - 2];
-                out.cvs.insert(out.cvs.begin(), first); out.cvs.push_back(last);
+                out.cvs.insert(out.cvs.begin(), first);
+                out.cvs.push_back(last);
             }
-        } else if (domain == HdInterpolationVarying) for (size_t i = 0; i < count; ++i) out.ends.push_back(get(varying + i));
-        else if (domain == HdInterpolationUniform) out.value = get(curve);
+        } else if (domain == HdInterpolationVarying)
+            for (size_t i = 0; i < count; ++i) out.ends.push_back(get(varying + i));
+        else if (domain == HdInterpolationUniform)
+            out.value = get(curve);
         return out;
     }
-    template<class T> static T at(const CurvePrimvar<T>& primvar, const Sample& s) {
+    template <class T>
+    static T at(const CurvePrimvar<T>& primvar, const Sample& s) {
         if (!primvar.cvs.empty()) {
             T value(0);
             for (size_t k = 0; k < 4; ++k) value += s.weights[k] * primvar.cvs[(s.first + k) % primvar.cvs.size()];
             return value;
         }
-        if (!primvar.ends.empty()) return (1 - s.u) * primvar.ends[s.segment % primvar.ends.size()] + s.u * primvar.ends[(s.segment + 1) % primvar.ends.size()];
+        if (!primvar.ends.empty())
+            return (1 - s.u) * primvar.ends[s.segment % primvar.ends.size()] +
+                   s.u * primvar.ends[(s.segment + 1) % primvar.ends.size()];
         return primvar.value;
     }
+
 public:
     explicit Curves(const SdfPath& id) : HdBasisCurves(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
@@ -714,10 +932,13 @@ public:
         const CleanBits clean{bits};
         const auto topology = delegate->GetBasisCurvesTopology(GetId());
         // displayColor per vertex, segment end or curve; constant colors stay on the material.
-        const auto displayColor = mesh.material.empty() ? value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray()) : VtVec3fArray();
+        const auto displayColor = mesh.material.empty()
+                                      ? value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray())
+                                      : VtVec3fArray();
         const auto colorDomain = interpolation(delegate, GetId(), HdTokens->displayColor);
         std::vector<GfVec3f> colors;
-        const auto points = value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
+        const auto points =
+            value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
         const auto widthDomain = interpolation(delegate, GetId(), HdTokens->widths);
         // Curves with normals are ribbons facing them.
@@ -728,7 +949,8 @@ public:
         const auto indices = topology.GetCurveIndices();
         const auto type = topology.GetCurveType(), basis = topology.GetCurveBasis();
         const bool periodic = topology.GetCurveWrap() == HdTokens->periodic;
-        const bool pinned = topology.GetCurveWrap() == HdTokens->pinned && type == HdTokens->cubic && basis != HdTokens->bezier;
+        const bool pinned =
+            topology.GetCurveWrap() == HdTokens->pinned && type == HdTokens->cubic && basis != HdTokens->bezier;
         const int Sides = ribbon ? 2 : 6;
         size_t offset = 0, varying = 0;
         // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
@@ -737,7 +959,10 @@ public:
             std::vector<size_t> vertices;
             for (size_t i = 0; i < count; ++i) {
                 const size_t vertex = indices.empty() ? offset + i : size_t(indices[offset + i]);
-                if (vertex >= points.size()) { TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText()); return; }
+                if (vertex >= points.size()) {
+                    TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText());
+                    return;
+                }
                 vertices.push_back(vertex);
             }
             offset += count;
@@ -754,48 +979,67 @@ public:
             if (curve.size() < 2) continue;
             // Parallel-transported frame along the curve; ribbons span the authored normal's binormal instead.
             GfVec3d tangent = (curve[1].point - curve[0].point).GetNormalized();
-            GfVec3d frame = GfCross(tangent, std::abs(tangent[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0)).GetNormalized();
+            GfVec3d frame =
+                GfCross(tangent, std::abs(tangent[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0)).GetNormalized();
             std::vector<std::vector<GfVec3f>> rings, ringNormals;
             for (size_t i = 0; i < curve.size(); ++i) {
                 const auto next = curve[std::min(i + 1, curve.size() - 1)].point, prev = curve[i ? i - 1 : 0].point;
                 const auto t = (next - prev).GetLength() > 1e-12 ? (next - prev).GetNormalized() : tangent;
                 frame = frame - t * GfDot(frame, t);
-                if (frame.GetLength() < 1e-9) frame = GfCross(t, std::abs(t[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0));
+                if (frame.GetLength() < 1e-9)
+                    frame = GfCross(t, std::abs(t[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0));
                 frame.Normalize();
-                if (ribbon) if (const auto n = at(normal, curve[i]); GfCross(t, n).GetLength() > 1e-9) frame = GfCross(GfCross(t, n), t).GetNormalized();
+                if (ribbon)
+                    if (const auto n = at(normal, curve[i]); GfCross(t, n).GetLength() > 1e-9)
+                        frame = GfCross(GfCross(t, n), t).GetNormalized();
                 const auto binormal = GfCross(t, frame);
                 const double radius = .5 * std::max(0., at(width, curve[i]));
-                rings.emplace_back(); ringNormals.emplace_back(); tangent = t;
+                rings.emplace_back();
+                ringNormals.emplace_back();
+                tangent = t;
                 for (int side = 0; side < Sides; ++side) {
                     // A ribbon's two edges lie along the binormal and face the normal.
                     const double angle = 2 * 3.14159265358979323846 * side / Sides;
-                    const auto dir = ribbon ? (side ? 1. : -1.) * binormal : std::cos(angle) * frame + std::sin(angle) * binormal;
+                    const auto dir =
+                        ribbon ? (side ? 1. : -1.) * binormal : std::cos(angle) * frame + std::sin(angle) * binormal;
                     rings.back().emplace_back(curve[i].point + radius * dir);
                     ringNormals.back().emplace_back(ribbon ? frame : dir);
                 }
             }
             // Ring vertices are shared by the quads around them.
-            const auto vertex = [&, base = uint32_t(mesh.points.size())](size_t ring, int side) { return base + uint32_t(ring * Sides + size_t(side)); };
-            for (size_t ring = 0; ring < rings.size(); ++ring) for (int side = 0; side < Sides; ++side) {
-                mesh.points.push_back(rings[ring][side]); mesh.normals.push_back(ringNormals[ring][side]); colors.emplace_back(at(color, curve[ring]));
-                mesh.uv.emplace_back(float(side) / Sides, float(ring) / float(rings.size() - 1));
-            }
-            for (size_t i = 0; i + 1 < rings.size(); ++i) for (int side = 0; side < (ribbon ? 1 : Sides); ++side) {
-                const int next = (side + 1) % Sides;
-                // Counter-clockwise seen from outside (dir = cos * normal + sin * binormal turns about the tangent).
-                mesh.indices.insert(mesh.indices.end(), {vertex(i, side), vertex(i + 1, next), vertex(i + 1, side), vertex(i, side), vertex(i, next), vertex(i + 1, next)});
-            }
+            const auto vertex = [&, base = uint32_t(mesh.points.size())](size_t ring, int side) {
+                return base + uint32_t(ring * Sides + size_t(side));
+            };
+            for (size_t ring = 0; ring < rings.size(); ++ring)
+                for (int side = 0; side < Sides; ++side) {
+                    mesh.points.push_back(rings[ring][side]);
+                    mesh.normals.push_back(ringNormals[ring][side]);
+                    colors.emplace_back(at(color, curve[ring]));
+                    mesh.uv.emplace_back(float(side) / Sides, float(ring) / float(rings.size() - 1));
+                }
+            for (size_t i = 0; i + 1 < rings.size(); ++i)
+                for (int side = 0; side < (ribbon ? 1 : Sides); ++side) {
+                    const int next = (side + 1) % Sides;
+                    // Counter-clockwise seen from outside (dir = cos * normal + sin * binormal turns about the
+                    // tangent).
+                    mesh.indices.insert(mesh.indices.end(), {vertex(i, side), vertex(i + 1, next), vertex(i + 1, side),
+                                                             vertex(i, side), vertex(i, next), vertex(i + 1, next)});
+                }
             if (periodic || ribbon) continue;
-            // Flat caps: the end faces +tangent (ring order is counter-clockwise seen from there), the start faces -tangent.
+            // Flat caps: the end faces +tangent (ring order is counter-clockwise seen from there), the start faces
+            // -tangent.
             for (const bool end : {false, true}) {
                 const size_t ring = end ? rings.size() - 1 : 0;
-                const auto t = end ? curve.back().point - curve[curve.size() - 2].point : curve[0].point - curve[1].point;
+                const auto t =
+                    end ? curve.back().point - curve[curve.size() - 2].point : curve[0].point - curve[1].point;
                 if (t.GetLength() < 1e-12) continue;
                 const GfVec3f facing(t.GetNormalized());
-                const auto center = uint32_t(mesh.points.size()); // then the ring's corners, with the cap's normal
+                const auto center = uint32_t(mesh.points.size());  // then the ring's corners, with the cap's normal
                 for (int side = -1; side < Sides; ++side) {
                     mesh.points.push_back(side < 0 ? GfVec3f(curve[ring].point) : rings[ring][side]);
-                    mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end)); colors.emplace_back(at(color, curve[ring]));
+                    mesh.normals.push_back(facing);
+                    mesh.uv.emplace_back(0.f, float(end));
+                    colors.emplace_back(at(color, curve[ring]));
                 }
                 for (int side = 0; side < Sides; ++side) {
                     const uint32_t a = center + 1 + uint32_t(side), b = center + 1 + uint32_t((side + 1) % Sides);
@@ -808,16 +1052,21 @@ public:
         mesh.instanced = !GetInstancerId().IsEmpty();
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         if (mesh.instanced)
-            if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
+            if (const auto* instancer =
+                    dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
                 mesh.motionRight = instancer->ComputeMotion();
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
     }
     void Finalize(HdRenderParam* param) override {
         auto* state = static_cast<HdUEState*>(param);
-        state->erase(GetId().GetString()); state->erase(GetId().GetString() + ".displayColor");
+        state->erase(GetId().GetString());
+        state->erase(GetId().GetString() + ".displayColor");
     }
+
 protected:
-    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override {
+        _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr()));
+    }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
 #if defined(HDUE_HOUDINI)
@@ -830,22 +1079,28 @@ public:
 };
 // Density from an OpenVDB float grid, densified over its active bounding box.
 class Volume final : public HdVolume {
-    static constexpr int MaxResolution = 512; // per axis; larger grids are point-sampled with a stride
-    std::optional<GfMatrix4d> gridToLocal_; // the loaded grid's voxel to prim space
+    static constexpr int MaxResolution = 512;  // per axis; larger grids are point-sampled with a stride
+    std::optional<GfMatrix4d> gridToLocal_;    // the loaded grid's voxel to prim space
 public:
     explicit Volume(const SdfPath& id) : HdVolume(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto* state = static_cast<HdUEState*>(param);
-        HdUEVolumeData volume; volume.id = GetId().GetString(); volume.visible = delegate->GetVisible(GetId());
+        HdUEVolumeData volume;
+        volume.id = GetId().GetString();
+        volume.visible = delegate->GetVisible(GetId());
         volume.renderTag = delegate->GetRenderTag(GetId());
         // Visibility, purpose and transform edits keep the loaded grid instead of reading the file again.
-        if (gridToLocal_ && !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag | HdChangeTracker::DirtyTransform))) {
+        if (gridToLocal_ && !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag |
+                                        HdChangeTracker::DirtyTransform))) {
             const auto localToWorld = *gridToLocal_ * delegate->GetTransform(GetId());
             std::lock_guard lock(state->mutex);
             if (const auto it = state->volumes.find(volume.id); it != state->volumes.end()) {
-                it->second.visible = volume.visible; it->second.renderTag = volume.renderTag; it->second.localToWorld = localToWorld;
-                state->dirtyVolumes.insert(volume.id); ++state->revision;
+                it->second.visible = volume.visible;
+                it->second.renderTag = volume.renderTag;
+                it->second.localToWorld = localToWorld;
+                state->dirtyVolumes.insert(volume.id);
+                ++state->revision;
                 *bits = HdChangeTracker::Clean;
                 return;
             }
@@ -853,92 +1108,118 @@ public:
         gridToLocal_.reset();
         const auto fields = delegate->GetVolumeFieldDescriptors(GetId());
         const HdVolumeFieldDescriptor* chosen = nullptr;
-        for (const auto& field : fields) if (field.fieldName == TfToken("density")) chosen = &field;
+        for (const auto& field : fields)
+            if (field.fieldName == TfToken("density")) chosen = &field;
         if (!chosen && !fields.empty()) chosen = &fields.front();
         try {
             if (chosen) {
                 const bool vdb = chosen->fieldPrimType == TfToken("openvdbAsset");
                 if (!vdb && chosen->fieldPrimType != TfToken("houdiniFieldAsset"))
-                    throw std::runtime_error("only openvdbAsset and houdiniFieldAsset fields are supported, not " + chosen->fieldPrimType.GetString());
+                    throw std::runtime_error("only openvdbAsset and houdiniFieldAsset fields are supported, not " +
+                                             chosen->fieldPrimType.GetString());
                 const auto file = value(delegate->Get(chosen->fieldId, TfToken("filePath")), SdfAssetPath());
                 const auto path = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
                 auto gridName = value(delegate->Get(chosen->fieldId, TfToken("fieldName")), TfToken()).GetString();
                 if (gridName.empty()) gridName = chosen->fieldName.GetString();
                 const auto index = delegate->Get(chosen->fieldId, TfToken("fieldIndex"));
-                static std::once_flag initialized; std::call_once(initialized, [] { openvdb::initialize(); });
-                const bool vdbFile = vdb && path.rfind("op:", 0) != 0 && TfStringEndsWith(TfStringToLower(path), ".vdb");
+                static std::once_flag initialized;
+                std::call_once(initialized, [] { openvdb::initialize(); });
+                const bool vdbFile =
+                    vdb && path.rfind("op:", 0) != 0 && TfStringEndsWith(TfStringToLower(path), ".vdb");
                 if (vdbFile) {
-                    openvdb::io::File file(path); file.open(false);
+                    openvdb::io::File file(path);
+                    file.open(false);
                     const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
                     file.close();
                     if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
                     HdUEDensifyGrid(*grid, MaxResolution, volume);
-                } else // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
-                    HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb, MaxResolution, volume);
+                } else  // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
+                    HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb,
+                                         MaxResolution, volume);
                 gridToLocal_ = volume.localToWorld;
                 volume.localToWorld = volume.localToWorld * delegate->GetTransform(GetId());
             }
         } catch (const std::exception& error) {
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
-            gridToLocal_.reset(); volume.width = volume.height = volume.depth = 0; volume.density.clear();
+            gridToLocal_.reset();
+            volume.width = volume.height = volume.depth = 0;
+            volume.density.clear();
         }
         if (HdUETracePass()) {
             const auto& m = volume.localToWorld;
-            std::fprintf(stderr, "hdUE volume %s fields=%zu dims=%ux%ux%u origin=(%g,%g,%g) x=(%g,%g,%g)%c", GetId().GetText(), fields.size(),
-                volume.width, volume.height, volume.depth, m[3][0], m[3][1], m[3][2], m[0][0], m[0][1], m[0][2], 10);
+            std::fprintf(stderr, "hdUE volume %s fields=%zu dims=%ux%ux%u origin=(%g,%g,%g) x=(%g,%g,%g)%c",
+                         GetId().GetText(), fields.size(), volume.width, volume.height, volume.depth, m[3][0], m[3][1],
+                         m[3][2], m[0][0], m[0][1], m[0][2], 10);
             std::fflush(stderr);
         }
         std::lock_guard lock(state->mutex);
         state->volumes[volume.id] = std::move(volume);
-        state->dirtyVolumes.insert(GetId().GetString()); state->removed.erase(GetId().GetString()); ++state->revision;
+        state->dirtyVolumes.insert(GetId().GetString());
+        state->removed.erase(GetId().GetString());
+        ++state->revision;
         *bits = HdChangeTracker::Clean;
     }
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+
 protected:
-    void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
+    void _InitRepr(const TfToken& token, HdDirtyBits*) override {
+        _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr()));
+    }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
 #endif
 class Light final : public HdLight {
-    bool viewerStored_ = false, viewerVisible_ = false; GfVec3f viewerColor_{0.f};
+    bool viewerStored_ = false, viewerVisible_ = false;
+    GfVec3f viewerColor_{0.f};
     uint32_t type_;
+
 public:
     Light(const SdfPath& id, uint32_t type) : HdLight(id), type_(type) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
-        HdUELightData data; data.id = GetId().GetString(); data.type = type_;
-        data.transform = delegate->GetTransform(GetId()); data.visible = delegate->GetVisible(GetId());
+        HdUELightData data;
+        data.id = GetId().GetString();
+        data.type = type_;
+        data.transform = delegate->GetTransform(GetId());
+        data.visible = delegate->GetVisible(GetId());
         const auto get = [&](const char* name) { return delegate->GetLightParamValue(GetId(), TfToken(name)); };
         const auto applicationLight = get("params");
-        data.viewer = applicationLight.IsHolding<GlfSimpleLight>() && !applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight();
+        data.viewer = applicationLight.IsHolding<GlfSimpleLight>() &&
+                      !applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight();
         data.color = HdUEFromSceneLinear(value(get("color"), data.color));
         data.intensity = value(get("intensity"), 1.f) * std::exp2(value(get("exposure"), 0.f));
-        if(value(get("enableColorTemperature"),false)) {
-            const auto temperature=UsdLuxBlackbodyTemperatureAsRgb(value(get("colorTemperature"),6500.f));
-            for(int c=0;c<3;++c) data.color[c]*=temperature[c];
+        if (value(get("enableColorTemperature"), false)) {
+            const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(value(get("colorTemperature"), 6500.f));
+            for (int c = 0; c < 3; ++c) data.color[c] *= temperature[c];
         }
-        if(value(get("normalize"),false)) data.flags|=HDUE_LIGHT_NORMALIZE;
-        if(!value(get("shadow:enable"),true)) data.flags&=~HDUE_LIGHT_SHADOWS;
-        if(value(get("treatAsPoint"),false)) data.flags|=HDUE_LIGHT_POINT;
-        if(!value(get("hdue:visibleBackground"),true)) data.flags&=~HDUE_LIGHT_BACKGROUND;
-        if(!value(get("hdue:megaLights"),true)) data.flags&=~HDUE_LIGHT_MEGALIGHTS;
-        data.diffuse=value(get("diffuse"),1.f); data.specular=value(get("specular"),1.f);
-        data.angle=value(get("angle"),.53f);
-        data.coneAngle=value(get("shaping:cone:angle"),180.f); data.coneSoftness=value(get("shaping:cone:softness"),0.f);
-        if(const auto ies=get("shaping:ies:file"); ies.IsHolding<SdfAssetPath>()) {
-            const auto& file=ies.UncheckedGet<SdfAssetPath>();
-            data.ies=file.GetResolvedPath().empty()?file.GetAssetPath():file.GetResolvedPath();
+        if (value(get("normalize"), false)) data.flags |= HDUE_LIGHT_NORMALIZE;
+        if (!value(get("shadow:enable"), true)) data.flags &= ~HDUE_LIGHT_SHADOWS;
+        if (value(get("treatAsPoint"), false)) data.flags |= HDUE_LIGHT_POINT;
+        if (!value(get("hdue:visibleBackground"), true)) data.flags &= ~HDUE_LIGHT_BACKGROUND;
+        if (!value(get("hdue:megaLights"), true)) data.flags &= ~HDUE_LIGHT_MEGALIGHTS;
+        data.diffuse = value(get("diffuse"), 1.f);
+        data.specular = value(get("specular"), 1.f);
+        data.angle = value(get("angle"), .53f);
+        data.coneAngle = value(get("shaping:cone:angle"), 180.f);
+        data.coneSoftness = value(get("shaping:cone:softness"), 0.f);
+        if (const auto ies = get("shaping:ies:file"); ies.IsHolding<SdfAssetPath>()) {
+            const auto& file = ies.UncheckedGet<SdfAssetPath>();
+            data.ies = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
         }
-        data.iesAngleScale=value(get("shaping:ies:angleScale"),0.f); data.iesNormalize=value(get("shaping:ies:normalize"),false);
-        auto texture=get("texture:file");
-        if(applicationLight.IsHolding<GlfSimpleLight>() && applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
-            texture=VtValue(applicationLight.UncheckedGet<GlfSimpleLight>().GetDomeLightTextureFile());
-        if(texture.IsHolding<SdfAssetPath>()) {
-            const auto& file=texture.UncheckedGet<SdfAssetPath>();
-            data.texture=file.GetResolvedPath().empty()?file.GetAssetPath():file.GetResolvedPath();
+        data.iesAngleScale = value(get("shaping:ies:angleScale"), 0.f);
+        data.iesNormalize = value(get("shaping:ies:normalize"), false);
+        auto texture = get("texture:file");
+        if (applicationLight.IsHolding<GlfSimpleLight>() &&
+            applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
+            texture = VtValue(applicationLight.UncheckedGet<GlfSimpleLight>().GetDomeLightTextureFile());
+        if (texture.IsHolding<SdfAssetPath>()) {
+            const auto& file = texture.UncheckedGet<SdfAssetPath>();
+            data.texture = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
         }
-        const auto format=value(get("texture:format"),TfToken("automatic"));
-        data.textureFormat=format==TfToken("automatic")?HDUE_ENVIRONMENT_AUTOMATIC:format==TfToken("latlong")?HDUE_ENVIRONMENT_LATLONG:99;
+        const auto format = value(get("texture:format"), TfToken("automatic"));
+        data.textureFormat = format == TfToken("automatic") ? HDUE_ENVIRONMENT_AUTOMATIC
+                             : format == TfToken("latlong") ? HDUE_ENVIRONMENT_LATLONG
+                                                            : 99;
         if (data.viewer) {
             // Hdx uses 15000 for its camera light when the renderer is not
             // Storm. Treat this application light separately from USD lights.
@@ -948,36 +1229,52 @@ public:
             data.transform = GfMatrix4d(1);
             data.type = HDUE_CAMERA_DISTANT_LIGHT;
         }
-        const bool radial=type_==HDUE_SPHERE_LIGHT || type_==HDUE_DISK_LIGHT || type_==HDUE_CYLINDER_LIGHT;
-        data.width=value(get(radial?"radius":"width"),radial?.5f:1.f);
-        data.height=type_==HDUE_DISK_LIGHT?data.width:value(get("height"),1.f);
-        data.length=value(get("length"),1.f);
+        const bool radial = type_ == HDUE_SPHERE_LIGHT || type_ == HDUE_DISK_LIGHT || type_ == HDUE_CYLINDER_LIGHT;
+        data.width = value(get(radial ? "radius" : "width"), radial ? .5f : 1.f);
+        data.height = type_ == HDUE_DISK_LIGHT ? data.width : value(get("height"), 1.f);
+        data.length = value(get("length"), 1.f);
         auto* state = static_cast<HdUEState*>(param);
         // Hdx moves the camera light with every camera move; the backend follows the camera itself, so an unchanged
         // viewer light needs no state lock (a scene upload holds it for seconds and Houdini's UI would wait).
-        if (data.viewer && viewerStored_ && viewerColor_ == data.color && viewerVisible_ == data.visible) { *bits = Clean; return; }
+        if (data.viewer && viewerStored_ && viewerColor_ == data.color && viewerVisible_ == data.visible) {
+            *bits = Clean;
+            return;
+        }
         std::lock_guard lock(state->mutex);
-        if (data.viewer) { viewerStored_ = true; viewerColor_ = data.color; viewerVisible_ = data.visible; }
+        if (data.viewer) {
+            viewerStored_ = true;
+            viewerColor_ = data.color;
+            viewerVisible_ = data.visible;
+        }
         const auto old = state->lights.find(data.id);
-        if(old!=state->lights.end() && old->second.transform==data.transform && old->second.texture==data.texture &&
-            old->second.color==data.color && old->second.intensity==data.intensity && old->second.visible==data.visible &&
-            old->second.type==data.type && old->second.width==data.width && old->second.height==data.height && old->second.length==data.length &&
-            old->second.flags==data.flags && old->second.diffuse==data.diffuse && old->second.specular==data.specular &&
-            old->second.angle==data.angle && old->second.coneAngle==data.coneAngle && old->second.coneSoftness==data.coneSoftness &&
-            old->second.textureFormat==data.textureFormat && old->second.ies==data.ies && old->second.iesAngleScale==data.iesAngleScale &&
-            old->second.iesNormalize==data.iesNormalize) {*bits=Clean; return;}
-        if (data.viewer && old != state->lights.end() && old->second.viewer && old->second.color == data.color && old->second.visible == data.visible) {
+        if (old != state->lights.end() && old->second.transform == data.transform &&
+            old->second.texture == data.texture && old->second.color == data.color &&
+            old->second.intensity == data.intensity && old->second.visible == data.visible &&
+            old->second.type == data.type && old->second.width == data.width && old->second.height == data.height &&
+            old->second.length == data.length && old->second.flags == data.flags &&
+            old->second.diffuse == data.diffuse && old->second.specular == data.specular &&
+            old->second.angle == data.angle && old->second.coneAngle == data.coneAngle &&
+            old->second.coneSoftness == data.coneSoftness && old->second.textureFormat == data.textureFormat &&
+            old->second.ies == data.ies && old->second.iesAngleScale == data.iesAngleScale &&
+            old->second.iesNormalize == data.iesNormalize) {
+            *bits = Clean;
+            return;
+        }
+        if (data.viewer && old != state->lights.end() && old->second.viewer && old->second.color == data.color &&
+            old->second.visible == data.visible) {
             // The backend follows the render camera at request time. Moving
             // Hdx's camera light must not submit/cancel the entire scene.
             *bits = Clean;
             return;
         }
-        state->lights[data.id] = data; state->dirtyLights.insert(data.id); ++state->revision;
+        state->lights[data.id] = data;
+        state->dirtyLights.insert(data.id);
+        ++state->revision;
         *bits = Clean;
     }
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
-}
+}  // namespace
 // HdCamera that also records its transform samples for camera motion blur.
 class Camera final : public HdCamera {
 public:
@@ -986,13 +1283,21 @@ public:
         const bool transformDirty = *bits & DirtyTransform;
         HdCamera::Sync(delegate, param, bits);
         if (!transformDirty || GetId().IsEmpty()) return;
-        float times[HdUEMaxMotionSamples]; GfMatrix4d values[HdUEMaxMotionSamples];
-        const size_t count = delegate->SampleTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
+        float times[HdUEMaxMotionSamples];
+        GfMatrix4d values[HdUEMaxMotionSamples];
+        const size_t count = delegate->SampleTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow,
+                                                       HdUEMaxMotionSamples, times, values);
         HdUEMotionSamples motion;
-        for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) { motion.times.push_back(times[i]); motion.values.push_back(values[i]); }
+        for (size_t i = 0; i < std::min(count, HdUEMaxMotionSamples); ++i) {
+            motion.times.push_back(times[i]);
+            motion.values.push_back(values[i]);
+        }
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->cameraMutex);
-        if (motion.moving()) state->cameraMotion[GetId().GetString()] = motion; else state->cameraMotion.erase(GetId().GetString());
+        if (motion.moving())
+            state->cameraMotion[GetId().GetString()] = motion;
+        else
+            state->cameraMotion.erase(GetId().GetString());
     }
 };
 HdSprim* HdUECreateCamera(const SdfPath& id) { return new Camera(id); }
@@ -1006,19 +1311,22 @@ HdBprim* HdUECreateField(const SdfPath& id) { return new Field(id); }
 HdInstancer* HdUECreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) { return new Instancer(delegate, id); }
 void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
     std::set<SdfPath> sources;
-    { std::lock_guard lock(state.mutex);
-      for (const auto& [id,part]:state.meshes) {
-        const auto name=HdUEWetValue<std::string>(HdUEWetSettings(*state.wetBindings,part),"maskPrimvar","");
-        if (!name.empty() && !part.masks.count(name) && !part.maskErrors.count(name)) sources.insert(SdfPath(part.sourceId));
-      }
+    {
+        std::lock_guard lock(state.mutex);
+        for (const auto& [id, part] : state.meshes) {
+            const auto name = HdUEWetValue<std::string>(HdUEWetSettings(*state.wetBindings, part), "maskPrimvar", "");
+            if (!name.empty() && !part.masks.count(name) && !part.maskErrors.count(name))
+                sources.insert(SdfPath(part.sourceId));
+        }
     }
-    for (const auto& id:sources)
-        if (const auto* mesh=dynamic_cast<const Mesh*>(index->GetRprim(id)))
-            if (auto* delegate=index->GetSceneDelegateForRprim(id)) mesh->RefreshSelectedMasks(delegate,state);
+    for (const auto& id : sources)
+        if (const auto* mesh = dynamic_cast<const Mesh*>(index->GetRprim(id)))
+            if (auto* delegate = index->GetSceneDelegateForRprim(id)) mesh->RefreshSelectedMasks(delegate, state);
 }
 HdSprim* HdUECreateLight(const SdfPath& id, uint32_t type) { return new Light(id, type); }
 // Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
 void HdUETakeMeshSyncStats(double& milliseconds, int& count) {
-    milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0; count = meshSyncs.exchange(0);
+    milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0;
+    count = meshSyncs.exchange(0);
 }
 PXR_NAMESPACE_CLOSE_SCOPE

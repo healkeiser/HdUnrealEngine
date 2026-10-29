@@ -11,11 +11,13 @@ class FAllocatedVirtualTexture;
 // The sole engine patch grants this adapter access to the VT system's lock refcounts.
 class FHdueVirtualTextureResidency {
 public:
-    FHdueVirtualTextureResidency(TArray<TStrongObjectPtr<UTexture2D>>&& Textures, uint64 Generation, const HdueResidencyOptions& Options);
+    FHdueVirtualTextureResidency(TArray<TStrongObjectPtr<UTexture2D>>&& Textures, uint64 Generation,
+                                 const HdueResidencyOptions& Options);
     ~FHdueVirtualTextureResidency();
-    void Update(); // Render Thread, outside an active VT update.
-    void Release(); // Render Thread; balances only our own locks.
+    void Update();   // Render Thread, outside an active VT update.
+    void Release();  // Render Thread; balances only our own locks.
     HdueResidencyStatus Status() const;
+
 private:
     TArray<TStrongObjectPtr<UTexture2D>> Textures;
     TArray<FVirtualTextureProducerHandle> Handles;
@@ -34,7 +36,9 @@ private:
     struct FMappingTarget {
         FAllocatedVirtualTexture* VT;
         uint32 Layer, CreatedFrame;
-        bool operator==(const FMappingTarget& Other) const { return VT == Other.VT && Layer == Other.Layer && CreatedFrame == Other.CreatedFrame; }
+        bool operator==(const FMappingTarget& Other) const {
+            return VT == Other.VT && Layer == Other.Layer && CreatedFrame == Other.CreatedFrame;
+        }
     };
     TArray<FMappingTarget> MappingTargets;
     int32 MappingIndex = 0;

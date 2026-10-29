@@ -10,16 +10,16 @@ $ErrorActionPreference = 'Stop'
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Game = Join-Path $TaskRoot 'out\runtime\Windows\HdUEBackend'
 $Bin = Join-Path $Game 'Binaries\Win64'
-$BackendDll=Join-Path $Bin 'HdUEBackend.dll'
-$RuntimeProject=Join-Path $Game 'HdUEBackend.uproject'
+$BackendDll = Join-Path $Bin 'HdUEBackend.dll'
+$RuntimeProject = Join-Path $Game 'HdUEBackend.uproject'
 if ($RuntimeConfig) {
-    $ConfigPath=[IO.Path]::GetFullPath($RuntimeConfig)
-    $Profile=Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-    if ($Profile.version -ne 1) {throw 'Unsupported runtime configuration.'}
-    foreach ($Key in @('backend_dll','runtime_project')) {
-        if (-not [IO.Path]::IsPathRooted($Profile.$Key)) {$Profile.$Key=[IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ConfigPath) $Profile.$Key))}
+    $ConfigPath = [IO.Path]::GetFullPath($RuntimeConfig)
+    $RuntimeProfile = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    if ($RuntimeProfile.version -ne 1) { throw 'Unsupported runtime configuration.' }
+    foreach ($Key in @('backend_dll', 'runtime_project')) {
+        if (-not [IO.Path]::IsPathRooted($RuntimeProfile.$Key)) { $RuntimeProfile.$Key = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ConfigPath) $RuntimeProfile.$Key)) }
     }
-    $BackendDll=$Profile.backend_dll; $RuntimeProject=$Profile.runtime_project
+    $BackendDll = $RuntimeProfile.backend_dll; $RuntimeProject = $RuntimeProfile.runtime_project
 }
 $RunOutput = New-HdUERun -Name backend-smoke -Path $OutputDirectory
 $Arguments = @('--backend', $BackendDll, '--project', $RuntimeProject,

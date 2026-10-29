@@ -17,6 +17,7 @@ public:
     void GetSceneStatus(HdueAssetSceneStatus& Status) const;
     HdueResult GetStatus(const FString& Id, HdueAssetStatus& Status) const;
     TArray<AActor*> GetActors() const;
+
 private:
     struct FEntry {
         FString Path, Error;

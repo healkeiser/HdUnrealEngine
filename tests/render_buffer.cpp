@@ -8,8 +8,10 @@
 #include <thread>
 PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
-void check(bool ok, const char* text) { if (!ok) throw std::runtime_error(text); }
+void check(bool ok, const char* text) {
+    if (!ok) throw std::runtime_error(text);
 }
+}  // namespace
 int main(int argc, char** argv) {
     try {
         if (argc == 2 && std::string_view(argv[1]) == "--benchmark") {
@@ -26,7 +28,8 @@ int main(int argc, char** argv) {
                     checksum += pixels[(size_t(size[0]) * size[1] - 1) * 4];
                     image.Unmap();
                 }
-                const auto milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / 50;
+                const auto milliseconds =
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / 50;
                 if (comma) std::cout << ',';
                 comma = true;
                 std::cout << std::setprecision(9) << "{\"width\":" << size[0] << ",\"height\":" << size[1]
@@ -42,30 +45,40 @@ int main(int argc, char** argv) {
             // The viewport colour AOV is half float: float images are encoded (and flipped) on publish.
             HdUERenderBuffer half(SdfPath("/half"));
             check(half.Allocate(GfVec3i(1, 2, 1), HdFormatFloat16Vec4, false), "half-float allocation rejected");
-            HdueFrameInfo info{}; info.width = 1; info.height = 2;
+            HdueFrameInfo info{};
+            info.width = 1;
+            info.height = 2;
             half.publish(info, {0.5f, 1.f, 2.f, 1.f, 3.f, 0.f, 0.f, 1.f});
             const auto* texels = static_cast<const GfHalf*>(half.Map());
-            check(texels && float(texels[0]) == 3.f && float(texels[4]) == 0.5f && float(texels[6]) == 2.f, "half-float image not encoded bottom-up");
+            check(texels && float(texels[0]) == 3.f && float(texels[4]) == 0.5f && float(texels[6]) == 2.f,
+                  "half-float image not encoded bottom-up");
             half.Unmap();
         }
         check(buffer.Allocate(GfVec3i(2, 1, 1), HdFormatFloat32Vec4, false), "valid allocation rejected");
-        HdueFrameInfo frame{}; frame.width = 2; frame.height = 1; frame.converged = 1;
+        HdueFrameInfo frame{};
+        frame.width = 2;
+        frame.height = 1;
+        frame.converged = 1;
         buffer.publish(frame, std::vector<float>(8, 1));
         const auto* pinned = static_cast<const float*>(buffer.Map());
         check(pinned && pinned[0] == 1, "initial image missing");
         check(!buffer.Allocate(GfVec3i(3, 2, 1), HdFormatFloat32Vec4, false), "mapped image was reallocated");
-        std::thread publisher([&] { for (int i = 0; i < 100; ++i) buffer.publish(frame, std::vector<float>(8, 2)); });
+        std::thread publisher([&] {
+            for (int i = 0; i < 100; ++i) buffer.publish(frame, std::vector<float>(8, 2));
+        });
         publisher.join();
         for (int i = 0; i < 8; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
         buffer.Unmap();
         const auto* fresh = static_cast<const float*>(buffer.Map());
         for (int i = 0; i < 8; ++i) check(fresh[i] == 2, "next Map did not see the completed frame");
         buffer.Unmap();
-        buffer.invalidate(); check(!buffer.IsConverged(), "new generation kept old convergence");
+        buffer.invalidate();
+        check(!buffer.IsConverged(), "new generation kept old convergence");
         check(buffer.Allocate(GfVec3i(2, 2, 1), HdFormatFloat32Vec4, false), "2D allocation failed");
         frame.height = 2;
         std::vector<float> asymmetric(16, 0);
-        asymmetric[0] = 3; asymmetric[8] = 7;
+        asymmetric[0] = 3;
+        asymmetric[8] = 7;
         buffer.publish(frame, std::move(asymmetric));
         const auto* oriented = static_cast<const float*>(buffer.Map());
         check(oriented[0] == 7 && oriented[8] == 3, "UE top-down image was not converted to Hydra lower-left AOV");
@@ -76,45 +89,60 @@ int main(int argc, char** argv) {
         check(buffer.IsMapped() && oriented[0] == 7, "partial Unmap released a live snapshot");
         buffer.Finalize(nullptr);
         check(oriented[0] == 7 && buffer.Map() == oriented, "deallocation invalidated a live mapped snapshot");
-        buffer.Unmap(); buffer.Unmap();
+        buffer.Unmap();
+        buffer.Unmap();
         check(!buffer.IsMapped() && buffer.Map() == nullptr, "deallocated buffer exposed stale pixels");
-        check(buffer.Allocate(GfVec3i(1, 1, 1), HdFormatFloat32Vec4, false), "reallocation after snapshot release failed");
+        check(buffer.Allocate(GfVec3i(1, 1, 1), HdFormatFloat32Vec4, false),
+              "reallocation after snapshot release failed");
         check(static_cast<const float*>(buffer.Map())[0] == 0, "reallocation retained stale image data");
         buffer.Unmap();
         check(buffer.Allocate(GfVec3i(2, 1, 1), HdFormatFloat32Vec4, true), "progressive AOV allocation rejected");
         check(buffer.IsMultiSampled(), "multiSampled descriptor was lost");
-        frame.height=1; buffer.publish(frame,std::vector<float>(8,5)); buffer.Resolve();
-        check(static_cast<const float*>(buffer.Map())[0]==5, "resolved progressive image missing"); buffer.Unmap();
+        frame.height = 1;
+        buffer.publish(frame, std::vector<float>(8, 5));
+        buffer.Resolve();
+        check(static_cast<const float*>(buffer.Map())[0] == 5, "resolved progressive image missing");
+        buffer.Unmap();
         HdUERenderBuffer depth(SdfPath("/depth"));
-        check(depth.Allocate(GfVec3i(2,2,1),HdFormatFloat32,false),"scalar depth allocation rejected");
-        check(depth.GetFormat()==HdFormatFloat32,"depth format lost");
-        frame.height=2; depth.publish(frame,{.1f,.2f,.7f,1.f});
-        const auto* z=static_cast<const float*>(depth.Map());
-        check(z[0]==.7f && z[1]==1.f && z[2]==.1f && z[3]==.2f,"depth row orientation incorrect");
+        check(depth.Allocate(GfVec3i(2, 2, 1), HdFormatFloat32, false), "scalar depth allocation rejected");
+        check(depth.GetFormat() == HdFormatFloat32, "depth format lost");
+        frame.height = 2;
+        depth.publish(frame, {.1f, .2f, .7f, 1.f});
+        const auto* z = static_cast<const float*>(depth.Map());
+        check(z[0] == .7f && z[1] == 1.f && z[2] == .1f && z[3] == .2f, "depth row orientation incorrect");
         depth.Unmap();
         // A color3f beauty receives RGBA; an RGBA buffer receives RGB with alpha 1.
         HdUERenderBuffer rgb(SdfPath("/rgb"));
-        check(rgb.Allocate(GfVec3i(1,1,1),HdFormatFloat32Vec3,false),"color3f allocation rejected");
-        frame.height=1; frame.width=1; rgb.publish(frame,{.1f,.2f,.3f,.4f},4);
-        const auto* c=static_cast<const float*>(rgb.Map());
-        check(c[0]==.1f && c[1]==.2f && c[2]==.3f,"RGBA to RGB conversion incorrect"); rgb.Unmap();
+        check(rgb.Allocate(GfVec3i(1, 1, 1), HdFormatFloat32Vec3, false), "color3f allocation rejected");
+        frame.height = 1;
+        frame.width = 1;
+        rgb.publish(frame, {.1f, .2f, .3f, .4f}, 4);
+        const auto* c = static_cast<const float*>(rgb.Map());
+        check(c[0] == .1f && c[1] == .2f && c[2] == .3f, "RGBA to RGB conversion incorrect");
+        rgb.Unmap();
         HdUERenderBuffer rgba(SdfPath("/rgba"));
-        check(rgba.Allocate(GfVec3i(1,1,1),HdFormatFloat32Vec4,false),"color4f allocation rejected");
-        rgba.publish(frame,{.5f,.6f,.7f},3);
-        const auto* a=static_cast<const float*>(rgba.Map());
-        check(a[0]==.5f && a[2]==.7f && a[3]==1.f,"RGB to RGBA conversion incorrect"); rgba.Unmap();
+        check(rgba.Allocate(GfVec3i(1, 1, 1), HdFormatFloat32Vec4, false), "color4f allocation rejected");
+        rgba.publish(frame, {.5f, .6f, .7f}, 3);
+        const auto* a = static_cast<const float*>(rgba.Map());
+        check(a[0] == .5f && a[2] == .7f && a[3] == 1.f, "RGB to RGBA conversion incorrect");
+        rgba.Unmap();
         GfMatrix4d projection(0.);
-        const double nearPlane=1,farPlane=1000;
-        projection[0][0]=projection[1][1]=1;
-        projection[2][2]=-(farPlane+nearPlane)/(farPlane-nearPlane);
-        projection[2][3]=-1;
-        projection[3][2]=-2*farPlane*nearPlane/(farPlane-nearPlane);
-        check(HdUEProjectDepth(0,projection,1)==1,"background depth must be far");
-        check(std::abs(HdUEProjectDepth(1,projection,1))<1e-6,"near depth projection incorrect");
-        check(std::abs(HdUEProjectDepth(1000,projection,1)-1)<1e-6,"far depth projection incorrect");
-        check(std::abs(HdUEProjectDepth(10,projection,1)-.9009009f)<1e-6,"perspective depth projection incorrect");
-        check(std::abs(HdUEProjectDepth(1000,projection,100)-.9009009f)<1e-6,"meter stage depth conversion incorrect");
+        const double nearPlane = 1, farPlane = 1000;
+        projection[0][0] = projection[1][1] = 1;
+        projection[2][2] = -(farPlane + nearPlane) / (farPlane - nearPlane);
+        projection[2][3] = -1;
+        projection[3][2] = -2 * farPlane * nearPlane / (farPlane - nearPlane);
+        check(HdUEProjectDepth(0, projection, 1) == 1, "background depth must be far");
+        check(std::abs(HdUEProjectDepth(1, projection, 1)) < 1e-6, "near depth projection incorrect");
+        check(std::abs(HdUEProjectDepth(1000, projection, 1) - 1) < 1e-6, "far depth projection incorrect");
+        check(std::abs(HdUEProjectDepth(10, projection, 1) - .9009009f) < 1e-6,
+              "perspective depth projection incorrect");
+        check(std::abs(HdUEProjectDepth(1000, projection, 100) - .9009009f) < 1e-6,
+              "meter stage depth conversion incorrect");
         std::cout << "PASS: stable mapped snapshots, concurrent publication, allocation and convergence\n";
         return 0;
-    } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
 }

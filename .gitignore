@@ -24,3 +24,4 @@
 !/unreal/HdUEBackend/HdUEBackend.uproject
 
 .ruff_cache/
+uv.lock

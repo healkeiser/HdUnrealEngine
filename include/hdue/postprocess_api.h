@@ -29,9 +29,9 @@ typedef struct HduePostProcessDesc {
 } HduePostProcessDesc;
 typedef struct HduePostProcessApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *set_post_process)(HdueSession session, const HduePostProcessDesc* desc);
+    HdueResult(HDUE_CALL* set_post_process)(HdueSession session, const HduePostProcessDesc* desc);
 } HduePostProcessApi;
-typedef HdueResult (HDUE_CALL *HdueGetPostProcessApiFn)(uint32_t version, uint32_t capacity, HduePostProcessApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetPostProcessApiFn)(uint32_t version, uint32_t capacity, HduePostProcessApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32_t version, uint32_t capacity, HduePostProcessApi* api);
 #ifdef __cplusplus
 }

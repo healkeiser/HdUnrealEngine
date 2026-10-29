@@ -50,7 +50,8 @@ bool SaveAsset(UObject* Asset) {
     UPackage* Package = Asset->GetOutermost();
     FSavePackageArgs Args;
     Args.TopLevelFlags = RF_Public | RF_Standalone;
-    const FString File = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
+    const FString File =
+        FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
     FAssetRegistryModule::AssetCreated(Asset);
     return UPackage::SavePackage(Package, Asset, *File, Args);
 }
@@ -59,21 +60,27 @@ UMaterial* CreatePBR(const TCHAR* Name, FLinearColor Color, float Metal, float R
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
     if (Material && Material->HasSubstrateFrontMaterialConnected() &&
-        (!Translucent || Material->GetBlendMode() == BLEND_TranslucentGreyTransmittance)) return Material;
+        (!Translucent || Material->GetBlendMode() == BLEND_TranslucentGreyTransmittance))
+        return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
     auto* Base = NewObject<UMaterialExpressionVectorParameter>(Material);
-    Base->ParameterName = TEXT("BaseColor"); Base->DefaultValue = Color;
+    Base->ParameterName = TEXT("BaseColor");
+    Base->DefaultValue = Color;
     auto* Metallic = NewObject<UMaterialExpressionScalarParameter>(Material);
-    Metallic->ParameterName = TEXT("Metallic"); Metallic->DefaultValue = Metal;
+    Metallic->ParameterName = TEXT("Metallic");
+    Metallic->DefaultValue = Metal;
     auto* Rough = NewObject<UMaterialExpressionScalarParameter>(Material);
-    Rough->ParameterName = TEXT("Roughness"); Rough->DefaultValue = Roughness;
+    Rough->ParameterName = TEXT("Roughness");
+    Rough->DefaultValue = Roughness;
     auto* Texture = NewObject<UMaterialExpressionTextureSampleParameter2D>(Material);
     Texture->ParameterName = TEXT("BaseColorTexture");
-    Texture->Texture = LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
+    Texture->Texture =
+        LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
     auto* Multiply = NewObject<UMaterialExpressionMultiply>(Material);
-    Multiply->A.Connect(0, Base); Multiply->B.Connect(0, Texture);
+    Multiply->A.Connect(0, Base);
+    Multiply->B.Connect(0, Texture);
     auto* Conversion = NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material);
     Conversion->BaseColor.Connect(0, Multiply);
     Conversion->Metallic.Connect(0, Metallic);
@@ -81,9 +88,8 @@ UMaterial* CreatePBR(const TCHAR* Name, FLinearColor Color, float Metal, float R
     Slab->DiffuseAlbedo.Connect(0, Conversion);
     Slab->F0.Connect(1, Conversion);
     Slab->Roughness.Connect(0, Rough);
-    const TArray<UMaterialExpression*> Expressions = { Base, Metallic, Rough, Texture, Multiply, Conversion, Slab };
-    for (UMaterialExpression* Expression : Expressions)
-        Material->GetExpressionCollection().AddExpression(Expression);
+    const TArray<UMaterialExpression*> Expressions = {Base, Metallic, Rough, Texture, Multiply, Conversion, Slab};
+    for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     auto* Data = Material->GetEditorOnlyData();
     Data->BaseColor.Expression = nullptr;
     Data->Metallic.Expression = nullptr;
@@ -92,9 +98,11 @@ UMaterial* CreatePBR(const TCHAR* Name, FLinearColor Color, float Metal, float R
     if (Translucent) {
         // Opacity is coverage, with no fabricated glass IOR or absorption.
         auto* Opacity = NewObject<UMaterialExpressionScalarParameter>(Material);
-        Opacity->ParameterName = TEXT("Opacity"); Opacity->DefaultValue = 1.f;
+        Opacity->ParameterName = TEXT("Opacity");
+        Opacity->DefaultValue = 1.f;
         auto* Weight = NewObject<UMaterialExpressionSubstrateWeight>(Material);
-        Weight->A.Connect(0, Slab); Weight->Weight.Connect(0, Opacity);
+        Weight->A.Connect(0, Slab);
+        Weight->Weight.Connect(0, Opacity);
         Material->GetExpressionCollection().AddExpression(Opacity);
         Material->GetExpressionCollection().AddExpression(Weight);
         Data->FrontMaterial.Connect(0, Weight);
@@ -106,7 +114,9 @@ UMaterial* CreatePBR(const TCHAR* Name, FLinearColor Color, float Metal, float R
 }
 UTexture2D* CreateLinearWhite() {
     // Default for data-texture samplers, which must not be sRGB.
-    if (auto* Existing = LoadObject<UTexture2D>(nullptr, TEXT("/Game/HdUE/T_LinearWhite.T_LinearWhite"), nullptr, LOAD_NoWarn)) return Existing;
+    if (auto* Existing =
+            LoadObject<UTexture2D>(nullptr, TEXT("/Game/HdUE/T_LinearWhite.T_LinearWhite"), nullptr, LOAD_NoWarn))
+        return Existing;
     UPackage* Package = CreatePackage(TEXT("/Game/HdUE/T_LinearWhite"));
     auto* Texture = NewObject<UTexture2D>(Package, TEXT("T_LinearWhite"), RF_Public | RF_Standalone);
     const uint8 White[4] = {255, 255, 255, 255};
@@ -121,73 +131,100 @@ UTexture2D* CreateLinearWhite() {
 // <Slot>Mask), so an untextured input is Scale 0, Bias constant. Preview Surface masters shade
 // one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
 // same inputs to UE's Substrate standard_surface function, whose slabs and layers cost more per pixel.
-UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite, bool Layered = false, bool Thin = false) {
+UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite, bool Layered = false,
+                         bool Thin = false) {
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
     const auto HasParameter = [](UMaterial* Existing, const TCHAR* Parameter) {
         for (const auto& Expression : Existing->GetExpressionCollection().Expressions)
-            if (const auto* Named = Cast<UMaterialExpressionScalarParameter>(Expression); Named && Named->ParameterName == Parameter) return true;
+            if (const auto* Named = Cast<UMaterialExpressionScalarParameter>(Expression);
+                Named && Named->ParameterName == Parameter)
+                return true;
         return false;
     };
-    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes && Material->TwoSided &&
-        Material->GetEditorOnlyData()->WorldPositionOffset.Expression && HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion1") : TEXT("PreviewSurfaceVersion3")) && Material->bUsedWithNanite)
+    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
+        Material->TwoSided && Material->GetEditorOnlyData()->WorldPositionOffset.Expression &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion1") : TEXT("PreviewSurfaceVersion3")) &&
+        Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
     TArray<UMaterialExpression*> Expressions;
-    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    const auto Add = [&](auto* Expression) {
+        Expressions.Add(Expression);
+        return Expression;
+    };
     const auto Vector = [&](const FString& Parameter, FLinearColor Value) {
         auto* Expression = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-        Expression->ParameterName = *Parameter; Expression->DefaultValue = Value; return Expression;
+        Expression->ParameterName = *Parameter;
+        Expression->DefaultValue = Value;
+        return Expression;
     };
     // The delegate's UV affine: u' = dot((u,v,1), UVRow0.rgb), v' = dot((u,v,1), UVRow1.rgb).
     auto* Coordinate = Add(NewObject<UMaterialExpressionTextureCoordinate>(Material));
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+    One->R = 1.f;
     auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Homogeneous->A.Connect(0, Coordinate); Homogeneous->B.Connect(0, One);
+    Homogeneous->A.Connect(0, Coordinate);
+    Homogeneous->B.Connect(0, One);
     UMaterialExpressionDotProduct* Rows[2];
     for (int32 Row = 0; Row < 2; ++Row) {
         Rows[Row] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
         Rows[Row]->A.Connect(0, Homogeneous);
-        Rows[Row]->B.Connect(0, Vector(FString::Printf(TEXT("UVRow%d"), Row), Row ? FLinearColor(0, 1, 0) : FLinearColor(1, 0, 0)));
+        Rows[Row]->B.Connect(
+            0, Vector(FString::Printf(TEXT("UVRow%d"), Row), Row ? FLinearColor(0, 1, 0) : FLinearColor(1, 0, 0)));
     }
     auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    UV->A.Connect(0, Rows[0]); UV->B.Connect(0, Rows[1]);
+    UV->A.Connect(0, Rows[0]);
+    UV->B.Connect(0, Rows[1]);
     const auto Slot = [&](const FString& Slot, FLinearColor Default, bool Color, bool Scalar) -> UMaterialExpression* {
         auto* Sample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
         Sample->ParameterName = *(Slot + TEXT("Texture"));
         Sample->Coordinates.Connect(0, UV);
         Sample->SamplerType = Color ? SAMPLERTYPE_Color : SAMPLERTYPE_LinearColor;
-        Sample->Texture = Color ? LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture")) : LinearWhite;
+        Sample->Texture =
+            Color ? LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
+                  : LinearWhite;
         auto* Scaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-        Scaled->A.Connect(5, Sample); Scaled->B.Connect(5, Vector(Slot + TEXT("Scale"), FLinearColor(0, 0, 0, 0)));
+        Scaled->A.Connect(5, Sample);
+        Scaled->B.Connect(5, Vector(Slot + TEXT("Scale"), FLinearColor(0, 0, 0, 0)));
         auto* Biased = Add(NewObject<UMaterialExpressionAdd>(Material));
-        Biased->A.Connect(0, Scaled); Biased->B.Connect(5, Vector(Slot + TEXT("Bias"), Default));
+        Biased->A.Connect(0, Scaled);
+        Biased->B.Connect(5, Vector(Slot + TEXT("Bias"), Default));
         if (Scalar) {
             auto* Channel = Add(NewObject<UMaterialExpressionDotProduct>(Material));
-            Channel->A.Connect(0, Biased); Channel->B.Connect(5, Vector(Slot + TEXT("Mask"), FLinearColor(1, 0, 0, 0)));
+            Channel->A.Connect(0, Biased);
+            Channel->B.Connect(5, Vector(Slot + TEXT("Mask"), FLinearColor(1, 0, 0, 0)));
             return Channel;
         }
         auto* Rgb = Add(NewObject<UMaterialExpressionComponentMask>(Material));
-        Rgb->Input.Connect(0, Biased); Rgb->R = Rgb->G = Rgb->B = 1; Rgb->A = 0;
+        Rgb->Input.Connect(0, Biased);
+        Rgb->R = Rgb->G = Rgb->B = 1;
+        Rgb->A = 0;
         return Rgb;
     };
     auto* Surface = Slot(TEXT("BaseColor"), FLinearColor(.7f, .7f, .7f, 1), true, false);
     // displayColor primvars: vertex colors times ISM per-instance custom data, enabled by UseVertexColor.
     auto* VertexColor = Add(NewObject<UMaterialExpressionVertexColor>(Material));
     auto* InstanceColor = Add(NewObject<UMaterialExpressionPerInstanceCustomData3Vector>(Material));
-    InstanceColor->DataIndex = 0; InstanceColor->ConstDefaultValue = FLinearColor(1, 1, 1, 1);
+    InstanceColor->DataIndex = 0;
+    InstanceColor->ConstDefaultValue = FLinearColor(1, 1, 1, 1);
     auto* Primvar = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    Primvar->A.Connect(0, VertexColor); Primvar->B.Connect(0, InstanceColor);
+    Primvar->A.Connect(0, VertexColor);
+    Primvar->B.Connect(0, InstanceColor);
     auto* UseVertexColor = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-    UseVertexColor->ParameterName = TEXT("UseVertexColor"); UseVertexColor->DefaultValue = 0.f;
+    UseVertexColor->ParameterName = TEXT("UseVertexColor");
+    UseVertexColor->DefaultValue = 0.f;
     auto* Tint = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    Tint->ConstA = 1.f; Tint->B.Connect(0, Primvar); Tint->Alpha.Connect(0, UseVertexColor);
+    Tint->ConstA = 1.f;
+    Tint->B.Connect(0, Primvar);
+    Tint->Alpha.Connect(0, UseVertexColor);
     auto* BaseColor = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    BaseColor->A.Connect(0, Surface); BaseColor->B.Connect(0, Tint);
+    BaseColor->A.Connect(0, Surface);
+    BaseColor->B.Connect(0, Tint);
     auto* Emissive = Slot(TEXT("Emissive"), FLinearColor(0, 0, 0, 0), true, false);
     auto* Metallic = Slot(TEXT("Metallic"), FLinearColor(0, 0, 0, 0), false, true);
     auto* Roughness = Slot(TEXT("Roughness"), FLinearColor(.5f, .5f, .5f, .5f), false, true);
@@ -203,78 +240,124 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     DisplacementSample->MipValueMode = TMVM_MipLevel;
     DisplacementSample->ConstMipValue = 0;
     auto* DisplacementScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    DisplacementScaled->A.Connect(5, DisplacementSample); DisplacementScaled->B.Connect(5, Vector(TEXT("DisplacementScale"), FLinearColor(0, 0, 0, 0)));
+    DisplacementScaled->A.Connect(5, DisplacementSample);
+    DisplacementScaled->B.Connect(5, Vector(TEXT("DisplacementScale"), FLinearColor(0, 0, 0, 0)));
     auto* DisplacementBiased = Add(NewObject<UMaterialExpressionAdd>(Material));
-    DisplacementBiased->A.Connect(0, DisplacementScaled); DisplacementBiased->B.Connect(5, Vector(TEXT("DisplacementBias"), FLinearColor(0, 0, 0, 0)));
+    DisplacementBiased->A.Connect(0, DisplacementScaled);
+    DisplacementBiased->B.Connect(5, Vector(TEXT("DisplacementBias"), FLinearColor(0, 0, 0, 0)));
     auto* DisplacementAmount = Add(NewObject<UMaterialExpressionDotProduct>(Material));
-    DisplacementAmount->A.Connect(0, DisplacementBiased); DisplacementAmount->B.Connect(5, Vector(TEXT("DisplacementMask"), FLinearColor(1, 0, 0, 0)));
+    DisplacementAmount->A.Connect(0, DisplacementBiased);
+    DisplacementAmount->B.Connect(5, Vector(TEXT("DisplacementMask"), FLinearColor(1, 0, 0, 0)));
     auto* VertexNormal = Add(NewObject<UMaterialExpressionVertexNormalWS>(Material));
     auto* Offset = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    Offset->A.Connect(0, VertexNormal); Offset->B.Connect(0, DisplacementAmount);
+    Offset->A.Connect(0, VertexNormal);
+    Offset->B.Connect(0, DisplacementAmount);
     // USD tangent-space normals are +Y up (OpenGL); UE's are -Y after the V flip.
-    auto* FlipGreen = Add(NewObject<UMaterialExpressionConstant3Vector>(Material)); FlipGreen->Constant = FLinearColor(1, -1, 1);
+    auto* FlipGreen = Add(NewObject<UMaterialExpressionConstant3Vector>(Material));
+    FlipGreen->Constant = FLinearColor(1, -1, 1);
     auto* UENormal = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    UENormal->A.Connect(0, Normal); UENormal->B.Connect(0, FlipGreen);
-    auto* UnitNormal = Add(NewObject<UMaterialExpressionNormalize>(Material)); UnitNormal->VectorInput.Connect(0, UENormal);
+    UENormal->A.Connect(0, Normal);
+    UENormal->B.Connect(0, FlipGreen);
+    auto* UnitNormal = Add(NewObject<UMaterialExpressionNormalize>(Material));
+    UnitNormal->VectorInput.Connect(0, UENormal);
     auto* Occlusion = Slot(TEXT("Occlusion"), FLinearColor(1, 1, 1, 1), false, true);
     auto* Clearcoat = Slot(TEXT("Clearcoat"), FLinearColor(0, 0, 0, 0), false, true);
     auto* ClearcoatRoughness = Slot(TEXT("ClearcoatRoughness"), FLinearColor(.01f, .01f, .01f, .01f), false, true);
     auto* SpecularColor = Slot(TEXT("SpecularColor"), FLinearColor(0, 0, 0, 1), true, false);
     const auto Scalar = [&](const TCHAR* Parameter, float Value) {
         auto* Expression = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-        Expression->ParameterName = Parameter; Expression->DefaultValue = Value; return Expression;
+        Expression->ParameterName = Parameter;
+        Expression->DefaultValue = Value;
+        return Expression;
     };
     UMaterialExpression* Front = nullptr;
     auto* Data = Material->GetEditorOnlyData();
-    Data->BaseColor.Expression = nullptr; Data->Metallic.Expression = nullptr; Data->Roughness.Expression = nullptr;
+    Data->BaseColor.Expression = nullptr;
+    Data->Metallic.Expression = nullptr;
+    Data->Roughness.Expression = nullptr;
     if (Layered) {
-        Scalar(TEXT("StandardSurfaceVersion1"), 1.f); // unconnected marker: bump the name when this graph changes, to regenerate
+        Scalar(TEXT("StandardSurfaceVersion1"),
+               1.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
-        Call->SetMaterialFunction(LoadObject<UMaterialFunction>(nullptr, TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Opaque.Substrate-StandardSurface-Opaque")));
+        Call->SetMaterialFunction(LoadObject<UMaterialFunction>(
+            nullptr,
+            TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Opaque.Substrate-StandardSurface-Opaque")));
         const auto Input = [&](const TCHAR* Input, UMaterialExpression* Expression) {
             for (auto& Function : Call->FunctionInputs)
-                if (Function.ExpressionInput && Function.ExpressionInput->InputName == Input) { Function.Input.Connect(0, Expression); return; }
+                if (Function.ExpressionInput && Function.ExpressionInput->InputName == Input) {
+                    Function.Input.Connect(0, Expression);
+                    return;
+                }
             UE_LOG(LogTemp, Error, TEXT("Substrate standard_surface has no input %s"), Input);
         };
-        const auto Constant = [&](float Value) { auto* Expression = Add(NewObject<UMaterialExpressionConstant>(Material)); Expression->R = Value; return Expression; };
+        const auto Constant = [&](float Value) {
+            auto* Expression = Add(NewObject<UMaterialExpressionConstant>(Material));
+            Expression->R = Value;
+            return Expression;
+        };
         // subsurface_color and sheen_color: a tint, times the base colour texture when they read its image.
         const auto Tinted = [&](const TCHAR* Parameter) {
             auto* Follow = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-            Follow->ConstA = 1.f; Follow->B.Connect(0, Surface); Follow->Alpha.Connect(0, Scalar(*(FString(Parameter) + TEXT("BaseTexture")), 0.f));
+            Follow->ConstA = 1.f;
+            Follow->B.Connect(0, Surface);
+            Follow->Alpha.Connect(0, Scalar(*(FString(Parameter) + TEXT("BaseTexture")), 0.f));
             auto* Color = Add(NewObject<UMaterialExpressionMultiply>(Material));
-            Color->A.Connect(0, Vector(FString(Parameter) + TEXT("Color"), FLinearColor::White)); Color->B.Connect(0, Follow);
+            Color->A.Connect(0, Vector(FString(Parameter) + TEXT("Color"), FLinearColor::White));
+            Color->B.Connect(0, Follow);
             return Color;
         };
         // The delegate folds the base, specular and emission weights into their colours.
-        Input(TEXT("base"), Constant(1.f)); Input(TEXT("base_color"), BaseColor); Input(TEXT("metalness"), Metallic);
-        Input(TEXT("specular"), Constant(1.f)); Input(TEXT("specular_color"), SpecularColor); Input(TEXT("specular_roughness"), Roughness);
+        Input(TEXT("base"), Constant(1.f));
+        Input(TEXT("base_color"), BaseColor);
+        Input(TEXT("metalness"), Metallic);
+        Input(TEXT("specular"), Constant(1.f));
+        Input(TEXT("specular_color"), SpecularColor);
+        Input(TEXT("specular_roughness"), Roughness);
         Input(TEXT("specular_IOR"), Scalar(TEXT("SpecularIOR"), 1.5f));
-        Input(TEXT("coat"), Clearcoat); Input(TEXT("coat_color"), Vector(TEXT("CoatColor"), FLinearColor::White)); Input(TEXT("coat_roughness"), ClearcoatRoughness);
-        Input(TEXT("sheen"), Scalar(TEXT("Sheen"), 0.f)); Input(TEXT("sheen_color"), Tinted(TEXT("Sheen"))); Input(TEXT("sheen_roughness"), Scalar(TEXT("SheenRoughness"), .3f));
-        Input(TEXT("subsurface"), Scalar(TEXT("Subsurface"), 0.f)); Input(TEXT("subsurface_color"), Tinted(TEXT("Subsurface")));
-        Input(TEXT("subsurface_radius"), Vector(TEXT("SubsurfaceRadius"), FLinearColor::White)); Input(TEXT("subsurface_scale"), Constant(1.f));
-        Input(TEXT("emission"), Constant(1.f)); Input(TEXT("emission_color"), Emissive);
+        Input(TEXT("coat"), Clearcoat);
+        Input(TEXT("coat_color"), Vector(TEXT("CoatColor"), FLinearColor::White));
+        Input(TEXT("coat_roughness"), ClearcoatRoughness);
+        Input(TEXT("sheen"), Scalar(TEXT("Sheen"), 0.f));
+        Input(TEXT("sheen_color"), Tinted(TEXT("Sheen")));
+        Input(TEXT("sheen_roughness"), Scalar(TEXT("SheenRoughness"), .3f));
+        Input(TEXT("subsurface"), Scalar(TEXT("Subsurface"), 0.f));
+        Input(TEXT("subsurface_color"), Tinted(TEXT("Subsurface")));
+        Input(TEXT("subsurface_radius"), Vector(TEXT("SubsurfaceRadius"), FLinearColor::White));
+        Input(TEXT("subsurface_scale"), Constant(1.f));
+        Input(TEXT("emission"), Constant(1.f));
+        Input(TEXT("emission_color"), Emissive);
         Input(TEXT("normal"), UnitNormal);
-        auto* ThinWalled = Add(NewObject<UMaterialExpressionStaticBool>(Material)); ThinWalled->Value = Thin;
+        auto* ThinWalled = Add(NewObject<UMaterialExpressionStaticBool>(Material));
+        ThinWalled->Value = Thin;
         Input(TEXT("thin_walled"), ThinWalled);
         Front = Call;
     } else {
         // Metalness workflow, with ior as the dielectric specular level (the backend converts ior to it).
         auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
-        Conversion->BaseColor.Connect(0, BaseColor); Conversion->Metallic.Connect(0, Metallic);
+        Conversion->BaseColor.Connect(0, BaseColor);
+        Conversion->Metallic.Connect(0, Metallic);
         Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
         // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
         auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
-        Scalar(TEXT("PreviewSurfaceVersion3"), 3.f); // unconnected marker: bump the name when this graph changes, to regenerate
+        Scalar(TEXT("PreviewSurfaceVersion3"),
+               3.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-        Albedo->A.Connect(0, Conversion); Albedo->B.Connect(0, BaseColor); Albedo->Alpha.Connect(0, UseSpecular);
+        Albedo->A.Connect(0, Conversion);
+        Albedo->B.Connect(0, BaseColor);
+        Albedo->Alpha.Connect(0, UseSpecular);
         auto* F0 = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-        F0->A.Connect(1, Conversion); F0->B.Connect(0, SpecularColor); F0->Alpha.Connect(0, UseSpecular);
+        F0->A.Connect(1, Conversion);
+        F0->B.Connect(0, SpecularColor);
+        F0->Alpha.Connect(0, UseSpecular);
         auto* Slab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
-        Slab->DiffuseAlbedo.Connect(0, Albedo); Slab->F0.Connect(0, F0);
-        Slab->Roughness.Connect(0, Roughness); Slab->Normal.Connect(0, UnitNormal); Slab->EmissiveColor.Connect(0, Emissive);
-        // Clear coat as UE converts its own: a second specular lobe on the slab (Substrate haziness), with clearcoatRoughness
-        // and weighted by clearcoat. An approximation of a coat layer, without the coat's absorption over the base.
+        Slab->DiffuseAlbedo.Connect(0, Albedo);
+        Slab->F0.Connect(0, F0);
+        Slab->Roughness.Connect(0, Roughness);
+        Slab->Normal.Connect(0, UnitNormal);
+        Slab->EmissiveColor.Connect(0, Emissive);
+        // Clear coat as UE converts its own: a second specular lobe on the slab (Substrate haziness), with
+        // clearcoatRoughness and weighted by clearcoat. An approximation of a coat layer, without the coat's absorption
+        // over the base.
         Slab->SecondRoughness.Connect(0, ClearcoatRoughness);
         Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
         Front = Slab;
@@ -286,16 +369,20 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     if (Blend == BLEND_Masked) {
         // Cutout at opacityThreshold, independent of UE's per-asset clip value.
         auto* Threshold = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-        Threshold->ParameterName = TEXT("OpacityThreshold"); Threshold->DefaultValue = .5f;
+        Threshold->ParameterName = TEXT("OpacityThreshold");
+        Threshold->DefaultValue = .5f;
         auto* Coverage = Add(NewObject<UMaterialExpressionSubtract>(Material));
-        Coverage->A.Connect(0, Opacity); Coverage->B.Connect(0, Threshold);
+        Coverage->A.Connect(0, Opacity);
+        Coverage->B.Connect(0, Threshold);
         auto* Centered = Add(NewObject<UMaterialExpressionAdd>(Material));
-        Centered->A.Connect(0, Coverage); Centered->ConstB = .5f;
+        Centered->A.Connect(0, Coverage);
+        Centered->ConstB = .5f;
         Data->OpacityMask.Connect(0, Centered);
         Material->OpacityMaskClipValue = .5f;
     } else if (Blend == BLEND_TranslucentGreyTransmittance) {
         auto* Weight = Add(NewObject<UMaterialExpressionSubstrateWeight>(Material));
-        Weight->A.Connect(0, Front); Weight->Weight.Connect(0, Opacity);
+        Weight->A.Connect(0, Front);
+        Weight->Weight.Connect(0, Opacity);
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
@@ -304,7 +391,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     Material->TwoSided = true;
     // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
     Material->bUsedWithInstancedStaticMeshes = true;
-    Material->bUsedWithNanite = true; // runtime-built Nanite meshes (Scene.cpp BuildNanite)
+    Material->bUsedWithNanite = true;  // runtime-built Nanite meshes (Scene.cpp BuildNanite)
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
@@ -320,22 +407,35 @@ UMaterial* CreateAovMaterial() {
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
     TArray<UMaterialExpression*> Expressions;
-    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    const auto Add = [&](auto* Expression) {
+        Expressions.Add(Expression);
+        return Expression;
+    };
     // Order matches HDUE_AOV_ALBEDO..HDUE_AOV_OCCLUSION; scalar channels broadcast to RGB.
-    const ESceneTextureId Ids[] = {PPI_BaseColor, PPI_WorldNormal, PPI_Roughness, PPI_Metallic, PPI_Specular, PPI_MaterialAO};
+    const ESceneTextureId Ids[] = {PPI_BaseColor, PPI_WorldNormal, PPI_Roughness,
+                                   PPI_Metallic,  PPI_Specular,    PPI_MaterialAO};
     UMaterialExpression* Sum = nullptr;
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Ids); ++Index) {
         auto* Lookup = Add(NewObject<UMaterialExpressionSceneTexture>(Material));
         Lookup->SceneTextureId = Ids[Index];
         auto* Channel = Add(NewObject<UMaterialExpressionComponentMask>(Material));
         Channel->Input.Connect(0, Lookup);
-        Channel->R = 1; Channel->G = Channel->B = Index < 2; Channel->A = 0;
+        Channel->R = 1;
+        Channel->G = Channel->B = Index < 2;
+        Channel->A = 0;
         auto* Weight = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-        Weight->ParameterName = *FString::Printf(TEXT("Aov%d"), Index + 1); Weight->DefaultValue = 0;
+        Weight->ParameterName = *FString::Printf(TEXT("Aov%d"), Index + 1);
+        Weight->DefaultValue = 0;
         auto* Term = Add(NewObject<UMaterialExpressionMultiply>(Material));
-        Term->A.Connect(0, Channel); Term->B.Connect(0, Weight);
-        if (Sum) { auto* Next = Add(NewObject<UMaterialExpressionAdd>(Material)); Next->A.Connect(0, Sum); Next->B.Connect(0, Term); Sum = Next; }
-        else Sum = Term;
+        Term->A.Connect(0, Channel);
+        Term->B.Connect(0, Weight);
+        if (Sum) {
+            auto* Next = Add(NewObject<UMaterialExpressionAdd>(Material));
+            Next->A.Connect(0, Sum);
+            Next->B.Connect(0, Term);
+            Sum = Next;
+        } else
+            Sum = Term;
     }
     // Scalar terms are float; the first term is RGB, so the sum is RGB.
     auto* Output = Add(NewObject<UMaterialExpressionSubstratePostProcess>(Material));
@@ -360,30 +460,46 @@ UMaterial* CreateIdMaterial() {
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEId"), RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
-    const auto Add = [&](auto* Expression) { Material->GetExpressionCollection().AddExpression(Expression); return Expression; };
+    const auto Add = [&](auto* Expression) {
+        Material->GetExpressionCollection().AddExpression(Expression);
+        return Expression;
+    };
     auto* Id = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-    Id->ParameterName = TEXT("HdUEId"); Id->DefaultValue = FLinearColor(0, 0, 0, 0);
-    Id->bUseCustomPrimitiveData = true; Id->PrimitiveDataIndex = 0;
+    Id->ParameterName = TEXT("HdUEId");
+    Id->DefaultValue = FLinearColor(0, 0, 0, 0);
+    Id->bUseCustomPrimitiveData = true;
+    Id->PrimitiveDataIndex = 0;
     auto* InstanceMode = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-    InstanceMode->ParameterName = TEXT("HdUEInstanceMode"); InstanceMode->DefaultValue = 0.f;
-    InstanceMode->bUseCustomPrimitiveData = true; InstanceMode->PrimitiveDataIndex = 4;
+    InstanceMode->ParameterName = TEXT("HdUEInstanceMode");
+    InstanceMode->DefaultValue = 0.f;
+    InstanceMode->bUseCustomPrimitiveData = true;
+    InstanceMode->PrimitiveDataIndex = 4;
     auto* Instance = Add(NewObject<UMaterialExpressionPerInstanceCustomData>(Material));
-    Instance->DataIndex = 3; Instance->ConstDefaultValue = -1.f;
+    Instance->DataIndex = 3;
+    Instance->ConstDefaultValue = -1.f;
     auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
-    Scaled->A.Connect(0, Instance); Scaled->ConstB = 2048.f;
+    Scaled->A.Connect(0, Instance);
+    Scaled->ConstB = 2048.f;
     auto* High = Add(NewObject<UMaterialExpressionFloor>(Material));
     High->Input.Connect(0, Scaled);
     auto* HighScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    HighScaled->A.Connect(0, High); HighScaled->ConstB = 2048.f;
+    HighScaled->A.Connect(0, High);
+    HighScaled->ConstB = 2048.f;
     auto* Low = Add(NewObject<UMaterialExpressionSubtract>(Material));
-    Low->A.Connect(0, Instance); Low->B.Connect(0, HighScaled);
+    Low->A.Connect(0, Instance);
+    Low->B.Connect(0, HighScaled);
     auto* HighLow = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    HighLow->A.Connect(0, High); HighLow->B.Connect(0, Low);
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    HighLow->A.Connect(0, High);
+    HighLow->B.Connect(0, Low);
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+    One->R = 1.f;
     auto* Encoded = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Encoded->A.Connect(0, HighLow); Encoded->B.Connect(0, One);
+    Encoded->A.Connect(0, HighLow);
+    Encoded->B.Connect(0, One);
     auto* Select = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    Select->A.Connect(0, Id); Select->B.Connect(0, Encoded); Select->Alpha.Connect(0, InstanceMode);
+    Select->A.Connect(0, Id);
+    Select->B.Connect(0, Encoded);
+    Select->Alpha.Connect(0, InstanceMode);
     auto* Unlit = Add(NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material));
     Unlit->EmissiveColor.Connect(0, Select);
     Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
@@ -396,13 +512,16 @@ UMaterial* CreateIdMaterial() {
 // Heterogeneous volume material for dense density grids: UVW_j = dot((world, 1), WorldToUVW_j),
 // rows the backend derives from the voxel transform; extinction = density * ExtinctionScale.
 UMaterial* CreateVolumeMaterial() {
-    UVolumeTexture* Empty = LoadObject<UVolumeTexture>(nullptr, TEXT("/Game/HdUE/T_HdUEVolumeEmpty.T_HdUEVolumeEmpty"), nullptr, LOAD_NoWarn);
+    UVolumeTexture* Empty = LoadObject<UVolumeTexture>(nullptr, TEXT("/Game/HdUE/T_HdUEVolumeEmpty.T_HdUEVolumeEmpty"),
+                                                       nullptr, LOAD_NoWarn);
     if (!Empty) {
         UPackage* Package = CreatePackage(TEXT("/Game/HdUE/T_HdUEVolumeEmpty"));
         Empty = NewObject<UVolumeTexture>(Package, TEXT("T_HdUEVolumeEmpty"), RF_Public | RF_Standalone);
         const uint8 Black[4] = {0, 0, 0, 0};
         Empty->Source.Init(1, 1, 1, 1, TSF_BGRA8, Black);
-        Empty->SRGB = false; Empty->CompressionSettings = TC_VectorDisplacementmap; Empty->MipGenSettings = TMGS_NoMipmaps;
+        Empty->SRGB = false;
+        Empty->CompressionSettings = TC_VectorDisplacementmap;
+        Empty->MipGenSettings = TMGS_NoMipmaps;
         Empty->PostEditChange();
         if (!SaveAsset(Empty)) return nullptr;
     }
@@ -411,37 +530,53 @@ UMaterial* CreateVolumeMaterial() {
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"), nullptr, LOAD_NoWarn);
     if (Material && Material->MaterialDomain == MD_Volume && Material->bUsedWithHeterogeneousVolumes) {
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
-            if (const auto* Row = Cast<UMaterialExpressionVectorParameter>(Expression); Row && Row->ParameterName == TEXT("WorldToUVW0")) return Material;
+            if (const auto* Row = Cast<UMaterialExpressionVectorParameter>(Expression);
+                Row && Row->ParameterName == TEXT("WorldToUVW0"))
+                return Material;
     }
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEVolume"), RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
     Material->GetExpressionCollection().Empty();
     TArray<UMaterialExpression*> Expressions;
-    const auto Add = [&](auto* Expression) { Expressions.Add(Expression); return Expression; };
+    const auto Add = [&](auto* Expression) {
+        Expressions.Add(Expression);
+        return Expression;
+    };
     auto* World = Add(NewObject<UMaterialExpressionWorldPosition>(Material));
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material)); One->R = 1.f;
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+    One->R = 1.f;
     auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Homogeneous->A.Connect(0, World); Homogeneous->B.Connect(0, One);
+    Homogeneous->A.Connect(0, World);
+    Homogeneous->B.Connect(0, One);
     UMaterialExpressionDotProduct* Axes[3];
     for (int32 Axis = 0; Axis < 3; ++Axis) {
         auto* Row = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-        Row->ParameterName = *FString::Printf(TEXT("WorldToUVW%d"), Axis); Row->DefaultValue = FLinearColor(0, 0, 0, 0);
+        Row->ParameterName = *FString::Printf(TEXT("WorldToUVW%d"), Axis);
+        Row->DefaultValue = FLinearColor(0, 0, 0, 0);
         Axes[Axis] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
-        Axes[Axis]->A.Connect(0, Homogeneous); Axes[Axis]->B.Connect(5, Row);
+        Axes[Axis]->A.Connect(0, Homogeneous);
+        Axes[Axis]->B.Connect(5, Row);
     }
     auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    UV->A.Connect(0, Axes[0]); UV->B.Connect(0, Axes[1]);
+    UV->A.Connect(0, Axes[0]);
+    UV->B.Connect(0, Axes[1]);
     auto* UVW = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    UVW->A.Connect(0, UV); UVW->B.Connect(0, Axes[2]);
+    UVW->A.Connect(0, UV);
+    UVW->B.Connect(0, Axes[2]);
     auto* Density = Add(NewObject<UMaterialExpressionTextureSampleParameterVolume>(Material));
-    Density->ParameterName = TEXT("Density"); Density->Texture = Empty; Density->SamplerType = SAMPLERTYPE_LinearColor;
+    Density->ParameterName = TEXT("Density");
+    Density->Texture = Empty;
+    Density->SamplerType = SAMPLERTYPE_LinearColor;
     Density->Coordinates.Connect(0, UVW);
     auto* Scale = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-    Scale->ParameterName = TEXT("ExtinctionScale"); Scale->DefaultValue = 1.f;
+    Scale->ParameterName = TEXT("ExtinctionScale");
+    Scale->DefaultValue = 1.f;
     auto* Extinction = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    Extinction->A.Connect(1, Density); Extinction->B.Connect(0, Scale);
+    Extinction->A.Connect(1, Density);
+    Extinction->B.Connect(0, Scale);
     auto* Albedo = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-    Albedo->ParameterName = TEXT("Albedo"); Albedo->DefaultValue = FLinearColor(.8f, .8f, .8f, 1);
+    Albedo->ParameterName = TEXT("Albedo");
+    Albedo->DefaultValue = FLinearColor(.8f, .8f, .8f, 1);
     auto* Data = Material->GetEditorOnlyData();
     // Legacy volume inputs, as UE's SparseVolumeTextureMaterialFactory uses: albedo, extinction.
     Data->BaseColor.Connect(0, Albedo);
@@ -466,7 +601,8 @@ UMaterial* CreateGlass() {
     Material->GetExpressionCollection().Empty();
     const auto Scalar = [&](const TCHAR* Name, float Value) {
         auto* Expression = NewObject<UMaterialExpressionScalarParameter>(Material);
-        Expression->ParameterName = Name; Expression->DefaultValue = Value;
+        Expression->ParameterName = Name;
+        Expression->DefaultValue = Value;
         Material->GetExpressionCollection().AddExpression(Expression);
         return Expression;
     };
@@ -476,38 +612,50 @@ UMaterial* CreateGlass() {
     auto* Thickness = Scalar(TEXT("SurfaceThicknessCm"), .2f);
     auto* Coverage = Scalar(TEXT("Coverage"), 1.f);
     auto* Color = NewObject<UMaterialExpressionVectorParameter>(Material);
-    Color->ParameterName = TEXT("AttenuationColor"); Color->DefaultValue = FLinearColor(.95f, .98f, .95f);
+    Color->ParameterName = TEXT("AttenuationColor");
+    Color->DefaultValue = FLinearColor(.95f, .98f, .95f);
     auto* MFP = NewObject<UMaterialExpressionSubstrateTransmittanceToMFP>(Material);
-    MFP->TransmittanceColor.Connect(0, Color); MFP->Thickness.Connect(0, Distance);
+    MFP->TransmittanceColor.Connect(0, Color);
+    MFP->Thickness.Connect(0, Distance);
     // UE 5.8.4's thickness stack reads the root's constant, not its expression.
     // Keep that slab at 0.01 cm, scaling MFP so the realtime optical depth is
     // SurfaceThicknessCm / physical MFP. PT must retain unscaled world-space MFP.
     constexpr float RealtimeSlabThicknessCm = .01f;
     auto* ThicknessScale = NewObject<UMaterialExpressionDivide>(Material);
-    ThicknessScale->ConstA = RealtimeSlabThicknessCm; ThicknessScale->B.Connect(0, Thickness);
+    ThicknessScale->ConstA = RealtimeSlabThicknessCm;
+    ThicknessScale->B.Connect(0, Thickness);
     auto* RealtimeMFP = NewObject<UMaterialExpressionMultiply>(Material);
-    RealtimeMFP->A.Connect(0, MFP); RealtimeMFP->B.Connect(0, ThicknessScale);
+    RealtimeMFP->A.Connect(0, MFP);
+    RealtimeMFP->B.Connect(0, ThicknessScale);
     auto* SelectedMFP = NewObject<UMaterialExpressionPathTracingQualitySwitch>(Material);
-    SelectedMFP->Normal.Connect(0, RealtimeMFP); SelectedMFP->PathTraced.Connect(0, MFP);
+    SelectedMFP->Normal.Connect(0, RealtimeMFP);
+    SelectedMFP->PathTraced.Connect(0, MFP);
     // Fresnel F0 = ((n-1)/(n+1))^2; the same IOR drives ray bending.
     auto* Numerator = NewObject<UMaterialExpressionSubtract>(Material);
-    Numerator->A.Connect(0, IOR); Numerator->ConstB = 1;
+    Numerator->A.Connect(0, IOR);
+    Numerator->ConstB = 1;
     auto* Denominator = NewObject<UMaterialExpressionAdd>(Material);
-    Denominator->A.Connect(0, IOR); Denominator->ConstB = 1;
+    Denominator->A.Connect(0, IOR);
+    Denominator->ConstB = 1;
     auto* Ratio = NewObject<UMaterialExpressionDivide>(Material);
-    Ratio->A.Connect(0, Numerator); Ratio->B.Connect(0, Denominator);
+    Ratio->A.Connect(0, Numerator);
+    Ratio->B.Connect(0, Denominator);
     auto* F0 = NewObject<UMaterialExpressionMultiply>(Material);
-    F0->A.Connect(0, Ratio); F0->B.Connect(0, Ratio);
+    F0->A.Connect(0, Ratio);
+    F0->B.Connect(0, Ratio);
     auto* Black = NewObject<UMaterialExpressionConstant3Vector>(Material);
     Black->Constant = FLinearColor::Black;
     auto* Slab = NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material);
     Slab->DiffuseAlbedo.Connect(0, Black);
     Slab->SubSurfaceType = MSS_SimpleVolume;
-    Slab->F0.Connect(0, F0); Slab->Roughness.Connect(0, Roughness);
+    Slab->F0.Connect(0, F0);
+    Slab->Roughness.Connect(0, Roughness);
     Slab->SSSMFP.Connect(0, SelectedMFP);
     auto* Weight = NewObject<UMaterialExpressionSubstrateWeight>(Material);
-    Weight->A.Connect(0, Slab); Weight->Weight.Connect(0, Coverage);
-    for (auto* Expression : TArray<UMaterialExpression*>{Color, MFP, ThicknessScale, RealtimeMFP, SelectedMFP, Numerator, Denominator, Ratio, F0, Black, Slab, Weight})
+    Weight->A.Connect(0, Slab);
+    Weight->Weight.Connect(0, Coverage);
+    for (auto* Expression : TArray<UMaterialExpression*>{Color, MFP, ThicknessScale, RealtimeMFP, SelectedMFP,
+                                                         Numerator, Denominator, Ratio, F0, Black, Slab, Weight})
         Material->GetExpressionCollection().AddExpression(Expression);
     auto* Data = Material->GetEditorOnlyData();
     Data->FrontMaterial.Connect(0, Weight);
@@ -523,24 +671,30 @@ UMaterial* CreateGlass() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
-}
+}  // namespace
 
-UHdUEPrepareCommandlet::UHdUEPrepareCommandlet()
-{
-    IsClient = false; IsServer = false; IsEditor = true; LogToConsole = true;
+UHdUEPrepareCommandlet::UHdUEPrepareCommandlet() {
+    IsClient = false;
+    IsServer = false;
+    IsEditor = true;
+    LogToConsole = true;
 }
-int32 UHdUEPrepareCommandlet::Main(const FString& Params)
-{
+int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
     UTexture2D* LinearWhite = CreateLinearWhite();
     if (!LinearWhite) return 3;
     UMaterial* Preview = CreateSurface(TEXT("M_PreviewSurface"), BLEND_Opaque, LinearWhite);
     UMaterial* Masked = CreateSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
-    UMaterial* Translucent = CreateSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
-    // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's function).
+    UMaterial* Translucent =
+        CreateSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
+    // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's
+    // function).
     for (const bool Thin : {false, true})
         for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked})
-            if (!CreateSurface(*FString::Printf(TEXT("M_StandardSurface%s%s"), Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""), Thin ? TEXT("Thin") : TEXT("")),
-                    Blend, LinearWhite, true, Thin)) return 3;
+            if (!CreateSurface(
+                    *FString::Printf(TEXT("M_StandardSurface%s%s"), Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""),
+                                     Thin ? TEXT("Thin") : TEXT("")),
+                    Blend, LinearWhite, true, Thin))
+                return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
@@ -557,26 +711,33 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
     }
     UPackage* MeshPackage = CreatePackage(TEXT("/Game/HdUE/SM_Nanite"));
     auto* NativeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/HdUE/SM_Nanite.SM_Nanite"), nullptr, LOAD_NoWarn);
-    if (!NativeMesh) NativeMesh = DuplicateObject<UStaticMesh>(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")), MeshPackage, TEXT("SM_Nanite"));
+    if (!NativeMesh)
+        NativeMesh = DuplicateObject<UStaticMesh>(
+            LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")), MeshPackage, TEXT("SM_Nanite"));
     NativeMesh->SetFlags(RF_Public | RF_Standalone);
     NativeMesh->GetNaniteSettings().bEnabled = true;
     NativeMesh->bAllowCPUAccess = true;
     NativeMesh->NeverStream = true;
     NativeMesh->SetMaterial(0, Native);
     NativeMesh->Build(false);
-    FStaticMeshCompilingManager::Get().FinishCompilation({ NativeMesh });
+    FStaticMeshCompilingManager::Get().FinishCompilation({NativeMesh});
     if (!SaveAsset(NativeMesh)) return 4;
-    const FString MapFile = FPackageName::LongPackageNameToFilename(TEXT("/Game/HdUETest"), FPackageName::GetMapPackageExtension());
-    UWorld* World = FPaths::FileExists(MapFile) ? UEditorLoadingAndSavingUtils::LoadMap(MapFile) : UEditorLoadingAndSavingUtils::NewBlankMap(false);
+    const FString MapFile =
+        FPackageName::LongPackageNameToFilename(TEXT("/Game/HdUETest"), FPackageName::GetMapPackageExtension());
+    UWorld* World = FPaths::FileExists(MapFile) ? UEditorLoadingAndSavingUtils::LoadMap(MapFile)
+                                                : UEditorLoadingAndSavingUtils::NewBlankMap(false);
     if (!World) return 1;
     TArray<AActor*> OldActors;
-    for (TActorIterator<AActor> It(World); It; ++It) if (It->IsA<AStaticMeshActor>() || It->IsA<ADirectionalLight>()) OldActors.Add(*It);
+    for (TActorIterator<AActor> It(World); It; ++It)
+        if (It->IsA<AStaticMeshActor>() || It->IsA<ADirectionalLight>()) OldActors.Add(*It);
     for (auto* Actor : OldActors) World->DestroyActor(Actor);
     auto* Cube = World->SpawnActor<AStaticMeshActor>(FVector(0, 0, 50), FRotator::ZeroRotator);
-    Cube->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+    Cube->GetStaticMeshComponent()->SetStaticMesh(
+        LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
     Cube->GetStaticMeshComponent()->SetMaterial(0, Red);
     auto* Ground = World->SpawnActor<AStaticMeshActor>(FVector(0, 0, -5), FRotator::ZeroRotator);
-    Ground->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+    Ground->GetStaticMeshComponent()->SetStaticMesh(
+        LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
     Ground->GetStaticMeshComponent()->SetMaterial(0, Grey);
     Ground->SetActorScale3D(FVector(12, 12, 0.1));
     auto* Light = World->SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator(-45, 60, 0));
@@ -589,4 +750,3 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params)
     UE_LOG(LogTemp, Display, TEXT("hdUE test map created at /Game/HdUETest"));
     return 0;
 }
-

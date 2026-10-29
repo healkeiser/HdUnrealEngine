@@ -12,7 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
+$OpenUsdRoot = Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 if (-not $InputUsd) { $InputUsd = Join-Path $TaskRoot 'samples\smoke.usda' }
 $InputUsd = [IO.Path]::GetFullPath($InputUsd)
@@ -40,6 +40,7 @@ try {
         $Result = Get-Content -Raw -LiteralPath $ResultPath | ConvertFrom-Json
         if (-not $Result.passed -or -not $Result.engine_shutdown) { throw 'Incomplete usdview verification.' }
     }
-} finally {
+}
+finally {
     Restore-HdUEEnvironment -Snapshot $Previous
 }

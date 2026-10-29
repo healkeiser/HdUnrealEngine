@@ -35,9 +35,13 @@ const ColorManagement& management() {
             result.sceneLinear = scene->getName();
             // UE's working space: linear Rec.709 under any of its usual names or aliases.
             OCIO::ConstColorSpaceRcPtr rec709;
-            for (const char* name : {"lin_rec709", "Linear Rec.709 (sRGB)", "lin_srgb", "Utility - Linear - sRGB", "linear", "Linear"})
+            for (const char* name :
+                 {"lin_rec709", "Linear Rec.709 (sRGB)", "lin_srgb", "Utility - Linear - sRGB", "linear", "Linear"})
                 if ((rec709 = config->getColorSpace(name))) break;
-            if (!rec709) { TF_WARN("hdUE: OCIO config has no linear Rec.709 colour space; output stays linear Rec.709"); return; }
+            if (!rec709) {
+                TF_WARN("hdUE: OCIO config has no linear Rec.709 colour space; output stays linear Rec.709");
+                return;
+            }
             result.rec709 = rec709->getName();
             if (std::string(rec709->getName()) == scene->getName()) return;
             result.toScene = config->getProcessor(rec709, scene)->getDefaultCPUProcessor();
@@ -50,7 +54,7 @@ const ColorManagement& management() {
     });
     return result;
 }
-}
+}  // namespace
 const std::string& HdUESceneLinearName() { return management().sceneLinear; }
 bool HdUESceneLinearIsRec709() { return management().identity; }
 void HdUEToSceneLinear(std::vector<float>& rgba) {
@@ -89,7 +93,8 @@ std::string HdUELinearRec709Texture(const std::string& file) {
     std::error_code error;
     const auto stamp = std::filesystem::last_write_time(file, error);
     if (error) return file;
-    const auto key = std::hash<std::string>{}(file + "|" + m.sceneLinear + "|" + std::to_string(stamp.time_since_epoch().count()));
+    const auto key =
+        std::hash<std::string>{}(file + "|" + m.sceneLinear + "|" + std::to_string(stamp.time_since_epoch().count()));
     const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
     const auto cached = folder / (std::to_string(key) + ".exr");
     if (std::filesystem::exists(cached, error)) return cached.string();
@@ -98,8 +103,10 @@ std::string HdUELinearRec709Texture(const std::string& file) {
     if (std::filesystem::exists(cached, error)) return cached.string();
     std::filesystem::create_directories(folder, error);
     OIIO::ImageBuf source(file), converted;
-    if (!OIIO::ImageBufAlgo::colorconvert(converted, source, m.sceneLinear, m.rec709) || !converted.write(cached.string())) {
-        TF_WARN("hdUE: could not convert %s from %s to %s; using it as is", file.c_str(), m.sceneLinear.c_str(), m.rec709.c_str());
+    if (!OIIO::ImageBufAlgo::colorconvert(converted, source, m.sceneLinear, m.rec709) ||
+        !converted.write(cached.string())) {
+        TF_WARN("hdUE: could not convert %s from %s to %s; using it as is", file.c_str(), m.sceneLinear.c_str(),
+                m.rec709.c_str());
         return file;
     }
     return cached.string();

@@ -1,7 +1,7 @@
 param([string]$EngineRoot = '')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$EngineRoot=Get-HdUELocalPath -Key engine_root -Value $EngineRoot
+$EngineRoot = Get-HdUELocalPath -Key engine_root -Value $EngineRoot
 $Tag = '5.8.4-release'
 $Commit = 'f45729c0b6f097038e72b52d366a62baeca3275b'
 if (-not (Test-Path -LiteralPath $EngineRoot)) {

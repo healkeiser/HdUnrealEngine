@@ -46,8 +46,12 @@ enum {
     HDUE_STATE_STOPPED = 4
 };
 enum { HDUE_REALTIME = 0, HDUE_PATH_TRACED = 1 };
-enum { HDUE_RGBA32_FLOAT = 1, HDUE_SCENE_LINEAR_SRGB = 1, HDUE_MESH_REQUIRE_NANITE = 1,
-    HDUE_MESH_EDITABLE = 2 }; // EDITABLE: geometry edited after upload (surface effects); others build static meshes
+enum {
+    HDUE_RGBA32_FLOAT = 1,
+    HDUE_SCENE_LINEAR_SRGB = 1,
+    HDUE_MESH_REQUIRE_NANITE = 1,
+    HDUE_MESH_EDITABLE = 2
+};  // EDITABLE: geometry edited after upload (surface effects); others build static meshes
 
 /* Every descriptor is caller-owned. Set struct_size to sizeof(the descriptor).
  * Strings are UTF-8 and are copied during the call. No UE/pxr/STL type, native
@@ -103,18 +107,26 @@ typedef struct HdueRenderRequest {
     double projection_scale[2];
     double projection_offset[2];
     uint32_t orthographic;
-    float far_clip_cm;       /* orthographic depth range [near_clip_cm, far_clip_cm] */
-    float fstop;             /* depth of field when fstop and focus_distance_cm are > 0 */
+    float far_clip_cm; /* orthographic depth range [near_clip_cm, far_clip_cm] */
+    float fstop;       /* depth of field when fstop and focus_distance_cm are > 0 */
     float focus_distance_cm;
     float focal_length_cm;
 } HdueRenderRequest;
 /* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
-enum { HDUE_AOV_COLOR = 0, HDUE_AOV_ALBEDO = 1, HDUE_AOV_NORMAL = 2, HDUE_AOV_ROUGHNESS = 3,
-    HDUE_AOV_METALLIC = 4, HDUE_AOV_SPECULAR = 5, HDUE_AOV_OCCLUSION = 6,
+enum {
+    HDUE_AOV_COLOR = 0,
+    HDUE_AOV_ALBEDO = 1,
+    HDUE_AOV_NORMAL = 2,
+    HDUE_AOV_ROUGHNESS = 3,
+    HDUE_AOV_METALLIC = 4,
+    HDUE_AOV_SPECULAR = 5,
+    HDUE_AOV_OCCLUSION = 6,
     /* Unlit ID pass: R = id / 2048, G = id % 2048, B = 1 where a mesh with prim_id >= 0 is visible. */
     HDUE_AOV_PRIM_ID = 7,
     /* Same encoding as PRIM_ID with the Hydra instance index of instanced meshes; -1 elsewhere. */
-    HDUE_AOV_INSTANCE_ID = 8, HDUE_AOV_COUNT = 9 };
+    HDUE_AOV_INSTANCE_ID = 8,
+    HDUE_AOV_COUNT = 9
+};
 
 typedef struct HdueFrameInfo {
     uint32_t struct_size;
@@ -132,13 +144,22 @@ typedef struct HdueFrameInfo {
     double readback_ms;
 } HdueFrameInfo;
 
-enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2,
-    HDUE_CAMERA_DISTANT_LIGHT = 3 };
+enum { HDUE_DISTANT_LIGHT = 0, HDUE_SPHERE_LIGHT = 1, HDUE_RECT_LIGHT = 2, HDUE_CAMERA_DISTANT_LIGHT = 3 };
 /* Material inputs that can be driven by a texture (UsdUVTexture, MaterialX image). */
-enum { HDUE_TEXTURE_BASE_COLOR = 0, HDUE_TEXTURE_EMISSIVE = 1, HDUE_TEXTURE_METALLIC = 2,
-    HDUE_TEXTURE_ROUGHNESS = 3, HDUE_TEXTURE_OPACITY = 4, HDUE_TEXTURE_NORMAL = 5, HDUE_TEXTURE_DISPLACEMENT = 6,
-    HDUE_TEXTURE_OCCLUSION = 7, HDUE_TEXTURE_CLEARCOAT = 8, HDUE_TEXTURE_CLEARCOAT_ROUGHNESS = 9, HDUE_TEXTURE_SPECULAR_COLOR = 10,
-    HDUE_TEXTURE_SLOT_COUNT = 11 };
+enum {
+    HDUE_TEXTURE_BASE_COLOR = 0,
+    HDUE_TEXTURE_EMISSIVE = 1,
+    HDUE_TEXTURE_METALLIC = 2,
+    HDUE_TEXTURE_ROUGHNESS = 3,
+    HDUE_TEXTURE_OPACITY = 4,
+    HDUE_TEXTURE_NORMAL = 5,
+    HDUE_TEXTURE_DISPLACEMENT = 6,
+    HDUE_TEXTURE_OCCLUSION = 7,
+    HDUE_TEXTURE_CLEARCOAT = 8,
+    HDUE_TEXTURE_CLEARCOAT_ROUGHNESS = 9,
+    HDUE_TEXTURE_SPECULAR_COLOR = 10,
+    HDUE_TEXTURE_SLOT_COUNT = 11
+};
 /* Colour slots hold (sRGB-encoded, for 8-bit files) colours; the others hold linear data. */
 static inline int hdue_texture_is_color(uint32_t slot) {
     return slot == HDUE_TEXTURE_BASE_COLOR || slot == HDUE_TEXTURE_EMISSIVE || slot == HDUE_TEXTURE_SPECULAR_COLOR;
@@ -238,21 +259,22 @@ typedef struct HdueSceneBatch {
 typedef struct HdueApi {
     uint32_t struct_size;
     uint32_t abi_version;
-    HdueResult (HDUE_CALL *initialize)(const HdueInitDesc* desc);
-    HdueResult (HDUE_CALL *get_status)(HdueStatus* status);
-    HdueResult (HDUE_CALL *tick)(void);
-    HdueResult (HDUE_CALL *create_session)(const HdueSessionDesc* desc, HdueSession* session);
-    HdueResult (HDUE_CALL *destroy_session)(HdueSession session);
-    HdueResult (HDUE_CALL *request_render)(HdueSession session, const HdueRenderRequest* request);
-    HdueResult (HDUE_CALL *poll_frame)(HdueSession session, HdueFrameInfo* frame);
-    HdueResult (HDUE_CALL *copy_frame)(HdueSession session, uint64_t frame_id, void* buffer, uint64_t capacity);
-    HdueResult (HDUE_CALL *window_message)(uint64_t hwnd, uint32_t message, uint64_t wparam, int64_t lparam, int64_t* result);
-    HdueResult (HDUE_CALL *shutdown)(void);
-    HdueResult (HDUE_CALL *apply_scene)(HdueSession session, const HdueSceneBatch* batch);
+    HdueResult(HDUE_CALL* initialize)(const HdueInitDesc* desc);
+    HdueResult(HDUE_CALL* get_status)(HdueStatus* status);
+    HdueResult(HDUE_CALL* tick)(void);
+    HdueResult(HDUE_CALL* create_session)(const HdueSessionDesc* desc, HdueSession* session);
+    HdueResult(HDUE_CALL* destroy_session)(HdueSession session);
+    HdueResult(HDUE_CALL* request_render)(HdueSession session, const HdueRenderRequest* request);
+    HdueResult(HDUE_CALL* poll_frame)(HdueSession session, HdueFrameInfo* frame);
+    HdueResult(HDUE_CALL* copy_frame)(HdueSession session, uint64_t frame_id, void* buffer, uint64_t capacity);
+    HdueResult(HDUE_CALL* window_message)(uint64_t hwnd, uint32_t message, uint64_t wparam, int64_t lparam,
+                                          int64_t* result);
+    HdueResult(HDUE_CALL* shutdown)(void);
+    HdueResult(HDUE_CALL* apply_scene)(HdueSession session, const HdueSceneBatch* batch);
 } HdueApi;
 
 /* Does not initialize the engine. The DLL must remain loaded until process exit. */
-typedef HdueResult (HDUE_CALL *HdueGetApiFn)(uint32_t version, uint32_t capacity, HdueApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetApiFn)(uint32_t version, uint32_t capacity, HdueApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t version, uint32_t capacity, HdueApi* api);
 
 /* Optional versioned extension. The original v1 function table stays unchanged. */
@@ -287,15 +309,14 @@ typedef struct HdueNativePickApi {
     /* Owner thread only. No Tick/render wait. On a hit, ID includes a trailing
        NUL; BUFFER_TOO_SMALL fills hit.required_id_bytes without touching ID.
        StaticMesh uses CPU-readable resident LOD0, Nanite uses fallback LOD0. */
-    HdueResult (HDUE_CALL *pick_native)(HdueSession session, const HdueNativeRay* ray,
-        HdueNativeHit* hit, char* object_id, uint32_t id_capacity);
-    HdueResult (HDUE_CALL *get_material_info)(const char* asset_path, HduePickMaterialInfo* info);
+    HdueResult(HDUE_CALL* pick_native)(HdueSession session, const HdueNativeRay* ray, HdueNativeHit* hit,
+                                       char* object_id, uint32_t id_capacity);
+    HdueResult(HDUE_CALL* get_material_info)(const char* asset_path, HduePickMaterialInfo* info);
 } HdueNativePickApi;
-typedef HdueResult (HDUE_CALL *HdueGetNativePickApiFn)(uint32_t version, uint32_t capacity, HdueNativePickApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetNativePickApiFn)(uint32_t version, uint32_t capacity, HdueNativePickApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_native_pick_api(uint32_t version, uint32_t capacity, HdueNativePickApi* api);
 
 #ifdef __cplusplus
 }
 #endif
 #endif
-

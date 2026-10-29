@@ -17,38 +17,51 @@ class FHdueLighting {
 public:
     explicit FHdueLighting(UWorld* InWorld);
     ~FHdueLighting();
-    bool Apply(const HdueLightBatch& Batch,FString& Error);
+    bool Apply(const HdueLightBatch& Batch, FString& Error);
     void Remove(const FString& Id);
     void Clear();
     void Tick();
-    void UpdateCamera(const FVector& Eye,const FVector& Target,const FVector& Up);
+    void UpdateCamera(const FVector& Eye, const FVector& Target, const FVector& Up);
     bool Ready() const;
     bool BackgroundVisible() const;
     FTextureRHIRef EnvironmentTexture() const;
-    float EnvironmentScale() const {return RadianceScale;}
+    float EnvironmentScale() const { return RadianceScale; }
     void Status(HdueLightingStatus& Status) const;
-    const FString& GetError() const {return LastError;}
+    const FString& GetError() const { return LastError; }
+
 private:
-    struct FDefinition {HdueLight Data{}; FString Id,File,Ies;};
-    struct FImageEntry {FDateTime Modified; int64 Size=0; TSharedPtr<FImage> Image;};
+    struct FDefinition {
+        HdueLight Data{};
+        FString Id, File, Ies;
+    };
+    struct FImageEntry {
+        FDateTime Modified;
+        int64 Size = 0;
+        TSharedPtr<FImage> Image;
+    };
     UWorld* World;
-    TMap<FString,FDefinition> Definitions;
-    TMap<FString,AActor*> Actors;
-    TMap<FString,FImageEntry> Images;
-    TMap<FString,TStrongObjectPtr<UTexture2D>> LightTextures;
-    struct FProfileEntry {FDateTime Modified; int64 Size=0; TStrongObjectPtr<UTextureLightProfile> Texture; float Mean=0;}; // Mean: of the max-normalized profile over the sphere
-    TMap<FString,FProfileEntry> Profiles; // IES files by path
-    UTextureLightProfile* Profile(const FString& File,FString& Error);
-    AActor* SkyActor=nullptr;
-    USkyLightComponent* Sky=nullptr;
+    TMap<FString, FDefinition> Definitions;
+    TMap<FString, AActor*> Actors;
+    TMap<FString, FImageEntry> Images;
+    TMap<FString, TStrongObjectPtr<UTexture2D>> LightTextures;
+    struct FProfileEntry {
+        FDateTime Modified;
+        int64 Size = 0;
+        TStrongObjectPtr<UTextureLightProfile> Texture;
+        float Mean = 0;  // of the max-normalized profile over the sphere
+    };
+    TMap<FString, FProfileEntry> Profiles;  // IES files by path
+    UTextureLightProfile* Profile(const FString& File, FString& Error);
+    AActor* SkyActor = nullptr;
+    USkyLightComponent* Sky = nullptr;
     TStrongObjectPtr<UTextureCube> Environment;
     TStrongObjectPtr<UTexture2D> DiskTexture;
     FRenderCommandFence CaptureFence;
-    bool EnvironmentDirty=false;
-    bool ShowBackground=false;
-    uint32 DomeCount=0,Resolution=0;
-    float RadianceScale=1,MaximumRadiance=0;
+    bool EnvironmentDirty = false;
+    bool ShowBackground = false;
+    uint32 DomeCount = 0, Resolution = 0;
+    float RadianceScale = 1, MaximumRadiance = 0;
     FString LastError;
     bool RebuildEnvironment(FString& Error);
-    bool UpdateLocal(const FDefinition& Definition,FString& Error);
+    bool UpdateLocal(const FDefinition& Definition, FString& Error);
 };

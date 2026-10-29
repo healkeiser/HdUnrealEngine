@@ -24,10 +24,10 @@ typedef struct HdueVolumeDesc {
 } HdueVolumeDesc;
 typedef struct HdueVolumeApi {
     uint32_t struct_size, abi_version;
-    HdueResult (HDUE_CALL *upsert)(HdueSession session, const HdueVolumeDesc* volume);
-    HdueResult (HDUE_CALL *remove)(HdueSession session, const char* id);
+    HdueResult(HDUE_CALL* upsert)(HdueSession session, const HdueVolumeDesc* volume);
+    HdueResult(HDUE_CALL* remove)(HdueSession session, const char* id);
 } HdueVolumeApi;
-typedef HdueResult (HDUE_CALL *HdueGetVolumeApiFn)(uint32_t version, uint32_t capacity, HdueVolumeApi* api);
+typedef HdueResult(HDUE_CALL* HdueGetVolumeApiFn)(uint32_t version, uint32_t capacity, HdueVolumeApi* api);
 HDUE_EXPORT HdueResult HDUE_CALL hdue_get_volume_api(uint32_t version, uint32_t capacity, HdueVolumeApi* api);
 #ifdef __cplusplus
 }

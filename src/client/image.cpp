@@ -12,7 +12,8 @@ void write_pfm(const std::filesystem::path& path, const HdueFrameInfo& frame, co
     if (!path.parent_path().empty()) std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
     if (!out) throw std::runtime_error("Cannot create PFM output");
-    out << "PF\n" << frame.width << ' ' << frame.height << "\n"
+    out << "PF\n"
+        << frame.width << ' ' << frame.height << "\n"
         << (std::endian::native == std::endian::little ? "-1.0\n" : "1.0\n");
     // ABI images are top to bottom; PFM is bottom to top, with RGB float pixels.
     for (uint32_t y = frame.height; y-- > 0;) {
@@ -26,5 +27,4 @@ void write_pfm(const std::filesystem::path& path, const HdueFrameInfo& frame, co
     }
     if (!out) throw std::runtime_error("Failed writing PFM output");
 }
-}
-
+}  // namespace hdue

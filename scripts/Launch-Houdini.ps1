@@ -1,74 +1,75 @@
 param(
-    [string]$HoudiniRoot='',
-    [string]$RuntimeConfig='',
-    [string]$InputUsd='',
-    [string]$HipFile='',
-    [string]$LogDirectory='',
-    [string]$BuildDirectory='',
-    [string]$MaterialXLibrary='',
-    [string]$SubstrateLibrary='',
+    [string]$HoudiniRoot = '',
+    [string]$RuntimeConfig = '',
+    [string]$InputUsd = '',
+    [string]$HipFile = '',
+    [string]$LogDirectory = '',
+    [string]$BuildDirectory = '',
+    [string]$MaterialXLibrary = '',
+    [string]$SubstrateLibrary = '',
     # Runs that in-Houdini test (tests/houdini) and waits for it; empty: an interactive session.
-    [ValidateSet('','integration','viewport','optextures','materials','lighting','references','surfaces','substrate','substrate-textures','substrate-live')][string]$TestKind='',
-    [int]$TimeoutSeconds=420
+    [ValidateSet('', 'integration', 'viewport', 'optextures', 'materials', 'lighting', 'references', 'surfaces', 'substrate', 'substrate-textures', 'substrate-live')][string]$TestKind = '',
+    [int]$TimeoutSeconds = 420
 )
-$ErrorActionPreference='Stop'
+$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$HoudiniRoot=Get-HdUELocalPath -Key houdini_root -Value $HoudiniRoot
-$DelegateBuild=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory
-$TaskRoot=Split-Path -Parent $PSScriptRoot
-$HoudiniExe=Join-Path $HoudiniRoot 'bin\houdini.exe'
-$Version=(Get-Item -LiteralPath $HoudiniExe).VersionInfo
-if (@($Version.FileMajorPart,$Version.FileMinorPart) -join '.' -ne '22.0') {throw 'This delegate requires a Houdini 22.0 ABI.'}
+$HoudiniRoot = Get-HdUELocalPath -Key houdini_root -Value $HoudiniRoot
+$DelegateBuild = Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory
+$TaskRoot = Split-Path -Parent $PSScriptRoot
+$HoudiniExe = Join-Path $HoudiniRoot 'bin\houdini.exe'
+$Version = (Get-Item -LiteralPath $HoudiniExe).VersionInfo
+if (@($Version.FileMajorPart, $Version.FileMinorPart) -join '.' -ne '22.0') { throw 'This delegate requires a Houdini 22.0 ABI.' }
 if (-not $RuntimeConfig) {
-    $ActiveConfig=Join-Path $TaskRoot 'out\project-assets\active-houdini.json'
-    $RuntimeConfig=Get-HdUELocalPath -Key runtime_config -Optional
-    if (-not $RuntimeConfig -and (Test-Path -LiteralPath $ActiveConfig)) {$RuntimeConfig=$ActiveConfig}
-    if (-not (Test-Path -LiteralPath $RuntimeConfig)) {throw 'Run Update-HoudiniRuntime.ps1 or specify an updated -RuntimeConfig with the depth extension.'}
+    $ActiveConfig = Join-Path $TaskRoot 'out\project-assets\active-houdini.json'
+    $RuntimeConfig = Get-HdUELocalPath -Key runtime_config -Optional
+    if (-not $RuntimeConfig -and (Test-Path -LiteralPath $ActiveConfig)) { $RuntimeConfig = $ActiveConfig }
+    if (-not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Run Update-HoudiniRuntime.ps1 or specify an updated -RuntimeConfig with the depth extension.' }
 }
-if (-not (Test-Path -LiteralPath $RuntimeConfig)) {throw 'Specify a prepared -RuntimeConfig.'}
+if (-not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Specify a prepared -RuntimeConfig.' }
 if ($HipFile) {
-    if ($InputUsd) {throw 'Choose either -HipFile or -InputUsd.'}
-    $HipFile=(Resolve-Path -LiteralPath $HipFile).Path
+    if ($InputUsd) { throw 'Choose either -HipFile or -InputUsd.' }
+    $HipFile = (Resolve-Path -LiteralPath $HipFile).Path
 }
-if (-not $LogDirectory) {$LogDirectory=New-HdUERun -Name houdini-session -Create}
+if (-not $LogDirectory) { $LogDirectory = New-HdUERun -Name houdini-session -Create }
 New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
-$Dll=Join-Path $DelegateBuild 'Release\hdUE_Houdini22.dll'
-if (-not (Test-Path -LiteralPath $Dll)) {throw 'Run Build-Houdini.ps1 first.'}
-$Names=@('HFS','PATH','PYTHONPATH','HOUDINI_PATH','PXR_PLUGINPATH_NAME','HOUDINI_USER_PREF_DIR','HOUDINI_NO_START_PAGE_SPLASH','HDUE_HOUDINI_ENABLE','HDUE_RUNTIME_CONFIG','HDUE_HOUDINI_INPUT','HDUE_HOUDINI_HIP','HDUE_HOUDINI_LOG_DIR','HDUE_HOUDINI_TEST','HDUE_HOUDINI_PLUGIN','HDUE_MATERIALX_LIBRARY','HDUE_SUBSTRATE_LIBRARY')
-$Previous=@{}; foreach ($Name in $Names) {$Previous[$Name]=[Environment]::GetEnvironmentVariable($Name,'Process')}
+$Dll = Join-Path $DelegateBuild 'Release\hdUE_Houdini22.dll'
+if (-not (Test-Path -LiteralPath $Dll)) { throw 'Run Build-Houdini.ps1 first.' }
+$Names = @('HFS', 'PATH', 'PYTHONPATH', 'HOUDINI_PATH', 'PXR_PLUGINPATH_NAME', 'HOUDINI_USER_PREF_DIR', 'HOUDINI_NO_START_PAGE_SPLASH', 'HDUE_HOUDINI_ENABLE', 'HDUE_RUNTIME_CONFIG', 'HDUE_HOUDINI_INPUT', 'HDUE_HOUDINI_HIP', 'HDUE_HOUDINI_LOG_DIR', 'HDUE_HOUDINI_TEST', 'HDUE_HOUDINI_PLUGIN', 'HDUE_MATERIALX_LIBRARY', 'HDUE_SUBSTRATE_LIBRARY')
+$Previous = @{}; foreach ($Name in $Names) { $Previous[$Name] = [Environment]::GetEnvironmentVariable($Name, 'Process') }
 try {
-    $env:HFS=$HoudiniRoot
-    $env:PATH="$HoudiniRoot\bin;$HoudiniRoot\python313;$env:PATH"
-    $env:PYTHONPATH='' # Houdini must use its own Python/USD, not standalone usdview.
+    $env:HFS = $HoudiniRoot
+    $env:PATH = "$HoudiniRoot\bin;$HoudiniRoot\python313;$env:PATH"
+    $env:PYTHONPATH = '' # Houdini must use its own Python/USD, not standalone usdview.
     # The in-Houdini tests are not shipped: their folder is on HOUDINI_PATH only for test runs.
-    $env:HOUDINI_PATH="$TaskRoot\integrations\houdini;"+$(if ($TestKind) {"$TaskRoot\tests\houdini;"})+$(if ($Previous.HOUDINI_PATH) {$Previous.HOUDINI_PATH} else {'&'})
-    $env:PXR_PLUGINPATH_NAME="$HoudiniRoot\bin\usd_plugins;$HoudiniRoot\houdini\dso\usd_plugins;$DelegateBuild\resources"
-    $env:HDUE_HOUDINI_PLUGIN=$Dll
-    $env:HDUE_MATERIALX_LIBRARY=if ($MaterialXLibrary) {[IO.Path]::GetFullPath($MaterialXLibrary)} else {''}
-    $env:HDUE_SUBSTRATE_LIBRARY=if ($SubstrateLibrary) {[IO.Path]::GetFullPath($SubstrateLibrary)} else {''}
-    $env:HDUE_HOUDINI_ENABLE='1'
-    $env:HDUE_RUNTIME_CONFIG=[IO.Path]::GetFullPath($RuntimeConfig)
-    $env:HDUE_HOUDINI_INPUT=if ($InputUsd) {[IO.Path]::GetFullPath($InputUsd)} else {''}
-    $env:HDUE_HOUDINI_HIP=$HipFile
-    if ($LogDirectory) {$env:HDUE_HOUDINI_LOG_DIR=[IO.Path]::GetFullPath($LogDirectory)}
-    $env:HDUE_HOUDINI_TEST=$TestKind
+    $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($TestKind) { "$TaskRoot\tests\houdini;" }) + $(if ($Previous.HOUDINI_PATH) { $Previous.HOUDINI_PATH } else { '&' })
+    $env:PXR_PLUGINPATH_NAME = "$HoudiniRoot\bin\usd_plugins;$HoudiniRoot\houdini\dso\usd_plugins;$DelegateBuild\resources"
+    $env:HDUE_HOUDINI_PLUGIN = $Dll
+    $env:HDUE_MATERIALX_LIBRARY = if ($MaterialXLibrary) { [IO.Path]::GetFullPath($MaterialXLibrary) } else { '' }
+    $env:HDUE_SUBSTRATE_LIBRARY = if ($SubstrateLibrary) { [IO.Path]::GetFullPath($SubstrateLibrary) } else { '' }
+    $env:HDUE_HOUDINI_ENABLE = '1'
+    $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($RuntimeConfig)
+    $env:HDUE_HOUDINI_INPUT = if ($InputUsd) { [IO.Path]::GetFullPath($InputUsd) } else { '' }
+    $env:HDUE_HOUDINI_HIP = $HipFile
+    if ($LogDirectory) { $env:HDUE_HOUDINI_LOG_DIR = [IO.Path]::GetFullPath($LogDirectory) }
+    $env:HDUE_HOUDINI_TEST = $TestKind
     if ($TestKind) {
         # Documented batch-startup UI flag. This does not answer consent
         # questions or change any telemetry/privacy preference.
-        $env:HOUDINI_NO_START_PAGE_SPLASH='1'
-        $env:HOUDINI_USER_PREF_DIR=Join-Path ([IO.Path]::GetFullPath($LogDirectory)) 'preferences'
+        $env:HOUDINI_NO_START_PAGE_SPLASH = '1'
+        $env:HOUDINI_USER_PREF_DIR = Join-Path ([IO.Path]::GetFullPath($LogDirectory)) 'preferences'
         New-Item -ItemType Directory -Force -Path $env:HOUDINI_USER_PREF_DIR | Out-Null
         # Suppress only the first-run welcome window in this disposable test
         # profile. Do not write telemetry, privacy or user preference values.
         Set-Content -LiteralPath (Join-Path $env:HOUDINI_USER_PREF_DIR 'pluto_ui.pref') -Value 'pluto_ui.welcome_seen := 1;' -Encoding utf8
     }
-    $LaunchArguments=@('-foreground')
-    if ($HipFile) {$LaunchArguments+='"'+$HipFile+'"'}
-    $Process=Start-Process -FilePath $HoudiniExe -ArgumentList $LaunchArguments -PassThru -RedirectStandardOutput (Join-Path $LogDirectory 'houdini.log') -RedirectStandardError (Join-Path $LogDirectory 'houdini-error.log')
+    $LaunchArguments = @('-foreground')
+    if ($HipFile) { $LaunchArguments += '"' + $HipFile + '"' }
+    $Process = Start-Process -FilePath $HoudiniExe -ArgumentList $LaunchArguments -PassThru -RedirectStandardOutput (Join-Path $LogDirectory 'houdini.log') -RedirectStandardError (Join-Path $LogDirectory 'houdini-error.log')
     Write-Output "Houdini PID $($Process.Id), logs: $LogDirectory"
     if ($TestKind) {
-        if (-not $Process.WaitForExit($TimeoutSeconds*1000)) {throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR."}
-        if ($Process.ExitCode) {throw 'Houdini / hdUE exited with an error.'}
-        if (Test-Path -LiteralPath (Join-Path $env:HDUE_HOUDINI_LOG_DIR 'test-error.txt')) {throw 'Solaris integration test failed; see test-error.txt.'}
+        if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) { throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR." }
+        if ($Process.ExitCode) { throw 'Houdini / hdUE exited with an error.' }
+        if (Test-Path -LiteralPath (Join-Path $env:HDUE_HOUDINI_LOG_DIR 'test-error.txt')) { throw 'Solaris integration test failed; see test-error.txt.' }
     }
-} finally {Restore-HdUEEnvironment -Snapshot $Previous}
+}
+finally { Restore-HdUEEnvironment -Snapshot $Previous }

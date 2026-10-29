@@ -1,4 +1,5 @@
 """On-demand picking of USD and cooked UE geometry, without a render wait."""
+
 from pxr import Gf, Sdf
 
 PLUGIN = "HdUERendererPlugin"
@@ -10,7 +11,14 @@ def install_picking(controller):
     last_error = None
 
     def no_hit():
-        return Gf.Vec3d(0), Gf.Vec3d(0), Sdf.Path.emptyPath, -1, Sdf.Path.emptyPath, -1
+        return (
+            Gf.Vec3d(0),
+            Gf.Vec3d(0),
+            Sdf.Path.emptyPath,
+            -1,
+            Sdf.Path.emptyPath,
+            -1,
+        )
 
     def pick(frustum):
         nonlocal last_error
@@ -22,8 +30,17 @@ def install_picking(controller):
             return no_hit()
         # Resolve nearest to the cursor center, with a small subpixel footprint
         # matching the narrowed frustum supplied by usdview.
-        samples = [(0, 0), (-.65, 0), (.65, 0), (0, -.65), (0, .65),
-                   (-.65, -.65), (.65, -.65), (-.65, .65), (.65, .65)]
+        samples = [
+            (0, 0),
+            (-0.65, 0),
+            (0.65, 0),
+            (0, -0.65),
+            (0, 0.65),
+            (-0.65, -0.65),
+            (0.65, -0.65),
+            (-0.65, 0.65),
+            (0.65, 0.65),
+        ]
         forward = frustum.ComputeViewDirection().GetNormalized()
         for x, y in samples:
             ray = frustum.ComputePickRay(Gf.Vec2d(x, y))
@@ -32,11 +49,19 @@ def install_picking(controller):
             if cosine <= 0:
                 continue
             offset = Gf.Dot(ray.startPoint - frustum.position, forward)
-            minimum = max(0.0, float((frustum.nearFar.GetMin() - offset) / cosine))
+            minimum = max(
+                0.0, float((frustum.nearFar.GetMin() - offset) / cosine)
+            )
             maximum = float((frustum.nearFar.GetMax() - offset) / cosine)
-            if not renderer.InvokeRendererCommand("hdue:pickRay", {
-                    "origin": ray.startPoint, "direction": direction,
-                    "minimum": minimum, "maximum": maximum}):
+            if not renderer.InvokeRendererCommand(
+                "hdue:pickRay",
+                {
+                    "origin": ray.startPoint,
+                    "direction": direction,
+                    "minimum": minimum,
+                    "maximum": maximum,
+                },
+            ):
                 error = "hdUE picking is unavailable; rebuild the host plugin"
                 if error != last_error:
                     controller.statusMessage(error)

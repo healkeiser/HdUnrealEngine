@@ -14,7 +14,10 @@
 #pragma include_alias("ISkeletonEditor.h", "CoreMinimal.h")
 #pragma include_alias("ISkeletonEditorModule.h", "CoreMinimal.h")
 #pragma include_alias("SkeletalMeshTools.h", "CoreMinimal.h")
-class FExtender; class FUICommandList; struct FSoftSkinVertex; struct FSkinnedMeshChunk;
+class FExtender;
+class FUICommandList;
+struct FSoftSkinVertex;
+struct FSkinnedMeshChunk;
 #include "MeshRepresentationCommon.cpp"
 #include "MeshCardRepresentationUtilities.cpp"
 DEFINE_LOG_CATEGORY(LogMeshUtilities);
@@ -22,18 +25,19 @@ DEFINE_LOG_CATEGORY(LogMeshUtilities);
 
 // Any thread, before the LOD's resources are initialized (the builder reads its CPU copies). Null without Embree.
 FCardRepresentationData* HdueMeshCards(const FStaticMeshLODResources& LOD, const FBoxSphereBounds& Bounds) {
-#if !WITH_EDITOR && USE_EMBREE // USE_EMBREE is only defined where the game target links Embree
-    if (!GetModuleHandleW(TEXT("embree4.dll"))) return nullptr; // Bridge's Initialize loads it from this DLL's folder
+#if !WITH_EDITOR && USE_EMBREE  // USE_EMBREE is only defined where the game target links Embree
+    if (!GetModuleHandleW(TEXT("embree4.dll"))) return nullptr;  // Bridge's Initialize loads it from this DLL's folder
     FEmbreeScene Embree;
     MeshRepresentation::SetupEmbreeScene(TEXT("hdUE"), false, Embree);
     if (!Embree.Scene) return nullptr;
-    const FSignedDistanceFieldBuildSectionData Section; // opaque, one-sided
+    const FSignedDistanceFieldBuildSectionData Section;  // opaque, one-sided
     FMeshDataForDerivedDataTask Mesh{nullptr, &LOD, MakeArrayView(&Section, 1), {}, {}, FBoxSphereBounds3f(Bounds)};
     FCardRepresentationData* Cards = nullptr;
     if (MeshRepresentation::AddMeshDataToEmbreeScene(Embree, Mesh, true)) {
         Embree.Commit();
         Cards = new FCardRepresentationData;
-        BuildMeshCards(Bounds.GetBox(), FGenerateCardMeshContext(Embree.MeshName, Embree, *Cards), 12, *Cards); // UE's default MaxLumenMeshCards
+        BuildMeshCards(Bounds.GetBox(), FGenerateCardMeshContext(Embree.MeshName, Embree, *Cards), 12,
+                       *Cards);  // UE's default MaxLumenMeshCards
     }
     MeshRepresentation::DeleteEmbreeScene(Embree);
     return Cards;

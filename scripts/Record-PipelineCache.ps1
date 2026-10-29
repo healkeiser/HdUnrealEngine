@@ -69,11 +69,13 @@ threading.Timer($HoudiniSeconds, lambda: hdefereval.executeDeferred(lambda: hou.
             $env:HOUDINI_PATH = "$Hook;&"
             $Launch = & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $HoudiniRuntimeConfig `
                 -InputUsd $(if ($InputUsd) { $InputUsd } else { Join-Path $TaskRoot 'samples\smoke.usda' }) -LogDirectory (Join-Path $RunRoot 'houdini')
-        } finally { $env:HOUDINI_PATH = $PreviousPath }
+        }
+        finally { $env:HOUDINI_PATH = $PreviousPath }
         $Houdini = Get-Process -Id ([regex]::Match("$Launch", 'Houdini PID (\d+)').Groups[1].Value)
         if (-not $Houdini.WaitForExit(($HoudiniSeconds + 120) * 1000)) { $Houdini.Kill(); throw "Houdini (PID $($Houdini.Id)) did not quit; killed it." }
     }
-} finally {
+}
+finally {
     [IO.File]::WriteAllBytes($Ini, $OriginalIni)
     if (Test-Path -LiteralPath $SetAside) { Move-Item -LiteralPath $SetAside -Destination $Bundled }
 }

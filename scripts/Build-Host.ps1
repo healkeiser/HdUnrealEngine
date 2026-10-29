@@ -1,7 +1,7 @@
 param([string]$OpenUsdRoot = '')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
+$OpenUsdRoot = Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 & cmake -S $TaskRoot -B (Join-Path $TaskRoot 'build') -G 'Visual Studio 17 2022' -A x64 -DHDUE_BUILD_HYDRA=ON "-DOPENUSD_ROOT=$OpenUsdRoot" "-Dpxr_DIR=$OpenUsdRoot"
 if ($LASTEXITCODE) { throw 'CMake configuration failed.' }

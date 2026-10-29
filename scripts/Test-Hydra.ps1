@@ -17,19 +17,19 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$OpenUsdRoot=Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
+$OpenUsdRoot = Get-HdUELocalPath -Key openusd_root -Value $OpenUsdRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Game = Join-Path $TaskRoot 'out\runtime\Windows\HdUEBackend'
-$BackendDll=Join-Path $Game 'Binaries\Win64\HdUEBackend.dll'
-$RuntimeProject=Join-Path $Game 'HdUEBackend.uproject'
+$BackendDll = Join-Path $Game 'Binaries\Win64\HdUEBackend.dll'
+$RuntimeProject = Join-Path $Game 'HdUEBackend.uproject'
 if ($RuntimeConfig) {
-    $ConfigPath=[IO.Path]::GetFullPath($RuntimeConfig)
-    $Profile=Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-    if ($Profile.version -ne 1) {throw 'Unsupported runtime configuration.'}
-    foreach ($Key in @('backend_dll','runtime_project')) {
-        if (-not [IO.Path]::IsPathRooted($Profile.$Key)) {$Profile.$Key=[IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ConfigPath) $Profile.$Key))}
+    $ConfigPath = [IO.Path]::GetFullPath($RuntimeConfig)
+    $RuntimeProfile = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    if ($RuntimeProfile.version -ne 1) { throw 'Unsupported runtime configuration.' }
+    foreach ($Key in @('backend_dll', 'runtime_project')) {
+        if (-not [IO.Path]::IsPathRooted($RuntimeProfile.$Key)) { $RuntimeProfile.$Key = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ConfigPath) $RuntimeProfile.$Key)) }
     }
-    $BackendDll=$Profile.backend_dll; $RuntimeProject=$Profile.runtime_project
+    $BackendDll = $RuntimeProfile.backend_dll; $RuntimeProject = $RuntimeProfile.runtime_project
 }
 if (-not $InputUsd) { $InputUsd = Join-Path $TaskRoot 'samples\smoke.usda' }
 $RunOutput = New-HdUERun -Name hydra -Path $OutputDirectory
@@ -59,7 +59,8 @@ try {
     if ($LightingTest) { $PerCycle += 8 }
     if ($Metrics.passed -ne $true -or $Metrics.frames.Count -ne ($PerCycle * $Cycles)) { throw 'Incomplete Hydra rendering evidence.' }
     Write-Output "Verified Hydra/UE output: $RunOutput"
-} finally {
+}
+finally {
     $env:PATH = $PreviousPath
     $env:PXR_PLUGINPATH_NAME = $PreviousPlugins
 }
