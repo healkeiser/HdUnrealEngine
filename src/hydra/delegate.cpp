@@ -1626,6 +1626,17 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
     {"Warmup frames", TfToken("warmupFrames"), VtValue(16)}, {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
     {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
     {"Environment cube resolution",TfToken("domeResolution"),VtValue(512)} }; }
+namespace {
+// Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
+// a synced prim: only those need uploading again.
+template <class Prims> void dirtyChangedEntries(const VtDictionary& before, const VtDictionary& after, const Prims& prims, std::set<std::string>& dirty) {
+    const auto changed = [&](const VtDictionary& from, const VtDictionary& to) {
+        for (const auto& [id, entry] : from)
+            if (prims.count(id) && (!to.count(id) || to.find(id)->second != entry)) dirty.insert(id);
+    };
+    changed(before, after); changed(after, before);
+}
+}
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) {
     if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
     if(key.GetString().starts_with("hdUE:")) { SetRenderSetting(TfToken(key.GetString().substr(5)),value); return; }
@@ -1643,14 +1654,22 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     std::lock_guard settingsLock(state_->settingsMutex);
     if (const auto old=state_->settings.find(key); old!=state_->settings.end() && old->second==value) return;
     HdRenderDelegate::SetRenderSetting(key, value);
-    if (key == TfToken("nativeMaterialParameters")) {
-        const auto previous = state_->setting<VtDictionary>("nativeMaterialParameters", {});
-        const auto current = value.IsHolding<VtDictionary>() ? value.UncheckedGet<VtDictionary>() : VtDictionary();
-        for (const auto& [id, fields] : previous) if (state_->materials.count(id) && (!current.count(id) || current.find(id)->second != fields)) state_->dirtyMaterials.insert(id);
-        for (const auto& [id, fields] : current) if (state_->materials.count(id) && (!previous.count(id) || previous.find(id)->second != fields)) state_->dirtyMaterials.insert(id);
+    // Settings that re-upload prims compare against their effective previous value (unset = the default), so the first
+    // value a host sends does not re-upload a scene it already matches.
+    const auto previousDictionary = state_->setting<VtDictionary>(key.GetText(), {});
+    const double previousUnits = state_->setting<double>("metersPerUnit", 0.01);
+    const std::string previousAxis = state_->setting<std::string>("upAxis", "Y");
+    const bool previousNanite = state_->setting<bool>("requireNanite", false);
+    state_->settings[key] = value;
+    const auto currentDictionary = value.IsHolding<VtDictionary>() ? value.UncheckedGet<VtDictionary>() : VtDictionary();
+    if (key == TfToken("nativeMaterialParameters") || key == TfToken("nativeMaterialAssets")) {
+        dirtyChangedEntries(previousDictionary, currentDictionary, state_->materials, state_->dirtyMaterials);
         ++state_->revision;
     }
-    state_->settings[key] = value;
+    if (key == TfToken("nativeMeshAssets")) {
+        dirtyChangedEntries(previousDictionary, currentDictionary, state_->meshes, state_->dirtyMeshes);
+        ++state_->revision;
+    }
     if (key==TfToken("surfaceEffects")) state_->wetBindings=std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects",{}));
     if (key==TfToken("surfaceEffects") || key==TfToken("wetMaskPreview") || key==TfToken("wetValidationError")) {
         ++state_->revision;
@@ -1683,11 +1702,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         for (const auto& [id, light] : state_->lights) if (!light.viewer) state_->dirtyLights.insert(id);
         ++state_->revision;
     }
-    if (key == TfToken("nativeMaterialAssets")) {
-        for (const auto& [id, v] : state_->materials) state_->dirtyMaterials.insert(id);
-        ++state_->revision;
-    }
-    if (key == TfToken("nativeMeshAssets") || key == TfToken("requireNanite") || key == TfToken("metersPerUnit") || key == TfToken("upAxis")) {
+    const bool sceneSpaceChanged = (key == TfToken("metersPerUnit") && state_->setting<double>("metersPerUnit", 0.01) != previousUnits) ||
+        (key == TfToken("upAxis") && state_->setting<std::string>("upAxis", "Y") != previousAxis) ||
+        (key == TfToken("requireNanite") && state_->setting<bool>("requireNanite", false) != previousNanite);
+    if (sceneSpaceChanged) {
         for (const auto& [id, v] : state_->materials) state_->dirtyMaterials.insert(id);
         for (const auto& [id, v] : state_->meshes) state_->dirtyMeshes.insert(id);
         for (const auto& [id, v] : state_->lights) state_->dirtyLights.insert(id);
