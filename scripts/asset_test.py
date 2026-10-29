@@ -264,7 +264,7 @@ class AssetTest(SmokeTest):
             )
             before = self.stats()["sessionHandle"]
             self.switch("HdStormRendererPlugin")
-            self.switch("HdUERendererPlugin")
+            self.switch("HdUEHoudiniRendererPlugin")
             self.launcher.configure_renderer()
             yield from self.image("delegate-recreated", 0, 64)
             if (

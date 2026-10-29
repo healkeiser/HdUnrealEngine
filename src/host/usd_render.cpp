@@ -549,12 +549,7 @@ int wmain(int argc, wchar_t** argv) {
         const double initMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         PlugRegistry::GetInstance().RegisterPlugins(utf8(options.plugins));
         auto& registry = HdRendererPluginRegistry::GetInstance();
-#if defined(HDUE_HOUDINI)
-        // A separate Tf type prevents discovery of the standalone USD ABI.
         auto* plugin = registry.GetRendererPlugin(TfToken("HdUEHoudiniRendererPlugin"));
-#else
-        auto* plugin = registry.GetRendererPlugin(TfToken("HdUERendererPlugin"));
-#endif
         check(plugin != nullptr, "Hydra could not discover the hdUE renderer plugin");
         std::filesystem::create_directories(options.output);
         std::ofstream metrics(options.output / "metrics.json");

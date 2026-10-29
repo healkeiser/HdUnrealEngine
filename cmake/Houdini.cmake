@@ -26,7 +26,6 @@ target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk opengl32
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hgi.lib" "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_garch.lib")
 target_compile_options(hdUE PRIVATE /W3 /utf-8 /bigobj)
 set(HDUE_PLUGIN_NAME hdUEHoudini22)
-set(HDUE_PLUGIN_TYPE HdUEHoudiniRendererPlugin)
 set(HDUE_PLUGIN_LIBRARY "Release/hdUE_Houdini22.dll")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/resources")
 configure_file(resources/plugInfo.json.in "${CMAKE_BINARY_DIR}/resources/plugInfo.json" @ONLY)
