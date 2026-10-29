@@ -12,7 +12,8 @@ extern "C" {
  * materials are cooked post-process material paths added as blendables with weight 1.
  * tonemapper 0 keeps the beauty linear (default); 1 runs UE's tonemapper, bloom, grading, vignette,
  * grain and lens effects and makes the beauty display-referred.
- * Names starting with "r." set that console variable instead (process-wide, e.g. r.PathTracing.Denoiser.Name).
+ * Names containing a dot set that console variable instead (process-wide, e.g. r.ScreenPercentage, sg.ShadowQuality;
+ * True/False become 1/0); a variable dropped from a later set gets back the value it had before hdUE set it.
  * Unknown names and unparsable values are skipped with a warning in the UE log. Replaces the
  * previous set; owner thread; applies to the next request. */
 typedef struct HduePostProcessDesc {

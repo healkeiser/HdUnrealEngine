@@ -80,10 +80,10 @@ private:
     TMap<FString, FPreviewTexture> PreviewTextures;
     double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
-    // A static mesh's render data, and Nanite data for the Nanite version TickConversions swaps in.
+    // A static mesh's render data (with Lumen cards if asked), and Nanite data for the version TickConversions swaps in.
     struct FConversion { TUniquePtr<FStaticMeshRenderData> RenderData; FBoxSphereBounds Bounds; TSharedPtr<Nanite::FResources> Nanite; };
-    static FConversion BuildStatic(const HdueMeshDesc& Desc);
-    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic; // background Nanite builds (null: no Nanite data)
+    static FConversion BuildStatic(const HdueMeshDesc& Desc, bool Cards);
+    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic; // background card and Nanite builds
     const FPreviewTexture* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;

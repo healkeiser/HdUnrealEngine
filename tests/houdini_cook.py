@@ -5,7 +5,7 @@ import sys
 import tempfile
 import json
 import hou
-from pxr import Gf,Sdf,Usd,UsdGeom
+from pxr import Sdf,UsdGeom
 
 root=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root/'integrations/houdini/python3.13libs'))
@@ -15,29 +15,38 @@ _runtime_config.write_text(json.dumps({'version':1}),encoding='utf-8')
 os.environ['HDUE_RUNTIME_CONFIG']=str(_runtime_config)
 import hdue_houdini as integration
 
-source=hou.node('/stage').createNode('pythonscript','test_source')
+ASSET='/Game/HdUE/SM_Nanite.SM_Nanite'
+network=hou.node('/stage')
+source=network.createNode('pythonscript','test_source')
 source.parm('python').set('''from pxr import UsdGeom, Sdf
 stage=hou.pwd().editableStage()
 prim=UsdGeom.Xform.Define(stage,'/Native').GetPrim()
-prim.CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('/Game/HdUE/SM_Nanite.SM_Nanite')
+prim.CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
 parent=UsdGeom.Xform.Define(stage,'/Parent')
 parent.AddTranslateOp().Set((1,2,3)); parent.AddScaleOp().Set((2,2,2))
 mesh=UsdGeom.Mesh.Define(stage,'/Parent/MeshAsset')
 mesh.CreatePointsAttr([(0,0,0),(1,0,0),(0,1,0)])
 mesh.CreateFaceVertexCountsAttr([3]); mesh.CreateFaceVertexIndicesAttr([0,1,2])
-mesh.GetPrim().CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('/Game/HdUE/SM_Nanite.SM_Nanite')
-''')
+mesh.GetPrim().CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
+asset=stage.DefinePrim('/Prototype/Asset','Xform')
+asset.CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
+instance=stage.DefinePrim('/Instance','Xform')
+instance.GetReferences().AddInternalReference('/Prototype'); instance.SetInstanceable(True)
+''' % (ASSET,ASSET,ASSET))
 before=source.stage().GetRootLayer().ExportToString()
-node=integration.settings_node(source,{'metersperunit':.01,'upaxis':'y'})
+# A Z-up centimetre input, as a scene file would bring it: a standard Configure Layer LOP.
+units=network.createNode('configurelayer','z_up_centimeters'); units.setInput(0,source)
+for name,value in {'metersperunit':.01,'upaxis':'z'}.items():
+    units.parm('set'+name).set(1); units.parm(name).set(value)
+
+# hdUE_settings passes the input stage through: no Python LOPs, no normalization, no generated prims.
+node=integration.settings_node(units)
 stage=node.stage()
 assert not node.errors(),node.errors()
-assert UsdGeom.GetStageMetersPerUnit(stage)==1.
-assert UsdGeom.GetStageUpAxis(stage)=='Y'
-proxy=UsdGeom.Mesh(stage.GetPrimAtPath('/Native/__HdUEAssetProxy'))
-assert proxy and len(proxy.GetPointsAttr().Get())==8
-assert UsdGeom.PrimvarsAPI(proxy).GetPrimvar('hdue:asset').Get()=='/Game/HdUE/SM_Nanite.SM_Nanite'
-assert abs(UsdGeom.BBoxCache(Usd.TimeCode.Default(),['default','render']).ComputeWorldBound(proxy.GetPrim()).ComputeAlignedRange().GetSize()[0]-1.)<1e-5
-assert stage.GetMetadata('renderSettingsPrimPath')=='/Render/rendersettings',stage.GetRootLayer().ExportToString()
+assert not [c.path() for c in node.allSubChildren() if c.type().name()=='pythonscript']
+assert UsdGeom.GetStageMetersPerUnit(stage)==.01 and UsdGeom.GetStageUpAxis(stage)=='Z'
+assert stage.GetPrimAtPath('/Instance').IsInstance(),'native instancing must reach Hydra'
+assert not stage.GetPrimAtPath('/Native/'+integration.NativeAssets.PROXY)
 assert not stage.GetPrimAtPath('/Render/rendersettings'),'hdUE settings must leave render settings to Render Settings LOPs'
 assert integration.render_options(stage)==('realtime',64)
 render=integration.render_settings_node(node)
@@ -47,28 +56,53 @@ assert settings.GetAttribute('hdUE:renderMode').Get()=='realtime'
 assert not settings.GetAttribute('hdUE:lumenEnabled').HasAuthoredValue(),'unset controls must not author'
 integration._render_property(render,'xn__hdUErenderMode','pathtraced')
 assert integration.render_options(render.stage())==('pathtraced',64)
-assert source.stage().GetRootLayer().ExportToString()==before
-native=integration.settings_node(source) # native Solaris input: Y-up / meters
-native_stage=native.stage()
-assert not native.errors(),native.errors()
-mesh=native_stage.GetPrimAtPath('/Parent/MeshAsset')
-assert UsdGeom.Imageable(mesh).GetPurposeAttr().Get()=='guide'
-mesh_proxy=native_stage.GetPrimAtPath('/Parent/MeshAsset/__HdUEAssetProxy')
-matrix=UsdGeom.Xformable(mesh_proxy).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-assert Gf.IsClose(matrix.ExtractTranslation(),Gf.Vec3d(1,2,3),1e-9)
-assert abs(matrix.TransformDir(Gf.Vec3d(1,0,0)).GetLength()-2)<1e-9
-again=integration.settings_node(native)
-assert again.stage().GetPrimAtPath('/Parent/MeshAsset/__HdUEAssetProxy')
-assert not again.errors(),again.errors()
-clear=source.parent().createNode('pythonscript','clear_asset_reference'); clear.setInput(0,native)
+
+# Native asset bounds live in the viewport overrides (session-only), sized in the stage's own units.
+assets=integration.NativeAssets()
+assert assets.sync(network,render,render.stage())
+assert not assets.sync(network,render,render.stage()),'unchanged stage must not re-author'
+def overrides():
+    with network.viewportOverrides(render) as edit:
+        return edit.layer()
+layer=overrides()
+for path in ('/Native','/Parent/MeshAsset','/Instance/Asset'):
+    proxy=layer.GetPrimAtPath(path+'/'+integration.NativeAssets.PROXY)
+    assert proxy and proxy.specifier==Sdf.SpecifierDef and proxy.typeName=='Mesh',path
+    assert proxy.attributes['primvars:hdue:asset'].default==ASSET
+    assert proxy.attributes['purpose'].default=='render'
+    points=proxy.attributes['points'].default
+    assert len(points)==8 and abs(max(p[0] for p in points)-min(p[0] for p in points)-100)<1e-4,'100 cm in a centimetre stage'
+assert layer.GetPrimAtPath('/Parent/MeshAsset').attributes['purpose'].default=='guide'
+assert layer.GetPrimAtPath('/Instance').HasInfo('instanceable') and not layer.GetPrimAtPath('/Instance').GetInfo('instanceable')
+assert render.stage().GetPrimAtPath('/Instance').IsInstance(),'the graph keeps its instancing'
+
+# MaterialX inside an instance needs its stage path only with a cooked library.
+look=network.createNode('pythonscript','instanced_materialx'); look.setInput(0,render)
+look.parm('python').set('''from pxr import Sdf, UsdShade
+stage=hou.pwd().editableStage()
+material=UsdShade.Material.Define(stage,'/Prototype/Asset/Looks/Paint')
+shader=UsdShade.Shader.Define(stage,'/Prototype/Asset/Looks/Paint/Surface'); shader.CreateIdAttr('ND_standard_surface_surfaceshader')
+material.CreateSurfaceOutput('mtlx').ConnectToSource(shader.CreateOutput('out',Sdf.ValueTypeNames.Token))
+stage.OverridePrim('/Native').SetActive(False)
+stage.OverridePrim('/Parent').SetActive(False)
+stage.OverridePrim('/Prototype/Asset').GetAttribute('hdue:asset').Set('')''')
+assert not look.errors(),look.errors()
+assert assets.sync(network,look,look.stage())
+assert not overrides().GetPrimAtPath('/Instance') or not overrides().GetPrimAtPath('/Instance').HasInfo('instanceable')
+assert assets.sync(network,look,look.stage(),materials=True)
+assert not overrides().GetPrimAtPath('/Instance').GetInfo('instanceable')
+assert not overrides().GetPrimAtPath('/Instance/Asset/'+integration.NativeAssets.PROXY)
+# A downstream edit clearing the asset removes its proxy; restoring it brings it back.
+clear=network.createNode('pythonscript','clear_asset_reference'); clear.setInput(0,render)
 clear.parm('python').set('stage=hou.pwd().editableStage()\nstage.GetPrimAtPath("/Parent/MeshAsset").GetAttribute("hdue:asset").Set("")')
-removed=integration.settings_node(clear)
-assert not removed.stage().GetPrimAtPath('/Parent/MeshAsset/__HdUEAssetProxy').IsActive()
-assert UsdGeom.Imageable(removed.stage().GetPrimAtPath('/Parent/MeshAsset')).GetPurposeAttr().Get()=='default'
-assert not removed.errors(),removed.errors()
-restore=source.parent().createNode('pythonscript','restore_asset_reference'); restore.setInput(0,removed)
-restore.parm('python').set('stage=hou.pwd().editableStage()\nstage.GetPrimAtPath("/Parent/MeshAsset").GetAttribute("hdue:asset").Set("/Game/HdUE/SM_Nanite.SM_Nanite")')
-restored=integration.settings_node(restore)
-assert restored.stage().GetPrimAtPath('/Parent/MeshAsset/__HdUEAssetProxy').IsActive()
-assert not restored.errors(),restored.errors()
-print('PASS: real Solaris LOP cook, native proxy, render settings and source preservation')
+assert assets.sync(network,clear,clear.stage())
+layer=overrides()
+assert not layer.GetPrimAtPath('/Parent/MeshAsset/'+integration.NativeAssets.PROXY)
+assert not layer.GetPropertyAtPath('/Parent/MeshAsset.purpose')
+assert layer.GetPrimAtPath('/Native/'+integration.NativeAssets.PROXY)
+assets.clear()
+layer=overrides()
+assert not layer.GetPrimAtPath('/Native/'+integration.NativeAssets.PROXY)
+assert not layer.GetPrimAtPath('/Instance').HasInfo('instanceable')
+assert source.stage().GetRootLayer().ExportToString()==before
+print('PASS: pass-through hdUE settings, render settings, native asset overrides and source preservation')

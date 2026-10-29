@@ -59,6 +59,11 @@ static_assert(ENGINE_MAJOR_VERSION == HDUE_ENGINE_MAJOR &&
     "Use the pinned UE 5.8.4 source, not a different installed/source engine.");
 
 namespace {
+// hdUE's interactive resolution, set like any console variable (hdUE:cvar:r:HdUE:...).
+TAutoConsoleVariable<int32> CVarInteractiveResolution(TEXT("r.HdUE.InteractiveResolution"), 1,
+    TEXT("Interactive hosts: render realtime frames at r.HdUE.InteractiveScreenPercentage while requests keep coming (the camera moves)."));
+TAutoConsoleVariable<float> CVarInteractiveScreenPercentage(TEXT("r.HdUE.InteractiveScreenPercentage"), 50.f,
+    TEXT("Screen percentage of interactive realtime frames while moving (r.HdUE.InteractiveResolution)."));
 struct FReadbackJob {
     TAtomic<bool> Complete{false};
     TAtomic<bool> Failed{false};
@@ -236,7 +241,10 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     Result.engine_patch = ENGINE_PATCH_VERSION;
     if (Result.rhi_ready) Result.dedicated_video_memory_bytes = GRHIGlobals.GpuInfo.DedicatedVideoMemory;
     Result.render_mode_mask = 1u << HDUE_REALTIME;
-    if (Result.rhi_ready && HasRayTracing()) Result.render_mode_mask |= 1u << HDUE_PATH_TRACED;
+    // IsRayTracingEnabled ensures it runs on the game thread: other threads read the owner's last answer.
+    static std::atomic<bool> RayTracing{false};
+    if (Result.rhi_ready && CheckOwner() == HDUE_OK) RayTracing = HasRayTracing();
+    if (Result.rhi_ready && RayTracing) Result.render_mode_mask |= 1u << HDUE_PATH_TRACED;
     if (CheckOwner() == HDUE_OK) { // the error text is the UE thread's to read (other threads get the state only)
         FTCHARToUTF8 Message(*Runtime.Error);
         const int32 Count = FMath::Min(Message.Length(), int32(sizeof(Result.message) - 1));
@@ -259,15 +267,21 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         return Fail(HDUE_INVALID_ARGUMENT, TEXT("Project not found, or invalid project/map quoting."));
     }
     {
-        // NaniteBuilder delay-loads embree4.dll by name. Inside a host process (Houdini) the executable's folder is the
-        // host's, so load it from this DLL's folder first; later by-name loads then resolve to it.
+        // NaniteBuilder and the Lumen card builder delay-load embree4.dll (and its tbb12.dll) by name. Inside a host process
+        // the executable's folder is the host's, so load them from this DLL's folder first (a tbb12 the host already has,
+        // as Houdini does, is kept); later by-name loads then resolve to them. Backslashes: LoadLibraryExW fails on FPaths'.
         HMODULE Self = nullptr;
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
             reinterpret_cast<LPCWSTR>(&Initialize), &Self);
         wchar_t Path[MAX_PATH] = {};
         if (Self && GetModuleFileNameW(Self, Path, MAX_PATH)) {
-            const FString Folder = FPaths::GetPath(FString(Path));
-            LoadLibraryExW(*FPaths::Combine(Folder, TEXT("embree4.dll")), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+            for (const TCHAR* Name : {TEXT("tbb12.dll"), TEXT("embree4.dll")}) {
+                if (GetModuleHandleW(Name)) continue;
+                FString Dll = FPaths::GetPath(FString(Path)) / Name;
+                FPaths::MakePlatformFilename(Dll);
+                if (!LoadLibraryExW(*Dll, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS))
+                    UE_LOG(LogTemp, Warning, TEXT("hdUE: cannot load %s (error %u): no Nanite or Lumen cards for generated meshes."), *Dll, GetLastError());
+            }
         }
     }
     FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound -NoLoadingScreen -NoSplash -ResX=640 -ResY=360"), *Project, *Map);
@@ -438,11 +452,24 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     FEngineShowFlags Flags(ESFIM_Game);
     Flags.SetPathTracing(PathTracing);
     Flags.SetMegaLights(!PathTracing);
-    // Interactive realtime navigation renders at half resolution, upsampled by TSR, until requests stop for 250 ms.
+    // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the anti-aliasing
+    // method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage (100).
     static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
-    const bool Moving = Interactive && !PathTracing && !Aov && FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
-    const float ScreenFraction = Moving ? 0.5f : 1.f;
-    Flags.SetScreenPercentage(Moving);
+    // Offline hosts (husk) render a few warmup frames per image: update Lumen's surface cache every frame so its bounce
+    // lighting converges within them (measured on Sponza: 16 warmup frames then come within ~15% of 128 in the shade, at the same frame time).
+    static const bool OfflineLumen = [] {
+        if (Interactive) return false;
+        for (const auto& [Name, Value] : {TPair<const TCHAR*, int32>{TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2},
+                {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2}, {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000},
+                {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
+            if (IConsoleVariable* Variable = IConsoleManager::Get().FindConsoleVariable(Name)) Variable->Set(Value, ECVF_SetByCode);
+        return true;
+    }();
+    const bool Moving = Interactive && CVarInteractiveResolution.GetValueOnGameThread() && !PathTracing && !Aov &&
+        FPlatformTime::Seconds() - Session->RequestedAt < 0.25;
+    const float ScreenFraction = PathTracing || Aov ? 1.f : Moving ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
+        : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
+    Flags.SetScreenPercentage(ScreenFraction != 1.f);
     // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
     // frames that can (adding latency).
     if (Interactive && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
@@ -530,7 +557,6 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         }
     }
     View->EndFinalPostprocessSettings(Options);
-    View->FinalPostProcessSettings.bMegaLights=!PathTracing;
     if (!Aov && Session->Tonemapper) {
         // Lumen caches lighting in float16 at a fixed pre-exposure that covers scene exposures within [EV - 12, EV + 8].
         // Manual exposure puts the scene near -AutoExposureBias EV; physically dim scenes (large bias) fell below the
@@ -773,22 +799,49 @@ bool ImportPostProcessValue(FProperty* Property, const FString& Text, FPostProce
     return End && !*End;
 }
 
+// Console variables hdUE set, with the value each had before (a variable no longer listed gets it back) and the
+// value last set (set again only when it changes: scalability groups re-apply their whole level when set).
+static TMap<FString, FString> ConsoleDefaults, ConsoleValues;
+
+static void SetConsoleVariable(const FString& Name, FString Text) {
+    IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name);
+    if (!CVar || CVar->TestFlags(ECVF_ReadOnly)) {
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: console variable %s skipped (%s)"), *Name, CVar ? TEXT("read-only") : TEXT("unknown"));
+        return;
+    }
+    if (Text == TEXT("True") || Text == TEXT("False")) Text = Text == TEXT("True") ? TEXT("1") : TEXT("0"); // USD booleans
+    if (const FString* Last = ConsoleValues.Find(Name); Last && *Last == Text) return;
+    ConsoleValues.Add(Name, Text);
+    const FString Old = CVar->GetString();
+    const bool First = !ConsoleDefaults.Contains(Name);
+    if (First) ConsoleDefaults.Add(Name, Old);
+    CVar->Set(*Text, ECVF_SetByCode);
+    if (First || CVar->GetString() != Old) UE_LOG(LogTemp, Log, TEXT("hdUE: console variable %s = %s (was %s)"), *Name, *CVar->GetString(), *Old);
+}
+
+static void RestoreConsoleVariables(const TSet<FString>& Kept) {
+    for (auto It = ConsoleDefaults.CreateIterator(); It; ++It) {
+        if (Kept.Contains(It.Key())) continue;
+        if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*It.Key())) CVar->Set(*It.Value(), ECVF_SetByCode);
+        UE_LOG(LogTemp, Log, TEXT("hdUE: console variable %s restored to %s"), *It.Key(), *It.Value());
+        ConsoleValues.Remove(It.Key());
+        It.RemoveCurrent();
+    }
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     if (CheckReady() != HDUE_OK) return CheckReady();
     if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
         (Desc->material_count && !Desc->materials)) return HDUE_INVALID_ARGUMENT;
     FPostProcessSettings Settings;
+    TSet<FString> Variables;
     // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
     for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
         if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
     for (uint32 Index = 0; Index < Desc->count; ++Index) {
         if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
-        if (Name.StartsWith(TEXT("r."))) {
-            if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name)) CVar->Set(*Text, ECVF_SetByCode);
-            else UE_LOG(LogTemp, Warning, TEXT("hdUE: console variable %s skipped (unknown)"), *Name);
-            continue;
-        }
+        if (Name.Contains(TEXT("."))) { SetConsoleVariable(Name, Text); Variables.Add(Name); continue; }
         FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
         auto* Override = CastField<FBoolProperty>(FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
         if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {
@@ -808,6 +861,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         Materials.Emplace(Material);
         Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
     }
+    RestoreConsoleVariables(Variables);
     const auto Session = Runtime.Session;
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
@@ -886,6 +940,9 @@ HdueResult HDUE_CALL CopyDepth(HdueSession Handle,uint64 FrameId,float* Buffer,u
 HdueResult HDUE_CALL WindowMessage(uint64 Hwnd, uint32 Message, uint64 Wparam, int64 Lparam, int64* Result) {
     if (CheckReady() != HDUE_OK) return CheckReady();
     if (!Result) return HDUE_INVALID_ARGUMENT;
+    // Offscreen UE has no window to route messages to (UELibrary_WndProc dereferences it); hosts fall back to DefWindowProc.
+    static const bool Offscreen = FParse::Param(FCommandLine::Get(), TEXT("RenderOffscreen"));
+    if (Offscreen) return HDUE_INVALID_STATE;
     *Result = UELibrary_WndProc(reinterpret_cast<HWND>(Hwnd), Message, WPARAM(Wparam), LPARAM(Lparam));
     return HDUE_OK;
 }
@@ -945,6 +1002,13 @@ HdueResult HDUE_CALL Shutdown() {
     Runtime.World = nullptr;
     if (Runtime.EngineStarted) UELibrary_Shutdown();
     Runtime.EngineStarted = false;
+    // Hosts run UE on a thread of their own, but the process exits on its main thread, which then runs UE's static
+    // destructors; ~FScheduler checks it is on the game thread, and that fatal check crashed every exit after a clean
+    // shutdown. This static is constructed after UE's globals, so it is destroyed first: it hands the game thread to
+    // the exiting thread.
+    static struct FExitingGameThread {
+        ~FExitingGameThread() { FTaskTagScope::SwapTag(ETaskTag::EGameThread); GGameThreadId = FPlatformTLS::GetCurrentThreadId(); }
+    } ExitingGameThread;
     Runtime.State = HDUE_STATE_STOPPED;
     return HDUE_OK;
 }

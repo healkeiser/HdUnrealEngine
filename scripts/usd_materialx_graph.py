@@ -45,11 +45,6 @@ def graph_data(material, time=Usd.TimeCode.Default()):
             result=resolve(source,seen+(path,))
             return dict(result,trace=[path]+result["trace"])
         value=attr.Get(time)
-        original=attr.GetCustomDataByKey('hdueOpTexture')
-        if original and original.get('uri','').startswith('opdef:'):
-            current=value.path if isinstance(value,Sdf.AssetPath) else value
-            if current==original['resolved']:
-                value=Sdf.AssetPath(original['uri'],original['uri'])
         return dict(attribute=path,type=str(attr.GetTypeName()),value=value_data(value),colorspace=str(attr.GetColorSpace()),trace=[path])
     def visit(shader):
         path=str(shader.GetPath())

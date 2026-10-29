@@ -81,6 +81,25 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials
     Delegate->SetRenderSetting(TfToken("nativeMaterialParameters"),VtValue(overrides));
     return HDUE_OK;
 }
+extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_textures(const HdueViewportTextures* update) {
+    if (!update || update->struct_size!=sizeof(*update) || update->abi_version!=1 || update->reserved ||
+        update->texture_count>65536 || (update->texture_count && !update->textures)) return HDUE_INVALID_ARGUMENT;
+    const auto state=Viewport.lock();
+    if (!state || !Delegate) return HDUE_PENDING;
+    if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
+    if (!update->session || update->session!=state->session) return HDUE_INVALID_STATE;
+    using namespace PXR_NS;
+    VtDictionary files;
+    const auto text=[](const char* value) {return value && value[0] && strnlen(value,4097)<=4096;};
+    for (uint32_t i=0;i<update->texture_count;++i) {
+        const auto& t=update->textures[i];
+        if (!text(t.uri) || !text(t.file) || files.count(t.uri) ||
+            (std::strncmp(t.uri,"op:",3) && std::strncmp(t.uri,"opdef:",6))) return HDUE_INVALID_ARGUMENT;
+        files[t.uri]=VtValue(std::string(t.file));
+    }
+    Delegate->SetRenderSetting(TfToken("opTextures"),VtValue(files));
+    return HDUE_OK;
+}
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_options(const HdueViewportOptions* options) {
     if(!options || options->struct_size!=sizeof(*options) || options->mode>1 || !options->samples || options->samples>65536 ||
         options->lumen>1 || options->auto_light>1 || options->z_up>1 || !std::isfinite(options->meters_per_unit) || options->meters_per_unit<=0 || !std::isfinite(options->time_seconds)) return HDUE_INVALID_ARGUMENT;

@@ -24,6 +24,8 @@ _Static_assert(sizeof(HdueViewportWet) == 48, "viewport wet layout");
 _Static_assert(sizeof(HdueViewportSurfaces) == 40, "viewport surface layout");
 _Static_assert(sizeof(HdueViewportMaterial) == 32, "viewport material binding layout");
 _Static_assert(sizeof(HdueViewportMaterials) == 32, "viewport materials layout");
+_Static_assert(sizeof(HdueViewportTexture) == 16, "viewport texture layout");
+_Static_assert(sizeof(HdueViewportTextures) == 32, "viewport textures layout");
 
 _Static_assert(sizeof(HdueSession) == 8, "64-bit session handles");
 _Static_assert(offsetof(HdueInitDesc, instance_handle) == 8, "C ABI alignment");

@@ -15,7 +15,8 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 | `hdUE:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
 | `hdUE:subdivisionLevel` | 2 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
 | `hdUE:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
-| `hdUE:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty |
+| `hdUE:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
+| `hdUE:cvar:<console variable>` | | A UE console variable, with `:` for `.` (`int hdUE:cvar:r:Shadow:Virtual:Enable = 1`); see [engine quality](#engine-quality) |
 | `hdUE:postProcessMaterials` | | Cooked post-process materials added to the beauty |
 | `hdUE:domeResolution` | 512 | Environment cubemap face size |
 | `hdUE:autoViewerLight`, `hdUE:viewerLightIntensity` | | Review light for scenes without lights |
@@ -31,7 +32,7 @@ Material-binding GeomSubsets partition triangles by their original USD face whil
 
 Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not apply subdivision creases.
 
-Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. The Solaris settings subnet still expands instanceable references in its own layer for editable mesh/material translation.
+Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. Instanceable references (USD native instancing) reach the delegate as Hydra instancers too, in Solaris as elsewhere.
 
 Implicit Cube, Sphere, Cone, Cylinder, Capsule and Plane prims are converted to meshes by Hydra's implicit-surface scene index (`HdUE_ImplicitSurfaceSceneIndexPlugin`), as for hdEmbree.
 
@@ -158,7 +159,24 @@ By default the beauty is linear scene-referred HDR, like Karma's, so colour mana
 - `hdUE:postProcessMaterials` lists cooked post-process material paths (a string array, or one string separated by spaces), added as blendables.
 - `hdUE:tonemapper` runs UE's tonemapper. Bloom, colour grading (saturation, contrast, gamma, gain, offset, white balance, LUTs), the film curve, vignette, grain, chromatic aberration and lens flares only happen inside it, so they need it on. The camera exposure is then applied before the tonemapper, added to any authored `AutoExposureBias`, rather than to the result; UE's physical-camera exposure (ISO, shutter, aperture) stays off unless `AutoExposureApplyPhysicalCameraExposure` is set. UE's on-screen warnings are never drawn into hdUE frames. The beauty becomes display-referred (sRGB), so set the Solaris viewport's colour correction to raw, and don't expect it to match Karma.
 
-Depth of field, post-process materials with a "Before Tonemapping" blendable location, and the other settings apply with the tonemapper off too. The render settings LOP's Post-Processing section shows Tonemapper, Post-Process Materials, Bloom, Vignette, Film Grain, White Balance, Saturation and Contrast; add other properties with an Edit Properties LOP or in the USD file. Post-processing applies to the beauty only; AOVs stay raw. Changing a post-process setting restarts Path Tracer accumulation.
+Depth of field, post-process materials with a "Before Tonemapping" blendable location, and the other settings apply with the tonemapper off too. Post-processing applies to the beauty only; AOVs stay raw. Changing a post-process setting restarts Path Tracer accumulation.
+
+The render settings LOP's **Post Process Volume** section lists every user-facing `FPostProcessSettings` property (212) in UE's own categories, names, ranges, tooltips and defaults: Lens (Bloom, Exposure, Chromatic Aberration, Dirt Mask, Camera, Local Exposure, Lens Flares, Image Effects, Depth of Field), Color Grading, Film, Film Grain, Global Illumination (Lumen), Reflections, Rendering Features (ambient occlusion, motion blur, translucency, ...) and Path Tracing. Properties that need the tonemapper are disabled while it is off. Defaults are UE's, except where hdUE sets its own per view (shown in the tooltips): manual exposure, Lumen GI and reflections from `hdUE:lumenEnabled`, front-layer translucency reflections on, Path Tracer bounces 8 (16 with refractive materials), and depth of field from the USD camera. `scripts/generate_render_settings.py` generates the section from the engine source. It leaves out: `WeightedBlendables` (use `hdUE:postProcessMaterials`), `PathTracingSamplesPerPixel` (use `hdUE:samplesPerPixel`), `PathTracingEnableDenoiser` (the runtime has no UE denoiser plugin; use `hdUE:denoiser`), the mobile depth of field, and the fixed-size arrays `LensFlareTints` and `DepthOfFieldMatteBoxFlags`. Texture and curve properties take a cooked asset path.
+
+## Engine quality
+
+`hdUE:cvar:<name>` sets a UE console variable for the process (`:` stands for `.`, which USD attribute names cannot hold); removing the attribute restores the value the variable had before. Booleans are written as 1 and 0. Read-only variables (`ECVF_ReadOnly`, such as `r.RayTracing`) cannot change at runtime and are skipped with a warning. The render settings LOP's **Engine Quality** section, and the viewport's display options for the interactive ones, offer:
+
+| Folder | Console variables |
+| --- | --- |
+| Scalability | `sg.*Quality` (Low to Cinematic, default Epic): the levels of UE's scalability groups |
+| Resolution and Anti-Aliasing | `r.AntiAliasingMethod` (None, FXAA, TAA, TSR), `r.ScreenPercentage` (realtime beauty), `r.HdUE.InteractiveResolution` and `r.HdUE.InteractiveScreenPercentage` (Houdini's viewport renders at 50% while moving) |
+| Lumen | `r.Lumen.HardwareRayTracing`, `r.Lumen.Reflections.HardwareRayTracing`; quality and hit lighting are post-process properties |
+| Shadows | `r.Shadow.Virtual.Enable` (off in this project), resolution biases and soft-shadow rays, `r.Shadow.FilterMethod`, `r.RayTracing.Shadows` |
+| Nanite, MegaLights, Ray Tracing | `r.Nanite`, `r.Nanite.MaxPixelsPerEdge`, `r.MegaLights.NumSamplesPerPixel`, `r.MegaLights.DefaultShadowMethod`, `r.RayTracing.Enable` |
+| Path Tracer | `r.PathTracing.ApproximateCaustics`, `r.PathTracing.FilterWidth` |
+
+Other console variables work as attributes too. `scripts/Test-RenderSettings.ps1 -RuntimeConfig <config>` renders with every generated setting at its default and fails if UE skipped one or if a console variable's generated default differs from UE's value.
 
 ![UE post-processing](images/gallery/post_processing.png)
 

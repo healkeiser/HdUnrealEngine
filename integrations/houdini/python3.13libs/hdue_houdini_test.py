@@ -38,7 +38,7 @@ class Test:
             next(self.steps)
         except StopIteration:
             self.timer.stop()
-            self.verified=dict(passed=not self.capture_errors,presentation='native Solaris viewport',native_solaris_compositor_verified=True,native_selection_overlay_verified=self.selection_overlay,up_axis='Y',meters_per_unit=1.,captures=self.captures,capture_errors=self.capture_errors,frames=self.frames,pid=__import__('os').getpid(),houdini=hou.applicationVersionString(),delegate_module=self.api.library._handle,backend_module=self.host.runtime.library._handle)
+            self.verified=dict(passed=not self.capture_errors,presentation='native Solaris viewport',native_solaris_compositor_verified=True,native_selection_overlay_verified=self.selection_overlay,up_axis='Z',meters_per_unit=.01,captures=self.captures,capture_errors=self.capture_errors,frames=self.frames,pid=__import__('os').getpid(),houdini=hou.applicationVersionString(),delegate_module=self.api.library._handle,backend_module=self.host.runtime.library._handle)
             self.finish()
         except BaseException:
             self.timer.stop(); error=traceback.format_exc()
@@ -103,8 +103,9 @@ class Test:
         hdefereval.execute_deferred(viewer.curViewport().frameAll)
         for _ in range(8): yield
         first=yield from self.image('01-lumen',0)
-        if UsdGeom.GetStageUpAxis(viewer.stage())!='Y' or UsdGeom.GetStageMetersPerUnit(viewer.stage())!=1:
-            raise AssertionError('Solaris output is not Y-up / meters')
+        # The stage reaches hdUE as authored (smoke.usda: Z-up centimetres); the delegate converts it.
+        if UsdGeom.GetStageUpAxis(viewer.stage())!='Z' or UsdGeom.GetStageMetersPerUnit(viewer.stage())!=.01:
+            raise AssertionError('Solaris output is not the input stage space')
         import threading
         from hdue_viewport import Options
         result=[]

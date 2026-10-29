@@ -67,11 +67,11 @@ class Test(Probe):
         integration.set_mode('pathtraced')
         state=yield from self.completed('02-red-pathtraced',1,state['generation'])
         captures.append((yield from self.capture(viewer,'02-red-pathtraced')))
-        old_path=textures.cache().entries[('op:'+output.path(),False)]['path']
+        old_path=textures.cache().entries[('op:'+output.path(),True)]['path']
         # No forced LOP cook: the host must detect this upstream COP edit itself.
         color.parmTuple('f3').set((.02,.05,.8))
         state=yield from self.completed('03-blue-pathtraced',1,state['generation'],2)
-        if old_path==textures.cache().entries[('op:'+output.path(),False)]['path']:
+        if old_path==textures.cache().entries[('op:'+output.path(),True)]['path']:
             raise AssertionError('COP edit did not replace the immutable texture path')
         captures.append((yield from self.capture(viewer,'03-blue-pathtraced')))
         integration.set_mode('realtime')

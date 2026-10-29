@@ -158,6 +158,8 @@ int wmain(int argc, wchar_t** argv) {
         desc.window_handle = reinterpret_cast<uint64_t>(window);
         desc.project_path = project.c_str();
         desc.map_path = "/Game/HdUETest";
+        // Headless unless asked: frames are read back from render targets, so no window needs to appear.
+        if (!options.visible) desc.extra_arguments = "-RenderOffscreen";
         const auto started = Clock::now();
         backend.initialize(desc);
         const double init_ms = seconds(started) * 1000;

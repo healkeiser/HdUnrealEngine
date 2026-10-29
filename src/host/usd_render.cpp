@@ -1,5 +1,6 @@
 #include "hdue/backend.hpp"
 #include <windows.h>
+#include "pxr/base/tf/getenv.h"
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/vt/dictionary.h"
@@ -397,6 +398,8 @@ int wmain(int argc, wchar_t** argv) {
         const auto project = utf8(options.project);
         HdueInitDesc init{}; init.struct_size = sizeof(init); init.instance_handle = reinterpret_cast<uint64_t>(instance);
         init.window_handle = reinterpret_cast<uint64_t>(window); init.project_path = project.c_str(); init.map_path = "/Game/HdUETest";
+        // Headless, as hdUE is inside Houdini (HDUE_SHOW_WINDOW=1 shows UE's window).
+        if (!TfGetenvBool("HDUE_SHOW_WINDOW", false)) init.extra_arguments = "-RenderOffscreen";
         const auto start = Clock::now(); runtime.initialize(init);
         const double initMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         PlugRegistry::GetInstance().RegisterPlugins(utf8(options.plugins));

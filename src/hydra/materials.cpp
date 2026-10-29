@@ -88,7 +88,8 @@ public:
         }
         if (!texture) { warnOnce(TfStringPrintf("textured %s inputs are not translated; %s uses its constant", input, shader_.nodeTypeId.GetText())); return false; }
         *texture = source.texture;
-        if (color && !source.raw) texture->file = HdUELinearRec709Texture(texture->file);
+        // A host image (op:) exists only once the host exported it: converted when the scene is packed.
+        if (color && !source.raw) { texture->sceneLinear = true; texture->file = HdUELinearRec709Texture(texture->file); }
         if (source.channel >= 0) { texture->mask = GfVec4f(0); texture->mask[source.channel % 4] = 1; }
         // ponytail: one UV transform per material, from the first textured input; per-texture transforms if assets mix them.
         if (!uvSet_) uvSet_ = uvTransform(*source.image, data_.uvTransform);

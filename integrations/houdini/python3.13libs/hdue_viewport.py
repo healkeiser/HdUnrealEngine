@@ -21,6 +21,10 @@ class Material(C.Structure):
     _fields_=[('material_id',C.c_char_p),('native_asset',C.c_char_p),('parameter_count',U32),('reserved',U32),('parameters',C.POINTER(Parameter))]
 class Materials(C.Structure):
     _fields_=[('struct_size',U32),('abi_version',U32),('session',U64),('material_count',U32),('reserved',U32),('materials',C.POINTER(Material))]
+class Texture(C.Structure):
+    _fields_=[('uri',C.c_char_p),('file',C.c_char_p)]
+class Textures(C.Structure):
+    _fields_=[('struct_size',U32),('abi_version',U32),('session',U64),('texture_count',U32),('reserved',U32),('textures',C.POINTER(Texture))]
 class Wet(C.Structure):
     _fields_=[(n,C.c_char_p) for n in ('prim_path','variant_asset','preview_asset','mask_primvar')]+[('amount',C.c_float),('roughness',C.c_float),('flags',U32),('reserved',U32)]
 class Surfaces(C.Structure):
@@ -41,6 +45,9 @@ class Viewport:
         # Owner-only backend calls (runtime.bind) run on the UE thread the delegate runs.
         runtime.run_on_ue_thread=self.library.hdue_run_on_ue_thread
         runtime.run_on_ue_thread.argtypes=[Task,C.py_object]; runtime.run_on_ue_thread.restype=Result
+        self.set_textures=self.library.hdue_set_viewport_textures
+        self.set_textures.argtypes=[C.POINTER(Textures)]; self.set_textures.restype=Result
+        if C.sizeof(Texture)!=16 or C.sizeof(Textures)!=32: raise RuntimeError('Invalid viewport texture ABI')
         self.set_surfaces=getattr(self.library,'hdue_set_viewport_surfaces',None)
         if self.set_surfaces:
             self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result
@@ -108,6 +115,15 @@ class Viewport:
         code=self.set_materials(C.byref(update))
         if code==1: return False
         self.runtime.check(code,'viewport materials')
+        return True
+
+    def textures(self,session,files):
+        """Map op:/opdef: texture paths to the files the host exported for them (the complete set)."""
+        data=(Texture*len(files))(*(Texture(uri.encode('utf-8'),file.encode('utf-8')) for uri,file in sorted(files.items())))
+        update=Textures(C.sizeof(Textures),1,session,len(files),0,data)
+        code=self.set_textures(C.byref(update))
+        if code==1: return False
+        self.runtime.check(code,'viewport textures')
         return True
 
     def surfaces(self,session,bindings,preview=False,error=''):

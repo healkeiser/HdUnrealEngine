@@ -140,11 +140,15 @@ struct HdUESelfHost {
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
 // Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
-// also an exit handler, registered once UE runs so it precedes UE's own: a process leaving with UE alive (husk with
-// HDUE_HOUDINI_UI, Houdini without its hdUE host) otherwise ran UE's teardown on the main thread and hung.
+// also an exit handler for a process leaving with UE alive (husk with HDUE_HOUDINI_UI, Houdini without its hdUE host).
+// std::atexit in this DLL runs at its detach, after ExitProcess has ended UE's thread: UE can no longer shut down, and
+// waiting for that thread, or UE's own teardown, hung the exit. The process ends there with its exit code instead.
 void shutdownSelfHost() {
     auto& host = selfHost();
     if (!host.backend) return;
+    if (WaitForSingleObject(host.worker.native_handle(), 0) == WAIT_OBJECT_0) {
+        DWORD code = 0; GetExitCodeProcess(GetCurrentProcess(), &code); TerminateProcess(GetCurrentProcess(), code);
+    }
     host.run([&] {
         try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { std::fprintf(stderr, "hdUE shutdown: %s\n", e.what()); }
         if (host.window) DestroyWindow(host.window);
@@ -193,11 +197,10 @@ uint32_t HdUEAovId(const TfToken& name) {
     return 0;
 }
 namespace {
-// Offscreen UE (-RenderOffscreen) has no window of its own to route messages to.
 const bool selfHostVisible = TfGetenvBool("HDUE_SHOW_WINDOW", false);
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     const auto& host = selfHost();
-    if (selfHostVisible && host.backend && host.backend->initialized()) {
+    if (host.backend && host.backend->initialized()) {
         int64_t result = 0;
         if (host.backend->api().window_message(reinterpret_cast<uint64_t>(window), message, uint64_t(wparam), int64_t(lparam), &result) == HDUE_OK) return LRESULT(result);
     }
@@ -416,6 +419,14 @@ HdueMaterialParameter materialParameter(ScenePacket& packet, const std::string& 
     } else throw std::runtime_error("Unsupported native material parameter value: " + name);
     return p;
 }
+// The file for a texture path: host images (op:, opdef:) through the host's map, empty until it exported them.
+std::string textureFile(HdUEState& state, const std::string& file, bool sceneLinear = false) {
+    if (!HdUEHostTexture(file)) return file;
+    const auto files = state.setting<VtDictionary>("opTextures", {});
+    const auto it = files.find(file);
+    if (it == files.end() || !it->second.IsHolding<std::string>()) return {};
+    return sceneLinear ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>()) : it->second.UncheckedGet<std::string>();
+}
 void prepareMaterials(HdUEState& state, ScenePacket& packet) {
     const float units = float(state.setting<double>("metersPerUnit", 0.01) * 100);
     for (const auto& id : packet.dirtyMaterials) {
@@ -430,7 +441,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         for (int slot = 0; slot < HDUE_TEXTURE_SLOT_COUNT; ++slot) {
             const auto& texture = data.textures[slot];
             auto& out = desc.textures[slot];
-            out.file = packet.own(texture.file);
+            out.file = packet.own(textureFile(state, texture.file, texture.sceneLinear));
             // Displacement is a distance: scene units to UE centimetres.
             const float scale = slot == HDUE_TEXTURE_DISPLACEMENT ? units : 1.f;
             for (int i = 0; i < 4; ++i) { out.scale[i] = texture.scale[i] * scale; out.bias[i] = texture.bias[i] * scale; out.channel_mask[i] = texture.mask[i]; }
@@ -558,7 +569,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         light.angle_degrees = source ? source->angle : .53f;
         light.cube_resolution = domeResolution;
         light.texture_format = source ? source->textureFormat : HDUE_ENVIRONMENT_AUTOMATIC;
-        light.texture_file = packet.own(source ? source->texture : "");
+        light.texture_file = packet.own(source ? textureFile(state, source->texture) : "");
         light.ies_file = packet.own(source ? source->ies : ""); light.ies_angle_scale = source ? source->iesAngleScale : 0;
         light.ies_normalize = source && source->iesNormalize;
         for (int c = 0; c < 3; ++c) { light.position_cm[c] = legacy.position[c]; light.color[c] = legacy.color[c]; }
@@ -991,16 +1002,19 @@ public:
             }
             // Houdini's UI: post and return; Hydra calls again while not converged. A UE tick can take hundreds of ms
             // (scene uploads, ID-pass material swaps), which froze the UI while it waited.
+            // Calls arriving while one is queued are coalesced, so the queued call and the pump always render the
+            // newest camera: keeping the camera of the call that was queued lost Houdini's last move (it then saw a
+            // converged image and stopped calling).
+            { std::lock_guard lock(latestMutex_); latestPass_ = pass; latestTags_ = tags; }
+            converged_ = false;
             const auto eye = pass->view.GetInverse().ExtractTranslation();
             const bool skipped = executeQueued_.exchange(true);
             trace("hdUE execute posted=%d eye=(%.2f, %.2f, %.2f)\n", int(!skipped), eye[0], eye[1], eye[2]);
             if (skipped) return;
-            host.post([this, pass, tags] {
-                executeQueued_ = false; executeOnce(pass, tags);
-                // Between Executes, keep publishing frames UE finishes for the last camera.
-                selfHost().pumps[this] = [this, pass, tags] {
-                    if (!executeQueued_ && !IsConverged() && !state_->paused) executeOnce(pass, tags);
-                };
+            host.post([this] {
+                executeQueued_ = false; executeLatest();
+                // Between Executes, keep publishing frames UE finishes for the newest camera.
+                selfHost().pumps[this] = [this] { if (!executeQueued_ && !IsConverged() && !state_->paused) executeLatest(); };
             });
             return;
         }
@@ -1018,6 +1032,14 @@ public:
             do executeOnce(pass, tags);
             while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
         });
+    }
+    std::mutex latestMutex_;
+    std::shared_ptr<const PassSnapshot> latestPass_;
+    TfTokenVector latestTags_;
+    void executeLatest() {
+        std::shared_ptr<const PassSnapshot> pass; TfTokenVector tags;
+        { std::lock_guard lock(latestMutex_); pass = latestPass_; tags = latestTags_; }
+        if (pass) executeOnce(pass, tags);
     }
     void executeOnce(const std::shared_ptr<const PassSnapshot>& pass, const TfTokenVector&) {
         // HDUE_TRACE_TIMING=1: one line per Execute that did work, with where its time went.
@@ -1329,14 +1351,16 @@ public:
                 return request;
               };
                 if (needsRequest && s.backend->postprocess_api().set_post_process) {
-                    // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper.
+                    // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper, and
+                    // hdUE:cvar:<console variable, ':' for '.'> (USD attribute names cannot hold dots).
                     // With the tonemapper on, the camera exposure goes in before it rather than onto display values.
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.setting<bool>("tonemapper", false);
                     const auto settings = s.settingsSnapshot();
                     for (const auto& [key, value] : settings) {
-                        if (!TfStringStartsWith(key.GetString(), "postProcess:")) continue;
-                        names.push_back(key.GetString().substr(12));
+                        if (TfStringStartsWith(key.GetString(), "postProcess:")) names.push_back(key.GetString().substr(12));
+                        else if (TfStringStartsWith(key.GetString(), "cvar:")) names.push_back(TfStringReplace(key.GetString().substr(5), ":", "."));
+                        else continue;
                         values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value));
                     }
                     if (tonemapper) {
@@ -1689,6 +1713,13 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         dirtyChangedEntries(previousDictionary, currentDictionary, state_->meshes, state_->dirtyMeshes);
         ++state_->revision;
     }
+    if (key==TfToken("opTextures")) { // re-pack what reads a host image
+        for (const auto& [id, material] : state_->materials)
+            if (std::any_of(material.textures.begin(), material.textures.end(), [](const auto& t) { return HdUEHostTexture(t.file); }))
+                state_->dirtyMaterials.insert(id);
+        for (const auto& [id, light] : state_->lights) if (HdUEHostTexture(light.texture)) state_->dirtyLights.insert(id);
+        ++state_->revision;
+    }
     if (key==TfToken("surfaceEffects")) state_->wetBindings=std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects",{}));
     if (key==TfToken("surfaceEffects") || key==TfToken("wetMaskPreview") || key==TfToken("wetValidationError")) {
         ++state_->revision;
@@ -1700,7 +1731,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
         key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
         key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") ||
-        TfStringStartsWith(key.GetString(), "postProcess:")) ++state_->requestSettingsRevision;
+        TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);
         const double fps=state_->setting<double>("houdini:fps",24.);

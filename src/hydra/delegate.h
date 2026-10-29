@@ -90,7 +90,11 @@ struct HdUEVolumeData {
 struct HdUETextureData {
     std::string file;
     GfVec4f scale{1}, bias{0}, mask{1, 0, 0, 0};
+    bool sceneLinear = false; // a colour image, converted from the OCIO scene_linear role
 };
+// op: (Houdini COP) and opdef: (embedded HDA) images exist only inside the host, which exports them and maps each
+// path to its file (render setting opTextures). Materials and lights keep these paths; they are resolved when packed.
+inline bool HdUEHostTexture(const std::string& path) { return !path.rfind("op:", 0) || !path.rfind("opdef:", 0); }
 struct HdUEMaterialData {
     std::string id;
     GfVec3f color{0.7f}, emissive{0};

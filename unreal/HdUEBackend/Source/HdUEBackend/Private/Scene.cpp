@@ -384,6 +384,11 @@ const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Fil
         auto* Created = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient);
         Created->bNotOfflineProcessed = true;
         Created->SRGB = SRGB && !IsFloatFormat(Texture->Pending->PixelFormat); // float images are already linear
+        // UpdateResource hands the mips to the render thread. Discardable bulk data moves them there: copying them
+        // (FTexturePlatformData::TryLoadMips) was 99% of texture creation, ~680 ms for Sponza's 111 textures, and kept a
+        // CPU copy of every texture for the scene's lifetime.
+        // ponytail: the resource can't be rebuilt from this texture; it is never updated again (create a new one).
+        for (FTexture2DMipMap& Mip : Texture->Pending->Mips) Mip.BulkData.SetBulkDataFlags(BULKDATA_AlwaysAllowDiscard);
         Created->SetPlatformData(Texture->Pending.Release());
         Created->UpdateResource();
         Texture->Texture.Reset(Created);
@@ -484,8 +489,10 @@ void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> Rend
 // Any thread: one Hydra mesh's static render data, with a vertex per Hydra vertex (each has one normal, UV and colour).
 // Meshes without normals get a vertex per triangle corner with the triangle's normal, as dynamic meshes draw them.
 // UE's BuildFromMeshDescription went through an FMeshDescription with a vertex per corner, whose edge bookkeeping took
-// 7 s for Sponza's largest mesh.
-FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc) {
+// 7 s for Sponza's largest mesh. Without Lumen cards (MeshCards.cpp), Lumen's surface cache has nothing for the mesh and
+// its bounces go black.
+FCardRepresentationData* HdueMeshCards(const FStaticMeshLODResources& LOD, const FBoxSphereBounds& Bounds);
+FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool Cards) {
     const bool Faceted = !Desc.normals;
     const int32 Count = int32(Faceted ? Desc.index_count : Desc.vertex_count);
     TArray<FStaticMeshBuildVertex> Vertices; Vertices.SetNumUninitialized(Count);
@@ -519,22 +526,24 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc) {
     Section.MaterialIndex = 0; Section.FirstIndex = 0; Section.NumTriangles = Indices.Num() / 3;
     Section.MinVertexIndex = 0; Section.MaxVertexIndex = Count - 1; Section.bCastShadow = true;
     LOD.IndexBuffer.SetIndices(Indices, Count - 1 > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
+    if (Cards) LOD.CardRepresentationData = HdueMeshCards(LOD, Result.Bounds);
     return Result;
 }
 
-// Replaces one static mesh queued by Apply with its Nanite version once that build has finished. Nanite data must be
-// attached before a mesh's GPU resources exist, so the Nanite version is a second static mesh.
+// Replaces one static mesh queued by Apply with its version with Lumen cards (and Nanite data) once that build has
+// finished. Both must be attached before a mesh's GPU resources exist, so that version is a second static mesh.
 void FHdueScene::TickConversions() {
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
         if (!It.Value().IsCompleted()) continue; // not built yet
         AActor* Actor = Actors.FindRef(It.Key());
         auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr;
         const TSharedPtr<FConversion> Conversion = It.Value().GetResult();
-        const UMaterialInterface* Material = Component ? Component->GetMaterial(0) : nullptr;
-        // Nanite draws opaque and masked materials only; the regular static mesh stays for the others.
-        if (!Component || !Conversion || (Material && IsTranslucentBlendMode(*Material))) { It.RemoveCurrent(); continue; }
+        if (!Component) { It.RemoveCurrent(); continue; }
+        const UMaterialInterface* Material = Component->GetMaterial(0);
+        // Nanite draws opaque and masked materials only.
+        const bool Nanite = Conversion->Nanite && !(Material && IsTranslucentBlendMode(*Material));
         UStaticMesh* Built = NewStaticMesh(Actor);
-        FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds, Conversion->Nanite.Get());
+        FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds, Nanite ? Conversion->Nanite.Get() : nullptr);
         static int32 NaniteMeshes = 0, Tried = 0;
         ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
         if (Tried % 50 == 1 || PendingStatic.Num() == 1)
@@ -770,14 +779,14 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // Assemble the generated meshes on all cores; components and assets are created below on this thread. Meshes that
     // are not edited after upload become static meshes: UDynamicMeshComponent rebuilt its draw commands and dynamic
     // ray-tracing instances every frame, and building its scene proxies held the first frame of a large scene on the
-    // game thread (3.8 s for Sponza's 454 meshes). Instanced prototypes are static everywhere; other meshes are static
-    // in interactive hosts (Houdini's viewport), while offline hosts (husk) keep dynamic meshes, cheaper for a few frames.
-    // Wet surface effects edit their meshes and keep them dynamic.
+    // game thread (3.8 s for Sponza's 454 meshes), and UE's dynamic meshes get Lumen cards from their bounds only, which
+    // left Lumen's bounces inside concave meshes black. Wet surface effects edit their meshes and keep them dynamic.
+    // Offline hosts (husk) build Lumen cards here, for their first frame; interactive hosts (Houdini's viewport) show
+    // meshes without cards first and swap in versions with cards built in the background by TickConversions.
     const auto StaticGenerated = [&](const HdueMeshDesc& Desc) {
-        return !(Desc.native_asset && *Desc.native_asset) && (Desc.instance_transforms || (Interactive_() && !(Desc.flags & HDUE_MESH_EDITABLE)));
+        return !(Desc.native_asset && *Desc.native_asset) && (Desc.instance_transforms || !(Desc.flags & HDUE_MESH_EDITABLE));
     };
-    // Nanite for interactive hosts' static meshes, built in the background and swapped in by TickConversions;
-    // HDUE_NANITE=0 keeps the regular static meshes.
+    // Nanite for interactive hosts' static meshes, built with their cards; HDUE_NANITE=0 keeps regular static meshes.
     static const bool NaniteMeshes = Interactive_() && FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
     if (NaniteMeshes) Nanite::IBuilderModule::Get(); // load the builder on this thread before worker tasks use it
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
@@ -785,7 +794,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
         const auto& Desc = Batch.meshes[Index];
         if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
-        if (StaticGenerated(Desc)) StaticData[Index] = BuildStatic(Desc);
+        if (StaticGenerated(Desc)) StaticData[Index] = BuildStatic(Desc, !Interactive_());
         else BuiltMeshes[Index] = BuildDynamicMesh(Desc);
     });
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
@@ -826,22 +835,21 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             UE_LOG(LogTemp, Display, TEXT("hdUE native mesh %s: NaniteData=%d"), *Mesh->GetPathName(), Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
-            PendingStatic.Remove(Id); // a Nanite build for the previous geometry finishes unused
+            PendingStatic.Remove(Id); // a background build for the previous geometry finishes unused
             if (Static) {
                 auto* Built = NewStaticMesh(Actor);
                 FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds, nullptr);
                 if (Instanced) InstanceMesh = Built;
                 else Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-                if (NaniteMeshes && !Instanced) {
-                    // Nanite data and the Nanite mesh's render data are built on background workers, from a copy of
-                    // the descriptor's arrays: done here, they doubled the time to the first frame (and normal-priority
-                    // Nanite tasks starved its rendering for 15 s).
+                if (Interactive_()) {
+                    // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
+                    // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
+                    // normal-priority Nanite tasks starved its rendering for 15 s).
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    PendingStatic.Add(Id, UE::Tasks::Launch(TEXT("HdueConversion"), [Copy]() -> TSharedPtr<FConversion> {
-                        TSharedPtr<Nanite::FResources> Nanite = BuildNanite(Copy->Desc);
-                        if (!Nanite) return nullptr;
-                        auto Result = MakeShared<FConversion>(BuildStatic(Copy->Desc));
-                        Result->Nanite = MoveTemp(Nanite);
+                    const bool WithNanite = NaniteMeshes && !Instanced;
+                    PendingStatic.Add(Id, UE::Tasks::Launch(TEXT("HdueConversion"), [Copy, WithNanite]() -> TSharedPtr<FConversion> {
+                        auto Result = MakeShared<FConversion>(BuildStatic(Copy->Desc, true));
+                        if (WithNanite) Result->Nanite = BuildNanite(Copy->Desc);
                         return Result;
                     }, UE::Tasks::ETaskPriority::BackgroundLow));
                 }

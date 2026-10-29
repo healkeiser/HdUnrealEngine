@@ -9,7 +9,7 @@ import time
 import traceback
 
 import hou
-from pxr import Gf, Sdf, Tf, Usd, UsdGeom, UsdRender
+from pxr import Sdf, Tf, Usd, UsdGeom, UsdRender, UsdShade
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -57,8 +57,8 @@ class Host:
         from substrate_live import LivePreparation
         self.live_substrate=LivePreparation(config['runtime_project'],self.log_dir)
         self.prepared_materials=PreparedMaterials(self.live_substrate)
-        from hdue_preparation import ViewportPreparation
-        self.prepared_output=ViewportPreparation()
+        self.assets=NativeAssets()
+        self.texture_files={}; self.pushed_textures=None
         self.material_error=None
         self.last_materials=None
         # Material preparation walks the stage (~70 ms on Sponza, then Hydra work): only after a change outside the
@@ -119,33 +119,6 @@ class Host:
             self.live_substrate.tick()
             node=current_settings_node()
             if node:
-                # The prepared output and asset bridge depend on the displayed LOP's cook: refresh when it recooks.
-                textures_key=_stage_key(node)
-                if textures_key!=self.last_textures:
-                    self.last_textures=textures_key
-                    from hdue_op_textures import cache,refresh
-                    try:
-                        viewer=scene_viewer()
-                        preparation_revision=self.prepared_output.revision
-                        refreshed=False
-                        if viewer.currentHydraRenderer() in (LABEL,PLUGIN):
-                            network=viewer.pwd()
-                            display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
-                            self.prepared_output.ensure(display,node)
-                        else:
-                            self.prepared_output.close()
-                        bridge=node.node('asset_bridge')
-                        if bridge and cache().dirty(bridge):
-                            refresh(bridge)
-                            refreshed=True
-                            if bridge.errors(): raise ValueError('; '.join(bridge.errors()))
-                        if refreshed or preparation_revision!=self.prepared_output.revision:
-                            viewer.curViewport().draw()
-                        error=None
-                    except (hou.Error,ValueError,RuntimeError) as failure:
-                        error=str(failure)
-                    if error and error!=self.texture_error: _report(error)
-                    self.texture_error=error
                 if state['active']:
                     try:
                         stage=scene_viewer().stage()
@@ -156,6 +129,8 @@ class Host:
                     except (hou.Error,ValueError,RuntimeError) as error:
                         self.material_problem(str(error),state['session']); stage=None
                     if stage:
+                        self.sync_scene(state['session'],_stage_key(node),
+                                        any(node.evalParm(name) for name in ('hdue_materialx_library','hdue_substrate_library')))
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
                         self.watch_stage(stage)
                         materials_key=(state['session'],_settings_values(node),hou.frame())
@@ -180,8 +155,12 @@ class Host:
                                  UsdGeom.GetStageMetersPerUnit(stage),UsdGeom.GetStageUpAxis(stage)=='Z',hou.frame()/hou.fps())
                         if options!=self.last_options and self.api.options(*options[1:]):
                             self.last_options=options; scene_viewer().curViewport().draw()
-            elif self.prepared_output.node is not None:
-                self.prepared_output.close()
+            if self.assets.authored:
+                # The bounds meshes serve hdUE only; other renderers get the scene as authored.
+                viewer=hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+                if not node or viewer is None or viewer.currentHydraRenderer() not in (LABEL,PLUGIN):
+                    try: self.assets.clear()
+                    except hou.Error: _report(traceback.format_exc())
             if self.viewer:
                 if state['error']: self.viewer.status.setText(state['error'])
                 elif not state['active']: self.viewer.status.setText('Select Unreal Engine (hdUE) in Solaris to resume')
@@ -205,9 +184,37 @@ class Host:
         finally:
             if self.running and not self.closed: self.timer.start(16)
 
+    def sync_scene(self,session,key,materials=False):
+        """What the delegate cannot read from USD by itself, kept out of the LOP graph: images of op:/opdef: texture
+        paths (exported here, outside any cook) and bounds meshes for hdue:asset prims (viewport overrides)."""
+        from hdue_op_textures import cache,prepare_stage
+        viewer=scene_viewer(); redraw=False
+        try:
+            stage=viewer.stage()
+            if key!=self.last_textures:
+                network=viewer.pwd()
+                display=network.displayNode() if isinstance(network,hou.LopNetwork) else None
+                # Never cook from here: this timer also fires while Houdini cooks (a re-entrant cook fails with
+                # "Infinite recursion in evaluation"). The viewed stage is already composed.
+                if display and display.needsToCook(): return
+                if display: redraw=self.assets.sync(network,display,stage,materials)
+            if key!=self.last_textures or cache().dirty('viewport'):
+                self.last_textures=key
+                self.texture_files=prepare_stage(stage)
+            if session and (session,self.texture_files)!=self.pushed_textures and self.api.textures(session,self.texture_files):
+                self.pushed_textures=(session,dict(self.texture_files)); redraw=True
+            error=None
+        except (hou.Error,ValueError,RuntimeError) as failure:
+            error=str(failure)
+        if error and error!=self.texture_error: _report(error)
+        self.texture_error=error
+        if redraw: viewer.curViewport().draw()
+
     def close(self):
         if self.closed: return
         self.running=False; self.timer.stop()
+        try: self.assets.clear()
+        except BaseException: _report(traceback.format_exc())
         self.live_substrate.close()
         # Switch viewers away so their sessions end before UE shuts down (deactivated hdUE delegates only pause).
         try:
@@ -221,7 +228,6 @@ class Host:
         shutdown=getattr(self.api.library,'hdue_shutdown_ue',None)
         if shutdown:
             shutdown.argtypes=[]; shutdown.restype=None; shutdown()
-        self.prepared_output.close()
         from hdue_op_textures import close
         close()
         self.closed=True; self.write_state()
@@ -353,9 +359,8 @@ def current_settings_node():
     if viewer is None: return None
     network=viewer.pwd()
     node=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
-    from hdue_preparation import TAG
-    # hdue_materialx_library exists only on the hdUE_settings subnet; its children copy other controls.
-    while node and (not node.parm('hdue_materialx_library') or node.userData(TAG)=='1'):
+    # hdue_materialx_library exists only on the hdUE_settings subnet.
+    while node and not node.parm('hdue_materialx_library'):
         inputs=node.inputs(); node=inputs[0] if inputs else None
     return node
 
@@ -369,12 +374,11 @@ def configure_live_preparation(node):
     retry.setScriptCallbackLanguage(hou.scriptLanguage.Python); group.append(retry)
     node.setParmTemplateGroup(group)
 
-def settings_node(input_node,metadata=None):
-    from hdue_op_textures import prepare_stage
-    prepare_stage(input_node.stage())
-    if metadata is None:
-        stage=input_node.stage()
-        metadata={'metersperunit':UsdGeom.GetStageMetersPerUnit(stage),'upaxis':str(UsdGeom.GetStageUpAxis(stage))}
+def settings_node(input_node):
+    """hdUE's host controls on a pass-through subnet: the scene below it stays the input's USD, unchanged.
+
+    The delegate converts stage units and up axis itself; COP/HDA images and native asset bounds are the host's
+    (Host.sync_scene), outside the LOP graph."""
     node=input_node.parent().createNode('subnet','hdUE_settings')
     node.setInput(0,input_node)
     group=node.parmTemplateGroup()
@@ -390,105 +394,107 @@ def settings_node(input_node,metadata=None):
     retry=hou.ButtonParmTemplate('hdue_substrate_retry','Retry material preparation')
     retry.setScriptCallback('import hdue_houdini; hdue_houdini._host.live_substrate.retry()')
     retry.setScriptCallbackLanguage(hou.scriptLanguage.Python); group.append(retry)
-    group.append(hou.StringParmTemplate('hdue_source_axis','Input up axis',1,default_value=(str(metadata['upaxis']).upper(),),menu_items=('Y','Z'),menu_labels=('Y','Z')))
-    group.append(hou.FloatParmTemplate('hdue_source_units','Input meters per unit',1,default_value=(metadata['metersperunit'],),min=1e-9))
     node.setParmTemplateGroup(group)
-    normalize=node.createNode('pythonscript','normalize_to_solaris')
-    normalize.setInput(0,node.indirectInputs()[0])
-    channels=normalize.parmTemplateGroup()
-    channels.append(hou.StringParmTemplate('hdue_source_axis','Input up axis',1))
-    channels.append(hou.FloatParmTemplate('hdue_source_units','Input meters per unit',1))
-    normalize.setParmTemplateGroup(channels)
-    normalize.parm('hdue_source_axis').setExpression('chs("../hdue_source_axis")',hou.exprLanguage.Hscript)
-    normalize.parm('hdue_source_units').setExpression('ch("../hdue_source_units")',hou.exprLanguage.Hscript)
-    normalize.parm('python').set('import hdue_houdini\nhdue_houdini.normalize(hou.pwd())')
-    layer=node.createNode('configurelayer','stage_metadata')
-    layer.setInput(0,normalize)
-    layer.parm('setrendersettings').set(1); layer.parm('rendersettings').set('/Render/rendersettings')
-    for name,value in {'metersperunit':1.,'upaxis':'y'}.items():
-        layer.parm('set'+name).set(1); layer.parm(name).set(value)
-    bridge=node.createNode('pythonscript','asset_bridge')
-    bridge.setInput(0,layer)
-    bridge.parm('python').set('import hdue_houdini\nhdue_houdini.cook(hou.pwd())')
-    node.node('output0').setInput(0,bridge)
-    node.layoutChildren()
+    node.node('output0').setInput(0,node.indirectInputs()[0])
     return node
 
-def normalize(node):
-    from scene_space import normalize_stage
-    stage=node.editableStage()
-    # Hydra instancing is not implemented. Expand references only in this
-    # generated layer so subsets and shaders inside instances remain editable.
-    expand_references(stage)
-    normalize_stage(stage,node.evalParm('hdue_source_axis'),node.evalParm('hdue_source_units'))
+def _catalog():
+    path=runtime_config().get('asset_catalog')
+    if not path: return {}
+    key=(path,Path(path).stat().st_mtime_ns)
+    if key not in _catalog_cache:
+        _catalog_cache.clear()
+        _catalog_cache[key]=json.loads(Path(path).read_text(encoding='utf-8-sig'))['assets']
+    return _catalog_cache[key]
 
-def expand_references(stage):
-    while True:
-        instances=[prim for prim in stage.Traverse() if prim.IsInstance()]
-        if not instances: break
-        for prim in instances: prim.SetInstanceable(False)
+def _materialx(prim):
+    output=UsdShade.Material(prim).GetSurfaceOutput('mtlx') if prim.IsA(UsdShade.Material) else None
+    return bool(output) and output.HasConnectedSource()
 
-def prepare_viewport(node):
-    expand_references(node.editableStage())
-    cook(node)
+class NativeAssets:
+    """hdue:asset prims, shown to Hydra as bounds meshes carrying the asset (the delegate places the cooked UE asset).
 
-def cook(node):
-    stage=node.editableStage()
-    from hdue_op_textures import resolve_stage, preview_fallbacks
-    resolve_stage(stage,node)
-    preview_fallbacks(stage)
-    # Author bounds meshes into this LOP's layer for Xform/Scope asset prims.
-    # The delegate uses the primvar to instantiate the real cooked UE asset.
-    from asset_proxy import author_proxy
-    config=runtime_config()
-    catalog_path=config.get('asset_catalog')
-    catalog={}
-    if catalog_path:
-        key=(catalog_path,Path(catalog_path).stat().st_mtime_ns)
-        if key not in _catalog_cache:
-            _catalog_cache.clear()
-            _catalog_cache[key]=json.loads(Path(catalog_path).read_text(encoding='utf-8-sig'))['assets']
-        catalog=_catalog_cache[key]
-    # A downstream edit can clear an asset reference from an already prepared
-    # stage. Mask only generated proxies, and restore the original mesh purpose.
-    for prim in list(stage.Traverse()):
-        generated=prim.GetAttribute('hdue:generatedAssetProxy')
-        if not generated or generated.Get()!=True: continue
-        parent=prim.GetParent(); reference=parent.GetAttribute('hdue:asset')
-        if reference and reference.Get(): continue
-        prim.SetActive(False)
-        original=parent.GetAttribute('hdue:originalPurpose')
-        if original and parent.IsA(UsdGeom.Mesh) and UsdGeom.Mesh(parent).GetPointsAttr().Get():
-            UsdGeom.Imageable(parent).CreatePurposeAttr(original.Get())
-    references=[]
-    for prim in stage.Traverse():
-        attr=prim.GetAttribute('hdue:asset')
-        asset=attr.Get() if attr else None
-        if asset:
-            if isinstance(asset,Sdf.AssetPath): asset=asset.path
-            if not isinstance(asset,str): raise ValueError('hdue:asset requires a UE object path string: '+str(prim.GetPath()))
-            references.append((str(prim.GetPath()),asset,prim.IsA(UsdGeom.Mesh)))
-    for path,asset,is_mesh in references:
-        prim=stage.GetPrimAtPath(path)
-        # A child proxy also supports native references authored directly on
-        # Mesh prims. The original mesh remains available as a guide.
-        if is_mesh:
-            imageable=UsdGeom.Imageable(prim)
-            if not prim.GetAttribute('hdue:originalPurpose'):
-                prim.CreateAttribute('hdue:originalPurpose',Sdf.ValueTypeNames.Token,custom=True).Set(imageable.GetPurposeAttr().Get())
-            imageable.CreatePurposeAttr(UsdGeom.Tokens.guide)
-        proxy=author_proxy(stage,path,asset,catalog,100.,'Y',False)
-        proxy.GetPrim().SetActive(True)
-        proxy.CreatePurposeAttr(UsdGeom.Tokens.render)
-        correction=prim.GetAttribute('hdue:assetSpace')
-        matrix=correction.Get() if correction else Gf.Matrix4d(1)
-        xform=UsdGeom.Xformable(proxy)
-        ops=xform.GetOrderedXformOps()
-        op=next((op for op in ops if str(op.GetOpName())=='xformOp:transform:hdueAssetSpace'),None)
-        if op is None: op=xform.AddTransformOp(UsdGeom.XformOp.PrecisionDouble,'hdueAssetSpace')
-        xform.SetXformOpOrder([op]); op.Set(matrix)
-        for package in catalog.get(asset,{}).get('unavailable_script_packages',[]):
-            _report(f'{path}: unavailable source script package {package}; its actors were omitted by cook')
+    Like usdview's session layer: authored only into the LOP network's viewport overrides (Houdini's session-only
+    layer over the displayed stage), never into the graph or its layers. A Mesh with hdue:asset becomes a guide.
+    Instances are left to Hydra, except around what the host maps by stage path (asset prims, hdue:surface:*
+    attributes, and MaterialX materials when a cooked library is set): those instances are made non-instanceable
+    there, as a prototype's Hydra paths are not its stage paths."""
+    PROXY='__HdUEAssetProxy'
+
+    def __init__(self):
+        self.network=None; self.authored=[]; self.previous=None
+
+    def sync(self,network,display,stage,materials=False):
+        """Re-author when the viewed stage's asset prims change; True if the overrides changed."""
+        if stage is None: return False
+        refs={}; instances=set()
+        # The viewed stage includes these overrides: instances made editable here still count as instances.
+        authored={path for kind,path in self.authored if kind=='instanceable'}
+        for prim in Usd.PrimRange.Stage(stage,Usd.TraverseInstanceProxies()):
+            attr=prim.GetAttribute('hdue:asset')
+            asset=attr.Get() if attr else None
+            if asset:
+                if isinstance(asset,Sdf.AssetPath): asset=asset.path
+                if not isinstance(asset,str): raise ValueError('hdue:asset requires a UE object path string: '+str(prim.GetPath()))
+                refs[str(prim.GetPath())]=(asset,prim.IsA(UsdGeom.Mesh))
+            elif not prim.IsInstanceProxy() or not (
+                    any(name.startswith('hdue:surface:') for name in prim.GetPropertyNames()) or
+                    (materials and _materialx(prim))):
+                continue
+            parent=prim
+            while not parent.IsPseudoRoot():
+                if parent.IsInstance() or str(parent.GetPath()) in authored: instances.add(str(parent.GetPath()))
+                parent=parent.GetParent()
+        current=(network.path(),refs,instances,UsdGeom.GetStageMetersPerUnit(stage),str(UsdGeom.GetStageUpAxis(stage)))
+        if current==self.previous: return False
+        changed=bool(self.authored)
+        self.clear()
+        if not refs and not instances:
+            self.previous=current
+            return changed
+        from asset_proxy import author_proxy
+        catalog=_catalog()
+        scratch=Usd.Stage.CreateInMemory()
+        for path,(asset,_) in refs.items():
+            proxy=author_proxy(scratch,path,asset,catalog,current[3]*100,current[4])
+            proxy.CreatePurposeAttr(UsdGeom.Tokens.render)
+        with network.viewportOverrides(display) as overrides:
+            layer=overrides.layer()
+            with Sdf.ChangeBlock():
+                for path in sorted(instances):
+                    Sdf.CreatePrimInLayer(layer,path).SetInfo('instanceable',False)
+                    self.authored.append(('instanceable',path))
+                for path,(asset,is_mesh) in refs.items():
+                    proxy=path+'/'+self.PROXY
+                    Sdf.CreatePrimInLayer(layer,proxy)
+                    Sdf.CopySpec(scratch.GetRootLayer(),proxy,layer,proxy)
+                    self.authored.append(('spec',proxy))
+                    if is_mesh:
+                        purpose=Sdf.AttributeSpec(layer.GetPrimAtPath(path),'purpose',Sdf.ValueTypeNames.Token,Sdf.VariabilityUniform)
+                        purpose.default=UsdGeom.Tokens.guide
+                        self.authored.append(('spec',path+'.purpose'))
+        self.network=network; self.previous=current
+        for path,(asset,_) in refs.items():
+            for package in catalog.get(asset,{}).get('unavailable_script_packages',[]):
+                _report(f'{path}: unavailable source script package {package}; its actors were omitted by cook')
+        return True
+
+    def clear(self):
+        authored,self.authored=self.authored,[]
+        network,self.network=self.network,None
+        self.previous=None
+        if not authored: return
+        try: display=network.displayNode()
+        except hou.ObjectWasDeleted: return
+        if display is None: return
+        with network.viewportOverrides(display) as overrides:
+            layer=overrides.layer(); edit=Sdf.BatchNamespaceEdit()
+            for kind,path in authored:
+                if kind=='instanceable':
+                    spec=layer.GetPrimAtPath(path)
+                    if spec: spec.ClearInfo('instanceable')
+                elif layer.GetObjectAtPath(path): edit.Add(path,Sdf.Path.emptyPath)
+            layer.Apply(edit)
 
 def render_settings_node(input_node,mode='realtime',samples=64):
     """A standard Render Settings LOP at /Render/rendersettings (Houdini's default path) with hdUE's mode and samples authored."""
@@ -532,10 +538,7 @@ def open_usd(path):
     if stage is None: raise RuntimeError('Solaris /stage network is unavailable')
     source=stage.createNode('sublayer','hdUE_source')
     source.parm('filepath1').set(str(Path(path).resolve()))
-    file_stage=Usd.Stage.Open(str(Path(path).resolve()),Usd.Stage.LoadNone)
-    node=settings_node(source,{'metersperunit':UsdGeom.GetStageMetersPerUnit(file_stage),
-                               'upaxis':str(UsdGeom.GetStageUpAxis(file_stage)).lower()})
-    node=render_settings_node(node)
+    node=render_settings_node(settings_node(source))
     node.setDisplayFlag(True); node.setCurrent(True,clear_all_selected=True)
     stage.layoutChildren()
     viewer=scene_viewer(); viewer.setPwd(stage)
@@ -554,9 +557,8 @@ def set_render_setting(prefix,value):
     """Author an hdUE:* setting on the displayed chain's Render Settings LOP, adding one if there is none."""
     viewer=scene_viewer(); network=viewer.pwd()
     display=network.displayNode() if isinstance(network,hou.LopNetwork) else viewer.currentNode()
-    from hdue_preparation import TAG
     node=display
-    while node and (node.userData(TAG)=='1' or node.type().name()!='rendersettings'):
+    while node and node.type().name()!='rendersettings':
         inputs=node.inputs(); node=inputs[0] if inputs else None
     if node: _render_property(node,prefix,value)
     else:

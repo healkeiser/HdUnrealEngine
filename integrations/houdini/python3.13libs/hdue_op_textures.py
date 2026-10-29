@@ -108,8 +108,9 @@ class Cache:
         self.entries[key] = dict(stamp=self.stamp(node), path=str(result))
         return str(result)
 
-    def dirty(self, bridge):
-        for uri in self.bindings.get(bridge.path(), ()):
+    def dirty(self, key):
+        """Whether an image exported for key (see prepare_stage) changed: a COP recook, a new frame, new HDA bytes."""
+        for uri in self.bindings.get(key, ()):
             try:
                 if uri.startswith('opdef:'):
                     stamp=hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()
@@ -144,104 +145,22 @@ def close():
         _cache = None
 
 
-def resolve_stage(stage, bridge):
-    """Author only into the caller's editable LOP layer; keep upstream op: URIs."""
-    references = set()
-    for prim in list(stage.Traverse()):
-        shader = UsdShade.ConnectableAPI(prim)
-        if not (prim.IsA(UsdShade.Shader) or prim.HasAPI(UsdLux.LightAPI)):
-            continue
-        for input_ in shader.GetInputs():
-            attr = input_.GetAttr()
-            value = attr.Get()
-            uri = value.path if isinstance(value, Sdf.AssetPath) else value if isinstance(value, str) else ''
-            previous = attr.GetCustomDataByKey('hdueOpTexture')
-            if previous and uri == previous['resolved']:
-                uri = previous['uri']
-            if not uri.startswith(('op:','opdef:')):
-                continue
-            references.add(uri)
-            cache().bindings[bridge.path()] = references
-            color_space = shader.GetInput('sourceColorSpace')
-            raw = bool(attr.GetColorSpace() == 'raw' or (color_space and color_space.Get() == 'raw'))
-            entry = cache().entries.get((uri, raw))
-            if not entry:
-                raise ValueError('COP texture is awaiting preparation outside the LOP cook: ' + uri)
-            path = entry['path']
-            attr.Set(Sdf.AssetPath(path) if isinstance(value, Sdf.AssetPath) else path)
-            attr.SetCustomDataByKey('hdueOpTexture', dict(uri=uri, resolved=path))
-    cache().bindings[bridge.path()] = references
+def prepare_stage(stage, key='viewport'):
+    """Export every op:/opdef: image the stage's shaders and lights use, on the host thread (outside any LOP cook).
 
-
-def prepare_stage(stage):
-    """Export on the host thread, outside any LOP cook/Usd stage write lock."""
-    for prim in Usd.PrimRange.Stage(stage,Usd.TraverseInstanceProxies()):
-        shader = UsdShade.ConnectableAPI(prim)
-        if not (prim.IsA(UsdShade.Shader) or prim.HasAPI(UsdLux.LightAPI)):
-            continue
-        for input_ in shader.GetInputs():
-            attr = input_.GetAttr()
-            value = attr.Get()
-            uri = value.path if isinstance(value, Sdf.AssetPath) else value if isinstance(value, str) else ''
-            previous = attr.GetCustomDataByKey('hdueOpTexture')
-            if previous and uri == previous['resolved']:
-                uri = previous['uri']
-            if uri.startswith(('op:','opdef:')):
-                color_space = shader.GetInput('sourceColorSpace')
-                raw = bool(attr.GetColorSpace() == 'raw' or (color_space and color_space.Get() == 'raw'))
-                cache().resolve(uri, raw)
-
-
-def refresh(bridge):
-    prepare_stage(bridge.inputs()[0].stage())
-    bridge.cook(force=True)
-
-
-def preview_fallbacks(stage):
-    """Basic MaterialX base-color image fallback for the generic PBR renderer.
-
-    Retain the authored MaterialX terminal. Full MaterialX graphs still use the
-    existing prepared/cooked MaterialX route, not this small viewport fallback.
+    Returns {uri: file} for the delegate, which reads these paths through the host (hdue_set_viewport_textures).
+    Images are exported raw: the delegate converts colour inputs from scene_linear as for any other EXR.
     """
-    for prim in list(stage.Traverse()):
-        material = UsdShade.Material(prim)
-        if not material or material.GetSurfaceOutput().HasConnectedSource():
+    files = {}
+    for prim in Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies()):
+        if not (prim.IsA(UsdShade.Shader) or prim.HasAPI(UsdLux.LightAPI)):
             continue
-        output = material.GetSurfaceOutput('mtlx')
-        source = output.GetConnectedSource() if output else None
-        if not source:
-            continue
-        surface = UsdShade.Shader(source[0].GetPrim())
-        identifier = surface.GetIdAttr().Get()
-        if identifier not in ('ND_standard_surface_surfaceshader', 'ND_open_pbr_surface_surfaceshader'):
-            continue
-        base = surface.GetInput('base_color')
-        connection = base.GetConnectedSource() if base else None
-        if not connection:
-            continue
-        image = UsdShade.Shader(connection[0].GetPrim())
-        if image.GetIdAttr().Get() not in ('ND_image_color3', 'ND_image_color4'):
-            continue
-        file = image.GetInput('file')
-        if not file or not file.Get() or not file.GetAttr().GetCustomDataByKey('hdueOpTexture'):
-            continue
-        path = material.GetPath().AppendChild('__HdUECopPreview')
-        if stage.GetPrimAtPath(path):
-            raise ValueError('Reserved hdUE COP preview path is already in use: ' + str(path))
-        preview = UsdShade.Shader.Define(stage, path)
-        preview.CreateIdAttr('UsdPreviewSurface')
-        preview.CreateInput('diffuseColor', Sdf.ValueTypeNames.Color3f).Set((1, 1, 1))
-        for source_name, target_name, fallback in (
-                ('specular_roughness', 'roughness', .5),
-                ('metalness' if identifier.startswith('ND_standard') else 'base_metalness', 'metallic', 0.)):
-            value = surface.GetInput(source_name)
-            if value and value.HasConnectedSource():
-                raise ValueError('COP preview requires constant ' + source_name + ' at ' + str(surface.GetPath()))
-            preview.CreateInput(target_name, Sdf.ValueTypeNames.Float).Set(value.Get() if value and value.Get() is not None else fallback)
-        texture = UsdShade.Shader.Define(stage, path.AppendChild('Image'))
-        texture.CreateIdAttr('UsdUVTexture')
-        texture.CreateInput('file', Sdf.ValueTypeNames.Asset).Set(file.Get())
-        texture.CreateInput('sourceColorSpace', Sdf.ValueTypeNames.Token).Set('raw')
-        texture.CreateOutput('rgb', Sdf.ValueTypeNames.Float3)
-        preview.GetInput('diffuseColor').ConnectToSource(texture.ConnectableAPI(), 'rgb')
-        material.CreateSurfaceOutput().ConnectToSource(preview.ConnectableAPI(), 'surface')
+        for input_ in UsdShade.ConnectableAPI(prim).GetInputs():
+            value = input_.GetAttr().Get()
+            uri = value.path if isinstance(value, Sdf.AssetPath) else value if isinstance(value, str) else ''
+            if uri.startswith(('op:', 'opdef:')) and uri not in files:
+                files[uri] = None
+    cache().bindings[key] = set(files)
+    for uri in files:
+        files[uri] = cache().resolve(uri, True)
+    return files

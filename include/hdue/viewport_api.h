@@ -65,6 +65,19 @@ typedef struct HdueViewportSurfaces {
 } HdueViewportSurfaces;
 /* An error blocks new wet convergence until fixed, preserving the last image. */
 HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_surfaces(const HdueViewportSurfaces* surfaces);
+typedef struct HdueViewportTexture {
+    const char* uri;  /* op: or opdef: path as authored in USD */
+    const char* file; /* image the host exported for it */
+} HdueViewportTexture;
+typedef struct HdueViewportTextures {
+    uint32_t struct_size, abi_version;
+    HdueSession session;
+    uint32_t texture_count, reserved;
+    const HdueViewportTexture* textures;
+} HdueViewportTextures;
+/* Version 1. Replace the complete set of host-exported images for op:/opdef: texture paths (Houdini COPs and
+ * embedded HDA images), which only the host can evaluate. Materials and lights re-read their textures. */
+HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_textures(const HdueViewportTextures* textures);
 #ifdef __cplusplus
 }
 #endif

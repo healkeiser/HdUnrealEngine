@@ -7,7 +7,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import hou
-from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade, UsdLux
+from pxr import Sdf, Usd, UsdGeom, UsdShade, UsdLux
 
 root=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(root/'scripts'),str(root/'integrations/houdini/python3.13libs')]
@@ -33,11 +33,11 @@ with tempfile.TemporaryDirectory(prefix='hdue-embedded-test-') as directory:
     assert Path(cache.resolve(uri)).read_bytes()==first
     assert Path(cache.resolve(uri,True)).read_bytes()==first
     cache.bindings['test']={uri}
-    assert not cache.dirty(SimpleNamespace(path=lambda:'test'))
+    assert not cache.dirty('test')
     definition.addSection('image.png',second)
-    assert cache.dirty(SimpleNamespace(path=lambda:'test'))
+    assert cache.dirty('test')
     assert cache.resolve(uri)!=resolved['path']
-    assert not cache.dirty(SimpleNamespace(path=lambda:'test'))
+    assert not cache.dirty('test')
     definition.addSection('image.png',first)
     source=directory/'source.usda'
     stage=Usd.Stage.CreateNew(str(source))
@@ -73,18 +73,12 @@ with tempfile.TemporaryDirectory(prefix='hdue-embedded-test-') as directory:
     file=directory/'library.json'; file.write_text(json.dumps(registry))
     composed=Usd.Stage.CreateInMemory()
     composed.DefinePrim('/Referenced').GetReferences().AddReference(str(source))
-    from hdue_op_textures import prepare_stage,resolve_stage
-    prepare_stage(composed)
-    resolve_stage(composed,SimpleNamespace(path=lambda:'test-dome'))
-    sky=composed.GetAttributeAtPath('/Referenced/Dome.inputs:texture:file')
-    assert Path(sky.Get().path).read_bytes()==environment
-    assert sky.GetCustomDataByKey('hdueOpTexture')['uri']==sky_uri
-    assert dome.GetTextureFileAttr().Get().path==sky_uri
-    attr=composed.GetAttributeAtPath('/Referenced/Looks/Paint/Image.inputs:file')
-    attr.Set(Sdf.AssetPath(resolved['path']))
-    attr.SetCustomDataByKey('hdueOpTexture',{'uri':uri,'resolved':resolved['path']})
+    from hdue_op_textures import prepare_stage
+    files=prepare_stage(composed,'test-dome')
+    assert Path(files[sky_uri]).read_bytes()==environment and Path(files[uri]).read_bytes()==first
+    assert composed.GetAttributeAtPath('/Referenced/Dome.inputs:texture:file').Get().path==sky_uri,'the stage keeps its opdef: paths'
     calls=[]
-    api=SimpleNamespace(materials=lambda session,assets,overrides:calls.append((session,assets,overrides)) or True)
+    api=SimpleNamespace(materials=lambda session,assets,overrides:calls.append((session,assets,overrides)) or True,surfaces=lambda *args,**kwargs:True)
     bridge=PreparedMaterials()
     assert bridge.sync(composed,Usd.TimeCode.Default(),str(file),1,api)
     assert calls[-1][1]=={'/Referenced/Looks/Paint':'/Game/HdUE/Test.Test'}
@@ -125,45 +119,10 @@ with tempfile.TemporaryDirectory(prefix='hdue-embedded-test-') as directory:
     assert lop.stage().GetPrimAtPath('/Referenced').IsInstance()
     prepared=integration.settings_node(lop)
     assert not prepared.errors(),prepared.errors()
-    assert not prepared.stage().GetPrimAtPath('/Referenced').IsInstance()
-    # References created after the settings subnet must also pass through
-    # preparation at the final displayed output, including subsequent edits.
-    downstream=lop.parent().createNode('reference','downstream_instance')
-    downstream.setInput(0,prepared)
-    downstream.parm('filepath1').set(str(source))
-    downstream.parm('primpath1').set('/Shot/Asset')
-    downstream.parm('instanceable1').set(1)
-    edit=lop.parent().createNode('pythonscript','parent_transform')
-    edit.setInput(0,downstream)
-    def translate(value):
-        edit.parm('python').set('from pxr import UsdGeom\nstage=hou.pwd().editableStage()\n'
-            +'UsdGeom.Xformable(stage.GetPrimAtPath("/Shot/Asset")).AddTranslateOp(opSuffix="test").Set(('+str(value)+',0,0))')
-    translate(2)
-    assert edit.stage().GetPrimAtPath('/Shot/Asset').IsInstance()
-    from hdue_preparation import ViewportPreparation
-    output=ViewportPreparation()
-    final=output.ensure(edit,prepared)
-    assert not final.errors(),final.errors()
-    assert not final.stage().GetPrimAtPath('/Shot/Asset').IsInstance()
-    assert edit.stage().GetPrimAtPath('/Shot/Asset').IsInstance()
-    assert final.stage().GetAttributeAtPath('/Shot/Asset/Looks/Paint/Image.inputs:file').Get().path!=uri
-    geometry=final.stage().GetPrimAtPath('/Shot/Asset/Geometry')
-    assert Gf.IsClose(UsdGeom.Xformable(geometry).ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation(),Gf.Vec3d(2,0,0),1e-9)
-    translate(5); output.ensure(final,prepared)
-    geometry=final.stage().GetPrimAtPath('/Shot/Asset/Geometry')
-    assert Gf.IsClose(UsdGeom.Xformable(geometry).ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation(),Gf.Vec3d(5,0,0),1e-9)
-    appended=lop.parent().createNode('pythonscript','edit_prepared_output')
-    appended.setInput(0,final)
-    appended.parm('python').set('stage=hou.pwd().editableStage()')
-    final=output.ensure(appended,prepared)
-    assert appended.inputs()[0]==edit # no cycle or lost artist edit
-    assert not final.stage().GetPrimAtPath('/Shot/Asset').IsInstance()
+    # Instancing reaches Hydra unchanged; the host still finds images inside instances.
+    assert prepared.stage().GetPrimAtPath('/Referenced').IsInstance()
+    assert set(prepare_stage(prepared.stage(),'instanced'))=={uri,sky_uri}
     assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
-    adopted=ViewportPreparation(); adopted.ensure(final,prepared)
-    assert adopted.node==final
-    adopted.close(); output.node=None
-    assert appended.isDisplayFlagSet()
-    assert lop.stage().GetPrimAtPath('/Referenced').IsInstance()
     cache.close()
     from hdue_op_textures import close
     close()
