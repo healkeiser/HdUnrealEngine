@@ -4,7 +4,9 @@ comparison images, docs/gallery.md and the README blocks. Two independent sets:
 - cornell: the CC0 Cornell box (samples/cornell) and one layer per feature in samples/cornell/variants;
 - sponza: Intel's Sponza 2022 (CC BY 4.0, not included) from its main camera, lit by samples/sponza/lighting.usda.
 
-    hython scripts/render_gallery.py [--set cornell|sponza] [--sponza FILE] [--dev] [--only NAME ...] [--docs-only]
+    hython scripts/render_gallery.py [--set cornell|sponza] [--sponza FILE] [--addon FILE ...] [--dev] [--only NAME ...] [--docs-only]
+
+Sponza is read from samples/sponza/intel by default (samples/sponza/README.md).
 
 hdUE must be registered (installed package), or pass --dev to use this checkout's build and .local runtime profile.
 hdUE times are per frame from the extra time of a 16-frame (Lumen) or 4-frame husk run over a 1-frame run; Karma
@@ -25,6 +27,12 @@ import OpenImageIO as oiio
 ROOT = Path(__file__).resolve().parent.parent
 CORNELL = ROOT / "samples" / "cornell"
 SPONZA = ROOT / "samples" / "sponza"
+# Intel's download, kept out of git (samples/sponza/README.md): the scene and the add-ons the gallery layers over it.
+SPONZA_SCENE = SPONZA / "intel" / "main" / "NewSponza_Main_USD_Yup_003.usda"
+SPONZA_ADDONS = [
+    SPONZA / "intel" / "curtains" / "NewSponza_Curtains_USD_YUp.usda",
+    SPONZA / "intel" / "cypress_tree" / "NewSponza_CypressTree_USDA_YUp.usda",
+]
 OUT = ROOT / "out" / "gallery"
 IMAGES = ROOT / "docs" / "images" / "gallery"
 HUSK = Path(os.environ.get("HFS", "")) / "bin" / "husk.exe"
@@ -481,14 +489,15 @@ def main():
     parser.add_argument(
         "--sponza",
         type=Path,
-        help="Intel Sponza 2022's NewSponza_Main_USD_Yup_003.usda (for --set sponza)",
+        default=SPONZA_SCENE,
+        help="Intel Sponza 2022's NewSponza_Main_USD_Yup_003.usda (for --set sponza; default: samples/sponza/intel)",
     )
     parser.add_argument(
         "--addon",
         type=Path,
         action="append",
-        default=[],
-        help="a Sponza add-on's USD (e.g. NewSponza_CypressTree_USDA_YUp.usda), sublayered over the scene; repeatable",
+        help="a Sponza add-on's USD sublayered over the scene; repeatable (default: the curtains and cypress tree in "
+        "samples/sponza/intel, when present)",
     )
     parser.add_argument(
         "--dev",
@@ -520,8 +529,11 @@ def main():
         and not (args.sponza and args.sponza.exists())
     ):
         parser.error(
-            "--set sponza needs --sponza pointing at NewSponza_Main_USD_Yup_003.usda"
+            f"--set sponza needs Intel's Sponza 2022 in {SPONZA_SCENE.parent.parent} (samples/sponza/README.md), "
+            "or --sponza pointing at NewSponza_Main_USD_Yup_003.usda"
         )
+    if args.addon is None:
+        args.addon = [a for a in SPONZA_ADDONS if a.exists()]
     out = SETS[args.set][0]
     out.mkdir(parents=True, exist_ok=True)
     results_path = out / "results.json"
@@ -624,10 +636,7 @@ def section(which, results, machine):
         if addons:
             intro += f" Add-ons from the same package, sublayered unchanged: {', '.join(f'`{a}`' for a in addons)}."
         intro += f" Rendered with husk at {resolution}:"
-        command = (
-            "hython scripts/render_gallery.py --set sponza --sponza <NewSponza_Main_USD_Yup_003.usda>"
-            + "".join(" --addon <add-on .usda>" for _ in addons)
-        )
+        command = "hython scripts/render_gallery.py --set sponza"
     setup = (
         f"{intro}\n\n"
         f"- **hdUE Lumen**: realtime mode, 16 warmup frames.\n"

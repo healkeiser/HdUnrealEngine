@@ -25,3 +25,5 @@
 
 .ruff_cache/
 uv.lock
+# Intel Sponza 2022 (CC BY 4.0): downloaded locally, never committed (samples/sponza/README.md)
+/samples/sponza/intel/

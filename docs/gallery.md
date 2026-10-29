@@ -85,10 +85,10 @@ Regenerate with `hython scripts/render_gallery.py`.
 - Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
 - Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean luminance relative to Karma CPU, the reference (1.00 = same).
 
-Regenerate with `hython scripts/render_gallery.py --set sponza --sponza <NewSponza_Main_USD_Yup_003.usda> --addon <add-on .usda> --addon <add-on .usda>`.
+Regenerate with `hython scripts/render_gallery.py --set sponza`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.2 s | 2.1 s | 24.7 s | 508.3 s | 107x / 12x | 0.80 / 0.86 |
+| Main view | 0.3 s | 2.1 s | 24.7 s | 508.3 s | 80x / 12x | 0.79 / 0.86 |
 
 ![Main view: `/root/PhysCamera001` (Intel's Render_Main_A view), exposure +4.5 stops as authored.](images/gallery/sponza/PhysCamera001.png)
