@@ -1034,7 +1034,11 @@ public:
 #if defined(HDUE_HOUDINI)
             s.executeThread=GetCurrentThreadId();
 #endif
-            if (!selfHost().pumping) selfHost().tick(); // a second tick per loop doubled each frame's engine cost
+            if (!selfHost().pumping) {
+                const auto tickStart = Clock::now();
+                selfHost().tick(); // pumps run right after the loop's tick: a second one doubled each frame's engine cost
+                if (const double tickMs = ms(tickStart, Clock::now()); tickMs > 50) trace("hdUE slow execute tick: %.1f ms\n", tickMs);
+            }
             // Keep the last valid AOV while a prepared material graph is
             // invalid. Dirty USD data stays queued until preparation/undo.
             if (!s.setting<bool>("materialGraphValid", true)) { converged_ = true; return; }
@@ -1374,6 +1378,7 @@ public:
                 }
                 const auto requestStart = std::chrono::steady_clock::now();
                 const auto requested=s.backend->api().request_render(s.session, &request);
+                if (const double requestMs = ms(requestStart, Clock::now()); requestMs > 50) trace("hdUE slow request_render: %.1f ms (result %d)\n", requestMs, int(requested));
                 if(requested==HDUE_PENDING) {
                     if (!needsRequest) { subframeDue_ = true; converged_ = false; s.error.clear(); return; } // retry the sub-frame
                     s.assetRequestPending=true; converged_=false; s.lastFrame={};
@@ -1414,7 +1419,9 @@ public:
             }
             if (denoisePending_ && aovsDone_) { denoise(*buffer); denoisePending_ = false; }
 #if defined(HDUE_HOUDINI)
+            const auto gpuStart = Clock::now();
             syncGpuFrames(s, *buffer, depth, denoising);
+            if (const double gpuMs = ms(gpuStart, Clock::now()); gpuMs > 50) trace("hdUE slow GPU frame sync: %.1f ms\n", gpuMs);
 #endif
             { std::lock_guard lock(s.mutex); s.error.clear(); }
             const double total = ms(start, Clock::now());
