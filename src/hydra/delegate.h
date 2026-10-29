@@ -79,17 +79,20 @@ struct HdUEMeshData {
     VtArray<TfToken> categories;          // light/shadow link collections that include the prim (GetCategories)
     bool instanced = false;               // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances;    // USD world matrices (prototype transform included)
-    std::vector<GfVec3f> instanceColors;  // per instance; empty unless displayColor varies
+    std::vector<GfVec3f> instanceColors;  // per instance: an instance-rate displayColor (or material colour primvar)
     std::vector<int32_t> instanceIds;     // Hydra instanceId per instance; empty means the instance index
-    // Motion blur: the matrices at time t are motionLeft.at(t) * M * motionRight.at(t) + velocity * t, for M the
-    // transform or each instance. Both factors are relative to the current frame (identity at t = 0).
+    // Motion blur: the matrices at time t are motionLeft.at(t) * M * motionRight.at(t) + velocity * t +
+    // acceleration * t^2 / 2, for M the transform or each instance. Both factors are relative to the current frame
+    // (identity at t = 0).
     HdUEMotionSamples motionLeft, motionRight;
-    std::vector<GfVec3f> velocities;  // per instance, world units per frame
+    std::vector<GfVec3f> velocities;     // per instance, world units per frame
+    std::vector<GfVec3f> accelerations;  // per instance, world units per frame^2
     // Deformation blur: per-vertex point offsets at frame-relative times (piecewise linear); empty unless points move.
     std::vector<float> deformTimes;
     std::vector<std::vector<GfVec3f>> deformOffsets;
     bool moving() const {
-        return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !deformTimes.empty();
+        return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !accelerations.empty() ||
+               !deformTimes.empty();
     }
     std::vector<GfVec3f> pointsAt(float t) const {
         auto out = points;
@@ -109,7 +112,7 @@ struct HdUEVolumeData {
     bool visible = true;
     TfToken renderTag;
     uint32_t width = 0, height = 0, depth = 0;
-    std::vector<float> density;
+    VtFloatArray density;  // shared by the volumes of one prim's instances
     GfMatrix4d localToWorld{1};
     GfVec3f albedo{.8f};
 };

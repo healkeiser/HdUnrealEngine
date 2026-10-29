@@ -25,6 +25,7 @@
 #include <cmath>
 #include <algorithm>
 #include "geom_subsets.h"
+#include "instancing.h"
 #include "subdivision.h"
 #include "mesh_normals.h"
 #include "mesh_weld.h"
@@ -34,9 +35,6 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/instancer.h"
-#include "pxr/base/gf/quatd.h"
-#include "pxr/base/gf/quatf.h"
-#include "pxr/base/gf/quath.h"
 #include "pxr/base/gf/matrix4d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -205,40 +203,41 @@ double HdUEFramesPerSecond(const HdUEState& state) {
                                                         : 0;
     return fps > 0 ? fps : state.setting<double>("framesPerSecond", 24);
 }
-// Instance transforms as hdEmbree composes them: for each index,
-// instanceTransform * scale * rotation * translation * instancerTransform, then nested
-// instancers apply after (child * parent).
+// Instance transforms as hdEmbree composes them (HdUEInstanceTransform), then nested instancers apply after (child *
+// parent). Masked instances (invisibleIds, inactiveIds) are already absent from GetInstanceIndices.
 class Instancer final : public HdInstancer {
     std::map<TfToken, VtValue> primvars_;
     bool visible_ = true;
-    template <class V>
-    static bool vec3(const VtValue& v, size_t i, GfVec3d& out) {
-        if (!v.IsHolding<VtArray<V>>() || i >= v.UncheckedGet<VtArray<V>>().size()) return false;
-        const auto& x = v.UncheckedGet<VtArray<V>>()[i];
-        out = GfVec3d(x[0], x[1], x[2]);
-        return true;
-    }
-    static bool vector3(const VtValue& v, size_t i, GfVec3d& out) {
-        return vec3<GfVec3f>(v, i, out) || vec3<GfVec3d>(v, i, out) || vec3<GfVec3h>(v, i, out);
-    }
-    template <class Q>
-    static bool quat(const VtValue& v, size_t i, GfQuatd& out) {
-        if (!v.IsHolding<VtArray<Q>>() || i >= v.UncheckedGet<VtArray<Q>>().size()) return false;
-        const auto& q = v.UncheckedGet<VtArray<Q>>()[i];
-        const auto im = q.GetImaginary();
-        out = GfQuatd(q.GetReal(), GfVec3d(im[0], im[1], im[2]));
-        return true;
-    }
-    static bool rotation(const VtValue& v, size_t i, GfQuatd& out) {
-        if (quat<GfQuath>(v, i, out) || quat<GfQuatf>(v, i, out) || quat<GfQuatd>(v, i, out)) return true;
-        if (!v.IsHolding<VtVec4fArray>() || i >= v.UncheckedGet<VtVec4fArray>().size()) return false;
-        const auto& q = v.UncheckedGet<VtVec4fArray>()[i];
-        out = GfQuatd(q[0], GfVec3d(q[1], q[2], q[3]));
-        return true;  // <real, i, j, k>
-    }
     VtValue primvar(const TfToken& name) const {
         const auto it = primvars_.find(name);
         return it == primvars_.end() ? VtValue() : it->second;
+    }
+    const Instancer* parent() const {
+        return GetParentId().IsEmpty()
+                   ? nullptr
+                   : dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
+    }
+    // A per-instance vector primvar (velocities, accelerations; instancer space) in world space for each flattened
+    // instance, plus its parent instance's own; empty when no level authors it. Angular velocities are not applied.
+    std::vector<GfVec3f> ComputeInstanceVectors(const SdfPath& prototype, const TfToken& name) const {
+        if (!visible_) return {};
+        const auto values = primvar(name);
+        const auto* up = parent();
+        const auto inherited = up ? up->ComputeInstanceVectors(GetId(), name) : std::vector<GfVec3f>();
+        if (values.IsEmpty() && inherited.empty()) return {};
+        const auto parents = up ? up->ComputeInstanceTransforms(GetId()) : VtMatrix4dArray(1, GfMatrix4d(1));
+        const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
+        const auto indices = GetDelegate()->GetInstanceIndices(GetId(), prototype);
+        std::vector<GfVec3f> out;
+        out.reserve(parents.size() * indices.size());
+        for (size_t i = 0; i < parents.size(); ++i)
+            for (const int index : indices) {
+                GfVec3d v(0);
+                HdUEInstanceVector(values, size_t(index), v);
+                v = (instancer * parents[i]).TransformDir(v);
+                out.emplace_back(i < inherited.size() ? v + GfVec3d(inherited[i]) : v);
+            }
+        return out;
     }
 
 public:
@@ -256,41 +255,42 @@ public:
             primvars_.swap(current);
         }
     }
-    // Per-instance velocities in world units per second (top-level instancers only; nested ones return none).
-    std::vector<GfVec3f> ComputeInstanceVelocities(const SdfPath& prototype) const {
-        const auto velocities = primvar(HdTokens->velocities);
-        if (!visible_ || !GetParentId().IsEmpty() || velocities.IsEmpty()) return {};
-        const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
-        std::vector<GfVec3f> out;
-        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype)) {
-            GfVec3d v(0);
-            vector3(velocities, size_t(index), v);
-            out.emplace_back(instancer.TransformDir(v));
-        }
-        return out;
-    }
-    HdUEMotionSamples ComputeMotion() const {
+    // Motion of count flattened instances of prototype: the instancer's transform samples, and USD PointInstancer
+    // velocities and accelerations per frame (dropped unless there is one per instance).
+    void ComputeInstanceMotion(const SdfPath& prototype, double fps, size_t count, HdUEMeshData& mesh) const {
         float times[HdUEMaxMotionSamples];
         GfMatrix4d values[HdUEMaxMotionSamples];
-        const size_t count = GetDelegate()->SampleInstancerTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow,
-                                                                     HdUEMaxMotionSamples, times, values);
-        return HdUERelativeMotion(times, values, count, GetDelegate()->GetInstancerTransform(GetId()), false);
+        const size_t samples = GetDelegate()->SampleInstancerTransform(GetId(), -HdUEMotionWindow, HdUEMotionWindow,
+                                                                       HdUEMaxMotionSamples, times, values);
+        mesh.motionRight =
+            HdUERelativeMotion(times, values, samples, GetDelegate()->GetInstancerTransform(GetId()), false);
+        const auto perFrame = [&](const TfToken& name, double seconds) {
+            auto out = ComputeInstanceVectors(prototype, name);
+            if (out.size() != count) out.clear();
+            for (auto& v : out) v /= float(seconds);
+            return out;
+        };
+        mesh.velocities = perFrame(HdTokens->velocities, fps);
+        mesh.accelerations = perFrame(HdTokens->accelerations, fps * fps);
     }
-    // Per-instance displayColor (instance interpolation), repeated for each parent instance like the transforms.
-    std::vector<GfVec3f> ComputeInstanceColors(const SdfPath& prototype) const {
-        const auto colors = value(primvar(HdTokens->displayColor), VtVec3fArray());
-        if (colors.empty() || !visible_) return {};
+    // An instance-rate colour primvar (displayColor, or the one a bound material reads) for each flattened instance,
+    // from the nearest instancer that authors it, as Storm resolves nested instance primvars; empty when none does.
+    std::vector<GfVec3f> ComputeInstanceColors(const SdfPath& prototype, const TfToken& name) const {
+        if (!visible_) return {};
+        const auto colors = value(primvar(name), VtVec3fArray());
+        const auto* up = parent();
+        const auto inherited = up && colors.empty() ? up->ComputeInstanceColors(GetId(), name) : std::vector<GfVec3f>();
+        if (colors.empty() && inherited.empty()) return {};
+        const size_t parents = up ? up->ComputeInstanceTransforms(GetId()).size() : 1;
+        const auto indices = GetDelegate()->GetInstanceIndices(GetId(), prototype);
         std::vector<GfVec3f> out;
-        for (const int index : GetDelegate()->GetInstanceIndices(GetId(), prototype))
-            out.push_back(size_t(index) < colors.size() ? colors[index] : colors[0]);
-        if (GetParentId().IsEmpty()) return out;
-        const auto* parent =
-            dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
-        const size_t parents = parent ? parent->ComputeInstanceTransforms(GetId()).size() : 0;
-        std::vector<GfVec3f> nested;
-        nested.reserve(parents * out.size());
-        for (size_t i = 0; i < parents; ++i) nested.insert(nested.end(), out.begin(), out.end());
-        return nested;
+        out.reserve(parents * indices.size());
+        for (size_t i = 0; i < parents; ++i)
+            for (const int index : indices)
+                out.push_back(!colors.empty()        ? colors[size_t(index) < colors.size() ? index : 0]
+                              : i < inherited.size() ? inherited[i]
+                                                     : GfVec3f(1));
+        return out;
     }
     VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype) const {
         if (!visible_) return {};
@@ -301,23 +301,12 @@ public:
         const auto scales = primvar(HdInstancerTokens->instanceScales),
                    matrices = primvar(HdInstancerTokens->instanceTransforms);
         VtMatrix4dArray transforms(indices.size());
-        for (size_t i = 0; i < indices.size(); ++i) {
-            const size_t index = size_t(indices[i]);
-            GfMatrix4d m = instancer, step(1);
-            GfVec3d v;
-            GfQuatd q;
-            if (vector3(translations, index, v)) m = step.SetTranslate(v) * m;
-            if (rotation(rotations, index, q)) m = GfMatrix4d(1).SetRotate(q) * m;
-            if (vector3(scales, index, v)) m = GfMatrix4d(1).SetScale(v) * m;
-            if (matrices.IsHolding<VtMatrix4dArray>() && index < matrices.UncheckedGet<VtMatrix4dArray>().size())
-                m = matrices.UncheckedGet<VtMatrix4dArray>()[index] * m;
-            transforms[i] = m;
-        }
-        if (GetParentId().IsEmpty()) return transforms;
-        const auto* parent =
-            dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
-        if (!parent) return transforms;
-        const auto parents = parent->ComputeInstanceTransforms(GetId());
+        for (size_t i = 0; i < indices.size(); ++i)
+            transforms[i] =
+                HdUEInstanceTransform(instancer, translations, rotations, scales, matrices, size_t(indices[i]));
+        const auto* up = parent();
+        if (!up) return transforms;
+        const auto parents = up->ComputeInstanceTransforms(GetId());
         VtMatrix4dArray nested(parents.size() * transforms.size());
         for (size_t i = 0; i < parents.size(); ++i)
             for (size_t j = 0; j < transforms.size(); ++j)
@@ -325,6 +314,21 @@ public:
         return nested;
     }
 };
+// The rprim's instancer, synced with its parents (HdUEInstancePlacements syncs it first).
+const Instancer* HdUEInstancer(HdSceneDelegate* delegate, const SdfPath& instancerId) {
+    return instancerId.IsEmpty() ? nullptr
+                                 : dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(instancerId));
+}
+// Placements of an rprim under a Hydra instancer (its own transform first), or empty when not instanced.
+std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const SdfPath& id, const SdfPath& instancerId,
+                                               const GfMatrix4d& transform) {
+    std::vector<GfMatrix4d> out;
+    if (instancerId.IsEmpty()) return out;
+    HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), instancerId);
+    if (const auto* instancer = HdUEInstancer(delegate, instancerId))
+        for (const auto& instance : instancer->ComputeInstanceTransforms(id)) out.push_back(transform * instance);
+    return out;
+}
 // Cumulative mesh Sync time (all Hydra threads), reported with each scene submit by HDUE_TRACE_TIMING.
 std::atomic<int64_t> meshSyncMicroseconds{0};
 std::atomic<int> meshSyncs{0};
@@ -387,22 +391,11 @@ public:
         mesh.renderTag = delegate->GetRenderTag(GetId());
         _UpdateInstancer(delegate, bits);  // sets GetInstancerId
         const CleanBits clean{bits};
-        if (!GetInstancerId().IsEmpty()) {
-            HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), GetInstancerId());
-            mesh.instanced = true;
-            if (const auto* instancer =
-                    dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId()))) {
-                for (const auto& instance : instancer->ComputeInstanceTransforms(GetId()))
-                    mesh.instances.push_back(mesh.transform * instance);
-                if (mesh.material.empty())
-                    mesh.instanceColors =
-                        HdUEVaryingColors(instancer->ComputeInstanceColors(GetId()), mesh.instances.size());
-                mesh.motionRight = instancer->ComputeMotion();
-                mesh.velocities = instancer->ComputeInstanceVelocities(GetId());
-                if (mesh.velocities.size() != mesh.instances.size()) mesh.velocities.clear();
-                for (auto& v : mesh.velocities) v /= float(HdUEFramesPerSecond(*state));
-            }
-        }
+        mesh.instanced = !GetInstancerId().IsEmpty();
+        mesh.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
+        const auto* instancer = HdUEInstancer(delegate, GetInstancerId());
+        if (instancer)
+            instancer->ComputeInstanceMotion(GetId(), HdUEFramesPerSecond(*state), mesh.instances.size(), mesh);
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
@@ -453,9 +446,13 @@ public:
         const auto uv = triangulated<GfVec2f>(delegate, GetId(), uvName, points.size(), triangles, parameters, util,
                                               HdTypeFloatVec2, subdivision.get());
         // Vertex colours: an unbound mesh's displayColor when it varies (a uniform one stays the material's constant
-        // color), or the primvar a bound material's base colour reads.
+        // color), or the primvar a bound material's base colour reads. An instancer's instance-rate primvar of that
+        // name replaces the mesh's own, as per-instance colours.
+        if (instancer && !colorName.IsEmpty() && mesh.sceneAsset.empty())
+            mesh.instanceColors = instancer->ComputeInstanceColors(GetId(), colorName);
+        if (mesh.instanceColors.size() != mesh.instances.size()) mesh.instanceColors.clear();
         Triangulated<GfVec3f> colors;
-        if (!colorName.IsEmpty() && mesh.sceneAsset.empty()) {
+        if (!colorName.IsEmpty() && mesh.sceneAsset.empty() && mesh.instanceColors.empty()) {
             colors = triangulated<GfVec3f>(delegate, GetId(), colorName, points.size(), triangles, parameters, util,
                                            HdTypeFloatVec3, subdivision.get());
             if (mesh.material.empty() && std::all_of(colors.values.begin(), colors.values.end(),
@@ -746,16 +743,6 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.categories = delegate->GetCategories(prim.GetId());
     return mesh;
 }
-// Placements of an rprim under a Hydra instancer (its own transform first), or empty when not instanced.
-std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const SdfPath& id, const SdfPath& instancerId,
-                                               const GfMatrix4d& transform) {
-    std::vector<GfMatrix4d> out;
-    if (instancerId.IsEmpty()) return out;
-    HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), instancerId);
-    if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(instancerId)))
-        for (const auto& instance : instancer->ComputeInstanceTransforms(id)) out.push_back(transform * instance);
-    return out;
-}
 // Widths per vertex (or with a matching count), else the first (constant), else the fallback.
 float HdUEWidth(const VtFloatArray& widths, size_t index, float fallback) {
     if (widths.empty()) return fallback;
@@ -797,27 +784,42 @@ public:
         HdUEAppendSphere(mesh);
         mesh.instanced = true;
         auto placements = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
-        if (placements.empty()) placements.push_back(mesh.transform);
+        const auto* instancer = HdUEInstancer(delegate, GetInstancerId());
+        if (!instancer) placements = {mesh.transform};
+        const float fps = float(HdUEFramesPerSecond(*static_cast<HdUEState*>(param)));
+        // Points move with their prim (or instancer) transform, their velocities and their instances'.
+        HdUEMeshData placed;
+        if (instancer)
+            instancer->ComputeInstanceMotion(GetId(), fps, placements.size(), placed);
+        else
+            placed.motionRight = HdUETransformMotion(delegate, GetId(), mesh.transform, false);
+        mesh.motionRight = placed.motionRight;
+        // Per point displayColor when it varies, else the instances' (which replace the points' own).
         std::vector<GfVec3f> colors;
         if (mesh.material.empty()) {
             const auto authored = value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray());
             colors = HdUEVaryingColors(std::vector<GfVec3f>(authored.begin(), authored.end()), points.size());
+            if (instancer) placed.instanceColors = instancer->ComputeInstanceColors(GetId(), HdTokens->displayColor);
+            if (placed.instanceColors.size() != placements.size()) placed.instanceColors.clear();
         }
-        // Points move with their prim (or instancer) transform and their velocities.
-        mesh.motionRight = GetInstancerId().IsEmpty() ? HdUETransformMotion(delegate, GetId(), mesh.transform, false)
-                                                      : HdUEMotionSamples{};
         const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
-        const float fps = float(HdUEFramesPerSecond(*static_cast<HdUEState*>(param)));
         // Every point of every placement (nested under a Hydra instancer when there is one).
-        for (const auto& placement : placements)
+        for (size_t p = 0; p < placements.size(); ++p)
             for (size_t i = 0; i < points.size(); ++i) {
-                if (velocities.size() == points.size())
-                    mesh.velocities.emplace_back(GfVec3f(placement.TransformDir(GfVec3d(velocities[i]))) / fps);
+                if (velocities.size() == points.size() || !placed.velocities.empty())
+                    mesh.velocities.push_back((velocities.size() == points.size()
+                                                   ? GfVec3f(placements[p].TransformDir(GfVec3d(velocities[i]))) / fps
+                                                   : GfVec3f(0)) +
+                                              (placed.velocities.empty() ? GfVec3f(0) : placed.velocities[p]));
+                if (!placed.accelerations.empty()) mesh.accelerations.push_back(placed.accelerations[p]);
                 const double radius = .5 * HdUEWidth(widths, i, .1f);
                 mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) *
-                                         GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placement);
-                if (!colors.empty()) mesh.instanceColors.push_back(colors[i]);
-                mesh.instanceIds.push_back(GetInstancerId().IsEmpty() ? -1 : int32_t(&placement - placements.data()));
+                                         GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placements[p]);
+                if (!placed.instanceColors.empty())
+                    mesh.instanceColors.push_back(placed.instanceColors[p]);
+                else if (!colors.empty())
+                    mesh.instanceColors.push_back(colors[i]);
+                mesh.instanceIds.push_back(instancer ? int32_t(p) : -1);
             }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
@@ -1060,10 +1062,17 @@ public:
         mesh.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
         mesh.instanced = !GetInstancerId().IsEmpty();
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
-        if (mesh.instanced)
-            if (const auto* instancer =
-                    dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
-                mesh.motionRight = instancer->ComputeMotion();
+        if (const auto* instancer = HdUEInstancer(delegate, GetInstancerId())) {
+            instancer->ComputeInstanceMotion(GetId(), HdUEFramesPerSecond(*static_cast<HdUEState*>(param)),
+                                             mesh.instances.size(), mesh);
+            // Instance-rate displayColor replaces the curves' own.
+            if (mesh.material.empty())
+                mesh.instanceColors = instancer->ComputeInstanceColors(GetId(), HdTokens->displayColor);
+            if (mesh.instanceColors.size() != mesh.instances.size())
+                mesh.instanceColors.clear();
+            else
+                mesh.colors.clear();
+        }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
     }
     void Finalize(HdRenderParam* param) override {
@@ -1090,6 +1099,7 @@ public:
 class Volume final : public HdVolume {
     static constexpr int MaxResolution = 512;  // per axis; larger grids are point-sampled with a stride
     std::optional<GfMatrix4d> gridToLocal_;    // the loaded grid's voxel to prim space
+    std::vector<std::string> emitted_;         // the prim's id, or one id per instance under a Hydra instancer
 public:
     explicit Volume(const SdfPath& id) : HdVolume(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
@@ -1099,18 +1109,43 @@ public:
         volume.id = GetId().GetString();
         volume.visible = delegate->GetVisible(GetId());
         volume.renderTag = delegate->GetRenderTag(GetId());
-        // Visibility, purpose and transform edits keep the loaded grid instead of reading the file again.
-        if (gridToLocal_ && !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag |
-                                        HdChangeTracker::DirtyTransform))) {
-            const auto localToWorld = *gridToLocal_ * delegate->GetTransform(GetId());
+        _UpdateInstancer(delegate, bits);
+        const auto transform = delegate->GetTransform(GetId());
+        auto placements = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), transform);
+        if (!HdUEInstancer(delegate, GetInstancerId())) placements = {transform};
+        // One volume per placement, sharing the density grid: "<id>#<instance>" under an instancer.
+        const auto publish = [&](const HdUEVolumeData& loaded) {
+            std::vector<std::string> ids;
+            for (size_t i = 0; i < placements.size(); ++i) {
+                auto& out = state->volumes[ids.emplace_back(
+                    GetInstancerId().IsEmpty() ? volume.id : volume.id + "#" + std::to_string(i))];
+                out = loaded;
+                out.id = ids.back();
+                out.visible = volume.visible;
+                out.renderTag = volume.renderTag;
+                out.localToWorld = (gridToLocal_ ? *gridToLocal_ : loaded.localToWorld) * placements[i];
+                state->dirtyVolumes.insert(out.id);
+                state->removed.erase(out.id);
+            }
+            for (const auto& id : emitted_)
+                if (std::find(ids.begin(), ids.end(), id) == ids.end()) {
+                    state->volumes.erase(id);
+                    state->dirtyVolumes.erase(id);
+                    state->removed.insert(id);
+                }
+            emitted_ = std::move(ids);
+            ++state->revision;
+            *bits = HdChangeTracker::Clean;
+        };
+        // Visibility, purpose, transform and instance edits keep the loaded grid instead of reading the file again.
+        if (gridToLocal_ && !emitted_.empty() &&
+            !(*bits &
+              ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag | HdChangeTracker::DirtyTransform |
+                HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex))) {
             std::lock_guard lock(state->mutex);
-            if (const auto it = state->volumes.find(volume.id); it != state->volumes.end()) {
-                it->second.visible = volume.visible;
-                it->second.renderTag = volume.renderTag;
-                it->second.localToWorld = localToWorld;
-                state->dirtyVolumes.insert(volume.id);
-                ++state->revision;
-                *bits = HdChangeTracker::Clean;
+            if (const auto it = state->volumes.find(emitted_.front()); it != state->volumes.end()) {
+                const auto loaded = it->second;  // the density is shared, not copied
+                publish(loaded);
                 return;
             }
         }
@@ -1146,7 +1181,6 @@ public:
                     HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb,
                                          MaxResolution, volume);
                 gridToLocal_ = volume.localToWorld;
-                volume.localToWorld = volume.localToWorld * delegate->GetTransform(GetId());
             }
         } catch (const std::exception& error) {
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
@@ -1155,20 +1189,18 @@ public:
             volume.density.clear();
         }
         if (HdUETracePass()) {
-            const auto& m = volume.localToWorld;
+            const auto m = volume.localToWorld * transform;
             std::fprintf(stderr, "hdUE volume %s fields=%zu dims=%ux%ux%u origin=(%g,%g,%g) x=(%g,%g,%g)%c",
                          GetId().GetText(), fields.size(), volume.width, volume.height, volume.depth, m[3][0], m[3][1],
                          m[3][2], m[0][0], m[0][1], m[0][2], 10);
             std::fflush(stderr);
         }
         std::lock_guard lock(state->mutex);
-        state->volumes[volume.id] = std::move(volume);
-        state->dirtyVolumes.insert(GetId().GetString());
-        state->removed.erase(GetId().GetString());
-        ++state->revision;
-        *bits = HdChangeTracker::Clean;
+        publish(volume);
     }
-    void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+    void Finalize(HdRenderParam* param) override {
+        for (const auto& id : emitted_) static_cast<HdUEState*>(param)->erase(id);
+    }
 
 protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override {

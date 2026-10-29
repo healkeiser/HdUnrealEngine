@@ -2,6 +2,7 @@
 #include "depth.h"
 #include "surface_settings.h"
 #include "color_management.h"
+#include "instancing.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/rprim.h"
@@ -722,8 +723,14 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         if (data.instanced) {
             // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units.
             std::vector<double> matrices(data.instances.size() * 16);
-            for (size_t i = 0; i < data.instances.size(); ++i)
+            for (size_t i = 0; i < data.instances.size(); ++i) {
                 rowMajor(inverse * data.instances[i] * basis, &matrices[i * 16]);
+                // ponytail: UE instances are FTransforms, so shear is dropped; bake sheared instances if it matters.
+                static std::once_flag sheared;
+                if (HdUEHasShear(data.instances[i]))
+                    std::call_once(sheared,
+                                   [&] { TF_WARN("Sheared instances of %s render without shear", data.id.c_str()); });
+            }
             desc.instance_count = uint32_t(data.instances.size());
             std::vector<float> instanceColors;
             for (const auto& c : data.instanceColors) instanceColors.insert(instanceColors.end(), {c[0], c[1], c[2]});
@@ -1161,10 +1168,13 @@ class Pass final : public HdRenderPass {
         for (const auto& [id, mesh] : s.meshes) {
             if (!mesh.moving()) continue;
             const auto left = mesh.motionLeft.at(t), right = mesh.motionRight.at(t);
-            const auto place = [&](GfMatrix4d m, const GfVec3f* velocity) {
+            const auto place = [&](GfMatrix4d m, size_t instance) {
                 m = left * m * right;
-                if (velocity)
-                    for (int c = 0; c < 3; ++c) m[3][c] += (*velocity)[c] * t;
+                const bool velocity = mesh.velocities.size() > instance,
+                           acceleration = mesh.accelerations.size() > instance;
+                for (int c = 0; c < 3; ++c)
+                    m[3][c] += (velocity ? mesh.velocities[instance][c] * t : 0.f) +
+                               (acceleration ? mesh.accelerations[instance][c] * t * t / 2 : 0.f);
                 return m;
             };
             auto& out = storage.emplace_back();
@@ -1174,14 +1184,12 @@ class Pass final : public HdRenderPass {
                     for (int c = 0; c < 4; ++c) out.push_back(m[r][c]);
             };
             if (mesh.instanced) {
-                for (size_t i = 0; i < mesh.instances.size(); ++i)
-                    push(place(mesh.instances[i],
-                               mesh.velocities.size() == mesh.instances.size() ? &mesh.velocities[i] : nullptr));
+                for (size_t i = 0; i < mesh.instances.size(); ++i) push(place(mesh.instances[i], i));
             } else if (!asset(nativeMeshes, id).empty())
-                push(place(mesh.transform, nullptr));
+                push(place(mesh.transform, SIZE_MAX));
             else
                 push(mesh.transform.GetInverse() *
-                     place(mesh.transform, nullptr));  // generic meshes are submitted in world space
+                     place(mesh.transform, SIZE_MAX));  // generic meshes are submitted in world space
             ids.push_back(&id);
         }
         // Deforming meshes are resubmitted with their points at t, before set_transforms moves them.
@@ -2966,27 +2974,30 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
         }
     }
     for (auto& [id, mesh] : state_->meshes) {
-        if (!mesh.visible || mesh.points.empty() || !asset(nativeMeshes, id).empty() ||
-            std::abs(mesh.transform.GetDeterminant()) < 1e-20)
-            continue;
+        if (!mesh.visible || mesh.points.empty() || !asset(nativeMeshes, id).empty()) continue;
         if (!mesh.pickMesh)
             mesh.pickMesh = std::make_shared<HdUEPickMesh>(mesh.points, mesh.indices);  // lazily, on the first pick
         const auto material = asset(nativeMaterials, mesh.material);
         const bool twoSided =
             !material.empty() && (state_->pickMaterialFlags.at(material) & HDUE_PICK_MATERIAL_TWO_SIDED);
-        const auto inverse = mesh.transform.GetInverse();
-        // Preserve the ray parameter through nonuniform/negative scale.
-        const GfRay local(inverse.Transform(origin), inverse.TransformDir(direction));
-        HdUEPickHit hit;
-        if (!mesh.pickMesh->intersect(mesh.points, mesh.indices, local, minimum, maximum, &hit, twoSided)) continue;
-        maximum = hit.distance;
-        const GfVec3d point = origin + direction * hit.distance;
-        GfVec3d normal(0);
-        for (int c = 0; c < 3; ++c)
-            normal += GfVec3d(mesh.normals[mesh.indices[size_t(hit.triangle) * 3 + c]]) * hit.barycentric[c];
-        normal = inverse.GetTranspose().TransformDir(normal).GetNormalized();
-        if (twoSided && GfDot(normal, direction) > 0) normal = -normal;
-        store(mesh.scenePath, point, normal, hit.distance, mesh.sceneAsset.empty() ? "usd" : "ue-asset-bounds");
+        // Each placement: the prim's transform, or every instance of a Hydra instancer's prototype.
+        const std::vector<GfMatrix4d> single{mesh.transform};
+        for (const auto& placement : mesh.instanced ? mesh.instances : single) {
+            if (std::abs(placement.GetDeterminant()) < 1e-20) continue;
+            const auto inverse = placement.GetInverse();
+            // Preserve the ray parameter through nonuniform/negative scale.
+            const GfRay local(inverse.Transform(origin), inverse.TransformDir(direction));
+            HdUEPickHit hit;
+            if (!mesh.pickMesh->intersect(mesh.points, mesh.indices, local, minimum, maximum, &hit, twoSided)) continue;
+            maximum = hit.distance;
+            const GfVec3d point = origin + direction * hit.distance;
+            GfVec3d normal(0);
+            for (int c = 0; c < 3; ++c)
+                normal += GfVec3d(mesh.normals[mesh.indices[size_t(hit.triangle) * 3 + c]]) * hit.barycentric[c];
+            normal = inverse.GetTranspose().TransformDir(normal).GetNormalized();
+            if (twoSided && GfDot(normal, direction) > 0) normal = -normal;
+            store(mesh.scenePath, point, normal, hit.distance, mesh.sceneAsset.empty() ? "usd" : "ue-asset-bounds");
+        }
     }
     return true;
 }

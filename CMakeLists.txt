@@ -71,13 +71,17 @@ if(HDUE_BUILD_HYDRA)
         target_link_libraries(hdue_subset_test PRIVATE hd)
         target_compile_options(hdue_subset_test PRIVATE /utf-8)
         add_test(NAME geom_subset_partition COMMAND hdue_subset_test)
+        add_executable(hdue_instancing_test tests/instancing.cpp)
+        target_include_directories(hdue_instancing_test PRIVATE src/hydra "${OPENUSD_ROOT}/include")
+        target_link_libraries(hdue_instancing_test PRIVATE gf vt)
+        add_test(NAME instance_transforms COMMAND hdue_instancing_test)
         get_filename_component(_python_lib_dir "${Python3_LIBRARY}" DIRECTORY)
         get_filename_component(_python_runtime "${_python_lib_dir}" DIRECTORY)
         set_tests_properties(render_buffer_snapshots PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
         set_tests_properties(picking_bvh PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
-        set_tests_properties(geom_subset_partition PROPERTIES ENVIRONMENT_MODIFICATION
+        set_tests_properties(geom_subset_partition instance_transforms PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
     endif()
 endif()
