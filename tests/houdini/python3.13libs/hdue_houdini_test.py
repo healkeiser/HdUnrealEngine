@@ -5,7 +5,6 @@ import math
 import os
 import time
 import traceback
-from pathlib import Path
 import hou
 import numpy as np
 from PySide6 import QtCore
@@ -13,6 +12,24 @@ import hdue_houdini as integration
 from hdue_viewer import write_pfm
 
 _test=None
+
+
+def flipbook(path):
+    """Capture the Solaris compositor to path with a native flipbook (QWidget.grab must not re-enter Houdini's
+    Vulkan/GL viewport painting); yields until the file exists, then returns a list that fills when the flipbook ends."""
+    import hdefereval
+    viewer=integration.scene_viewer(); done=[]
+    def capture():
+        settings=viewer.flipbookSettings().stash()
+        settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
+        settings.beautyPassOnly(False); settings.useResolution(False); settings.output(str(path))
+        viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
+        done.append(True)
+    hdefereval.execute_deferred(capture)
+    while not path.is_file(): yield
+    return done
+
+
 class Test:
     def __init__(self,host):
         self.host=host; self.output=host.log_dir; self.frames=[]; self.capture_errors=[]; self.deadline=time.monotonic()+300
@@ -195,20 +212,9 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         yield from self.capture('10-resize-solaris.png')
 
     def capture(self,name,selected=False):
-        # Native flipbook dispatch captures the actual Solaris compositor.
-        # QWidget.grab must not re-enter Houdini's Vulkan/GL viewport painting.
-        import hdefereval
         from PySide6 import QtGui
-        viewer=integration.scene_viewer(); path=self.output/name; done=[]
-        def flipbook():
-            settings=viewer.flipbookSettings().stash()
-            settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
-            settings.beautyPassOnly(False)
-            settings.useResolution(False); settings.output(str(path))
-            viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
-            done.append(True)
-        hdefereval.execute_deferred(flipbook)
-        while not path.is_file(): yield
+        path=self.output/name
+        done=yield from flipbook(path)
         # The flipbook's nested event loop ends on the renderer's next update; the test must not go on (or quit) inside it.
         self.update()
         while not done: yield

@@ -62,7 +62,7 @@ class Host:
         # advanced between Qt events, so navigation waited seconds per frame and heavy UE work froze the UI.
         os.environ['HDUE_HOUDINI_UI']='1'; hou.putenv('HDUE_HOUDINI_UI','1')
         self.runtime=Runtime(config['backend_dll'],config['runtime_project'],self.log_dir/'ue.log',start=False)
-        self.api=Viewport(self.runtime,os.environ.get('HDUE_HOUDINI_PLUGIN',str(ROOT/'build/houdini-22.0.466/Release/hdUE_Houdini22.dll')))
+        self.api=Viewport(self.runtime,os.environ['HDUE_HOUDINI_PLUGIN'])  # set by the package and Launch-Houdini.ps1
         from hdue_materialx import PreparedMaterials
         from substrate_live import LivePreparation
         self.live_substrate=LivePreparation(config['runtime_project'],self.log_dir)

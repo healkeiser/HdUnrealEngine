@@ -20,8 +20,7 @@ if ($Target -match 'bBuildDeveloperTools\s*=\s*true' -and -not $UnrealLicenseesO
 $EngineRoot=Get-HdUELocalPath -Key engine_root
 $EngineLicenses=Join-Path $EngineRoot 'Engine\Source\ThirdParty\Licenses'
 if (-not (Test-Path -LiteralPath $EngineLicenses)) {throw "Missing $EngineLicenses."}
-$BuildDirectory=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory -Optional
-$Build=if ($BuildDirectory) {[IO.Path]::GetFullPath($BuildDirectory)} else {Join-Path $TaskRoot 'build\houdini-22.0.466'}
+$Build=Get-HdUELocalPath -Key houdini_build_root -Value $BuildDirectory
 if (-not $RuntimeConfig) {
     $RuntimeConfig=Get-HdUELocalPath -Key runtime_config -Optional
     $Active=Join-Path $TaskRoot 'out\project-assets\active-houdini.json'
@@ -48,18 +47,24 @@ $Package=Join-Path $Out $Name
 if (Test-Path -LiteralPath $Package) {Remove-Item -LiteralPath $Package -Recurse -Force}
 New-Item -ItemType Directory -Force -Path $Package | Out-Null
 
+function Copy-Tree([string]$From,[string]$To) {
+    & robocopy $From $To @args /NFL /NDL /NJH /NJS | Out-Null
+    if ($LASTEXITCODE -ge 8) {throw "Copy failed: $From"}
+}
 # Same relative layout as the repository, so hdue_houdini.ROOT and its imports keep working.
-& robocopy (Join-Path $TaskRoot 'integrations\houdini') (Join-Path $Package 'integrations\houdini') /E /XD __pycache__ /NFL /NDL /NJH /NJS | Out-Null
-& robocopy (Join-Path $TaskRoot 'scripts') (Join-Path $Package 'scripts') *.py *.ps1 /XD __pycache__ /NFL /NDL /NJH /NJS | Out-Null
-& robocopy (Join-Path $TaskRoot 'samples') (Join-Path $Package 'samples') /E /NFL /NDL /NJH /NJS | Out-Null
+Copy-Tree (Join-Path $TaskRoot 'integrations\houdini') (Join-Path $Package 'integrations\houdini') /E /XD __pycache__
+# Only the scripts/ modules the integration imports, found by following its imports.
+$Modules=& uv run --quiet --python 3.13 (Join-Path $PSScriptRoot 'runtime_modules.py')
+if ($LASTEXITCODE) {throw 'Cannot list the runtime modules.'}
+Copy-Tree (Join-Path $TaskRoot 'scripts') (Join-Path $Package 'scripts') @($Modules)
+Copy-Tree (Join-Path $TaskRoot 'samples') (Join-Path $Package 'samples') /E
 New-Item -ItemType Directory -Force -Path (Join-Path $Package 'plugin\Release'),(Join-Path $Package 'plugin\resources') | Out-Null
 Copy-Item -LiteralPath $Delegate -Destination (Join-Path $Package 'plugin\Release')
 Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json') -Destination (Join-Path $Package 'plugin\resources')
 # Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out. So do the smoke
 # test, import libraries and the D3D12/Vulkan debug layers: debugging aids, not part of the product.
 $RuntimeTarget=Join-Path $Package 'runtime\Windows'
-& robocopy $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp d3d12SDKLayers.dll VkLayer_* /NFL /NDL /NJH /NJS | Out-Null
-if ($LASTEXITCODE -ge 8) {throw 'Runtime copy failed.'}
+Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp d3d12SDKLayers.dll VkLayer_*
 $BinTarget=Join-Path $RuntimeTarget ([IO.Path]::GetRelativePath($RuntimeRoot,(Split-Path $BackendDll)))
 Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
 $Relative={param($Path) 'runtime/Windows/'+([IO.Path]::GetRelativePath($RuntimeRoot,$Path) -replace '\\','/')}
@@ -69,8 +74,7 @@ Copy-Item -Path (Join-Path $TaskRoot 'packaging\houdini\*') -Destination $Packag
 # License terms: hdUE's MIT license, the package terms the Unreal Engine EULA requires (4(c), 7(a)) and the
 # third-party licenses Unreal Engine ships with (7(b)).
 Copy-Item -LiteralPath (Join-Path $TaskRoot 'LICENSE'),(Join-Path $TaskRoot 'THIRD_PARTY_NOTICES.md') -Destination $Package
-& robocopy $EngineLicenses (Join-Path $Package 'licenses') /E /NFL /NDL /NJH /NJS | Out-Null
-if ($LASTEXITCODE -ge 8) {throw 'License copy failed.'}
+Copy-Tree $EngineLicenses (Join-Path $Package 'licenses') /E
 $global:LASTEXITCODE=0
 Write-Output "Package ready: $Package"
 if ($Zip) {

@@ -1,7 +1,6 @@
 """HDR environment and MegaLights verification in the real Solaris viewport."""
 import ctypes as C
 import threading
-import hou
 import numpy as np
 from pxr import UsdGeom
 from lighting_api import Lighting,Status

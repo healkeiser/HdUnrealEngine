@@ -1,8 +1,5 @@
 """Verify VOP authoring, native shaders and live Solaris Substrate updates."""
-import ctypes as C
-import hou
 import numpy as np
-from pxr import UsdGeom
 import hdue_houdini as integration
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi

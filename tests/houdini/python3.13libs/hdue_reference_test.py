@@ -2,7 +2,6 @@
 import os
 import numpy as np
 import hou
-from pxr import UsdGeom
 import hdue_houdini as integration
 from hdue_houdini_test import Test as ViewportTest
 from material_api import MaterialApi

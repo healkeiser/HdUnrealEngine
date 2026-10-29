@@ -1,7 +1,6 @@
 """Real Solaris viewport test for live op: texture updates in both render modes."""
 import json
 import sys
-import time
 
 import hou
 import hdefereval

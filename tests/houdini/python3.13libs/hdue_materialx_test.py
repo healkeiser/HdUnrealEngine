@@ -1,14 +1,11 @@
 """Native Solaris verification for a caller-supplied cooked MaterialX library."""
 import ctypes as C
-import json
-from pathlib import Path
 import threading
-import hou
 import numpy as np
 from pxr import UsdGeom,UsdShade
 from PySide6 import QtGui
 import hdue_houdini as integration
-from hdue_houdini_test import Test as ViewportTest
+from hdue_houdini_test import Test as ViewportTest, flipbook
 from hdue_viewport import Materials
 from material_api import MaterialApi
 
@@ -74,15 +71,8 @@ class Test(ViewportTest):
                 raise AssertionError('Stale subset partitions survived restoration')
 
     def capture(self,name):
-        import hdefereval
-        viewer=integration.scene_viewer(); path=self.output/name
-        def flipbook():
-            settings=viewer.flipbookSettings().stash()
-            settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
-            settings.beautyPassOnly(False); settings.useResolution(False); settings.output(str(path))
-            viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
-        hdefereval.execute_deferred(flipbook)
-        while not path.is_file(): yield
+        path=self.output/name
+        yield from flipbook(path)
         image=QtGui.QImage(str(path))
         if image.isNull(): raise AssertionError('Solaris compositor capture failed')
         self.captures.append(dict(file=name,width=image.width(),height=image.height()))

@@ -11,6 +11,7 @@ import hou
 import hdefereval
 from PySide6 import QtCore,QtGui
 import hdue_houdini as integration
+from hdue_houdini_test import flipbook
 
 _test=None
 class Probe:
@@ -66,19 +67,11 @@ class Probe:
 
     def capture(self,viewer,label):
         output=self.host.log_dir/(label+'-solaris.png')
-        def capture():
-            settings=viewer.flipbookSettings().stash()
-            settings.frameRange((hou.frame(),hou.frame())); settings.outputToMPlay(False)
-            settings.beautyPassOnly(False)
-            settings.useResolution(False); settings.output(str(output))
-            viewer.flipbook(viewer.curViewport(),settings,open_dialog=False)
-        hdefereval.execute_deferred(capture)
-        while not output.is_file(): yield
+        yield from flipbook(output)
         image=QtGui.QImage(str(output)).convertToFormat(QtGui.QImage.Format_RGBA8888)
-        data=bytes(image.constBits()); stride=image.bytesPerLine()
-        red=sum(data[y*stride+x*4]>30 and data[y*stride+x*4]>data[y*stride+x*4+1]*1.5 and data[y*stride+x*4]>data[y*stride+x*4+2]*1.5
-                for y in range(50,image.height()-30,2) for x in range(30,image.width()-30,2))
-        pixels=np.frombuffer(data,dtype=np.uint8).reshape(image.height(),stride)[:,:image.width()*4].reshape(image.height(),image.width(),4)
+        pixels=np.frombuffer(bytes(image.constBits()),dtype=np.uint8).reshape(image.height(),image.bytesPerLine())[:,:image.width()*4].reshape(image.height(),image.width(),4)
+        r,g,b=np.moveaxis(pixels[50:image.height()-30:2,30:image.width()-30:2,:3].astype(float),-1,0)
+        red=int(((r>30)&(r>g*1.5)&(r>b*1.5)).sum())
         lit=int((pixels[40:-30,30:-30,:3].max(axis=2)>35).sum())
         result=dict(width=image.width(),height=image.height(),red_pixels=red,lit_pixels=lit,native_viewport=lit>image.width()*image.height()*.005)
         if Path(os.environ.get('HDUE_HOUDINI_INPUT','')).name=='smoke.usda' and red<image.width()*image.height()*.0001:
