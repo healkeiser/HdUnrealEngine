@@ -7,6 +7,7 @@
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/camera.h"
+#include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -344,8 +345,8 @@ bool active(const HdUELightData& light) {
     return light.visible && std::isfinite(light.intensity) && light.intensity > 0 &&
         (light.color[0] > 0 || light.color[1] > 0 || light.color[2] > 0);
 }
-std::string asset(const HdUEState& state, const char* key, const std::string& id) {
-    const auto mapping = state.setting<VtDictionary>(key, {});
+// Callers read the mapping (a host setting) once, not once per prim.
+std::string asset(const VtDictionary& mapping, const std::string& id) {
     const auto it = mapping.find(id);
     return it != mapping.end() && it->second.IsHolding<std::string>() ? it->second.UncheckedGet<std::string>() : "";
 }
@@ -433,11 +434,12 @@ std::string textureFile(HdUEState& state, const std::string& file, bool sceneLin
     return sceneLinear ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>()) : it->second.UncheckedGet<std::string>();
 }
 void prepareMaterials(HdUEState& state, ScenePacket& packet) {
+    const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
     const float units = float(state.setting<double>("metersPerUnit", 0.01) * 100);
     for (const auto& id : packet.dirtyMaterials) {
         const auto& data = state.materials.at(id);
         HdueMaterialDesc desc{};
-        desc.id = packet.own(data.id); desc.native_asset = packet.own(asset(state, "nativeMaterialAssets", id));
+        desc.id = packet.own(data.id); desc.native_asset = packet.own(asset(nativeMaterials, id));
         for (int i = 0; i < 3; ++i) { desc.base_color[i] = data.color[i]; desc.emissive_color[i] = data.emissive[i]; }
         desc.base_color[3] = data.opacity; desc.metallic = data.metallic; desc.roughness = data.roughness;
         desc.opacity_threshold = data.opacityThreshold;
@@ -472,7 +474,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         if (state.materials.find(id) == state.materials.end()) continue;
         const auto entry = overrides.find(id);
         if (entry == overrides.end()) continue;
-        if (asset(state, "nativeMaterialAssets", id).empty() || !entry->second.IsHolding<VtDictionary>())
+        if (asset(nativeMaterials, id).empty() || !entry->second.IsHolding<VtDictionary>())
             throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
         if (!state.backend->material_api().set_parameters) throw std::runtime_error("Backend has no material parameter extension");
         std::vector<HdueMaterialParameter> parameters;
@@ -487,6 +489,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto basis = sceneBasis(state);
     const bool requireNanite = state.setting<bool>("requireNanite", false);
     const auto inverse = basis.GetInverse();
+    const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
         if (!data.sceneAsset.empty()) {
@@ -496,29 +499,32 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             continue;
         }
         packet.removedAssets.push_back(packet.own(id)); // in case it was a scene asset before
-        const auto nativeAsset = asset(state, "nativeMeshAssets", id);
+        const auto nativeAsset = asset(nativeMeshes, id);
         // Instanced prototypes keep local vertices; each instance matrix carries the placement.
         const GfMatrix4d bake = data.instanced ? GfMatrix4d(1) : data.transform;
         const auto normalTransform = bake.GetInverse().GetTranspose();
         const auto moved = packet.points.find(id);
         const auto& points = moved != packet.points.end() ? moved->second : data.points;
-        std::vector<float> p, n, uv;
-        p.reserve(points.size() * 3);
-        for (size_t i = 0; i < points.size(); ++i) {
-            const auto point = convert(bake.Transform(GfVec3d(points[i])));
-            for (int c = 0; c < 3; ++c) p.push_back(float(point[c]));
-            if (data.normals.size() == data.points.size()) {
-                const auto normal = convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
-                for (int c = 0; c < 3; ++c) n.push_back(float(normal[c]));
+        const size_t count = points.size();
+        const bool normals = data.normals.size() == data.points.size(), uvs = data.uv.size() == data.points.size();
+        std::vector<float> p(count * 3), n(normals ? count * 3 : 0), uv(uvs ? count * 2 : 0);
+        WorkParallelForN(count, [&](size_t begin, size_t end) {
+            for (size_t i = begin; i < end; ++i) {
+                const auto point = convert(bake.Transform(GfVec3d(points[i])));
+                for (int c = 0; c < 3; ++c) p[i * 3 + c] = float(point[c]);
+                if (normals) {
+                    const auto normal = convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
+                    for (int c = 0; c < 3; ++c) n[i * 3 + c] = float(normal[c]);
+                }
+                if (uvs) { uv[i * 2] = data.uv[i][0]; uv[i * 2 + 1] = 1 - data.uv[i][1]; }
             }
-            if (data.uv.size() == data.points.size()) { uv.push_back(data.uv[i][0]); uv.push_back(1 - data.uv[i][1]); }
-        }
+        });
         auto index = data.indices;
         // World transforms are baked into dynamic vertices. Preserve front
         // faces when an authored transform adds another handedness reversal.
         if (bake.GetDeterminant() < 0)
             for (size_t i = 0; i + 2 < index.size(); i += 3) std::swap(index[i + 1], index[i + 2]);
-        std::vector<float> colors;
+        std::vector<float> colors; colors.reserve(data.colors.size() * 3);
         for (const auto& c : data.colors) colors.insert(colors.end(), {c[0], c[1], c[2]});
         HdueMeshDesc desc{};
         desc.id = packet.own(data.id); desc.material_id = packet.own(data.material); desc.native_asset = packet.own(nativeAsset);
@@ -660,6 +666,7 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
 }
 void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
     const auto effects = state.setting<VtDictionary>("surfaceEffects", {});
+    const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
     const bool preview = state.setting<bool>("wetMaskPreview", false);
     for (const auto& [id, data] : state.meshes) {
         const auto fields = HdUEWetSettings(effects, data);
@@ -684,7 +691,7 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
             binding.mask_count = uint32_t(mask->second.size());
         }
         // The revision this upload leaves the mesh at: generic meshes advance by one when re-uploaded.
-        const bool reuploaded = packet.dirtyMeshes.count(id) && data.sceneAsset.empty() && asset(state, "nativeMeshAssets", id).empty();
+        const bool reuploaded = packet.dirtyMeshes.count(id) && data.sceneAsset.empty() && asset(nativeMeshes, id).empty();
         binding.geometry_revision = state.geometryRevisions[data.id] + uint64_t(reuploaded);
         packet.wet.push_back(binding);
     }
@@ -802,6 +809,7 @@ class Pass final : public HdRenderPass {
         std::unique_lock lock(s.mutex);
         std::vector<std::vector<double>> storage;
         std::vector<const std::string*> ids;
+        const auto nativeMeshes = s.setting<VtDictionary>("nativeMeshAssets", {});
         for (const auto& [id, mesh] : s.meshes) {
             if (!mesh.moving()) continue;
             const auto left = mesh.motionLeft.at(t), right = mesh.motionRight.at(t);
@@ -814,7 +822,7 @@ class Pass final : public HdRenderPass {
             const auto push = [&](const GfMatrix4d& usd) { const auto m = inverse * usd * basis; for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) out.push_back(m[r][c]); };
             if (mesh.instanced) {
                 for (size_t i = 0; i < mesh.instances.size(); ++i) push(place(mesh.instances[i], mesh.velocities.size() == mesh.instances.size() ? &mesh.velocities[i] : nullptr));
-            } else if (!asset(s, "nativeMeshAssets", id).empty()) push(place(mesh.transform, nullptr));
+            } else if (!asset(nativeMeshes, id).empty()) push(place(mesh.transform, nullptr));
             else push(mesh.transform.GetInverse() * place(mesh.transform, nullptr)); // generic meshes are submitted in world space
             ids.push_back(&id);
         }
@@ -1005,7 +1013,7 @@ public:
     // Buffers are deleted on the UE thread (DestroyBprim), so one alive at the start of an Execute stays alive in it.
     struct PassSnapshot {
         HdRenderPassAovBindingVector aovs; std::vector<HdRenderBuffer*> buffers; GfMatrix4d view, projection;
-        SdfPath cameraId; bool camera = false; double shutterOpen = 0, shutterClose = 0; float nearClip = .1f;
+        SdfPath cameraId; bool camera = false; double shutterOpen = 0, shutterClose = 0; float nearClip = .1f, farClip = 0;
         GfVec4f lens{0.f}; std::vector<GfVec2i> sizes;
         bool same(const PassSnapshot& o) const {
             return aovs == o.aovs && view == o.view && projection == o.projection && cameraId == o.cameraId && lens == o.lens && sizes == o.sizes;
@@ -1017,7 +1025,7 @@ public:
         if (camera) {
             snapshot.camera = true; snapshot.cameraId = camera->GetId();
             snapshot.shutterOpen = camera->GetShutterOpen(); snapshot.shutterClose = camera->GetShutterClose();
-            snapshot.nearClip = camera->GetClippingRange().GetMin();
+            snapshot.nearClip = camera->GetClippingRange().GetMin(); snapshot.farClip = camera->GetClippingRange().GetMax();
             snapshot.lens = GfVec4f(camera->GetFStop(), camera->GetFocusDistance(), camera->GetFocalLength(), camera->GetLinearExposureScale());
         }
         for (const auto& aov : snapshot.aovs) {
@@ -1123,6 +1131,7 @@ public:
             if (!s.setting<bool>("materialGraphValid", true)) { converged_ = true; return; }
             HdUERenderBuffer* buffer = nullptr;
             HdUERenderBuffer* depth = nullptr;
+            HdUERenderBuffer* cameraDepth = nullptr; // linear, in scene units
             std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
             extraBeauties_.clear();
             std::vector<HdRenderBuffer*> bound; // alive buffers, by binding
@@ -1148,7 +1157,7 @@ public:
                 else if(sourceType==TfToken("primvar")) name=TfToken();
                 else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
                 name=HdUEBeauty(name);
-                if (name != HdAovTokens->color && name != HdAovTokens->depth && !HdUEAovId(name)) {
+                if (name != HdAovTokens->color && name != HdAovTokens->depth && name != HdAovTokens->cameraDepth && !HdUEAovId(name)) {
                     if (warnedVars_.insert(aov.aovName).second)
                         TF_WARN("hdUE does not render the render var %s (%s %s); it receives its clear value", aov.aovName.GetText(),
                             sourceType.GetText(), sourceName.GetText());
@@ -1157,6 +1166,7 @@ public:
                 }
                 if(name==HdAovTokens->color) if (auto* b=dynamic_cast<HdUERenderBuffer*>(renderBuffer)) (buffer ? extraBeauties_.push_back(b) : void(buffer=b));
                 if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
+                if(name==HdAovTokens->cameraDepth) cameraDepth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 // Houdini's viewport binds primId/instanceId for its selection highlight. Rendering them swaps every
                 // material twice per converged view (hundreds of ms each on large scenes), so the viewport skips them
                 // unless HDUE_VIEWPORT_ID_AOVS=1; husk renders what its render vars ask for.
@@ -1231,7 +1241,7 @@ public:
                 for (const auto& [id, data] : s.lights) s.dirtyLights.insert(id);
                 changed = true;
             }
-            if(depth && !depthEnabled_) {
+            if((depth || cameraDepth) && !depthEnabled_) {
                 if(!s.backend->depth_api().set_enabled) throw std::runtime_error("Solaris requires the updated backend depth extension; run Update-HoudiniRuntime.ps1");
                 s.backend->require(s.backend->depth_api().set_enabled(s.session,1),"enable_depth");
                 depthEnabled_=true; changed=true;
@@ -1279,8 +1289,8 @@ public:
                 copyMs = ms(copyStart, Clock::now()); traced = frame;
                 std::vector<float> depthPixels;
                 HdueResult depthCopy=HDUE_OK;
-                if(copy==HDUE_OK && depth) {
-                    depthPixels=depth->takeSpare(size_t(frame.width)*frame.height);
+                if(copy==HDUE_OK && (depth || cameraDepth)) {
+                    depthPixels=(depth ? depth : cameraDepth)->takeSpare(size_t(frame.width)*frame.height);
                     depthCopy=s.backend->depth_api().copy_depth(s.session,frame.frame_id,depthPixels.data(),depthPixels.size()*sizeof(float));
                 }
                 if (copy == HDUE_STALE_FRAME || depthCopy==HDUE_STALE_FRAME) {
@@ -1290,19 +1300,26 @@ public:
                     ++s.staleFrameRetries;
                 } else {
                     s.backend->require(copy, "copy_frame");
-                    if(depth) {
+                    if(depth || cameraDepth) {
                         s.backend->require(depthCopy,"copy_depth");
+                        // cameraDepth is linear; so is depth for Houdini (UsdRenderers.json depthstyle linear), else clip-space [0,1].
+                        std::vector<float> clip;
+#if !defined(HDUE_HOUDINI)
+                        if(depth) clip.resize(depthPixels.size());
+#endif
                         WorkParallelForN(depthPixels.size(), [&](size_t begin, size_t end) {
                             for (size_t i = begin; i < end; ++i) {
                                 float& value = depthPixels[i];
-#if defined(HDUE_HOUDINI)
+                                if (!clip.empty()) clip[i]=HdUEProjectDepth(value,projection_,centimetersPerUnit_);
                                 value=value>0 && std::isfinite(value) ? float(value/centimetersPerUnit_) : std::numeric_limits<float>::max();
-#else
-                                value=HdUEProjectDepth(value,projection_,centimetersPerUnit_);
-#endif
                             }
                         });
-                        depth->publish(frame,std::move(depthPixels),1);
+                        auto& depthValues=clip.empty() ? depthPixels : clip;
+                        if(cameraDepth) {
+                            if(depth && &depthValues==&depthPixels) cameraDepth->publish(frame,depthPixels,1);
+                            else cameraDepth->publish(frame,std::move(depthPixels),1);
+                        }
+                        if(depth) depth->publish(frame,std::move(depthValues),1);
                     }
                     if (subframes_ > 1 && frame.converged) {
                         // One converged sub-frame: add it and publish the running average.
@@ -1389,6 +1406,7 @@ public:
                         s.width, s.height, s.setting<double>("metersPerUnit", .01), s.setting<std::string>("upAxis", "Y").c_str());
                 const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
                 request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
+                if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip) request.far_clip_cm = float(pass->farClip * cmPerUnit);
                 // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
                 if (projection[3][3] == 1) {
                     request.orthographic = 1;
@@ -1467,7 +1485,7 @@ public:
                     trace("hdUE request pending (UE not ready)\n");
                     if (!needsRequest) { subframeDue_ = true; converged_ = false; s.error.clear(); return; } // retry the sub-frame
                     s.assetRequestPending=true; converged_=false; s.lastFrame={};
-                    buffer->invalidate(); for (auto* extra : extraBeauties_) extra->invalidate(); if(depth) depth->invalidate(); s.error.clear(); return;
+                    buffer->invalidate(); for (auto* extra : extraBeauties_) extra->invalidate(); for (auto* d : {depth, cameraDepth}) if (d) d->invalidate(); s.error.clear(); return;
                 }
                 s.backend->require(requested, "request_render");
                 s.generation=request.generation;
@@ -1478,7 +1496,7 @@ public:
                     s.submittedRequestSettingsRevision=settingsVersion;
                     centimetersPerUnit_=s.setting<double>("metersPerUnit",.01)*100.;
                     s.lastFrame = {}; buffer->invalidate(); for (auto* extra : extraBeauties_) extra->invalidate();
-                    if(depth) depth->invalidate();
+                    for (auto* d : {depth, cameraDepth}) if (d) d->invalidate();
                     beautyRequest_ = build(view); // AOVs render the unblurred pose at the current time
                     aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty(); denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
@@ -1616,7 +1634,7 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const {
 #endif
     return t;
 }
-const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->camera, HdPrimTypeTokens->material,
+const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const { static TfTokenVector t{HdPrimTypeTokens->camera, HdPrimTypeTokens->material, HdPrimTypeTokens->extComputation,
     HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->domeLight,HdPrimTypeTokens->diskLight,HdPrimTypeTokens->cylinderLight}; return t; }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -1644,6 +1662,7 @@ void HdUERenderDelegate::DestroyRprim(HdRprim* p) { delete p; }
 HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id) {
     if (type == HdPrimTypeTokens->camera) return HdUECreateCamera(id);
     if (type == HdPrimTypeTokens->material) return HdUECreateMaterial(id);
+    if (type == HdPrimTypeTokens->extComputation) return new HdExtComputation(id); // evaluated by the rprims reading it
     if (type == HdPrimTypeTokens->distantLight) return HdUECreateLight(id, HDUE_DISTANT_LIGHT);
     if (type == HdPrimTypeTokens->sphereLight) return HdUECreateLight(id, HDUE_SPHERE_LIGHT);
     if (type == HdPrimTypeTokens->rectLight) return HdUECreateLight(id, HDUE_RECT_LIGHT);
@@ -1706,7 +1725,10 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
         ? HdAovDescriptor(HdFormatFloat32Vec3,false,VtValue(GfVec3f(0))) : HdAovDescriptor(HdFormatFloat32,false,VtValue(0.f));
 #if defined(HDUE_HOUDINI)
     if(name==HdAovTokens->depth) return HdAovDescriptor(HdFormatFloat32,false,VtValue(std::numeric_limits<float>::max()));
+#else
+    if(name==HdAovTokens->depth) return HdAovDescriptor(HdFormatFloat32,false,VtValue(1.f));
 #endif
+    if(name==HdAovTokens->cameraDepth) return HdAovDescriptor(HdFormatFloat32,false,VtValue(std::numeric_limits<float>::max()));
     return HdAovDescriptor();
 }
 // Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
@@ -1866,7 +1888,8 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         if (!mesh.sceneAsset.empty()) nativeAssetIds[mesh.scenePath]=VtValue(id);
     }
     int translucentMaterials = 0;
-    for (const auto& [id, material] : state.materials) if (material.opacity < 1.f && asset(state, "nativeMaterialAssets", id).empty()) ++translucentMaterials;
+    const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
+    for (const auto& [id, material] : state.materials) if (material.opacity < 1.f && asset(nativeMaterials, id).empty()) ++translucentMaterials;
     int sceneLights = int(state.nativeAssets.lights);
     HdueLightingStatus lighting{}; lighting.struct_size=sizeof(lighting);
     const auto& lightingApi=state.backend->lighting_api();
@@ -1943,9 +1966,10 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
     if (!std::isfinite(minimum) || !std::isfinite(maximum) || minimum < 0 || maximum < minimum || direction.GetLengthSq() < 1e-20) return false;
     direction.Normalize();
     bool nativeScene = false;
+    const auto nativeMeshes = state_->setting<VtDictionary>("nativeMeshAssets", {});
+    const auto nativeMaterials = state_->setting<VtDictionary>("nativeMaterialAssets", {});
     for (const auto& [id, mesh] : state_->meshes) {
-        if (mesh.visible && (!asset(*state_, "nativeMeshAssets", id).empty() ||
-                             !asset(*state_, "nativeMaterialAssets", mesh.material).empty())) nativeScene = true;
+        if (mesh.visible && (!asset(nativeMeshes, id).empty() || !asset(nativeMaterials, mesh.material).empty())) nativeScene = true;
     }
     const auto store = [&](const std::string& path, const GfVec3d& point, const GfVec3d& normal, double distance,
                            const char* geometry, bool naniteFallback = false) {
@@ -1969,7 +1993,7 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
         // mesh. Validate them before returning any hit in the scene.
         for (const auto& [id, mesh] : state_->meshes) {
             if (!mesh.visible) continue;
-            const auto path = asset(*state_, "nativeMaterialAssets", mesh.material);
+            const auto path = asset(nativeMaterials, mesh.material);
             if (path.empty() || state_->pickMaterialFlags.count(path)) continue;
             HduePickMaterialInfo info{}; info.struct_size = sizeof(info);
             const auto code = api.get_material_info(path.c_str(), &info);
@@ -2008,9 +2032,9 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
         }
     }
     for (auto& [id, mesh] : state_->meshes) {
-        if (!mesh.visible || mesh.points.empty() || !asset(*state_, "nativeMeshAssets", id).empty() || std::abs(mesh.transform.GetDeterminant()) < 1e-20) continue;
+        if (!mesh.visible || mesh.points.empty() || !asset(nativeMeshes, id).empty() || std::abs(mesh.transform.GetDeterminant()) < 1e-20) continue;
         if (!mesh.pickMesh) mesh.pickMesh = std::make_shared<HdUEPickMesh>(mesh.points, mesh.indices); // lazily, on the first pick
-        const auto material = asset(*state_, "nativeMaterialAssets", mesh.material);
+        const auto material = asset(nativeMaterials, mesh.material);
         const bool twoSided = !material.empty() && (state_->pickMaterialFlags.at(material) & HDUE_PICK_MATERIAL_TWO_SIDED);
         const auto inverse = mesh.transform.GetInverse();
         // Preserve the ray parameter through nonuniform/negative scale.

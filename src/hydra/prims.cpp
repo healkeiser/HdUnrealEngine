@@ -14,6 +14,7 @@
 #include "pxr/base/tf/stringUtils.h"
 #endif
 #include "pxr/imaging/hd/meshUtil.h"
+#include "pxr/imaging/hd/extComputationUtils.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/light.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
@@ -39,17 +40,33 @@
 #include "pxr/base/gf/matrix4d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-TfToken HdUEMaterialUvPrimvar(HdSceneDelegate* delegate, const SdfPath& material); // materials.cpp
+std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material); // materials.cpp
 namespace {
 template<class T> T value(const VtValue& v, T fallback) { return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback; }
 // Sync's dirty bits end clean on every path: a prim that failed is not synced (and reported) again each frame.
 struct CleanBits { HdDirtyBits* bits; ~CleanBits() { *bits = HdChangeTracker::Clean; } };
-// The mesh's UV primvar: from its own binding, else from its GeomSubsets' bindings, else st.
-// ponytail: one UV set per mesh; per-subset sets if assets mix them.
-TfToken meshUvPrimvar(HdSceneDelegate* delegate, const SdfPath& mesh, const HdMeshTopology& topology) {
-    auto name = HdUEMaterialUvPrimvar(delegate, delegate->GetMaterialId(mesh));
-    for (const auto& subset : topology.GetGeomSubsets()) if (name.IsEmpty()) name = HdUEMaterialUvPrimvar(delegate, subset.materialId);
-    return name.IsEmpty() ? TfToken("st") : name;
+// The mesh's UV and colour primvars: from its own binding, else from its GeomSubsets' bindings; else st, and displayColor
+// when nothing is bound (a bound material reads colours only through a primvar reader).
+// ponytail: one UV set and colour per mesh; per-subset sets if assets mix them.
+std::pair<TfToken, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material, const HdMeshTopology& topology) {
+    auto names = HdUEMaterialPrimvars(delegate, material);
+    for (const auto& subset : topology.GetGeomSubsets()) if (names.first.IsEmpty() || names.second.IsEmpty()) {
+        const auto [uv, color] = HdUEMaterialPrimvars(delegate, subset.materialId);
+        if (names.first.IsEmpty()) names.first = uv;
+        if (names.second.IsEmpty()) names.second = color;
+    }
+    if (names.first.IsEmpty()) names.first = TfToken("st");
+    if (material.IsEmpty()) names.second = HdTokens->displayColor;
+    return names;
+}
+// ExtComputation primvars (UsdSkel skinning through a scene delegate), evaluated on the CPU as HdEmbree does.
+HdExtComputationUtils::ValueStore computedPrimvars(HdSceneDelegate* delegate, const SdfPath& id) {
+    const auto descriptors = delegate->GetExtComputationPrimvarDescriptors(id, HdInterpolationVertex);
+    return descriptors.empty() ? HdExtComputationUtils::ValueStore() : HdExtComputationUtils::GetComputedPrimvarValues(descriptors, delegate);
+}
+VtValue primvar(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, const HdExtComputationUtils::ValueStore& computed) {
+    const auto it = computed.find(name);
+    return it == computed.end() ? delegate->Get(id, name) : it->second;
 }
 HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name) {
     for (int i = 0; i < HdInterpolationCount; ++i)
@@ -69,24 +86,28 @@ template<class T> struct Triangulated {
     const T& at(size_t corner, size_t point) const { return values[perCorner ? corner : point]; }
     bool same(size_t a, size_t b) const { return !perCorner || values[a] == values[b]; } // corners of one point
 };
+// computed: the primvar's ExtComputation value (vertex), which replaces the authored one.
 template<class T> Triangulated<T> triangulated(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, size_t pointCount,
-    const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type, const HdUESubdivision* subdivision = nullptr) {
-    // Indexed primvars (primvars:x:indices) arrive unflattened; expand them first.
+    const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type, const HdUESubdivision* subdivision = nullptr,
+    const VtValue& computed = {}) {
     VtIntArray indices;
-    const auto raw = delegate->GetIndexedPrimvar(id, name, &indices);
+    const auto raw = computed.IsEmpty() ? delegate->GetIndexedPrimvar(id, name, &indices) : computed;
     if (!raw.IsHolding<VtArray<T>>()) return {};
     VtArray<T> array = raw.UncheckedGet<VtArray<T>>();
+    const auto domain = computed.IsEmpty() ? interpolation(delegate, id, name) : HdInterpolationVertex;
+    // Indexed primvars (primvars:x:indices) arrive unflattened. A subdivision refines face-varying ones through their
+    // indices, so values shared across faces stay connected; others are expanded first.
+    const int channel = subdivision && domain == HdInterpolationFaceVarying && !indices.empty() ? subdivision->channel(indices) : 0;
     if (!indices.empty()) {
-        VtArray<T> flat(indices.size());
-        for (size_t i = 0; i < indices.size(); ++i) {
-            if (indices[i] < 0 || size_t(indices[i]) >= array.size()) return {};
-            flat[i] = array[indices[i]];
+        if (std::any_of(indices.begin(), indices.end(), [&](int i) { return i < 0 || size_t(i) >= array.size(); })) return {};
+        if (!channel) {
+            VtArray<T> flat(indices.size());
+            for (size_t i = 0; i < indices.size(); ++i) flat[i] = array[indices[i]];
+            array = std::move(flat);
         }
-        array = std::move(flat);
     }
     if (array.empty()) return {};
-    const auto domain = interpolation(delegate, id, name);
-    if (subdivision && (array = subdivision->refine(array, domain)).empty()) return {};
+    if (subdivision && (array = subdivision->refine(array, domain, channel)).empty()) return {};
     Triangulated<T> out;
     if (domain == HdInterpolationConstant) out.values.assign(pointCount, array[0]);
     else if (domain == HdInterpolationFaceVarying) {
@@ -246,6 +267,25 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         const MeshSyncTimer timer;
         auto* state = static_cast<HdUEState*>(param);
+        // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry.
+        if (!emitted_.empty() && GetInstancerId().IsEmpty() &&
+            !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag))) {
+            const auto transform = delegate->GetTransform(GetId());
+            const bool visible = delegate->GetVisible(GetId());
+            const auto renderTag = delegate->GetRenderTag(GetId());
+            const auto motion = HdUETransformMotion(delegate, GetId(), transform, true);
+            std::lock_guard lock(state->mutex);
+            if (std::all_of(emitted_.begin(), emitted_.end(), [&](const std::string& id) { return state->meshes.count(id); })) {
+                for (const auto& id : emitted_) {
+                    auto& part = state->meshes[id];
+                    const bool changed = part.transform != transform || part.visible != visible;
+                    part.transform = transform; part.visible = visible; part.renderTag = renderTag; part.motionLeft = motion;
+                    if (changed) { state->dirtyMeshes.insert(id); ++state->revision; }
+                }
+                *bits = HdChangeTracker::Clean;
+                return;
+            }
+        }
         HdUEMeshData mesh;
         mesh.id = GetId().GetString();
         mesh.sourceId = mesh.id;
@@ -274,24 +314,42 @@ public:
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
-        auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        const auto computed = computedPrimvars(delegate, GetId());
+        auto points = value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray());
         auto topology = delegate->GetMeshTopology(GetId());
-        // catmullClark and loop meshes are refined uniformly (hdUE:subdivisionLevel); authored normals do not apply to them.
-        const auto subdivision = mesh.sceneAsset.empty() ? HdUESubdivision::Create(topology, state->setting<int>("subdivisionLevel", 2)) : nullptr;
+        const auto [uvName, colorName] = meshPrimvars(delegate, delegate->GetMaterialId(GetId()), topology);
+        // catmullClark and loop meshes are refined uniformly (hdUE:subdivisionLevel), with their subdiv tags and the
+        // indices of their face-varying UVs and colours; authored normals do not apply to them.
+        std::unique_ptr<HdUESubdivision> subdivision;
+        if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 2) : 0;
+            level > 0 && (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark || topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
+            topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
+            std::vector<VtIntArray> fvarIndices;
+            for (const auto& name : {uvName, colorName}) if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
+                VtIntArray indices; delegate->GetIndexedPrimvar(GetId(), name, &indices);
+                if (!indices.empty()) fvarIndices.push_back(indices);
+            }
+            subdivision = HdUESubdivision::Create(topology, level, std::move(fvarIndices));
+        }
         if (subdivision) { points = subdivision->refine(points, HdInterpolationVertex); topology = subdivision->topology(); }
         HdMeshUtil util(&topology, GetId());
         VtVec3iArray triangles;
         VtIntArray parameters;
         util.ComputeTriangleIndices(&triangles, &parameters);
         maskTopology_=topology; maskTriangles_=triangles; maskParameters_=parameters; pointCount_=points.size();
-        // Authored normals (subdivision surfaces ignore them); zero or missing ones are generated below.
-        const auto normals = subdivision ? Triangulated<GfVec3f>{} :
-            triangulated<GfVec3f>(delegate, GetId(), HdTokens->normals, points.size(), triangles, parameters, util, HdTypeFloatVec3);
-        const auto uv = triangulated<GfVec2f>(delegate, GetId(), meshUvPrimvar(delegate, GetId(), topology), points.size(), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
-        Triangulated<GfVec3f> colors; // varying displayColor only: a uniform one stays the material's constant color
-        if (mesh.material.empty() && mesh.sceneAsset.empty()) {
-            colors = triangulated<GfVec3f>(delegate, GetId(), HdTokens->displayColor, points.size(), triangles, parameters, util, HdTypeFloatVec3, subdivision.get());
-            if (std::all_of(colors.values.begin(), colors.values.end(), [&](const GfVec3f& c) { return c == colors.values[0]; })) colors = {};
+        // Authored normals (subdivision surfaces ignore them, and so do computed points without computed normals); zero
+        // or missing ones are generated below.
+        const auto computedNormals = computed.find(HdTokens->normals);
+        const auto normals = subdivision || (computed.count(HdTokens->points) && computedNormals == computed.end()) ? Triangulated<GfVec3f>{} :
+            triangulated<GfVec3f>(delegate, GetId(), HdTokens->normals, points.size(), triangles, parameters, util, HdTypeFloatVec3, nullptr,
+                computedNormals == computed.end() ? VtValue() : computedNormals->second);
+        const auto uv = triangulated<GfVec2f>(delegate, GetId(), uvName, points.size(), triangles, parameters, util, HdTypeFloatVec2, subdivision.get());
+        // Vertex colours: an unbound mesh's displayColor when it varies (a uniform one stays the material's constant
+        // color), or the primvar a bound material's base colour reads.
+        Triangulated<GfVec3f> colors;
+        if (!colorName.IsEmpty() && mesh.sceneAsset.empty()) {
+            colors = triangulated<GfVec3f>(delegate, GetId(), colorName, points.size(), triangles, parameters, util, HdTypeFloatVec3, subdivision.get());
+            if (mesh.material.empty() && std::all_of(colors.values.begin(), colors.values.end(), [&](const GfVec3f& c) { return c == colors.values[0]; })) colors = {};
         }
         std::shared_ptr<const VtDictionary> selectedBindings;
         { std::lock_guard lock(state->mutex); selectedBindings=state->wetBindings; }
@@ -547,7 +605,7 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto mesh = HdUEShapeBase(*this, delegate);
         _UpdateInstancer(delegate, bits);
-        const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        const auto points = value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
         HdUEAppendSphere(mesh);
         mesh.instanced = true;
@@ -581,39 +639,71 @@ protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override { _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr())); }
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override { return bits; }
 };
+// One primvar along one curve, by interpolation: per control vertex (blended with the basis weights), per segment end
+// (varying: linear across each segment), else one value (uniform, constant, or the fallback).
+template<class T> struct CurvePrimvar {
+    std::vector<T> cvs, ends;
+    T value;
+};
 class Curves final : public HdBasisCurves {
     // Samples along one curve: cubic segments are evaluated in their basis; linear curves keep their vertices.
-    struct Sample { GfVec3d first; double second; GfVec3d color; };
-    static std::vector<Sample> samples(const std::vector<GfVec3d>& cv, const std::vector<double>& width, const std::vector<GfVec3d>& color,
-        const TfToken& type, const TfToken& basis, bool periodic) {
+    struct Sample { GfVec3d point; size_t first, segment; double u, weights[4]; };
+    static size_t segments(size_t n, const TfToken& type, const TfToken& basis, bool periodic) {
+        if (type == HdTokens->linear || n < 4) return periodic || !n ? n : n - 1;
+        if (basis == HdTokens->bezier) return periodic ? n / 3 : (n - 1) / 3;
+        return periodic ? n : n - 3;
+    }
+    static std::vector<Sample> samples(const std::vector<GfVec3d>& cv, const TfToken& type, const TfToken& basis, bool periodic) {
         const size_t n = cv.size();
         std::vector<Sample> out;
         if (type == HdTokens->linear || n < 4) {
-            for (size_t i = 0; i < n; ++i) out.push_back({cv[i], width[i], color[i]});
-            if (periodic && n > 2) out.push_back(out.front());
+            for (size_t i = 0; i < n; ++i) out.push_back({cv[i], i, i, 0, {1, 0, 0, 0}});
+            if (periodic && n > 2) { out.push_back(out.front()); out.back().segment = n - 1; out.back().u = 1; }
             return out;
         }
         const bool bezier = basis == HdTokens->bezier;
         const size_t step = bezier ? 3 : 1;
-        const size_t segments = bezier ? (periodic ? n / 3 : (n - 1) / 3) : (periodic ? n : n - 3);
         constexpr int Steps = 16;
-        for (size_t s = 0; s < segments; ++s) {
+        for (size_t s = 0, count = segments(n, type, basis, periodic); s < count; ++s) {
             const size_t first = s * step;
-            const auto P = [&](size_t k) { return cv[(first + k) % n]; };
-            const auto W = [&](size_t k) { return width[(first + k) % n]; };
-            const auto C = [&](size_t k) { return color[(first + k) % n]; };
             for (int t = (s ? 1 : 0); t <= Steps; ++t) {
                 const double u = double(t) / Steps, u2 = u * u, u3 = u2 * u, m = 1 - u;
-                double b[4];
+                Sample sample{GfVec3d(0), first, s, u};
+                double* b = sample.weights;
                 if (bezier) { b[0] = m * m * m; b[1] = 3 * u * m * m; b[2] = 3 * u2 * m; b[3] = u3; }
                 else if (basis == HdTokens->catmullRom) { b[0] = .5 * (-u3 + 2 * u2 - u); b[1] = .5 * (3 * u3 - 5 * u2 + 2); b[2] = .5 * (-3 * u3 + 4 * u2 + u); b[3] = .5 * (u3 - u2); }
                 else { b[0] = m * m * m / 6; b[1] = (3 * u3 - 6 * u2 + 4) / 6; b[2] = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6; b[3] = u3 / 6; } // bspline
-                GfVec3d point(0), c(0); double w = 0;
-                for (size_t k = 0; k < 4; ++k) { point += b[k] * P(k); w += b[k] * W(k); c += b[k] * C(k); }
-                out.push_back({point, w, c});
+                for (size_t k = 0; k < 4; ++k) sample.point += b[k] * cv[(first + k) % n];
+                out.push_back(sample);
             }
         }
         return out;
+    }
+    // vertices: the curve's points; pinned curves get USD's phantom end points (2 P0 - P1, 2 Pn-1 - Pn-2) on every
+    // vertex primvar. Varying values start at varying, count per curve.
+    template<class T, class A> static CurvePrimvar<T> curvePrimvar(const VtArray<A>& values, HdInterpolation domain, const std::vector<size_t>& vertices,
+        bool pinned, size_t curve, size_t varying, size_t count, T fallback) {
+        CurvePrimvar<T> out{{}, {}, values.empty() ? fallback : T(values[0])};
+        const auto get = [&](size_t i) { return i < values.size() ? T(values[i]) : out.value; };
+        if (domain == HdInterpolationVertex) {
+            for (const size_t v : vertices) out.cvs.push_back(get(v));
+            if (pinned && out.cvs.size() > 1) {
+                const size_t n = out.cvs.size();
+                const T first = 2. * out.cvs[0] - out.cvs[1], last = 2. * out.cvs[n - 1] - out.cvs[n - 2];
+                out.cvs.insert(out.cvs.begin(), first); out.cvs.push_back(last);
+            }
+        } else if (domain == HdInterpolationVarying) for (size_t i = 0; i < count; ++i) out.ends.push_back(get(varying + i));
+        else if (domain == HdInterpolationUniform) out.value = get(curve);
+        return out;
+    }
+    template<class T> static T at(const CurvePrimvar<T>& primvar, const Sample& s) {
+        if (!primvar.cvs.empty()) {
+            T value(0);
+            for (size_t k = 0; k < 4; ++k) value += s.weights[k] * primvar.cvs[(s.first + k) % primvar.cvs.size()];
+            return value;
+        }
+        if (!primvar.ends.empty()) return (1 - s.u) * primvar.ends[s.segment % primvar.ends.size()] + s.u * primvar.ends[(s.segment + 1) % primvar.ends.size()];
+        return primvar.value;
     }
 public:
     explicit Curves(const SdfPath& id) : HdBasisCurves(id) {}
@@ -623,72 +713,89 @@ public:
         _UpdateInstancer(delegate, bits);
         const CleanBits clean{bits};
         const auto topology = delegate->GetBasisCurvesTopology(GetId());
-        // displayColor per vertex or per curve; constant colors stay on the material.
+        // displayColor per vertex, segment end or curve; constant colors stay on the material.
         const auto displayColor = mesh.material.empty() ? value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray()) : VtVec3fArray();
+        const auto colorDomain = interpolation(delegate, GetId(), HdTokens->displayColor);
         std::vector<GfVec3f> colors;
-        const auto points = value(delegate->Get(GetId(), HdTokens->points), VtVec3fArray());
+        const auto points = value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray());
         const auto widths = value(delegate->Get(GetId(), HdTokens->widths), VtFloatArray());
+        const auto widthDomain = interpolation(delegate, GetId(), HdTokens->widths);
+        // Curves with normals are ribbons facing them.
+        const auto normals = value(delegate->Get(GetId(), HdTokens->normals), VtVec3fArray());
+        const auto normalDomain = interpolation(delegate, GetId(), HdTokens->normals);
+        const bool ribbon = !normals.empty();
         const auto counts = topology.GetCurveVertexCounts();
         const auto indices = topology.GetCurveIndices();
+        const auto type = topology.GetCurveType(), basis = topology.GetCurveBasis();
         const bool periodic = topology.GetCurveWrap() == HdTokens->periodic;
-        constexpr int Sides = 6;
-        size_t offset = 0;
+        const bool pinned = topology.GetCurveWrap() == HdTokens->pinned && type == HdTokens->cubic && basis != HdTokens->bezier;
+        const int Sides = ribbon ? 2 : 6;
+        size_t offset = 0, varying = 0;
         // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
         for (size_t curveIndex = 0; curveIndex < counts.size(); ++curveIndex) {
-            const int count = counts[curveIndex];
-            std::vector<GfVec3d> cv, color; std::vector<double> width;
-            for (int i = 0; i < count; ++i) {
+            const size_t count = size_t(std::max(0, counts[curveIndex]));
+            std::vector<size_t> vertices;
+            for (size_t i = 0; i < count; ++i) {
                 const size_t vertex = indices.empty() ? offset + i : size_t(indices[offset + i]);
                 if (vertex >= points.size()) { TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText()); return; }
-                cv.emplace_back(points[vertex]);
-                width.push_back(HdUEWidth(widths, vertex, .01f));
-                color.emplace_back(displayColor.size() == points.size() ? displayColor[vertex]
-                    : displayColor.size() == counts.size() ? displayColor[curveIndex] : GfVec3f(1));
+                vertices.push_back(vertex);
             }
-            offset += size_t(count);
-            const auto curve = samples(cv, width, color, topology.GetCurveType(), topology.GetCurveBasis(), periodic);
+            offset += count;
+            const size_t cvCount = count + (pinned && count > 1 ? 2 : 0);
+            const size_t varyingCount = segments(cvCount, type, basis, periodic) + (periodic ? 0 : 1);
+            const auto primvar = [&](const auto& values, HdInterpolation domain, auto fallback) {
+                return curvePrimvar(values, domain, vertices, pinned, curveIndex, varying, varyingCount, fallback);
+            };
+            const auto width = primvar(widths, widthDomain, .01);
+            const auto color = primvar(displayColor, colorDomain, GfVec3d(1));
+            const auto normal = primvar(normals, normalDomain, GfVec3d(0));
+            varying += varyingCount;
+            const auto curve = samples(primvar(points, HdInterpolationVertex, GfVec3d(0)).cvs, type, basis, periodic);
             if (curve.size() < 2) continue;
-            // Parallel-transported frame along the curve.
-            GfVec3d tangent = (curve[1].first - curve[0].first).GetNormalized();
-            GfVec3d normal = GfCross(tangent, std::abs(tangent[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0)).GetNormalized();
+            // Parallel-transported frame along the curve; ribbons span the authored normal's binormal instead.
+            GfVec3d tangent = (curve[1].point - curve[0].point).GetNormalized();
+            GfVec3d frame = GfCross(tangent, std::abs(tangent[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0)).GetNormalized();
             std::vector<std::vector<GfVec3f>> rings, ringNormals;
             for (size_t i = 0; i < curve.size(); ++i) {
-                const auto next = curve[std::min(i + 1, curve.size() - 1)].first, prev = curve[i ? i - 1 : 0].first;
+                const auto next = curve[std::min(i + 1, curve.size() - 1)].point, prev = curve[i ? i - 1 : 0].point;
                 const auto t = (next - prev).GetLength() > 1e-12 ? (next - prev).GetNormalized() : tangent;
-                normal = normal - t * GfDot(normal, t);
-                if (normal.GetLength() < 1e-9) normal = GfCross(t, std::abs(t[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0));
-                normal.Normalize();
-                const auto binormal = GfCross(t, normal);
+                frame = frame - t * GfDot(frame, t);
+                if (frame.GetLength() < 1e-9) frame = GfCross(t, std::abs(t[1]) < .9 ? GfVec3d(0, 1, 0) : GfVec3d(1, 0, 0));
+                frame.Normalize();
+                if (ribbon) if (const auto n = at(normal, curve[i]); GfCross(t, n).GetLength() > 1e-9) frame = GfCross(GfCross(t, n), t).GetNormalized();
+                const auto binormal = GfCross(t, frame);
+                const double radius = .5 * std::max(0., at(width, curve[i]));
                 rings.emplace_back(); ringNormals.emplace_back(); tangent = t;
                 for (int side = 0; side < Sides; ++side) {
+                    // A ribbon's two edges lie along the binormal and face the normal.
                     const double angle = 2 * 3.14159265358979323846 * side / Sides;
-                    const auto dir = std::cos(angle) * normal + std::sin(angle) * binormal;
-                    rings.back().emplace_back(curve[i].first + .5 * curve[i].second * dir);
-                    ringNormals.back().emplace_back(dir);
+                    const auto dir = ribbon ? (side ? 1. : -1.) * binormal : std::cos(angle) * frame + std::sin(angle) * binormal;
+                    rings.back().emplace_back(curve[i].point + radius * dir);
+                    ringNormals.back().emplace_back(ribbon ? frame : dir);
                 }
             }
             // Ring vertices are shared by the quads around them.
             const auto vertex = [&, base = uint32_t(mesh.points.size())](size_t ring, int side) { return base + uint32_t(ring * Sides + size_t(side)); };
             for (size_t ring = 0; ring < rings.size(); ++ring) for (int side = 0; side < Sides; ++side) {
-                mesh.points.push_back(rings[ring][side]); mesh.normals.push_back(ringNormals[ring][side]); colors.emplace_back(curve[ring].color);
+                mesh.points.push_back(rings[ring][side]); mesh.normals.push_back(ringNormals[ring][side]); colors.emplace_back(at(color, curve[ring]));
                 mesh.uv.emplace_back(float(side) / Sides, float(ring) / float(rings.size() - 1));
             }
-            for (size_t i = 0; i + 1 < rings.size(); ++i) for (int side = 0; side < Sides; ++side) {
+            for (size_t i = 0; i + 1 < rings.size(); ++i) for (int side = 0; side < (ribbon ? 1 : Sides); ++side) {
                 const int next = (side + 1) % Sides;
                 // Counter-clockwise seen from outside (dir = cos * normal + sin * binormal turns about the tangent).
                 mesh.indices.insert(mesh.indices.end(), {vertex(i, side), vertex(i + 1, next), vertex(i + 1, side), vertex(i, side), vertex(i, next), vertex(i + 1, next)});
             }
-            if (periodic) continue;
+            if (periodic || ribbon) continue;
             // Flat caps: the end faces +tangent (ring order is counter-clockwise seen from there), the start faces -tangent.
             for (const bool end : {false, true}) {
                 const size_t ring = end ? rings.size() - 1 : 0;
-                const auto t = end ? curve.back().first - curve[curve.size() - 2].first : curve[0].first - curve[1].first;
+                const auto t = end ? curve.back().point - curve[curve.size() - 2].point : curve[0].point - curve[1].point;
                 if (t.GetLength() < 1e-12) continue;
                 const GfVec3f facing(t.GetNormalized());
                 const auto center = uint32_t(mesh.points.size()); // then the ring's corners, with the cap's normal
                 for (int side = -1; side < Sides; ++side) {
-                    mesh.points.push_back(side < 0 ? GfVec3f(curve[ring].first) : rings[ring][side]);
-                    mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end)); colors.emplace_back(curve[ring].color);
+                    mesh.points.push_back(side < 0 ? GfVec3f(curve[ring].point) : rings[ring][side]);
+                    mesh.normals.push_back(facing); mesh.uv.emplace_back(0.f, float(end)); colors.emplace_back(at(color, curve[ring]));
                 }
                 for (int side = 0; side < Sides; ++side) {
                     const uint32_t a = center + 1 + uint32_t(side), b = center + 1 + uint32_t((side + 1) % Sides);
@@ -724,6 +831,7 @@ public:
 // Density from an OpenVDB float grid, densified over its active bounding box.
 class Volume final : public HdVolume {
     static constexpr int MaxResolution = 512; // per axis; larger grids are point-sampled with a stride
+    std::optional<GfMatrix4d> gridToLocal_; // the loaded grid's voxel to prim space
 public:
     explicit Volume(const SdfPath& id) : HdVolume(id) {}
     HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
@@ -731,6 +839,18 @@ public:
         auto* state = static_cast<HdUEState*>(param);
         HdUEVolumeData volume; volume.id = GetId().GetString(); volume.visible = delegate->GetVisible(GetId());
         volume.renderTag = delegate->GetRenderTag(GetId());
+        // Visibility, purpose and transform edits keep the loaded grid instead of reading the file again.
+        if (gridToLocal_ && !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag | HdChangeTracker::DirtyTransform))) {
+            const auto localToWorld = *gridToLocal_ * delegate->GetTransform(GetId());
+            std::lock_guard lock(state->mutex);
+            if (const auto it = state->volumes.find(volume.id); it != state->volumes.end()) {
+                it->second.visible = volume.visible; it->second.renderTag = volume.renderTag; it->second.localToWorld = localToWorld;
+                state->dirtyVolumes.insert(volume.id); ++state->revision;
+                *bits = HdChangeTracker::Clean;
+                return;
+            }
+        }
+        gridToLocal_.reset();
         const auto fields = delegate->GetVolumeFieldDescriptors(GetId());
         const HdVolumeFieldDescriptor* chosen = nullptr;
         for (const auto& field : fields) if (field.fieldName == TfToken("density")) chosen = &field;
@@ -755,11 +875,12 @@ public:
                     HdUEDensifyGrid(*grid, MaxResolution, volume);
                 } else // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
                     HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb, MaxResolution, volume);
+                gridToLocal_ = volume.localToWorld;
                 volume.localToWorld = volume.localToWorld * delegate->GetTransform(GetId());
             }
         } catch (const std::exception& error) {
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
-            volume.width = volume.height = volume.depth = 0; volume.density.clear();
+            gridToLocal_.reset(); volume.width = volume.height = volume.depth = 0; volume.density.clear();
         }
         if (HdUETracePass()) {
             const auto& m = volume.localToWorld;
