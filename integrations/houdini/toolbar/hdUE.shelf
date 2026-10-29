@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
   <toolshelf name="hdUE" label="hdUE"><memberTool name="hdue_substrate_builder"/><memberTool name="hdue_substrate_publish"/><memberTool name="hdue_substrate_water"/></toolshelf>
-  <tool name="hdue_substrate_builder" label="Substrate Builder" icon="VOP_material">
+  <tool name="hdue_substrate_builder" label="Substrate Builder" icon="HDUE_hdue">
     <script scriptType="python"><![CDATA[import hdue_substrate
 hdue_substrate.create()]]></script>
   </tool>
-  <tool name="hdue_substrate_publish" label="Author Substrate USD" icon="LOP_materiallibrary">
+  <tool name="hdue_substrate_publish" label="Author Substrate USD" icon="HDUE_hdue">
     <script scriptType="python"><![CDATA[import hdue_substrate
 hdue_substrate.publish()]]></script>
   </tool>
-  <tool name="hdue_substrate_water" label="Water Coating Example" icon="VOP_material">
+  <tool name="hdue_substrate_water" label="Water Coating Example" icon="HDUE_hdue">
     <script scriptType="python"><![CDATA[import hdue_substrate
 hdue_substrate.create(preset='wet')]]></script>
   </tool>

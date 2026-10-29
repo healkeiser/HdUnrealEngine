@@ -74,7 +74,7 @@ def help_page(group):
     """The node's help card (wiki markup), one entry per parameter from its help text, under its tabs and sections."""
     import hou
 
-    lines = [f"= {LABEL} =", "", '#type: node', '#context: lop', f'#internal: {NAME}', '#icon: LOP/rendersettings', "",
+    lines = [f"= {LABEL} =", "", '#type: node', '#context: lop', f'#internal: {NAME}', '#icon: HDUE/hduerenderproperties', "",
              '"""Renders the stage with Unreal Engine (hdUE): render settings, camera, resolution, output and AOVs."""', "",
              "Like Karma Render Settings, it creates the render settings prim, its render product and render vars. "
              "Each setting's menu button chooses whether this node authors it; unauthored settings keep hdUE's defaults "
@@ -159,7 +159,7 @@ def build():
     asset = subnet.createDigitalAsset(NAME, str(HDA), LABEL, min_num_inputs=0, max_num_inputs=1, ignore_external_references=True)
     definition = asset.type().definition()
     definition.setParmTemplateGroup(group)  # the subnet's spare parameters are not carried over
-    definition.setIcon("LOP_rendersettings")
+    definition.setIcon("HDUE_hduerenderproperties")
     definition.addSection("Tools.shelf", TOOL)
     definition.addSection("Help", help_page(group))
     definition.addSection("OnCreated", "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n")
