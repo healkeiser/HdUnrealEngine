@@ -326,14 +326,13 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             init.window_handle = reinterpret_cast<uint64_t>(host.window);
             init.project_path = project.c_str();
             init.map_path = "/Game/HdUETest";
+            init.flags = host.continuous ? HDUE_INIT_INTERACTIVE : 0;
             // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
             // Without -stdout, UE echoes Display/Warning/Error lines with wprintf, which reached the host's console
             // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
             // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
             const std::string arguments =
-                std::string(host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive"
-                                                               : "-RenderOffscreen -stdout -hdUEInteractive")
-                                            : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout")) +
+                std::string(selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout") +
                 " " + TfGetenv("HDUE_UE_ARGS") +
                 // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user,
                 // not in a possibly shared or read-only install folder.

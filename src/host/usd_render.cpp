@@ -551,7 +551,7 @@ int wmain(int argc, wchar_t** argv) {
         init.project_path = project.c_str();
         init.map_path = "/Game/HdUETest";
         // Headless, as hdUE is inside Houdini (HDUE_SHOW_WINDOW=1 shows UE's window).
-        // HDUE_UE_ARGS appends UE command-line arguments, as for the delegate (-hdUEInteractive: Nanite meshes).
+        // HDUE_UE_ARGS appends UE command-line arguments, as for the delegate.
         const auto arguments =
             (TfGetenvBool("HDUE_SHOW_WINDOW", false) ? std::string() : std::string("-RenderOffscreen ")) +
             TfGetenv("HDUE_UE_ARGS");

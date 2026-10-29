@@ -199,6 +199,7 @@ struct FRuntime {
     uint32 Owner = 0;
     uint32 State = HDUE_STATE_COLD;
     bool EngineStarted = false;
+    bool Interactive = false;  // HDUE_INIT_INTERACTIVE: a viewport (Houdini). Otherwise offline frames (husk).
     FString Error;
     UWorld* World = nullptr;
     uint64 NextSession = 1;
@@ -233,11 +234,7 @@ int32 CVarInt(const TCHAR* Name) {
 void SetCVar(const TCHAR* Name, int32 Value) {
     if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name)) CVar->Set(Value, ECVF_SetByCode);
 }
-// -hdUEInteractive: a viewport (Houdini). Without it the host renders offline frames (husk).
-bool IsInteractive() {
-    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
-    return Interactive;
-}
+bool IsInteractive() { return Runtime.Interactive; }
 // Finished frames are guarded by the session's FrameMutex, so any thread may read them: hosts that run UE on a thread
 // of their own (hdUE in Houdini's UI) read frames from their UI thread. Null when not ready or not this session.
 TSharedPtr<FSession, ESPMode::ThreadSafe> ReadableSession(HdueSession Handle) {
@@ -295,6 +292,7 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     if (Runtime.State != HDUE_STATE_COLD) return HDUE_INVALID_STATE;
     Runtime.Owner = FPlatformTLS::GetCurrentThreadId();
     Runtime.State = HDUE_STATE_STARTING;
+    Runtime.Interactive = (Desc->flags & HDUE_INIT_INTERACTIVE) != 0;
     const FString Project = UTF8_TO_TCHAR(Desc->project_path);
     const FString Map = UTF8_TO_TCHAR(Desc->map_path);
     if (!FPaths::FileExists(Project) || Project.Contains(TEXT("\"")) || Map.Contains(TEXT("\""))) {
@@ -420,7 +418,7 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
     Session->Handle = Runtime.NextSession++;
     Session->Width = Desc->width;
     Session->Height = Desc->height;
-    Session->Scene = MakeUnique<FHdueScene>(Runtime.World);
+    Session->Scene = MakeUnique<FHdueScene>(Runtime.World, Runtime.Interactive);
     Session->Target = NewObject<UTextureRenderTarget2D>(GetTransientPackage());
     Session->Target->AddToRoot();
     Session->Target->ClearColor = FLinearColor::Black;
@@ -747,7 +745,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     const double Now = FPlatformTime::Seconds();
     // One readback at a time (they share Session->Readback); a draw that would converge while one is in flight is
     // followed by more draws until it can be read back.
-    // Interactive hosts (-hdUEInteractive: Houdini's viewport) read back every draw they can, so navigation shows
+    // Interactive hosts (Houdini's viewport) read back every draw they can, so navigation shows
     // frames at UE's rate rather than four progress images a second.
     int32 FreeSlot = -1;
     for (int32 Slot = 0; Slot < FSession::ReadbackSlots && FreeSlot < 0; ++Slot)

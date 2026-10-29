@@ -124,7 +124,7 @@ The Preview Surface `displacement` input (a constant or a texture) moves vertice
 
 ## Nanite
 
-Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). In interactive hosts (Houdini's viewport), meshes hdUE builds from Hydra become Nanite meshes too: hdUE first draws them as regular static meshes, builds their Nanite data on worker threads, then swaps each one for a Nanite static mesh, one per frame. Every Nanite page stays resident in memory, since UE streams the other pages only from cooked files. Animated or edited meshes stay dynamic, and instanced meshes stay regular instanced static meshes. Batch renders (husk) don't convert, and `HDUE_NANITE=0` turns Nanite off in the viewport.
+Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). Static meshes hdUE builds from Hydra, and instancer prototypes, become Nanite meshes too. Batch renders (husk) build Nanite data and Lumen cards before the first frame; interactive hosts (Houdini's viewport, which start UE with `HDUE_INIT_INTERACTIVE`) first draw regular static meshes, build both on worker threads, then swap each mesh, one per frame. Every Nanite page stays resident in memory, since UE streams the other pages only from cooked files. Animated or edited meshes stay dynamic. `HDUE_NANITE=0` turns Nanite off.
 
 ## Debug views
 
