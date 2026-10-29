@@ -2185,8 +2185,9 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     }
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
-    if (stageUnits != settings.end() && stageUnits->second.IsHolding<double>())
-        state_->settings[TfToken("metersPerUnit")] = stageUnits->second;
+    const bool hostUnits = stageUnits != settings.end() && !VtValue::Cast<double>(stageUnits->second).IsEmpty();
+    if (hostUnits && !state_->namespaced.count(TfToken("metersPerUnit")))
+        state_->settings[TfToken("metersPerUnit")] = VtValue::Cast<double>(stageUnits->second);
     // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
     // (already open in husk). Houdini's viewport sends stageUpAxis from the hdUE host. hdUE:upAxis overrides both.
     if (const auto file = settings.find(TfToken("usdFilename"));
@@ -2197,6 +2198,13 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             VtValue axis;
             if (layer->HasField(SdfPath::AbsoluteRootPath(), TfToken("upAxis"), &axis) && axis.IsHolding<TfToken>())
                 state_->settings[TfToken("upAxis")] = VtValue(axis.UncheckedGet<TfToken>().GetString());
+            // husk passes no stage units either: without them a metre-scale stage reached UE at 1 cm per unit, too
+            // small for Lumen's surface cache (no cards on a 5 cm room), which left only screen traces for indirect
+            // light.
+            if (VtValue units; !hostUnits && !state_->namespaced.count(TfToken("metersPerUnit")) &&
+                               layer->HasField(SdfPath::AbsoluteRootPath(), TfToken("metersPerUnit"), &units) &&
+                               !VtValue::Cast<double>(units).IsEmpty())
+                state_->settings[TfToken("metersPerUnit")] = VtValue::Cast<double>(units);
             if (HdUETraceSettings())
                 std::fprintf(stderr, "hdUE stage up axis of %s: %s\n", layer->GetIdentifier().c_str(),
                              TfStringify(axis).c_str());
