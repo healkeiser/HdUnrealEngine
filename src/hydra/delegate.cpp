@@ -7,6 +7,7 @@
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/camera.h"
+#include "pxr/imaging/cameraUtil/framing.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -1340,6 +1341,42 @@ public:
                    lens == o.lens && sizes == o.sizes;
         }
     };
+    // Framing (crops, tiles, overscan, non-square pixels): UE fills the whole render buffer, so the projection maps the
+    // data window onto it. With Hydra framing, GetProjectionMatrix maps the data window to NDC; the data window may be
+    // a part of the buffer (CameraUtilFraming), so it is remapped. husk sets no framing: it passes the data window as
+    // the viewport (x, y from the bottom, in pixels of the resolution) with the buffer at its size, the resolution,
+    // pixel aspect and conform policy as settings, and conforms the camera to the data window rather than the image.
+    GfMatrix4d framedProjection(const HdRenderPassState& state, const HdCamera& camera,
+                                const std::vector<GfVec2i>& sizes) const {
+        auto& s = *state_;
+        const auto resolution = s.setting<GfVec2i>("resolution", GfVec2i(0));
+        if (!state.GetFraming().IsValid() && resolution[0] > 0 && resolution[1] > 0 &&
+            s.setting<std::string>("houdini:renderer", "") == "husk") {
+            const auto vp = state.GetViewport();
+            const CameraUtilFraming framing(
+                GfRange2f(GfVec2f(0), GfVec2f(resolution)),
+                GfRect2i(GfVec2i(int(vp[0]), resolution[1] - int(vp[1]) - int(vp[3])), int(vp[2]), int(vp[3])),
+                s.setting<float>("pixelAspectRatio", 1.f));
+            const auto policy = s.setting<std::string>("aspectRatioConformPolicy", "expandAperture");
+            return framing.ApplyToProjectionMatrix(camera.ComputeProjectionMatrix(),
+                                                   policy == "cropAperture"             ? CameraUtilCrop
+                                                   : policy == "adjustApertureWidth"    ? CameraUtilMatchVertically
+                                                   : policy == "adjustApertureHeight"   ? CameraUtilMatchHorizontally
+                                                   : policy == "adjustPixelAspectRatio" ? CameraUtilDontConform
+                                                                                        : CameraUtilFit);
+        }
+        auto projection = state.GetProjectionMatrix();
+        const auto& framing = state.GetFraming();
+        const auto size = sizes.empty() ? GfVec2i(0) : sizes[0];
+        if (!framing.IsValid() || size[0] <= 0 || size[1] <= 0) return projection;
+        const auto& w = framing.dataWindow;  // pixels of the buffer, y down
+        GfMatrix4d remap(1);
+        remap[0][0] = double(w.GetWidth()) / size[0];
+        remap[1][1] = double(w.GetHeight()) / size[1];
+        remap[3][0] = double(2 * w.GetMinX() + w.GetWidth() - size[0]) / size[0];
+        remap[3][1] = double(size[1] - 2 * w.GetMinY() - w.GetHeight()) / size[1];
+        return projection * remap;
+    }
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
         const auto* camera = state->GetCamera();
         PassSnapshot snapshot{state->GetAovBindings(), {}, state->GetWorldToViewMatrix(), state->GetProjectionMatrix()};
@@ -1360,6 +1397,7 @@ public:
             snapshot.buffers.push_back(b);
             snapshot.sizes.emplace_back(b ? int(b->GetWidth()) : 0, b ? int(b->GetHeight()) : 0);
         }
+        if (camera) snapshot.projection = framedProjection(*state, *camera, snapshot.sizes);
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
         // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
@@ -1866,8 +1904,10 @@ public:
                         request.target[c] = target[c];
                         request.up[c] = up[c];
                     }
-                    request.horizontal_fov_degrees =
-                        float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846);
+                    // The backend takes the projection from projection_scale; the field of view only feeds its range
+                    // check and texture streaming, so a narrow crop or tile is not rejected as under 1 degree.
+                    request.horizontal_fov_degrees = std::clamp(
+                        float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846), 1.f, 170.f);
                     if (HdUETraceScene())
                         TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
                                   pass->camera ? pass->cameraId.GetText() : "none", eye[0], eye[1], eye[2], target[0],
