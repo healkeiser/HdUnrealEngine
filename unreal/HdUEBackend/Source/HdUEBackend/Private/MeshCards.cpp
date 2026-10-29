@@ -22,7 +22,7 @@ DEFINE_LOG_CATEGORY(LogMeshUtilities);
 
 // Any thread, before the LOD's resources are initialized (the builder reads its CPU copies). Null without Embree.
 FCardRepresentationData* HdueMeshCards(const FStaticMeshLODResources& LOD, const FBoxSphereBounds& Bounds) {
-#if USE_EMBREE && !WITH_EDITOR
+#if !WITH_EDITOR && USE_EMBREE // USE_EMBREE is only defined where the game target links Embree
     if (!GetModuleHandleW(TEXT("embree4.dll"))) return nullptr; // Bridge's Initialize loads it from this DLL's folder
     FEmbreeScene Embree;
     MeshRepresentation::SetupEmbreeScene(TEXT("hdUE"), false, Embree);

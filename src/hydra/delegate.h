@@ -206,6 +206,18 @@ struct HdUEState : HdRenderParam {
             return (zUp ? GfVec3d(p[0], -p[1], p[2]) : GfVec3d(-p[2], p[0], p[1])) * (direction ? 1 : scale);
         }
     };
+    // hdUE:debugView, which replaces the realtime beauty only.
+    std::string debugView() const {
+        return setting<std::string>("renderMode", "realtime") == "realtime" ? setting<std::string>("debugView", "off") : "off";
+    }
+    // UE's tonemapper draws the beauty (hdUE:tonemapper, or a debug view drawn for display as UE's viewport does): the
+    // camera exposure goes in before it. Buffer debug views stay linear data.
+    bool toneMapped() const {
+        const auto view = debugView();
+        return setting<bool>("tonemapper", false) || (view != "off" && !view.starts_with("buffer:"));
+    }
+    // The camera exposure scales the beauty (not a debug view's data).
+    bool exposed() const { return !toneMapped() && debugView() == "off"; }
     Converter converter() const { return {setting<double>("metersPerUnit", 0.01) * 100, setting<std::string>("upAxis", "Y") == "Z"}; }
     GfVec3d convert(const GfVec3d& point, bool direction = false) const { return converter()(point, direction); }
 };

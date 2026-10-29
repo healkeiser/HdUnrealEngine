@@ -26,6 +26,7 @@
 #include "CanvasTypes.h"
 #include "ContentStreaming.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/ConfigCacheIni.h"
 #include "HAL/PlatformTLS.h"
 #include "LegacyScreenPercentageDriver.h"
 #include "Math/PerspectiveMatrix.h"
@@ -119,6 +120,11 @@ struct FSession {
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
     bool Preparing = false;
     bool ResidencyFailed = false;
+    // hdUE:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
+    EViewModeIndex DebugView = VMI_Lit;
+    FName FSceneView::* DebugMember = nullptr;
+    FName DebugName;
+    TStrongObjectPtr<UMaterialInterface> DebugMaterial;
     bool MegaLightsActive=false;
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial; // PP_HdUEAov, weights select HDUE_AOV_*.
     // hdue/postprocess_api.h: beauty overrides; the materials stay referenced while they are blendables.
@@ -478,6 +484,12 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Flags.SetTonemapper(!Aov && Session->Tonemapper);
     Flags.SetEyeAdaptation(!Aov && Session->Tonemapper); // off: exposure 1 whatever the settings
     Flags.SetRefraction(true);
+    // Debug views replace the realtime beauty only, as UE's viewport View Mode menu does.
+    const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
+    if (ViewMode != VMI_Lit) {
+        ApplyViewMode(ViewMode, !Request.orthographic, Flags);
+        EngineShowFlagOverride(ESFIM_Game, ViewMode, Flags, true);
+    }
     if (Aov) {
         Flags.SetAntiAliasing(false); Flags.SetTemporalAA(false); Flags.SetMotionBlur(false); Flags.SetBloom(false);
         Flags.SetDepthOfField(false); Flags.SetVignette(false); Flags.SetGrain(false); Flags.SetLensFlares(false);
@@ -492,6 +504,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and Movie
     // Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the shadows.
     Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
+    Family.ViewMode = ViewMode;
     FSceneViewInitOptions Options;
     Options.ViewFamily = &Family;
     Options.SceneViewStateInterface = Aov ? Session->AovViewState : Session->ViewState;
@@ -523,6 +536,17 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     View->bIsGameView = true;
     View->bIsOfflineRender = PathTracing;
     View->bCameraCut = Session->CameraCut && Session->Draws == 0;
+    if (ViewMode != VMI_Lit) {
+        // The material overrides UGameViewportClient::Draw sets for these view modes.
+        const FVector4f Brightness(GEngine->LightingOnlyBrightness.R, GEngine->LightingOnlyBrightness.G, GEngine->LightingOnlyBrightness.B, 0.f);
+        if (Flags.OverrideDiffuseAndSpecular) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(.1f, .1f, .1f, 0.f); }
+        else if (Flags.LightingOnlyOverride) { View->DiffuseOverrideParameter = Brightness; View->SpecularOverrideParameter = FVector4f(0.f); }
+        else if (Flags.ReflectionOverride) {
+            View->DiffuseOverrideParameter = FVector4f(0.f); View->SpecularOverrideParameter = FVector4f(1.f, 1.f, 1.f, 0.f);
+            View->NormalOverrideParameter = FVector4f(0.f, 0.f, 1.f, 0.f); View->RoughnessOverrideParameter = FVector2f(0.f);
+        }
+        if (Session->DebugMember) View->*Session->DebugMember = Session->DebugName;
+    }
     View->StartFinalPostprocessSettings(Options.ViewOrigin);
     // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend on
     // auto exposure (two identical Sponza renders with it differed by 7%).
@@ -570,6 +594,11 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
             Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
             View->OverridePostProcessSettings(Blend, 1.f);
         }
+    }
+    if (ViewMode != VMI_Lit && Session->DebugMaterial) {
+        FPostProcessSettings Blend;
+        Blend.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Session->DebugMaterial.Get()));
+        View->OverridePostProcessSettings(Blend, 1.f);
     }
     View->EndFinalPostprocessSettings(Options);
     if (!Aov && Session->Tonemapper) {
@@ -845,18 +874,46 @@ static void RestoreConsoleVariables(const TSet<FString>& Kept) {
     }
 }
 
+// "<view mode>[:<visualization>]", e.g. nanite:Triangles or buffer:BaseColor (the names UE's r.*.Visualize console
+// variables take). View modes needing editor-only data or debug material shaders the cook leaves out are not offered.
+static void SetDebugView(FSession& Session, const FString& Text) {
+    static const TMap<FString, TPair<EViewModeIndex, FName FSceneView::*>> Modes{
+        {TEXT("off"), {VMI_Lit, nullptr}}, {TEXT("unlit"), {VMI_Unlit, nullptr}},
+        {TEXT("lightingOnly"), {VMI_LightingOnly, nullptr}}, {TEXT("detailLighting"), {VMI_Lit_DetailLighting, nullptr}},
+        {TEXT("reflections"), {VMI_ReflectionOverride, nullptr}}, {TEXT("lightComplexity"), {VMI_LightComplexity, nullptr}},
+        {TEXT("buffer"), {VMI_VisualizeBuffer, &FSceneView::CurrentBufferVisualizationMode}},
+        {TEXT("nanite"), {VMI_VisualizeNanite, &FSceneView::CurrentNaniteVisualizationMode}},
+        {TEXT("lumen"), {VMI_VisualizeLumen, &FSceneView::CurrentLumenVisualizationMode}},
+        {TEXT("vsm"), {VMI_VisualizeVirtualShadowMap, &FSceneView::CurrentVirtualShadowMapVisualizationMode}}};
+    FString Kind = Text, Name;
+    Text.Split(TEXT(":"), &Kind, &Name);
+    const auto* Mode = Modes.Find(Kind);
+    if (!Mode) UE_LOG(LogTemp, Warning, TEXT("hdUE: debug view '%s' skipped (unknown view mode)"), *Text);
+    Session.DebugView = Mode ? Mode->Key : VMI_Lit;
+    Session.DebugMember = Mode ? Mode->Value : nullptr;
+    Session.DebugName = Name.IsEmpty() ? NAME_None : FName(*Name);
+    // Cooked runtimes skip FBufferVisualizationData (AllowDebugViewmodes() is false without r.ForceDebugViewModes, which
+    // would cook debug shaders for every material): its buffer materials are blended in as post-process materials instead.
+    FString Entry, Path;
+    Session.DebugMaterial.Reset(Kind == TEXT("buffer") && GConfig->GetString(TEXT("Engine.BufferVisualizationMaterials"), *Name, Entry, GEngineIni) &&
+        FParse::Value(*Entry, TEXT("Material="), Path) ? LoadObject<UMaterialInterface>(nullptr, *Path) : nullptr);
+    if (Kind == TEXT("buffer") && !Session.DebugMaterial) UE_LOG(LogTemp, Warning, TEXT("hdUE: debug view '%s' skipped (no cooked buffer material)"), *Text);
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     if (CheckReady() != HDUE_OK) return CheckReady();
     if (!ValidSession(Handle) || !Desc || Desc->struct_size != sizeof(*Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
         (Desc->material_count && !Desc->materials)) return HDUE_INVALID_ARGUMENT;
     FPostProcessSettings Settings;
     TSet<FString> Variables;
+    FString DebugView = TEXT("off");
     // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
     for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
         if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
     for (uint32 Index = 0; Index < Desc->count; ++Index) {
         if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        if (Name == TEXT("DebugView")) { DebugView = Text; continue; }
         if (Name.Contains(TEXT("."))) { SetConsoleVariable(Name, Text); Variables.Add(Name); continue; }
         FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
         auto* Override = CastField<FBoolProperty>(FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
@@ -879,6 +936,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     }
     RestoreConsoleVariables(Variables);
     const auto Session = Runtime.Session;
+    SetDebugView(*Session, DebugView);
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
     Session->Tonemapper = Desc->tonemapper != 0;

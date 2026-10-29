@@ -859,11 +859,10 @@ class Pass final : public HdRenderPass {
     void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth, bool denoising) {
         const auto frames = s.locked([&] { return s.gpuFrames; });
         const auto& api = s.backend->gpu_api();
-        const bool tonemapper = s.setting<bool>("tonemapper", false);
         HdueGpuOptions options{sizeof(options)};
         options.enabled = frames && !frames->failed() && api.configure && subframes_ <= 1 && !denoising && HdUESceneLinearIsRec709();
         options.depth = depth != nullptr;
-        options.color_scale = tonemapper ? 1.f : lens_[3]; // camera exposure, as the CPU path applies it
+        options.color_scale = s.exposed() ? lens_[3] : 1.f; // camera exposure, as the CPU path applies it
         options.depth_scale = float(1 / centimetersPerUnit_);
         if (std::memcmp(&options, &gpuOptions_, sizeof(options)) || gpuBuffers_[0] != &buffer || gpuBuffers_[1] != depth) {
             if (api.configure && api.configure(s.session, &options) != HDUE_OK && options.enabled) { // not a D3D12 runtime
@@ -1278,7 +1277,7 @@ public:
                         if (frame.converged) applyMotion(s, 0);
                     } else if (subframes_ > 1) lastFrame_ = frame.frame_id; // an unfinished sub-frame stays out of the average
                     if (frame.frame_id != lastFrame_) {
-                        if (lens_[3] != 1.f && !s.setting<bool>("tonemapper", false)) // camera exposure, as Karma applies it to the beauty only
+                        if (lens_[3] != 1.f && s.exposed()) // camera exposure, as Karma applies it to the beauty only
                             for (size_t i = 0; i + 3 < pixels.size(); i += 4) { pixels[i] *= lens_[3]; pixels[i + 1] *= lens_[3]; pixels[i + 2] *= lens_[3]; }
                         if (denoising && frame.converged) { beautyPixels_ = pixels; beautyFrame_ = frame; denoisePending_ = true; }
                         const auto publishStart = Clock::now();
@@ -1368,14 +1367,15 @@ public:
               };
                 if (needsRequest && s.backend->postprocess_api().set_post_process) {
                     // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper, and
-                    // hdUE:cvar:<console variable, ':' for '.'> (USD attribute names cannot hold dots).
+                    // hdUE:cvar:<console variable, ':' for '.'> (USD attribute names cannot hold dots), and hdUE:debugView.
                     // With the tonemapper on, the camera exposure goes in before it rather than onto display values.
                     std::vector<std::string> names, values, materials;
-                    const bool tonemapper = s.setting<bool>("tonemapper", false);
+                    const bool tonemapper = s.toneMapped(); // debug views are drawn for display, as in UE's viewport
                     const auto settings = s.settingsSnapshot();
                     for (const auto& [key, value] : settings) {
                         if (TfStringStartsWith(key.GetString(), "postProcess:")) names.push_back(key.GetString().substr(12));
                         else if (TfStringStartsWith(key.GetString(), "cvar:")) names.push_back(TfStringReplace(key.GetString().substr(5), ":", "."));
+                        else if (key == TfToken("debugView")) names.push_back("DebugView");
                         else continue;
                         values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value));
                     }
@@ -1743,7 +1743,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
         key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
-        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") ||
+        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") || key==TfToken("debugView") ||
         TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);
