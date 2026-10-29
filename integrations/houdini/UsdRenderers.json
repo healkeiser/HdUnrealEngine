@@ -3,7 +3,7 @@
     "valid": "env:HDUE_HOUDINI_ENABLE",
     "menulabel": "Unreal Engine (hdUE)",
     "menupriority": 30,
-    "allowbackgroundupdate": true,
+    "allowbackgroundupdate": false,
     "viewportrenderer": false,
     "destroyifdeactivated": false,
     "pauseonupdate": false,

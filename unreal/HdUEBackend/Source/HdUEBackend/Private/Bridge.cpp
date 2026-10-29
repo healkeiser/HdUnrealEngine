@@ -408,14 +408,15 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (Assets.failed) return Fail(HDUE_ENGINE_ERROR, UTF8_TO_TCHAR(Assets.message));
     ReleaseResidency(Session);
     // A moving realtime camera needs Lumen's persistent temporal history. Scene
-    // edits cancel HasRequest in ApplyScene; mode/time/settings changes still
-    // reset, and every Path Tracer request starts a fresh accumulation.
+    // edits cancel HasRequest in ApplyScene; mode changes still reset, and every
+    // Path Tracer request starts a fresh accumulation.
     const bool Aov = Request->aov != HDUE_AOV_COLOR;
     const auto& Previous = Session->BeautyRequest;
-    // Settings changes (Lumen, samples, warmup, post) keep it too: rebuilding it blanked and reconverged the image,
-    // where UE's own viewport changes instantly.
+    // Settings changes (Lumen, samples, warmup, post) and time keep it too: rebuilding it blanked and reconverged the
+    // image, where UE's own viewport changes instantly and plays Sequencer without camera cuts. Resetting it on every
+    // time change froze Houdini's playback on the last image until it stopped.
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
-        Previous.time_seconds == Request->time_seconds && Previous.aov == Request->aov;
+        Previous.aov == Request->aov;
     if (Aov) {
         if (!Session->AovViewState) Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     } else if (!KeepHistory) {
