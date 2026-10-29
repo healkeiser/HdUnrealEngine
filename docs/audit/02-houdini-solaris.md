@@ -6,7 +6,7 @@ Branch `feature/package` at `e8fe1f4`. Read: `README.md`, `docs/houdini.md`, `do
 
 Reference material:
 
-- SideFX's own files in the locally installed Houdini 22.0.368 (`C:\Program Files\Side Effects Software\Houdini 22.0.368`):
+- SideFX's own files in the locally installed Houdini 22.0.368 (`$HFS`):
   - `houdini/UsdRenderers.json` (the Karma and Storm entries)
   - `houdini/python3.13libs/usdrenderers.py` (the parser)
   - `houdini/soho/parameters/BRAY_HdKarma_*.ds` and `Husk_Aov.ds`

@@ -3,7 +3,7 @@ find_package(Houdini 22.0 CONFIG REQUIRED
     PATHS "${HDUE_HOUDINI_ROOT}/toolkit/cmake" NO_DEFAULT_PATH)
 file(STRINGS "${HDUE_HOUDINI_ROOT}/toolkit/include/pxr/pxr.h" _pxr_version REGEX "^#define PXR_VERSION ")
 if(NOT _pxr_version MATCHES "2605$")
-    message(FATAL_ERROR "Houdini 22.0.466 is expected to provide its USD 26.05 ABI")
+    message(FATAL_ERROR "Houdini 22.0 is expected to provide its USD 26.05 ABI")
 endif()
 add_library(hdue_hdk INTERFACE)
 target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty

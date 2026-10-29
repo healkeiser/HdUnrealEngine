@@ -101,7 +101,7 @@ From a source checkout without the package, set the environment first:
 
 ```powershell
 $env:HOUDINI_PATH = "$PWD\integrations\houdini;&"
-$env:PXR_PLUGINPATH_NAME = "$PWD\build\houdini-22.0.466\resources"
+$env:PXR_PLUGINPATH_NAME = "$PWD\build\houdini\resources"
 $env:HDUE_HOUDINI_ENABLE = '1'
 $env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
 ```

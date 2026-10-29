@@ -12,7 +12,7 @@
 **How claims were checked:**
 
 - **Code claims** were checked against the repository at `feature/package` (`e8fe1f4`).
-- **Engine behaviour** was checked against the pinned engine source at `H:/hdUE/UE_5.8.4_src`. Paths written as `Engine/...` are in that tree.
+- **Engine behaviour** was checked against the pinned engine source (`engine_root`). Paths written as `Engine/...` are in that tree.
 - **Doc claims** cite the Epic page that was actually fetched. Items marked **(unverified)** could not be confirmed from a fetched page or from code.
 
 **Epic sources used:**
@@ -463,7 +463,7 @@ Document the profile in `docs/rendering.md`.
 
 **What we do**
 
-- Content is cooked with the launcher editor (`Prepare-Content.ps1:11-16`; `editor_root` points to `C:/Program Files/Epic Games/UE_5.8`, Build.version CL 58902052).
+- Content is cooked with the launcher editor (`Prepare-Content.ps1:11-16`; `editor_root` points to the launcher editor installation, Build.version CL 58902052).
 - The runtime is the source build (CL 0).
 - `DefaultGame.ini:21` pins `GameVersion=1` so the PSO cache is not rejected.
 

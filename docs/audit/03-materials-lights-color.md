@@ -4,7 +4,7 @@
 
 Audited at `feature/package` @ `e8fe1f4`. Code read: `src/hydra/materials.cpp`, `src/hydra/color_management.{h,cpp}`, `src/hydra/prims.cpp` (Light sprim), `src/hydra/delegate.cpp` (light/material packing, output colour), `include/hdue/{lighting,material,postprocess,bridge}_api.h`, `unreal/HdUEBackend/Source/HdUEBackend/Private/{Lighting,Scene,Bridge}.cpp`, `unreal/HdUEBackend/Source/HdUEContent/Private/HdUEPrepareCommandlet.cpp` (the `M_PreviewSurface*` parents), the MaterialX/Substrate commandlets (only skimmed for colour-space handling), `unreal/HdUEBackend/Config/DefaultEngine.ini`, `samples/cornell/**`, `scripts/render_gallery.py`.
 
-Engine and USD sources were read locally rather than quoted from memory: UE 5.8.4 at `H:\hdUE\UE_5.8.4_src` and OpenUSD 26.03 at `H:\hdUE\OpenUSD-26.03` (paths below marked `UE:` / `USD:`).
+Engine and USD sources were read locally rather than quoted from memory: UE 5.8.4 at the engine source (`engine_root`) and OpenUSD 26.03 at the OpenUSD build (`openusd_root`) (paths below marked `UE:` / `USD:`).
 
 Specs and docs:
 - UsdPreviewSurface spec: https://openusd.org/release/spec_usdpreviewsurface.html (the page header says 2.5 and the changelog says 2.6 is head).

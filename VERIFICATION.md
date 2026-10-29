@@ -4,7 +4,7 @@ This document covers repository-owned code and synthetic fixtures. Local configu
 
 ## Environments and evidence
 
-Validation targets Windows x64, UE 5.8.4, DirectX 12 hardware ray tracing, OpenUSD 26.03 for standalone/usdview, and Houdini 22.0.466 with bundled USD 26.05/Python 3.13. The delegate builds are ABI-isolated. All Python execution uses `uv`.
+Validation targets Windows x64, UE 5.8.4, DirectX 12 hardware ray tracing, OpenUSD 26.03 for standalone/usdview, and Houdini 22.0 with bundled USD 26.05/Python 3.13 (tested on 22.0.368; upstream verified 22.0.466). The delegate builds are ABI-isolated. All Python execution uses `uv`.
 
 Each rendering run must create fresh images, metrics, logs, and `verified.json` in an ignored output directory. Exit code zero is insufficient. One UE initialization per process and final STOPPED state are required.
 
@@ -14,7 +14,7 @@ Each SDK build has four native tests covering ABI layout, render-buffer snapshot
 
 ```powershell
 ctest --test-dir build -C Release --output-on-failure
-ctest --test-dir build/houdini-22.0.466 -C Release --output-on-failure
+ctest --test-dir build/houdini -C Release --output-on-failure
 ```
 
 Coverage includes structure sizes, immutable AOV publication, repeated Map/Unmap, pointer lifetime, concurrent publication, reallocation rejection while mapped, finalization, row orientation, scalar depth, convergence, picking bounds, clipping, backfaces, transformed geometry, negative/nonuniform scales, and BVH traversal.
@@ -39,7 +39,7 @@ The Solaris lighting run produced five converged renderer states and two composi
 
 `Test-Usdview.ps1` covers native presentation, convergence, edits, resizing, camera navigation, renderer switching, stage reopening, selection, and shutdown. The synthetic regression includes 24 captured frames and ten picking operations.
 
-`Test-Camera.ps1` measures continuous interaction and verifies coalescing rather than unbounded queuing. `Test-BufferPerf.ps1` measures CPU AOV map behavior. Performance depends on resolution, hardware, content, cache state, and readback cost.
+`Test-Usdview.ps1 -Check camera` measures continuous interaction and verifies coalescing rather than unbounded queuing. `Test-BufferPerf.ps1` measures CPU AOV map behavior. Performance depends on resolution, hardware, content, cache state, and readback cost.
 
 The custom picking path does not imply standard Hydra ID AOV or selection-outline support.
 
@@ -85,11 +85,11 @@ The `references` test kind references a caller-selected prepared asset downstrea
 
 These checks establish binding and converged finite images; they do not assert pixel-identical subsurface scattering between Lumen and Path Tracer.
 
-`Test-MaterialX.ps1` checks public parameter edits, material changes, image comparisons, invalid updates, source preservation, renderer re-creation, and shutdown. Graph validation rejects cycles, unknown nodes, incompatible connections/types, missing images, nonfinite values, and unsupported volume/displacement outputs.
+`Test-Usdview.ps1 -Check materialx` checks public parameter edits, material changes, image comparisons, invalid updates, source preservation, renderer re-creation, and shutdown. Graph validation rejects cycles, unknown nodes, incompatible connections/types, missing images, nonfinite values, and unsupported volume/displacement outputs.
 
 Synthetic normal/UDIM tests cover raw normals, strength, texture replacement, tile coordinates, malformed/missing tiles, dependency hashes, and material parameter compatibility.
 
-`Test-Residency.ps1` keeps Path Tracer at zero samples until all required pages and mappings are ready. It checks capacity/timeout failures, lock release, recovery, edits during preparation, mode changes, and delegate re-creation. The generated large fixture requires 10,922 pages/mappings; insufficient capacity must fail without accumulating low-resolution images.
+`Test-Usdview.ps1 -Check residency` keeps Path Tracer at zero samples until all required pages and mappings are ready. It checks capacity/timeout failures, lock release, recovery, edits during preparation, mode changes, and delegate re-creation. The generated large fixture requires 10,922 pages/mappings; insufficient capacity must fail without accumulating low-resolution images.
 
 ## Reference-safe sample
 

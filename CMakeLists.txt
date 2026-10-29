@@ -22,7 +22,7 @@ target_compile_options(hdue_backend_smoke PRIVATE /W4 /permissive- /utf-8)
 target_link_options(hdue_backend_smoke PRIVATE /MANIFEST:EMBED "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/src/host/hdue.manifest")
 
 include(CTest)
-set(HDUE_HOUDINI_ROOT "" CACHE PATH "Build against the Houdini 22.0.466 HDK instead of standalone OpenUSD")
+set(HDUE_HOUDINI_ROOT "" CACHE PATH "Build against a Houdini 22.0 HDK instead of standalone OpenUSD")
 if(HDUE_HOUDINI_ROOT)
     include(cmake/Houdini.cmake)
     return()
