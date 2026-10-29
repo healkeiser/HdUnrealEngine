@@ -86,7 +86,7 @@ class Cache:
             rop.parm('setprecision').set(1)
             rop.parm('precision').set('b32')
             rop.parm('outputaovs').set(1)
-            rop.parm('enabled1').set(1)
+            if rop.parm('enabled1'): rop.parm('enabled1').set(1)  # Houdini 22.0.368's Image ROP has no per-AOV toggle
             rop.parm('aov1').set('C')
             rop.parm('useport1').set(1)
             rop.parm('port1').set(output)

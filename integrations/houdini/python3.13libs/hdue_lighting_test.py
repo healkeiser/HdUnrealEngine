@@ -36,7 +36,7 @@ class Test(ViewportTest):
         status.struct_size-=1
         if self.lights.get_status(session,C.byref(status))!=-1: raise AssertionError('Short status accepted')
         status.struct_size=C.sizeof(status); result=[]
-        worker=threading.Thread(target=lambda:result.append(self.lights.get_status(session,C.byref(status))))
+        worker=threading.Thread(target=lambda:result.append(self.lights.get_status.direct(session,C.byref(status))))
         worker.start(); worker.join()
         if result!=[-3]: raise AssertionError('Lighting diagnostics left the owner thread')
         yield from self.capture('01-hdri-lumen-solaris.png')

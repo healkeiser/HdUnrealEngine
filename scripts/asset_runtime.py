@@ -21,10 +21,10 @@ class Assets:
         get.argtypes=[U32,U32,C.POINTER(AssetApi)]; get.restype=Result
         api=AssetApi(); runtime.check(get(1,C.sizeof(api),C.byref(api)),"get_asset_api")
         if api.struct_size!=40 or api.abi_version!=1: raise RuntimeError("Invalid asset extension")
-        self.upsert=C.CFUNCTYPE(Result,U64,C.POINTER(AssetDesc))(api.upsert)
-        self.remove=C.CFUNCTYPE(Result,U64,C.c_char_p)(api.remove)
-        self.get_status=C.CFUNCTYPE(Result,U64,C.c_char_p,C.POINTER(AssetStatus))(api.get_instance_status)
-        self.get_scene=C.CFUNCTYPE(Result,U64,C.POINTER(AssetSceneStatus))(api.get_scene_status)
+        self.upsert=runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(AssetDesc)),api.upsert)
+        self.remove=runtime.bind(C.CFUNCTYPE(Result,U64,C.c_char_p),api.remove)
+        self.get_status=runtime.bind(C.CFUNCTYPE(Result,U64,C.c_char_p,C.POINTER(AssetStatus)),api.get_instance_status)
+        self.get_scene=runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(AssetSceneStatus)),api.get_scene_status)
 
     def status(self,session,id):
         status=AssetStatus(); status.struct_size=C.sizeof(status)

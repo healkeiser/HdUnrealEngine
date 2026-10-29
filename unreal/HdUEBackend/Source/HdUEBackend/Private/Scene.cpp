@@ -24,8 +24,6 @@
 #include "Components/HeterogeneousVolumeComponent.h"
 #include "Engine/VolumeTexture.h"
 #include "TextureResource.h"
-#include "DynamicMeshToMeshDescription.h"
-#include "StaticMeshAttributes.h"
 #include "ImageCore.h"
 #include "RenderUtils.h"
 #include "ImageCoreUtils.h"
@@ -409,6 +407,22 @@ void FHdueScene::BindMaterials() {
 }
 namespace {
 bool Interactive_() { static const bool Value = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive")); return Value; }
+// One Hydra vertex for static and Nanite meshes (any thread). Hydra meshes carry no tangents: the frame around the normal
+// is arbitrary. Colours stay linear in 8 bits, as dynamic meshes store them.
+FVector3f HydraNormal(const HdueMeshDesc& Desc, uint32 V) {
+    return Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FVector3f::UpVector;
+}
+FStaticMeshBuildVertex HydraVertex(const HdueMeshDesc& Desc, uint32 V, FVector3f Normal) {
+    if (!Normal.Normalize()) Normal = FVector3f::UpVector;
+    FStaticMeshBuildVertex Vertex;
+    Vertex.Position = FVector3f(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]);
+    Vertex.TangentZ = Normal;
+    Vertex.TangentX = (FMath::Abs(Normal.X) < .9f ? FVector3f::ForwardVector : FVector3f::RightVector).Cross(Normal).GetSafeNormal();
+    Vertex.TangentY = Normal.Cross(Vertex.TangentX);
+    Vertex.UVs[0] = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
+    Vertex.Color = Desc.colors ? FLinearColor(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2]).ToFColor(false) : FColor::White;
+    return Vertex;
+}
 // Nanite data for one generated mesh (any thread). Every page is a root page: outside the editor, UE streams non-root
 // pages only from cooked files on disk, and these meshes exist only in memory.
 TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
@@ -417,17 +431,14 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     Input.Vertices.Empty(int32(Desc.vertex_count), 1, 0);
     FBox3f Bounds(ForceInit);
     for (uint32 V = 0; V < Desc.vertex_count; ++V) {
-        const FVector3f Position(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]);
-        FVector3f Normal = Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2]) : FVector3f::UpVector;
-        if (!Normal.Normalize()) Normal = FVector3f::UpVector;
-        const FVector3f Tangent = (FMath::Abs(Normal.X) < .9f ? FVector3f::ForwardVector : FVector3f::RightVector).Cross(Normal).GetSafeNormal();
-        Input.Vertices.Position.Add(Position);
-        Input.Vertices.TangentZ.Add(Normal);
-        Input.Vertices.TangentX.Add(Tangent);
-        Input.Vertices.TangentY.Add(Normal.Cross(Tangent));
-        Input.Vertices.UVs[0].Add(Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector);
-        if (Desc.colors) Input.Vertices.Color.Add(FLinearColor(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2]).ToFColor(false));
-        Bounds += Position;
+        const FStaticMeshBuildVertex Vertex = HydraVertex(Desc, V, HydraNormal(Desc, V));
+        Input.Vertices.Position.Add(Vertex.Position);
+        Input.Vertices.TangentZ.Add(Vertex.TangentZ);
+        Input.Vertices.TangentX.Add(Vertex.TangentX);
+        Input.Vertices.TangentY.Add(Vertex.TangentY);
+        Input.Vertices.UVs[0].Add(Vertex.UVs[0]);
+        if (Desc.colors) Input.Vertices.Color.Add(Vertex.Color);
+        Bounds += Vertex.Position;
     }
     // The builder's vertex view drops all-white colours but its format still counts them: keep none in that case.
     if (!Input.Vertices.Color.ContainsByPredicate([](const FColor& C) { return C != FColor::White; })) Input.Vertices.Color.Empty();
@@ -448,25 +459,13 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
     return Resources;
 }
-}
-
-namespace {
-// UE's fast BuildFromMeshDescriptions path, split so the CPU half runs off the game thread (30-60 ms per mesh there
-// stalled frames for the first minutes after a load) and Nanite data is attached before the GPU resources exist.
 UStaticMesh* NewStaticMesh(UObject* Outer) {
     auto* Mesh = NewObject<UStaticMesh>(Outer);
     FStaticMaterial Slot; Slot.UVChannelData = FMeshUVChannelInfo(1.f); // texture streaming reads UV density
     Mesh->GetStaticMaterials().Add(Slot);
     return Mesh;
 }
-// Any thread: reads only the mesh's material slots.
-TUniquePtr<FStaticMeshRenderData> BuildRenderData(const UStaticMesh& Mesh, const FMeshDescription& Description) {
-    auto Data = MakeUnique<FStaticMeshRenderData>();
-    Data->AllocateLODResources(1);
-    const_cast<UStaticMesh&>(Mesh).BuildFromMeshDescription(Description, Data->LODResources[0]);
-    return Data;
-}
-// Game thread.
+// Game thread: Nanite data is attached before the GPU resources exist.
 void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> RenderData, const FBoxSphereBounds& Bounds, Nanite::FResources* Nanite) {
     Built->SetRenderData(MoveTemp(RenderData));
     FStaticMeshRenderData& Data = *Built->GetRenderData();
@@ -482,33 +481,65 @@ void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> Rend
     Data.ScreenSize[0].Default = 1.f;
 }
 }
+// Any thread: one Hydra mesh's static render data, with a vertex per Hydra vertex (each has one normal, UV and colour).
+// Meshes without normals get a vertex per triangle corner with the triangle's normal, as dynamic meshes draw them.
+// UE's BuildFromMeshDescription went through an FMeshDescription with a vertex per corner, whose edge bookkeeping took
+// 7 s for Sponza's largest mesh.
+FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc) {
+    const bool Faceted = !Desc.normals;
+    const int32 Count = int32(Faceted ? Desc.index_count : Desc.vertex_count);
+    TArray<FStaticMeshBuildVertex> Vertices; Vertices.SetNumUninitialized(Count);
+    TArray<uint32> Indices(Desc.indices, int32(Desc.index_count));
+    const auto Position = [&](uint32 V) { return FVector3f(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]); };
+    FBox3f Bounds(ForceInit);
+    bool Colored = false;
+    for (int32 I = 0; I < Count; ++I) {
+        uint32 V = uint32(I);
+        FVector3f Normal;
+        if (Faceted) {
+            const uint32* Triangle = Desc.indices + I / 3 * 3;
+            Normal = (Position(Triangle[1]) - Position(Triangle[0])).Cross(Position(Triangle[2]) - Position(Triangle[0]));
+            V = Indices[I]; Indices[I] = uint32(I);
+        } else Normal = HydraNormal(Desc, V);
+        Vertices[I] = HydraVertex(Desc, V, Normal);
+        Bounds += Vertices[I].Position;
+        Colored |= Vertices[I].Color != FColor::White;
+    }
+    FConversion Result{MakeUnique<FStaticMeshRenderData>(), FBoxSphereBounds(FBox(Bounds)), nullptr};
+    Result.RenderData->AllocateLODResources(1);
+    if (Indices.IsEmpty()) return Result;
+    FStaticMeshLODResources& LOD = Result.RenderData->LODResources[0];
+    LOD.VertexBuffers.PositionVertexBuffer.Init(Vertices);
+    FStaticMeshVertexBufferFlags Flags; Flags.bNeedsCPUAccess = true; Flags.bUseBackwardsCompatibleF16TruncUVs = false;
+    LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, 1, Flags);
+    if (Colored) LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices);
+    else LOD.VertexBuffers.ColorVertexBuffer.InitFromSingleColor(FColor::White, Count);
+    LOD.bHasColorVertexData = true;
+    FStaticMeshSection& Section = LOD.Sections.AddDefaulted_GetRef();
+    Section.MaterialIndex = 0; Section.FirstIndex = 0; Section.NumTriangles = Indices.Num() / 3;
+    Section.MinVertexIndex = 0; Section.MaxVertexIndex = Count - 1; Section.bCastShadow = true;
+    LOD.IndexBuffer.SetIndices(Indices, Count - 1 > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
+    return Result;
+}
 
-// Replaces one dynamic mesh queued by Apply with a static mesh (cached draw commands, static ray-tracing geometry),
-// with Nanite data when its build has finished.
+// Replaces one static mesh queued by Apply with its Nanite version once that build has finished. Nanite data must be
+// attached before a mesh's GPU resources exist, so the Nanite version is a second static mesh.
 void FHdueScene::TickConversions() {
-    RetiredConversions.RemoveAll([](const FPendingConversion& Retired) { return Retired.Task.IsCompleted(); });
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
-        if (!It.Value().Task.IsCompleted()) continue; // not built yet
+        if (!It.Value().IsCompleted()) continue; // not built yet
         AActor* Actor = Actors.FindRef(It.Key());
-        auto* Dynamic = IsValid(Actor) ? Cast<UDynamicMeshComponent>(Actor->GetRootComponent()) : nullptr;
-        if (!Dynamic) { It.RemoveCurrent(); continue; }
-        const TSharedPtr<FConversion> Conversion = It.Value().Task.GetResult();
-        const UMaterialInterface* Material = Dynamic->GetMaterial(0);
-        const bool NaniteMaterial = !Material || !IsTranslucentBlendMode(*Material); // Nanite draws opaque and masked only
-        UStaticMesh* Built = It.Value().Mesh.Get();
-        FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds, NaniteMaterial ? Conversion->Nanite.Get() : nullptr);
-        if (Conversion->Nanite && NaniteMaterial) {
-            static int32 NaniteMeshes = 0, Tried = 0;
-            ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
-            if (Tried % 50 == 1 || PendingStatic.Num() == 1)
-                UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
-        }
-        AddRootComponent<UStaticMeshComponent>(Actor, [&](UStaticMeshComponent& Component) {
-            Component.SetStaticMesh(Built);
-            Component.SetMaterial(0, Dynamic->GetMaterial(0));
-        });
-        Actor->SetActorTransform(Dynamic->GetComponentTransform());
-        Dynamic->DestroyComponent();
+        auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr;
+        const TSharedPtr<FConversion> Conversion = It.Value().GetResult();
+        const UMaterialInterface* Material = Component ? Component->GetMaterial(0) : nullptr;
+        // Nanite draws opaque and masked materials only; the regular static mesh stays for the others.
+        if (!Component || !Conversion || (Material && IsTranslucentBlendMode(*Material))) { It.RemoveCurrent(); continue; }
+        UStaticMesh* Built = NewStaticMesh(Actor);
+        FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds, Conversion->Nanite.Get());
+        static int32 NaniteMeshes = 0, Tried = 0;
+        ++Tried; if (Built->HasValidNaniteData()) ++NaniteMeshes;
+        if (Tried % 50 == 1 || PendingStatic.Num() == 1)
+            UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
+        Component->SetStaticMesh(Built);
         It.RemoveCurrent();
         return; // one per tick keeps frames smooth
     }
@@ -738,31 +769,24 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     const double MaterialsDone = FPlatformTime::Seconds();
     // Assemble the generated meshes on all cores; components and assets are created below on this thread. Meshes that
     // are not edited after upload become static meshes: UDynamicMeshComponent rebuilt its draw commands and dynamic
-    // ray-tracing instances every frame.
-    TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
-    TArray<FMeshDescription> Descriptions; Descriptions.SetNum(Batch.mesh_count);
-    // Nanite for converted meshes (interactive hosts); HDUE_NANITE=0 keeps them regular static meshes.
+    // ray-tracing instances every frame, and building its scene proxies held the first frame of a large scene on the
+    // game thread (3.8 s for Sponza's 454 meshes). Instanced prototypes are static everywhere; other meshes are static
+    // in interactive hosts (Houdini's viewport), while offline hosts (husk) keep dynamic meshes, cheaper for a few frames.
+    // Wet surface effects edit their meshes and keep them dynamic.
+    const auto StaticGenerated = [&](const HdueMeshDesc& Desc) {
+        return !(Desc.native_asset && *Desc.native_asset) && (Desc.instance_transforms || (Interactive_() && !(Desc.flags & HDUE_MESH_EDITABLE)));
+    };
+    // Nanite for interactive hosts' static meshes, built in the background and swapped in by TickConversions;
+    // HDUE_NANITE=0 keeps the regular static meshes.
     static const bool NaniteMeshes = Interactive_() && FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
     if (NaniteMeshes) Nanite::IBuilderModule::Get(); // load the builder on this thread before worker tasks use it
-    // Interactive hosts (Houdini's viewport) convert generated meshes to static ones in the background, one per tick
-    // (TickConversions): building static render data on this thread made a large scene's load 4x slower. Offline
-    // hosts (husk) keep dynamic meshes, which are cheaper for a few frames.
-    static const bool Interactive = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
-    const auto StaticGenerated = [&](const HdueMeshDesc& Desc) {
-        return !(Desc.native_asset && *Desc.native_asset) && Desc.instance_transforms != nullptr;
-    };
-    const auto ConvertLater = [&](const HdueMeshDesc& Desc) {
-        return Interactive && !(Desc.native_asset && *Desc.native_asset) && !Desc.instance_transforms && !(Desc.flags & HDUE_MESH_EDITABLE);
-    };
+    TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes; BuiltMeshes.SetNum(Batch.mesh_count);
+    TArray<FConversion> StaticData; StaticData.SetNum(Batch.mesh_count);
     ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
         const auto& Desc = Batch.meshes[Index];
         if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
-        BuiltMeshes[Index] = BuildDynamicMesh(Desc);
-        if (StaticGenerated(Desc)) {
-            FStaticMeshAttributes Attributes(Descriptions[Index]); Attributes.Register();
-            FDynamicMeshToMeshDescription().Convert(&BuiltMeshes[Index], Descriptions[Index]);
-            BuiltMeshes[Index].Clear();
-        }
+        if (StaticGenerated(Desc)) StaticData[Index] = BuildStatic(Desc);
+        else BuiltMeshes[Index] = BuildDynamicMesh(Desc);
     });
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Desc = Batch.meshes[Index];
@@ -802,35 +826,26 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             UE_LOG(LogTemp, Display, TEXT("hdUE native mesh %s: NaniteData=%d"), *Mesh->GetPathName(), Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
-            using namespace UE::Geometry;
+            PendingStatic.Remove(Id); // a Nanite build for the previous geometry finishes unused
             if (Static) {
                 auto* Built = NewStaticMesh(Actor);
-                FinishStaticMesh(Built, BuildRenderData(*Built, Descriptions[Index]), Descriptions[Index].GetBounds(), nullptr);
+                FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds, nullptr);
                 if (Instanced) InstanceMesh = Built;
                 else Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-            } else {
-                Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
-                // A conversion still running keeps its mesh alive until it finishes (its worker uses it).
-                if (FPendingConversion Previous; PendingStatic.RemoveAndCopyValue(Id, Previous) && !Previous.Task.IsCompleted()) RetiredConversions.Add(MoveTemp(Previous));
-                if (ConvertLater(Desc)) {
-                    // The static mesh description and Nanite data are built on background workers, from a copy of the
-                    // descriptor's arrays: done here, they doubled the time to the first frame (and normal-priority
+                if (NaniteMeshes && !Instanced) {
+                    // Nanite data and the Nanite mesh's render data are built on background workers, from a copy of
+                    // the descriptor's arrays: done here, they doubled the time to the first frame (and normal-priority
                     // Nanite tasks starved its rendering for 15 s).
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    UStaticMesh* Mesh = NewStaticMesh(Actor);
-                    PendingStatic.Add(Id, {TStrongObjectPtr<UStaticMesh>(Mesh), UE::Tasks::Launch(TEXT("HdueConversion"), [Copy, Mesh]() -> TSharedPtr<FConversion> {
-                        TSharedPtr<FConversion> Result = MakeShared<FConversion>();
-                        UE::Geometry::FDynamicMesh3 Dynamic = BuildDynamicMesh(Copy->Desc);
-                        FMeshDescription Description;
-                        FStaticMeshAttributes Attributes(Description); Attributes.Register();
-                        FDynamicMeshToMeshDescription().Convert(&Dynamic, Description);
-                        Result->RenderData = BuildRenderData(*Mesh, Description);
-                        Result->Bounds = Description.GetBounds();
-                        if (NaniteMeshes) Result->Nanite = BuildNanite(Copy->Desc);
+                    PendingStatic.Add(Id, UE::Tasks::Launch(TEXT("HdueConversion"), [Copy]() -> TSharedPtr<FConversion> {
+                        TSharedPtr<Nanite::FResources> Nanite = BuildNanite(Copy->Desc);
+                        if (!Nanite) return nullptr;
+                        auto Result = MakeShared<FConversion>(BuildStatic(Copy->Desc));
+                        Result->Nanite = MoveTemp(Nanite);
                         return Result;
-                    }, UE::Tasks::ETaskPriority::BackgroundLow)});
+                    }, UE::Tasks::ETaskPriority::BackgroundLow));
                 }
-            }
+            } else Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
             ++GeometryRevisions.FindOrAdd(Id); ++GeometryUploads;
         }
         if (Instanced) {

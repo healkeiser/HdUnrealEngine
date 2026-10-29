@@ -1,7 +1,7 @@
 """Caller-owned C diagnostics and readback for the Houdini delegate."""
 import ctypes as C
 from pathlib import Path
-from hdue_runtime import ABI_VERSION,Api,U32,U64,Result
+from hdue_runtime import ABI_VERSION,Api,Task,U32,U64,Result
 from material_api import Parameter
 
 class Frame(C.Structure):
@@ -38,6 +38,9 @@ class Viewport:
         self.set_materials.argtypes=[C.POINTER(Materials)]; self.set_materials.restype=Result
         self.run_ui_tasks=getattr(self.library,'hdue_run_ui_tasks',None)
         if self.run_ui_tasks: self.run_ui_tasks.argtypes=[]; self.run_ui_tasks.restype=None
+        # Owner-only backend calls (runtime.bind) run on the UE thread the delegate runs.
+        runtime.run_on_ue_thread=self.library.hdue_run_on_ue_thread
+        runtime.run_on_ue_thread.argtypes=[Task,C.py_object]; runtime.run_on_ue_thread.restype=Result
         self.set_surfaces=getattr(self.library,'hdue_set_viewport_surfaces',None)
         if self.set_surfaces:
             self.set_surfaces.argtypes=[C.POINTER(Surfaces)]; self.set_surfaces.restype=Result
@@ -51,7 +54,7 @@ class Viewport:
         extension=DepthApi()
         runtime.check(self.get_depth(1,C.sizeof(extension),C.byref(extension)),'depth extension')
         if extension.struct_size!=24 or extension.abi_version!=1: raise RuntimeError('Invalid depth extension layout')
-        self.set_depth=C.CFUNCTYPE(Result,U64,U32)(extension.set_enabled)
+        self.set_depth=runtime.bind(C.CFUNCTYPE(Result,U64,U32),extension.set_enabled)
         self.copy_depth=C.CFUNCTYPE(Result,U64,U64,C.c_void_p,U64)(extension.copy_depth)
 
     def status(self):

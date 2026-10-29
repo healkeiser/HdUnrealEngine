@@ -23,8 +23,8 @@ class SurfaceApi:
         self.get.argtypes=[U32,U32,C.POINTER(Api)]; self.get.restype=Result
         table=Api(); runtime.check(self.get(1,C.sizeof(table),C.byref(table)),'surface API')
         if table.struct_size!=24 or table.abi_version!=1 or not table.apply or not table.get_status: raise RuntimeError('Incomplete surface API')
-        self.apply=C.CFUNCTYPE(Result,U64,C.POINTER(Batch))(table.apply)
-        self.get_status=C.CFUNCTYPE(Result,U64,C.POINTER(Status))(table.get_status)
+        self.apply=runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(Batch)),table.apply)
+        self.get_status=runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(Status)),table.get_status)
 
     def status(self,session):
         result=Status(struct_size=C.sizeof(Status))

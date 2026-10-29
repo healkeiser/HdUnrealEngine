@@ -37,13 +37,12 @@ class MaterialApi:
         self.require(self.get_api(1,C.sizeof(table),C.byref(table)))
         if table.struct_size != 32 or table.abi_version != 1 or any(not getattr(table,n) for n,_ in Api._fields_[2:]):
             raise RuntimeError("Incompatible material extension")
-        self.get_info = C.CFUNCTYPE(Result,C.POINTER(RendererInfo))(table.get_renderer_info)
-        self.set_parameters = C.CFUNCTYPE(Result,U64,C.POINTER(Update))(table.set_parameters)
-        self.get_stats = C.CFUNCTYPE(Result,U64,C.c_char_p,C.POINTER(MaterialStats))(table.get_material_stats)
+        self.get_info = runtime.bind(C.CFUNCTYPE(Result,C.POINTER(RendererInfo)),table.get_renderer_info)
+        self.set_parameters = runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(Update)),table.set_parameters)
+        self.get_stats = runtime.bind(C.CFUNCTYPE(Result,U64,C.c_char_p,C.POINTER(MaterialStats)),table.get_material_stats)
 
     def require(self, result):
-        if result != 0:
-            raise RuntimeError(f"Material API {result}: {self.runtime.status().message.decode('utf-8','replace')}")
+        self.runtime.check(result, "Material API")
 
     def renderer_info(self):
         info = RendererInfo(struct_size=C.sizeof(RendererInfo))

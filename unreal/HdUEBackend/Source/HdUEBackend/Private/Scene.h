@@ -1,7 +1,6 @@
 #pragma once
 #include "ImageCore.h"
 #include "Engine/Texture.h"
-#include "MeshDescription.h"
 #include "Tasks/Task.h"
 #include "Rendering/NaniteResources.h"
 #include "hdue/bridge.h"
@@ -81,12 +80,10 @@ private:
     TMap<FString, FPreviewTexture> PreviewTextures;
     double TextureSeconds = 0; int32 TextureImports = 0; // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials; // replaced last Apply; released next Apply
-    // Dynamic meshes TickConversions turns into static (and Nanite) meshes, with their background builds.
-    // The worker builds the static mesh's render data (and Nanite data) for Mesh, created on the game thread.
+    // A static mesh's render data, and Nanite data for the Nanite version TickConversions swaps in.
     struct FConversion { TUniquePtr<FStaticMeshRenderData> RenderData; FBoxSphereBounds Bounds; TSharedPtr<Nanite::FResources> Nanite; };
-    struct FPendingConversion { TStrongObjectPtr<UStaticMesh> Mesh; UE::Tasks::TTask<TSharedPtr<FConversion>> Task; };
-    TMap<FString, FPendingConversion> PendingStatic;
-    TArray<FPendingConversion> RetiredConversions; // replaced while their worker ran
+    static FConversion BuildStatic(const HdueMeshDesc& Desc);
+    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic; // background Nanite builds (null: no Nanite data)
     const FPreviewTexture* PreviewTexture(const FString& File, bool SRGB, FString& Error);
     struct FWet {
         FString Asset;

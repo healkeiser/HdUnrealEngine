@@ -228,7 +228,9 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     Result.struct_size = sizeof(Result);
     Result.state = Runtime.State;
     Result.world_ready = Runtime.World && Runtime.World->Scene;
-    Result.rhi_ready = GDynamicRHI && !GUsingNullRHI;
+    // Not GDynamicRHI alone: it is set before the RHI finishes initializing, when a host thread polling a booting UE
+    // reached ray-tracing queries that assert on an uninitialized RHI.
+    Result.rhi_ready = GDynamicRHI && GRHIGlobals.IsRHIInitialized && !GUsingNullRHI;
     Result.engine_major = ENGINE_MAJOR_VERSION;
     Result.engine_minor = ENGINE_MINOR_VERSION;
     Result.engine_patch = ENGINE_PATCH_VERSION;

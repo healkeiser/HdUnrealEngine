@@ -8,6 +8,8 @@ import threading
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
 ABI_VERSION = 8  # HDUE_ABI_VERSION
+Task = C.CFUNCTYPE(None, C.py_object)  # hdue_run_on_ue_thread's task, called with the Python callable to run
+_run_task = Task(lambda work: work())
 
 
 class InitDesc(C.Structure):
@@ -46,7 +48,7 @@ class Runtime:
         self.attempted = False
         self.closed = False
         self.ticks = 0
-        self.initializations = 0
+        self._initializations = 0
         self.backend_name=Path(library).name
         self.library = C.CDLL(str(Path(library).resolve()), winmode=0x1100)
         _process_libraries.append(self.library)
@@ -65,6 +67,7 @@ class Runtime:
         self.window_message = C.CFUNCTYPE(Result, U64, U32, U64, I64,
                                          C.POINTER(I64))(api.window_message)
         self.attached = not start
+        self.run_on_ue_thread = None  # attached: the delegate's hdue_run_on_ue_thread, set by whoever loads the delegate
         if self.attached:
             return
         self.user = C.WinDLL("user32", use_last_error=True)
@@ -116,7 +119,7 @@ class Runtime:
         desc = InitDesc(C.sizeof(InitDesc), 0, instance, self.window, project_bytes,
                         b"/Game/HdUETest", arguments.encode("utf-8"))
         self.attempted = True
-        self.initializations += 1
+        self._initializations += 1
         try:
             self.check(self.initialize(C.byref(desc)), "initialize")
             status = self.status()
@@ -128,6 +131,13 @@ class Runtime:
         except BaseException:
             self.close()
             raise
+
+    @property
+    def initializations(self):
+        """UE lifetimes this process began. Attached, the delegate started UE, and UE allows one per process."""
+        if self.attached:
+            return int(self.status().state != 0)  # HDUE_STATE_COLD
+        return self._initializations
 
     def assert_owner(self):
         if not self.attached and threading.get_ident() != self.owner:
@@ -142,8 +152,37 @@ class Runtime:
 
     def check(self, result, operation):
         if result:
+            # UE's error text is readable on UE's thread only.
             raise RuntimeError(f"{operation} failed ({result}): " +
-                               self.status().message.decode("utf-8", "replace"))
+                               self.on_ue_thread(self.status).message.decode("utf-8", "replace"))
+
+    def on_ue_thread(self, call, *args):
+        """call(*args) on the thread that owns UE: hdUE's UE thread when attached, since the backend accepts no other.
+        The caller waits with the GIL released, so call may be Python."""
+        if not (self.attached and self.run_on_ue_thread):
+            return call(*args)
+        outcome = []
+        def work():
+            try:
+                outcome.append((True, call(*args)))
+            except BaseException as error:
+                outcome.append((False, error))
+        code = self.run_on_ue_thread(_run_task, work)
+        if code:
+            raise RuntimeError(f"hdUE's UE thread did not run {call} ({code})")
+        succeeded, value = outcome[0]
+        if not succeeded:
+            raise value
+        return value
+
+    def bind(self, prototype, pointer):
+        """A backend C function from an API table, called on the thread that owns UE (see on_ue_thread). Functions
+        that any thread may call (status, finished frames) are bound with the prototype directly instead.
+        .direct is the unmarshalled function."""
+        function = prototype(pointer)
+        bound = lambda *args: self.on_ue_thread(function, *args)
+        bound.direct = function
+        return bound
 
     def tick(self):
         self.assert_owner()

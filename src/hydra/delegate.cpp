@@ -1930,6 +1930,14 @@ PXR_NAMESPACE_CLOSE_SCOPE
 #if defined(HDUE_HOUDINI)
 // Ends UE that hdUE runs on its own thread in Houdini's UI (hdue_houdini calls this when Houdini quits).
 extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_shutdown_ue() { PXR_NS::shutdownSelfHost(); }
+// Runs task(context) on the thread that owns UE and waits for it (inline on that thread, or while nothing owns UE): the
+// backend accepts calls from its owner only, and in Houdini's UI that is hdUE's UE thread, not the host's.
+extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_run_on_ue_thread(void (HDUE_CALL* task)(void*), void* context) {
+    if (!task) return HDUE_INVALID_ARGUMENT;
+    try { PXR_NS::ueRun([&] { task(context); }); }
+    catch (const std::exception&) { return HDUE_INVALID_STATE; } // the owner did not pick the task up
+    return HDUE_OK;
+}
 extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks() {
     auto& queue = PXR_NS::ownerQueue();
     queue.owner = GetCurrentThreadId();

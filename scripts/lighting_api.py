@@ -20,7 +20,7 @@ class Lighting:
         api=Api()
         runtime.check(get(2,C.sizeof(api),C.byref(api)),'lighting API')
         if api.struct_size!=C.sizeof(api) or api.abi_version!=2: raise RuntimeError('Unsupported lighting ABI')
-        self.get_status=C.CFUNCTYPE(Result,U64,C.POINTER(Status))(api.get_status)
+        self.get_status=runtime.bind(C.CFUNCTYPE(Result,U64,C.POINTER(Status)),api.get_status)
 
     def status(self,session):
         status=Status(); status.struct_size=C.sizeof(status)

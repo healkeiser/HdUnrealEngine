@@ -2,6 +2,7 @@
 import ctypes as C
 import json
 import math
+import os
 import time
 import traceback
 from array import array
@@ -178,6 +179,9 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         viewer.setHydraRenderer('Houdini VK')
         for _ in range(8): yield
         integration.activate()
+        # Houdini pauses a delegate it switches away from and resumes it on return; a restart replaces it.
+        viewer.restartRenderer()
+        while self.api.status()['session'] in (0,old): yield
         before=yield from self.image('07-delegate-recreated',1,0)
         if self.frames[-1]['session']==old or self.host.runtime.initializations!=1: raise AssertionError('Incorrect UE/delegate lifetime')
         self.navigate('orbit',35,15)
@@ -237,20 +241,25 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         viewport.draw()
 
     def depth_contracts(self):
-        from hdue_viewport import DepthApi
+        from hdue_viewport import DepthApi,Frame
         import threading
         api=DepthApi()
         if self.api.get_depth(99,C.sizeof(api),C.byref(api))!=-2: raise AssertionError('Depth ABI version accepted')
         if self.api.get_depth(1,C.sizeof(api)-1,C.byref(api))!=-6: raise AssertionError('Short depth table accepted')
-        state=self.api.status(); frame=state['frame']; count=frame['width']*frame['height']
-        guard=np.full(count,-123,dtype=np.float32)
+        # Depth belongs to UE's newest frame, by UE's frame id (the viewport status numbers the frames Houdini shows).
+        state=self.api.status(); frame=Frame(); frame.struct_size=C.sizeof(frame)
+        self.host.runtime.check(self.api.poll(state['session'],C.byref(frame)),'poll image')
+        guard=np.full(frame.width*frame.height,-123,dtype=np.float32)
         pointer=guard.ctypes.data_as(C.c_void_p)
-        if self.api.copy_depth(state['session'],frame['frame_id'],pointer,guard.nbytes-1)!=-6 or not (guard==-123).all(): raise AssertionError('Short depth buffer contract failed')
+        if self.api.copy_depth(state['session'],frame.frame_id,pointer,guard.nbytes-1)!=-6 or not (guard==-123).all(): raise AssertionError('Short depth buffer contract failed')
         if self.api.copy_depth(state['session'],0,pointer,guard.nbytes)!=-7: raise AssertionError('Stale depth frame accepted')
-        result=[]; thread=threading.Thread(target=lambda:result.append(self.api.set_depth(state['session'],1)))
+        result=[]; thread=threading.Thread(target=lambda:result.append(self.api.set_depth.direct(state['session'],1)))
         thread.start(); thread.join()
         if result!=[-3]: raise AssertionError('Depth API did not reject a worker thread')
 
 def start(host):
     global _test
+    # The native selection highlight needs the primId/instanceId AOVs, which the viewport renders only on request.
+    # Set before the delegate's first draw, which reads it once.
+    os.environ['HDUE_VIEWPORT_ID_AOVS']='1'; hou.putenv('HDUE_VIEWPORT_ID_AOVS','1')
     _test=Test(host)

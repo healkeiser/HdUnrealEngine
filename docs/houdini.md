@@ -28,7 +28,7 @@ In the Houdini UI, UE runs on its own thread and ticks continuously; the viewpor
 
 - **Image resolution.** Display Options > Render > Image Resolution set to *Render Settings Prim* renders at the render settings' resolution; the viewport size is cheaper while navigating.
 - **Selection IDs.** Solaris asks for `primId` and `instanceId` for its selection highlight. Rendering them swaps every material twice per converged view, so the viewport leaves them out unless `HDUE_VIEWPORT_ID_AOVS=1`; selection then works from the Scene Graph Tree but is not highlighted in the hdUE image.
-- **Loading.** Textures decode in parallel and meshes are assembled on all cores. Meshes first appear as dynamic meshes and are converted to static meshes in the background, one per tick (cached draw commands and static ray-tracing geometry). Meshes with wet surface effects stay dynamic.
+- **Loading.** Textures decode in parallel and meshes are assembled on all cores. Meshes are uploaded as static meshes (cached draw commands and static ray-tracing geometry), their render data built on all cores, and are swapped for Nanite meshes in the background, one per tick. Meshes with wet surface effects stay dynamic.
 - **Re-created prims.** A prim deleted and re-created with identical data (Houdini rebuilds the Hydra scene when its LOP chain changes) is not re-uploaded.
 - `HDUE_TRACE_TIMING=1` (with `HDUE_TRACE_FILE=<path>`, since Houdini's UI has no visible stderr) logs where each frame's and each scene upload's time goes.
 
