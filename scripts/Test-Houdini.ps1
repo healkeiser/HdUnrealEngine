@@ -15,6 +15,8 @@ if ($LASTEXITCODE) {throw 'Solaris LOP cook test failed.'}
 if ($LASTEXITCODE) {throw 'Native asset proxy test failed.'}
 & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot 'tests\scene_space_test.py')
 if ($LASTEXITCODE) {throw 'USD / Solaris / UE space conversion test failed.'}
+& uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot 'tests\render_outputs_test.py')
+if ($LASTEXITCODE) {throw 'hdUE render vars, products and settings LOP test failed.'}
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory $RunOutput -Test
 $Result=Get-Content -LiteralPath (Join-Path $RunOutput 'verified.json') -Raw | ConvertFrom-Json
 $Runtime=Get-Content -LiteralPath (Join-Path $RunOutput 'runtime-state.json') -Raw | ConvertFrom-Json
