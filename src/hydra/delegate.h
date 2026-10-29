@@ -8,6 +8,7 @@
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec4f.h"
+#include "pxr/base/tf/getenv.h"
 #include <algorithm>
 #include <type_traits>
 #include <array>
@@ -26,6 +27,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 class HdUEGpuFrames;
+// Diagnostic switches, read once (they were read per prim and per Execute).
+inline bool HdUETraceScene() { static const bool on = TfGetenvBool("HDUE_TRACE_SCENE", false); return on; }
+inline bool HdUETracePass() { static const bool on = TfGetenvBool("HDUE_TRACE_PASS", false); return on; }
+inline bool HdUETraceSettings() { static const bool on = TfGetenvBool("HDUE_TRACE_SETTINGS", false); return on; }
 // Matrix samples at frame-relative times around the current frame (motion blur).
 struct HdUEMotionSamples {
     std::vector<float> times;

@@ -464,7 +464,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         if (data.subsurfaceBaseTexture) desc.flags |= HDUE_MATERIAL_SUBSURFACE_BASE_TEXTURE;
         if (data.sheenBaseTexture) desc.flags |= HDUE_MATERIAL_SHEEN_BASE_TEXTURE;
         packet.materials.push_back(desc);
-        if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
+        if (HdUETraceScene()) TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1], desc.base_color[2]);
     }
     // Native material parameter overrides.
     const auto overrides = state.setting<VtDictionary>("nativeMaterialParameters", {});
@@ -550,7 +550,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         if (!nativeAsset.empty()) rowMajor(inverse * data.transform * basis, desc.transform);
         else packet.genericMeshes.push_back(id);
         packet.meshes.push_back(desc);
-        if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
+        if (HdUETraceScene()) TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
     }
 }
 void prepareLights(HdUEState& state, ScenePacket& packet) {
@@ -616,7 +616,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         desc.height_cm = float(data.height * data.transform.TransformDir(GfVec3d(0, 1, 0)).GetLength() * units);
         packet.lights.push_back(desc);
         extend(desc, &data);
-        if (TfGetenvBool("HDUE_TRACE_SCENE", false)) TF_STATUS("hdUE light %s intensity=%g rgb=(%g,%g,%g)", desc.id, desc.intensity, desc.color[0], desc.color[1], desc.color[2]);
+        if (HdUETraceScene()) TF_STATUS("hdUE light %s intensity=%g rgb=(%g,%g,%g)", desc.id, desc.intensity, desc.color[0], desc.color[1], desc.color[2]);
     }
     if (packet.autoLight) {
         for (int i = 0; i < 2; ++i) {
@@ -1307,9 +1307,10 @@ public:
                     if (subframes_ > 1 && frame.converged) {
                         // One converged sub-frame: add it and publish the running average.
                         if (accum_.size() != pixels.size()) accum_.assign(pixels.size(), 0.f);
-                        for (size_t i = 0; i < pixels.size(); ++i) accum_[i] += pixels[i];
-                        ++subframe_;
-                        for (size_t i = 0; i < pixels.size(); ++i) pixels[i] = accum_[i] / float(subframe_);
+                        const float weight = 1.f / float(++subframe_);
+                        WorkParallelForN(pixels.size(), [&](size_t begin, size_t end) {
+                            for (size_t i = begin; i < end; ++i) { accum_[i] += pixels[i]; pixels[i] = accum_[i] * weight; }
+                        });
                         subframeSamples_ += frame.completed_samples; frame.completed_samples = subframeSamples_;
                         frame.converged = subframe_ >= subframes_;
                         subframeDue_ = !frame.converged;
@@ -1351,7 +1352,7 @@ public:
             const bool settingsChanged = settingsVersion != settingsVersion_;
             const bool cameraChanged = view != view_ || projection != projection_ || lens != lens_;
             const bool needsRequest = changed || settingsChanged || cameraChanged;
-            if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
+            if (HdUETracePass()) {
                 std::fprintf(stderr, "hdUE pass changed=%d settings=%d camera=%d converged=%d frame=%llu gen=%llu buffer=%ux%u aovs=%zu slot=%zu inflight=%d done=%d error=%s\n",
                     changed, settingsChanged, cameraChanged, int(converged_.load()), (unsigned long long)s.lastFrame.frame_id, (unsigned long long)s.generation,
                     buffer->GetWidth(), buffer->GetHeight(), aovs_.size(), aovSlot_, aovInFlight_, bool(aovsDone_), s.error.c_str());
@@ -1381,7 +1382,7 @@ public:
                 const auto up = s.convert(camera.TransformDir(GfVec3d(0, 1, 0)), true);
                 for (int c = 0; c < 3; ++c) { request.eye[c] = eye[c]; request.target[c] = target[c]; request.up[c] = up[c]; }
                 request.horizontal_fov_degrees = float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846);
-                if (TfGetenvBool("HDUE_TRACE_SCENE", false))
+                if (HdUETraceScene())
                     TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
                         pass->camera ? pass->cameraId.GetText() : "none",
                         eye[0], eye[1], eye[2], target[0], target[1], target[2], request.horizontal_fov_degrees,
@@ -1517,7 +1518,7 @@ public:
                 std::fflush(stderr);
             }
         } catch (const std::exception& error) {
-            if (TfGetenvBool("HDUE_TRACE_PASS", false)) { std::fprintf(stderr, "hdUE pass error: %s\n", error.what()); std::fflush(stderr); }
+            if (HdUETracePass()) { std::fprintf(stderr, "hdUE pass error: %s\n", error.what()); std::fflush(stderr); }
             std::lock_guard lock(state_->mutex); state_->error = error.what(); converged_ = false;
         }
     }
@@ -1734,7 +1735,7 @@ template <class Prims> void dirtyChangedEntries(const VtDictionary& before, cons
 }
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) { SetRenderSetting(key, value, false); }
 void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value, bool fromNamespace) {
-    if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
+    if (HdUETraceSettings()) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
     if(key.GetString().starts_with("hdUE:")) {
         const TfToken bare(key.GetString().substr(5));
         { std::lock_guard lock(state_->settingsMutex); state_->namespaced.insert(bare); }
@@ -1790,7 +1791,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         ++state_->revision;
         if (key==TfToken("surfaceEffects") && state_->renderIndex)
             for (const auto& id:state_->renderIndex->GetRprimIds()) state_->renderIndex->GetChangeTracker().MarkRprimDirty(id,HdChangeTracker::DirtyPrimvar);
-        if (key==TfToken("surfaceEffects") && TfGetenvBool("HDUE_TRACE_SCENE",false))
+        if (key==TfToken("surfaceEffects") && HdUETraceScene())
             TF_STATUS("hdUE wet settings: renderIndex=%p rprims=%zu",state_->renderIndex,state_->renderIndex?state_->renderIndex->GetRprimIds().size():0);
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||

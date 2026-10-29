@@ -1,4 +1,6 @@
 #include "color_management.h"
+#include "pxr/base/work/loops.h"
+#include <algorithm>
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/diagnostic.h"
 #if defined(HDUE_HOUDINI)
@@ -55,8 +57,14 @@ void HdUEToSceneLinear(std::vector<float>& rgba) {
 #if defined(HDUE_HOUDINI)
     const auto& m = management();
     if (m.identity || rgba.size() < 4) return;
-    OCIO::PackedImageDesc image(rgba.data(), long(rgba.size() / 4), 1, 4);
-    m.toScene->apply(image);
+    // Rows of 16k pixels in parallel: one thread took 10-30 ms per 1080p frame.
+    const size_t pixels = rgba.size() / 4, chunk = 16384;
+    WorkParallelForN((pixels + chunk - 1) / chunk, [&](size_t begin, size_t end) {
+        for (size_t c = begin; c < end; ++c) {
+            OCIO::PackedImageDesc image(rgba.data() + c * chunk * 4, long(std::min(chunk, pixels - c * chunk)), 1, 4);
+            m.toScene->apply(image);
+        }
+    });
 #else
     (void)rgba;
 #endif

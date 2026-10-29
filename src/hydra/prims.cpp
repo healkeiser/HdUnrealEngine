@@ -368,7 +368,7 @@ public:
                 }
             }
         }
-        if (TfGetenvBool("HDUE_TRACE_SCENE",false)) TF_STATUS("hdUE wet sync %s scene=%s requested=%zu masks=%zu",GetId().GetText(),mesh.scenePath.c_str(),maskNames.size(),mesh.masks.size());
+        if (HdUETraceScene()) TF_STATUS("hdUE wet sync %s scene=%s requested=%zu masks=%zu",GetId().GetText(),mesh.scenePath.c_str(),maskNames.size(),mesh.masks.size());
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
@@ -761,7 +761,7 @@ public:
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
             volume.width = volume.height = volume.depth = 0; volume.density.clear();
         }
-        if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
+        if (HdUETracePass()) {
             const auto& m = volume.localToWorld;
             std::fprintf(stderr, "hdUE volume %s fields=%zu dims=%ux%ux%u origin=(%g,%g,%g) x=(%g,%g,%g)%c", GetId().GetText(), fields.size(),
                 volume.width, volume.height, volume.depth, m[3][0], m[3][1], m[3][2], m[0][0], m[0][1], m[0][2], 10);
