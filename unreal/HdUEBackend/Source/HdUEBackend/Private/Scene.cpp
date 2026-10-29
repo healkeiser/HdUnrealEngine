@@ -191,6 +191,10 @@ void FHdueScene::RemoveVolume(const FString& Id) {
         Volumes.Remove(Id);
     }
 }
+void FHdueScene::ApplyLinks() {
+    for (const auto& Entry : Actors)
+        if (IsValid(Entry.Value)) Lighting->Link(Entry.Key, Cast<UPrimitiveComponent>(Entry.Value->GetRootComponent()));
+}
 void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Matrices) {
     AActor* Actor = Actors.FindRef(Id);
     if (!IsValid(Actor) || !Count) return;
@@ -1179,6 +1183,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
         PrimIds.Add(Id, Desc.prim_id);
+        Lighting->Link(Id, Cast<UPrimitiveComponent>(Actor->GetRootComponent()));
     }
     for (uint32 Index = 0; Index < Batch.light_count; ++Index) {
         const auto& Desc = Batch.lights[Index];

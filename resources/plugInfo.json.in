@@ -9,6 +9,10 @@
       "HdUE_ImplicitSurfaceSceneIndexPlugin": {
         "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
         "displayName": "Implicit surfaces to meshes for hdUE"
+      },
+      "HdUE_LightLinkingSceneIndexPlugin": {
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "displayName": "Light and shadow linking categories for hdUE"
       }
     } }
   }]

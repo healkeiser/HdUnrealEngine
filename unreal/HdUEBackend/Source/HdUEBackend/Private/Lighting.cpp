@@ -1,5 +1,6 @@
 #include "Lighting.h"
 #include "Components/DirectionalLightComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/RectLightComponent.h"
 #include "Components/SpotLightComponent.h"
@@ -65,6 +66,7 @@ void FHdueLighting::Clear() {
     Definitions.Empty();
     Images.Empty();
     LightTextures.Empty();
+    Objects.Empty();
     if (IsValid(SkyActor)) World->DestroyActor(SkyActor);
     SkyActor = nullptr;
     Sky = nullptr;
@@ -86,17 +88,27 @@ void FHdueLighting::Remove(const FString& Id) {
     Definitions.Remove(Id);
 }
 bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
-    if (Batch.struct_size != sizeof(Batch) || Batch.light_count > 65536 || (Batch.light_count && !Batch.lights)) {
+    if (Batch.struct_size != sizeof(Batch) || Batch.light_count > 65536 || (Batch.light_count && !Batch.lights) ||
+        (Batch.flags & ~uint32(HDUE_LIGHT_BATCH_LINKS)) ||
+        (Batch.object_count && (!Batch.object_ids || !Batch.object_links))) {
         Error = TEXT("Invalid extended light batch.");
         return false;
+    }
+    TMap<FString, uint32> Links;
+    for (uint32 I = 0; I < Batch.object_count; ++I) {
+        if (!Text(Batch.object_ids[I]) || (Batch.object_links[I] & ~uint32(HDUE_LINK_CHANNELS | HDUE_LINK_NO_SHADOW))) {
+            Error = TEXT("Invalid light link.");
+            return false;
+        }
+        Links.Add(UTF8_TO_TCHAR(Batch.object_ids[I]), Batch.object_links[I]);
     }
     TArray<FDefinition> Pending;
     TSet<FString> Ids;
     for (uint32 I = 0; I < Batch.light_count; ++I) {
         const auto& D = Batch.lights[I];
         if (D.struct_size != sizeof(D) || D.type > HDUE_CYLINDER_LIGHT || D.visible > 1 || (D.flags & ~31u) ||
-            !Text(D.id) || D.cube_resolution < 32 || D.cube_resolution > 2048 ||
-            !FMath::IsPowerOfTwo(D.cube_resolution)) {
+            (D.lighting_channels & ~uint32(HDUE_LINK_CHANNELS)) || !Text(D.id) || D.cube_resolution < 32 ||
+            D.cube_resolution > 2048 || !FMath::IsPowerOfTwo(D.cube_resolution)) {
             Error = TEXT("Unsupported light descriptor or environment resolution.");
             return false;
         }
@@ -123,7 +135,7 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
                 return false;
             }
         for (float Value : {D.intensity, D.width_cm, D.height_cm, D.length_cm, D.angle_degrees, D.diffuse, D.specular,
-                            D.cone_angle, D.cone_softness, D.ies_angle_scale})
+                            D.cone_angle, D.cone_softness, FMath::Abs(D.ies_angle_scale)})
             if (!FMath::IsFinite(Value) || Value < 0) {
                 Error = TEXT("Invalid light parameter.");
                 return false;
@@ -160,7 +172,8 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
             Ignore(TEXT("an IES profile on a distant or dome light"));
             Definition.Ies.Empty();
         }
-        if (FString ProfileError; !Definition.Ies.IsEmpty() && !Profile(Definition.Ies, ProfileError)) {
+        if (FString ProfileError;
+            !Definition.Ies.IsEmpty() && !Profile(Definition.Ies, D.ies_angle_scale, ProfileError)) {
             Ignore(*ProfileError);
             Definition.Ies.Empty();
         }
@@ -221,8 +234,19 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
         Definitions.Add(Definition.Id, Definition);
         if (Definition.Data.type != HDUE_DOME_LIGHT && !UpdateLocal(Definition, Error)) return false;
     }
+    if (Batch.flags & HDUE_LIGHT_BATCH_LINKS) Objects = MoveTemp(Links);
     LastError.Empty();
     return true;
+}
+void FHdueLighting::Link(const FString& Id, UPrimitiveComponent* Mesh) const {
+    if (!Mesh) return;
+    const uint32* Found = Objects.Find(Id);
+    const uint32 Flags = Found ? *Found : HDUE_LINK_CHANNELS;
+    const FLightingChannels& Channels = Mesh->LightingChannels;
+    if (Channels.bChannel0 != bool(Flags & 1) || Channels.bChannel1 != bool(Flags & 2) ||
+        Channels.bChannel2 != bool(Flags & 4))
+        Mesh->SetLightingChannels(Flags & 1, Flags & 2, Flags & 4);
+    if (Mesh->CastShadow != !(Flags & HDUE_LINK_NO_SHADOW)) Mesh->SetCastShadow(!(Flags & HDUE_LINK_NO_SHADOW));
 }
 bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
     const auto& D = Definition.Data;
@@ -234,8 +258,10 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         Light = NewObject<UDirectionalLightComponent>(Actor);
     else if (D.type == HDUE_RECT_LIGHT || D.type == HDUE_DISK_LIGHT)
         Light = NewObject<URectLightComponent>(Actor);
-    // ShapingAPI's default cone (90) already cuts emission beyond it: a sphere light is a spot up to 90 degrees.
-    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle <= 90)
+    // A sphere light is a spot below 90 degrees. ShapingAPI's default cone (90, a hemisphere) stays a point light: UE
+    // clamps spots to 89 degrees with no penumbra, and the Path Tracer then lit a 90-degree cone at 0.2-0.4x Karma, and
+    // cut a straight-down IES beam to 0.63x (the light in a Z-up Cornell box). Light above the horizon is kept (1.15x).
+    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle < 90)
         Light = NewObject<USpotLightComponent>(Actor);
     else
         Light = NewObject<UPointLightComponent>(Actor);
@@ -256,6 +282,11 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
     Light->SetSpecularScale(D.specular);
     Light->SetCastShadows((D.flags & HDUE_LIGHT_SHADOWS) != 0);
     Light->bAllowMegaLights = !Distant && (D.flags & HDUE_LIGHT_MEGALIGHTS) != 0;
+    if (const uint32 Channels = D.lighting_channels) {  // light linking; sky lights have no channels
+        Light->LightingChannels.bChannel0 = (Channels & 1) != 0;
+        Light->LightingChannels.bChannel1 = (Channels & 2) != 0;
+        Light->LightingChannels.bChannel2 = (Channels & 4) != 0;
+    }
     Actor->SetActorLocation(FVector(D.position_cm[0], D.position_cm[1], D.position_cm[2]));
     Actor->SetActorRotation(FRotationMatrix::MakeFromXZ(-Axis(D, 2), Axis(D, 1)).Rotator());
     // UsdLux intensity is luminance in nits for every light; normalize divides by the size factor.
@@ -345,17 +376,15 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         }
     }
     if (auto* Local = Cast<ULocalLightComponent>(Light); Local && !Definition.Ies.IsEmpty()) {
-        // UE has no IES angle scale; the profile keeps its own angles.
-        if (D.ies_angle_scale != 0)
-            UE_LOG(LogTemp, Warning, TEXT("hdUE: shaping:ies:angleScale is not supported (%s)"), *Definition.Id);
-        UTextureLightProfile* Texture = Profile(Definition.Ies, Error);
-        if (!Texture) return false;
+        const auto* Entry = Profile(Definition.Ies, D.ies_angle_scale, Error);
+        if (!Entry) return false;
+        UTextureLightProfile* Texture = Entry->Texture.Get();
         // UsdLux scales the light by the profile's candela values (iesSample * L). UE's texture holds them over their
         // maximum (IESLoader), which it keeps in Brightness: multiply it back. bUseIESBrightness would instead replace
         // the USD intensity. normalize keeps the unshaped light's power: divide by the profile's mean over the sphere.
         Local->SetIESTexture(Texture);
         Local->bUseIESBrightness = false;
-        const float Mean = Profiles[Definition.Ies].Mean;
+        const float Mean = Entry->Mean;
         Intensity *= D.ies_normalize ? (Mean > 0 ? 1 / Mean : 1.f) : Texture->Brightness;
     }
     Light->SetIntensity(Intensity);
@@ -363,15 +392,16 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
     Actor->SetActorHiddenInGame(!D.visible);
     return true;
 }
-UTextureLightProfile* FHdueLighting::Profile(const FString& File, FString& Error) {
+const FHdueLighting::FProfileEntry* FHdueLighting::Profile(const FString& File, float AngleScale, FString& Error) {
     const auto Stat = IFileManager::Get().GetStatData(*File);
     if (!Stat.bIsValid || Stat.bIsDirectory) {
         Error = TEXT("IES profile is not a readable file: ") + File;
         return nullptr;
     }
-    if (const auto* Cached = Profiles.Find(File);
+    const FString Key = AngleScale ? File + TEXT("|") + FString::SanitizeFloat(AngleScale) : File;
+    if (const auto* Cached = Profiles.Find(Key);
         Cached && Cached->Modified == Stat.ModificationTime && Cached->Size == Stat.FileSize)
-        return Cached->Texture.Get();
+        return Cached;
     TArray<uint8> Bytes;
     if (!FFileHelper::LoadFileToArray(Bytes, *File)) {
         Error = TEXT("Cannot read IES profile: ") + File;
@@ -396,9 +426,25 @@ UTextureLightProfile* FHdueLighting::Profile(const FString& File, FString& Error
     Data->PixelFormat = PF_FloatRGBA;
     auto* Mip = new FTexture2DMipMap(Width, Height, 1);
     Data->Mips.Add(Mip);
+    const auto* Texels = reinterpret_cast<const FFloat16Color*>(Converter.GetRawData().GetData());
+    TArray<FFloat16Color> Pixels(Texels, Width * Height);
+    // shaping:ies:angleScale remaps the vertical angle theta (texture x: 0..180 degrees, IESLoader) before sampling
+    // the profile: theta / s for s > 0, (theta - pi) / -s + pi for s < 0 (UsdLux ShapingAPI). Clamped to the profile.
+    if (AngleScale)
+        for (int32 X = 0; X < Width; ++X) {
+            const double Theta = double(X) / Width * UE_DOUBLE_PI;
+            const double Source =
+                AngleScale > 0 ? Theta / AngleScale : (Theta - UE_DOUBLE_PI) / -AngleScale + UE_DOUBLE_PI;
+            const double Column = FMath::Clamp(Source / UE_DOUBLE_PI * Width, 0., double(Width - 1));
+            const int32 A = FMath::FloorToInt32(Column), B = FMath::Min(A + 1, Width - 1);
+            for (int32 Y = 0; Y < Height; ++Y)
+                Pixels[int64(Y) * Width + X] =
+                    FFloat16Color(FMath::Lerp(FLinearColor(Texels[int64(Y) * Width + A]),
+                                              FLinearColor(Texels[int64(Y) * Width + B]), float(Column - A)));
+        }
     Mip->BulkData.Lock(LOCK_READ_WRITE);
-    FMemory::Memcpy(Mip->BulkData.Realloc(Converter.GetRawData().Num()), Converter.GetRawData().GetData(),
-                    Converter.GetRawData().Num());
+    FMemory::Memcpy(Mip->BulkData.Realloc(Pixels.Num() * sizeof(FFloat16Color)), Pixels.GetData(),
+                    Pixels.Num() * sizeof(FFloat16Color));
     Mip->BulkData.Unlock();
     Texture->SetPlatformData(Data);
     Texture->AddressX = TA_Clamp;
@@ -410,9 +456,8 @@ UTextureLightProfile* FHdueLighting::Profile(const FString& File, FString& Error
     Texture->Brightness = Converter.GetBrightness();
     Texture->TextureMultiplier = Converter.GetMultiplier();
     Texture->UpdateResource();
-    // Mean of the normalized profile over the sphere: columns are vertical angles 0..180 degrees (IESLoader), each
-    // weighted by its solid angle; rows are horizontal angles.
-    const auto* Texels = reinterpret_cast<const FFloat16Color*>(Converter.GetRawData().GetData());
+    // Mean of the file's normalized profile over the sphere (normalize uses the file's power, before angleScale):
+    // columns are vertical angles 0..180 degrees (IESLoader), each weighted by its solid angle; rows are horizontal.
     double Sum = 0, Weight = 0;
     for (int32 X = 0; X < Width; ++X) {
         const double W = FMath::Sin((X + .5) / Width * UE_DOUBLE_PI);
@@ -421,12 +466,12 @@ UTextureLightProfile* FHdueLighting::Profile(const FString& File, FString& Error
             Weight += W;
         }
     }
-    auto& Entry = Profiles.FindOrAdd(File);
+    auto& Entry = Profiles.FindOrAdd(Key);
     Entry.Modified = Stat.ModificationTime;
     Entry.Size = Stat.FileSize;
     Entry.Texture.Reset(Texture);
     Entry.Mean = float(Weight > 0 ? Sum / Weight : 0);
-    return Texture;
+    return &Entry;
 }
 bool FHdueLighting::RebuildEnvironment(FString& Error) {
     DomeCount = 0;

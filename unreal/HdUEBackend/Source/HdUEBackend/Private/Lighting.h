@@ -12,6 +12,7 @@ class USkyLightComponent;
 class UTextureCube;
 class UTexture2D;
 class UTextureLightProfile;
+class UPrimitiveComponent;
 
 class FHdueLighting {
 public:
@@ -28,6 +29,8 @@ public:
     float EnvironmentScale() const { return RadianceScale; }
     void Status(HdueLightingStatus& Status) const;
     const FString& GetError() const { return LastError; }
+    // Applies an object's light and shadow links (HdueLightBatch object table) to its mesh component.
+    void Link(const FString& Id, UPrimitiveComponent* Mesh) const;
 
 private:
     struct FDefinition {
@@ -50,8 +53,9 @@ private:
         TStrongObjectPtr<UTextureLightProfile> Texture;
         float Mean = 0;  // of the max-normalized profile over the sphere
     };
-    TMap<FString, FProfileEntry> Profiles;  // IES files by path
-    UTextureLightProfile* Profile(const FString& File, FString& Error);
+    TMap<FString, FProfileEntry> Profiles;  // IES files by path (and angle scale)
+    const FProfileEntry* Profile(const FString& File, float AngleScale, FString& Error);
+    TMap<FString, uint32> Objects;  // HDUE_LINK_* by mesh ID; absent: every channel, casts shadows
     AActor* SkyActor = nullptr;
     USkyLightComponent* Sky = nullptr;
     TStrongObjectPtr<UTextureCube> Environment;

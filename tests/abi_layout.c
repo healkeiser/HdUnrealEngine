@@ -9,8 +9,8 @@
 _Static_assert(sizeof(HdueGpuOptions) == 20, "GPU frame options layout");
 _Static_assert(sizeof(HdueGpuFrame) == 136, "GPU frame layout");
 _Static_assert(sizeof(HdueGpuApi) == 32, "GPU frame extension layout");
-_Static_assert(sizeof(HdueLight) == 200, "extended light layout");
-_Static_assert(sizeof(HdueLightBatch) == 16, "light batch layout");
+_Static_assert(sizeof(HdueLight) == 208, "extended light layout");
+_Static_assert(sizeof(HdueLightBatch) == 40, "light batch layout");
 _Static_assert(sizeof(HdueLightingStatus) == 56, "lighting status layout");
 _Static_assert(sizeof(HdueLightingApi) == 24, "lighting API layout");
 #include <stddef.h>

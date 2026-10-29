@@ -76,6 +76,7 @@ struct HdUEMeshData {
     bool visible = true;
     TfToken renderTag;                    // purpose; hidden while the render pass does not draw it
     int primId = -1;                      // HdRprim::GetPrimId, written by the ID pass
+    VtArray<TfToken> categories;          // light/shadow link collections that include the prim (GetCategories)
     bool instanced = false;               // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances;    // USD world matrices (prototype transform included)
     std::vector<GfVec3f> instanceColors;  // per instance; empty unless displayColor varies
@@ -152,6 +153,7 @@ struct HdUELightData {
     std::string ies;  // shaping:ies:file
     float iesAngleScale = 0;
     bool iesNormalize = false;
+    TfToken lightLink, shadowLink;  // collection ids; empty when the collection includes everything
     uint32_t flags = HDUE_LIGHT_SHADOWS | HDUE_LIGHT_BACKGROUND | HDUE_LIGHT_MEGALIGHTS,
              textureFormat = HDUE_ENVIRONMENT_AUTOMATIC;
     bool visible = true, viewer = false;
@@ -242,6 +244,8 @@ struct HdUEState : HdRenderParam {
     HdueAssetSceneStatus nativeAssets{sizeof(HdueAssetSceneStatus)};
     HdueSurfaceStatus surfaceStatus{sizeof(HdueSurfaceStatus)};
     uint32_t submittedNativeLights = 0;
+    // Light linking as UE last received it: channels per light (0: all) and the object table (prepareLinks).
+    std::map<std::string, uint32_t> linkedLights, linkedObjects;
     ~HdUEState() override;
     void erase(const std::string& id);
     template <class T>
