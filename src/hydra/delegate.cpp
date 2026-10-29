@@ -332,8 +332,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
             // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
             const std::string arguments =
-                std::string(selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout") +
-                " " + TfGetenv("HDUE_UE_ARGS") +
+                std::string(selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout") + " " + TfGetenv("HDUE_UE_ARGS") +
                 // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user,
                 // not in a possibly shared or read-only install folder.
                 (TfGetenv("HDUE_USER_DIR").empty() ? "" : " -userdir=\"" + TfGetenv("HDUE_USER_DIR") + "\"");
