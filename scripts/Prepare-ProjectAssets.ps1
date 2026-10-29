@@ -19,10 +19,7 @@ if (-not $SkipCopy) {
     & "$PSScriptRoot\Copy-ProjectContent.ps1" -ProjectPath $ProjectPath -OutputDirectory (Join-Path $Run 'content-copy')
 }
 $Project=Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
-if (-not $SkipBuild) {
-    & (Join-Path $EditorRoot 'Engine\Build\BatchFiles\Build.bat') HdUEBackendEditor Win64 Development "-Project=$Project" -gather -WaitMutex -NoHotReload
-    if ($LASTEXITCODE) {throw 'Editor module build failed.'}
-}
+if (-not $SkipBuild) {Build-HdUEEditor $EditorRoot}
 $Editor=Join-Path $EditorRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 & $Editor $Project -run=HdUEInspectAssets "-InspectMap=$Map" "-InspectAsset=$InspectAsset" "-Output=$Run\catalog.json" -unattended -nop4 -nosplash -nullrhi -stdout -UTF8Output
 if ($LASTEXITCODE) {throw 'Project inspection failed; resolve required plugin dependencies before cooking.'}

@@ -464,11 +464,12 @@ def replace_generated(path, blocks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    paths = ROOT / ".local/paths.json"
-    engine = os.environ.get("HDUE_ENGINE_ROOT") or (json.loads(paths.read_text())["engine_root"] if paths.exists() else None)
-    parser.add_argument("--engine-root", type=Path, default=engine)
+    parser.add_argument("--engine-root", type=Path, help="Default: engine_root (Local-Paths.ps1)")
     parser.add_argument("--defaults-json", type=Path, help="Write every generated setting at its default, for --renderer-settings")
     args = parser.parse_args()
+    if not args.engine_root:
+        from local_paths import local_path
+        args.engine_root = local_path("engine_root")
     source = args.engine_root / "Engine/Source"
     header = (source / "Runtime/Engine/Classes/Engine/Scene.h").read_text(encoding="utf-8")
     enums = parse_enums(header, (source / "Runtime/Engine/Classes/Engine/EngineTypes.h").read_text(encoding="utf-8"))

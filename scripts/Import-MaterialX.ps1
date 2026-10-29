@@ -15,13 +15,8 @@ $Project = Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
 $Version = Get-Content -Raw -LiteralPath (Join-Path $EditorRoot 'Engine\Build\Build.version') | ConvertFrom-Json
 if ($Version.MajorVersion -ne 5 -or $Version.MinorVersion -ne 8 -or $Version.PatchVersion -ne 4) { throw 'MaterialX authoring requires UE 5.8.4.' }
 if (-not $Destination.StartsWith('/Game/HdUE/')) { throw 'Choose /Game/HdUE/... so prepared materials are included in the cook.' }
-$RunOutput = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot ('out\materialx-import\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
-if (Test-Path -LiteralPath $RunOutput) { throw 'Choose a fresh import output directory.' }
-New-Item -ItemType Directory -Path $RunOutput -Force | Out-Null
-if (-not $SkipBuild) {
-    & (Join-Path $EditorRoot 'Engine\Build\BatchFiles\Build.bat') HdUEBackendEditor Win64 Development "-Project=$Project" -gather -WaitMutex -NoHotReload *> (Join-Path $RunOutput 'build.log')
-    if ($LASTEXITCODE) { throw 'MaterialX commandlet build failed.' }
-}
+$RunOutput = New-HdUERun -Name materialx-import -Path $OutputDirectory -Create
+if (-not $SkipBuild) { Build-HdUEEditor $EditorRoot *> (Join-Path $RunOutput 'build.log') }
 $Editor = Join-Path $EditorRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $Reports = @()
 $Folders = @{}

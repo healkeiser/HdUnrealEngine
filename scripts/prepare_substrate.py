@@ -23,7 +23,6 @@ def collect(stage,time,entries):
 
 
 def export(scene,library,output,destination,time):
-    from prepare_renderer_settings import export as material_settings
     from materialx_controls import MaterialXLibrary,OfflineView
     stage=Usd.Stage.Open(str(scene.resolve()))
     entries={}

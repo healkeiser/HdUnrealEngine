@@ -12,7 +12,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,14 +89,6 @@ voptoolutils.genericTool(kwargs, '$HDA_NAME')]]></script>
   </tool>
 </shelfDocument>
 """
-
-
-def relaunch():
-    paths = ROOT / ".local/paths.json"
-    local = json.loads(paths.read_text()) if paths.exists() else {}
-    houdini = Path(os.environ.get("HDUE_HOUDINI_ROOT") or os.environ.get("HFS") or local["houdini_root"])
-    env = dict(os.environ, HDUE_BUILD_HDA="1")
-    sys.exit(subprocess.run([str(houdini / "bin/hython.exe"), __file__], env=env).returncode)
 
 
 def help_text(kind, name):
@@ -241,4 +232,5 @@ if __name__ == "__main__":
         from substrate_graph import NODES, outputs
         build()
     else:
-        relaunch()
+        from local_paths import relaunch
+        relaunch(__file__)

@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$ProjectPath,[Parameter(Mandatory=$true)][string]$OutputDirectory)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $TaskRoot=Split-Path -Parent $PSScriptRoot
 $SourceProject=if (Test-Path -LiteralPath $ProjectPath -PathType Container) {
     $Projects=@(Get-ChildItem -LiteralPath $ProjectPath -Filter *.uproject)
@@ -9,29 +10,18 @@ $SourceProject=if (Test-Path -LiteralPath $ProjectPath -PathType Container) {
 $SourceContent=[IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $SourceProject) 'Content'))
 $Destination=[IO.Path]::GetFullPath((Join-Path $TaskRoot 'unreal\HdUEBackend\Content'))
 if ($SourceContent.TrimEnd('\') -eq $Destination.TrimEnd('\')) {throw 'Source and destination content must be different.'}
-$Run=[IO.Path]::GetFullPath($OutputDirectory)
-if (Test-Path -LiteralPath $Run) {throw 'Choose a fresh content receipt directory.'}
-$Files=@(rg --files $SourceContent)
-if ($LASTEXITCODE) {throw 'Cannot enumerate source content.'}
-$Receipt=@()
-# Preflight every collision before copying; never overwrite workspace assets.
-foreach ($File in $Files) {
-    $Relative=[IO.Path]::GetRelativePath($SourceContent,$File)
-    $Target=[IO.Path]::GetFullPath((Join-Path $Destination $Relative))
-    if (-not $Target.StartsWith($Destination.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)) {throw 'Content target escaped its destination.'}
-    $Info=Get-Item -LiteralPath $File
-    if (Test-Path -LiteralPath $Target) {
-        if ((Get-Item -LiteralPath $Target).Length -ne $Info.Length -or (Get-FileHash -LiteralPath $File).Hash -ne (Get-FileHash -LiteralPath $Target).Hash) {throw "Different asset already exists: $Target"}
-    }
-    $Receipt+=@{relative=$Relative;bytes=$Info.Length;source_write_utc=$Info.LastWriteTimeUtc.ToString('o')}
+$Run=New-HdUERun -Name content-copy -Path $OutputDirectory -Create
+# Preflight every collision before copying; never overwrite workspace assets. robocopy lists the existing files whose
+# size or time differ; those must still hold the same bytes.
+foreach ($Line in robocopy $SourceContent $Destination /E /L /XX /NJH /NJS /NDL /NP /NS /FP) {
+    if ($Line -notmatch '^\s*(Newer|Older|Changed)\s+(.+)$') {continue}
+    $File=$Matches[2].Trim(); $Target=Join-Path $Destination ([IO.Path]::GetRelativePath($SourceContent,$File))
+    if ((Get-FileHash -LiteralPath $File).Hash -ne (Get-FileHash -LiteralPath $Target).Hash) {throw "Different asset already exists: $Target"}
 }
-New-Item -ItemType Directory -Force -Path $Run | Out-Null
-foreach ($File in $Files) {
-    $Target=Join-Path $Destination ([IO.Path]::GetRelativePath($SourceContent,$File))
-    if (-not (Test-Path -LiteralPath $Target)) {
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
-        Copy-Item -LiteralPath $File -Destination $Target
-    }
-}
-@{source_project=$SourceProject;project_sha256=(Get-FileHash -LiteralPath $SourceProject).Hash.ToLowerInvariant();destination=$Destination;files=$Receipt} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Run 'copied-content.json') -Encoding utf8
-Write-Output "Copied $($Files.Count) content files into hdUE; source project unchanged."
+if ($LASTEXITCODE -ge 8) {throw 'Cannot enumerate source content.'}
+# Only new files (/XC /XN /XO); the log is the receipt.
+& robocopy $SourceContent $Destination /E /XC /XN /XO /NP /NDL /FP "/LOG:$(Join-Path $Run 'robocopy.log')" | Out-Null
+if ($LASTEXITCODE -ge 8) {throw "Content copy failed; see $Run\robocopy.log."}
+@{source_project=$SourceProject;project_sha256=(Get-FileHash -LiteralPath $SourceProject).Hash.ToLowerInvariant();destination=$Destination} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Run 'copied-content.json') -Encoding utf8
+$global:LASTEXITCODE=0
+Write-Output "Copied new content files into hdUE (receipt: $Run\robocopy.log); source project unchanged."

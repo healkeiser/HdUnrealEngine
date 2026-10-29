@@ -32,8 +32,7 @@ if ($RuntimeConfig) {
     $BackendDll=$Profile.backend_dll; $RuntimeProject=$Profile.runtime_project
 }
 if (-not $InputUsd) { $InputUsd = Join-Path $TaskRoot 'samples\smoke.usda' }
-$RunOutput = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot ('out\hydra\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')) }
-if (Test-Path -LiteralPath $RunOutput) { throw 'Test output directory already exists; fresh evidence is required.' }
+$RunOutput = New-HdUERun -Name hydra -Path $OutputDirectory
 $PythonExe = & uv python find 3.11
 if ($LASTEXITCODE) { throw 'The OpenUSD SDK requires its uv-managed Python 3.11 runtime.' }
 $PreviousPath = $env:PATH
