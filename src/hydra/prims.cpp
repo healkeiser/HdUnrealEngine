@@ -42,6 +42,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 TfToken HdUEMaterialUvPrimvar(HdSceneDelegate* delegate, const SdfPath& material); // materials.cpp
 namespace {
 template<class T> T value(const VtValue& v, T fallback) { return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback; }
+// Sync's dirty bits end clean on every path: a prim that failed is not synced (and reported) again each frame.
+struct CleanBits { HdDirtyBits* bits; ~CleanBits() { *bits = HdChangeTracker::Clean; } };
 // The mesh's UV primvar: from its own binding, else from its GeomSubsets' bindings, else st.
 // ponytail: one UV set per mesh; per-subset sets if assets mix them.
 TfToken meshUvPrimvar(HdSceneDelegate* delegate, const SdfPath& mesh, const HdMeshTopology& topology) {
@@ -159,9 +161,13 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
         _UpdateInstancer(delegate, bits);
         if (*bits & HdChangeTracker::DirtyVisibility) visible_ = delegate->GetVisible(GetId());
-        if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId()))
+        if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId())) {
+            std::map<TfToken, VtValue> current; // a primvar removed from the instancer stops applying
             for (const auto& primvar : delegate->GetPrimvarDescriptors(GetId(), HdInterpolationInstance))
-                if (HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name)) primvars_[primvar.name] = delegate->Get(GetId(), primvar.name);
+                current[primvar.name] = HdChangeTracker::IsPrimvarDirty(*bits, GetId(), primvar.name) || !primvars_.count(primvar.name)
+                    ? delegate->Get(GetId(), primvar.name) : primvars_[primvar.name];
+            primvars_.swap(current);
+        }
     }
     // Per-instance velocities in world units per second (top-level instancers only; nested ones return none).
     std::vector<GfVec3f> ComputeInstanceVelocities(const SdfPath& prototype) const {
@@ -248,7 +254,9 @@ public:
         mesh.material = delegate->GetMaterialId(GetId()).GetString();
         mesh.transform = delegate->GetTransform(GetId());
         mesh.visible = delegate->GetVisible(GetId());
+        mesh.renderTag = delegate->GetRenderTag(GetId());
         _UpdateInstancer(delegate, bits); // sets GetInstancerId
+        const CleanBits clean{bits};
         if (!GetInstancerId().IsEmpty()) {
             HdInstancer::_SyncInstancerAndParents(delegate->GetRenderIndex(), GetInstancerId());
             mesh.instanced = true;
@@ -423,7 +431,6 @@ public:
             state->meshes.erase(id); state->dirtyMeshes.erase(id); state->removed.insert(id); ++state->revision;
         }
         emitted_ = std::move(current);
-        *bits = HdChangeTracker::Clean;
     }
     void RefreshSelectedMasks(HdSceneDelegate* delegate, HdUEState& state) const {
         // A renderer-setting edit does not change a scene-index data source.
@@ -499,6 +506,7 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.material = delegate->GetMaterialId(prim.GetId()).GetString();
     mesh.transform = delegate->GetTransform(prim.GetId());
     mesh.visible = delegate->GetVisible(prim.GetId());
+    mesh.renderTag = delegate->GetRenderTag(prim.GetId());
     mesh.primId = prim.GetPrimId();
     return mesh;
 }
@@ -613,6 +621,7 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto mesh = HdUEShapeBase(*this, delegate);
         _UpdateInstancer(delegate, bits);
+        const CleanBits clean{bits};
         const auto topology = delegate->GetBasisCurvesTopology(GetId());
         // displayColor per vertex or per curve; constant colors stay on the material.
         const auto displayColor = mesh.material.empty() ? value(delegate->Get(GetId(), HdTokens->displayColor), VtVec3fArray()) : VtVec3fArray();
@@ -695,7 +704,6 @@ public:
             if (const auto* instancer = dynamic_cast<const Instancer*>(delegate->GetRenderIndex().GetInstancer(GetInstancerId())))
                 mesh.motionRight = instancer->ComputeMotion();
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
-        *bits = HdChangeTracker::Clean;
     }
     void Finalize(HdRenderParam* param) override {
         auto* state = static_cast<HdUEState*>(param);
@@ -722,6 +730,7 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         auto* state = static_cast<HdUEState*>(param);
         HdUEVolumeData volume; volume.id = GetId().GetString(); volume.visible = delegate->GetVisible(GetId());
+        volume.renderTag = delegate->GetRenderTag(GetId());
         const auto fields = delegate->GetVolumeFieldDescriptors(GetId());
         const HdVolumeFieldDescriptor* chosen = nullptr;
         for (const auto& field : fields) if (field.fieldName == TfToken("density")) chosen = &field;

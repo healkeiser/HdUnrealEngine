@@ -84,7 +84,8 @@ void trace(const char* format, ...) {
 }
 // Hosts such as husk never start UE. The first delegate created while the
 // runtime is cold starts it on its own thread and ticks it from Execute, as
-// hdue_usd_render does; the last delegate shuts it down.
+// hdue_usd_render does. UE allows one lifetime per process, so it stays until the process exits (husk
+// --restart-delegate creates the next delegate on the same UE).
 struct HdUESelfHost {
     std::unique_ptr<hdue::Backend> backend;
     HWND window = nullptr;
@@ -140,9 +141,10 @@ struct HdUESelfHost {
 };
 HdUESelfHost& selfHost() { static HdUESelfHost host; return host; }
 // Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
-// also an exit handler for a process leaving with UE alive (husk with HDUE_HOUDINI_UI, Houdini without its hdUE host).
-// std::atexit in this DLL runs at its detach, after ExitProcess has ended UE's thread: UE can no longer shut down, and
-// waiting for that thread, or UE's own teardown, hung the exit. The process ends there with its exit code instead.
+// also the exit handler of every process that started UE. std::atexit in this DLL runs at its detach, after ExitProcess
+// has ended UE's thread: UE can no longer shut down, and waiting for that thread, or UE's own teardown, hung the exit.
+// The process ends there with its exit code instead (already set during detach). UE cannot shut down from exit()
+// either: exit() holds the CRT's exit lock, which UE's module unloads wait for.
 void shutdownSelfHost() {
     auto& host = selfHost();
     if (!host.backend) return;
@@ -235,7 +237,10 @@ bool houdiniUi() {
     GetModuleFileNameW(nullptr, path, MAX_PATH);
     auto name = std::filesystem::path(path).filename().wstring();
     for (auto& c : name) c = wchar_t(towlower(c));
-    return name == L"houdini.exe" || name == L"houdinifx.exe" || name == L"houdinicore.exe" || name == L"happrentice.exe" || name == L"houdinicore.exe";
+    for (const auto* gui : {L"houdini.exe", L"houdinifx.exe", L"houdinicore.exe", L"basehoudini.exe", L"happrentice.exe", L"hindie.exe",
+                            L"hescape.exe", L"hedu.exe", L"heducation.exe", L"hexper.exe"})
+        if (name == gui) return true;
+    return false;
 }
 // Starts UE on hdUE's thread and ticks it until its world and RHI are ready. wait = false (Houdini's UI) returns at once:
 // work posted meanwhile runs once UE is ready, and a failure is kept in HdUESelfHost::bootError.
@@ -277,7 +282,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             }
             if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
                 throw std::runtime_error(std::string("hdUE: UE did not become ready: ") + status.message);
-            if (host.continuous) std::atexit([] { shutdownSelfHost(); });
+            std::atexit([] { shutdownSelfHost(); });
             started->set_value();
         } catch (const std::exception& e) {
             { std::lock_guard lock(host.bootMutex); host.bootError = e.what(); }
@@ -489,7 +494,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
         if (!data.sceneAsset.empty()) {
-            HdueAssetDesc d{}; d.struct_size = sizeof(d); d.id = packet.own(data.id); d.asset_path = packet.own(data.sceneAsset); d.visible = data.visible;
+            HdueAssetDesc d{}; d.struct_size = sizeof(d); d.id = packet.own(data.id); d.asset_path = packet.own(data.sceneAsset); d.visible = data.visible && state.shown(data.renderTag);
             rowMajor(inverse * data.transform * basis, d.transform);
             packet.sceneAssets.push_back(d); packet.removed.push_back(d.id);
             continue;
@@ -521,7 +526,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         for (const auto& c : data.colors) colors.insert(colors.end(), {c[0], c[1], c[2]});
         HdueMeshDesc desc{};
         desc.id = packet.own(data.id); desc.material_id = packet.own(data.material); desc.native_asset = packet.own(nativeAsset);
-        desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible;
+        desc.vertex_count = uint32_t(data.points.size()); desc.index_count = uint32_t(index.size()); desc.visible = data.visible && state.shown(data.renderTag);
         desc.prim_id = data.primId;
         if (colors.size() == p.size()) desc.colors = packet.own(packet.floats, std::move(colors));
         desc.positions = packet.own(packet.floats, std::move(p));
@@ -644,7 +649,7 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         const auto it = state.volumes.find(id);
         if (it == state.volumes.end()) continue;
         const auto& volume = it->second;
-        HdueVolumeDesc desc{}; desc.struct_size = sizeof(desc); desc.id = packet.own(volume.id); desc.visible = volume.visible;
+        HdueVolumeDesc desc{}; desc.struct_size = sizeof(desc); desc.id = packet.own(volume.id); desc.visible = volume.visible && state.shown(volume.renderTag);
         desc.width = volume.width; desc.height = volume.height; desc.depth = volume.depth;
         desc.density = packet.own(packet.floats, std::vector<float>(volume.density.begin(), volume.density.end()));
         const auto m = volume.localToWorld * basis;
@@ -832,12 +837,15 @@ class Pass final : public HdRenderPass {
         if (!moves.empty()) s.backend->require(s.backend->motion_api().set_transforms(s.session, moves.data(), uint32_t(moves.size())), "set_transforms");
         motionApplied_ = t != 0;
     }
-    uint64_t settingsVersion_ = ~uint64_t(0), lastFrame_ = 0;
+    // Read by IsConverged on the host's thread while the UE thread writes them.
+    std::atomic<uint64_t> settingsVersion_{~uint64_t(0)};
+    uint64_t lastFrame_ = 0;
     double centimetersPerUnit_ = 1;
     bool depthEnabled_ = false;
     std::atomic<bool> converged_{false};
-    std::atomic<bool> executeQueued_{false};
-    uint32_t skippedIdSize_[2] = {0, 0}; // size of the ID buffers last filled with -1 (viewport ID AOVs skipped) // Houdini's UI: an Execute posted to the UE thread and not yet started
+    std::atomic<bool> executeQueued_{false}; // Houdini's UI: an Execute posted to the UE thread and not yet started
+    std::set<TfToken> warnedVars_; // render vars hdUE does not render, warned once each
+    std::vector<HdUERenderBuffer*> extraBeauties_; // further render vars of the beauty (C in one product, Ci in another)
     std::chrono::steady_clock::time_point lastRequestAt_{};
     // GBuffer AOVs render one by one after the beauty converges, from its camera.
     std::unique_ptr<HdUERenderBuffer> internalColor_; // beauty target when no color AOV is bound
@@ -848,7 +856,7 @@ class Pass final : public HdRenderPass {
     std::unique_ptr<HdUERenderBuffer> guideAlbedo_, guideNormal_;
     std::vector<float> beautyPixels_; // top-down RGBA of the converged beauty, before denoising
     HdueFrameInfo beautyFrame_{};
-    bool denoisePending_ = false;
+    std::atomic<bool> denoisePending_{false};
 #if defined(HDUE_HOUDINI)
     // Houdini's GL viewport takes every frame from the backend's shared GPU ring (gpu_frames.h); the CPU buffers then
     // receive only converged frames, for Map (the Python viewer, scripts). The CPU path stays for what it computes
@@ -930,13 +938,16 @@ class Pass final : public HdRenderPass {
         output.read(0, count * 4 * sizeof(float), pixels.data());
         for (size_t i = 0; i < count; ++i) pixels[i * 4 + 3] = beautyPixels_[i * 4 + 3];
         HdUEToSceneLinear(pixels); // OCIO scene_linear (ACEScg in ACES pipelines)
-        beauty.publish(beautyFrame_, std::move(pixels));
+        for (auto* extra : extraBeauties_) extra->publish(beautyFrame_, pixels, 4);
+        beauty.publish(beautyFrame_, std::move(pixels), 4);
 #else
-        beauty.publish(beautyFrame_, beautyPixels_); // the standalone build has no denoiser
+        for (auto* extra : extraBeauties_) extra->publish(beautyFrame_, beautyPixels_, 4);
+        beauty.publish(beautyFrame_, beautyPixels_, 4); // the standalone build has no denoiser
 #endif
     }
     size_t aovSlot_ = 0;
-    bool aovInFlight_ = false, aovsDone_ = true;
+    bool aovInFlight_ = false;
+    std::atomic<bool> aovsDone_{true}; // also true while no AOV is bound
     void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame, const std::vector<float>& rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
         if (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID) {
@@ -947,7 +958,7 @@ class Pass final : public HdRenderPass {
                 const int32_t value = p && p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
                 std::memcpy(&out[i], &value, sizeof(value));
             }
-            target.publish(frame, std::move(out));
+            target.publish(frame, std::move(out), 1);
             return;
         }
         const bool vector = id == HDUE_AOV_ALBEDO || id == HDUE_AOV_NORMAL;
@@ -965,7 +976,17 @@ class Pass final : public HdRenderPass {
             if (const float length = std::sqrt(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]); id == HDUE_AOV_NORMAL && length > 1e-6f)
                 for (int c = 0; c < 3; ++c) o[c] /= length;
         }
-        target.publish(frame, std::move(out));
+        target.publish(frame, std::move(out), vector ? 3 : 1);
+    }
+    // A bound render var hdUE does not render (other light path expressions, primvars, unknown names): its clear value,
+    // converged, as HdArnold does, so hosts never wait for it; -1 in integer buffers ("no prim").
+    static void clear(HdUERenderBuffer& target) {
+        if (!target.GetWidth() || target.IsConverged()) return;
+        HdueFrameInfo blank{}; blank.struct_size = sizeof(blank); blank.width = target.GetWidth(); blank.height = target.GetHeight(); blank.converged = 1;
+        const size_t channels = HdGetComponentCount(target.GetFormat());
+        std::vector<float> values(size_t(blank.width) * blank.height * channels, 0.f);
+        if (HdGetComponentFormat(target.GetFormat()) == HdFormatInt32) { const int32_t none = -1; for (auto& v : values) std::memcpy(&v, &none, sizeof(none)); }
+        target.publish(blank, std::move(values), channels);
     }
 public:
     Pass(HdRenderIndex* index, const HdRprimCollection& collection, std::shared_ptr<HdUEState> state)
@@ -978,36 +999,45 @@ public:
         if (const auto error=state_->setting<std::string>("wetValidationError", ""); !error.empty())
             return converged_ && state_->error==error;
         if (!state_->setting<bool>("materialGraphValid",true)) return true;
-        return converged_ && (aovs_.empty() || aovsDone_) && !denoisePending_ &&
+        return converged_ && aovsDone_ && !denoisePending_ &&
             settingsVersion_==state_->requestSettingsRevision && state_->submittedRevision==state_->revision;
     }
     // What Execute reads from Hydra's render pass state, copied on the calling thread: Houdini reuses that object for
     // its other drawing once Execute returns, so a posted Execute must not read it later.
+    // The camera's values and the bound buffers are copied or resolved here too: a posted Execute runs while Houdini
+    // syncs or deletes the camera and buffers, so it never dereferences Hydra's camera or looks up the render index.
+    // Buffers are deleted on the UE thread (DestroyBprim), so one alive at the start of an Execute stays alive in it.
     struct PassSnapshot {
-        HdRenderPassAovBindingVector aovs; GfMatrix4d view, projection; const HdCamera* camera = nullptr;
-        const HdRenderPassAovBindingVector& GetAovBindings() const { return aovs; }
-        const GfMatrix4d& GetWorldToViewMatrix() const { return view; }
-        const GfMatrix4d& GetProjectionMatrix() const { return projection; }
-        const HdCamera* GetCamera() const { return camera; }
-        GfVec4f lens; std::vector<GfVec2i> sizes;
+        HdRenderPassAovBindingVector aovs; std::vector<HdRenderBuffer*> buffers; GfMatrix4d view, projection;
+        SdfPath cameraId; bool camera = false; double shutterOpen = 0, shutterClose = 0; float nearClip = .1f;
+        GfVec4f lens{0.f}; std::vector<GfVec2i> sizes;
         bool same(const PassSnapshot& o) const {
-            return aovs == o.aovs && view == o.view && projection == o.projection && camera == o.camera && lens == o.lens && sizes == o.sizes;
+            return aovs == o.aovs && view == o.view && projection == o.projection && cameraId == o.cameraId && lens == o.lens && sizes == o.sizes;
         }
     };
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
         HdUETraceThread("Execute");
         const auto* camera = state->GetCamera();
-        PassSnapshot snapshot{state->GetAovBindings(), state->GetWorldToViewMatrix(), state->GetProjectionMatrix(), camera,
-            camera ? GfVec4f(camera->GetFStop(), camera->GetFocusDistance(), camera->GetFocalLength(), camera->GetLinearExposureScale()) : GfVec4f(0)};
+        PassSnapshot snapshot{state->GetAovBindings(), {}, state->GetWorldToViewMatrix(), state->GetProjectionMatrix()};
+        if (camera) {
+            snapshot.camera = true; snapshot.cameraId = camera->GetId();
+            snapshot.shutterOpen = camera->GetShutterOpen(); snapshot.shutterClose = camera->GetShutterClose();
+            snapshot.nearClip = camera->GetClippingRange().GetMin();
+            snapshot.lens = GfVec4f(camera->GetFStop(), camera->GetFocusDistance(), camera->GetFocalLength(), camera->GetLinearExposureScale());
+        }
         for (const auto& aov : snapshot.aovs) {
-            const auto* b = aov.renderBuffer ? aov.renderBuffer : static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer, aov.renderBufferId));
+            auto* b = aov.renderBuffer ? aov.renderBuffer : static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer, aov.renderBufferId));
+            snapshot.buffers.push_back(b);
             snapshot.sizes.emplace_back(b ? int(b->GetWidth()) : 0, b ? int(b->GetHeight()) : 0);
         }
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
+        setRenderTags(tags);
+        // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
+        if (state_->locked([&] { return state_->submittedRevision != state_->revision; })) HdUERefreshWetMasks(*state_, GetRenderIndex());
         // husk polls Execute at its own pace and UE advances one tick per call; when this process owns UE,
         // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
         auto& host = selfHost();
-        if (!host.worker.joinable()) { ueRun([&] { executeOnce(pass, tags); }); return; }
+        if (!host.worker.joinable()) { ueRun([&] { executeOnce(pass); }); return; }
         if (host.continuous) {
             if (const auto error = host.error(); !error.empty()) {
                 std::lock_guard lock(state_->mutex); state_->error = error; converged_ = true; return;
@@ -1021,7 +1051,7 @@ public:
             // calls again while a pass is not converged, so resetting it on every call kept Houdini redrawing without end
             // and a flipbook waiting for convergence until its own timeout.
             bool moved;
-            { std::lock_guard lock(latestMutex_); moved = !latestPass_ || !latestPass_->same(*pass); latestPass_ = pass; latestTags_ = tags; }
+            { std::lock_guard lock(latestMutex_); moved = !latestPass_ || !latestPass_->same(*pass); latestPass_ = pass; }
             if (moved) converged_ = false;
             const auto eye = pass->view.GetInverse().ExtractTranslation();
             const bool skipped = executeQueued_.exchange(true);
@@ -1043,21 +1073,32 @@ public:
         host.run([&] {
             *ran = std::chrono::steady_clock::now();
             // Houdini's UI: UE ticks between calls on its thread, so submit and poll without holding the UI thread.
-            if (host.continuous) { executeOnce(pass, tags); return; }
+            if (host.continuous) { executeOnce(pass); return; }
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
-            do executeOnce(pass, tags);
+            do executeOnce(pass);
             while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
         });
     }
     std::mutex latestMutex_;
     std::shared_ptr<const PassSnapshot> latestPass_;
-    TfTokenVector latestTags_;
     void executeLatest() {
-        std::shared_ptr<const PassSnapshot> pass; TfTokenVector tags;
-        { std::lock_guard lock(latestMutex_); pass = latestPass_; tags = latestTags_; }
-        if (pass) executeOnce(pass, tags);
+        std::shared_ptr<const PassSnapshot> pass;
+        { std::lock_guard lock(latestMutex_); pass = latestPass_; }
+        if (pass) executeOnce(pass);
     }
-    void executeOnce(const std::shared_ptr<const PassSnapshot>& pass, const TfTokenVector&) {
+    // Render tags (purposes): prims whose tag the pass does not draw are sent hidden; a change re-sends only the prims
+    // whose visibility it flips. Empty tags draw everything.
+    void setRenderTags(TfTokenVector tags) {
+        std::sort(tags.begin(), tags.end());
+        auto& s = *state_;
+        std::lock_guard lock(s.mutex);
+        if (tags == s.renderTags) return;
+        const auto flips = [&](const TfToken& tag) { return HdUEState::tagShown(tags, tag) != HdUEState::tagShown(s.renderTags, tag); };
+        for (const auto& [id, mesh] : s.meshes) if (flips(mesh.renderTag)) s.dirtyMeshes.insert(id);
+        for (const auto& [id, volume] : s.volumes) if (flips(volume.renderTag)) s.dirtyVolumes.insert(id);
+        s.renderTags = std::move(tags); ++s.revision;
+    }
+    void executeOnce(const std::shared_ptr<const PassSnapshot>& pass) {
         // HDUE_TRACE_TIMING=1: one line per Execute that did work, with where its time went.
         static const bool timing = TfGetenvBool("HDUE_TRACE_TIMING", false);
         using Clock = std::chrono::steady_clock;
@@ -1088,10 +1129,12 @@ public:
             HdUERenderBuffer* buffer = nullptr;
             HdUERenderBuffer* depth = nullptr;
             std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
-            for (const auto& aov : pass->GetAovBindings()) {
-                auto* renderBuffer=aov.renderBuffer;
-                if (!renderBuffer && !aov.renderBufferId.IsEmpty())
-                    renderBuffer=static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer,aov.renderBufferId));
+            extraBeauties_.clear();
+            std::vector<HdRenderBuffer*> bound; // alive buffers, by binding
+            for (auto* b : pass->buffers) bound.push_back(HdUERenderBuffer::alive(b) ? b : nullptr);
+            for (size_t binding = 0; binding < pass->aovs.size(); ++binding) {
+                const auto& aov = pass->aovs[binding];
+                auto* renderBuffer = bound[binding];
                 // husk names bindings after the render var's AOV name; a raw var's sourceName says what to render.
                 const auto setting=[&](const char* key) {
                     const auto it=aov.aovSettings.find(TfToken(key));
@@ -1101,11 +1144,19 @@ public:
                 };
                 TfToken name=aov.aovName;
                 const auto sourceType=setting("sourceType"), sourceName=setting("sourceName");
-                // ponytail: every light path expression renders the full beauty; split lobes if LPE AOVs are needed.
-                if(sourceType==TfToken("lpe")) name=HdAovTokens->color;
+                // The only light path expression hdUE renders is the whole beauty; primvar vars are not rendered.
+                if(sourceType==TfToken("lpe")) name=TfStringReplace(sourceName.GetString()," ","")=="C.*" ? HdAovTokens->color : TfToken();
+                else if(sourceType==TfToken("primvar")) name=TfToken();
                 else if(!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType==TfToken("raw"))) name=sourceName;
                 name=HdUEBeauty(name);
-                if(name==HdAovTokens->color) buffer=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
+                if (name != HdAovTokens->color && name != HdAovTokens->depth && !HdUEAovId(name)) {
+                    if (warnedVars_.insert(aov.aovName).second)
+                        TF_WARN("hdUE does not render the render var %s (%s %s); it receives its clear value", aov.aovName.GetText(),
+                            sourceType.GetText(), sourceName.GetText());
+                    if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
+                    continue;
+                }
+                if(name==HdAovTokens->color) if (auto* b=dynamic_cast<HdUERenderBuffer*>(renderBuffer)) (buffer ? extraBeauties_.push_back(b) : void(buffer=b));
                 if(name==HdAovTokens->depth) depth=dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 // Houdini's viewport binds primId/instanceId for its selection highlight. Rendering them swaps every
                 // material twice per converged view (hundreds of ms each on large scenes), so the viewport skips them
@@ -1115,15 +1166,8 @@ public:
                 const bool skipped = selfHost().continuous && !viewportIds && (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID);
                 if(id && !skipped && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
                     aovs.emplace_back(dynamic_cast<HdUERenderBuffer*>(renderBuffer),id);
-                if(skipped) if(auto* target=dynamic_cast<HdUERenderBuffer*>(renderBuffer); target && target->GetWidth() &&
-                    (target->GetWidth()!=skippedIdSize_[0] || target->GetHeight()!=skippedIdSize_[1])) {
-                    // "No prim" everywhere, once per size, so Houdini never reads stale IDs.
-                    HdueFrameInfo blank{}; blank.struct_size=sizeof(blank); blank.width=target->GetWidth(); blank.height=target->GetHeight(); blank.converged=1;
-                    std::vector<float> ids(size_t(blank.width)*blank.height); const int32_t none=-1;
-                    for(auto& value:ids) std::memcpy(&value,&none,sizeof(none));
-                    target->publish(blank,std::move(ids));
-                    skippedIdSize_[0]=target->GetWidth(); skippedIdSize_[1]=target->GetHeight();
-                }
+                // "No prim" everywhere, so Houdini never reads stale IDs.
+                if(skipped) if(auto* target=dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
             }
             const bool denoising = s.setting<std::string>("renderMode", "realtime") == "pathtraced" &&
                 TfStringToLower(s.setting<std::string>("denoiser", "off")) == "oidn";
@@ -1148,18 +1192,16 @@ public:
                 }
                 buffer=internalColor_.get();
             }
-            if (!buffer && std::any_of(pass->GetAovBindings().begin(), pass->GetAovBindings().end(), [&](const HdRenderPassAovBinding& aov) {
-                    const auto* b = aov.renderBuffer ? aov.renderBuffer : static_cast<HdRenderBuffer*>(GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer, aov.renderBufferId));
-                    return b && b->GetWidth(); })) {
+            if (!buffer && std::any_of(bound.begin(), bound.end(), [](const HdRenderBuffer* b) { return b && b->GetWidth(); })) {
                 // Allocated outputs, none of them renderable: fail the frame instead of leaving husk waiting.
                 std::string names;
-                for (const auto& aov : pass->GetAovBindings()) names += " " + aov.aovName.GetString();
+                for (const auto& aov : pass->aovs) names += " " + aov.aovName.GetString();
                 if (s.error.empty()) TF_RUNTIME_ERROR("hdUE renders none of the requested render vars:%s", names.c_str());
                 s.setError("hdUE renders none of the requested render vars:" + names); converged_ = true; aovsDone_ = true; return;
             }
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
                 std::string bindings;
-                for (const auto& aov:pass->GetAovBindings()) bindings+=" "+aov.aovName.GetString()+":"+aov.renderBufferId.GetString();
+                for (const auto& aov:pass->aovs) bindings+=" "+aov.aovName.GetString()+":"+aov.renderBufferId.GetString();
                 throw std::runtime_error("hdUE requires an allocated float32 RGBA color AOV; bindings:"+bindings+
                     (buffer?" allocation: "+buffer->allocationError():" (missing buffer)"));
             }
@@ -1195,7 +1237,7 @@ public:
                 s.backend->require(s.backend->depth_api().set_enabled(s.session,1),"enable_depth");
                 depthEnabled_=true; changed=true;
             }
-            if (changed) { HdUERefreshWetMasks(s,GetRenderIndex()); submit(s); }
+            if (changed) submit(s);
             if (s.backend->asset_api().get_scene_status) {
                 HdueAssetSceneStatus assets{}; assets.struct_size=sizeof(assets);
                 s.backend->require(s.backend->asset_api().get_scene_status(s.session,&assets),"asset_scene_status");
@@ -1206,25 +1248,23 @@ public:
                 if (lightsChanged) { s.locked([&] { ++s.revision; }); submit(s); changed=true; }
             }
             if (s.assetRequestPending) { changed=true; s.assetRequestPending=false; }
-            const auto view = pass->GetWorldToViewMatrix();
-            const auto projection = pass->GetProjectionMatrix();
-            const HdCamera* hdCamera = pass->GetCamera();
-            const GfVec4f lens = hdCamera ? GfVec4f(hdCamera->GetFStop(), hdCamera->GetFocusDistance(), hdCamera->GetFocalLength(), hdCamera->GetLinearExposureScale())
-                                          : GfVec4f(0.f, 0.f, 0.f, 1.f);
+            const auto view = pass->view;
+            const auto projection = pass->projection;
+            const GfVec4f lens = pass->camera ? pass->lens : GfVec4f(0.f, 0.f, 0.f, 1.f);
             // Sub-frame times are spread over the camera shutter; the camera moves with its own samples.
             std::optional<HdUEMotionSamples> cameraMotion;
-            if (hdCamera) {
+            if (pass->camera) {
                 std::lock_guard cameraLock(s.cameraMutex);
-                if (const auto it = s.cameraMotion.find(hdCamera->GetId().GetString()); it != s.cameraMotion.end()) cameraMotion = it->second;
+                if (const auto it = s.cameraMotion.find(pass->cameraId.GetString()); it != s.cameraMotion.end()) cameraMotion = it->second;
             }
             const auto subframeTime = [&](int k) {
-                return float(hdCamera->GetShutterOpen() + (k + .5) / subframes_ * (hdCamera->GetShutterClose() - hdCamera->GetShutterOpen()));
+                return float(pass->shutterOpen + (k + .5) / subframes_ * (pass->shutterClose - pass->shutterOpen));
             };
             const auto viewAt = [&](float t) {
                 if (subframes_ < 2 || !cameraMotion) return view;
                 return view * cameraMotion->at(0) * cameraMotion->at(t).GetInverse();
             };
-            const auto settingsVersion = s.requestSettingsRevision;
+            const uint64_t settingsVersion = s.requestSettingsRevision;
             // Consume a completed image before changing its generation. Otherwise
             // continuous camera input can discard every image before presentation.
             HdueFrameInfo frame{}; frame.struct_size = sizeof(frame);
@@ -1263,7 +1303,7 @@ public:
 #endif
                             }
                         });
-                        depth->publish(frame,std::move(depthPixels));
+                        depth->publish(frame,std::move(depthPixels),1);
                     }
                     if (subframes_ > 1 && frame.converged) {
                         // One converged sub-frame: add it and publish the running average.
@@ -1283,7 +1323,8 @@ public:
                         const auto publishStart = Clock::now();
                         // UE renders linear Rec.709 (tone-mapped: display-linear); hosts expect the OCIO scene_linear role.
                         HdUEToSceneLinear(pixels);
-                        buffer->publish(frame, std::move(pixels));
+                        for (auto* extra : extraBeauties_) extra->publish(frame, pixels, 4);
+                        buffer->publish(frame, std::move(pixels), 4);
                         publishMs = ms(publishStart, Clock::now());
                         ++s.publishedFrames;
                         s.lastFrame = frame; lastFrame_ = frame.frame_id;
@@ -1314,7 +1355,7 @@ public:
             if (TfGetenvBool("HDUE_TRACE_PASS", false)) {
                 std::fprintf(stderr, "hdUE pass changed=%d settings=%d camera=%d converged=%d frame=%llu gen=%llu buffer=%ux%u aovs=%zu slot=%zu inflight=%d done=%d error=%s\n",
                     changed, settingsChanged, cameraChanged, int(converged_.load()), (unsigned long long)s.lastFrame.frame_id, (unsigned long long)s.generation,
-                    buffer->GetWidth(), buffer->GetHeight(), aovs_.size(), aovSlot_, aovInFlight_, aovsDone_, s.error.c_str());
+                    buffer->GetWidth(), buffer->GetHeight(), aovs_.size(), aovSlot_, aovInFlight_, bool(aovsDone_), s.error.c_str());
                 std::fflush(stderr);
             }
             // Batch hosts (husk) coalesce camera updates until a frame arrives; Houdini's viewport requests the newest
@@ -1343,11 +1384,11 @@ public:
                 request.horizontal_fov_degrees = float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846);
                 if (TfGetenvBool("HDUE_TRACE_SCENE", false))
                     TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
-                        pass->GetCamera() ? pass->GetCamera()->GetId().GetText() : "none",
+                        pass->camera ? pass->cameraId.GetText() : "none",
                         eye[0], eye[1], eye[2], target[0], target[1], target[2], request.horizontal_fov_degrees,
                         s.width, s.height, s.setting<double>("metersPerUnit", .01), s.setting<std::string>("upAxis", "Y").c_str());
                 const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
-                request.near_clip_cm = hdCamera ? float(hdCamera->GetClippingRange().GetMin() * cmPerUnit) : 0.1f;
+                request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
                 // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
                 if (projection[3][3] == 1) {
                     request.orthographic = 1;
@@ -1403,7 +1444,9 @@ public:
                     applyMotion(s, 0);
                     // Motion blur needs a shutter, sub-frames and something moving.
                     const int samples = std::max(1, s.setting<int>("motionSamples", 16));
-                    const bool shutter = hdCamera && hdCamera->GetShutterClose() > hdCamera->GetShutterOpen();
+                    // UsdRenderSettings disableMotionBlur (and the deprecated instantaneousShutter) close the shutter.
+                    const bool shutter = pass->camera && pass->shutterClose > pass->shutterOpen &&
+                        !s.setting<bool>("disableMotionBlur", false) && !s.setting<bool>("instantaneousShutter", false);
                     const bool moving = cameraMotion.has_value() ||
                         s.locked([&] { return std::any_of(s.meshes.begin(), s.meshes.end(), [](const auto& entry) { return entry.second.moving(); }); });
                     subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 && s.backend->motion_api().set_transforms ? samples : 1;
@@ -1424,7 +1467,7 @@ public:
                     trace("hdUE request pending (UE not ready)\n");
                     if (!needsRequest) { subframeDue_ = true; converged_ = false; s.error.clear(); return; } // retry the sub-frame
                     s.assetRequestPending=true; converged_=false; s.lastFrame={};
-                    buffer->invalidate(); if(depth) depth->invalidate(); s.error.clear(); return;
+                    buffer->invalidate(); for (auto* extra : extraBeauties_) extra->invalidate(); if(depth) depth->invalidate(); s.error.clear(); return;
                 }
                 s.backend->require(requested, "request_render");
                 s.generation=request.generation;
@@ -1434,7 +1477,7 @@ public:
                     view_ = view; projection_ = projection; lens_ = lens; settingsVersion_ = settingsVersion;
                     s.submittedRequestSettingsRevision=settingsVersion;
                     centimetersPerUnit_=s.setting<double>("metersPerUnit",.01)*100.;
-                    s.lastFrame = {}; buffer->invalidate();
+                    s.lastFrame = {}; buffer->invalidate(); for (auto* extra : extraBeauties_) extra->invalidate();
                     if(depth) depth->invalidate();
                     beautyRequest_ = build(view); // AOVs render the unblurred pose at the current time
                     aovSlot_ = 0; aovInFlight_ = false; aovsDone_ = aovs_.empty(); denoisePending_ = false;
@@ -1487,8 +1530,9 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
-    for(const auto& [key,value]:settings) if(key.GetString().starts_with("hdUE:"))
-        state_->settings[TfToken(key.GetString().substr(5))]=value;
+    for(const auto& [key,value]:settings) if(key.GetString().starts_with("hdUE:")) {
+        state_->settings[TfToken(key.GetString().substr(5))]=value; state_->namespaced.insert(TfToken(key.GetString().substr(5)));
+    }
     state_->wetBindings=std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects",{}));
     const auto stageUnits=settings.find(TfToken("stageMetersPerUnit"));
     if (stageUnits!=settings.end() && stageUnits->second.IsHolding<double>())
@@ -1552,29 +1596,15 @@ HdUERenderDelegate::~HdUERenderDelegate() {
         return;
     }
     if (selfHosted_ && state_->paused) --host.paused;
-    if (--host.delegates > 0) return;
-    if (host.continuous) {
-        // Houdini's UI keeps UE for the next viewport (one UE lifetime per process); hdue_shutdown_ue ends it. A paused
-        // (deactivated) delegate can outlive that shutdown: its session ended with UE.
-        if (!host.worker.joinable()) return;
-        host.run([&] {
-            std::lock_guard lock(state_->mutex);
-            if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
-        });
-        return;
-    }
-    // The session must end while UE still runs; UE allows one lifetime per process.
+    --host.delegates;
+    // UE stays for the next delegate (one UE lifetime per process; husk --restart-delegate, Houdini's next viewport) and
+    // ends at process exit or hdue_shutdown_ue. A paused (deactivated) delegate can outlive that shutdown: its session
+    // ended with UE.
+    if (!host.worker.joinable()) return;
     host.run([&] {
-        {
-            std::lock_guard lock(state_->mutex);
-            if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
-        }
-        try { host.tick(); host.backend->shutdown(); } catch (const std::exception& e) { TF_RUNTIME_ERROR("hdUE shutdown: %s", e.what()); }
-        if (host.window) DestroyWindow(host.window);
-        host.window = nullptr;
+        std::lock_guard lock(state_->mutex);
+        if (state_->session) { state_->backend->api().destroy_session(state_->session); state_->session = 0; }
     });
-    host.stop();
-    host.backend.reset();
     // husk may write its images after releasing the delegate.
     std::error_code ignored; std::filesystem::current_path(host.directory, ignored);
 }
@@ -1631,7 +1661,11 @@ HdBprim* HdUERenderDelegate::CreateBprim(const TfToken& type, const SdfPath& id)
     return type == HdPrimTypeTokens->renderBuffer ? new HdUERenderBuffer(id) : nullptr;
 }
 HdBprim* HdUERenderDelegate::CreateFallbackBprim(const TfToken& type) { return CreateBprim(type, SdfPath::EmptyPath()); }
-void HdUERenderDelegate::DestroyBprim(HdBprim* p) { delete p; }
+void HdUERenderDelegate::DestroyBprim(HdBprim* p) {
+    // Render buffers die on the UE thread, after any Execute that is using them (PassSnapshot).
+    if (dynamic_cast<HdUERenderBuffer*>(p) && selfHost().worker.joinable()) { selfHost().post([p] { delete p; }); return; }
+    delete p;
+}
 void HdUERenderDelegate::CommitResources(HdChangeTracker*) { HdUETraceThread("CommitResources"); }
 void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
     HdUETraceThread("SetDrivers");
@@ -1650,6 +1684,10 @@ void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
 }
 bool HdUERenderDelegate::Pause() { return setPaused(true); }
 bool HdUERenderDelegate::Resume() { return setPaused(false); }
+// Stopping is pausing: UE keeps its scene, and Restart renders on from it (usdview's stop button).
+bool HdUERenderDelegate::IsStopped() const { return state_->paused; }
+bool HdUERenderDelegate::Stop(bool) { return setPaused(true); }
+bool HdUERenderDelegate::Restart() { return setPaused(false); }
 bool HdUERenderDelegate::setPaused(bool paused) {
     trace("hdUE %s (was %s)\n", paused ? "pause" : "resume", state_->paused ? "paused" : "running");
     if (state_->paused.exchange(paused) == paused) return true;
@@ -1672,12 +1710,19 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
 #endif
     return HdAovDescriptor();
 }
+// Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
+// Prefixed families (postProcess:*, cvar:*) and dictionaries set by the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const { return {
     {"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
     {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
     {"Warmup frames", TfToken("warmupFrames"), VtValue(16)}, {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
     {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
-    {"Environment cube resolution",TfToken("domeResolution"),VtValue(512)} }; }
+    {"Environment cube resolution",TfToken("domeResolution"),VtValue(512)},
+    {"Scene lights", TfToken("sceneLightsEnabled"), VtValue(true)}, {"Viewer light without scene lights", TfToken("autoViewerLight"), VtValue(false)},
+    {"Motion blur", TfToken("motionBlur"), VtValue(true)}, {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
+    {"Subdivision level", TfToken("subdivisionLevel"), VtValue(2)}, {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
+    {"Denoiser", TfToken("denoiser"), VtValue(std::string("off"))}, {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
+    {"Require Nanite", TfToken("requireNanite"), VtValue(false)} }; }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
 // a synced prim: only those need uploading again.
@@ -1689,9 +1734,18 @@ template <class Prims> void dirtyChangedEntries(const VtDictionary& before, cons
     changed(before, after); changed(after, before);
 }
 }
-void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) {
+void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value) { SetRenderSetting(key, value, false); }
+void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value, bool fromNamespace) {
     if (TfGetenvBool("HDUE_TRACE_SETTINGS", false)) { std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str()); std::fflush(stderr); }
-    if(key.GetString().starts_with("hdUE:")) { SetRenderSetting(TfToken(key.GetString().substr(5)),value); return; }
+    if(key.GetString().starts_with("hdUE:")) {
+        const TfToken bare(key.GetString().substr(5));
+        { std::lock_guard lock(state_->settingsMutex); state_->namespaced.insert(bare); }
+        SetRenderSetting(bare, value, true); return;
+    }
+    // A bare key never overrides its hdUE: form: Houdini sends its own renderMode (batch, interactive).
+    if (!fromNamespace) { std::lock_guard lock(state_->settingsMutex); if (state_->namespaced.count(key)) return; }
+    // Hydra's standard toggle (usdview's "Enable Scene Lights").
+    if (key == HdRenderSettingsTokens->enableSceneLights) { SetRenderSetting(TfToken("sceneLightsEnabled"), value); return; }
 #if defined(HDUE_HOUDINI)
     if (key == TfToken("houdini:viewport") && value.IsHolding<bool>() && value.UncheckedGet<bool>()) HdUERegisterViewport(state_,this);
 #endif
@@ -1743,7 +1797,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (key==TfToken("renderMode") || key==TfToken("samplesPerPixel") || key==TfToken("warmupFrames") ||
         key==TfToken("lumenEnabled") || key==TfToken("timeSeconds") || key==TfToken("motionBlur") || key==TfToken("motionSamples") ||
-        key==TfToken("framesPerSecond") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") || key==TfToken("debugView") ||
+        key==TfToken("framesPerSecond") || key==TfToken("disableMotionBlur") || key==TfToken("instantaneousShutter") || key==TfToken("tonemapper") || key==TfToken("postProcessMaterials") || key==TfToken("denoiser") || key==TfToken("debugView") ||
         TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:")) ++state_->requestSettingsRevision;
     if (key==TfToken("houdini:frame") || key==TfToken("houdini:fps")) {
         const double frame=state_->setting<double>("houdini:frame",1.);
@@ -1820,7 +1874,10 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     if(lightingApi.get_status && state.session) state.backend->require(lightingApi.get_status(state.session,&lighting),"lighting_status");
     if (state.setting<bool>("sceneLightsEnabled", true))
         for (const auto& [id, light] : state.lights) if (!light.viewer && active(light)) ++sceneLights;
-    return { {"error", VtValue(residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error)}, {"generation", VtValue(state.generation)},
+    const auto error = residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error;
+    return { {"error", VtValue(error)}, {"generation", VtValue(state.generation)},
+        // husk exits with this code (farm managers judge frames by it); Houdini's UI keeps rendering after an error.
+        {"huskErrorStatus", VtValue(int(!error.empty() && !selfHost().continuous))},
         {"wetBindings",VtValue(int(state.surfaceStatus.binding_count))}, {"wetUploadPending",VtValue(bool(state.surfaceStatus.upload_pending))},
         {"wetMaskUploads",VtValue(state.surfaceStatus.mask_uploads)}, {"wetMaskBytes",VtValue(state.surfaceStatus.mask_bytes)},
         {"wetGeometryUploads",VtValue(state.surfaceStatus.geometry_uploads)}, {"wetUpdates",VtValue(state.surfaceStatus.updates)},

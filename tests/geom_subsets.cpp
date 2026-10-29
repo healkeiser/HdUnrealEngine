@@ -66,15 +66,18 @@ int main() {
         require(parts.size()==1 && parts[0].id=="/Mesh/Quad" && parts[0].points.size()==10 && parts[0].indices.size()==12);
         topology.SetGeomSubsets({}); parts=HdUEPartitionSubsets(mesh,topology,params);
         require(parts.size()==1 && parts[0].id=="/Mesh");
-        for (auto invalid: {VtIntArray{-1},VtIntArray{3},VtIntArray{0,0}}) {
-            subset.indices=invalid; topology.SetGeomSubsets({subset}); bool rejected=false;
-            try { HdUEPartitionSubsets(mesh,topology,params); } catch(const std::invalid_argument&) { rejected=true; }
-            require(rejected);
+        // Missing faces are skipped; a face listed twice, or by two subsets, keeps its first subset.
+        for (auto invalid: {VtIntArray{-1},VtIntArray{3}}) {
+            subset.indices=invalid; topology.SetGeomSubsets({subset});
+            parts=HdUEPartitionSubsets(mesh,topology,params);
+            require(parts.size()==1 && parts[0].id=="/Mesh");
         }
+        subset.indices={0,0}; topology.SetGeomSubsets({subset});
+        require(HdUEPartitionSubsets(mesh,topology,params).size()==2);
         subset.indices={0}; auto overlap=subset; overlap.id=SdfPath("/Mesh/Overlap");
-        topology.SetGeomSubsets({subset,overlap}); bool rejected=false;
-        try { HdUEPartitionSubsets(mesh,topology,params); } catch(const std::invalid_argument&) { rejected=true; }
-        require(rejected);
+        topology.SetGeomSubsets({subset,overlap});
+        parts=HdUEPartitionSubsets(mesh,topology,params);
+        require(parts.size()==2 && parts[1].id=="/Mesh/Quad");
         mesh.sceneAsset="/Game/Native.Native";
         require(HdUEPartitionSubsets(mesh,topology,params).size()==1);
         const auto smooth=HdUEComputeSmoothNormals(VtVec3fArray{GfVec3f(0),GfVec3f(2,0,0),GfVec3f(0,2,0),GfVec3f(0,0,1)},

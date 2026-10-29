@@ -2,6 +2,7 @@
 #include "delegate.h"
 #include "pxr/imaging/hd/meshTopology.h"
 #include "pxr/imaging/hd/meshUtil.h"
+#include "pxr/base/tf/diagnostic.h"
 #include <stdexcept>
 #include <algorithm>
 
@@ -31,6 +32,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
     prototype.motionLeft=mesh.motionLeft; prototype.motionRight=mesh.motionRight; prototype.velocities=mesh.velocities;
     prototype.deformTimes=mesh.deformTimes; prototype.deformOffsets.resize(mesh.deformOffsets.size());
     std::vector<HdUEMeshData> parts{prototype};
+    bool invalid = false;
     for (const auto& subset : topology.GetGeomSubsets()) {
         if (subset.type != HdGeomSubset::TypeFaceSet || subset.materialId.IsEmpty()) continue;
         const int owner = int(parts.size());
@@ -38,12 +40,13 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(
         parts.back().id = subset.id.GetString();
         parts.back().material = subset.materialId.GetString();
         parts.back().bindingPath = SdfPath(mesh.scenePath).AppendChild(subset.id.GetNameToken()).GetString();
+        // materialBind subsets are nonOverlapping; a face listed again keeps its first subset, as Storm draws it.
         for (int face : subset.indices) {
-            if (face < 0 || size_t(face) >= owners.size() || owners[face] != 0)
-                throw std::invalid_argument("Invalid or overlapping materialBind face subsets");
+            if (face < 0 || size_t(face) >= owners.size() || (owners[face] != 0 && owners[face] != owner)) { invalid = true; continue; }
             owners[face] = owner;
         }
     }
+    if (invalid) TF_WARN("%s: materialBind subsets overlap or list missing faces; each face keeps its first subset", mesh.id.c_str());
     // Each part's local index of a mesh vertex, valid where stamp holds the part.
     std::vector<uint32_t> local(vertices);
     std::vector<int> stamp(vertices, -1);

@@ -92,6 +92,17 @@ int main(int argc, char** argv) {
         const auto* z=static_cast<const float*>(depth.Map());
         check(z[0]==.7f && z[1]==1.f && z[2]==.1f && z[3]==.2f,"depth row orientation incorrect");
         depth.Unmap();
+        // A color3f beauty receives RGBA; an RGBA buffer receives RGB with alpha 1.
+        HdUERenderBuffer rgb(SdfPath("/rgb"));
+        check(rgb.Allocate(GfVec3i(1,1,1),HdFormatFloat32Vec3,false),"color3f allocation rejected");
+        frame.height=1; frame.width=1; rgb.publish(frame,{.1f,.2f,.3f,.4f},4);
+        const auto* c=static_cast<const float*>(rgb.Map());
+        check(c[0]==.1f && c[1]==.2f && c[2]==.3f,"RGBA to RGB conversion incorrect"); rgb.Unmap();
+        HdUERenderBuffer rgba(SdfPath("/rgba"));
+        check(rgba.Allocate(GfVec3i(1,1,1),HdFormatFloat32Vec4,false),"color4f allocation rejected");
+        rgba.publish(frame,{.5f,.6f,.7f},3);
+        const auto* a=static_cast<const float*>(rgba.Map());
+        check(a[0]==.5f && a[2]==.7f && a[3]==1.f,"RGB to RGBA conversion incorrect"); rgba.Unmap();
         GfMatrix4d projection(0.);
         const double nearPlane=1,farPlane=1000;
         projection[0][0]=projection[1][1]=1;

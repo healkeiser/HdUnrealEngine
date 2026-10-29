@@ -1,19 +1,38 @@
 {
   "HdUEHoudiniRendererPlugin": {
-    "valid": "env:HDUE_HOUDINI_ENABLE",
+    "valid": "env:HDUE_RUNTIME_CONFIG",
     "menulabel": "Unreal Engine (hdUE)",
     "menupriority": 30,
     "allowbackgroundupdate": false,
     "viewportrenderer": false,
     "destroyifdeactivated": false,
     "pauseonupdate": false,
-    "defaultpurposes": ["default", "render"],
+    "defaultpurposes": [
+      "default",
+      "render"
+    ],
     "drawmodesupport": false,
     "needsdepth": false,
     "needsselection": true,
     "depthstyle": "linear",
     "aovsupport": true,
-    "statsdatapaths": {"rendererStage": "rendererStage", "totalClockTime": "totalClockTime", "percentDone": "percentDone"},
-    "viewstats": ["nativeActors", "nativeMeshes", "completedSamples"]
+    "statsdatapaths": {
+      "rendererStage": "rendererStage",
+      "totalClockTime": "totalClockTime",
+      "percentDone": "percentDone"
+    },
+    "viewstats": [
+      "nativeActors",
+      "nativeMeshes",
+      "completedSamples"
+    ],
+    "husk.stats_metadata": "",
+    "husk.metadata": {
+      "float OpenEXR:frame": "$frame",
+      "float OpenEXR:FramesPerSecond": "$fps",
+      "string OpenEXR:husk:command": "$command_line",
+      "string OpenEXR:husk:usd_file": "$usdfile",
+      "string OpenEXR:Software": "hdUE (Unreal Engine 5.8) $husk_version"
+    }
   }
 }

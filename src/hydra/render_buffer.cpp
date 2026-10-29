@@ -1,10 +1,17 @@
 #include "delegate.h"
 #include "pxr/base/work/loops.h"
 #include "pxr/base/gf/half.h"
+#include "pxr/base/tf/diagnostic.h"
 #include <algorithm>
 #include <cstring>
 PXR_NAMESPACE_OPEN_SCOPE
-HdUERenderBuffer::HdUERenderBuffer(const SdfPath& id) : HdRenderBuffer(id) {}
+namespace {
+std::mutex liveMutex;
+std::set<const HdRenderBuffer*> live;
+}
+HdUERenderBuffer::HdUERenderBuffer(const SdfPath& id) : HdRenderBuffer(id) { std::lock_guard lock(liveMutex); live.insert(this); }
+HdUERenderBuffer::~HdUERenderBuffer() { std::lock_guard lock(liveMutex); live.erase(this); }
+bool HdUERenderBuffer::alive(const HdRenderBuffer* b) { std::lock_guard lock(liveMutex); return b && live.count(b); }
 bool HdUERenderBuffer::Allocate(const GfVec3i& dimensions, HdFormat format, bool multi) {
     std::lock_guard lock(mutex_);
     if (maps_ || dimensions[0] < 1 || dimensions[1] < 1 || dimensions[0] > 8192 || dimensions[1] > 8192 ||
@@ -44,10 +51,27 @@ bool HdUERenderBuffer::IsConverged() const { std::lock_guard lock(mutex_); retur
 void HdUERenderBuffer::invalidate() { std::lock_guard lock(mutex_); converged_ = false; }
 void HdUERenderBuffer::_Deallocate() { std::lock_guard lock(mutex_); pixels_.reset(); if (!maps_) pinned_.reset(); width_ = height_ = 0; converged_ = false;
 }
-void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pixels) {
+void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pixels, size_t sourceChannels) {
     std::lock_guard lock(mutex_);
     const size_t channels=HdGetComponentCount(format_), bytes=HdDataSizeOfFormat(format_);
-    if (frame.width != width_ || frame.height != height_ || pixels.size() != size_t(width_) * height_ * channels) return;
+    if (!sourceChannels) sourceChannels = channels;
+    if (frame.width != width_ || frame.height != height_ || pixels.size() != size_t(width_) * height_ * sourceChannels) {
+        if (!sizeWarned_) TF_WARN("hdUE: %s receives a %ux%u image with %zu channels for its %ux%u buffer; frame dropped",
+            GetId().GetText(), frame.width, frame.height, sourceChannels, width_, height_);
+        sizeWarned_ = true;
+        return;
+    }
+    // A buffer allocated with other channels than hdUE renders (a color3f beauty, the UsdRenderVar default; an RGBA
+    // albedo): copy the common channels, fill the rest (alpha 1).
+    if (sourceChannels != channels) {
+        std::vector<float> converted(size_t(width_) * height_ * channels);
+        WorkParallelForN(size_t(width_) * height_, [&](size_t begin, size_t end) {
+            for (size_t i = begin; i < end; ++i) for (size_t c = 0; c < channels; ++c)
+                converted[i * channels + c] = c < sourceChannels ? pixels[i * sourceChannels + c] : c == 3 ? 1.f : 0.f;
+        });
+        pixels.swap(converted);
+    }
+    sizeWarned_ = false;
     std::vector<uint8_t> out;
     out.swap(spareBytes_);
     out.resize(size_t(width_) * height_ * bytes);

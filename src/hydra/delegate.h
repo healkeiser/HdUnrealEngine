@@ -13,6 +13,7 @@
 #include <array>
 #include <functional>
 #include <map>
+#include <atomic>
 #include <set>
 #include <mutex>
 #include <vector>
@@ -53,6 +54,7 @@ struct HdUEMeshData {
     std::vector<uint32_t> sourceCorners; // per vertex: a triangulated corner (3 * triangle + corner) of the source mesh
     GfMatrix4d transform{1};
     bool visible = true;
+    TfToken renderTag; // purpose; hidden while the render pass does not draw it
     int primId = -1; // HdRprim::GetPrimId, written by the ID pass
     bool instanced = false; // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances; // USD world matrices (prototype transform included)
@@ -82,6 +84,7 @@ struct HdUEMeshData {
 struct HdUEVolumeData {
     std::string id;
     bool visible = true;
+    TfToken renderTag;
     uint32_t width = 0, height = 0, depth = 0;
     std::vector<float> density;
     GfMatrix4d localToWorld{1};
@@ -145,6 +148,9 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
+    TfTokenVector renderTags; // sorted; the render pass's last tags (empty: everything)
+    static bool tagShown(const TfTokenVector& tags, const TfToken& tag) { return tags.empty() || std::binary_search(tags.begin(), tags.end(), tag); }
+    bool shown(const TfToken& tag) const { return tagShown(renderTags, tag); }
     // Cached viewport status for Houdini's UI while an upload holds the lock (diagnostics.cpp).
     std::mutex statusMutex; std::shared_ptr<void> viewportStatus;
     // Meshes erased since the last submit, kept so a re-created identical prim cancels its removal (HdUEState::erase).
@@ -152,6 +158,7 @@ struct HdUEState : HdRenderParam {
     HdRenderSettingsMap settings;
     // Guards settings: Houdini's UI thread writes them (SetRenderSetting) while hdUE's UE thread reads them.
     mutable std::recursive_mutex settingsMutex;
+    std::set<TfToken> namespaced; // settings set as hdUE:<name>, which the bare <name> no longer overrides
     // GetRenderStats' last result; the UE thread refreshes it (Houdini's UI asks often and must not wait on UE).
     std::mutex statsMutex; VtDictionary stats; std::atomic<bool> statsPending{false};
     HdRenderSettingsMap settingsSnapshot() const { std::lock_guard lock(settingsMutex); return settings; }
@@ -161,8 +168,9 @@ struct HdUEState : HdRenderParam {
     std::shared_ptr<HdUEGpuFrames> gpuFrames; // Houdini's GL viewport (gpu_frames.h); set under mutex by SetDrivers
     uint64_t aovGeneration = 0; // AOV requests (hdue/aov_api.h); generation stays the beauty's
     uint32_t width = 0, height = 0;
-    uint64_t revision = 1, submittedRevision = 0, generation = 0;
-    uint64_t requestSettingsRevision = 1;
+    // Revisions are also read without the lock by IsConverged on the host's thread.
+    std::atomic<uint64_t> revision{1}, submittedRevision{0}, requestSettingsRevision{1};
+    uint64_t generation = 0;
     uint64_t submittedRequestSettingsRevision = 0;
     uint64_t publishedFrames = 0, sceneSubmissions = 0, coalescedCameraUpdates = 0;
     uint64_t staleFrameRetries = 0;
@@ -228,6 +236,9 @@ HDUE_HYDRA_API void HdUETraceThread(const char* call);
 class HDUE_HYDRA_API HdUERenderBuffer final : public HdRenderBuffer {
 public:
     explicit HdUERenderBuffer(const SdfPath& id);
+    ~HdUERenderBuffer() override;
+    // Whether b is a render buffer that has not been deleted (a posted Execute holds pointers Hydra may have released).
+    static bool alive(const HdRenderBuffer* b);
     bool Allocate(const GfVec3i&, HdFormat, bool) override;
     unsigned int GetWidth() const override;
     unsigned int GetHeight() const override;
@@ -239,8 +250,9 @@ public:
     bool IsMapped() const override;
     void Resolve() override {}
     bool IsConverged() const override;
-    // Publishes a top-down float image (channels per the format), stored bottom-up in the buffer's format.
-    void publish(const HdueFrameInfo&, std::vector<float> pixels);
+    // Publishes a top-down float image with sourceChannels per pixel (0: the format's), stored bottom-up in the buffer's
+    // format; channels the buffer has and the image lacks are filled (alpha 1).
+    void publish(const HdueFrameInfo&, std::vector<float> pixels, size_t sourceChannels = 0);
     std::vector<float> takeSpare(size_t size); // a previous frame's float allocation, sized for the next publish
     void invalidate();
     std::string allocationError() const { std::lock_guard lock(mutex_); return allocationError_; }
@@ -254,7 +266,7 @@ private:
     mutable std::mutex mutex_;
     uint32_t width_ = 0, height_ = 0, maps_ = 0;
     HdFormat format_ = HdFormatFloat32Vec4;
-    bool converged_ = false, multiSampled_ = false;
+    bool converged_ = false, multiSampled_ = false, sizeWarned_ = false;
     std::string allocationError_;
     std::shared_ptr<std::vector<uint8_t>> pixels_, pinned_; // in format_
     std::vector<uint8_t> spareBytes_; // the replaced frame's storage, reused unless a Map still holds it
@@ -278,6 +290,10 @@ public:
     bool IsPauseSupported() const override { return true; }
     bool Pause() override;
     bool Resume() override;
+    bool IsStopSupported() const override { return true; }
+    bool IsStopped() const override;
+    bool Stop(bool blocking = true) override;
+    bool Restart() override;
 
     HdInstancer* CreateInstancer(HdSceneDelegate*, const SdfPath&) override;
     void DestroyInstancer(HdInstancer*) override;
@@ -294,6 +310,7 @@ public:
     HdAovDescriptor GetDefaultAovDescriptor(const TfToken&) const override;
     HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
     void SetRenderSetting(const TfToken&, const VtValue&) override;
+    void SetRenderSetting(const TfToken&, const VtValue&, bool fromNamespace);
     VtDictionary GetRenderStats() const override;
     bool InvokeCommand(const TfToken&, const HdCommandArgs&) override;
 private:
