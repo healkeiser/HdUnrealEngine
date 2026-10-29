@@ -1,0 +1,46 @@
+#usda 1.0
+(
+    doc = """Intel's Jungle Ruins (samples/jungle_ruins/intel, not included; see README.md) with render settings shared
+by hdUE and Karma. Intel's own Karma layer, with its sky dome, is sublayered unchanged."""
+    defaultPrim = "root"
+    metersPerUnit = 0.01
+    upAxis = "Z"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./intel/USD/JungleRuins_Karma.usda@]
+)
+
+def Scope "Render"
+{
+    def RenderSettings "Settings"
+    {
+        rel camera = </root/Camera/Camera>
+        uniform int2 resolution = (960, 540)
+        rel products = </Render/Product>
+        int hdUE:samplesPerPixel = 256
+        token hdUE:renderMode = "pathtraced"
+        token karma:global:convergence_mode = "Path Traced"
+        int karma:global:pathtracedsamples = 256
+        float karma:object:diffuselimit = 8
+    }
+
+    def RenderProduct "Product"
+    {
+        token productName = "jungle_ruins.exr"
+        rel orderedVars = [</Render/Vars/color>]
+    }
+
+    def Scope "Vars"
+    {
+        def RenderVar "color"
+        {
+            uniform token dataType = "color4f"
+            uniform string sourceName = "C.*[LO]"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "C"
+            token driver:parameters:aov:format = "color4f"
+        }
+    }
+}

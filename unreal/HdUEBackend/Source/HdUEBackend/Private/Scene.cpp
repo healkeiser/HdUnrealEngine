@@ -1049,9 +1049,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         return !(Desc.native_asset && *Desc.native_asset) &&
                (Desc.instance_transforms || !(Desc.flags & HDUE_MESH_EDITABLE));
     };
-    // Nanite for interactive hosts' static meshes, built with their cards; HDUE_NANITE=0 keeps regular static meshes.
-    static const bool NaniteMeshes =
-        Interactive_() && FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
+    // Nanite for static meshes and instancer prototypes, built with their cards: without it, every instance of a
+    // scattered prototype drew all its triangles (Jungle Ruins' 8.7 million instances hung the GPU).
+    // HDUE_NANITE=0 keeps regular static meshes.
+    static const bool NaniteMeshes = FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
     if (NaniteMeshes) Nanite::IBuilderModule::Get();  // load the builder on this thread before worker tasks use it
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes;
     BuiltMeshes.SetNum(Batch.mesh_count);
@@ -1068,9 +1069,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const int32 Index = Order[Task];
             const auto& Desc = Batch.meshes[Index];
             if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
-            if (StaticGenerated(Desc))
+            if (StaticGenerated(Desc)) {
                 StaticData[Index] = BuildStatic(Desc, !Interactive_());
-            else
+                if (NaniteMeshes && !Interactive_()) StaticData[Index].Nanite = BuildNanite(Desc);
+            } else
                 BuiltMeshes[Index] = BuildDynamicMesh(Desc);
         },
         EParallelForFlags::Unbalanced);
@@ -1134,7 +1136,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             PendingStatic.Remove(Id);  // a background build for the previous geometry finishes unused
             if (Static) {
                 auto* Built = NewStaticMesh(Actor);
-                FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds, nullptr);
+                // Nanite draws opaque and masked materials only.
+                const auto* Material = Desc.material_id ? Materials.Find(UTF8_TO_TCHAR(Desc.material_id)) : nullptr;
+                const bool Nanite = StaticData[Index].Nanite && !(Material && IsTranslucentBlendMode(*Material->Get()));
+                FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds,
+                                 Nanite ? StaticData[Index].Nanite.Get() : nullptr);
                 if (Instanced)
                     InstanceMesh = Built;
                 else
@@ -1144,7 +1150,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s).
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    const bool WithNanite = NaniteMeshes && !Instanced;
+                    const bool WithNanite = NaniteMeshes;
                     PendingStatic.Add(Id, UE::Tasks::Launch(
                                               TEXT("HdueConversion"),
                                               [Copy, WithNanite]() -> TSharedPtr<FConversion> {
