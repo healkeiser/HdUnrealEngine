@@ -1,4 +1,4 @@
-"""Exercise real Houdini VOP defaults, sockets and USD cook dependencies."""
+"""Exercise real Houdini VOP defaults, sockets and USD cook dependencies (run with integrations/houdini on HOUDINI_PATH)."""
 import sys
 from pathlib import Path
 import unittest
@@ -104,15 +104,18 @@ class VopTests(unittest.TestCase):
             network.node('amount').parm('value').set(.3)
             self.assertAlmostEqual(read(UsdShade.Material(target.stage().GetPrimAtPath('/Looks/WaterCoating')),Usd.TimeCode.Default())['nodes']['amount']['properties']['value'],.3,places=6)
 
-    def test_deep_optional_disconnect_and_legacy_author_upgrade(self):
+    def test_deep_optional_disconnect_in_a_legacy_python_lop(self):
         network=hdue_substrate.create(); slab=network.node('slab')
         normal=network.createNode(hdue_substrate.type_name('normalmap'),'normal')
         slab.setInput(3,normal)
         source=hou.node('/stage').createNode('sublayer')
         source.parm('filepath1').set(str(ROOT/'samples/substrate/showcase.usda'))
-        target=hdue_substrate.author_lop(network,'/Looks/Test',source)
-        # Simulate a saved author LOP from before structural revision tracking.
-        target.removeSpareParmTuple(target.parmTuple(hdue_substrate.REVISION_PARM))
+        # An authoring LOP saved before Material Library translation, without structural revision tracking.
+        target=hou.node('/stage').createNode('pythonscript'); target.setInput(0,source)
+        group=target.parmTemplateGroup()
+        for name,value in (('hdue_builder',network.path()),('hdue_material','/Looks/Test'),('hdue_bindings','')):
+            group.append(hou.StringParmTemplate(name,name,1,default_value=(value,)))
+        target.setParmTemplateGroup(group); target.parm('python').set('import hdue_substrate\nhdue_substrate.cook(hou.pwd())')
         target.stage(); self.assertTrue(target.parm(hdue_substrate.REVISION_PARM))
         count=target.cookCount(); slab.setInput(3,None)
         self.assertEqual(target.cookCount(),count,'Wiring notification forced a synchronous cook')
@@ -121,6 +124,19 @@ class VopTests(unittest.TestCase):
         slab.setInput(3,normal)
         recovered=read(UsdShade.Material(target.stage().GetPrimAtPath('/Looks/Test')),Usd.TimeCode.Default())
         self.assertIn('normal',recovered['nodes'])
+
+    def test_material_library_translates_a_builder_inside_it(self):
+        library=hou.node('/stage').createNode('materiallibrary'); library.setInput(0,hou.node('/stage').createNode('sphere'))
+        network=hdue_substrate.create(parent=library,preset='wet',material='/Looks/SS_Coat')
+        self.assertEqual(hou.lop.shaderRenderContextName(network,'surface'),'hdue','Run with integrations/houdini on HOUDINI_PATH')
+        self.assertTrue(network.isMaterialFlagSet())
+        library.parm('assign1').set(1); library.parm('geopath1').set('/sphere1')
+        stage=library.stage(); self.assertFalse(library.errors())
+        material=UsdShade.Material(stage.GetPrimAtPath('/materials/substrate_builder'))
+        self.assertEqual(signature(read(material,Usd.TimeCode.Default())),signature(hdue_substrate.graph(network)))
+        self.assertEqual(UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/sphere1')).ComputeBoundMaterial()[0].GetPath(),material.GetPath())
+        network.node('layer').setInput(0,network.node('water'))
+        self.assertNotIn('weight',read(UsdShade.Material(library.stage().GetPrimAtPath(material.GetPath())),Usd.TimeCode.Default())['nodes'])
 
     def test_disconnect_overrides_the_original_usd_material(self):
         from generate_substrate_textures import vops

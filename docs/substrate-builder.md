@@ -14,7 +14,7 @@ The renderer continues to use one UE instance in the host process. Shader graphs
 
 ```mermaid
 flowchart LR
-    V["Houdini VOP network"] --> A["Substrate authoring LOP"]
+    V["Houdini VOP network"] --> A["Material Library LOP (hdUE shader translator)"]
     A --> U["USD Material and Shader graph"]
     U --> P["Graph validation and preparation"]
     X["Prepared MaterialX library"] --> P
@@ -36,32 +36,17 @@ Houdini supplies the node editor, connections, parameters, and undo. hdUE export
 
 ## Authoring in Houdini
 
-Load the hdUE Houdini integration and add the **hdUE** shelf. The shelf provides:
+The hdUE Substrate VOPs ship in `integrations/houdini/otls/hdue_substrate.hda`, so they are in the TAB menu's **hdUE** submenu from startup, in `/mat` and inside a Material Library LOP. As with Karma's or MaterialX's VOPs, each carries a render mask (`hdUE`) by which Solaris picks its shader translator, here `integrations/houdini/husdplugins/shadertranslators/hdue.py`.
 
-- **Substrate Builder**: create an editable VOP network containing a Slab connected to the surface output.
-- **Water Coating Example**: create a MaterialX base, clear water Slab, public coverage/roughness parameters, float mask, Weight, and Vertical Layer.
-- **Author Substrate USD**: export the selected Builder through a Python LOP, using the current Scene Graph selection as material-binding targets.
+**hdUE Substrate Builder** is the material: a VOP subnet with the material flag on and a Slab wired to its surface output, whose TAB menu offers only the hdUE Substrate nodes (`tabmenumask`). Put it in a Material Library LOP, or leave it in `/mat` and point the library's **Material VOP** at it. The library authors the builder as one USD material (the graph described [below](#usd-representation-and-identity)), assigns it like any other material, and re-authors it on parameter edits, rewiring and node changes. No Python LOP is involved.
+
+The **hdUE** shelf provides:
+
+- **Substrate Builder**: create a builder in `/mat`.
+- **Water Coating Example**: create a builder with a MaterialX base, clear water Slab, public coverage/roughness parameters, float mask, Weight, and Vertical Layer.
+- **Author Substrate USD**: add a Material Library LOP after the displayed LOP that authors the selected builder at `/Looks/<builder name>`, bound to the current Scene Graph selection.
 
 The same operations are available in Houdini's Python shell:
-
-```python
-import hdue_substrate
-
-builder = hdue_substrate.create()
-
-# Optional example; set the MaterialX Surface node to an existing USD material.
-water = hdue_substrate.create(
-    preset="wet", material="/Looks/Base")
-
-# Export into an override layer after the current displayed LOP.
-hdue_substrate.publish(water)
-```
-
-`author_lop(builder, material_path, input_node, prim_paths)` provides explicit control over the output location. Its parameters select the VOP network, USD material path, and binding targets. Source USD files and referenced materials remain independently editable.
-
-### Material Library placement
-
-Substrate Builder can be created and edited inside a Material Library LOP's VOP network. Pass that LOP as the parent:
 
 ```python
 import hou
@@ -69,13 +54,15 @@ import hdue_substrate
 
 library = hou.node("/stage/materiallibrary1")
 builder = hdue_substrate.create(parent=library)
-output = hdue_substrate.author_lop(
-    builder, "/Looks/Substrate", input_node=library)
+
+# Optional example; set the MaterialX Surface node to an existing USD material.
+water = hdue_substrate.create(preset="wet", material="/Looks/Base")
+hdue_substrate.author_lop(water, "/Looks/Water", hou.node("/stage/sphere1"), ["/sphere1"])
 ```
 
-The current USD export path is the dedicated authoring LOP after Material Library. Standard Material Library translation does not automatically export these custom VOPs; Builder materials deliberately have their Houdini material flag disabled. In the verified placement test, Material Library alone authored no Substrate material, and the following authoring LOP successfully created `/Looks/Substrate` without errors. Automatic discovery, material-path mapping, and export through Material Library's own controls require further integration.
+`author_lop(builder, material_path, input_node, prim_paths)` configures the builder's own Material Library, or adds one after `input_node` that references a builder elsewhere. Source USD files and referenced materials remain independently editable. Scenes saved with the earlier Python authoring LOP keep working; that LOP still calls `hdue_substrate.cook()`.
 
-Node definitions are generated from repository source into the ignored `out/substrate-builder` directory. Generated HDA files and HIP inspection scenes are local artifacts.
+`scripts/build_substrate_hda.py` builds the asset from `scripts/substrate_graph.py`, with the help of each node and parameter: run it after editing either and commit the result. The type names (`hdue::substrate_<kind>::1.3`) are unchanged, so earlier scenes load the shipped definitions.
 
 ## Available nodes
 
@@ -122,7 +109,7 @@ The [direct texture example](../samples/substrate/textures.usda) has one mesh an
   -OutputDirectory out/textures-prepared
 ```
 
-`scripts/generate_substrate_textures.py` creates the owned image fixtures and USD scene. Its optional HIP output places the editable VOP network inside Material Library, followed by the dedicated authoring LOP.
+`scripts/generate_substrate_textures.py` creates the owned image fixtures and USD scene. Its optional HIP output places the editable builder inside a Material Library LOP, which authors and binds it.
 
 To create a HIP from the existing supplied scene without regenerating its images, run the generator through the configured Houdini Python executable:
 
@@ -216,7 +203,7 @@ The standalone host accepts a resolved settings snapshot generated by `scripts/p
 
 Public parameters are shared by prims bound to the same USD material. Masks vary independently on each mesh or material-binding GeomSubset. Use separate material instances/material prims when independently authored public parameter values are needed.
 
-The authoring LOP reads connected VOP parameters through native Houdini cook dependencies. Structural events (rewiring and child creation/deletion) increment a hidden authoring revision parameter because deep VOP wiring changes are not reliably tracked by parameter dependencies alone. Event handlers never force a synchronous cook. Both value edits and bursts of structural edits settle through Houdini's scheduler at the next evaluation. Saved author LOPs without the revision parameter are upgraded automatically.
+The Material Library LOP depends on the builder's parameters and wiring natively, also for a builder in `/mat`: value edits and bursts of structural edits settle through Houdini's scheduler at the next evaluation, in one cook. (Saved Python authoring LOPs track rewiring through a hidden revision parameter instead.)
 
 An edit that requires preparation pauses the current request and reports progress in Houdini's status bar. The last valid displayed AOV remains visible, but the pending request exposes no completed frame. Identical statuses are published once per session instead of being resubmitted on every material poll. Successful background preparation or restoring a cached graph resumes rendering.
 
@@ -272,7 +259,9 @@ The eight-case background-topology regression passes node addition, generated pa
 
 Implementation entry points:
 
-- [VOP definitions and authoring LOP](../integrations/houdini/python3.13libs/hdue_substrate.py)
+- [VOP network reading and authoring](../integrations/houdini/python3.13libs/hdue_substrate.py)
+- [VOP definitions and help](../scripts/build_substrate_hda.py)
+- [Material Library shader translator](../integrations/houdini/husdplugins/shadertranslators/hdue.py)
 - [Typed graph and USD contract](../scripts/substrate_graph.py)
 - [Texture resolution and preparation](../scripts/substrate_textures.py)
 - [Numerical texture/UV/UDIM render checks](../tests/substrate_texture_render.py)
