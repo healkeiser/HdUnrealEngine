@@ -22,7 +22,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "integrations/houdini"
 HDA = INTEGRATION / "otls/hdue_rendersettings.hda"
-NAME, LABEL = "hdue_rendersettings", "hdUE Render Settings"
+NAME, LABEL, ICON = "hdue_rendersettings", "hdUE Render Settings", "HDUE_hduerenderproperties"
 VARS = "/Render/Products/Vars/"
 # AOVs the delegate renders besides the beauty (HdUEAovId in src/hydra/delegate.cpp):
 # (render var and channel name, label, USD data type, husk format).
@@ -159,12 +159,17 @@ def build():
     asset = subnet.createDigitalAsset(NAME, str(HDA), LABEL, min_num_inputs=0, max_num_inputs=1, ignore_external_references=True)
     definition = asset.type().definition()
     definition.setParmTemplateGroup(group)  # the subnet's spare parameters are not carried over
-    definition.setIcon("HDUE_hduerenderproperties")
+    definition.setIcon(ICON)
     definition.addSection("Tools.shelf", TOOL)
     definition.addSection("Help", help_page(group))
     definition.addSection("OnCreated", "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n")
     definition.setExtraFileOption("OnCreated/IsPython", True)
     definition.save(str(HDA), asset)
+    # Saving embeds a copy of a resolvable icon; keep the name only (config/Icons on HOUDINI_PATH resolves it).
+    saved = hou.hda.definitionsInFile(str(HDA))[0]
+    if "IconSVG" in saved.sections():
+        saved.removeSection("IconSVG")
+        saved.setIcon(ICON)
     shutil.rmtree(HDA.parent / "backup", ignore_errors=True)
     print(f"{HDA}: {len(definition.parmTemplateGroup().entriesWithoutFolders())} parameters")
 
