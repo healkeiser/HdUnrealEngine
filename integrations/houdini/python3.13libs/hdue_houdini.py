@@ -85,10 +85,7 @@ class Host:
         config = runtime_config()
         os.environ["HDUE_BACKEND_DLL"] = config["backend_dll"]
         hou.putenv("HDUE_BACKEND_DLL", config["backend_dll"])
-        # UE runs on hdUE's own thread (started by the first hdUE delegate), not on Houdini's UI thread: there it only
-        # advanced between Qt events, so navigation waited seconds per frame and heavy UE work froze the UI.
-        os.environ["HDUE_HOUDINI_UI"] = "1"
-        hou.putenv("HDUE_HOUDINI_UI", "1")
+        # UE runs on hdUE's own thread (started by the first hdUE delegate), not on Houdini's UI thread.
         self.runtime = Runtime(
             config["backend_dll"],
             config["runtime_project"],
@@ -119,6 +116,8 @@ class Host:
         self.viewer = None
         self.last_options = None
         self.options_key = None
+        self.libraries = (None, None)
+        self.z_up = False
         self.closed = False
         self.last_state = time.monotonic()
         self.last_textures = None
@@ -202,8 +201,9 @@ class Host:
         try:
             state = self.api.status()
             self.live_substrate.tick()
+            # Optional UI shim (hdUE_settings subnet): mask preview and automatic Substrate preparation.
             node = current_settings_node()
-            if node:
+            if _hdue_selected():
                 if state["active"]:
                     try:
                         stage = scene_viewer().stage()
@@ -220,18 +220,15 @@ class Host:
                         self.material_problem(str(error), state["session"])
                         stage = None
                     if stage:
-                        values = _settings_values(node)
+                        values = _settings_values(node) if node else ()
                         key = _stage_key(values)
+                        # Render settings, as husk reads them; the stage changes only with the stage key.
+                        if key != self.options_key:
+                            self.options_key = key
+                            self.libraries = libraries(stage, node)
+                            self.z_up = UsdGeom.GetStageUpAxis(stage) == "Z"
                         self.sync_scene(
-                            state["session"],
-                            key,
-                            any(
-                                node.evalParm(name)
-                                for name in (
-                                    "hdue_materialx_library",
-                                    "hdue_substrate_library",
-                                )
-                            ),
+                            state["session"], key, any(self.libraries)
                         )
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
                         self.watch_stage(stage)
@@ -241,6 +238,7 @@ class Host:
                         materials_key = (
                             state["session"],
                             values,
+                            self.libraries,
                             hou.frame() if self.materials_animated else None,
                         )
                         if state["session"] and (
@@ -250,12 +248,13 @@ class Host:
                             self.last_materials = materials_key
                             self.materials_dirty = False
                             try:
-                                preview = node.parm("hdue_wet_mask_preview")
+                                preview = node and node.parm(
+                                    "hdue_wet_mask_preview"
+                                )
                                 self.prepared_materials.settings[
                                     "wetMaskPreview"
                                 ] = (bool(preview.eval()) if preview else False)
-                                substrate = node.parm("hdue_substrate_library")
-                                automatic = node.parm(
+                                automatic = node and node.parm(
                                     "hdue_substrate_auto_prepare"
                                 )
                                 self.live_substrate.enabled = (
@@ -266,10 +265,10 @@ class Host:
                                 changed = self.prepared_materials.sync(
                                     stage,
                                     Usd.TimeCode(hou.frame()),
-                                    node.evalParm("hdue_materialx_library"),
+                                    self.libraries[0],
                                     state["session"],
                                     self.api,
-                                    substrate.eval() if substrate else None,
+                                    self.libraries[1],
                                 )
                                 if changed:
                                     scene_viewer().curViewport().draw()
@@ -282,33 +281,19 @@ class Host:
                                 self.material_problem(
                                     str(error), state["session"]
                                 )
-                        # The stage only changes when the displayed LOP cooks or the settings change (the stage key).
-                        if key != self.options_key:
-                            mode, samples = render_options(stage)
-                            self.options_key = key
-                            self.stage_options = (
-                                mode == "pathtraced",
-                                samples,
-                                UsdGeom.GetStageMetersPerUnit(stage),
-                                UsdGeom.GetStageUpAxis(stage) == "Z",
-                            )
-                        options = (
-                            state["session"],
-                            *self.stage_options,
-                            hou.frame() / hou.fps(),
-                        )
-                        if options != self.last_options and self.api.options(
-                            *options[1:]
+                        # Hydra brings the render settings, units and time; Houdini sends no up axis.
+                        axis = (state["session"], self.z_up)
+                        if axis != self.last_options and self.api.up_axis(
+                            self.z_up
                         ):
-                            self.last_options = options
+                            self.last_options = axis
                             scene_viewer().curViewport().draw()
             if self.assets.authored:
                 # The bounds meshes serve hdUE only; other renderers get the scene as authored.
                 viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
-                if (
-                    not node
-                    or viewer is None
-                    or viewer.currentHydraRenderer() not in (LABEL, PLUGIN)
+                if viewer is None or viewer.currentHydraRenderer() not in (
+                    LABEL,
+                    PLUGIN,
                 ):
                     try:
                         self.assets.clear()
@@ -321,15 +306,6 @@ class Host:
                     self.viewer.status.setText(
                         "Select Unreal Engine (hdUE) in Solaris to resume"
                     )
-            # UE publishes frames on its own thread; redraw the viewport when one arrived so Houdini shows it.
-            if state["active"] and state["published_frames"] != getattr(
-                self, "shown_frames", None
-            ):
-                self.shown_frames = state["published_frames"]
-                try:
-                    scene_viewer().curViewport().draw()
-                except (hou.Error, AttributeError):
-                    pass
             if (
                 self.viewer
                 and self.viewer.isVisible()
@@ -468,7 +444,7 @@ def _hdue_selected():
             and tab.currentHydraRenderer() in (LABEL, PLUGIN)
             for tab in hou.ui.paneTabs()
         )
-    except hou.Error:
+    except (hou.Error, TypeError):  # TypeError: a viewer outside LOPs
         return False
 
 
@@ -518,22 +494,11 @@ def start():
             QtCore.QTimer.singleShot(
                 500, lambda: hdefereval.execute_deferred(activate_saved_hip)
             )
-        test = os.environ.get("HDUE_HOUDINI_TEST")
-        if test:
-            import importlib
+        if os.environ.get("HDUE_HOUDINI_TEST"):
+            # tests/houdini (on HOUDINI_PATH for test runs only) picks the test.
+            import hdue_tests
 
-            module = {
-                "substrate-live": "hdue_substrate_live_test",
-                "substrate-textures": "hdue_substrate_texture_test",
-                "substrate": "hdue_substrate_test",
-                "surfaces": "hdue_surface_test",
-                "references": "hdue_reference_test",
-                "lighting": "hdue_lighting_test",
-                "materials": "hdue_materialx_test",
-                "optextures": "hdue_op_texture_test",
-                "viewport": "hdue_solaris_probe",
-            }.get(test, "hdue_houdini_test")
-            importlib.import_module(module).start(_host)
+            hdue_tests.start(_host)
     except BaseException:
         _failure = traceback.format_exc()
         _report(_failure)
@@ -699,8 +664,8 @@ def current_settings_node():
         if isinstance(network, hou.LopNetwork)
         else viewer.currentNode()
     )
-    # hdue_materialx_library exists only on the hdUE_settings subnet.
-    while node and not node.parm("hdue_materialx_library"):
+    # hdue_wet_mask_preview exists only on the hdUE_settings subnet.
+    while node and not node.parm("hdue_wet_mask_preview"):
         inputs = node.inputs()
         node = inputs[0] if inputs else None
     return node
@@ -729,42 +694,18 @@ def configure_live_preparation(node):
 
 
 def settings_node(input_node):
-    """HdUE's host controls on a pass-through subnet: the scene below it stays the input's USD, unchanged.
+    """HdUE's viewport-only controls on a pass-through subnet: the scene below it stays the input's USD, unchanged.
 
-    The delegate converts stage units and up axis itself; COP/HDA images and native asset bounds are the host's
-    (Host.sync_scene), outside the LOP graph.
+    Everything that changes the image is a render setting (hdUE Render Settings LOP), so husk renders it too: render
+    mode, samples, and the cooked MaterialX and Substrate libraries. COP/HDA images and native asset bounds are the
+    host's (Host.sync_scene), outside the LOP graph.
     """
     node = input_node.parent().createNode("subnet", "hdUE_settings")
     node.setInput(0, input_node)
     group = node.parmTemplateGroup()
-    # Render mode and samples are hdUE:* render settings; see render_settings_node().
-    group.append(
-        hou.StringParmTemplate(
-            "hdue_materialx_library",
-            "Cooked MaterialX library",
-            1,
-            default_value=(
-                os.environ.get("HDUE_MATERIALX_LIBRARY")
-                or runtime_config().get("materialx_library", ""),
-            ),
-            string_type=hou.stringParmType.FileReference,
-        )
-    )
     group.append(
         hou.ToggleParmTemplate(
             "hdue_wet_mask_preview", "Preview Primvar mask", default_value=False
-        )
-    )
-    group.append(
-        hou.StringParmTemplate(
-            "hdue_substrate_library",
-            "Prepared Substrate library",
-            1,
-            default_value=(
-                os.environ.get("HDUE_SUBSTRATE_LIBRARY")
-                or runtime_config().get("substrate_library", ""),
-            ),
-            string_type=hou.stringParmType.FileReference,
         )
     )
     group.append(
@@ -1066,6 +1007,27 @@ def render_options(stage):
         return attr.Get() if attr and attr.HasAuthoredValue() else default
 
     return get("renderMode", "realtime"), get("samplesPerPixel", 64)
+
+
+def libraries(stage, node=None):
+    """(cooked MaterialX, prepared Substrate) library files: hdUE:materialxLibrary and hdUE:substrateLibrary on the
+    stage's render settings prim, as husk sees them; else an older hdUE_settings subnet's fields, HDUE_*_LIBRARY or
+    the runtime profile's materialx_library / substrate_library. None where there is none.
+    """
+    prim = _settings_prim(stage)
+    result = []
+    for name in ("materialx", "substrate"):
+        attr = prim.GetAttribute(f"hdUE:{name}Library") if prim else None
+        value = attr.Get() if attr and attr.HasAuthoredValue() else None
+        parm = node.parm(f"hdue_{name}_library") if node else None
+        value = (
+            getattr(value, "path", value)
+            or (parm.eval() if parm else None)
+            or os.environ.get(f"HDUE_{name.upper()}_LIBRARY")
+            or runtime_config().get(f"{name}_library")
+        )
+        result.append(value or None)
+    return tuple(result)
 
 
 def open_usd(path):

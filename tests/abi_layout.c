@@ -54,5 +54,4 @@ _Static_assert(sizeof(HdueAssetStatus) == 584, "Asset status C ABI layout");
 _Static_assert(sizeof(HdueAssetSceneStatus) == 544, "Asset scene status C ABI layout");
 _Static_assert(sizeof(HdueAssetApi) == 40, "Asset extension C ABI layout");
 _Static_assert(sizeof(HdueViewportStatus) == 648, "Houdini viewport status C ABI layout");
-_Static_assert(sizeof(HdueViewportOptions) == 40, "Houdini viewport options C ABI layout");
 _Static_assert(sizeof(HdueDepthApi) == 24, "Optional depth extension C ABI layout");
