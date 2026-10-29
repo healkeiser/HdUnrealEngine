@@ -1608,6 +1608,7 @@ void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
 bool HdUERenderDelegate::Pause() { return setPaused(true); }
 bool HdUERenderDelegate::Resume() { return setPaused(false); }
 bool HdUERenderDelegate::setPaused(bool paused) {
+    trace("hdUE %s (was %s)\n", paused ? "pause" : "resume", state_->paused ? "paused" : "running");
     if (state_->paused.exchange(paused) == paused) return true;
     auto& host = selfHost();
     if (selfHosted_) host.paused += paused ? 1 : -1;
