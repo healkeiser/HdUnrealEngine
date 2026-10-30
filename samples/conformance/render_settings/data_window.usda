@@ -1,0 +1,66 @@
+#usda 1.0
+(
+    doc = """dataWindowNDC (xmin, ymin, xmax, ymax in NDC, origin bottom left) limits the rendered pixels: (0, 0, 0.5, 1)
+renders only the left half. The right cube is outside it."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "dataWindowNDC",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "left half rendered",
+   "value": {
+    "region": [
+     -2.8,
+     -0.3,
+     -2.2,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "right half not rendered",
+   "value": {
+    "region": [
+     2.2,
+     -0.3,
+     2.8,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform float4 dataWindowNDC = (0, 0, 0.5, 1)
+    }
+}
+def Cube "Left"
+{
+        double size = 1.0
+        double3 xformOp:translate = (-2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Right"
+{
+        double size = 1.0
+        double3 xformOp:translate = (2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

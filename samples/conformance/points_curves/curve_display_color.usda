@@ -1,0 +1,66 @@
+#usda 1.0
+(
+    doc = """displayColor with uniform interpolation gives one colour per curve: red top, blue bottom."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomBasisCurves",
+ "feature": "uniform displayColor per curve",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "curve 0 red",
+   "color": {
+    "region": [
+     -3,
+     1.85,
+     3,
+     2.15
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "curve 1 blue",
+   "color": {
+    "region": [
+     -3,
+     -2.15,
+     3,
+     -1.85
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def BasisCurves "Curves"
+{
+    uniform token type = "linear"
+    int[] curveVertexCounts = [2, 2]
+    point3f[] points = [(-4, 2, 0), (4, 2, 0), (-4, -2, 0), (4, -2, 0)]
+    float[] widths = [0.5] (
+        interpolation = "constant"
+    )
+    color3f[] primvars:displayColor = [(0.9, 0.05, 0.05), (0.05, 0.05, 0.9)] (
+        interpolation = "uniform"
+    )
+}

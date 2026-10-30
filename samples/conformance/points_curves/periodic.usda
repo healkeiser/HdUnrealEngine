@@ -1,0 +1,57 @@
+#usda 1.0
+(
+    doc = """wrap = periodic closes each curve: a linear square of four vertices also draws its closing edge (left
+side)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomBasisCurves",
+ "feature": "wrap periodic",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "closing edge",
+   "value": {
+    "region": [
+     -2.05,
+     -1,
+     -1.95,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "first edge",
+   "value": {
+    "region": [
+     -1,
+     -2.05,
+     1,
+     -1.95
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def BasisCurves "Square"
+{
+    uniform token type = "linear"
+    uniform token wrap = "periodic"
+    int[] curveVertexCounts = [4]
+    point3f[] points = [(-2, -2, 0), (2, -2, 0), (2, 2, 0), (-2, 2, 0)]
+    float[] widths = [0.3] (
+        interpolation = "constant"
+    )
+}

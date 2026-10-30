@@ -1,0 +1,84 @@
+#usda 1.0
+(
+    doc = """inputs:diffuse multiplies the light's effect on diffuse response. The wall is purely diffuse (specular
+workflow, black specularColor); frame 2 sets diffuse = 0: the wall goes dark."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "diffuse multiplier",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "diffuse 0 removes diffuse light",
+   "ratio": [
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 2
+    },
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 1
+    }
+   ],
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </Matte>
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity = 1
+        float inputs:diffuse.timeSamples = {1: 1, 2: 0}
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Material "Matte"
+{
+    token outputs:surface.connect = </Matte/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+}

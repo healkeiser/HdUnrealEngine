@@ -1,0 +1,116 @@
+#usda 1.0
+(
+    doc = """bindMaterialAs = strongerThanDescendants on an ancestor's binding overrides the descendants' own bindings;
+the default weakerThanDescendants does not. Both parents bind red, both children bind blue: left (stronger) red,
+right (weaker) blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdShadeMaterialBindingAPI",
+ "feature": "bindMaterialAs strongerThanDescendants",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "stronger parent wins",
+   "color": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "weaker parent loses",
+   "color": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        token outputs:surface
+    }
+}
+def Material "Blue"
+{
+    token outputs:surface.connect = </Blue/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.05, 0.05, 0.9)
+        token outputs:surface
+    }
+}
+def Xform "Strong" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    rel material:binding = </Red> (
+        bindMaterialAs = "strongerThanDescendants"
+    )
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Cube "child" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+            double size = 1.6
+            rel material:binding = </Blue>
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    
+}
+def Xform "Weak" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    rel material:binding = </Red> (
+        bindMaterialAs = "weakerThanDescendants"
+    )
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Cube "child" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+            double size = 1.6
+            rel material:binding = </Blue>
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    
+}

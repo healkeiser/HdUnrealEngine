@@ -1,0 +1,47 @@
+#usda 1.0
+(
+    doc = """resolution is the output image size in pixels: (96, 48)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "resolution",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "width 96",
+   "value": {
+    "stat": "width"
+   },
+   "equals": 96
+  },
+  {
+   "name": "height 48",
+   "value": {
+    "stat": "height"
+   },
+   "equals": 48
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform int2 resolution = (96, 48)
+    }
+}
+def Cube "Cube"
+{
+        double size = 1.0
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -1,0 +1,84 @@
+#usda 1.0
+(
+    doc = """Lights are Imageable: visibility = invisible removes the light's contribution. Frame 1 visible, frame 2
+invisible: the wall goes dark."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "light visibility",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "visible lights",
+   "value": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ],
+    "stat": "luma",
+    "frame": 1
+   },
+   "min": 0.02
+  },
+  {
+   "name": "invisible light is off",
+   "ratio": [
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 2
+    },
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 1
+    }
+   ],
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity = 1
+        token visibility.timeSamples = {1: "inherited", 2: "invisible"}
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

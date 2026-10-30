@@ -1,0 +1,81 @@
+#usda 1.0
+(
+    doc = """displayColor with vertex interpolation colours each point: red, green, blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPoints",
+ "feature": "per-point displayColor",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "red",
+   "color": {
+    "region": [
+     -3.3,
+     -0.3,
+     -2.7,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "green",
+   "color": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "blue",
+   "color": {
+    "region": [
+     2.7,
+     -0.3,
+     3.3,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Points "Points"
+{
+    point3f[] points = [(-3, 0, 0), (0, 0, 0), (3, 0, 0)]
+    float[] widths = [1.5, 1.5, 1.5] (
+        interpolation = "vertex"
+    )
+    color3f[] primvars:displayColor = [(0.9, 0.05, 0.05), (0.05, 0.9, 0.05), (0.05, 0.05, 0.9)] (
+        interpolation = "vertex"
+    )
+}

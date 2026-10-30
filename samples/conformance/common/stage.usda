@@ -1,0 +1,105 @@
+#usda 1.0
+(
+    doc = """Shared conformance stage, sublayered by every scene: a camera at (0, 0, 10) looking down -Z whose 40 mm
+aperture at 40 mm focal length frames exactly x, y in [-5, 5] on the z = 0 plane (Y up, metres), one distant key
+light at intensity 1 (brightness in exposure) and render settings writing the beauty (beauty.####.exr) and the
+primId/instanceId AOVs (ids.####.exr). Scenes override what they test; scripts/run_conformance.py writes the root
+layer husk renders."""
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+)
+
+def Camera "Camera"
+{
+    float focalLength = 40
+    float horizontalAperture = 40
+    float verticalAperture = 40
+    float2 clippingRange = (0.1, 1000)
+    double3 xformOp:translate = (0, 0, 10)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+
+def Xform "Lights"
+{
+    def DistantLight "key"
+    {
+        # Tilted 30 degrees down and 20 degrees sideways so the fronts and tops of solids both catch light.
+        # normalize makes intensity x 2^exposure the illuminance (4 lux here) instead of the sun disk's luminance.
+        bool inputs:normalize = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 2
+        float inputs:angle = 0.53
+        float3 xformOp:rotateXYZ = (-30, 20, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderSettings "Settings"
+    {
+        rel camera = </Camera>
+        uniform int2 resolution = (128, 128)
+        rel products = [</Render/Beauty>, </Render/Ids>]
+        int hdUE:samplesPerPixel = 16
+        int hdUE:warmupFrames = 8
+        token hdUE:renderMode = "realtime"
+    }
+
+    # The IDs go to their own product, so a scene can drop them; render_settings/multi_var_product.usda puts every
+    # var in one product.
+    def RenderProduct "Beauty"
+    {
+        token productName = "beauty.$F4.exr"
+        rel orderedVars = [</Render/Vars/C>]
+    }
+
+    def RenderProduct "Ids"
+    {
+        token productName = "ids.$F4.exr"
+        rel orderedVars = [</Render/Vars/primId>, </Render/Vars/instanceId>]
+    }
+
+    def Scope "Vars"
+    {
+        def RenderVar "C"
+        {
+            uniform token dataType = "color4f"
+            uniform string sourceName = "C.*[LO]"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "C"
+            token driver:parameters:aov:format = "color4f"
+        }
+
+        def RenderVar "primId"
+        {
+            uniform token dataType = "int"
+            uniform string sourceName = "primId"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "primId"
+            token driver:parameters:aov:format = "int"
+        }
+
+        def RenderVar "instanceId"
+        {
+            uniform token dataType = "int"
+            uniform string sourceName = "instanceId"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "instanceId"
+            token driver:parameters:aov:format = "int"
+        }
+
+        def RenderVar "depth"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "depth"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "depth"
+            token driver:parameters:aov:format = "float"
+        }
+    }
+}

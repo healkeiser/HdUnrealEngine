@@ -1,0 +1,102 @@
+#usda 1.0
+(
+    doc = """A material:binding on an instance root applies to the instance's prototype geometry (bindings inherit down
+namespace). Instance A is bound to red, B to blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "native instancing",
+ "feature": "material bound on the instance root",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "instance A red",
+   "color": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "instance B blue",
+   "color": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+class Xform "Proto"
+{
+    def Cube "cube"
+    {
+        double size = 1.2
+    }
+}
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        token outputs:surface
+    }
+}
+def Material "Blue"
+{
+    token outputs:surface.connect = </Blue/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.05, 0.05, 0.9)
+        token outputs:surface
+    }
+}
+def Xform "A" (
+        instanceable = true
+        prepend references = </Proto>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+{
+        rel material:binding = </Red>
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Xform "B" (
+        instanceable = true
+        prepend references = </Proto>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+{
+        rel material:binding = </Blue>
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

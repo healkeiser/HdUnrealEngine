@@ -1,0 +1,84 @@
+#usda 1.0
+(
+    doc = """visibility = invisible hides a prim and everything beneath it (inherited). Left: visible cube; middle: an
+invisible cube; right: a cube under an invisible Xform."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomImageable",
+ "feature": "visibility (and inheritance)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "visible",
+   "value": {
+    "region": [
+     -3.3,
+     -0.3,
+     -2.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "invisible",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "inherited invisible",
+   "value": {
+    "region": [
+     2.7,
+     -0.3,
+     3.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Cube "Visible"
+{
+        double size = 1.0
+        double3 xformOp:translate = (-3, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Invisible"
+{
+        double size = 1.0
+        token visibility = "invisible"
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Xform "Hidden"
+{
+    token visibility = "invisible"
+    def Cube "Child"
+    {
+            double size = 1.0
+            double3 xformOp:translate = (3, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    
+}

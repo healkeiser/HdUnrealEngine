@@ -1,0 +1,164 @@
+#usda 1.0
+(
+    doc = """The intrinsic gprims render as their parametric shapes. Top: Cube, Sphere, Cone (axis Y); bottom: Cylinder,
+Capsule (axis Y), Plane (axis Z, facing the camera). Six distinct prims."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeom gprims",
+ "feature": "Cube, Sphere, Cone, Cylinder, Capsule, Plane",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "Cube",
+   "value": {
+    "region": [
+     -3.75,
+     1.75,
+     -3.25,
+     2.25
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Sphere",
+   "value": {
+    "region": [
+     -0.25,
+     1.75,
+     0.25,
+     2.25
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Cone",
+   "value": {
+    "region": [
+     3.25,
+     1.55,
+     3.75,
+     2.05
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Cylinder",
+   "value": {
+    "region": [
+     -3.75,
+     -2.25,
+     -3.25,
+     -1.75
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Capsule",
+   "value": {
+    "region": [
+     -0.25,
+     -2.25,
+     0.25,
+     -1.75
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Plane",
+   "value": {
+    "region": [
+     3.25,
+     -2.25,
+     3.75,
+     -1.75
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Cone tip is narrow",
+   "value": {
+    "region": [
+     2.87,
+     2.52,
+     3.03,
+     2.68
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "6 prims in primId",
+   "value": {
+    "stat": "ids"
+   },
+   "equals": 6
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Cube "Cube"
+{
+        double size = 1.4
+        double3 xformOp:translate = (-3.5, 2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "Sphere"
+{
+        double radius = 0.7
+        double3 xformOp:translate = (0, 2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cone "Cone"
+{
+        double radius = 0.7
+        double height = 1.4
+        uniform token axis = "Y"
+        double3 xformOp:translate = (3.5, 2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cylinder "Cylinder"
+{
+        double radius = 0.7
+        double height = 1.4
+        uniform token axis = "Y"
+        double3 xformOp:translate = (-3.5, -2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Capsule "Capsule"
+{
+        double radius = 0.5
+        double height = 0.8
+        uniform token axis = "Y"
+        double3 xformOp:translate = (0, -2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Plane "Plane"
+{
+        double width = 1.4
+        double length = 1.4
+        uniform token axis = "Z"
+        uniform bool doubleSided = 1
+        double3 xformOp:translate = (3.5, -2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

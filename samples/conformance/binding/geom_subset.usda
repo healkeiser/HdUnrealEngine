@@ -1,0 +1,95 @@
+#usda 1.0
+(
+    doc = """A GeomSubset of elementType face and familyName materialBind, with its own material:binding, overrides the
+mesh's binding on its faces. Mesh bound green; subset {face 1} bound red."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomSubset",
+ "feature": "materialBind GeomSubset",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "face 0 mesh binding",
+   "color": {
+    "region": [
+     -3,
+     -1,
+     -1,
+     1
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "face 1 subset binding",
+   "color": {
+    "region": [
+     1,
+     -1,
+     3,
+     1
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        token outputs:surface
+    }
+}
+def Material "Green"
+{
+    token outputs:surface.connect = </Green/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.05, 0.9, 0.05)
+        token outputs:surface
+    }
+}
+def Mesh "Strip" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-4, -2, 0), (0, -2, 0), (4, -2, 0), (-4, 2, 0), (0, 2, 0), (4, 2, 0)]
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </Green>
+    uniform token subsetFamily:materialBind:familyType = "nonOverlapping"
+    def GeomSubset "right" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform token elementType = "face"
+        uniform token familyName = "materialBind"
+        int[] indices = [1]
+        rel material:binding = </Red>
+    }
+}

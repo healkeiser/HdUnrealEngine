@@ -1,0 +1,93 @@
+#usda 1.0
+(
+    doc = """Points render as spheres (or discs) of diameter widths. Widths 0.6, 1.2 and 2.4 at x = -3, 0, 3: only the
+widest reaches 0.9 from its centre."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPoints",
+ "feature": "points, widths",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "point at x=-3",
+   "value": {
+    "region": [
+     -3.15,
+     -0.15,
+     -2.85,
+     0.15
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "point at x=0",
+   "value": {
+    "region": [
+     -0.15,
+     -0.15,
+     0.15,
+     0.15
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "point at x=3",
+   "value": {
+    "region": [
+     2.85,
+     -0.15,
+     3.15,
+     0.15
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "2.4 wide reaches 0.9",
+   "value": {
+    "region": [
+     3.82,
+     -0.08,
+     3.98,
+     0.08
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "1.2 wide does not",
+   "value": {
+    "region": [
+     0.82,
+     -0.08,
+     0.98,
+     0.08
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Points "Points"
+{
+    point3f[] points = [(-3, 0, 0), (0, 0, 0), (3, 0, 0)]
+    float[] widths = [0.6, 1.2, 2.4] (
+        interpolation = "vertex"
+    )
+}

@@ -1,0 +1,79 @@
+#usda 1.0
+(
+    doc = """subdivisionScheme = none renders the control cage as polygons; catmullClark renders the limit surface, which
+for a cube cage is a rounded blob well inside the cage corners. Two 2-unit cube cages at x = -2.5 (none) and 2.5
+(catmullClark)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "subdivisionScheme none vs catmullClark",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "none keeps its corner",
+   "value": {
+    "region": [
+     -3.52,
+     0.88,
+     -3.38,
+     1.02
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "catmullClark rounds the corner",
+   "value": {
+    "region": [
+     1.48,
+     0.88,
+     1.62,
+     1.02
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "catmullClark body",
+   "value": {
+    "region": [
+     2.1,
+     -0.4,
+     2.9,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "None"
+{
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 2, 3, 5, 4, 7, 6, 4, 0, 3, 7, 1, 5, 6, 2, 3, 2, 6, 7, 4, 5, 1, 0]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1), (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1)]
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (-2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Mesh "CatmullClark"
+{
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 2, 3, 5, 4, 7, 6, 4, 0, 3, 7, 1, 5, 6, 2, 3, 2, 6, 7, 4, 5, 1, 0]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1), (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1)]
+        uniform token subdivisionScheme = "catmullClark"
+        double3 xformOp:translate = (2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

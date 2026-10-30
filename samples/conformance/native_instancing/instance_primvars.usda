@@ -1,0 +1,80 @@
+#usda 1.0
+(
+    doc = """Constant primvars inherit down namespace, including from an instance root into its prototype's prims. The
+cube inside the prototype has no displayColor; instance A carries red, instance B green."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "native instancing",
+ "feature": "constant primvars inherited into instances",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "instance A red",
+   "color": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "instance B green",
+   "color": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+class Xform "Proto"
+{
+    def Cube "cube"
+    {
+        double size = 1.2
+    }
+}
+def Xform "A" (
+        instanceable = true
+        prepend references = </Proto>
+    )
+{
+        color3f[] primvars:displayColor = [(0.9, 0.05, 0.05)]
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Xform "B" (
+        instanceable = true
+        prepend references = </Proto>
+    )
+{
+        color3f[] primvars:displayColor = [(0.05, 0.9, 0.05)]
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

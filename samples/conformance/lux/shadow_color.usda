@@ -1,0 +1,58 @@
+#usda 1.0
+(
+    doc = """shadow:color tints shadows. hdUE does not support it and must say so in the log; shadows stay."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux ShadowAPI",
+ "feature": "shadow:color (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names shadow:color",
+   "log": "shadow:color is not supported",
+   "present": true
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def Sphere "Occluder"
+{
+        double radius = 0.8
+        double3 xformOp:translate = (0, 0, 1.5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def SphereLight "L" (
+    prepend apiSchemas = ["ShadowAPI"]
+)
+{
+        float inputs:radius = 0.05
+        float inputs:intensity = 1
+        float inputs:exposure = 12
+        color3f inputs:shadow:color = (1, 0, 0)
+        double3 xformOp:translate = (3, 0, 6)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

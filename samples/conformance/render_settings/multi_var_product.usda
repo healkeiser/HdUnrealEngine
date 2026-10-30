@@ -1,0 +1,90 @@
+#usda 1.0
+(
+    doc = """A RenderProduct's orderedVars all go into one image. One product holds the beauty, primId, instanceId and
+depth: the IDs must be prim IDs (two prims, background -1) and depth must be nearer on the cube than on the
+background, not copies of the beauty."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderProduct",
+ "feature": "several RenderVars in one product",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "2 prims in primId",
+   "value": {
+    "stat": "ids"
+   },
+   "equals": 2
+  },
+  {
+   "name": "beauty",
+   "value": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "depth: cube nearer than background",
+   "ratio": [
+    {
+     "region": [
+      -2.2,
+      -0.2,
+      -1.8,
+      0.2
+     ],
+     "aov": "depth"
+    },
+    {
+     "region": [
+      -0.5,
+      3.5,
+      0.5,
+      4.5
+     ],
+     "aov": "depth"
+    }
+   ],
+   "max": 0.9999
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = </Render/All>
+    }
+    def RenderProduct "All"
+    {
+        token productName = "all.$F4.exr"
+        rel orderedVars = [</Render/Vars/C>, </Render/Vars/primId>, </Render/Vars/instanceId>, </Render/Vars/depth>]
+    }
+}
+def Cube "A"
+{
+        double size = 1.0
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "B"
+{
+        double radius = 0.5
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

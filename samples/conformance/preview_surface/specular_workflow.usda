@@ -1,0 +1,86 @@
+#usda 1.0
+(
+    doc = """With useSpecularWorkflow = 1, specularColor is the F0 colour. A black-diffuse sphere with green specularColor
+under a white dome reflects green."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "useSpecularWorkflow, specularColor",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "green reflection",
+   "color": {
+    "region": [
+     -0.8,
+     -0.8,
+     0.8,
+     0.8
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "reflects",
+   "value": {
+    "region": [
+     -0.8,
+     -0.8,
+     0.8,
+     0.8
+    ],
+    "stat": "luma"
+   },
+   "min": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def DomeLight "Env"
+{
+    float inputs:intensity = 1
+    float inputs:exposure = 0
+}
+def Material "M"
+{
+    token outputs:surface.connect = </M/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 0, 0)
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 1, 0)
+            float inputs:roughness = 0.2
+        token outputs:surface
+    }
+}
+def Sphere "Ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.5
+        rel material:binding = </M>
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

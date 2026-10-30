@@ -1,0 +1,103 @@
+#usda 1.0
+(
+    doc = """The Hydra depth AOV is the normalized depth of the nearest surface (background at the far value). The cube 5
+units from the camera is nearer than the one 10 away, both nearer than the background."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "depth AOV",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "near < far",
+   "ratio": [
+    {
+     "region": [
+      -2.2,
+      -0.2,
+      -1.8,
+      0.2
+     ],
+     "aov": "depth"
+    },
+    {
+     "region": [
+      1.8,
+      -0.2,
+      2.2,
+      0.2
+     ],
+     "aov": "depth"
+    }
+   ],
+   "max": 0.9999
+  },
+  {
+   "name": "far < background",
+   "ratio": [
+    {
+     "region": [
+      1.8,
+      -0.2,
+      2.2,
+      0.2
+     ],
+     "aov": "depth"
+    },
+    {
+     "region": [
+      -0.5,
+      3.5,
+      0.5,
+      4.5
+     ],
+     "aov": "depth"
+    }
+   ],
+   "max": 0.9999
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Depth>]
+    }
+    def RenderProduct "Depth"
+    {
+        token productName = "depth.$F4.exr"
+        rel orderedVars = </Render/Vars/depth>
+    }
+    over "Vars"
+    {
+        def RenderVar "depth"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "depth"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "depth"
+        }
+    }
+}
+def Cube "Near"
+{
+        double size = 0.5
+        double3 xformOp:translate = (-1, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Far"
+{
+        double size = 1.0
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

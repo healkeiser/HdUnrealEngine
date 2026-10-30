@@ -1,0 +1,51 @@
+#usda 1.0
+(
+    doc = """aspectRatioConformPolicy reconciles a square 40 x 40 aperture with a 128 x 64 image. cropAperture: the aperture is cropped vertically; horizontal framing is kept.
+A sphere of radius 2 at the origin covers about 0.77 of the image height."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "aspectRatioConformPolicy cropAperture",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "sphere height fraction",
+   "value": {
+    "stat": "bbox_height"
+   },
+   "min": 0.72,
+   "max": 0.92
+  },
+  {
+   "name": "sphere pixel aspect",
+   "value": {
+    "stat": "bbox_aspect"
+   },
+   "min": 0.9,
+   "max": 1.1
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform int2 resolution = (128, 64)
+        uniform token aspectRatioConformPolicy = "cropAperture"
+    }
+}
+def Sphere "Ball"
+{
+        double radius = 2
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

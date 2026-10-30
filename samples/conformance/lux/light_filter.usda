@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """light:filters attaches LightFilters to a light. hdUE does not support filters and must say so; the light
+still renders."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLuxLightFilter",
+ "feature": "light:filters (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names light filters",
+   "log": "light filters are not supported",
+   "present": true
+  },
+  {
+   "name": "light still renders",
+   "value": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ],
+    "stat": "luma"
+   },
+   "min": 0.01
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def LightFilter "Filter"
+{
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity = 1
+        rel light:filters = </Filter>
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -1,0 +1,138 @@
+#usda 1.0
+(
+    doc = """Authored normals replace computed ones; vertex, faceVarying and uniform interpolations are valid. Each right-
+hand quad's normals tilt 60 degrees away from the key light (towards -X), so it must render much darker than the
+left reference quad with computed normals."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "authored normals: vertex, faceVarying, uniform",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "reference lit",
+   "value": {
+    "region": [
+     -3.1,
+     -0.6,
+     -1.9,
+     0.6
+    ],
+    "stat": "luma"
+   },
+   "min": 0.05
+  },
+  {
+   "name": "vertex normals darken",
+   "ratio": [
+    {
+     "region": [
+      2.0,
+      2.5,
+      3.0,
+      3.5
+     ]
+    },
+    {
+     "region": [
+      -3.1,
+      -0.6,
+      -1.9,
+      0.6
+     ]
+    }
+   ],
+   "max": 0.5
+  },
+  {
+   "name": "faceVarying normals darken",
+   "ratio": [
+    {
+     "region": [
+      2.0,
+      -0.5,
+      3.0,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      -3.1,
+      -0.6,
+      -1.9,
+      0.6
+     ]
+    }
+   ],
+   "max": 0.5
+  },
+  {
+   "name": "uniform normals darken",
+   "ratio": [
+    {
+     "region": [
+      2.0,
+      -3.5,
+      3.0,
+      -2.5
+     ]
+    },
+    {
+     "region": [
+      -3.1,
+      -0.6,
+      -1.9,
+      0.6
+     ]
+    }
+   ],
+   "max": 0.5
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Reference"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, -1, 0), (-1, -1, 0), (-1, 1, 0), (-4, 1, 0)]
+        uniform token subdivisionScheme = "none"
+}
+def Mesh "Vertex"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1, 2, 0), (4, 2, 0), (4, 4, 0), (1, 4, 0)]
+        uniform token subdivisionScheme = "none"
+        normal3f[] normals = [(-0.866, 0, 0.5), (-0.866, 0, 0.5), (-0.866, 0, 0.5), (-0.866, 0, 0.5)] (
+            interpolation = "vertex"
+        )
+}
+def Mesh "FaceVarying"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1, -1, 0), (4, -1, 0), (4, 1, 0), (1, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        normal3f[] normals = [(-0.866, 0, 0.5), (-0.866, 0, 0.5), (-0.866, 0, 0.5), (-0.866, 0, 0.5)] (
+            interpolation = "faceVarying"
+        )
+}
+def Mesh "Uniform"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1, -4, 0), (4, -4, 0), (4, -2, 0), (1, -2, 0)]
+        uniform token subdivisionScheme = "none"
+        normal3f[] normals = [(-0.866, 0, 0.5)] (
+            interpolation = "uniform"
+        )
+}

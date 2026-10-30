@@ -1,0 +1,55 @@
+#usda 1.0
+(
+    doc = """holeIndices lists faces that are not rendered. A two-face strip with holeIndices = [1]: the right face is a
+hole."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "holeIndices",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "face 0",
+   "value": {
+    "region": [
+     -2.5,
+     -1,
+     -0.5,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "face 1 is a hole",
+   "value": {
+    "region": [
+     0.5,
+     -1,
+     2.5,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Strip"
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-3, -1.5, 0), (0, -1.5, 0), (3, -1.5, 0), (-3, 1.5, 0), (0, 1.5, 0), (3, 1.5, 0)]
+        int[] holeIndices = [1]
+        uniform token subdivisionScheme = "none"
+}

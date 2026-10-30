@@ -1,0 +1,63 @@
+#usda 1.0
+(
+    doc = """shutter:open/close (frames relative to the frame) define motion blur. Shutter -0.5..0.5; the bottom cube's
+translation moves 2 units per frame along +X, so it smears 1 unit each side; the top cube is still."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomCamera",
+ "feature": "shutter:open / shutter:close",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "moving cube smears",
+   "value": {
+    "region": [
+     0.7,
+     -2.2,
+     1.3,
+     -1.8
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "still cube sharp",
+   "value": {
+    "region": [
+     0.7,
+     1.8,
+     1.3,
+     2.2
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.02
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Camera"
+{
+    double shutter:open = -0.5
+    double shutter:close = 0.5
+}
+def Cube "Still"
+{
+        double size = 1.0
+        double3 xformOp:translate = (0, 2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Moving"
+{
+        double3 xformOp:translate.timeSamples = {0: (-2, -2, 0), 1: (0, -2, 0), 2: (2, -2, 0)}
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

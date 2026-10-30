@@ -1,0 +1,82 @@
+#usda 1.0
+(
+    doc = """A DistantLight (angle 0.53, normalize on (intensity is illuminance)) is the only light on a grey wall at z = -2. Its brightness is
+intensity x 2^exposure: frame 2 has exposure +1 and must be twice as bright."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "DistantLight, exposure",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "lights the wall",
+   "value": {
+    "region": [
+     -1,
+     -1,
+     1,
+     1
+    ],
+    "stat": "luma",
+    "frame": 1
+   },
+   "min": 0.02
+  },
+  {
+   "name": "exposure +1 doubles",
+   "ratio": [
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 2
+    },
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 1
+    }
+   ],
+   "min": 1.8,
+   "max": 2.2
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def DistantLight "L"
+{
+        bool inputs:normalize = 1
+        float inputs:intensity = 1
+        float inputs:exposure.timeSamples = {1: 2, 2: 3}
+}

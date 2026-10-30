@@ -1,0 +1,85 @@
+#usda 1.0
+(
+    doc = """metallic = 1 removes the diffuse lobe: diffuseColor becomes the specular F0. Under the distant key light only
+(no environment), a smooth metal sphere is dark apart from a tiny highlight, while the dielectric sphere with the
+same diffuseColor is lit."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "metallic",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "metal much darker than dielectric",
+   "ratio": [
+    {
+     "region": [
+      1.7,
+      -0.8,
+      3.3,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -3.3,
+      -0.8,
+      -1.7,
+      0.8
+     ]
+    }
+   ],
+   "max": 0.4
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Dielectric"
+{
+    token outputs:surface.connect = </Dielectric/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.8, 0.8, 0.8)
+            float inputs:roughness = 0.05
+        token outputs:surface
+    }
+}
+def Material "Metal"
+{
+    token outputs:surface.connect = </Metal/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.8, 0.8, 0.8)
+            float inputs:roughness = 0.05
+            float inputs:metallic = 1
+        token outputs:surface
+    }
+}
+def Sphere "Dielectric_ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.2
+        rel material:binding = </Dielectric>
+        double3 xformOp:translate = (-2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "Metal_ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.2
+        rel material:binding = </Metal>
+        double3 xformOp:translate = (2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

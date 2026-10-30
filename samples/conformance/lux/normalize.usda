@@ -1,0 +1,71 @@
+#usda 1.0
+(
+    doc = """normalize divides luminance by the light's surface area, so its power does not change with size. A
+normalized sphere light: radius 0.25 in frame 1, 0.5 in frame 2, about the same wall brightness."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "normalize",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "power independent of size",
+   "ratio": [
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 2
+    },
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 1
+    }
+   ],
+   "min": 0.8,
+   "max": 1.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L"
+{
+        bool inputs:normalize = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 6
+        float inputs:radius.timeSamples = {1: 0.25, 2: 0.5}
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
