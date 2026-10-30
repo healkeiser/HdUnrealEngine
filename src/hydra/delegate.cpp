@@ -57,7 +57,7 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hd/driver.h"
 #if defined(HDUE_HOUDINI)
-#define HDUE_VIEWPORT_EXPORTS 1  // hdue_run_ui_tasks is defined below
+#define HDUE_VIEWPORT_EXPORTS 1  // the viewport_api.h exports are defined below
 #include "../houdini/diagnostics.h"
 #include "hdue/viewport_api.h"
 #include "gpu_frames.h"
@@ -226,47 +226,14 @@ void shutdownSelfHost() {
     host.stop();
     host.backend.reset();
 }
-// When a host (Houdini's UI thread) owns UE, delegates executing on other threads (Live Render) queue their
-// UE work here; the host runs it from hdue_run_ui_tasks after each tick.
-struct HdUEOwnerQueue {
-    struct Task {
-        std::function<void()> run;
-        int state = 0;
-        std::exception_ptr error;
-    };  // 0 queued, 1 running, 2 done
-    std::mutex mutex;
-    std::condition_variable done;
-    std::deque<std::shared_ptr<Task>> tasks;
-    std::atomic<DWORD> owner{0};
-};
-HdUEOwnerQueue& ownerQueue() {
-    static HdUEOwnerQueue queue;
-    return queue;
-}
-// Runs f on the thread that owns UE: hdUE's own UE thread, the host's thread, or inline.
+// Runs f on the thread that owns UE: hdUE's own UE thread, or inline.
 void ueRun(const std::function<void()>& f) {
     auto& host = selfHost();
     if (host.worker.joinable()) {
         host.run(f);
         return;
     }
-    auto& queue = ownerQueue();
-    const DWORD owner = queue.owner;
-    if (!owner || owner == GetCurrentThreadId()) {
-        f();
-        return;
-    }
-    auto task = std::make_shared<HdUEOwnerQueue::Task>();
-    task->run = f;
-    std::unique_lock lock(queue.mutex);
-    queue.tasks.push_back(task);
-    // A UI thread that waits for this thread (stopping a render) never drains: give up on work it has not started.
-    if (!queue.done.wait_for(lock, std::chrono::seconds(5), [&] { return task->state != 0; })) {
-        queue.tasks.erase(std::find(queue.tasks.begin(), queue.tasks.end(), task));
-        throw std::runtime_error("hdUE: the thread that owns UE did not run queued work within 5 s");
-    }
-    queue.done.wait(lock, [&] { return task->state == 2; });
-    if (task->error) std::rethrow_exception(task->error);
+    f();
 }
 }  // namespace
 // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
@@ -2670,7 +2637,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     // Houdini's viewport delegate registers for the hdUE host (diagnostics.cpp). With background scene updates Houdini
     // creates it on a worker thread, so the creating thread no longer identifies it: houdini:viewport does
     // (SetRenderSetting).
-    if (!ownerQueue().owner || ownerQueue().owner == GetCurrentThreadId()) HdUERegisterViewport(state_, this);
+    HdUERegisterViewport(state_, this);
 #endif
     for (const auto& desc : GetRenderSettingDescriptors()) {
         if (!state_->settings.count(desc.key)) state_->settings[desc.key] = desc.defaultValue;
@@ -3364,29 +3331,5 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_run_on_ue_thread(void(
         return HDUE_INVALID_STATE;
     }  // the owner did not pick the task up
     return HDUE_OK;
-}
-extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks() {
-    auto& queue = PXR_NS::ownerQueue();
-    queue.owner = GetCurrentThreadId();
-    for (;;) {
-        std::shared_ptr<PXR_NS::HdUEOwnerQueue::Task> task;
-        {
-            std::lock_guard lock(queue.mutex);
-            if (queue.tasks.empty()) return;
-            task = queue.tasks.front();
-            queue.tasks.pop_front();
-            task->state = 1;
-        }
-        try {
-            task->run();
-        } catch (...) {
-            task->error = std::current_exception();
-        }
-        {
-            std::lock_guard lock(queue.mutex);
-            task->state = 2;
-        }
-        queue.done.notify_all();
-    }
 }
 #endif

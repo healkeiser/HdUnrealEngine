@@ -74,7 +74,7 @@ In husk, hython and Houdini's UI, the owner is an `std::thread` that the first d
 
 In Process Explorer this thread is **`GameThread`** with a start address in `ucrtbase.dll` (the CRT thread entry of `std::thread`), not in the backend. In the Houdini session it was thread 7436 while Houdini's UI thread (start address `houdini.exe`, unnamed) was 48420, the `owner` the Python host recorded in `runtime-state.json`; `GameThread` CPU time grew while the viewport rendered. The Python host (`hdue_houdini.py`) never ticks UE: its 16 ms `QTimer` does housekeeping (materials, `op:` textures, status) and it attaches with `Runtime(start=False)`.
 
-Work from other threads reaches the owner through `ueRun` (`delegate.cpp`): with the worker, `run(f)`; without one, the `HdUEOwnerQueue`, which a host that runs UE on its own thread drains by calling `hdue_run_ui_tasks` after each tick (`include/hdue/viewport_api.h`; a task not picked up within 5 s fails with "the thread that owns UE did not run queued work within 5 s"). `hdue_run_on_ue_thread` runs a task through the same path and returns when it has run; the attached Python host sends every backend call it makes through it (`Runtime.on_ue_thread`, `scripts/hdue_runtime.py`). Live Render creates the delegate on one thread and executes it on others, which this indirection covers. In usdview, `hdue_runtime.Runtime(start=True)` initializes and ticks UE on usdview's Python thread; the delegate finds UE `READY` and starts no thread.
+Work from other threads reaches the owner through `ueRun` (`delegate.cpp`): with the worker, `run(f)`; without one, inline. `hdue_run_on_ue_thread` runs a task through the same path and returns when it has run; the attached Python host sends every backend call it makes through it (`Runtime.on_ue_thread`, `scripts/hdue_runtime.py`). Live Render creates the delegate on one thread and executes it on others, which this indirection covers. In usdview, `hdue_runtime.Runtime(start=True)` initializes and ticks UE on usdview's Python thread; the delegate finds UE `READY` and starts no thread.
 
 ### Thread inventory
 
@@ -187,7 +187,7 @@ Optional extensions, each from its own export with its own version, size and req
 | `gpu_api.h` | `hdue_get_gpu_api` | 1 | shared D3D12 frames for the host's graphics API |
 | (none) | `hdue_resize_session` | - | resize a session's target, keeping its scene; `HDUE_INVALID_STATE` on older runtimes |
 
-The delegate DLL exports a host-side API of its own (`include/hdue/viewport_api.h`, for the Python host): `hdue_get_viewport_status`, `hdue_set_viewport_up_axis`, `hdue_run_ui_tasks`, `hdue_run_on_ue_thread`, `hdue_set_viewport_materials`, `hdue_set_viewport_surfaces`, `hdue_set_viewport_textures` (each table version 1) and `hdue_shutdown_ue`. Calls validate versions, sizes, capacities, generations and the owning thread.
+The delegate DLL exports a host-side API of its own (`include/hdue/viewport_api.h`, for the Python host): `hdue_get_viewport_status`, `hdue_set_viewport_up_axis`, `hdue_run_on_ue_thread`, `hdue_set_viewport_materials`, `hdue_set_viewport_surfaces`, `hdue_set_viewport_textures` (each table version 1) and `hdue_shutdown_ue`. Calls validate versions, sizes, capacities, generations and the owning thread.
 
 ## Motion blur
 

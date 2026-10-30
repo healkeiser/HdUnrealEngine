@@ -24,9 +24,6 @@ HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(HdueViewportS
 /* The viewed stage's up axis (0 Y, 1 Z), which Houdini does not pass to the viewport's delegate. Render mode,
  * samples, units and time come through Hydra (the render settings prim, stageMetersPerUnit, houdini:frame). */
 HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_up_axis(uint32_t z_up);
-/* Called by the host on the thread that owns UE, after each tick: runs UE work that delegates executing on
- * other threads (Live Render) queued, and records this thread as the owner. */
-HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_run_ui_tasks(void);
 /* Runs task(context) on the thread that owns UE and returns when it has run; HDUE_INVALID_STATE if that thread did
  * not run it. Hosts call owner-only backend functions through it while hdUE runs UE on its own thread (Houdini's
  * UI). Any thread except one the UE thread waits for; on the UE thread itself it runs inline. */
