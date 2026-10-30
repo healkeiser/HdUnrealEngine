@@ -79,9 +79,10 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Package 'plugin\Release'),
 Copy-Item -LiteralPath $Delegate -Destination (Join-Path $Package 'plugin\Release')
 Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json') -Destination (Join-Path $Package 'plugin\resources')
 # Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out. So do the smoke
-# test, import libraries and the D3D12/Vulkan debug layers: debugging aids, not part of the product.
+# test, import libraries and the Vulkan debug layers: debugging aids, not part of the product. The Agility SDK copy
+# (D3D12) never loads: D3D12 reads D3D12SDKPath from the executable only, and husk/Houdini don't export it.
 $RuntimeTarget = Join-Path $Package 'runtime\Windows'
-Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp d3d12SDKLayers.dll VkLayer_*
+Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate D3D12 /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp VkLayer_*
 $BinTarget = Join-Path $RuntimeTarget ([IO.Path]::GetRelativePath($RuntimeRoot, (Split-Path $BackendDll)))
 Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
 # Houdini's own tbb12.dll is loaded first: every staged DLL must still find its imports there.

@@ -31,7 +31,7 @@ inseparable part of hdUE, on these terms:
      developers make no representations and give no warranties or conditions
      of any kind, express or implied, about them, and accept no liability for
      any damages arising from them, to the fullest extent permitted by law.
-  e. Microsoft redistributable files (D3D12Core.dll, xaudio2_9redist.dll,
+  e. Microsoft redistributable files (xaudio2_9redist.dll,
      WinPixEventRuntime.dll, dbghelp.dll) are licensed under Microsoft's terms;
      Microsoft and its suppliers are protected by this section as much as by
      those terms.

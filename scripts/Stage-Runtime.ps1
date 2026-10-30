@@ -11,6 +11,9 @@ $Runtime = Join-Path $Stage 'Windows'
 $Game = Join-Path $Runtime 'HdUEBackend'
 $Bin = Join-Path $Game 'Binaries\Win64'
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
+# UE's AgilitySDK module stages the Agility SDK in D3D12\x64, but D3D12 only reads D3D12SDKVersion/D3D12SDKPath from
+# the executable (husk.exe, houdinifx.exe), so the OS D3D12Core.dll is used and this copy never loads.
+Remove-Item -LiteralPath (Join-Path $Bin 'D3D12') -Recurse -Force -ErrorAction SilentlyContinue
 $HostBuild = Join-Path $TaskRoot 'build'
 $Smoke = Join-Path $HostBuild 'Release\hdue_backend_smoke.exe'
 if (-not (Test-Path -LiteralPath $Smoke)) {
