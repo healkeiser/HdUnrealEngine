@@ -2,7 +2,8 @@
 comparison images, docs/gallery.md and the README blocks. Two independent sets:
 
 - cornell: the CC0 Cornell box (samples/cornell) and one layer per feature in samples/cornell/variants;
-- sponza: Intel's Sponza 2022 (CC BY 4.0, not included) from its main camera, lit by samples/sponza/lighting.usda.
+- sponza: Intel's Sponza 2022 (CC BY 4.0, not included) from its main camera, lit by samples/sponza/lighting.usda,
+  with the MaterialX materials of samples/sponza/materials.usda.
 
     hython scripts/render_gallery.py [--set cornell|sponza] [--sponza FILE] [--addon FILE ...] [--dev] [--only NAME ...] [--docs-only] [--bless]
 
@@ -32,6 +33,9 @@ CORNELL = ROOT / "samples" / "cornell"
 SPONZA = ROOT / "samples" / "sponza"
 # Intel's download, kept out of git (samples/sponza/README.md): the scene and the add-ons the gallery layers over it.
 SPONZA_SCENE = SPONZA / "intel" / "main" / "NewSponza_Main_USD_Yup_003.usda"
+# MaterialX networks for the scene and its add-ons (scripts/generate_sponza_materials.py); its textures are Intel's, in
+# samples/sponza/intel.
+SPONZA_MATERIALS = SPONZA / "materials.usda"
 SPONZA_ADDONS = [
     SPONZA / "intel" / "curtains" / "NewSponza_Curtains_USD_YUp.usda",
     SPONZA / "intel" / "cypress_tree" / "NewSponza_CypressTree_USDA_YUp.usda",
@@ -582,7 +586,13 @@ def scenes(which, sponza_file, addons=()):
         )
         layer = override_layer(
             out / f"{camera}.usda",
-            [SPONZA / "lighting.usda", sponza_file, *fixes, *addons],
+            [
+                SPONZA / "lighting.usda",
+                SPONZA_MATERIALS,
+                sponza_file,
+                *fixes,
+                *addons,
+            ],
             metadata,
             [f"rel camera = </root/{camera}>"],
         )
@@ -748,8 +758,10 @@ def section(which, results, machine):
         order = [name for name in SPONZA_CAMERAS if name in results]
         intro = (
             "[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) "
-            "(Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials "
-            "with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer "
+            "(Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports "
+            "UsdPreviewSurface only; [samples/sponza/materials.usda](../samples/sponza/materials.usda) gives every material a "
+            "MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, "
+            "translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer "
             "image shows more noise than Karma at the same sample count. The scene has no lights, so "
             "[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, "
             "and levels the camera as Intel's render does."
