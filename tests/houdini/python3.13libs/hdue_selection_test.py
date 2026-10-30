@@ -15,7 +15,7 @@ import hdue_houdini as integration
 import hou
 import numpy as np
 from hdue_houdini_test import flipbook
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtOpenGLWidgets, QtWidgets
 
 _test = None
 
@@ -146,8 +146,14 @@ class Selection:
         yield from self.wait(0.5)
         viewport = viewer.curViewport()
         height = viewport.size()[-1]
-        widget = QtWidgets.QApplication.widgetAt(
-            viewer.qtScreenGeometry().center()
+        # The viewport's GL widget: the visible QOpenGLWidget of its size (not widgetAt, which other windows cover).
+        widget = next(
+            w
+            for w in QtWidgets.QApplication.allWidgets()
+            if isinstance(w, QtOpenGLWidgets.QOpenGLWidget)
+            and w.isVisible()
+            and (w.width(), w.height())
+            == tuple(int(v) for v in viewport.size()[-2:])
         )
         bounds = UsdGeom.BBoxCache(
             Usd.TimeCode.Default(), ["default", "render"]
