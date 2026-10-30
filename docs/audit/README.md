@@ -56,13 +56,15 @@ Third round (on `main`, `4a8d783` onward):
 - **Materials:** MAT-07 (each texture reads its own UV set; C ABI 10), MAT-08 (displacement diced and applied on the CPU in the delegate, so the Path Tracer sees it).
 - **Unreal backend:** UE-11 (Virtual Shadow Maps on), UE-16 (8192-pixel limit stated, husk tiles for larger images), UE-17 (UE's game thread is the host's; the smoke test runs UE on a worker thread). UE-10 kept: the public VT API cannot report residency.
 - **Houdini:** HOU-09 (`hdue::<name>::1.0` render LOPs, old names aliased in `OPcustomize`), HOU-11 (Render Geometry Settings tab), HOU-17 (progress and stats annotations, husk verbose callback).
+- **Conformance set** (`samples/conformance`, `scripts/run_conformance.py`, [docs/conformance.md](../conformance.md)): 108 scenes written from the USD schemas, checked automatically in both modes; 107 pass. Fixed from it: material binding purpose, `disableDepthOfField`, `includedPurposes`, the `UsdUVTexture` fallback, GeometryLight warned, hdUE warnings printed by husk. Far clip stays unsupported (a finite far plane changed Lumen's lighting by 8% with nothing clipped). Open: `lux/dome_latlong` realtime has a slight green cast since `4a8d783`.
+- **Build and tests:** BLD-01 (build stamped, warning in another Houdini build), BLD-02 (version, symbols, clean-tree packages), BLD-03 (tbb12 export check), TST-03 (gallery brightness bands in CI, Cornell tile baselines), TST-04 (`scripts/Test.ps1`). ALT-05 (interactive policy as an init flag), ALT-08 (OCIO built-in linear Rec.709, cache eviction), ALT-12, ALT-16, ALT-17.
 - **Alternatives:** ALT-13 (one canonical setting key), ALT-15 (no boot readiness loop), ALT-18 (one `Backend::boot`), ALT-19 (one renderer id, `HdUEHoudiniRendererPlugin`), and husk exits with code 1 instead of hanging when UE fails to boot. Declined with reasons: ALT-06 (only Houdini's viewport has a GL Hgi), ALT-07 (no OpenVDB in standalone OpenUSD), ALT-09 (already the proposed design), ALT-14 (the per-key blocks differ), ALT-20 (stock usdview/usdrecord hang in UE at Python exit).
 
 Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.
 - **Not feasible as specified:** MAT-05 (`transparent` opacity renders dark in UE's Path Tracer; Karma renders it like `presence`), HYD-15 far clip (UE's Path Tracer ignores a finite far plane), `hdue:asset` on Xform/Scope and cooked MaterialX/Substrate preparation in husk (host-only Python), ALT-04, ALT-12.
-- **Remaining:** SIM-01 (one API table), ALT-05/08/12/16/17 (in progress), BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04 (in progress), ALT-10/11 (wait for UE-01).
+- **Remaining:** SIM-01 (one API table), ALT-10/11 (wait for UE-01), re-record the PSO cache after VSM and the material changes.
 - **Investigate:** with `PathTracingMaxBounces=1`, hdUE's Path Tracer renders the floor and box tops black where Karma's direct-only render lights them.
 
 ## Then
