@@ -23,6 +23,9 @@ if (-not $Result.passed -or -not $Result.native_solaris_compositor_verified -or 
     throw "Incomplete Houdini / UE evidence: $RunOutput"
 }
 Write-Output "Verified Solaris / same-process UE: $RunOutput"
+# A post-process setting set back to its default (Revert to Defaults, or typed) renders as before it was changed.
+& (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory (Join-Path $RunOutput 'postprocess') -TestKind postprocess -TimeoutSeconds $TimeoutSeconds
+Write-Output "Verified Solaris post-process defaults: $RunOutput\postprocess"
 # Selection highlight and click picking: a Y-up metre stage (cube, mesh, instancer, points, curves) in the free view,
 # and the Z-up Cornell box through its camera (render buffers of another size than the viewport).
 foreach ($Case in @(

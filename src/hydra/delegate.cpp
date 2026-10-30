@@ -2933,14 +2933,20 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         return;
     }
     // Houdini repeats settings on redraws: an unchanged value returns without the state lock (held while an upload is
-    // prepared). The state lock is taken first, as everywhere else (setting() takes settingsMutex inside it).
+    // prepared). The state lock is taken first, as everywhere else (setting() takes settingsMutex inside it). Houdini
+    // sends an empty value for a setting no longer authored (a parameter back at its default, a blocked attribute):
+    // that removes it, so its default applies again (UE's own for postProcess:*, the variable's for cvar:*).
+    const auto unchanged = [&] {
+        const auto old = state_->settings.find(key);
+        return old == state_->settings.end() ? value.IsEmpty() : old->second == value;
+    };
     {
         std::lock_guard settingsLock(state_->settingsMutex);
-        if (const auto old = state_->settings.find(key); old != state_->settings.end() && old->second == value) return;
+        if (unchanged()) return;
     }
     std::lock_guard lock(state_->mutex);
     std::lock_guard settingsLock(state_->settingsMutex);
-    if (const auto old = state_->settings.find(key); old != state_->settings.end() && old->second == value) return;
+    if (unchanged()) return;
     HdRenderDelegate::SetRenderSetting(key, value);
     trace("hdUE setting changed: %s\n", key.GetText());
     // Settings that re-upload prims compare against their effective previous value (unset = the default), so the first
@@ -2951,7 +2957,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     const bool previousNanite = state_->setting<bool>("requireNanite", false);
     const bool previousCull = state_->setting<bool>("cullBackface", true);
     const bool previousInteractive = state_->interactive();
-    state_->settings[key] = value;
+    if (value.IsEmpty())
+        state_->settings.erase(key);
+    else
+        state_->settings[key] = value;
     // Into or out of tumbling/scrubbing/playing: capped samples and skipped AOVs (or the full image) need a new
     // request.
     if (state_->interactive() != previousInteractive) ++state_->requestSettingsRevision;

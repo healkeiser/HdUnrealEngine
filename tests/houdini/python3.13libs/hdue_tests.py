@@ -4,6 +4,7 @@ import importlib
 import os
 
 MODULES = {
+    "postprocess": "hdue_postprocess_test",
     "substrate-live": "hdue_substrate_live_test",
     "substrate-textures": "hdue_substrate_texture_test",
     "substrate": "hdue_substrate_test",
