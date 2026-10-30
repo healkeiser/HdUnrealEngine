@@ -16,12 +16,6 @@ must say so; the volume itself still renders."""
   {
    "name": "the volume still renders",
    "value": {
-    "region": [
-     -1,
-     -1,
-     1,
-     1
-    ],
     "stat": "alpha"
    },
    "min": 0.05

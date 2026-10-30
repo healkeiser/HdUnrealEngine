@@ -2727,8 +2727,8 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == HdPrimTypeTokens->cylinderLight) return HdUECreateLight(id, HDUE_CYLINDER_LIGHT);
     if (type == HdPrimTypeTokens->meshLight || type == HdPrimTypeTokens->pluginLight || type == TfToken("portalLight"))
         return HdUECreateUnsupportedLight(id, type);
-    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a UsdLuxGeometryLight
-        return HdUECreateUnsupportedLight(id, TfToken("GeometryLight"));
+    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a GeometryLight or PortalLight
+        return HdUECreateUnsupportedLight(id, type);
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {

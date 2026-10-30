@@ -11,7 +11,7 @@ renders. The key light is off."""
  "checks": [
   {
    "name": "warning names the mesh light",
-   "log": "meshLight is not supported",
+   "log": "hdUE warning:.*MeshLightAPI is not supported",
    "present": true
   },
   {

@@ -34,6 +34,8 @@
 #include "wet_mask.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hd/renderIndex.h"
+#include "pxr/imaging/hd/sceneIndex.h"
+#include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/base/gf/matrix4d.h"
 
@@ -1285,6 +1287,13 @@ public:
             std::call_once(shadowColorWarned, [&] {
                 TF_WARN("hdUE: shadow:color is not supported; shadows stay black (%s)", GetId().GetText());
             });
+        // UE lights have no shadow length limit (UE's USD importer maps shadow:enable only, USDLightConversion.cpp).
+        static std::once_flag shadowDistanceWarned;
+        if (value(get("shadow:distance"), -1.f) >= 0 || value(get("shadow:falloff"), -1.f) >= 0)
+            std::call_once(shadowDistanceWarned, [&] {
+                TF_WARN("hdUE: shadow:distance and shadow:falloff are not supported; shadows reach any distance (%s)",
+                        GetId().GetText());
+            });
         auto texture = get("texture:file");
         if (applicationLight.IsHolding<GlfSimpleLight>() &&
             applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
@@ -1409,11 +1418,19 @@ HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
         TfToken type;
         Unsupported(const SdfPath& id, const TfToken& type) : HdLight(id), type(type) {}
         HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
-        void Sync(HdSceneDelegate*, HdRenderParam*, HdDirtyBits* bits) override {
+        void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
+            // The generic light Sprim (GeometryLight, PortalLight) is named by its USD type.
+            auto name = type;
+            if (type == HdPrimTypeTokens->light && !GetId().IsEmpty())
+                if (const auto typeName =
+                        UsdImagingUsdPrimInfoSchema::GetFromParent(
+                            delegate->GetRenderIndex().GetTerminalSceneIndex()->GetPrim(GetId()).dataSource)
+                            .GetTypeName())
+                    name = typeName->GetTypedValue(0);
             static std::mutex mutex;
             static std::set<TfToken> warned;
-            if (std::lock_guard lock(mutex); !GetId().IsEmpty() && warned.insert(type).second)
-                TF_WARN("hdUE: %s is not supported and renders nothing (%s)", type.GetText(), GetId().GetText());
+            if (std::lock_guard lock(mutex); !GetId().IsEmpty() && warned.insert(name).second)
+                TF_WARN("hdUE: %s is not supported and renders nothing (%s)", name.GetText(), GetId().GetText());
             *bits = Clean;
         }
     };
