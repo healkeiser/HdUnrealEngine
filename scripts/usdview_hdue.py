@@ -114,7 +114,9 @@ class Launcher(Usdviewq.Launcher):
 
             options.hdue_backend = resolve_path("backend_dll")
             options.hdue_project = resolve_path("runtime_project")
-            options.hdue_asset_catalog = resolve_path("asset_catalog")
+            # Only Prepare-ProjectAssets.ps1 runtimes have a catalog.
+            if "asset_catalog" in config:
+                options.hdue_asset_catalog = resolve_path("asset_catalog")
         if Usd.GetVersion() != (0, 26, 3):
             raise ValueError("hdUE is pinned to OpenUSD 26.03")
         if options.noRender or options.allowAsync:
