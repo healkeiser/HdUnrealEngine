@@ -915,12 +915,14 @@
                 parm {
                     name    "xn__hdUEpostProcessAmbientCubemap_8nbl"
                     label   "Cubemap Texture"
-                    type    string
+                    type    file
                     size    1
                     default { "" }
-                    help    "The Ambient cubemap (Affects diffuse and specular shading), blends additively which if different from all other settings here Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                    help    "The Ambient cubemap (Affects diffuse and specular shading), blends additively which if different from all other settings here. An image file, imported at render time (a lat-long panorama, made a cubemap as UE imports one), or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                     parmtag { "spare_category" "Rendering Features|Ambient Cubemap" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "filechooser_mode" "read" }
+                    parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                    parmtag { "usdvaluetype" "asset" }
                     disablewhen R"({ xn__hdUEpostProcessAmbientCubemap_control_90bl == block } { xn__hdUEpostProcessAmbientCubemap_control_90bl == none })"
                 }
             }
@@ -1937,12 +1939,14 @@
                 parm {
                     name    "xn__hdUEpostProcessBloomConvolutionTexture_w2bl"
                     label   "Kernel"
-                    type    string
+                    type    file
                     size    1
                     default { "" }
-                    help    "Texture to replace default convolution bloom kernel Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                    help    "Texture to replace default convolution bloom kernel. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                     parmtag { "spare_category" "Lens|Bloom|Convolution" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "filechooser_mode" "read" }
+                    parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                    parmtag { "usdvaluetype" "asset" }
                     disablewhen R"({ xn__hdUEpostProcessBloomConvolutionTexture_control_xgcl == block } { xn__hdUEpostProcessBloomConvolutionTexture_control_xgcl == none } { xn__hdUEtonemapper_tya == 0 })"
                 }
                 HDUE_CONTROL("xn__hdUEpostProcessBloomConvolutionCenterUV_control_kicl", "Center")
@@ -2067,12 +2071,14 @@
             parm {
                 name    "xn__hdUEpostProcessAutoExposureMeterMask_nzbl"
                 label   "Exposure Metering Mask"
-                type    string
+                type    file
                 size    1
                 default { "" }
-                help    "Exposure metering mask. Bright spots on the mask will have high influence on auto-exposure metering and dark spots will have low influence. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                help    "Exposure metering mask. Bright spots on the mask will have high influence on auto-exposure metering and dark spots will have low influence. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                 parmtag { "spare_category" "Lens|Exposure" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "filechooser_mode" "read" }
+                parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                parmtag { "usdvaluetype" "asset" }
                 disablewhen R"({ xn__hdUEpostProcessAutoExposureMeterMask_control_odcl == block } { xn__hdUEpostProcessAutoExposureMeterMask_control_odcl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessAutoExposureLowPercent_control_bfcl", "Low Percent")
@@ -2620,12 +2626,14 @@
                 parm {
                     name    "xn__hdUEpostProcessColorGradingLUT_vpbl"
                     label   "Color Grading LUT"
-                    type    string
+                    type    file
                     size    1
                     default { "" }
-                    help    "Look up table texture to use or none of not used Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                    help    "Look up table texture to use or none of not used. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                     parmtag { "spare_category" "Color Grading|Misc" }
-                    parmtag { "usdvaluetype" "string" }
+                    parmtag { "filechooser_mode" "read" }
+                    parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                    parmtag { "usdvaluetype" "asset" }
                     disablewhen R"({ xn__hdUEpostProcessColorGradingLUT_control_w2bl == block } { xn__hdUEpostProcessColorGradingLUT_control_w2bl == none } { xn__hdUEtonemapper_tya == 0 })"
                 }
             }
@@ -2755,12 +2763,14 @@
             parm {
                 name    "xn__hdUEpostProcessBloomDirtMask_mmbl"
                 label   "Dirt Mask Texture"
-                type    string
+                type    file
                 size    1
                 default { "" }
-                help    "Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                help    "Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                 parmtag { "spare_category" "Lens|Dirt Mask" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "filechooser_mode" "read" }
+                parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                parmtag { "usdvaluetype" "asset" }
                 disablewhen R"({ xn__hdUEpostProcessBloomDirtMask_control_nzbl == block } { xn__hdUEpostProcessBloomDirtMask_control_nzbl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessBloomDirtMaskIntensity_control_bfcl", "Dirt Mask Intensity")
@@ -3022,12 +3032,14 @@
             parm {
                 name    "xn__hdUEpostProcessLensFlareBokehShape_ewbl"
                 label   "BokehShape"
-                type    string
+                type    file
                 size    1
                 default { "" }
-                help    "Defines the shape of the Bokeh when the image base lens flares are blurred, cannot be blended Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                help    "Defines the shape of the Bokeh when the image base lens flares are blurred, cannot be blended. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                 parmtag { "spare_category" "Lens|Lens Flares" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "filechooser_mode" "read" }
+                parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                parmtag { "usdvaluetype" "asset" }
                 disablewhen R"({ xn__hdUEpostProcessLensFlareBokehShape_control_f9bl == block } { xn__hdUEpostProcessLensFlareBokehShape_control_f9bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
         }
@@ -3117,12 +3129,14 @@
             parm {
                 name    "xn__hdUEpostProcessVignetteTexture_vpbl"
                 label   "Vignette Texture"
-                type    string
+                type    file
                 size    1
                 default { "" }
-                help    "Defines the shape of the vignette when VignetteType is set to Texture Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                help    "Defines the shape of the vignette when VignetteType is set to Texture. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                 parmtag { "spare_category" "Lens|Image Effects" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "filechooser_mode" "read" }
+                parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                parmtag { "usdvaluetype" "asset" }
                 disablewhen R"({ xn__hdUEpostProcessVignetteTexture_control_w2bl == block } { xn__hdUEpostProcessVignetteTexture_control_w2bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
             HDUE_CONTROL("xn__hdUEpostProcessSharpen_control_vpbl", "Sharpen")
@@ -3252,12 +3266,14 @@
             parm {
                 name    "xn__hdUEpostProcessFilmGrainTexture_irbl"
                 label   "Film Grain Texture"
-                type    string
+                type    file
                 size    1
                 default { "" }
-                help    "Defines film grain texture to use. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                help    "Defines film grain texture to use. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
                 parmtag { "spare_category" "Film Grain" }
-                parmtag { "usdvaluetype" "string" }
+                parmtag { "filechooser_mode" "read" }
+                parmtag { "filechooser_pattern" "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp" }
+                parmtag { "usdvaluetype" "asset" }
                 disablewhen R"({ xn__hdUEpostProcessFilmGrainTexture_control_j4bl == block } { xn__hdUEpostProcessFilmGrainTexture_control_j4bl == none } { xn__hdUEtonemapper_tya == 0 })"
             }
         }

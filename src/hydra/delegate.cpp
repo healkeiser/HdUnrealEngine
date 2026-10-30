@@ -30,6 +30,7 @@
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/js/json.h"
 #include "pxr/usd/sdf/layer.h"
+#include "pxr/usd/sdf/assetPath.h"
 #include <cmath>
 #include <chrono>
 #include <cstdarg>
@@ -2320,8 +2321,13 @@ public:
                             names.push_back("DebugView");
                         else
                             continue;
-                        values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False")
-                                                                 : TfStringify(value));
+                        if (value.IsHolding<SdfAssetPath>()) {  // texture settings: an image file or a cooked path
+                            const auto& asset = value.UncheckedGet<SdfAssetPath>();
+                            values.push_back(asset.GetResolvedPath().empty() ? asset.GetAssetPath()
+                                                                             : asset.GetResolvedPath());
+                        } else
+                            values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False")
+                                                                     : TfStringify(value));
                     }
                     if (tonemapper) {
                         // UE's own physical camera exposure (ISO, shutter, aperture) stays off unless the scene asks

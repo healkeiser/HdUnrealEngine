@@ -174,6 +174,48 @@ library = (
 assert str(library.GetTypeName()) == "string" and library.Get().endswith(
     "/library.json"
 ), library
+# Post-process texture settings take image files (USD assets, resolved against the layer) or cooked texture paths;
+# curve settings stay cooked paths.
+for prop in (
+    "AmbientCubemap",
+    "AutoExposureMeterMask",
+    "BloomConvolutionTexture",
+    "BloomDirtMask",
+    "ColorGradingLUT",
+    "FilmGrainTexture",
+    "LensFlareBokehShape",
+    "VignetteTexture",
+):
+    template = alone.parm(
+        hou.text.encode("hdUE:postProcess:" + prop)
+    ).parmTemplate()
+    tags = template.tags()
+    assert template.stringType() == hou.stringParmType.FileReference, prop
+    assert tags.get("filechooser_mode") == "read", (prop, tags)
+    assert "*.png" in tags.get(
+        "filechooser_pattern", ""
+    ) and "*.exr" in tags.get("filechooser_pattern", ""), (prop, tags)
+    assert tags.get("usdvaluetype") == "asset", (prop, tags)
+assert (
+    alone.parm(hou.text.encode("hdUE:postProcess:AutoExposureBiasCurve"))
+    .parmTemplate()
+    .stringType()
+    == hou.stringParmType.Regular
+)
+alone.parm(hou.text.encode("hdUE:tonemapper")).set(
+    1
+)  # lens settings apply with it
+alone.parm(hou.text.encode("hdUE:postProcess:BloomDirtMask")).set(
+    "$HIP/dirt.png"
+)
+dirt = (
+    alone.stage()
+    .GetPrimAtPath("/Render/rendersettings")
+    .GetAttribute("hdUE:postProcess:BloomDirtMask")
+)
+assert str(dirt.GetTypeName()) == "asset" and dirt.Get().path.endswith(
+    "/dirt.png"
+), dirt
 products = network.createNode("hdue::hduerenderproducts::1.0")
 products.parm("products").set(1)
 assert (
