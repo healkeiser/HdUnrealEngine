@@ -37,7 +37,7 @@ The Solaris lighting run produced five converged renderer states and two composi
 
 ## usdview
 
-`Test-Usdview.ps1` covers native presentation, convergence, edits, resizing, camera navigation, renderer switching, stage reopening, selection, and shutdown. The synthetic regression includes 24 captured frames and ten picking operations.
+`Test-Usdview.ps1` covers native presentation, convergence, edits, resizing, camera navigation, renderer switching, stage reopening, selection, and shutdown. The synthetic regression includes 24 captured frames and ten picking operations. Each `-Check` is a module in `tests/usdview/` that `usdview_hdue.py --hdue-check` runs inside usdview.
 
 `Test-Usdview.ps1 -Check camera` measures continuous interaction and verifies coalescing rather than unbounded queuing. `Test-BufferPerf.ps1` measures CPU AOV map behavior. Performance depends on resolution, hardware, content, cache state, and readback cost.
 

@@ -26,7 +26,7 @@ from pxr.Usdviewq.qt import QtCore, QtWidgets
 PLUGIN = "HdUEHoudiniRendererPlugin"
 ROOT = Path(__file__).resolve().parent.parent
 GAME = ROOT / "out/runtime/Windows/HdUEBackend"
-# --hdue-check name: (module, test class); Test-Usdview.ps1 -Check takes the same names.
+# --hdue-check name: (module in tests/usdview, test class); Test-Usdview.ps1 -Check takes the same names.
 CHECKS = {
     "camera": ("camera_benchmark", "CameraBenchmark"),
     "scene": ("scene_check", "SceneCheck"),
@@ -420,6 +420,7 @@ class Launcher(Usdviewq.Launcher):
 
     def LaunchProcess(self, options, app, controller):
         if options.hdue_test_output:
+            sys.path.insert(0, str(ROOT / "tests/usdview"))
             module, name = CHECKS.get(
                 options.hdue_check, ("usdview_test", "SmokeTest")
             )
