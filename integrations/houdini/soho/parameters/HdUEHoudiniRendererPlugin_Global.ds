@@ -147,7 +147,7 @@
                 size    1
                 default { 32 }
                 range   { 0! 100! }
-                help    "Sets the path tracing maximum bounces"
+                help    "Sets the path tracing maximum bounces. Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces."
                 parmtag { "spare_category" "Path Tracing" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__hdUEpostProcessPathTracingMaxBounces_control_odcl == block } { xn__hdUEpostProcessPathTracingMaxBounces_control_odcl == none })"
