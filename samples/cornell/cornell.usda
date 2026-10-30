@@ -56,7 +56,7 @@ def Scope "Render"
         token hdUE:renderMode = "pathtraced"
         token karma:global:convergence_mode = "Path Traced"
         int karma:global:pathtracedsamples = 512
-        # Karma traces one diffuse bounce by default; the UE Path Tracer traces 8.
+        # Karma traces one diffuse bounce by default; the UE Path Tracer up to 32 (PathTracingMaxBounces).
         float karma:object:diffuselimit = 8
     }
 

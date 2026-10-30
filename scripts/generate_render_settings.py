@@ -69,6 +69,11 @@ HDUE_DEFAULTS = {
         "Overrides hdUE:lumenEnabled.",
     ),
     "LumenFrontLayerTranslucencyReflections": (True, None),
+    "PathTracingMaxBounces": (
+        None,
+        "Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, "
+        "N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces.",
+    ),
     "PathTracingEnableReferenceDOF": (
         True,
         "hdUE turns it on when the USD camera has depth of field.",
