@@ -30,6 +30,13 @@
         "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
         "displayName": "Render pass renderVisibility collection for hdUE"
       },
+      "HdUE_PurposeVisibilitySceneIndexPlugin": {
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "displayName": "VisibilityAPI purpose visibility for hdUE"
+      },
+      "HdUE_VisibilityAPIAdapter": {
+        "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
+      },
       "HdUE_UnsupportedSceneIndexPlugin": {
         "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
         "displayName": "Warnings for what hdUE does not render"

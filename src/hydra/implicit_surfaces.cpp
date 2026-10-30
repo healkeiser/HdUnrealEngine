@@ -5,6 +5,7 @@
 #include "pxr/imaging/hd/containerDataSourceEditor.h"
 #include "pxr/imaging/hd/materialBindingsSchema.h"
 #include "pxr/imaging/hd/materialSchema.h"
+#include "pxr/imaging/hd/purposeSchema.h"
 #include "pxr/imaging/hd/sceneGlobalsSchema.h"
 #include "pxr/imaging/hd/sceneIndexPrimView.h"
 #include "pxr/imaging/hd/visibilitySchema.h"
@@ -24,6 +25,9 @@
 #include "pxr/imaging/hdsi/particleFieldConversionSceneIndex.h"
 #include "pxr/imaging/hdsi/renderPassPruneSceneIndex.h"
 #include "pxr/imaging/hdsi/tetMeshConversionSceneIndex.h"
+#include "pxr/usd/usdGeom/tokens.h"
+#include "pxr/usd/usdGeom/visibilityAPI.h"
+#include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
 #include "pxr/usdImaging/usdImaging/drawModeSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/geomModelSchema.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
@@ -296,6 +300,73 @@ protected:
         return HdsiRenderPassPruneSceneIndex::New(input);
     }
 };
+// UsdGeomVisibilityAPI: UsdImaging publishes no purpose visibility and UE's USD importer ignores it (only
+// ComputeVisibility, USDPrimConversion.cpp), so hdUE follows the spec (UsdGeomImageable::ComputeEffectiveVisibility):
+// this adapter publishes the authored tokens, HdUEPurposeVisibility hides render/proxy/guide gprims they make
+// invisible. ponytail: an edit on an ancestor does not dirty its descendants.
+TF_DEFINE_PRIVATE_TOKENS(HdUEPurposeVisibilityTokens, ((container, "hdUE:purposeVisibility"))(render)(proxy)(guide));
+class HdUE_VisibilityAPIAdapter final : public UsdImagingAPISchemaAdapter {
+public:
+    HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim, const TfToken&,
+                                                      const UsdImagingDataSourceStageGlobals&) override {
+        if (!subprim.IsEmpty()) return nullptr;
+        const UsdGeomVisibilityAPI api(prim);
+        const auto token = [](const UsdAttribute& attribute) {
+            TfToken value = UsdGeomTokens->inherited;
+            attribute.Get(&value);
+            return HdRetainedTypedSampledDataSource<TfToken>::New(value);
+        };
+        return HdRetainedContainerDataSource::New(
+            HdUEPurposeVisibilityTokens->container,
+            HdRetainedContainerDataSource::New(HdUEPurposeVisibilityTokens->render,
+                                               token(api.GetRenderVisibilityAttr()), HdUEPurposeVisibilityTokens->proxy,
+                                               token(api.GetProxyVisibilityAttr()), HdUEPurposeVisibilityTokens->guide,
+                                               token(api.GetGuideVisibilityAttr())));
+    }
+    HdDataSourceLocatorSet InvalidateImagingSubprim(const UsdPrim&, const TfToken& subprim, const TfToken&,
+                                                    const TfTokenVector& properties,
+                                                    UsdImagingPropertyInvalidationType) override {
+        for (const auto& property : properties)
+            if (subprim.IsEmpty() && TfStringEndsWith(property.GetString(), "Visibility"))
+                return HdDataSourceLocator(HdUEPurposeVisibilityTokens->container);
+        return {};
+    }
+};
+struct HdUEPurposeVisibility {
+    static HdContainerDataSourceHandle edit(const HdSceneIndexBase& input, const SdfPath& path,
+                                            const HdSceneIndexPrim& prim) {
+        if (!HdPrimTypeIsGprim(prim.primType)) return nullptr;
+        const auto purposeSource = HdPurposeSchema::GetFromParent(prim.dataSource).GetPurpose();
+        const auto purpose = purposeSource ? purposeSource->GetTypedValue(0) : TfToken();
+        if (purpose != HdUEPurposeVisibilityTokens->render && purpose != HdUEPurposeVisibilityTokens->proxy &&
+            purpose != HdUEPurposeVisibilityTokens->guide)
+            return nullptr;
+        // The nearest authored (not inherited) value on the prim or an ancestor; guides fall back to invisible.
+        bool visible = purpose != HdUEPurposeVisibilityTokens->guide;
+        for (auto at = path; !at.IsEmpty() && !at.IsAbsoluteRootPath(); at = at.GetParentPath()) {
+            const auto source = at == path ? prim.dataSource : input.GetPrim(at).dataSource;
+            const auto value = HdTypedSampledDataSource<TfToken>::Cast(HdContainerDataSource::Get(
+                source, HdDataSourceLocator(HdUEPurposeVisibilityTokens->container, purpose)));
+            if (value && value->GetTypedValue(0) != UsdGeomTokens->inherited) {
+                visible = value->GetTypedValue(0) == UsdGeomTokens->visible;
+                break;
+            }
+        }
+        if (visible) return nullptr;
+        return HdContainerDataSourceEditor(prim.dataSource)
+            .Set(
+                HdVisibilitySchema::GetDefaultLocator(),
+                HdVisibilitySchema::Builder().SetVisibility(HdRetainedTypedSampledDataSource<bool>::New(false)).Build())
+            .Finish();
+    }
+};
+class HdUE_PurposeVisibilitySceneIndexPlugin final : public HdSceneIndexPlugin {
+protected:
+    HdSceneIndexBaseRefPtr _AppendSceneIndex(const HdSceneIndexBaseRefPtr& input,
+                                             const HdContainerDataSourceHandle&) override {
+        return TfCreateRefPtr(new HdUE_EditingSceneIndex(input, HdUEPurposeVisibility::edit));
+    }
+};
 // The active render pass's renderVisibility collection (husk --pass): geometry outside it is invisible. Storm's own
 // (HdSt_RenderPassVisibilitySceneIndexPlugin) is registered for GL only and hdsi has none; UE's USD importer has no
 // render passes. ponytail: re-reads the pass when scene globals or the pass prim change, then dirties every prim's
@@ -406,11 +477,6 @@ protected:
                     if (schema == "MeshLightAPI" || schema == "VolumeLightAPI")
                         warn(schema, "%s is not supported: %s renders without emitting light", schema.GetText(),
                              entry.primPath.GetText());
-                    else if (schema == "VisibilityAPI")
-                        warn(schema,
-                             "VisibilityAPI (renderVisibility, guideVisibility, proxyVisibility) is not supported, as "
-                             "in UE's USD importer: %s keeps its visibility",
-                             entry.primPath.GetText());
                 }
         }
         _SendPrimsAdded(entries);
@@ -441,6 +507,9 @@ protected:
 TF_REGISTRY_FUNCTION(TfType) {
     HdSceneIndexPluginRegistry::Define<HdUE_UnsupportedSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_DrawModeSceneIndexPlugin>();
+    HdSceneIndexPluginRegistry::Define<HdUE_PurposeVisibilitySceneIndexPlugin>();
+    TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
+        .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_VisibilityAPIAdapter>>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassVisibilitySceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_ConversionSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassPruneSceneIndexPlugin>();
@@ -466,6 +535,9 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin) {
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
         "Unreal Engine (hdUE)", TfToken("HdUE_UnsupportedSceneIndexPlugin"), nullptr, 0,
+        HdSceneIndexPluginRegistry::InsertionOrderAtStart);
+    HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
+        "Unreal Engine (hdUE)", TfToken("HdUE_PurposeVisibilitySceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
         "Unreal Engine (hdUE)", TfToken("HdUE_RenderPassVisibilitySceneIndexPlugin"), nullptr, 0,
