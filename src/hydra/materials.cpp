@@ -472,14 +472,20 @@ void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurf
     read(s.emission, emission);
     color(s.emissionColor, data.emissive, HDUE_TEXTURE_EMISSIVE);
     weight(data, HDUE_TEXTURE_EMISSIVE, data.emissive, emission);
-    // MaterialX opacity is coverage without a threshold: an image is drawn as a cutout at 0.1, a constant below 1 is
-    // see-through. The cutout reads mipmapped coverage in raster (Lumen), where thin cards average below 0.5 and
-    // vanish with distance; at 0.1 Sponza's cypress keeps the Path Tracer's coverage (full-resolution texels, so
-    // threshold-independent for binary masks), and it is the exporters' usual UsdPreviewSurface threshold (Intel's).
-    // UE's Interchange cuts at UMaterial's default 1/3. Transmission is approximated as see-through coverage.
-    if (read(s.opacity, data.opacity, HDUE_TEXTURE_OPACITY)) data.opacityThreshold = .1f;
+    // Opacity as UE's Interchange imports MaterialX (UE 5.8, Substrate): an authored (non-default) or connected opacity
+    // makes the material masked (MaterialXStandardSurfaceShader.cpp:73-76, MaterialXOpenPBRSurfaceShader.cpp:67-70;
+    // defaults are skipped, MaterialXSurfaceShaderAbstract.cpp:131), cut at UMaterial's default OpacityMaskClipValue
+    // (Material.cpp:1170), which Interchange leaves unset. A standard_surface with transmission is translucent instead,
+    // its opacity unused for the blend (MaterialXStandardSurfaceShader.cpp:65-69); OpenPBR's geometry_opacity wins over
+    // transmission (masked). Karma renders opacity as fractional coverage: scenes moving between them adjust materials.
+    // Transmission is approximated as see-through coverage (opacity 1 - transmission) on the translucent parent.
+    const bool textured = read(s.opacity, data.opacity, HDUE_TEXTURE_OPACITY);
     read(s.transmission, transmission);
-    data.opacity *= 1 - std::clamp(transmission, 0.f, 1.f);
+    transmission = std::clamp(transmission, 0.f, 1.f);
+    if ((textured || data.opacity != 1) && (&s == &openPbr || transmission == 0))
+        data.opacityThreshold = .3333f;
+    else
+        data.opacity *= 1 - transmission;
     read(s.thinWalled, data.thinWalled);
     GfVec3f normal(0, 0, 1);
     r.read(s.normal, normal, HDUE_TEXTURE_NORMAL);
