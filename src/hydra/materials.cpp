@@ -472,9 +472,12 @@ void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurf
     read(s.emission, emission);
     color(s.emissionColor, data.emissive, HDUE_TEXTURE_EMISSIVE);
     weight(data, HDUE_TEXTURE_EMISSIVE, data.emissive, emission);
-    // MaterialX opacity is coverage without a threshold: an image cuts out at 0.5 (as UE's Interchange imports it),
-    // a constant below 1 is see-through. Transmission is approximated as see-through coverage.
-    if (read(s.opacity, data.opacity, HDUE_TEXTURE_OPACITY)) data.opacityThreshold = .5f;
+    // MaterialX opacity is coverage without a threshold: an image is drawn as a cutout at 0.1, a constant below 1 is
+    // see-through. The cutout reads mipmapped coverage in raster (Lumen), where thin cards average below 0.5 and
+    // vanish with distance; at 0.1 Sponza's cypress keeps the Path Tracer's coverage (full-resolution texels, so
+    // threshold-independent for binary masks), and it is the exporters' usual UsdPreviewSurface threshold (Intel's).
+    // UE's Interchange cuts at UMaterial's default 1/3. Transmission is approximated as see-through coverage.
+    if (read(s.opacity, data.opacity, HDUE_TEXTURE_OPACITY)) data.opacityThreshold = .1f;
     read(s.transmission, transmission);
     data.opacity *= 1 - std::clamp(transmission, 0.f, 1.f);
     read(s.thinWalled, data.thinWalled);
