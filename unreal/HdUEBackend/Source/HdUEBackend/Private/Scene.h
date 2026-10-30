@@ -37,9 +37,6 @@ struct FNaniteSource {
 };
 #include "CoreMinimal.h"
 #include "hdue/bridge.h"
-#include "hdue/material_api.h"
-#include "hdue/surface_api.h"
-#include "hdue/volume_api.h"
 #include "RenderCommandFence.h"
 #include "UObject/StrongObjectPtr.h"
 #include "NativeAssets.h"
@@ -80,10 +77,10 @@ public:
     HdueResult PickNative(const HdueNativeRay& Ray, HdueNativeHit& Hit, FString& ObjectId, FString& Error);
     // Swaps every mesh to M_HdUEId (its prim ID in custom primitive data) for the ID pass, or back.
     bool SetIdMode(int32 Mode, FString& Error);  // 0 off, 1 prim IDs, 2 instance IDs
-    // Dense density grids as heterogeneous volumes (hdue/volume_api.h).
+    // Dense density grids as heterogeneous volumes (upsert_volume).
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
     void RemoveVolume(const FString& Id);
-    void SetTransforms(const FString& Id, uint32 Count, const double* Matrices);  // hdue/motion_api.h
+    void SetTransforms(const FString& Id, uint32 Count, const double* Matrices);  // set_transforms
     void ApplyLinks();  // Lighting's object table to every mesh (after a light batch replaced it)
     FHdueNativeAssets Assets;
     TUniquePtr<FHdueLighting> Lighting;

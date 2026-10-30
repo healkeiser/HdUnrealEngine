@@ -237,7 +237,7 @@ struct HdUEState : HdRenderParam {
     std::shared_ptr<hdue::Backend> backend;
     HdueSession session = 0;
     std::shared_ptr<HdUEGpuFrames> gpuFrames;  // Houdini's GL viewport (gpu_frames.h); set under mutex by SetDrivers
-    uint64_t aovGeneration = 0;                // AOV requests (hdue/aov_api.h); generation stays the beauty's
+    uint64_t aovGeneration = 0;                // AOV requests (poll_aov); generation stays the beauty's
     uint32_t width = 0, height = 0;
     // Revisions are also read without the lock by IsConverged on the host's thread.
     std::atomic<uint64_t> revision{1}, submittedRevision{0}, requestSettingsRevision{1};

@@ -469,9 +469,8 @@ struct ScenePacket {
     bool firstBatch = false;
     // Descriptors.
     std::vector<HdueMeshDesc> meshes;
-    std::vector<HdueMeshTransform> moves;  // movedMeshes, through the motion extension after apply_scene
+    std::vector<HdueMeshTransform> moves;  // movedMeshes, through set_transforms after apply_scene
     std::vector<HdueMaterialDesc> materials;
-    std::vector<HdueLightDesc> lights;
     std::vector<HdueLight> extendedLights;
     std::vector<HdueAssetDesc> sceneAssets;
     std::vector<HdueVolumeDesc> volumes;
@@ -645,8 +644,6 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         if (entry == overrides.end()) continue;
         if (asset(nativeMaterials, id).empty() || !entry->second.IsHolding<VtDictionary>())
             throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
-        if (!state.backend->material_api().set_parameters)
-            throw std::runtime_error("Backend has no material parameter extension");
         std::vector<HdueMaterialParameter> parameters;
         for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
             parameters.push_back(materialParameter(packet, name, value));
@@ -703,7 +700,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
     for (const auto& id : packet.movedMeshes) {
         if (packet.dirtyMeshes.count(id)) continue;
-        if (packet.firstBatch || !state.backend->motion_api().set_transforms) {
+        if (packet.firstBatch) {
             packet.dirtyMeshes.insert(id);
             continue;
         }
@@ -967,7 +964,6 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         }
         desc.width_cm = float(data.width * data.transform.TransformDir(GfVec3d(1, 0, 0)).GetLength() * units);
         desc.height_cm = float(data.height * data.transform.TransformDir(GfVec3d(0, 1, 0)).GetLength() * units);
-        packet.lights.push_back(desc);
         extend(desc, &data);
         if (HdUETraceScene())
             TF_STATUS("hdUE light %s intensity=%g rgb=(%g,%g,%g)", desc.id, desc.intensity, desc.color[0],
@@ -984,23 +980,15 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
             desc.direction[0] = 1;
             desc.direction[1] = i ? -0.6 : 0.4;
             desc.direction[2] = i ? -0.2 : -0.5;
-            packet.lights.push_back(desc);
             extend(desc, nullptr);
         }
     } else if (state.autoLightActive) {
         packet.removed.push_back(AutoKey);
         packet.removed.push_back(AutoFill);
     }
-    if (!state.backend->lighting_api().upsert)
-        for (const auto& light : packet.extendedLights)
-            if (light.type > HDUE_CAMERA_DISTANT_LIGHT || (light.texture_file && *light.texture_file))
-                throw std::runtime_error(
-                    "This scene requires the backend lighting extension; build/cook/stage a current runtime.");
 }
 void prepareVolumes(HdUEState& state, ScenePacket& packet) {
     if (packet.dirtyVolumes.empty()) return;
-    if (!state.backend->volume_api().upsert)
-        throw std::runtime_error("This scene has volumes; build and stage the current backend");
     // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
     const auto basis = sceneBasis(state);
     const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
@@ -1063,10 +1051,7 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
         binding.geometry_revision = state.geometryRevisions[data.id] + uint64_t(reuploaded);
         packet.wet.push_back(binding);
     }
-    packet.surfaceUpdate = state.backend->surface_api().apply && state.backend->surface_api().get_status &&
-                           (!packet.wet.empty() || state.surfaceStatus.binding_count);
-    if (!packet.wet.empty() && !state.backend->surface_api().apply)
-        throw std::runtime_error("Wet surface extension unavailable; build/cook/stage the current runtime.");
+    packet.surfaceUpdate = !packet.wet.empty() || state.surfaceStatus.binding_count;
 }
 // Under the state lock: takes the dirty sets and copies what UE needs.
 void prepareScene(HdUEState& state, ScenePacket& packet) {
@@ -1086,7 +1071,7 @@ void prepareScene(HdUEState& state, ScenePacket& packet) {
 void sendScene(const HdUEState& state, ScenePacket& packet) {
     const auto& backend = *state.backend;
     const auto session = state.session;
-    const auto& lightingApi = backend.lighting_api();
+    const auto& api = backend.api();
     HdueSceneBatch batch{};
     batch.struct_size = sizeof(batch);
     batch.reset_scene = packet.firstBatch;
@@ -1094,13 +1079,11 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     batch.mesh_count = uint32_t(packet.meshes.size());
     batch.materials = packet.materials.data();
     batch.material_count = uint32_t(packet.materials.size());
-    batch.lights = lightingApi.upsert ? nullptr : packet.lights.data();
-    batch.light_count = lightingApi.upsert ? 0 : uint32_t(packet.lights.size());
     batch.removed_ids = packet.removed.data();
     batch.removed_count = uint32_t(packet.removed.size());
     if (batch.reset_scene || batch.mesh_count || batch.material_count || batch.light_count || batch.removed_count) {
         const auto applyStart = std::chrono::steady_clock::now();
-        backend.require(backend.api().apply_scene(session, &batch), "apply_scene");
+        backend.require(api.apply_scene(session, &batch), "apply_scene");
         uint64_t vertices = 0, triangles = 0;
         for (const auto& mesh : packet.meshes) {
             vertices += mesh.vertex_count;
@@ -1117,7 +1100,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         if (syncs)
             trace("hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads\n", syncs, syncMs);
     }
-    if (lightingApi.upsert && (!packet.extendedLights.empty() || packet.sendLinks)) {
+    if (!packet.extendedLights.empty() || packet.sendLinks) {
         HdueLightBatch update{sizeof(HdueLightBatch), uint32_t(packet.extendedLights.size()),
                               packet.extendedLights.data()};
         std::vector<const char*> ids;
@@ -1132,26 +1115,19 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
             update.object_ids = ids.data();
             update.object_links = links.data();
         }
-        backend.require(lightingApi.upsert(session, &update), "upsert_lights");
+        backend.require(api.upsert_lights(session, &update), "upsert_lights");
     }
     if (!packet.moves.empty()) {
-        backend.require(
-            backend.motion_api().set_transforms(session, packet.moves.data(), uint32_t(packet.moves.size())),
-            "set_transforms");
+        backend.require(api.set_transforms(session, packet.moves.data(), uint32_t(packet.moves.size())),
+                        "set_transforms");
         trace("hdUE scene submit: %zu meshes moved, geometry kept\n", packet.moves.size());
     }
-    const auto& assetApi = backend.asset_api();
-    if (!packet.sceneAssets.empty() && !assetApi.upsert)
-        throw std::runtime_error("Backend has no native scene asset extension");
-    if (assetApi.remove) {
-        for (const auto& id : packet.removedIds) backend.require(assetApi.remove(session, id.c_str()), "remove_asset");
-        for (const auto* id : packet.removedAssets) backend.require(assetApi.remove(session, id), "remove_asset");
-    }
-    for (const auto& desc : packet.sceneAssets) backend.require(assetApi.upsert(session, &desc), "upsert_asset");
-    for (const auto& desc : packet.volumes)
-        backend.require(backend.volume_api().upsert(session, &desc), "upsert_volume");
+    for (const auto& id : packet.removedIds) backend.require(api.remove_asset(session, id.c_str()), "remove_asset");
+    for (const auto* id : packet.removedAssets) backend.require(api.remove_asset(session, id), "remove_asset");
+    for (const auto& desc : packet.sceneAssets) backend.require(api.upsert_asset(session, &desc), "upsert_asset");
+    for (const auto& desc : packet.volumes) backend.require(api.upsert_volume(session, &desc), "upsert_volume");
     for (const auto& update : packet.materialUpdates)
-        backend.require(backend.material_api().set_parameters(session, &update), "set_material_parameters");
+        backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
 }
 // Under the state lock again: records what reached UE.
 void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceStatus& surface) {
@@ -1201,10 +1177,10 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
     try {
         sendScene(state, packet);
         if (packet.surfaceUpdate) {
-            const auto& surfaceApi = state.backend->surface_api();
+            const auto& api = state.backend->api();
             HdueSurfaceBatch batch{sizeof(batch), uint32_t(packet.wet.size()), packet.wet.data()};
-            state.backend->require(surfaceApi.apply(state.session, &batch), "apply_surface_effects");
-            state.backend->require(surfaceApi.get_status(state.session, &surface), "surface_status");
+            state.backend->require(api.apply_surfaces(state.session, &batch), "apply_surface_effects");
+            state.backend->require(api.get_surface_status(state.session, &surface), "surface_status");
         }
     } catch (...) {
         std::lock_guard lock(state.mutex);  // not uploaded: dirty again, for the next attempt
@@ -1224,9 +1200,9 @@ class Pass final : public HdRenderPass {
     uint32_t subframeSamples_ = 0;  // Path Tracer samples of the finished sub-frames
     bool subframeDue_ = false, motionApplied_ = false;
     std::vector<float> accum_;
-    // Moves every moving mesh to frame-relative time t through hdue/motion_api.h; t = 0 restores the submitted pose.
+    // Moves every moving mesh to frame-relative time t through set_transforms; t = 0 restores the submitted pose.
     void applyMotion(HdUEState& s, float t) {
-        if (!s.backend->motion_api().set_transforms || (!t && !motionApplied_)) return;
+        if (!t && !motionApplied_) return;
         const auto basis = sceneBasis(s);
         const auto inverse = basis.GetInverse();
         std::unique_lock lock(s.mutex);
@@ -1275,7 +1251,7 @@ class Pass final : public HdRenderPass {
         for (size_t i = 0; i < names.size(); ++i)
             moves.push_back({names[i].c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});
         if (!moves.empty())
-            s.backend->require(s.backend->motion_api().set_transforms(s.session, moves.data(), uint32_t(moves.size())),
+            s.backend->require(s.backend->api().set_transforms(s.session, moves.data(), uint32_t(moves.size())),
                                "set_transforms");
         motionApplied_ = t != 0;
     }
@@ -1309,19 +1285,17 @@ class Pass final : public HdRenderPass {
     uint64_t gpuFrame_ = 0;
     void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth, bool denoising) {
         const auto frames = s.locked([&] { return s.gpuFrames; });
-        const auto& api = s.backend->gpu_api();
+        const auto& api = s.backend->api();
         HdueGpuOptions options{sizeof(options)};
-        options.enabled =
-            frames && !frames->failed() && api.configure && subframes_ <= 1 && !denoising && HdUESceneLinearIsRec709();
+        options.enabled = frames && !frames->failed() && subframes_ <= 1 && !denoising && HdUESceneLinearIsRec709();
         options.depth = depth != nullptr;
         options.color_scale = s.exposed() ? lens_[3] : 1.f;  // camera exposure, as the CPU path applies it
         options.depth_scale = float(1 / centimetersPerUnit_);
         if (std::memcmp(&options, &gpuOptions_, sizeof(options)) || gpuBuffers_[0] != &buffer ||
             gpuBuffers_[1] != depth) {
-            if (api.configure && api.configure(s.session, &options) != HDUE_OK &&
-                options.enabled) {  // not a D3D12 runtime
+            if (api.configure_gpu_frames(s.session, &options) != HDUE_OK && options.enabled) {  // not a D3D12 runtime
                 options.enabled = 0;
-                s.backend->require(api.configure(s.session, &options), "configure_gpu_frames");
+                s.backend->require(api.configure_gpu_frames(s.session, &options), "configure_gpu_frames");
             }
             for (auto* bound : {&buffer, depth})
                 if (bound) bound->setResource(nullptr);
@@ -1483,7 +1457,7 @@ class Pass final : public HdRenderPass {
             const auto index = std::find(names.begin(), names.end(), var.row->buffer) - names.begin();
             if (size_t(index) == names.size()) names.push_back(var.row->buffer);
             std::vector<float> rgba(size_t(frame.required_bytes / sizeof(float)));
-            s.backend->require(s.backend->aov_api().copy_buffer(s.session, frame.frame_id, uint32_t(index), rgba.data(),
+            s.backend->require(s.backend->api().copy_aov_buffer(s.session, frame.frame_id, uint32_t(index), rgba.data(),
                                                                 frame.required_bytes),
                                "copy_buffer");
             // UE's direction buffers (WorldNormal, WorldTangent) are encoded as 0.5 + 0.5 * direction.
@@ -1981,10 +1955,11 @@ public:
                                          (buffer ? " allocation: " + buffer->allocationError() : " (missing buffer)"));
             }
             bool changed = s.locked([&] { return s.submittedRevision != s.revision; });
-            // A new size keeps the session and its scene when the runtime can resize in place (leaving a camera in
-            // Houdini changes the size); recreating it re-sent every mesh, material and texture.
+            // A new size keeps the session and its scene (leaving a camera in Houdini changes the size); recreating
+            // it re-sent every mesh, material and texture.
             if (s.session && (s.width != buffer->GetWidth() || s.height != buffer->GetHeight())) {
-                const auto resized = s.backend->resize_session(s.session, buffer->GetWidth(), buffer->GetHeight());
+                const auto resized =
+                    s.backend->api().resize_session(s.session, buffer->GetWidth(), buffer->GetHeight());
                 trace("hdUE resize %ux%u -> %ux%u: result %d\n", s.width, s.height, buffer->GetWidth(),
                       buffer->GetHeight(), int(resized));
                 if (resized != HDUE_OK) goto recreate;
@@ -2019,18 +1994,15 @@ public:
                 changed = true;
             }
             if ((depth || cameraDepth) && !depthEnabled_) {
-                if (!s.backend->depth_api().set_enabled)
-                    throw std::runtime_error(
-                        "Solaris requires the updated backend depth extension; run Update-HoudiniRuntime.ps1");
-                s.backend->require(s.backend->depth_api().set_enabled(s.session, 1), "enable_depth");
+                s.backend->require(s.backend->api().set_depth_enabled(s.session, 1), "enable_depth");
                 depthEnabled_ = true;
                 changed = true;
             }
             if (changed) submit(s);
-            if (s.backend->asset_api().get_scene_status) {
+            {
                 HdueAssetSceneStatus assets{};
                 assets.struct_size = sizeof(assets);
-                s.backend->require(s.backend->asset_api().get_scene_status(s.session, &assets), "asset_scene_status");
+                s.backend->require(s.backend->api().get_asset_scene_status(s.session, &assets), "asset_scene_status");
                 const bool lightsChanged = assets.lights != s.submittedNativeLights;
                 s.nativeAssets = assets;
                 if (assets.loading) {
@@ -2093,8 +2065,8 @@ public:
                 HdueResult depthCopy = HDUE_OK;
                 if (copy == HDUE_OK && (depth || cameraDepth)) {
                     depthPixels = (depth ? depth : cameraDepth)->takeSpare(size_t(frame.width) * frame.height);
-                    depthCopy = s.backend->depth_api().copy_depth(s.session, frame.frame_id, depthPixels.data(),
-                                                                  depthPixels.size() * sizeof(float));
+                    depthCopy = s.backend->api().copy_depth(s.session, frame.frame_id, depthPixels.data(),
+                                                            depthPixels.size() * sizeof(float));
                 }
                 if (copy == HDUE_STALE_FRAME || depthCopy == HDUE_STALE_FRAME) {
                     // The Render Thread may publish another completed frame
@@ -2172,10 +2144,10 @@ public:
             } else if (result != HDUE_PENDING && result != HDUE_OK)
                 s.backend->require(result, "poll_frame");
             if (aovInFlight_) {
-                // AOV frames have their own slot (hdue/aov_api.h); the beauty above is untouched.
+                // AOV frames have their own slot (poll_aov); the beauty above is untouched.
                 HdueFrameInfo aovFrame{};
                 aovFrame.struct_size = sizeof(aovFrame);
-                const auto polled = s.backend->aov_api().poll_aov(s.session, &aovFrame);
+                const auto polled = s.backend->api().poll_aov(s.session, &aovFrame);
                 if (polled == HDUE_OK && aovFrame.generation == s.aovGeneration && aovFrame.converged &&
                     aovSlot_ < aovs_.size()) {
                     const auto aovStart = Clock::now();
@@ -2294,7 +2266,7 @@ public:
                     }
                     return request;
                 };
-                if (needsRequest && s.backend->postprocess_api().set_post_process) {
+                if (needsRequest) {
                     // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper, and
                     // hdUE:cvar:<console variable, ':' for '.'> (USD attribute names cannot hold dots), and
                     // hdUE:debugView. With the tonemapper on, the camera exposure goes in before it rather than onto
@@ -2366,8 +2338,7 @@ public:
                                                    tonemapper
                                                        ? std::log2(std::max(lens[3], 1e-6f))
                                                        : 0.f};  // the USD camera exposure adds to AutoExposureBias
-                    s.backend->require(s.backend->postprocess_api().set_post_process(s.session, &desc),
-                                       "set_post_process");
+                    s.backend->require(s.backend->api().set_post_process(s.session, &desc), "set_post_process");
                 }
                 if (needsRequest) {
                     applyMotion(s, 0);
@@ -2381,10 +2352,7 @@ public:
                         return std::any_of(s.meshes.begin(), s.meshes.end(),
                                            [](const auto& entry) { return entry.second.moving(); });
                     });
-                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 &&
-                                         s.backend->motion_api().set_transforms
-                                     ? samples
-                                     : 1;
+                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     subframe_ = 0;
                     subframeSamples_ = 0;
                     accum_.clear();
@@ -2461,9 +2429,6 @@ public:
                 else {
                     // Same camera and time as the beauty; GBuffer channels converge after a couple of draws.
                     auto request = beautyRequest_;
-                    if (!s.backend->aov_api().poll_aov)
-                        throw std::runtime_error(
-                            "This runtime has no AOV extension; build and stage the current backend");
                     request.generation = std::max(s.generation, s.aovGeneration) + 1;
                     request.aov = aovs_[aovSlot_].second;
                     // A lighting component renders as the beauty. Path-traced albedo and normal come from the Path
@@ -2481,7 +2446,7 @@ public:
                             if (std::find(names.begin(), names.end(), var.row->buffer) == names.end())
                                 names.push_back(var.row->buffer);
                         s.backend->require(
-                            s.backend->aov_api().set_buffers(s.session, names.data(), uint32_t(names.size())),
+                            s.backend->api().set_aov_buffers(s.session, names.data(), uint32_t(names.size())),
                             "set_buffers");
                     }
                     if (aovs_[aovSlot_].first == cryptoIds_.get()) {
@@ -2600,9 +2565,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     state_->backend = std::make_shared<hdue::Backend>(std::filesystem::u8path(dll));
     auto& host = selfHost();
     const auto rendererInfo = [state = state_] {
-        if (state->backend->material_api().get_renderer_info)
-            state->backend->require(state->backend->material_api().get_renderer_info(&state->rendererInfo),
-                                    "get_renderer_info");
+        state->backend->require(state->backend->api().get_renderer_info(&state->rendererInfo), "get_renderer_info");
     };
     if (host.worker.joinable()) {
         // UE runs (or boots) on hdUE's thread.
@@ -3061,10 +3024,11 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     std::lock_guard lock(state.mutex);
     HdueResidencyStatus residency{};
     residency.struct_size = sizeof(residency);
-    const auto& residencyApi = state.backend->residency_api();
-    if (state.session && state.backend->surface_api().get_status)
-        state.backend->surface_api().get_status(state.session, &state.surfaceStatus);
-    if (state.session && residencyApi.get_status) residencyApi.get_status(state.session, &residency);
+    const auto& api = state.backend->api();
+    if (state.session) {
+        api.get_surface_status(state.session, &state.surfaceStatus);
+        api.get_residency_status(state.session, &residency);
+    }
     VtDictionary nativeAssetIds;
     int triangles = 0;
     for (const auto& [id, mesh] : state.meshes) {
@@ -3078,9 +3042,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     int sceneLights = int(state.nativeAssets.lights);
     HdueLightingStatus lighting{};
     lighting.struct_size = sizeof(lighting);
-    const auto& lightingApi = state.backend->lighting_api();
-    if (lightingApi.get_status && state.session)
-        state.backend->require(lightingApi.get_status(state.session, &lighting), "lighting_status");
+    if (state.session) state.backend->require(api.get_lighting_status(state.session, &lighting), "lighting_status");
     if (state.setting<bool>("sceneLightsEnabled", true))
         for (const auto& [id, light] : state.lights)
             if (!light.viewer && active(light)) ++sceneLights;
@@ -3241,11 +3203,7 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
             result["error"] = VtValue(std::string("Native picking requires the current scene to be submitted to UE"));
             return true;
         }
-        const auto& api = state_->backend->native_pick_api();
-        if (!api.pick_native) {
-            result["error"] = VtValue(std::string("Backend has no native picking extension"));
-            return true;
-        }
+        const auto& api = state_->backend->api();
         // Native materials can change culling or deform even a generic USD
         // mesh. Validate them before returning any hit in the scene.
         for (const auto& [id, mesh] : state_->meshes) {
@@ -3254,7 +3212,7 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
             if (path.empty() || state_->pickMaterialFlags.count(path)) continue;
             HduePickMaterialInfo info{};
             info.struct_size = sizeof(info);
-            const auto code = api.get_material_info(path.c_str(), &info);
+            const auto code = api.get_pick_material_info(path.c_str(), &info);
             if (code != HDUE_OK || !(info.flags & HDUE_PICK_MATERIAL_OPAQUE) ||
                 (info.flags & HDUE_PICK_MATERIAL_DEFORMED)) {
                 result["error"] = VtValue(

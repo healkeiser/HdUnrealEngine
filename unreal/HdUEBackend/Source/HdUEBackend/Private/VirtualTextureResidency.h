@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #if !WITH_EDITOR
-#include "hdue/residency_api.h"
+#include "hdue/bridge.h"
 #include "UObject/StrongObjectPtr.h"
 #include "VirtualTexturing.h"
 class UTexture2D;

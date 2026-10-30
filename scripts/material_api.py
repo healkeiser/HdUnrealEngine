@@ -1,4 +1,4 @@
-"""ctypes mirror of the optional, caller-owned hdUE material C ABI."""
+"""ctypes mirror of hdUE's caller-owned material C ABI (include/hdue/bridge.h)."""
 
 import ctypes as C
 
@@ -53,37 +53,21 @@ class MaterialStats(C.Structure):
     ]
 
 
-class Api(C.Structure):
-    _fields_ = [("struct_size", U32), ("abi_version", U32)] + [
-        (n, C.c_void_p)
-        for n in ("get_renderer_info", "set_parameters", "get_material_stats")
-    ]
-
-
 class MaterialApi:
     def __init__(self, runtime):
         self.runtime = runtime
         if tuple(
-            map(C.sizeof, (RendererInfo, Parameter, Update, MaterialStats, Api))
-        ) != (20, 40, 24, 32, 32):
-            raise RuntimeError("Material extension C ABI layout mismatch")
-        self.get_api = runtime.library.hdue_get_material_api
-        self.get_api.argtypes = [U32, U32, C.POINTER(Api)]
-        self.get_api.restype = Result
-        table = Api()
-        self.require(self.get_api(1, C.sizeof(table), C.byref(table)))
-        if (
-            table.struct_size != 32
-            or table.abi_version != 1
-            or any(not getattr(table, n) for n, _ in Api._fields_[2:])
-        ):
-            raise RuntimeError("Incompatible material extension")
+            map(C.sizeof, (RendererInfo, Parameter, Update, MaterialStats))
+        ) != (20, 40, 24, 32):
+            raise RuntimeError("Material C ABI layout mismatch")
+        table = runtime.api
         self.get_info = runtime.bind(
             C.CFUNCTYPE(Result, C.POINTER(RendererInfo)),
             table.get_renderer_info,
         )
         self.set_parameters = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Update)), table.set_parameters
+            C.CFUNCTYPE(Result, U64, C.POINTER(Update)),
+            table.set_material_parameters,
         )
         self.get_stats = runtime.bind(
             C.CFUNCTYPE(Result, U64, C.c_char_p, C.POINTER(MaterialStats)),

@@ -8,7 +8,7 @@ from pathlib import Path
 
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
-ABI_VERSION = 11  # HDUE_ABI_VERSION
+ABI_VERSION = 12  # HDUE_ABI_VERSION
 Task = C.CFUNCTYPE(
     None, C.py_object
 )  # hdue_run_on_ue_thread's task, called with the Python callable to run
@@ -52,12 +52,40 @@ class Api(C.Structure):
             "tick",
             "create_session",
             "destroy_session",
+            "resize_session",
             "request_render",
             "poll_frame",
             "copy_frame",
             "window_message",
             "shutdown",
             "apply_scene",
+            "pick_native",
+            "get_pick_material_info",
+            "get_renderer_info",
+            "set_material_parameters",
+            "get_material_stats",
+            "configure_residency",
+            "get_residency_status",
+            "upsert_asset",
+            "remove_asset",
+            "get_asset_status",
+            "get_asset_scene_status",
+            "set_depth_enabled",
+            "copy_depth",
+            "poll_aov",
+            "set_aov_buffers",
+            "copy_aov_buffer",
+            "set_transforms",
+            "set_post_process",
+            "upsert_volume",
+            "remove_volume",
+            "upsert_lights",
+            "get_lighting_status",
+            "apply_surfaces",
+            "get_surface_status",
+            "configure_gpu_frames",
+            "poll_gpu_frame",
+            "acquire_gpu_frame",
         )
     ]
 
@@ -74,7 +102,7 @@ class Runtime:
         if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (
             48,
             552,
-            96,
+            320,
         ):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()
@@ -93,11 +121,14 @@ class Runtime:
         if (
             get_api(ABI_VERSION, C.sizeof(api), C.byref(api))
             or api.abi_version != ABI_VERSION
-            or api.struct_size != 96
+            or api.struct_size != C.sizeof(api)
         ):
             raise RuntimeError("Incompatible hdUE C ABI")
         if any(not getattr(api, name) for name, _ in Api._fields_[2:]):
             raise RuntimeError("Incomplete hdUE C ABI")
+        self.api = (
+            api  # the whole table; the *_api.py wrappers bind its entries
+        )
         self.initialize = C.CFUNCTYPE(Result, C.POINTER(InitDesc))(
             api.initialize
         )

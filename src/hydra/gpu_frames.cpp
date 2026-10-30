@@ -78,7 +78,7 @@ VtValue HdUEGpuFrames::color(uint32_t width, uint32_t height, bool converged) {
     HdueGpuFrame frame{};
     frame.struct_size = sizeof(frame);
     frame.ring = ring_;
-    if (backend_->gpu_api().acquire_gpu_frame(session, &frame) != HDUE_OK) return {};
+    if (backend_->api().acquire_gpu_frame(session, &frame) != HDUE_OK) return {};
     clearErrors();  // Houdini's own drawing may have left errors behind
     if (frame.ring != ring_ && !import(frame)) return {};
     // Copied again on every redraw: the tasks after HdxAovInputTask may draw into the texture they are given.

@@ -2,7 +2,7 @@
 #include "CoreMinimal.h"
 #include "Engine/StreamableManager.h"
 #include "UObject/StrongObjectPtr.h"
-#include "hdue/asset_api.h"
+#include "hdue/bridge.h"
 class UWorld;
 class ULevelStreamingDynamic;
 class AActor;

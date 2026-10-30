@@ -248,8 +248,7 @@ class Test:
             raise AssertionError("Transform did not change the image")
         native = edit.parent().createNode("pythonscript", "hdUE_native_test")
         native.setInput(0, edit)
-        native.parm("python").set(
-            """from pxr import UsdGeom,Sdf,Gf
+        native.parm("python").set("""from pxr import UsdGeom,Sdf,Gf
 s=hou.pwd().editableStage()
 p=UsdGeom.Xform.Define(s,"/Native").GetPrim()
 p.CreateAttribute("hdue:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
@@ -259,8 +258,7 @@ parent.AddTranslateOp().Set(Gf.Vec3d(-2,0,0)); parent.AddScaleOp().Set(Gf.Vec3f(
 p=UsdGeom.Mesh.Define(s,"/NativeParent/MeshAsset").GetPrim()
 p.CreateAttribute("hdue:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
 UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
-"""
-        )
+""")
         prepared = integration.settings_node(native)
         prepared.setDisplayFlag(True)
         prepared.setCurrent(True, clear_all_selected=True)
@@ -472,13 +470,8 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
     def depth_contracts(self):
         import threading
 
-        from hdue_viewport import DepthApi, Frame
+        from hdue_viewport import Frame
 
-        api = DepthApi()
-        if self.api.get_depth(99, C.sizeof(api), C.byref(api)) != -2:
-            raise AssertionError("Depth ABI version accepted")
-        if self.api.get_depth(1, C.sizeof(api) - 1, C.byref(api)) != -6:
-            raise AssertionError("Short depth table accepted")
         # Depth belongs to UE's newest frame, by UE's frame id (the viewport status numbers the frames Houdini shows).
         state = self.api.status()
         frame = Frame()

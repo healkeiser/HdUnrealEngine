@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 
 import numpy as np
-from material_api import Api, MaterialApi, RendererInfo
+from hdue_runtime import ABI_VERSION, Api
+from material_api import MaterialApi, RendererInfo
 from pxr import Gf, Sdf, Usd, UsdShade
 from usdview_test import PLUGIN, SmokeTest
 
@@ -205,15 +206,14 @@ class MaterialXTest(SmokeTest):
             raise AssertionError(
                 "Material extension did not report Substrate Adaptive"
             )
+        get_api = self.launcher.runtime.library.hdue_get_api
         bad = Api()
         if (
-            api.get_api(999, C.sizeof(bad), C.byref(bad)) != -2
-            or api.get_api(1, C.sizeof(bad) - 1, C.byref(bad)) != -6
-            or bad.set_parameters
+            get_api(999, C.sizeof(bad), C.byref(bad)) != -2
+            or get_api(ABI_VERSION, C.sizeof(bad) - 1, C.byref(bad)) != -6
+            or bad.set_material_parameters
         ):
-            raise AssertionError(
-                "Material extension version/capacity contract failed"
-            )
+            raise AssertionError("API table version/capacity contract failed")
         worker_result = []
 
         def worker():

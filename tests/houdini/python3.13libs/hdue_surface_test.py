@@ -6,7 +6,7 @@ import threading
 import hdue_houdini as integration
 from hdue_materialx_test import Test as MaterialTest
 from hdue_viewport import Surfaces
-from surface_api import Api, Batch, SurfaceApi
+from surface_api import Batch, SurfaceApi
 
 _test = None
 
@@ -102,9 +102,6 @@ class Test(MaterialTest):
         empty = Batch(C.sizeof(Batch), 0, None)
         if self.surface.apply(session + 1, C.byref(empty)) != -1:
             raise AssertionError("Backend accepted a stale session")
-        table = Api()
-        if self.surface.get(99, C.sizeof(table), C.byref(table)) != -2:
-            raise AssertionError("Unknown surface ABI accepted")
         override.parm("hdue_wet_mask").set("missing_mask")
         while not self.host.material_error:
             yield

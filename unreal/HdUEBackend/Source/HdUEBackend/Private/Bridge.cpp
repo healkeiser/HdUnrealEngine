@@ -1,7 +1,6 @@
 #include "CoreMinimal.h"
 #if !WITH_EDITOR
 #include "hdue/bridge.h"
-#include "hdue/lighting_api.h"
 #include "Lighting.h"
 #include "EnvironmentBackground.h"
 #include "SharedFrames.h"
@@ -13,12 +12,6 @@
 #include "Message.h"
 #include "VirtualTextureResidency.h"
 #include "NativePicking.h"
-#include "hdue/material_api.h"
-#include "hdue/depth_api.h"
-#include "hdue/aov_api.h"
-#include "hdue/motion_api.h"
-#include "hdue/postprocess_api.h"
-#include "hdue/volume_api.h"
 #include "RenderUtils.h"
 #include "ShaderPipelineCache.h"
 #include "PipelineStateCache.h"
@@ -101,7 +94,7 @@ struct FReadbackJob {
     FTextureRHIRef Environment;
     float EnvironmentScale = 1;
     float ScreenFraction = 1;
-    // hdue/gpu_api.h: the draw also goes to the shared ring (enabled set), into a slot the render thread picks.
+    // configure_gpu_frames: the draw also goes to the shared ring (enabled set), into a slot the render thread picks.
     HdueGpuOptions Shared{};
     int32 SharedSlot = -1;
 };
@@ -147,7 +140,7 @@ struct FSession {
     TStrongObjectPtr<UMaterialInterface> DebugMaterial;
     bool MegaLightsActive = false;
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial;  // PP_HdUEAov, weights select HDUE_AOV_*.
-    // hdue/postprocess_api.h: beauty overrides; the materials stay referenced while they are blendables.
+    // set_post_process: beauty overrides; the materials stay referenced while they are blendables.
     FPostProcessSettings PostProcess;
     TArray<TStrongObjectPtr<UMaterialInterface>> PostProcessMaterials;
     // Texture properties set to an image file, by property: the file, its time and size when imported, and the texture.
@@ -160,13 +153,13 @@ struct FSession {
     TMap<FString, FPostProcessTexture> PostProcessTextures;
     bool Tonemapper = false;
     float ExposureStops = 0;
-    // AOV requests use their own view state and frame slot (hdue/aov_api.h); Frame/Pixels/depth
+    // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
     // and the beauty's Lumen or Path Tracer history belong to BeautyRequest.
     HdueRenderRequest BeautyRequest{};
     FSceneViewStateInterface* AovViewState = nullptr;
     HdueFrameInfo AovFrame{};
     TArray<float> AovPixels;
-    // hdue/aov_api.h set_buffers: the materials HDUE_AOV_BUFFERS renders, and the last BUFFERS frame's outputs.
+    // set_aov_buffers: the materials HDUE_AOV_BUFFERS renders, and the last BUFFERS frame's outputs.
     TArray<TStrongObjectPtr<UMaterialInterface>> BufferMaterials;
     TArray<TArray<float>> AovBuffers;
     // The converged Path Tracer beauty's albedo and normal (RGBA, as AovPixels): the buffers UE's Path Tracer
@@ -905,7 +898,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         if (!Session->InFlight.ContainsByPredicate([Slot](const auto& InFlight) { return InFlight->Slot == Slot; }))
             FreeSlot = Slot;
     const bool Room = FreeSlot >= 0 && Session->InFlight.Num() < (IsInteractive() ? FSession::ReadbackSlots : 1);
-    // A host reading the shared ring (hdue/gpu_api.h) gets every draw from there: the readback then only gives CPU
+    // A host reading the shared ring (hdue/bridge.h) gets every draw from there: the readback then only gives CPU
     // consumers (Map, the Python viewer) the converged image.
     if (HdueGpuOptions Shared{}; !Aov && HdueSharedFrames::Enabled(Session->Handle, Shared)) Job->Shared = Shared;
     const bool Sharing = Job->Shared.enabled != 0;
@@ -1532,7 +1525,7 @@ HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
     return HDUE_OK;
 }
 
-// hdue/aov_api.h: a [Engine.BufferVisualizationMaterials] key (BaseColor, WorldNormal, ...; cooked runtimes keep the
+// set_aov_buffers: a [Engine.BufferVisualizationMaterials] key (BaseColor, WorldNormal, ...; cooked runtimes keep the
 // materials, as debug views use them) or a material path.
 HdueResult HDUE_CALL SetBuffers(HdueSession Handle, const char* const* Names, uint32 Count) {
     HDUE_RETURN_UNLESS_READY();
@@ -1823,62 +1816,9 @@ HdueResult HDUE_CALL AssetSceneStatus(HdueSession Handle, HdueAssetSceneStatus* 
     Runtime.Session->Scene->Assets.GetSceneStatus(*Status);
     return HDUE_OK;
 }
-}  // namespace
-
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint32_t Capacity, HdueApi* Api) {
-    if (!Api || Capacity < sizeof(HdueApi)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HdueApi), HDUE_ABI_VERSION, Initialize, GetStatus,     Tick,     CreateSession, DestroySession,
-            RequestRender,   PollFrame,        CopyFrame,  WindowMessage, Shutdown, ApplyScene};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_native_pick_api(uint32 Version, uint32 Capacity,
-                                                                     HdueNativePickApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_NATIVE_PICK_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_NATIVE_PICK_ABI_VERSION, PickNative, GetPickMaterialInfo};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_material_api(uint32 Version, uint32 Capacity,
-                                                                  HdueMaterialApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_MATERIAL_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_MATERIAL_ABI_VERSION, GetRendererInfo, SetMaterialParameters, GetMaterialStats};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_residency_api(uint32 Version, uint32 Capacity,
-                                                                   HdueResidencyApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_RESIDENCY_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_RESIDENCY_ABI_VERSION, ConfigureResidency, GetResidencyStatus};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_asset_api(uint32 Version, uint32 Capacity, HdueAssetApi* Api) {
-    if (!Api || Version != HDUE_ASSET_ABI_VERSION || Capacity < sizeof(HdueAssetApi)) return HDUE_INVALID_ARGUMENT;
-    *Api = {sizeof(HdueAssetApi), HDUE_ASSET_ABI_VERSION, UpsertAsset, RemoveAsset, AssetStatus, AssetSceneStatus};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_volume_api(uint32 Version, uint32 Capacity, HdueVolumeApi* Api) {
-    if (!Api || Capacity < sizeof(HdueVolumeApi)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_VOLUME_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HdueVolumeApi), HDUE_VOLUME_ABI_VERSION, UpsertVolume, RemoveVolume};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32 Version, uint32 Capacity, HdueAovApi* Api) {
-    if (!Api || Capacity < sizeof(HdueAovApi)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_AOV_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HdueAovApi), HDUE_AOV_ABI_VERSION, PollAov, SetBuffers, CopyBuffer};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32 Version, uint32 Capacity, HdueMotionApi* Api) {
-    if (!Api || Capacity < sizeof(HdueMotionApi)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_MOTION_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HdueMotionApi), HDUE_MOTION_ABI_VERSION, SetTransforms};
-    return HDUE_OK;
-}
 // Resizes the session's render target in place, keeping its scene: recreating the session for a new viewport size
 // rebuilt every mesh, material and texture (seconds on large scenes, e.g. leaving a camera in Houdini).
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Handle, uint32 Width, uint32 Height) {
+HdueResult HDUE_CALL ResizeSession(HdueSession Handle, uint32 Width, uint32 Height) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Width || !Height || Width > 8192 || Height > 8192) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
@@ -1917,37 +1857,52 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
     }
     return HDUE_OK;
 }
+}  // namespace
 
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_postprocess_api(uint32 Version, uint32 Capacity,
-                                                                     HduePostProcessApi* Api) {
-    if (!Api || Capacity < sizeof(HduePostProcessApi)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_POSTPROCESS_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HduePostProcessApi), HDUE_POSTPROCESS_ABI_VERSION, SetPostProcess};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_gpu_api(uint32 Version, uint32 Capacity, HdueGpuApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_GPU_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_GPU_ABI_VERSION, ConfigureGpuFrames, PollGpuFrame, AcquireGpuFrame};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_depth_api(uint32 Version, uint32 Capacity, HdueDepthApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_DEPTH_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_DEPTH_ABI_VERSION, EnableDepth, CopyDepth};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_lighting_api(uint32 Version, uint32 Capacity,
-                                                                  HdueLightingApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_LIGHTING_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_LIGHTING_ABI_VERSION, UpsertLights, LightingStatus};
-    return HDUE_OK;
-}
-extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_surface_api(uint32 Version, uint32 Capacity, HdueSurfaceApi* Api) {
-    if (!Api || Capacity < sizeof(*Api)) return HDUE_BUFFER_TOO_SMALL;
-    if (Version != HDUE_SURFACE_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(*Api), HDUE_SURFACE_ABI_VERSION, ApplySurface, SurfaceStatus};
+extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint32_t Capacity, HdueApi* Api) {
+    if (!Api || Capacity < sizeof(HdueApi)) return HDUE_BUFFER_TOO_SMALL;
+    if (Version != HDUE_ABI_VERSION) return HDUE_ABI_MISMATCH;
+    *Api = {.struct_size = sizeof(HdueApi),
+            .abi_version = HDUE_ABI_VERSION,
+            .initialize = Initialize,
+            .get_status = GetStatus,
+            .tick = Tick,
+            .create_session = CreateSession,
+            .destroy_session = DestroySession,
+            .resize_session = ResizeSession,
+            .request_render = RequestRender,
+            .poll_frame = PollFrame,
+            .copy_frame = CopyFrame,
+            .window_message = WindowMessage,
+            .shutdown = Shutdown,
+            .apply_scene = ApplyScene,
+            .pick_native = PickNative,
+            .get_pick_material_info = GetPickMaterialInfo,
+            .get_renderer_info = GetRendererInfo,
+            .set_material_parameters = SetMaterialParameters,
+            .get_material_stats = GetMaterialStats,
+            .configure_residency = ConfigureResidency,
+            .get_residency_status = GetResidencyStatus,
+            .upsert_asset = UpsertAsset,
+            .remove_asset = RemoveAsset,
+            .get_asset_status = AssetStatus,
+            .get_asset_scene_status = AssetSceneStatus,
+            .set_depth_enabled = EnableDepth,
+            .copy_depth = CopyDepth,
+            .poll_aov = PollAov,
+            .set_aov_buffers = SetBuffers,
+            .copy_aov_buffer = CopyBuffer,
+            .set_transforms = SetTransforms,
+            .set_post_process = SetPostProcess,
+            .upsert_volume = UpsertVolume,
+            .remove_volume = RemoveVolume,
+            .upsert_lights = UpsertLights,
+            .get_lighting_status = LightingStatus,
+            .apply_surfaces = ApplySurface,
+            .get_surface_status = SurfaceStatus,
+            .configure_gpu_frames = ConfigureGpuFrames,
+            .poll_gpu_frame = PollGpuFrame,
+            .acquire_gpu_frame = AcquireGpuFrame};
     return HDUE_OK;
 }
 #endif

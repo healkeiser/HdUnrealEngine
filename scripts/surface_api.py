@@ -41,41 +41,14 @@ class Status(C.Structure):
     ]
 
 
-class Api(C.Structure):
-    _fields_ = [
-        ("struct_size", U32),
-        ("abi_version", U32),
-        ("apply", C.c_void_p),
-        ("get_status", C.c_void_p),
-    ]
-
-
 class SurfaceApi:
     def __init__(self, runtime):
         self.runtime = runtime
-        if tuple(map(C.sizeof, (Binding, Batch, Status, Api))) != (
-            64,
-            16,
-            48,
-            24,
-        ):
+        if tuple(map(C.sizeof, (Binding, Batch, Status))) != (64, 16, 48):
             raise RuntimeError("Surface ABI layout mismatch")
-        self.get = runtime.library.hdue_get_surface_api
-        self.get.argtypes = [U32, U32, C.POINTER(Api)]
-        self.get.restype = Result
-        table = Api()
-        runtime.check(
-            self.get(1, C.sizeof(table), C.byref(table)), "surface API"
-        )
-        if (
-            table.struct_size != 24
-            or table.abi_version != 1
-            or not table.apply
-            or not table.get_status
-        ):
-            raise RuntimeError("Incomplete surface API")
+        table = runtime.api
         self.apply = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Batch)), table.apply
+            C.CFUNCTYPE(Result, U64, C.POINTER(Batch)), table.apply_surfaces
         )
         self.get_status = runtime.bind(
             C.CFUNCTYPE(Result, U64, C.POINTER(Status)), table.get_status
