@@ -631,7 +631,8 @@ public:
                 !onlyNativeBounds &&
                 (previous == missing || previous->second.points != part.points ||
                  previous->second.indices != part.indices || previous->second.normals != part.normals ||
-                 previous->second.uv != part.uv || previous->second.uvSets != part.uvSets || (previous->second.transform != part.transform && !moved) ||
+                 previous->second.uv != part.uv || previous->second.uvSets != part.uvSets ||
+                 (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
