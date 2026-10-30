@@ -2553,7 +2553,8 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
         HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,    HdPrimTypeTokens->extComputation,
         HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
         HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,   HdPrimTypeTokens->cylinderLight,
-        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight")};
+        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight"),
+        HdPrimTypeTokens->light};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -2594,6 +2595,8 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == HdPrimTypeTokens->cylinderLight) return HdUECreateLight(id, HDUE_CYLINDER_LIGHT);
     if (type == HdPrimTypeTokens->meshLight || type == HdPrimTypeTokens->pluginLight || type == TfToken("portalLight"))
         return HdUECreateUnsupportedLight(id, type);
+    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a UsdLuxGeometryLight
+        return HdUECreateUnsupportedLight(id, TfToken("GeometryLight"));
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {
