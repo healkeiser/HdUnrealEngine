@@ -13,6 +13,7 @@ MODULES = {
     "materials": "hdue_materialx_test",
     "optextures": "hdue_op_texture_test",
     "viewport": "hdue_solaris_probe",
+    "selection": "hdue_selection_test",
 }
 
 

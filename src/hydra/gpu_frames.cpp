@@ -71,10 +71,10 @@ bool HdUEGpuFrames::import(HdueGpuFrame& frame) {
         fail("importing UE's shared textures failed (GL error " + std::to_string(error) + ")");
     return ok && !failed_;
 }
-VtValue HdUEGpuFrames::color(uint32_t width, uint32_t height) {
+VtValue HdUEGpuFrames::color(uint32_t width, uint32_t height, bool converged) {
     depthCopied_ = false;
     const HdueSession session = session_;
-    if (released_ || !session || !supported()) return {};
+    if (converged || released_ || !session || !supported()) return {};
     HdueGpuFrame frame{};
     frame.struct_size = sizeof(frame);
     frame.ring = ring_;

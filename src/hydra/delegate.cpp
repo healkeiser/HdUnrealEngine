@@ -1358,8 +1358,9 @@ class Pass final : public HdRenderPass {
                 if (bound) bound->setResource(nullptr);
             if (options.enabled) {
                 frames->setSession(s.session);
-                buffer.setResource(
-                    [frames, target = &buffer] { return frames->color(target->GetWidth(), target->GetHeight()); });
+                buffer.setResource([frames, target = &buffer] {
+                    return frames->color(target->GetWidth(), target->GetHeight(), target->IsConverged());
+                });
                 if (depth) depth->setResource([frames] { return frames->depth(); });
             }
             gpuOptions_ = options;
@@ -3193,6 +3194,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
                      ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) / float(state.samplesPerPixel()))
                      : 0.f)},
         {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
+        {"peakMemory", VtValue(int64_t(hdue::peak_memory_bytes()))},
         {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)},
         {"readbackMs", VtValue(state.lastFrame.readback_ms)}};
     // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images (UsdRenderers.json).

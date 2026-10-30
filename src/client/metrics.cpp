@@ -1,5 +1,6 @@
 #include "hdue/backend.hpp"
 #include <dxgi1_4.h>
+#include <psapi.h>
 #include <wrl/client.h>
 namespace hdue {
 std::optional<uint64_t> gpu_memory_bytes() {
@@ -21,5 +22,9 @@ std::optional<uint64_t> gpu_memory_bytes() {
         }
     }
     return available ? std::optional<uint64_t>(total) : std::nullopt;
+}
+uint64_t peak_memory_bytes() {
+    PROCESS_MEMORY_COUNTERS counters{};
+    return GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)) ? counters.PeakWorkingSetSize : 0;
 }
 }  // namespace hdue
