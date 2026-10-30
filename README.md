@@ -36,6 +36,7 @@
 - [Gallery](#gallery)
 - [Features](#features)
 - [How It Works](#how-it-works)
+- [What hdUE Changes](#what-hdue-changes)
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -180,6 +181,31 @@ Houdini describes a scene in USD and hands it to a renderer through Hydra, the s
 Unreal starts once per Houdini or husk session, so a render does not pay that cost again for every frame, and editing the scene only resends what you changed.
 
 Under the hood, for developers: [docs/architecture.md](docs/architecture.md) lists what to look for in Process Explorer or a debugger. That covers the two DLLs hdUE adds and the shared libraries they take from Houdini, the `GameThread` that hdUE starts, UE's named threads, the C ABI calls behind one frame, and how UE starts and stops.
+
+<!-- WHAT HDUE CHANGES -->
+## What hdUE Changes
+
+hdUE runs a stock Unreal Engine 5.8.4 built from source, with these changes to the engine:
+
+| Change | Why |
+|---|---|
+| `VirtualTextureSystem.h`: one `friend` declaration (`scripts/Apply-ResidencyPatch.ps1`) | The Path Tracer waits until every virtual-texture page it needs is loaded; UE's public API cannot report that. |
+| `NaniteDisplace.cpp`: an editor-only guard around one displacement-texture read (same script) | So Nanite meshes can be built at runtime, outside the editor. |
+| `MeshCards.cpp` compiles two of UE's private source files (`MeshRepresentationCommon.cpp`, `MeshCardRepresentationUtilities.cpp`) into the backend | To build Lumen cards for meshes created at runtime; the editor normally builds them on import. |
+| Build settings: a monolithic UELibrary target with Developer modules, and `IS_RUNNING_GAMETHREAD_ON_EXTERNAL_THREAD` | UE runs as a DLL inside Houdini, on a thread hdUE starts; Nanite and Lumen cards need the Developer modules ([EULA note](docs/houdini.md)). |
+
+The script checks the engine version and each insertion point before editing anything. UELibrary, Launch and the rest of the engine are unchanged.
+
+Where Unreal already has a way to do something, hdUE does it the same way: MaterialX opacity as UE's Interchange imports it, `doubleSided` as UE's USD importer, Movie Render Queue's offline settings and warmup, UE's defaults for bounces and Lumen. It departs from Unreal only here:
+
+| Where | Unreal | hdUE, and why |
+|---|---|---|
+| Light units | UE's USD importer passes UsdLux intensity as nits unchanged, so imported rect lights render 2x and sphere lights 4x brighter than UsdLux defines | Converts to UsdLux luminance, so lights match Karma and other renderers |
+| Spot cones | Clamps spots to 89 degrees, where Lumen and the Path Tracer then light only a quarter of a downward cone | Caps cones at 88 degrees |
+| Alpha-coverage mips for cutouts | UE's algorithm corrects each mip one level late and can make thin cutouts thinner | Same idea, with three fixes: thin leaves keep their coverage at a distance ([details](docs/rendering.md#materialx-surfaces)) |
+| Displacement | UE's Path Tracer ignores displacement | The mesh is diced and displaced on the CPU, so both Lumen and the Path Tracer see it |
+| New Nanite meshes | Their ray-tracing geometry is built on the next frame, so Lumen's first frame traced an empty scene | Builds it before the mesh is shown |
+| Camera far clip | Views use an infinite far plane | Not applied either: a finite far plane changed Lumen's lighting with nothing clipped |
 
 <!-- ARCHITECTURE -->
 ## Architecture
