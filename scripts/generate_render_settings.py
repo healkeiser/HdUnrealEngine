@@ -559,7 +559,8 @@ def parse_post_process(header, defaults, enums, skipped):
         elif enum_name in enums:
             kind, size = "menu", 1
         elif "TObjectPtr" in type_name or type_name.endswith("*"):
-            kind, size = "string", 1
+            # Textures also take image files (imported at render time); curves only cooked assets.
+            kind, size = ("image" if "UTexture" in type_name else "string"), 1
         elif type_name in TYPES:
             kind, size = TYPES[type_name]
         else:
@@ -574,7 +575,7 @@ def parse_post_process(header, defaults, enums, skipped):
             if default is not None
             else default_value(
                 defaults.get(name),
-                "float" if kind == "color" else kind,
+                {"color": "float", "image": "string"}.get(kind, kind),
                 size,
                 enum,
             )
@@ -586,8 +587,21 @@ def parse_post_process(header, defaults, enums, skipped):
             if re.search(r"/\*\*|//", before)
             else ""
         )
+        if kind in ("string", "image"):
+            help_text = help_text.strip()
+            help_text += "" if help_text[-1:] in ("", ".", "!", "?") else "."
         if kind == "string":
             help_text += " Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+        elif kind == "image":
+            help_text += (
+                " An image file, imported at render time"
+                + (
+                    " (a lat-long panorama, made a cubemap as UE imports one)"
+                    if "UTextureCube" in type_name
+                    else ""
+                )
+                + ", or the path of a cooked texture in the runtime project (/Game/... or /Engine/...)."
+            )
         if note:
             help_text = (
                 help_text.strip()
@@ -773,6 +787,10 @@ def ds_number(value):
     )
 
 
+# Formats FImageUtils::LoadImage reads (the backend's runtime import).
+IMAGE_PATTERN = "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp"
+
+
 def ds_parm(setting, indent, viewport):
     name = houdini_name(setting["attribute"])
     control = houdini_name(setting["attribute"] + "_control")
@@ -785,11 +803,13 @@ def ds_parm(setting, indent, viewport):
         "toggle": "toggle",
         "menu": "string",
         "string": "string",
+        "image": "file",
     }[kind]
     usd_type = {
         "toggle": "bool",
         "menu": "token",  # as Karma's menus
         "string": "string",
+        "image": "asset",
         "int": "int",
         "intmenu": "int",
         "color": "color3f",
@@ -826,6 +846,11 @@ def ds_parm(setting, indent, viewport):
     lines.append(
         f"    parmtag {{ \"spare_category\" {ds_string(setting['category'])} }}"
     )
+    if kind == "image":
+        lines.append('    parmtag { "filechooser_mode" "read" }')
+        lines.append(
+            f'    parmtag {{ "filechooser_pattern" "{IMAGE_PATTERN}" }}'
+        )
     if viewport:
         lines.append('    parmtag { "uiscope" "viewport" }')
     else:

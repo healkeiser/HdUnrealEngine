@@ -37,6 +37,12 @@
 #include "Math/Float16Color.h"
 #include "Misc/Paths.h"
 #include "Async/ParallelFor.h"
+#include "Engine/Texture2D.h"
+#include "Engine/TextureCube.h"
+#include "HAL/FileManager.h"
+#include "ImageCoreUtils.h"
+#undef LoadImage  // windows.h's LoadImageW macro would rename FImageUtils::LoadImage
+#include "ImageUtils.h"
 #include "Misc/ScopeLock.h"
 #include "Modules/ModuleManager.h"
 #include "RendererInterface.h"
@@ -144,6 +150,14 @@ struct FSession {
     // hdue/postprocess_api.h: beauty overrides; the materials stay referenced while they are blendables.
     FPostProcessSettings PostProcess;
     TArray<TStrongObjectPtr<UMaterialInterface>> PostProcessMaterials;
+    // Texture properties set to an image file, by property: the file, its time and size when imported, and the texture.
+    struct FPostProcessTexture {
+        FString File;
+        FDateTime Modified;
+        int64 Size = -1;
+        TStrongObjectPtr<UTexture> Texture;
+    };
+    TMap<FString, FPostProcessTexture> PostProcessTextures;
     bool Tonemapper = false;
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/aov_api.h); Frame/Pixels/depth
@@ -1340,6 +1354,103 @@ static void SetDebugView(FSession& Session, const FString& Text) {
         UE_LOG(LogTemp, Warning, TEXT("hdUE: debug view '%s' skipped (no cooked buffer material)"), *Text);
 }
 
+// A texture property set to an image file rather than a cooked path, imported as UE's texture defaults would: 8-bit
+// files sRGB, float files linear, a UTextureCube made from a lat-long panorama as UE's texture build makes one (with
+// box-filtered mips). Imported again only when the file's time or size changes; a failed import is remembered too.
+static UTexture* PostProcessTexture(FSession& Session, const FString& Name, const FString& File, UClass* Class) {
+    const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
+    auto& Entry = Session.PostProcessTextures.FindOrAdd(Name);
+    if (Entry.File == File && Entry.Modified == Stat.ModificationTime && Entry.Size == Stat.FileSize)
+        return Entry.Texture.Get();
+    Entry = {File, Stat.ModificationTime, Stat.FileSize, nullptr};
+    FImage Image;
+    if (!Stat.bIsValid || !FImageUtils::LoadImage(*File, Image) || Image.SizeX < 2 || Image.SizeY < 2) {
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s: cannot read the image '%s'"), *Name, *File);
+        return nullptr;
+    }
+    UE_LOG(LogTemp, Log, TEXT("hdUE: post-process setting %s imports '%s' (%dx%d)"), *Name, *File, Image.SizeX,
+           Image.SizeY);
+    if (Class->IsChildOf(UTextureCube::StaticClass())) {
+        Image.ChangeFormat(ERawImageFormat::RGBA32F, EGammaSpace::Linear);
+        const auto* Pixels = reinterpret_cast<const FLinearColor*>(Image.RawData.GetData());
+        const auto Read = [&](int32 X, int32 Y) { return Pixels[int64(Y) * Image.SizeX + X]; };
+        const int32 Extent = FMath::Min(1 << FMath::FloorLog2(Image.SizeX / 2), 2048);
+        UTextureCube* Cube = UTextureCube::CreateTransient(Extent, Extent, PF_FloatRGBA);
+        auto* Data = Cube->GetPlatformData();
+        TArray<FFloat16Color> Faces;
+        Faces.SetNumUninitialized(int64(6) * Extent * Extent);
+        // TextureCompressorModule's GenerateBaseCubeMipFromLongitudeLatitude2D: face texel -> direction -> long-lat.
+        ParallelFor(6, [&](int32 Face) {
+            for (int32 Y = 0; Y < Extent; ++Y)
+                for (int32 X = 0; X < Extent; ++X) {
+                    const double U = (X + .5) / Extent * 2 - 1, V = (Y + .5) / Extent * 2 - 1;
+                    const FVector S = FVector(U, V, 1).GetSafeNormal();
+                    const FVector D[] = {{S.Z, -S.Y, -S.X}, {-S.Z, -S.Y, S.X}, {S.X, S.Z, S.Y},
+                                         {S.X, -S.Z, -S.Y}, {S.X, -S.Y, S.Z},  {-S.X, -S.Y, -S.Z}};
+                    const FVector W(D[Face].X, D[Face].Z, D[Face].Y);
+                    const double LX = (1 + FMath::Atan2(W.X, -W.Z) / UE_DOUBLE_PI) / 2 * Image.SizeX;
+                    const double LY = FMath::Acos(FMath::Clamp(W.Y, -1., 1.)) / UE_DOUBLE_PI * Image.SizeY;
+                    const int32 X0 = FMath::Clamp(int32(LX), 0, Image.SizeX - 1),
+                                Y0 = FMath::Clamp(int32(LY), 0, Image.SizeY - 1);
+                    const int32 X1 = (X0 + 1) % Image.SizeX, Y1 = FMath::Min(Y0 + 1, Image.SizeY - 1);
+                    const float FX = float(LX - X0), FY = float(LY - Y0);
+                    auto Color = FMath::Lerp(FMath::Lerp(Read(X0, Y0), Read(X1, Y0), FX),
+                                             FMath::Lerp(Read(X0, Y1), Read(X1, Y1), FX), FY);
+                    Color.A = 1;
+                    Faces[(int64(Face) * Extent + Y) * Extent + X] = FFloat16Color(Color);
+                }
+        });
+        // ponytail: box-filtered mips, not UE's angular filter (TMGS_Angular); the diffuse lookup is a little sharper.
+        for (int32 Size = Extent, Level = 0; Size >= 1; Size /= 2, ++Level) {
+            if (Level) {
+                TArray<FFloat16Color> Down;
+                Down.SetNumUninitialized(int64(6) * Size * Size);
+                const int32 Up = Size * 2;
+                for (int32 Face = 0; Face < 6; ++Face)
+                    for (int32 Y = 0; Y < Size; ++Y)
+                        for (int32 X = 0; X < Size; ++X) {
+                            const auto At = [&](int32 DX, int32 DY) {
+                                return FLinearColor(Faces[(int64(Face) * Up + Y * 2 + DY) * Up + X * 2 + DX]);
+                            };
+                            Down[(int64(Face) * Size + Y) * Size + X] =
+                                FFloat16Color((At(0, 0) + At(1, 0) + At(0, 1) + At(1, 1)) * .25f);
+                        }
+                Faces = MoveTemp(Down);
+                Data->Mips.Add(new FTexture2DMipMap(Size, Size, 1));
+            }
+            auto& Mip = Data->Mips[Level];
+            Mip.BulkData.Lock(LOCK_READ_WRITE);
+            FMemory::Memcpy(Mip.BulkData.Realloc(Faces.Num() * sizeof(FFloat16Color)), Faces.GetData(),
+                            Faces.Num() * sizeof(FFloat16Color));
+            Mip.BulkData.Unlock();
+        }
+        Cube->SRGB = false;
+        Cube->NeverStream = true;
+        Cube->CompressionSettings = TC_HDR;
+        Cube->UpdateResource();
+        Entry.Texture.Reset(Cube);
+        return Cube;
+    }
+    if (!Class->IsChildOf(UTexture2D::StaticClass()) && Class != UTexture::StaticClass()) return nullptr;
+    ERawImageFormat::Type Raw;
+    const EPixelFormat Format = FImageCoreUtils::GetPixelFormatForRawImageFormat(Image.Format, &Raw);
+    UTexture2D* Texture = UTexture2D::CreateTransient(Image.SizeX, Image.SizeY, Format);
+    if (!Texture) return nullptr;
+    auto& Mip = Texture->GetPlatformData()->Mips[0];
+    FImageCore::CopyImage(
+        Image, FImageView(Mip.BulkData.Lock(LOCK_READ_WRITE), Image.SizeX, Image.SizeY, 1, Raw, Image.GammaSpace));
+    Mip.BulkData.Unlock();
+    Texture->SRGB = Image.GammaSpace != EGammaSpace::Linear;
+    Texture->NeverStream = true;
+    Texture->Filter = TF_Bilinear;
+    // Film grain tiles over the frame; the others (LUT strip, masks, kernels, shapes) are read edge to edge.
+    Texture->AddressX = Texture->AddressY = Name == TEXT("FilmGrainTexture") ? TA_Wrap : TA_Clamp;
+    if (Name == TEXT("ColorGradingLUT")) Texture->LODGroup = TEXTUREGROUP_ColorLookupTable;
+    Texture->UpdateResource();
+    Entry.Texture.Reset(Texture);
+    return Texture;
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
@@ -1348,6 +1459,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     FPostProcessSettings Settings;
     TSet<FString> Variables;
     FString DebugView = TEXT("off");
+    const auto Session = Runtime.Session;
+    TSet<FString> Files;  // texture properties set to image files this call
     // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
     for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
         if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
@@ -1366,6 +1479,17 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
         auto* Override = CastField<FBoolProperty>(
             FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
+        // A texture property takes an image file too: anything that is not a cooked path (/Game/..., /Engine/...).
+        const auto* Object = CastField<FObjectPropertyBase>(Property);
+        if (Object && Object->PropertyClass->IsChildOf(UTexture::StaticClass()) && !Text.IsEmpty() &&
+            (!Text.StartsWith(TEXT("/")) || FPaths::FileExists(Text))) {
+            Files.Add(Name);
+            if (UTexture* Texture = PostProcessTexture(*Session, Name, Text, Object->PropertyClass)) {
+                Object->SetObjectPropertyValue_InContainer(&Settings, Texture);
+                if (Override) Override->SetPropertyValue_InContainer(&Settings, true);
+            }
+            continue;
+        }
         if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {
             UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"),
                    *Name, *Text);
@@ -1386,7 +1510,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
     }
     RestoreConsoleVariables(Variables);
-    const auto Session = Runtime.Session;
+    for (auto It = Session->PostProcessTextures.CreateIterator(); It; ++It)
+        if (!Files.Contains(It.Key())) It.RemoveCurrent();  // no longer set from a file
     SetDebugView(*Session, DebugView);
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
