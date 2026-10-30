@@ -124,6 +124,8 @@ def relaunch():
         __file__,
         HOUDINI_PATH=f"{INTEGRATION};&",
         HDUE_HOUDINI_ENABLE="1",
+        # UsdRenderers.json only lists the delegate when a runtime is configured.
+        HDUE_RUNTIME_CONFIG=str(local_path("runtime_config")),
         PXR_PLUGINPATH_NAME=os.pathsep.join(
             [
                 str(houdini / "bin/usd_plugins"),
