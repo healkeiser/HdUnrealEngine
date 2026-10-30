@@ -132,9 +132,9 @@ The host/preparation adapter resolves the authored USD settings after reference 
 
 Parallel Sync work is accumulated into batches. The owner thread validates and applies each batch, then the render thread consumes the resulting resources.
 
-The existing base ABI remains unchanged. An optional versioned extension must carry effect bindings and mask updates with fixed-width fields, caller-owned data, a session handle, and a geometry revision. Exact C structure layouts are settled after the shader/mask proofs of concept. Scalar/vector updates should reuse existing material parameter facilities where possible.
+Effect bindings and mask updates go through the surface functions of the ABI table (`apply_surfaces`, `get_surface_status` in `include/hdue/bridge.h`) with fixed-width fields, caller-owned data, a session handle, and a geometry revision. Scalar/vector updates reuse the material parameter facilities where possible.
 
-For each affected binding, validate the complete material/mask update before publishing it. Copy caller data during the call. Never expose UE/USD objects across the boundary. A backend lacking the extension reports an unsupported effect instead of silently ignoring authored wet settings.
+For each affected binding, validate the complete material/mask update before publishing it. Copy caller data during the call. Never expose UE/USD objects across the boundary.
 
 Amount, roughness, mask, binding, topology, and relevant time changes advance the render generation and invalidate Path Tracer accumulation. Camera-only motion must not rebuild/cook a material or upload an unchanged mask. Geometry updates must retain or reapply the matching mask.
 

@@ -137,11 +137,11 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 2. **Execute (`Pass::_Execute`, host thread).** Copies the pass state (AOV bindings, buffers, view, projection, camera values) into a `PassSnapshot`, since Houdini reuses those objects once `Execute` returns. Then:
    - **husk / hython:** `host.run(...)` blocks the host thread while the UE thread calls `executeOnce` repeatedly for up to 250 ms or until converged, so a realtime frame costs GPU time rather than husk's polling interval.
    - **Houdini's UI:** `host.post(...)` and return at once; calls arriving while one is queued are coalesced to the newest camera, and the pump keeps publishing until `IsConverged`.
-3. **`executeOnce` (UE thread).** Ticks UE (unless the loop just did), creates or resizes the session (`create_session`, `hdue_resize_session`), and when `revision` changed: `prepareScene` takes the dirty sets under the state lock into a `ScenePacket` of ABI descriptors, then `sendScene` calls `apply_scene` (meshes, materials, removals; `reset_scene` on the first batch), the lighting, volume, asset, surface and motion extensions (`set_transforms` for moved meshes, keeping their geometry). Then it builds an `HdueRenderRequest` (UE centimetres, +X forward, +Z up; generation, mode, samples, warmup, projection, depth of field) and calls `request_render` when the request changed, then `poll_frame` / `copy_frame` (and `copy_depth`, `poll_aov`, `copy_buffer` for AOVs).
+3. **`executeOnce` (UE thread).** Ticks UE (unless the loop just did), creates or resizes the session (`create_session`, `resize_session`), and when `revision` changed: `prepareScene` takes the dirty sets under the state lock into a `ScenePacket` of ABI descriptors, then `sendScene` calls `apply_scene` (meshes, materials, removals; `reset_scene` on the first batch), then the lighting, volume, asset, surface and motion functions (`set_transforms` for moved meshes, keeping their geometry). Then it builds an `HdueRenderRequest` (UE centimetres, +X forward, +Z up; generation, mode, samples, warmup, projection, depth of field) and calls `request_render` when the request changed, then `poll_frame` / `copy_frame` (and `copy_depth`, `poll_aov`, `copy_aov_buffer` for AOVs).
 4. **UE tick (`Tick`, `Bridge.cpp`).** `UELibrary_Tick`, native assets, lighting and `TickConversions`; retire finished readbacks and poll the pending ones; when residency for the Path Tracer becomes ready, reset the view state; unless the current request's frame is converged, `Draw`.
 5. **Render.** `Draw` builds a scene view family for the session's render target (`SCS_FinalToneCurveHDR`, so the float target gets UE's tone curve as linear Rec.709) and `RenderAndReadBack` calls `BeginRenderingViewFamily`. A frame converges after `samples_per_pixel` Path Tracer draws, or after `warmup_frames` full-resolution realtime draws.
 6. **Readback (CPU path).** A `FRHIGPUTextureReadback` copies the colour (and depth, Path Tracer albedo/normal guides) in one of three slots. On a later tick the render thread locks it, converts half floats to float RGBA with straight alpha (and device depth to linear centimetres), and publishes `Pixels` and `Frame` under `FrameMutex`, with `frame_id`, `generation`, `converged`, `completed_samples`. `poll_frame` returns the newest frame; the delegate compares its generation with the request's so a stale frame is not shown as current.
-7. **Shared GPU frames (Solaris viewport).** With `gpu_api.h` configured, each beauty draw is also written into a ring of three shared D3D12 textures (RGBA16F colour, R32F depth, bottom row first) and UE's queue signals a shared ready fence (`SharedFrames.cpp`). On the GL thread, `HdUERenderBuffer::GetResource` → `HdUEGpuFrames::color` calls `acquire_gpu_frame`, imports the NT handles once per ring (`GL_EXT_memory_object_win32`, `GL_EXT_semaphore_win32`), waits for the ready fence on the GPU (`glWaitSemaphoreEXT`), copies into HgiGL textures (`glCopyImageSubData`) and signals the release fence. The CPU readback then runs only for converged frames, and Houdini composites the CPU buffers once they hold the converged frame, since its selection highlight lines the CPU `primId` buffer up with a CPU colour buffer. Motion blur, the denoiser, a non-Rec.709 OCIO `scene_linear`, husk, usdview, Live Render and `HDUE_GPU_FRAMES=0` keep the CPU path (`docs/houdini.md`).
+7. **Shared GPU frames (Solaris viewport).** With `configure_gpu_frames` enabled, each beauty draw is also written into a ring of three shared D3D12 textures (RGBA16F colour, R32F depth, bottom row first) and UE's queue signals a shared ready fence (`SharedFrames.cpp`). On the GL thread, `HdUERenderBuffer::GetResource` → `HdUEGpuFrames::color` calls `acquire_gpu_frame`, imports the NT handles once per ring (`GL_EXT_memory_object_win32`, `GL_EXT_semaphore_win32`), waits for the ready fence on the GPU (`glWaitSemaphoreEXT`), copies into HgiGL textures (`glCopyImageSubData`) and signals the release fence. The CPU readback then runs only for converged frames, and Houdini composites the CPU buffers once they hold the converged frame, since its selection highlight lines the CPU `primId` buffer up with a CPU colour buffer. Motion blur, the denoiser, a non-Rec.709 OCIO `scene_linear`, husk, usdview, Live Render and `HDUE_GPU_FRAMES=0` keep the CPU path (`docs/houdini.md`).
 8. **Publish (delegate).** Pixels are converted to the OCIO `scene_linear` space when needed, written into the bound `HdUERenderBuffer`s (colour, depth, AOVs, Cryptomatte), optionally denoised by OIDN, and the host maps them: husk writes the image, Houdini draws it.
 
 ### Interactive and offline profiles
@@ -160,7 +160,7 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 
 ## Startup and shutdown
 
-**Startup.** `HdUEHoudiniRendererPlugin::CreateRenderDelegate` → `HdUERenderDelegate` constructor → `hdue::Backend` loads the backend and resolves `hdue_get_api` and the extension getters (each checked for version, size and required functions) → if no worker exists, `get_status`; when `COLD`, `startSelfHost`:
+**Startup.** `HdUEHoudiniRendererPlugin::CreateRenderDelegate` → `HdUERenderDelegate` constructor → `hdue::Backend` loads the backend and fills its one table from `hdue_get_api` (checked for version and size) → if no worker exists, `get_status`; when `COLD`, `startSelfHost`:
 
 - husk and hython wait for the boot; Houdini's UI returns at once (work posted meanwhile runs once UE is ready, and a boot failure is kept in `bootError` and reported by every later delegate).
 - On the new thread: hidden window, `Backend::boot(instance, window, runtime_project, interactive)` → `Initialize`: owner thread, embree/tbb preload, `UELibrary_InitW`, checks for `GEngine`, a non-null RHI and a game world with a scene, offline cvars, `READY`. Then `std::atexit(shutdownSelfHost)`.
@@ -195,31 +195,33 @@ UE starts once per process. Later delegates (the next viewport, husk `--restart-
 
 ## ABI
 
-`include/hdue/bridge.h` is the base ABI: `HDUE_ABI_VERSION` 11, engine 5.8.4. `hdue_get_api(version, capacity, &api)` fills `HdueApi` (96 bytes: `struct_size`, `abi_version` and 11 function pointers: `initialize`, `get_status`, `tick`, `create_session`, `destroy_session`, `request_render`, `poll_frame`, `copy_frame`, `window_message`, `shutdown`, `apply_scene`). It does not start UE, and the DLL must stay loaded until process exit. Fixed-width POD fields, UTF-8 strings copied during the call, opaque handles and caller-owned buffers cross it; UE, USD and STL types, exceptions and memory ownership do not. The delegate and backend must come from the same build. Recent versions: 11 added the `HDUE_AOV_BUFFERS` and `HDUE_AOV_LIGHTING` requests and the Path Tracer's own albedo and normal; 10 added UV sets (`uv_set_count`, `HdueTextureDesc.uv_set`); 9 texture wrap modes and per-texture sRGB decoding; 8 indexed meshes and runtime MaterialX; 7 the camera projection and depth of field; 6 per-vertex and per-instance colours.
+`include/hdue/bridge.h` is the whole backend ABI: `HDUE_ABI_VERSION` 12, engine 5.8.4. The backend exports one function, `hdue_get_api(version, capacity, &api)`, which fills `HdueApi` (320 bytes: `struct_size`, `abi_version` and 39 function pointers) for exactly `HDUE_ABI_VERSION`, or returns `HDUE_ABI_MISMATCH` (another version) or `HDUE_BUFFER_TOO_SMALL` (capacity under `sizeof(HdueApi)`) without touching the table. `src/client/backend.cpp` and `scripts/hdue_runtime.py` load it once and check its version and size. It does not start UE, and the DLL must stay loaded until process exit. Fixed-width POD fields, UTF-8 strings copied during the call, opaque handles and caller-owned buffers cross it; UE, USD and STL types, exceptions and memory ownership do not. The delegate and backend come from the same build, so there are no optional parts: a change to any function or descriptor bumps the one version.
 
-Optional extensions, each from its own export with its own version, size and required functions (`src/client/backend.cpp` leaves an extension empty when any check fails):
+| Functions | Purpose |
+| --- | --- |
+| `initialize`, `get_status`, `tick`, `shutdown`, `window_message` | UE's lifetime |
+| `create_session`, `destroy_session`, `resize_session` | render targets; resizing keeps the scene |
+| `apply_scene`, `set_transforms` | meshes, materials, removals; transforms without resending geometry |
+| `request_render`, `poll_frame`, `copy_frame` | the beauty |
+| `set_depth_enabled`, `copy_depth` | linear depth readback |
+| `poll_aov`, `set_aov_buffers`, `copy_aov_buffer` | AOV frames; buffer visualizations from one render |
+| `upsert_lights`, `get_lighting_status` | UsdLux lights, HDRI, IES, light linking channels |
+| `upsert_volume`, `remove_volume` | OpenVDB / field volumes |
+| `upsert_asset`, `remove_asset`, `get_asset_status`, `get_asset_scene_status` | native UE assets in the scene |
+| `get_renderer_info`, `set_material_parameters`, `get_material_stats` | renderer info, native material parameters, stats |
+| `apply_surfaces`, `get_surface_status` | wet surface layer |
+| `set_post_process` | post-process settings and cvars |
+| `configure_residency`, `get_residency_status` | virtual texture residency before Path Tracer samples |
+| `configure_gpu_frames`, `poll_gpu_frame`, `acquire_gpu_frame` | shared D3D12 frames for the host's graphics API |
+| `pick_native`, `get_pick_material_info` | ray picks against UE meshes, material info |
 
-| Header | Export | Version | Purpose |
-| --- | --- | ---: | --- |
-| `bridge.h` | `hdue_get_native_pick_api` | 1 | ray picks against UE meshes, material info |
-| `material_api.h` | `hdue_get_material_api` | 1 | renderer info, material parameters, stats |
-| `residency_api.h` | `hdue_get_residency_api` | 1 | virtual texture residency before Path Tracer samples |
-| `asset_api.h` | `hdue_get_asset_api` | 1 | native UE assets in the scene |
-| `depth_api.h` | `hdue_get_depth_api` | 1 | linear depth readback |
-| `aov_api.h` | `hdue_get_aov_api` | 2 | AOV frames; v2: buffer visualizations from one render |
-| `motion_api.h` | `hdue_get_motion_api` | 1 | transforms without resending geometry |
-| `postprocess_api.h` | `hdue_get_postprocess_api` | 1 | post-process settings and cvars |
-| `volume_api.h` | `hdue_get_volume_api` | 1 | OpenVDB / field volumes |
-| `lighting_api.h` | `hdue_get_lighting_api` | 3 | UsdLux lights, HDRI, IES; v3: light linking channels |
-| `surface_api.h` | `hdue_get_surface_api` | 1 | wet surface layer |
-| `gpu_api.h` | `hdue_get_gpu_api` | 1 | shared D3D12 frames for the host's graphics API |
-| (none) | `hdue_resize_session` | - | resize a session's target, keeping its scene; `HDUE_INVALID_STATE` on older runtimes |
+Recent versions: 12 folded the twelve separately versioned extension tables and `hdue_resize_session` into `HdueApi`; 11 added the `HDUE_AOV_BUFFERS` and `HDUE_AOV_LIGHTING` requests and the Path Tracer's own albedo and normal; 10 added UV sets (`uv_set_count`, `HdueTextureDesc.uv_set`); 9 texture wrap modes and per-texture sRGB decoding; 8 indexed meshes and runtime MaterialX; 7 the camera projection and depth of field; 6 per-vertex and per-instance colours.
 
-The delegate DLL exports a host-side API of its own (`include/hdue/viewport_api.h`, for the Python host): `hdue_get_viewport_status`, `hdue_set_viewport_up_axis`, `hdue_run_on_ue_thread`, `hdue_set_viewport_materials`, `hdue_set_viewport_surfaces`, `hdue_set_viewport_textures` (each table version 1) and `hdue_shutdown_ue`. Calls validate versions, sizes, capacities, generations and the owning thread.
+The delegate DLL exports a host-side API of its own (`include/hdue/viewport_api.h`, for the Python host): `hdue_get_viewport_status`, `hdue_set_viewport_up_axis`, `hdue_run_on_ue_thread`, `hdue_set_viewport_materials`, `hdue_set_viewport_surfaces`, `hdue_set_viewport_textures` (each descriptor version 1) and `hdue_shutdown_ue`. Calls validate versions, sizes, capacities, generations and the owning thread. These stay plain exports: the Python host binds each by name with ctypes, and a table would add a getter and a mirror struct for no loader to remove.
 
 ## Motion blur
 
-UE's Path Tracer has no motion blur of its own (Movie Render Queue averages sub-frames). hdUE does the same inside the delegate: rprims record their transform samples one frame either side (`SampleTransform`, `SampleInstancerTransform`) and their `velocities`; the camera sprim records its own. When the render camera has an open shutter and something moves, the render pass renders `hdUE:motionSamples` sub-frames at times spread over `[shutter:open, shutter:close]`, moving meshes through `motion_api.h` (`set_transforms`, which leaves geometry untouched), and publishes the running average. Path Tracer samples are divided between sub-frames. AOVs render the unblurred pose at the current time.
+UE's Path Tracer has no motion blur of its own (Movie Render Queue averages sub-frames). hdUE does the same inside the delegate: rprims record their transform samples one frame either side (`SampleTransform`, `SampleInstancerTransform`) and their `velocities`; the camera sprim records its own. When the render camera has an open shutter and something moves, the render pass renders `hdUE:motionSamples` sub-frames at times spread over `[shutter:open, shutter:close]`, moving meshes through `set_transforms` (which leaves geometry untouched), and publishes the running average. Path Tracer samples are divided between sub-frames. AOVs render the unblurred pose at the current time.
 
 ## Inspecting a process
 

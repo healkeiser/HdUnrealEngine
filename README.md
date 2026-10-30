@@ -235,7 +235,7 @@ flowchart LR
     end
 
     Houdini -. "Hydra 2 · same process" .-> Delegate
-    Delegate -. "C ABI · versioned extensions" .-> Unreal
+    Delegate -. "C ABI · one function table" .-> Unreal
 
     classDef hostBox fill:#fff5f0,stroke:#e8c4a8,stroke-width:1px,color:#2d3748,rx:12,ry:12
     classDef delegateBox fill:#eef6f0,stroke:#a8d5b8,stroke-width:1px,color:#2d3748,rx:12,ry:12

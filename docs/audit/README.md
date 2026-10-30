@@ -64,7 +64,7 @@ Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.
 - **Not feasible as specified:** MAT-05 (`transparent` opacity renders dark in UE's Path Tracer; Karma renders it like `presence`), HYD-15 far clip (UE's Path Tracer ignores a finite far plane), `hdue:asset` on Xform/Scope and cooked MaterialX/Substrate preparation in husk (host-only Python), ALT-04, ALT-12.
-- **Remaining:** SIM-01 (one API table), ALT-10/11 (wait for UE-01), re-record the PSO cache after VSM and the material changes.
+- **Remaining:** ALT-10/11 (wait for UE-01), re-record the PSO cache after VSM and the material changes.
 - **Investigate:** with `PathTracingMaxBounces=1`, hdUE's Path Tracer renders the floor and box tops black where Karma's direct-only render lights them.
 
 ## Then
