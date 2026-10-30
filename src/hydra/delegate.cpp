@@ -21,6 +21,7 @@
 #include "pxr/base/vt/types.h"
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/diagnosticMgr.h"
 #include "pxr/base/tf/getenv.h"
 #include <optional>
 #include "pxr/base/work/loops.h"
@@ -172,6 +173,28 @@ void batchWarning(const std::string& message) {
     std::fprintf(stderr, "hdUE warning: %s\n", message.c_str());
     std::fflush(stderr);
 }
+// husk shows no Tf warning of a render delegate, even at -V 6: hdUE's own (issued from its sources) also go through
+// batchWarning, once per message. Houdini's UI and other hosts keep their Tf output.
+class HdUEBatchWarnings final : public TfDiagnosticMgr::Delegate {
+public:
+    HdUEBatchWarnings() { TfDiagnosticMgr::GetInstance().AddDelegate(this); }
+    ~HdUEBatchWarnings() override { TfDiagnosticMgr::GetInstance().RemoveDelegate(this); }
+    void IssueError(const TfError&) override {}
+    void IssueFatalError(const TfCallContext&, const std::string&) override {}
+    void IssueStatus(const TfStatus&) override {}
+    void IssueWarning(const TfWarning& warning) override {
+        static const auto sources = TfStringToLower(std::filesystem::path(__FILE__).parent_path().string());
+        if (!TfStringStartsWith(TfStringToLower(warning.GetSourceFileName()), sources)) return;
+        auto message = warning.GetCommentary();
+        if (TfStringStartsWith(message, "hdUE: ")) message.erase(0, 6);
+        std::lock_guard lock(mutex_);
+        if (seen_.insert(message).second) batchWarning(message);
+    }
+
+private:
+    std::mutex mutex_;
+    std::set<std::string> seen_;
+};
 // Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
 // also the exit handler of every process that started UE. std::atexit in this DLL runs at its detach, after ExitProcess
 // has ended UE's thread: UE can no longer shut down, and waiting for that thread, or UE's own teardown, hung the exit.
@@ -290,11 +313,15 @@ std::string runtimeConfig(const char* key) {
 // Houdini's interactive UI (not husk or hython), from the process executable. UE starts with the first delegate, and
 // Hydra says nothing usable by then: the viewport's delegate is created with no settings (houdini:viewport follows),
 // and both the viewport and husk send houdini:renderer = husk.
-bool houdiniUi() {
+std::wstring processName() {
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, path, MAX_PATH);
     auto name = std::filesystem::path(path).filename().wstring();
     for (auto& c : name) c = wchar_t(towlower(c));
+    return name;
+}
+bool houdiniUi() {
+    const auto name = processName();
     for (const auto* gui :
          {L"houdini.exe", L"houdinifx.exe", L"houdinicore.exe", L"basehoudini.exe", L"happrentice.exe", L"hindie.exe",
           L"hescape.exe", L"hedu.exe", L"heducation.exe", L"hexper.exe"})
@@ -2370,6 +2397,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
       registry_(std::make_shared<HdResourceRegistry>()) {
+    if (processName() == L"husk.exe") static HdUEBatchWarnings warnings;
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
