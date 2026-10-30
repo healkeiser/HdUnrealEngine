@@ -90,12 +90,16 @@ struct HdUEMeshData {
     HdUEMotionSamples motionLeft, motionRight;
     std::vector<GfVec3f> velocities;     // per instance, world units per frame
     std::vector<GfVec3f> accelerations;  // per instance, world units per frame^2
+    // Per instance: world rotation axis scaled by degrees per frame, about the instance's position
+    // (PointInstancer angularVelocities).
+    std::vector<GfVec3f> angularVelocities;
+    float blurScale = 1;  // UsdGeomMotionAPI motion:blurScale: motion is evaluated at t * blurScale
     // Deformation blur: per-vertex point offsets at frame-relative times (piecewise linear); empty unless points move.
     std::vector<float> deformTimes;
     std::vector<std::vector<GfVec3f>> deformOffsets;
     bool moving() const {
         return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !accelerations.empty() ||
-               !deformTimes.empty();
+               !angularVelocities.empty() || !deformTimes.empty();
     }
     std::vector<GfVec3f> pointsAt(float t) const {
         auto out = points;

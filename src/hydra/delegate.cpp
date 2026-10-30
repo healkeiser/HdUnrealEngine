@@ -8,6 +8,7 @@
 #include "cryptomatte.h"
 #include "aov_table.h"
 #include "pxr/imaging/hio/image.h"
+#include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -1223,14 +1224,21 @@ class Pass final : public HdRenderPass {
         const auto nativeMeshes = s.setting<VtDictionary>("nativeMeshAssets", {});
         for (const auto& [id, mesh] : s.meshes) {
             if (!mesh.moving()) continue;
-            const auto left = mesh.motionLeft.at(t), right = mesh.motionRight.at(t);
+            const float tm = t * mesh.blurScale;
+            const auto left = mesh.motionLeft.at(tm), right = mesh.motionRight.at(tm);
             const auto place = [&](GfMatrix4d m, size_t instance) {
                 m = left * m * right;
                 const bool velocity = mesh.velocities.size() > instance,
                            acceleration = mesh.accelerations.size() > instance;
                 for (int c = 0; c < 3; ++c)
-                    m[3][c] += (velocity ? mesh.velocities[instance][c] * t : 0.f) +
-                               (acceleration ? mesh.accelerations[instance][c] * t * t / 2 : 0.f);
+                    m[3][c] += (velocity ? mesh.velocities[instance][c] * tm : 0.f) +
+                               (acceleration ? mesh.accelerations[instance][c] * tm * tm / 2 : 0.f);
+                if (mesh.angularVelocities.size() > instance && mesh.angularVelocities[instance] != GfVec3f(0)) {
+                    const GfVec3d axis(mesh.angularVelocities[instance]), at = m.ExtractTranslation();
+                    m = m * GfMatrix4d(1).SetTranslate(-at) *
+                        GfMatrix4d(1).SetRotate(GfRotation(axis, axis.GetLength() * tm)) *
+                        GfMatrix4d(1).SetTranslate(at);
+                }
                 return m;
             };
             auto& out = storage.emplace_back();
@@ -1251,7 +1259,7 @@ class Pass final : public HdRenderPass {
         std::map<std::string, std::vector<GfVec3f>> deformed;
         for (const auto& [id, mesh] : s.meshes)
             if (!mesh.deformTimes.empty() && mesh.sceneAsset.empty()) {
-                deformed[id] = mesh.pointsAt(t);
+                deformed[id] = mesh.pointsAt(t * mesh.blurScale);
                 s.dirtyMeshes.insert(id);
             }
         std::vector<std::string> names;

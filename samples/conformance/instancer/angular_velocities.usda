@@ -3,17 +3,38 @@
     doc = """angularVelocities (degrees per second, per instance) rotate instances within the shutter (open -0.5 to 0.5
 frames); motion:nonlinearSampleCount (3 by default) sets how many samples an intermediate layer takes. The bottom
 instance spins at 720 degrees/s about Z (30 degrees a frame, +-15 within the shutter), so its corners smear; the top
-one is still. hdUE does not blur angularVelocities (README) and must say so."""
+one is still: near a corner the bottom instance covers the pixels only part of the shutter."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomPointInstancer",
- "feature": "angularVelocities (unsupported, warned)",
+ "feature": "angularVelocities",
  "frames": 1,
  "checks": [
   {
-   "name": "warning names angularVelocities",
-   "log": "hdUE warning:.*angularVelocities",
-   "present": true
+   "name": "the spinning instance's corner is blurred",
+   "value": {
+    "region": [
+     0.55,
+     -1.25,
+     0.75,
+     -1.15
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.8
+  },
+  {
+   "name": "the still instance's corner is sharp",
+   "value": {
+    "region": [
+     0.55,
+     2.65,
+     0.75,
+     2.75
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.95
   },
   {
    "name": "both instances render",

@@ -194,6 +194,11 @@ HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& 
         delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
     return HdUERelativeMotion(times, values, count, current, left);
 }
+// UsdGeomMotionAPI motion:blurScale (inherited), which UsdImaging publishes as blurScale.
+float HdUEBlurScale(HdSceneDelegate* delegate, const SdfPath& id) {
+    const auto scale = delegate->Get(id, HdTokens->blurScale);
+    return scale.IsHolding<float>() ? std::max(0.f, scale.UncheckedGet<float>()) : 1.f;
+}
 // USD velocities are per second; motion blur times are in frames.
 double HdUEFramesPerSecond(const HdUEState& state) {
     std::lock_guard lock(state.settingsMutex);
@@ -219,7 +224,7 @@ class Instancer final : public HdInstancer {
                    : dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
     }
     // A per-instance vector primvar (velocities, accelerations; instancer space) in world space for each flattened
-    // instance, plus its parent instance's own; empty when no level authors it. Angular velocities are not applied.
+    // instance, plus its parent instance's own; empty when no level authors it.
     std::vector<GfVec3f> ComputeInstanceVectors(const SdfPath& prototype, const TfToken& name) const {
         if (!visible_) return {};
         const auto values = primvar(name);
@@ -273,6 +278,7 @@ public:
         };
         mesh.velocities = perFrame(HdTokens->velocities, fps);
         mesh.accelerations = perFrame(HdTokens->accelerations, fps * fps);
+        mesh.angularVelocities = perFrame(HdTokens->angularVelocities, fps);
     }
     // An instance-rate colour primvar (displayColor, or the one a bound material reads) for each flattened instance,
     // from the nearest instancer that authors it, as Storm resolves nested instance primvars; empty when none does.
@@ -399,6 +405,7 @@ public:
         if (instancer)
             instancer->ComputeInstanceMotion(GetId(), HdUEFramesPerSecond(*state), mesh.instances.size(), mesh);
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
+        mesh.blurScale = HdUEBlurScale(delegate, GetId());
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
         mesh.doubleSided = delegate->GetDoubleSided(GetId());
@@ -764,6 +771,7 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.renderTag = delegate->GetRenderTag(prim.GetId());
     mesh.primId = prim.GetPrimId();
     mesh.categories = delegate->GetCategories(prim.GetId());
+    mesh.blurScale = HdUEBlurScale(delegate, prim.GetId());
     return mesh;
 }
 // Widths per vertex (or with a matching count), else the first (constant), else the fallback.
@@ -835,6 +843,7 @@ public:
                                                    : GfVec3f(0)) +
                                               (placed.velocities.empty() ? GfVec3f(0) : placed.velocities[p]));
                 if (!placed.accelerations.empty()) mesh.accelerations.push_back(placed.accelerations[p]);
+                if (!placed.angularVelocities.empty()) mesh.angularVelocities.push_back(placed.angularVelocities[p]);
                 const double radius = .5 * HdUEWidth(widths, i, .1f);
                 mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) *
                                          GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placements[p]);
