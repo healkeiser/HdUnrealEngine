@@ -1924,10 +1924,11 @@ public:
                         (buffer ? extraBeauties_.push_back(b) : void(buffer = b));
                 if (name == HdAovTokens->depth) depth = dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 if (name == HdAovTokens->cameraDepth) cameraDepth = dynamic_cast<HdUERenderBuffer*>(renderBuffer);
-                // Houdini's viewport binds primId/instanceId for its selection highlight. Rendering them swaps every
-                // material twice per converged view (hundreds of ms each on large scenes), so the viewport skips them
-                // unless hdUE:viewportIdAovs is on; husk renders what its render vars ask for.
-                const bool viewportIds = s.setting<bool>("viewportIdAovs", false);
+                // Houdini's viewport draws its selection highlight from primId/instanceId. Rendering them swaps every
+                // material twice per view (hundreds of ms on large scenes), so the viewport skips them while the user
+                // tumbles, scrubs or plays and renders them once the view settles; hdUE:viewportIdAovs = 0 skips them
+                // always (no highlight). husk renders what its render vars ask for.
+                const bool viewportIds = s.setting<bool>("viewportIdAovs", true) && !s.interactive();
                 const bool skipped = row && row->kind == HdUEAovKind::Id && selfHost().continuous && !viewportIds;
                 // Buffer rows render together in one HDUE_AOV_BUFFERS pass; path traced, albedo and normal are the
                 // Path Tracer's own buffers instead.

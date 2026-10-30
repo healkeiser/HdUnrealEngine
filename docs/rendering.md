@@ -24,7 +24,7 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 | `hdUE:autoViewerLight`, `hdUE:viewerLightIntensity` | | Review light for scenes without lights |
 | `hdUE:upAxis` | stage | Up axis override |
 | `hdUE:materialxLibrary`, `hdUE:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied in Houdini's viewport; husk keeps the Preview Surface fallback and warns |
-| `hdUE:viewportIdAovs` | 0 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight |
+| `hdUE:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
 
 In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.
 
