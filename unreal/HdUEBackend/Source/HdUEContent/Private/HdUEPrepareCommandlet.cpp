@@ -22,7 +22,6 @@
 #include "Materials/MaterialExpressionAppendVector.h"
 #include "Materials/MaterialExpressionDotProduct.h"
 #include "Materials/MaterialExpressionComponentMask.h"
-#include "Materials/MaterialExpressionVertexNormalWS.h"
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionNormalize.h"
 #include "Materials/MaterialExpressionSceneTexture.h"
@@ -147,8 +146,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         return false;
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
-        Material->TwoSided == TwoSided && Material->GetEditorOnlyData()->WorldPositionOffset.Expression &&
-        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion2") : TEXT("PreviewSurfaceVersion4")) &&
+        Material->TwoSided == TwoSided &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion3") : TEXT("PreviewSurfaceVersion5")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
@@ -166,30 +165,58 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Expression->DefaultValue = Value;
         return Expression;
     };
-    // The delegate's UV affine: u' = dot((u,v,1), UVRow0.rgb), v' = dot((u,v,1), UVRow1.rgb).
-    auto* Coordinate = Add(NewObject<UMaterialExpressionTextureCoordinate>(Material));
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
-    One->R = 1.f;
-    auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Homogeneous->A.Connect(0, Coordinate);
-    Homogeneous->B.Connect(0, One);
-    UMaterialExpressionDotProduct* Rows[2];
-    for (int32 Row = 0; Row < 2; ++Row) {
-        Rows[Row] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
-        Rows[Row]->A.Connect(0, Homogeneous);
-        Rows[Row]->B.Connect(
-            0, Vector(FString::Printf(TEXT("UVRow%d"), Row), Row ? FLinearColor(0, 1, 0) : FLinearColor(1, 0, 0)));
+    // The delegate's UV affine: u' = dot((u,v,1), UVRow0.rgb), v' = dot((u,v,1), UVRow1.rgb), of each of the mesh's
+    // UV sets (Nanite keeps 4).
+    UMaterialExpression* Sets[4];
+    for (int32 Set = 0; Set < 4; ++Set) {
+        auto* Coordinate = Add(NewObject<UMaterialExpressionTextureCoordinate>(Material));
+        Coordinate->CoordinateIndex = Set;
+        auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+        One->R = 1.f;
+        auto* Homogeneous = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+        Homogeneous->A.Connect(0, Coordinate);
+        Homogeneous->B.Connect(0, One);
+        UMaterialExpressionDotProduct* Rows[2];
+        for (int32 Row = 0; Row < 2; ++Row) {
+            Rows[Row] = Add(NewObject<UMaterialExpressionDotProduct>(Material));
+            Rows[Row]->A.Connect(0, Homogeneous);
+            Rows[Row]->B.Connect(
+                0, Vector(FString::Printf(TEXT("UVRow%d"), Row), Row ? FLinearColor(0, 1, 0) : FLinearColor(1, 0, 0)));
+        }
+        auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+        UV->A.Connect(0, Rows[0]);
+        UV->B.Connect(0, Rows[1]);
+        Sets[Set] = UV;
     }
-    auto* UV = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    UV->A.Connect(0, Rows[0]);
-    UV->B.Connect(0, Rows[1]);
-    // Wrap mode black: textures are clamped, and <Slot>Black (per axis, 0 or 1) zeroes texels outside [0,1], so the
-    // input reads its bias there: texel * Scale * (1 - saturate(dot(|floor(uv)|, Black.rg))).
-    auto* Tile = Add(NewObject<UMaterialExpressionFloor>(Material));
-    Tile->Input.Connect(0, UV);
-    auto* Outside = Add(NewObject<UMaterialExpressionAbs>(Material));
-    Outside->Input.Connect(0, Tile);
     const auto Slot = [&](const FString& Slot, FLinearColor Default, bool Color, bool Scalar) -> UMaterialExpression* {
+        // The UV set the slot's texture reads: sum of the sets weighted by <Slot>UVSet (one-hot; a mesh with fewer
+        // sets repeats its last).
+        UMaterialExpression* UV = nullptr;
+        auto* Weights = Vector(Slot + TEXT("UVSet"), FLinearColor(1, 0, 0, 0));
+        for (int32 Set = 0; Set < 4; ++Set) {
+            auto* Weight = Add(NewObject<UMaterialExpressionComponentMask>(Material));
+            Weight->Input.Connect(5, Weights);  // RGBA
+            Weight->R = Set == 0;
+            Weight->G = Set == 1;
+            Weight->B = Set == 2;
+            Weight->A = Set == 3;
+            auto* Term = Add(NewObject<UMaterialExpressionMultiply>(Material));
+            Term->A.Connect(0, Sets[Set]);
+            Term->B.Connect(0, Weight);
+            if (UV) {
+                auto* Sum = Add(NewObject<UMaterialExpressionAdd>(Material));
+                Sum->A.Connect(0, UV);
+                Sum->B.Connect(0, Term);
+                UV = Sum;
+            } else
+                UV = Term;
+        }
+        // Wrap mode black: textures are clamped, and <Slot>Black (per axis, 0 or 1) zeroes texels outside [0,1], so
+        // the input reads its bias there: texel * Scale * (1 - saturate(dot(|floor(uv)|, Black.rg))).
+        auto* Tile = Add(NewObject<UMaterialExpressionFloor>(Material));
+        Tile->Input.Connect(0, UV);
+        auto* Outside = Add(NewObject<UMaterialExpressionAbs>(Material));
+        Outside->Input.Connect(0, Tile);
         auto* Sample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
         Sample->ParameterName = *(Slot + TEXT("Texture"));
         Sample->Coordinates.Connect(0, UV);
@@ -252,28 +279,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     auto* Roughness = Slot(TEXT("Roughness"), FLinearColor(.5f, .5f, .5f, .5f), false, true);
     auto* Opacity = Slot(TEXT("Opacity"), FLinearColor(1, 1, 1, 1), false, true);
     auto* Normal = Slot(TEXT("Normal"), FLinearColor(0, 0, 1, 0), false, false);
-    // UsdPreviewSurface displacement: along the vertex normal, in cm (the delegate converts scale, bias and constant).
-    // World Position Offset runs in the vertex shader, so the texture is sampled at mip 0.
-    auto* DisplacementSample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
-    DisplacementSample->ParameterName = TEXT("DisplacementTexture");
-    DisplacementSample->Coordinates.Connect(0, UV);
-    DisplacementSample->SamplerType = SAMPLERTYPE_LinearColor;
-    DisplacementSample->Texture = LinearWhite;
-    DisplacementSample->MipValueMode = TMVM_MipLevel;
-    DisplacementSample->ConstMipValue = 0;
-    auto* DisplacementScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    DisplacementScaled->A.Connect(5, DisplacementSample);
-    DisplacementScaled->B.Connect(5, Vector(TEXT("DisplacementScale"), FLinearColor(0, 0, 0, 0)));
-    auto* DisplacementBiased = Add(NewObject<UMaterialExpressionAdd>(Material));
-    DisplacementBiased->A.Connect(0, DisplacementScaled);
-    DisplacementBiased->B.Connect(5, Vector(TEXT("DisplacementBias"), FLinearColor(0, 0, 0, 0)));
-    auto* DisplacementAmount = Add(NewObject<UMaterialExpressionDotProduct>(Material));
-    DisplacementAmount->A.Connect(0, DisplacementBiased);
-    DisplacementAmount->B.Connect(5, Vector(TEXT("DisplacementMask"), FLinearColor(1, 0, 0, 0)));
-    auto* VertexNormal = Add(NewObject<UMaterialExpressionVertexNormalWS>(Material));
-    auto* Offset = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    Offset->A.Connect(0, VertexNormal);
-    Offset->B.Connect(0, DisplacementAmount);
+    // UsdPreviewSurface displacement moves the mesh's vertices in the delegate (displacement.h): the path tracer's
+    // ray-tracing geometry ignores World Position Offset and Nanite tessellation.
     // USD tangent-space normals are +Y up (OpenGL); UE's are -Y after the V flip.
     auto* FlipGreen = Add(NewObject<UMaterialExpressionConstant3Vector>(Material));
     FlipGreen->Constant = FLinearColor(1, -1, 1);
@@ -298,7 +305,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     Data->Metallic.Expression = nullptr;
     Data->Roughness.Expression = nullptr;
     if (Layered) {
-        Scalar(TEXT("StandardSurfaceVersion2"),
+        Scalar(TEXT("StandardSurfaceVersion3"),
                1.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
         Call->SetMaterialFunction(LoadObject<UMaterialFunction>(
@@ -361,8 +368,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
         // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
         auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
-        Scalar(TEXT("PreviewSurfaceVersion4"),
-               4.f);  // unconnected marker: bump the name when this graph changes, to regenerate
+        Scalar(TEXT("PreviewSurfaceVersion5"),
+               5.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
         Albedo->A.Connect(0, Conversion);
         Albedo->B.Connect(0, BaseColor);
@@ -386,7 +393,6 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     }
     Data->FrontMaterial.Connect(0, Front);
     Data->AmbientOcclusion.Connect(0, Occlusion);
-    Data->WorldPositionOffset.Connect(0, Offset);
     Material->BlendMode = Blend;
     if (Blend == BLEND_Masked) {
         // Cutout at opacityThreshold, independent of UE's per-asset clip value.

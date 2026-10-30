@@ -562,7 +562,11 @@ FStaticMeshBuildVertex HydraVertex(const HdueMeshDesc& Desc, uint32 V, FVector3f
     Vertex.TangentX =
         (FMath::Abs(Normal.X) < .9f ? FVector3f::ForwardVector : FVector3f::RightVector).Cross(Normal).GetSafeNormal();
     Vertex.TangentY = Normal.Cross(Vertex.TangentX);
-    Vertex.UVs[0] = Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector;
+    for (int32 Set = 0; Set < HdueVertexUVs; ++Set) {
+        const float* UV =
+            Desc.uv ? Desc.uv + (size_t(FMath::Min(Set, HdueUVSets(Desc) - 1)) * Desc.vertex_count + V) * 2 : nullptr;
+        Vertex.UVs[Set] = UV ? FVector2f(UV[0], UV[1]) : FVector2f::ZeroVector;
+    }
     Vertex.Color =
         Desc.colors ? FLinearColor(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2]).ToFColor(false)
                     : FColor::White;
@@ -608,7 +612,8 @@ void HydraTangents(TArray<FStaticMeshBuildVertex>& Vertices, const TArray<uint32
 TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     if (!Desc.vertex_count || Desc.index_count < 3) return nullptr;
     Nanite::IBuilderModule::FInputMeshData Input;
-    Input.Vertices.Empty(int32(Desc.vertex_count), 1, 0);
+    const int32 Sets = HdueUVSets(Desc);
+    Input.Vertices.Empty(int32(Desc.vertex_count), Sets, 0);
     FBox3f Bounds(ForceInit);
     for (uint32 V = 0; V < Desc.vertex_count; ++V) {
         const FStaticMeshBuildVertex Vertex = HydraVertex(Desc, V, HydraNormal(Desc, V));
@@ -616,7 +621,7 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
         Input.Vertices.TangentZ.Add(Vertex.TangentZ);
         Input.Vertices.TangentX.Add(Vertex.TangentX);
         Input.Vertices.TangentY.Add(Vertex.TangentY);
-        Input.Vertices.UVs[0].Add(Vertex.UVs[0]);
+        for (int32 Set = 0; Set < Sets; ++Set) Input.Vertices.UVs[Set].Add(Vertex.UVs[Set]);
         if (Desc.colors) Input.Vertices.Color.Add(Vertex.Color);
         Bounds += Vertex.Position;
     }
@@ -635,7 +640,7 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     Section.MaxVertexIndex = Desc.vertex_count - 1;
     Input.Sections.Add(Section);
     Input.VertexBounds = FBounds3f(Bounds.Min, Bounds.Max);
-    Input.NumTexCoords = 1;
+    Input.NumTexCoords = uint8(Sets);
     FMeshNaniteSettings Settings;
     Settings.bEnabled = true;
     Settings.TargetMinimumResidencyInKB = MAX_uint32;
@@ -724,7 +729,7 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
     FStaticMeshVertexBufferFlags Flags;
     Flags.bNeedsCPUAccess = true;
     Flags.bUseBackwardsCompatibleF16TruncUVs = false;
-    LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, 1, Flags);
+    LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, HdueVertexUVs, Flags);
     if (Colored)
         LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices);
     else
@@ -784,16 +789,20 @@ UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
     FDynamicMesh3 Mesh;
     Mesh.EnableAttributes();
     Mesh.Attributes()->SetNumNormalLayers(1);
-    Mesh.Attributes()->SetNumUVLayers(1);
+    const int32 Sets = HdueUVSets(Desc);
+    Mesh.Attributes()->SetNumUVLayers(HdueVertexUVs);
     Mesh.Attributes()->EnablePrimaryColors();
     auto* Colors = Mesh.Attributes()->PrimaryColors();
     auto* NormalOverlay = Mesh.Attributes()->PrimaryNormals();
-    auto* UVOverlay = Mesh.Attributes()->PrimaryUV();
     const auto Append = [&](uint32 V) {
         NormalOverlay->AppendElement(
             Desc.normals ? FVector3f(Desc.normals[V * 3], Desc.normals[V * 3 + 1], Desc.normals[V * 3 + 2])
                          : FVector3f::ZeroVector);
-        UVOverlay->AppendElement(Desc.uv ? FVector2f(Desc.uv[V * 2], Desc.uv[V * 2 + 1]) : FVector2f::ZeroVector);
+        for (int32 Set = 0; Set < HdueVertexUVs; ++Set) {
+            const float* UV =
+                Desc.uv ? Desc.uv + (size_t(FMath::Min(Set, Sets - 1)) * Desc.vertex_count + V) * 2 : nullptr;
+            Mesh.Attributes()->GetUVLayer(Set)->AppendElement(UV ? FVector2f(UV[0], UV[1]) : FVector2f::ZeroVector);
+        }
         Colors->AppendElement(Desc.colors
                                   ? FVector4f(Desc.colors[V * 3], Desc.colors[V * 3 + 1], Desc.colors[V * 3 + 2], 1.f)
                                   : FVector4f(1.f, 1.f, 1.f, 1.f));
@@ -816,7 +825,8 @@ UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
         }
         if (Triangle < 0) continue;  // degenerate: a repeated vertex
         NormalOverlay->SetTriangle(Triangle, Vertices);
-        UVOverlay->SetTriangle(Triangle, Vertices);
+        for (int32 Set = 0; Set < HdueVertexUVs; ++Set)
+            Mesh.Attributes()->GetUVLayer(Set)->SetTriangle(Triangle, Vertices);
         Colors->SetTriangle(Triangle, Vertices);
     }
     if (!Desc.normals) FMeshNormals::InitializeOverlayToPerTriangleNormals(NormalOverlay);
@@ -839,7 +849,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         const TCHAR* Problem = !Mesh.id               ? TEXT("no ID")
                                : Mesh.index_count % 3 ? TEXT("index count is not a multiple of 3")
                                : Mesh.vertex_count > uint32(MAX_int32 / 3) || Mesh.index_count > uint32(MAX_int32) ||
-                                       (Mesh.instance_transforms && Mesh.instance_count > uint32(MAX_int32 / 16))
+                                       (Mesh.instance_transforms && Mesh.instance_count > uint32(MAX_int32 / 16)) ||
+                                       uint64(Mesh.vertex_count) * 2 * HdueUVSets(Mesh) > uint64(MAX_int32)
                                    ? TEXT("too large for 32-bit arrays")
                                : (Mesh.vertex_count && !Mesh.positions) || (Mesh.index_count && !Mesh.indices)
                                    ? TEXT("missing positions or indices")
@@ -1031,6 +1042,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), Stored(Texture.scale));
                     Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Stored(Texture.bias));
                     Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), Stored(Texture.channel_mask));
+                    FLinearColor Set(0, 0, 0, 0);
+                    Set.Component(FMath::Min<uint32>(Texture.uv_set, 3)) = 1;
+                    Instance->SetVectorParameterValue(*(Name + TEXT("UVSet")), Set);
                     if (Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK)
                         Instance->SetVectorParameterValue(
                             *(Name + TEXT("Black")),

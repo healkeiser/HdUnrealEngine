@@ -23,7 +23,8 @@ target_compile_definitions(hdUE PRIVATE HDUE_HYDRA_EXPORTS)
 target_include_directories(hdUE PUBLIC src/hydra)
 # gpu_frames.cpp: HgiGL textures and the GL interop entry points HgiGL loaded through garch.
 target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk opengl32
-    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hgi.lib" "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_garch.lib")
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hgi.lib" "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_garch.lib"
+    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hio.lib")
 target_compile_options(hdUE PRIVATE /W3 /utf-8 /bigobj)
 set(HDUE_PLUGIN_NAME hdUEHoudini22)
 set(HDUE_PLUGIN_LIBRARY "Release/hdUE_Houdini22.dll")
@@ -59,9 +60,13 @@ if(BUILD_TESTING)
     target_include_directories(hdue_placement_test PRIVATE src/hydra)
     target_link_libraries(hdue_placement_test PRIVATE hdue_hdk)
     add_test(NAME mesh_placement COMMAND hdue_placement_test)
+    add_executable(hdue_displacement_test tests/displacement.cpp)
+    target_include_directories(hdue_displacement_test PRIVATE src/hydra include)
+    target_link_libraries(hdue_displacement_test PRIVATE hdue_hdk)
+    add_test(NAME displacement_dice COMMAND hdue_displacement_test)
     add_executable(hdue_abi_layout tests/abi_layout.c)
     target_include_directories(hdue_abi_layout PRIVATE include)
     add_test(NAME abi_c_layout COMMAND hdue_abi_layout)
-    set_tests_properties(render_buffer_snapshots picking_bvh geom_subset_partition subdivision_refine instance_transforms mesh_placement PROPERTIES ENVIRONMENT_MODIFICATION
+    set_tests_properties(render_buffer_snapshots picking_bvh geom_subset_partition subdivision_refine instance_transforms mesh_placement displacement_dice PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${HDUE_HOUDINI_ROOT}/bin;PATH=path_list_prepend:${HDUE_HOUDINI_ROOT}/python313")
 endif()

@@ -20,6 +20,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
     const auto sized = [&](size_t size) { return size == vertices; };
     if (mesh.indices.size() != faceParams.size() * 3 || !sized(mesh.normals.size()) ||
         !sized(mesh.sourceCorners.size()) || (!mesh.uv.empty() && !sized(mesh.uv.size())) ||
+        !std::all_of(mesh.uvSets.begin(), mesh.uvSets.end(), [&](const auto& set) { return sized(set.size()); }) ||
         (!mesh.colors.empty() && !sized(mesh.colors.size())) ||
         !std::all_of(mesh.indices.begin(), mesh.indices.end(), [&](uint32_t index) { return index < vertices; }) ||
         !std::all_of(mesh.deformOffsets.begin(), mesh.deformOffsets.end(),
@@ -50,6 +51,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
     prototype.velocities = mesh.velocities;
     prototype.deformTimes = mesh.deformTimes;
     prototype.deformOffsets.resize(mesh.deformOffsets.size());
+    prototype.uvSets.resize(mesh.uvSets.size());
     std::vector<HdUEMeshData> parts{prototype};
     bool invalid = false;
     for (const auto& subset : topology.GetGeomSubsets()) {
@@ -92,6 +94,7 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
                     part.points.push_back(mesh.points[vertex]);
                     part.normals.push_back(mesh.normals[vertex]);
                     if (!mesh.uv.empty()) part.uv.push_back(mesh.uv[vertex]);
+                    for (size_t k = 0; k < mesh.uvSets.size(); ++k) part.uvSets[k].push_back(mesh.uvSets[k][vertex]);
                     if (!mesh.colors.empty()) part.colors.push_back(mesh.colors[vertex]);
                     part.sourceCorners.push_back(mesh.sourceCorners[vertex]);
                     for (size_t k = 0; k < mesh.deformOffsets.size(); ++k)

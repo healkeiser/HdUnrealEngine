@@ -67,7 +67,8 @@ struct HdUEMeshData {
     // Indexed triangles: three indices per triangle into the per-vertex arrays (points, normals, uv, colors, masks).
     std::vector<GfVec3f> points, normals;
     std::vector<GfVec2f> uv;
-    std::vector<GfVec3f> colors;  // empty unless displayColor varies
+    std::vector<std::vector<GfVec2f>> uvSets;  // the material's other UV primvars (HdueMeshDesc uv sets 1..), like uv
+    std::vector<GfVec3f> colors;               // empty unless displayColor varies
     std::vector<uint32_t> indices;
     std::map<std::string, std::vector<float>> masks;
     std::map<std::string, std::string> maskErrors;
@@ -133,6 +134,7 @@ struct HdUETextureData {
     std::string colorSpace;
     uint32_t wrap[2] = {HDUE_WRAP_REPEAT, HDUE_WRAP_REPEAT};
     uint32_t encoding = HDUE_TEXTURE_ENCODING_AUTO;
+    uint32_t uvSet = 0;  // index into the material's UV primvars (HdUEMaterialPrimvars)
 };
 // op: (Houdini COP) and opdef: (embedded HDA) images exist only inside the host, which exports them and maps each
 // path to its file (render setting opTextures). Materials and lights keep these paths; they are resolved when packed.

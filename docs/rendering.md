@@ -43,7 +43,7 @@ Implicit Cube, Sphere, Cone, Cylinder, Capsule and Plane prims are converted to 
 
 Points render as one shared sphere instanced per point, sized by `widths` (0.1 when unauthored). BasisCurves render as six-sided tubes with flat end caps on open curves: linear curves follow their vertices, cubic Bezier, B-spline and Catmull-Rom curves are evaluated in their basis, and `widths` set the diameter (0.01 when unauthored). Points and curves under a PointInstancer are drawn once per instance.
 
-Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float2` reads (`varname`, such as `st`, or `map1` from 3ds Max exports), or from `st` when the material names none. A mesh carries one UV set, chosen through its own binding.
+Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float2` reads (`varname`, such as `st`, or `map1` from 3ds Max exports), or from `st` when the material names none. Each texture reads the UV set its own `st` input names (also through a `UsdTransform2d`): the mesh carries every UV primvar its material reads, up to four, chosen through its own binding (else its first bound GeomSubset's). The UV transform is still one per material, from the first textured input.
 
 Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer, from the nearest of nested instancers that authors it) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5) with a diffuse albedo of 0.42 × `displayColor`, matching Karma's default surface, which reflects 0.4 × `displayColor` diffusely (measured against a bound white Preview Surface under a distant light; a `displayColor`-only box in the Cornell scene renders at 1.07 × Karma, it was 2.8 ×).
 
@@ -61,7 +61,7 @@ Every `UsdPreviewSurface` input is translated, as a constant or a `UsdUVTexture`
 | `opacity`, `opacityThreshold` | See-through (translucent) or cutout (masked). `opacityMode` is not read: partial opacity is presence (it scales specular and emission too), so thin glass loses part of its Fresnel reflections (rims at 0.8 × Karma, which keeps them in both modes) |
 | `normal` | Tangent-space normal map (USD's +Y up) |
 | `occlusion` | Ambient occlusion |
-| `displacement` | World Position Offset along the normal (see [Displacement](#displacement)) |
+| `displacement` | Moves the mesh's vertices along the normal (see [Displacement](#displacement)) |
 
 `UsdUVTexture` `wrapS`/`wrapT` (MaterialX `uaddressmode`/`vaddressmode`) are honoured: `repeat`, `clamp`, `mirror`, and `black`, which clamps and reads the input's `bias` outside [0, 1]. `useMetadata`, the default, does not read the file's wrap metadata and falls back to `black`, as the spec says for files without it (Karma does the same). `sourceColorSpace` (or the file's `colorSpace` metadata) decides whether 8-bit texels are sRGB-decoded: `raw` and linear spaces read linear, `sRGB` decodes, `auto` decodes colour inputs only.
 
@@ -74,7 +74,7 @@ Surfaces: `ND_standard_surface_surfaceshader`, `ND_open_pbr_surface_surfaceshade
 | Node | Translation |
 | --- | --- |
 | `ND_image_*`, `ND_tiledimage_*` (`uvtiling`, `uvoffset`), `UsdUVTexture` | The texture, with its `colorspace` / `sourceColorSpace` and address modes, as for Preview Surface |
-| `ND_geompropvalue_vector2`, `UsdPrimvarReader_float2` | Selects the mesh's UV set (`geomprop` / `varname`, such as `map1`) |
+| `ND_geompropvalue_vector2`, `UsdPrimvarReader_float2` | Selects the texture's UV set (`geomprop` / `varname`, such as `map1`) |
 | `ND_extract_*` | Selects a channel (alpha cutouts: `ND_image_color4` → `ND_extract_color4` index 3) |
 | `ND_convert_*`, `ND_dot_*` | Passed through |
 | `ND_normalmap*` | Tangent-space decode, with its `scale` on XY |
@@ -120,7 +120,7 @@ The beauty carries straight alpha: 1 where geometry covers the pixel, 0 where th
 
 ## Displacement
 
-The Preview Surface `displacement` input (a constant or a texture) moves vertices along their normal by that distance in scene units, as World Position Offset in hdUE's preview materials. Only existing vertices move: detail finer than the mesh needs a denser mesh, for example `catmullClark` subdivision (`hdUE:subdivisionLevel`). Shading normals are not recomputed from the displacement. UE's adaptive Nanite tessellation is not used: it needs displacement maps at Nanite build time.
+The Preview Surface `displacement` input and MaterialX `ND_displacement_float` (`displacement` × `scale`) move the mesh's points along their normals by that distance, in the mesh's object space and units, before the mesh is uploaded, so Lumen, the Path Tracer and Nanite see the same surface. A textured displacement first dices the mesh uniformly: each triangle splits into four per level, up to about one triangle per two texels and at most about a million triangles per mesh. Normals are then recomputed from the displaced surface; a UV seam splits the surface only where the texture differs across it, and hard edges open. A constant displacement moves the points without dicing. Meshes with wet-surface effects are not displaced. Displacement is not adaptive (Karma dices by screen size). UE's Nanite tessellation and World Position Offset are not used: UE 5.8's ray-traced geometry, which the Path Tracer renders, ignores both. MaterialX vector displacement is not translated.
 
 ## Nanite
 
@@ -154,7 +154,7 @@ UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the Opti
 
 Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `hdUE:subdivisionLevel` levels, with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
 
-Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; the default 2 still shows facets on close silhouettes. There is no adaptive or screen-space refinement, and displacement is not supported. Wet-surface masks are not translated on subdivided meshes.
+Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; the default 2 still shows facets on close silhouettes. There is no adaptive or screen-space refinement; a displaced subdivision mesh is diced further (see [Displacement](#displacement)). Wet-surface masks are not translated on subdivided meshes.
 
 ## Cameras
 

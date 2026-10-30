@@ -38,7 +38,8 @@
 #include "pxr/base/gf/matrix4d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material);  // materials.cpp
+std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate,
+                                                       const SdfPath& material);  // materials.cpp
 namespace {
 template <class T>
 T value(const VtValue& v, T fallback) {
@@ -49,19 +50,19 @@ struct CleanBits {
     HdDirtyBits* bits;
     ~CleanBits() { *bits = HdChangeTracker::Clean; }
 };
-// The mesh's UV and colour primvars: from its own binding, else from its GeomSubsets' bindings; else st, and
-// displayColor when nothing is bound (a bound material reads colours only through a primvar reader). ponytail: one UV
-// set and colour per mesh; per-subset sets if assets mix them.
-std::pair<TfToken, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material,
-                                         const HdMeshTopology& topology) {
+// The mesh's UV sets and colour primvar: from its own binding, else from its GeomSubsets' bindings; else st, and
+// displayColor when nothing is bound (a bound material reads colours only through a primvar reader). ponytail: one list
+// of UV sets and one colour per mesh; per-subset sets if assets mix them.
+std::pair<TfTokenVector, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material,
+                                               const HdMeshTopology& topology) {
     auto names = HdUEMaterialPrimvars(delegate, material);
     for (const auto& subset : topology.GetGeomSubsets())
-        if (names.first.IsEmpty() || names.second.IsEmpty()) {
+        if (names.first.empty() || names.second.IsEmpty()) {
             const auto [uv, color] = HdUEMaterialPrimvars(delegate, subset.materialId);
-            if (names.first.IsEmpty()) names.first = uv;
+            if (names.first.empty()) names.first = uv;
             if (names.second.IsEmpty()) names.second = color;
         }
-    if (names.first.IsEmpty()) names.first = TfToken("st");
+    if (names.first.empty()) names.first = {TfToken("st")};
     if (material.IsEmpty()) names.second = HdTokens->displayColor;
     return names;
 }
@@ -407,7 +408,7 @@ public:
         const auto computed = computedPrimvars(delegate, GetId());
         auto points = value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray());
         auto topology = delegate->GetMeshTopology(GetId());
-        const auto [uvName, colorName] = meshPrimvars(delegate, delegate->GetMaterialId(GetId()), topology);
+        const auto [uvNames, colorName] = meshPrimvars(delegate, delegate->GetMaterialId(GetId()), topology);
         // catmullClark and loop meshes are refined uniformly (hdUE:subdivisionLevel), with their subdiv tags and the
         // indices of their face-varying UVs and colours; authored normals do not apply to them.
         std::unique_ptr<HdUESubdivision> subdivision;
@@ -416,7 +417,9 @@ public:
                           topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
             topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
             std::vector<VtIntArray> fvarIndices;
-            for (const auto& name : {uvName, colorName})
+            auto names = uvNames;
+            names.push_back(colorName);
+            for (const auto& name : names)
                 if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
                     VtIntArray indices;
                     delegate->GetIndexedPrimvar(GetId(), name, &indices);
@@ -445,8 +448,16 @@ public:
                 : triangulated<GfVec3f>(delegate, GetId(), HdTokens->normals, points.size(), triangles, parameters,
                                         util, HdTypeFloatVec3, nullptr,
                                         computedNormals == computed.end() ? VtValue() : computedNormals->second);
-        const auto uv = triangulated<GfVec2f>(delegate, GetId(), uvName, points.size(), triangles, parameters, util,
-                                              HdTypeFloatVec2, subdivision.get());
+        // UV sets in the material's order; a set the mesh lacks reads (0, 0), unless it has none.
+        std::vector<Triangulated<GfVec2f>> uvSets;
+        for (const auto& name : uvNames)
+            uvSets.push_back(triangulated<GfVec2f>(delegate, GetId(), name, points.size(), triangles, parameters, util,
+                                                   HdTypeFloatVec2, subdivision.get()));
+        if (std::all_of(uvSets.begin(), uvSets.end(), [](const auto& set) { return set.values.empty(); }))
+            uvSets.clear();
+        const auto uvSame = [&](size_t a, size_t b) {
+            return std::all_of(uvSets.begin(), uvSets.end(), [&](const auto& set) { return set.same(a, b); });
+        };
         // Vertex colours: an unbound mesh's displayColor when it varies (a uniform one stays the material's constant
         // color), or the primvar a bound material's base colour reads. An instancer's instance-rate primvar of that
         // name replaces the mesh's own, as per-instance colours.
@@ -495,7 +506,7 @@ public:
             mesh.sourceCorners = HdUEWeldCorners(
                 triangles, points.size(),
                 [&](size_t a, size_t b) {
-                    return normals.same(a, b) && uv.same(a, b) && colors.same(a, b) &&
+                    return normals.same(a, b) && uvSame(a, b) && colors.same(a, b) &&
                            std::all_of(masks.begin(), masks.end(),
                                        [&](const auto& mask) { return mask.second[a] == mask.second[b]; });
                 },
@@ -518,13 +529,17 @@ public:
                 return;
             }
         mesh.points.reserve(vertices);
+        if (!uvSets.empty()) mesh.uvSets.resize(uvSets.size() - 1);
         mesh.normals.reserve(vertices);
         for (size_t v = 0; v < vertices; ++v) {
             const size_t corner = mesh.sourceCorners[v], point = vertexPoints[v];
             mesh.points.push_back(points[point]);
             const auto normal = normals.values.empty() ? GfVec3f(0) : normals.at(corner, point);
             mesh.normals.push_back(normal.GetLengthSq() < 1e-12f ? smooth[point] : normal);
-            if (!uv.values.empty()) mesh.uv.push_back(uv.at(corner, point));
+            for (size_t k = 0; k < uvSets.size(); ++k) {
+                const auto uv = uvSets[k].values.empty() ? GfVec2f(0) : uvSets[k].at(corner, point);
+                k ? mesh.uvSets[k - 1].push_back(uv) : mesh.uv.push_back(uv);
+            }
             if (!colors.values.empty()) mesh.colors.push_back(colors.at(corner, point));
             for (const auto& [name, values] : masks) mesh.masks[name].push_back(values[corner]);
         }
@@ -616,7 +631,7 @@ public:
                 !onlyNativeBounds &&
                 (previous == missing || previous->second.points != part.points ||
                  previous->second.indices != part.indices || previous->second.normals != part.normals ||
-                 previous->second.uv != part.uv || (previous->second.transform != part.transform && !moved) ||
+                 previous->second.uv != part.uv || previous->second.uvSets != part.uvSets || (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
