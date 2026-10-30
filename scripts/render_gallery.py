@@ -456,7 +456,7 @@ def duration(seconds):
 
 def detail(key, render, reference, samples, resolution, compared=True):
     """(settings and time per frame, brightness against Karma CPU): the caption's second and third lines."""
-    settings = "16 warmup frames" if key == "lumen" else f"{samples} spp"
+    settings = "32 warmup frames" if key == "lumen" else f"{samples} spp"
     if key == "karma":
         brightness = "Brightness reference"
     elif compared and reference:
@@ -775,8 +775,8 @@ def section(which, results, machine):
         command = "hython scripts/render_gallery.py --set sponza"
     setup = (
         f"{intro}\n\n"
-        f"- **hdUE Lumen**: realtime mode, 16 warmup frames.\n"
-        f"- **hdUE Path Tracer**: {samples} samples per pixel, up to 8 bounces.\n"
+        f"- **hdUE Lumen**: realtime mode, 32 warmup frames.\n"
+        f"- **hdUE Path Tracer**: {samples} samples per pixel, up to 32 bounces.\n"
         f"- **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, {samples} samples per pixel, 8 diffuse bounces.\n"
         f"- Machine: {machine}.\n"
         "- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or "

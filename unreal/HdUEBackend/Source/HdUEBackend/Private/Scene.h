@@ -76,7 +76,6 @@ public:
     HdueSurfaceStatus SurfaceStatus() const;
     bool SurfaceReady() const;
     TArray<TStrongObjectPtr<UTexture2D>> GatherVirtualTextures() const;
-    bool HasRefractiveMaterials() const;
     HdueResult PickNative(const HdueNativeRay& Ray, HdueNativeHit& Hit, FString& ObjectId, FString& Error);
     // Swaps every mesh to M_HdUEId (its prim ID in custom primitive data) for the ID pass, or back.
     bool SetIdMode(int32 Mode, FString& Error);  // 0 off, 1 prim IDs, 2 instance IDs

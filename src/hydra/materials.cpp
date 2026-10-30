@@ -320,6 +320,9 @@ private:
 };
 
 void readPreviewSurface(SurfaceReader& r, HdUEMaterialData& data) {
+    // Hydra passes authored inputs only; the others take UsdPreviewSurface's fallbacks (HdUEMaterialData's defaults
+    // are those, except the diffuse colour's 0.18).
+    data.color = GfVec3f(.18f);
     r.color("diffuseColor", data.color, HDUE_TEXTURE_BASE_COLOR);
     r.color("emissiveColor", data.emissive, HDUE_TEXTURE_EMISSIVE);
     r.read("metallic", data.metallic, HDUE_TEXTURE_METALLIC);

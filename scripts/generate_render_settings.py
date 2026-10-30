@@ -69,10 +69,6 @@ HDUE_DEFAULTS = {
         "Overrides hdUE:lumenEnabled.",
     ),
     "LumenFrontLayerTranslucencyReflections": (True, None),
-    "PathTracingMaxBounces": (
-        8,
-        "hdUE uses 8, or 16 when the scene has refractive materials, unless set.",
-    ),
     "PathTracingEnableReferenceDOF": (
         True,
         "hdUE turns it on when the USD camera has depth of field.",

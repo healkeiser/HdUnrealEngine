@@ -2270,7 +2270,7 @@ public:
                     request.mode = s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED
                                                                                                     : HDUE_REALTIME;
                     request.samples_per_pixel = uint32_t(s.samplesPerPixel());
-                    request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 16)));
+                    request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 32)));
                     request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
                     request.time_seconds = s.setting<double>("timeSeconds", 0);
                     const auto camera = view.GetInverse();
@@ -2872,7 +2872,7 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
     return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
             {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
-            {"Warmup frames", TfToken("warmupFrames"), VtValue(16)},
+            {"Warmup frames", TfToken("warmupFrames"), VtValue(32)},
             {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
             {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
             {"Environment cube resolution", TfToken("domeResolution"), VtValue(512)},
