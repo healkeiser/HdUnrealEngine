@@ -754,6 +754,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         desc.flags = requireNanite && !nativeAsset.empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
         // Surface effects edit vertex colours after upload, so their meshes stay editable (dynamic) in UE.
         if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) desc.flags |= HDUE_MESH_EDITABLE;
+        if (!data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!baked) rowMajor(inverse * data.transform * basis, desc.transform);
         if (nativeAsset.empty()) packet.genericMeshes.push_back(id);

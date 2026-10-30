@@ -28,6 +28,7 @@ _Static_assert(sizeof(HdueViewportTexture) == 16, "viewport texture layout");
 _Static_assert(sizeof(HdueViewportTextures) == 32, "viewport textures layout");
 
 _Static_assert(sizeof(HdueSession) == 8, "64-bit session handles");
+_Static_assert(HDUE_MESH_SINGLE_SIDED == 4 && HDUE_MESH_EDITABLE == 2, "Mesh flags are bits");
 _Static_assert(offsetof(HdueInitDesc, instance_handle) == 8, "C ABI alignment");
 _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");

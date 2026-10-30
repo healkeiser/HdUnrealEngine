@@ -407,6 +407,7 @@ public:
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
+        mesh.doubleSided = delegate->GetDoubleSided(GetId());
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
@@ -622,7 +623,8 @@ public:
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
-                 previous->second.instanceColors != part.instanceColors);
+                 previous->second.instanceColors != part.instanceColors ||
+                 previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;
             // Link categories change no geometry: the next upload recomputes the light-link table (prepareLinks).
             const bool maskChanged = previous == missing || previous->second.masks != part.masks ||

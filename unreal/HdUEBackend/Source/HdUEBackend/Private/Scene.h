@@ -86,6 +86,13 @@ private:
     TMap<FString, AActor*> Actors;
     TMap<FString, FVector> CameraLightDirections;
     TMap<FString, FString> MeshMaterials;
+    TSet<FString> SingleSided;  // meshes sent with HDUE_MESH_SINGLE_SIDED
+    // By material id: Base's twin on the one-sided parent (null when Base has none).
+    struct FOneSided {
+        UMaterialInterface* Base = nullptr;
+        TStrongObjectPtr<UMaterialInterface> Material;
+    };
+    TMap<FString, FOneSided> OneSided;
     TMap<FString, TStrongObjectPtr<UMaterialInterface>> Materials;
     TMap<FString, int32> PrimIds;
     struct FVolume {
@@ -125,4 +132,5 @@ private:
     TMap<FString, TSharedPtr<FNativePickGeometry>> NativePickGeometry;
     void Remove(const FString& Id);
     void BindMaterials();
+    UMaterialInterface* MeshMaterial(const FString& MeshId);  // its material, one-sided if the mesh is
 };

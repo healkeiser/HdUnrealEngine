@@ -128,9 +128,8 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
         if (!Kept.Contains(Old.Key)) {
             if (auto* Actor = Actors.FindRef(Old.Key); IsValid(Actor))
                 if (auto* Component = Actor->FindComponentByClass<UMeshComponent>())
-                    if (const auto* Base = Materials.Find(MeshMaterials.FindRef(Old.Key));
-                        Base && Component->GetMaterial(0) != Base->Get())
-                        Component->SetMaterial(0, Base->Get());
+                    if (auto* Base = MeshMaterial(Old.Key); Base && Component->GetMaterial(0) != Base)
+                        Component->SetMaterial(0, Base);
         }
     WetBindings.Empty();
     for (auto& P : Prepared) {

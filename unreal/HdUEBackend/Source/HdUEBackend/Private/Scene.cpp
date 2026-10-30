@@ -102,7 +102,9 @@ void FHdueScene::Remove(const FString& Id) {
         Actors.Remove(Id);
     }
     Materials.Remove(Id);
+    OneSided.Remove(Id);
     MeshMaterials.Remove(Id);
+    SingleSided.Remove(Id);
     PrimIds.Remove(Id);
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
@@ -500,13 +502,38 @@ const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key
     }
     return Texture;
 }
+// A single-sided mesh draws its generated material's twin on the one-sided parent (<Parent>OneSided, same folder),
+// with the same parameters. Native and thin-walled materials have none and stay as they are.
+UMaterialInterface* FHdueScene::MeshMaterial(const FString& MeshId) {
+    const FString& Id = MeshMaterials.FindRef(MeshId);
+    const auto* Material = Materials.Find(Id);
+    if (!Material) return nullptr;
+    if (!SingleSided.Contains(MeshId)) return Material->Get();
+    FOneSided& Twin = OneSided.FindOrAdd(Id);
+    if (Twin.Base != Material->Get()) {
+        Twin.Base = Material->Get();
+        if (Twin.Material) RetiredMaterials.Add(MoveTemp(Twin.Material));  // frames in flight may still draw it
+        Twin.Material.Reset();
+        auto* Instance = Cast<UMaterialInstanceDynamic>(Twin.Base);
+        if (Instance && Instance->Parent) {
+            const FString Name = Instance->Parent->GetName() + TEXT("OneSided");
+            const FString Path = Instance->Parent->GetPackage()->GetName() + TEXT("OneSided.") + Name;
+            if (auto* Parent = LoadObject<UMaterialInterface>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet)) {
+                auto* OneSidedInstance = UMaterialInstanceDynamic::Create(Parent, World);
+                OneSidedInstance->CopyParameterOverrides(Instance);
+                Twin.Material.Reset(OneSidedInstance);
+            }
+        }
+    }
+    return Twin.Material ? Twin.Material.Get() : Material->Get();
+}
 void FHdueScene::BindMaterials() {
     for (const auto& Entry : MeshMaterials) {
         AActor** Actor = Actors.Find(Entry.Key);
         if (!Actor || !IsValid(*Actor)) continue;
         auto* Component = (*Actor)->FindComponentByClass<UMeshComponent>();
         if (const auto* Material = Materials.Find(Entry.Value)) {
-            UMaterialInterface* Desired = Material->Get();
+            UMaterialInterface* Desired = MeshMaterial(Entry.Key);
             if (const auto* Wet = WetBindings.Find(Entry.Key);
                 Wet && (*Wet)->Base == Material->Get() && (*Wet)->Revision == GeometryRevisions.FindRef(Entry.Key))
                 Desired = (*Wet)->Material.Get();
@@ -829,6 +856,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         Actors.Empty();
         CameraLightDirections.Empty();
         MeshMaterials.Empty();
+        SingleSided.Empty();
+        OneSided.Empty();
         Materials.Empty();
         PreviewTextures.Empty();
         PrimIds.Empty();
@@ -1188,6 +1217,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             }
         }
         MeshMaterials.Add(Id, Desc.material_id ? UTF8_TO_TCHAR(Desc.material_id) : TEXT(""));
+        if (Desc.flags & HDUE_MESH_SINGLE_SIDED)
+            SingleSided.Add(Id);
+        else
+            SingleSided.Remove(Id);
         PrimIds.Add(Id, Desc.prim_id);
         Lighting->Link(Id, Cast<UPrimitiveComponent>(Actor->GetRootComponent()));
     }
