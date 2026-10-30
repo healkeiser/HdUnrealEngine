@@ -1,0 +1,70 @@
+#usda 1.0
+(
+    doc = """intensity scales brightness linearly (the one scene that animates intensity rather than exposure):
+frame 2 has intensity 2 and is twice as bright."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "intensity",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "intensity 2 doubles",
+   "ratio": [
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 2
+    },
+    {
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ],
+     "frame": 1
+    }
+   ],
+   "min": 1.8,
+   "max": 2.2
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity.timeSamples = {1: 1, 2: 2}
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

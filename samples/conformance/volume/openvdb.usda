@@ -1,0 +1,47 @@
+#usda 1.0
+(
+    doc = """A Volume binds fields by name (field:density) to an OpenVDBAsset (filePath, fieldName). The CC0 fog sphere
+from the Cornell sample (its voxels sit off the origin), scaled 3x, absorbs and scatters light: partial alpha and
+light in the frame."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdVolVolume",
+ "feature": "Volume with an OpenVDBAsset density field",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "volume has partial alpha",
+   "value": {
+    "stat": "alpha"
+   },
+   "min": 0.02
+  },
+  {
+   "name": "volume scatters light",
+   "value": {
+    "stat": "luma"
+   },
+   "min": 0.002
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Volume "Fog"
+{
+    rel field:density = </Fog/density>
+    double3 xformOp:scale = (3, 3, 3)
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+    def OpenVDBAsset "density"
+    {
+        asset filePath = @../../cornell/fog.vdb@
+        token fieldName = "density"
+    }
+}

@@ -1,0 +1,90 @@
+#usda 1.0
+(
+    doc = """projection = orthographic: apertures are in tenths of a scene unit and size does not change with distance.
+Aperture 100 frames 10 units; unit cubes at z = 0 (x = -2) and z = -30 (x = 2) look the same size."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomCamera",
+ "feature": "projection orthographic",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "near cube",
+   "value": {
+    "region": [
+     -2.4,
+     -0.4,
+     -1.6,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "far cube same size",
+   "value": {
+    "region": [
+     1.6,
+     -0.4,
+     2.4,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "equal coverage",
+   "ratio": [
+    {
+     "region": [
+      1.3,
+      -0.7,
+      2.7,
+      0.7
+     ],
+     "stat": "coverage"
+    },
+    {
+     "region": [
+      -2.7,
+      -0.7,
+      -1.3,
+      0.7
+     ],
+     "stat": "coverage"
+    }
+   ],
+   "min": 0.85,
+   "max": 1.15
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Camera"
+{
+    token projection = "orthographic"
+    float horizontalAperture = 100
+    float verticalAperture = 100
+}
+def Cube "Near"
+{
+        double size = 1.0
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Far"
+{
+        double size = 1.0
+        double3 xformOp:translate = (2, 0, -30)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

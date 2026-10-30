@@ -1,0 +1,111 @@
+#usda 1.0
+(
+    doc = """occlusion is extra ambient-occlusion information; the spec notes path tracers will likely ignore it. Realtime:
+under a white dome only, occlusion 0.2 darkens the ambient light compared with occlusion 1."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "occlusion",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "occlusion darkens ambient (realtime)",
+   "ratio": [
+    {
+     "region": [
+      1.7,
+      -0.8,
+      3.3,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -3.3,
+      -0.8,
+      -1.7,
+      0.8
+     ]
+    }
+   ],
+   "max": 0.9,
+   "modes": [
+    "realtime"
+   ]
+  },
+  {
+   "name": "lit by the dome",
+   "value": {
+    "region": [
+     -3.3,
+     -0.8,
+     -1.7,
+     0.8
+    ],
+    "stat": "luma"
+   },
+   "min": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def DomeLight "Env"
+{
+    float inputs:intensity = 1
+    float inputs:exposure = 0
+}
+def Material "Open"
+{
+    token outputs:surface.connect = </Open/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+        token outputs:surface
+    }
+}
+def Material "Occluded"
+{
+    token outputs:surface.connect = </Occluded/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+            float inputs:occlusion = 0.2
+        token outputs:surface
+    }
+}
+def Sphere "Open_ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.2
+        rel material:binding = </Open>
+        double3 xformOp:translate = (-2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "Occluded_ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.2
+        rel material:binding = </Occluded>
+        double3 xformOp:translate = (2.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

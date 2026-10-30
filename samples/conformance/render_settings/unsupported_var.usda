@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """A RenderVar the renderer cannot produce (here a light path expression for diffuse only) should be reported.
+hdUE warns and writes its clear value."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "unsupported RenderVar (warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names the var",
+   "log": "does not render the render var",
+   "present": true
+  },
+  {
+   "name": "beauty still renders",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Extra>]
+    }
+    def RenderProduct "Extra"
+    {
+        token productName = "extra.$F4.exr"
+        rel orderedVars = </Render/Vars/diffuse>
+    }
+    over "Vars"
+    {
+        def RenderVar "diffuse"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "C<RD>.*"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "diffuse"
+        }
+    }
+}
+def Cube "Cube"
+{
+        double size = 1.0
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -1,0 +1,83 @@
+#usda 1.0
+(
+    doc = """shaping:ies:file applies an IES photometric profile around the light's -Z axis. beam.ies is a narrow beam
+(full to 15 degrees, nothing past 45): from z = 4 the wall centre is lit and x = 4 is dark."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "ShapingAPI IES profile",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "beam centre lit",
+   "value": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ],
+    "stat": "luma"
+   },
+   "min": 0.02
+  },
+  {
+   "name": "outside the beam dark",
+   "ratio": [
+    {
+     "region": [
+      3.7,
+      -0.5,
+      4.7,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      -0.5,
+      -0.5,
+      0.5,
+      0.5
+     ]
+    }
+   ],
+   "max": 0.1
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L" (
+    prepend apiSchemas = ["ShapingAPI"]
+)
+{
+        float inputs:radius = 0.1
+        float inputs:intensity = 1
+        float inputs:exposure = 11
+        asset inputs:shaping:ies:file = @../../cornell/beam.ies@
+        double3 xformOp:translate = (0, 0, 4)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

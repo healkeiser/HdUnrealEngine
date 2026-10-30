@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """includedPurposes lists the purposes that render. With ["default"] only, the render-purpose cube is
+skipped."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "includedPurposes",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "default purpose",
+   "value": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "render purpose excluded",
+   "value": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform token[] includedPurposes = ["default"]
+    }
+}
+def Cube "Default"
+{
+        double size = 1.0
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "RenderPurpose"
+{
+        double size = 1.0
+        uniform token purpose = "render"
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -1,0 +1,110 @@
+#usda 1.0
+(
+    doc = """A PointInstancer may be a prototype of another. The inner instancer places cubes at x = -1, 1; the outer one
+places the inner at y = -2, 2: four cubes at (+-1, +-2), nothing at the origin."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "nested PointInstancers",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "cube (-1, -2)",
+   "value": {
+    "region": [
+     -1.3,
+     -2.3,
+     -0.7,
+     -1.7
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "cube (-1, 2)",
+   "value": {
+    "region": [
+     -1.3,
+     1.7,
+     -0.7,
+     2.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "cube (1, -2)",
+   "value": {
+    "region": [
+     0.7,
+     -2.3,
+     1.3,
+     -1.7
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "cube (1, 2)",
+   "value": {
+    "region": [
+     0.7,
+     1.7,
+     1.3,
+     2.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "nothing at origin",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Outer"
+{
+    point3f[] positions = [(0, -2, 0), (0, 2, 0)]
+    int[] protoIndices = [0, 0]
+    rel prototypes = [</Outer/Prototypes/inner>]
+    def Scope "Prototypes"
+    {
+    def PointInstancer "inner"
+    {
+        point3f[] positions = [(-1, 0, 0), (1, 0, 0)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [</Outer/Prototypes/inner/Prototypes/cube>]
+        def Scope "Prototypes"
+        {
+        def Cube "cube"
+        {
+                double size = 1.0
+                double3 xformOp:translate = (0, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        }
+    }
+    }
+}

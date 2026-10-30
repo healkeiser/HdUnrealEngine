@@ -1,0 +1,118 @@
+#usda 1.0
+(
+    doc = """Cubic basis curves with the same four control points (-1.5, -2), (-0.5, 2), (0.5, 2), (1.5, -2): bezier
+(x - 3.3) passes through the end points; catmullRom (x 0) runs from the second to the third point, overshooting to
+y = (-p0 + 9 p1 + 9 p2 - p3) / 16 = 2.5 midway;
+bspline (x 3.3) stays below the second control point, its midpoint at y = (p0 + 23 p1 + 23 p2 + p3) / 48 = 1.83."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomBasisCurves",
+ "feature": "cubic bezier, bspline, catmullRom",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "bezier reaches p0",
+   "value": {
+    "region": [
+     -4.86,
+     -2.01,
+     -4.74,
+     -1.89
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "catmullRom does not reach p0",
+   "value": {
+    "region": [
+     -1.6,
+     -2.05,
+     -1.4,
+     -1.85
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "catmullRom overshoots to y 2.5 midway",
+   "value": {
+    "region": [
+     -0.06,
+     2.44,
+     0.06,
+     2.56
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "bspline misses p1",
+   "value": {
+    "region": [
+     2.7,
+     1.9,
+     2.9,
+     2.1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "bspline midpoint",
+   "value": {
+    "region": [
+     3.24,
+     1.773,
+     3.36,
+     1.893
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def BasisCurves "Bezier"
+{
+    uniform token type = "cubic"
+    uniform token basis = "bezier"
+    int[] curveVertexCounts = [4]
+    point3f[] points = [(-4.8, -2, 0), (-3.8, 2, 0), (-2.8, 2, 0), (-1.8, -2, 0)]
+    float[] widths = [0.3] (
+        interpolation = "constant"
+    )
+}
+def BasisCurves "CatmullRom"
+{
+    uniform token type = "cubic"
+    uniform token basis = "catmullRom"
+    int[] curveVertexCounts = [4]
+    point3f[] points = [(-1.5, -2, 0), (-0.5, 2, 0), (0.5, 2, 0), (1.5, -2, 0)]
+    float[] widths = [0.3] (
+        interpolation = "constant"
+    )
+}
+def BasisCurves "Bspline"
+{
+    uniform token type = "cubic"
+    uniform token basis = "bspline"
+    int[] curveVertexCounts = [4]
+    point3f[] points = [(1.8, -2, 0), (2.8, 2, 0), (3.8, 2, 0), (4.8, -2, 0)]
+    float[] widths = [0.3] (
+        interpolation = "constant"
+    )
+}

@@ -1,0 +1,190 @@
+#usda 1.0
+(
+    doc = """The texture result is texel * scale + bias. A white texture: left plain, middle scale 0.5, right scale 0 with
+bias 0.25."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "scale and bias",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "scale 0.5 halves",
+   "ratio": [
+    {
+     "region": [
+      -0.8,
+      -0.8,
+      0.8,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -3.8,
+      -0.8,
+      -2.2,
+      0.8
+     ]
+    }
+   ],
+   "min": 0.4,
+   "max": 0.6
+  },
+  {
+   "name": "bias 0.25 alone gives a quarter",
+   "ratio": [
+    {
+     "region": [
+      2.2,
+      -0.8,
+      3.8,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -3.8,
+      -0.8,
+      -2.2,
+      0.8
+     ]
+    }
+   ],
+   "min": 0.18,
+   "max": 0.32
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Plain"
+{
+    token outputs:surface.connect = </Plain/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Plain/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/white.png@
+        float2 inputs:st.connect = </Plain/st.outputs:result>
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Scaled"
+{
+    token outputs:surface.connect = </Scaled/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Scaled/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/white.png@
+        float2 inputs:st.connect = </Scaled/st.outputs:result>
+        float4 inputs:scale = (0.5, 0.5, 0.5, 1)
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Biased"
+{
+    token outputs:surface.connect = </Biased/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Biased/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/white.png@
+        float2 inputs:st.connect = </Biased/st.outputs:result>
+        float4 inputs:scale = (0, 0, 0, 1)
+        float4 inputs:bias = (0.25, 0.25, 0.25, 0)
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "PlainQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.2, -1.5, 0), (-1.8, -1.5, 0), (-1.8, 1.5, 0), (-4.2, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Plain>
+}
+def Mesh "ScaledQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.2, -1.5, 0), (1.2, -1.5, 0), (1.2, 1.5, 0), (-1.2, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Scaled>
+}
+def Mesh "BiasedQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.8, -1.5, 0), (4.2, -1.5, 0), (4.2, 1.5, 0), (1.8, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Biased>
+}

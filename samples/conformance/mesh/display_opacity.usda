@@ -1,0 +1,43 @@
+#usda 1.0
+(
+    doc = """displayOpacity is the companion opacity of displayColor for unbound geometry. A quad with displayOpacity 0.3
+over the empty background: its alpha is partial, about 0.3."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "displayOpacity",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "partial alpha",
+   "value": {
+    "region": [
+     -1.5,
+     -1.5,
+     1.5,
+     1.5
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.15,
+   "max": 0.6
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Quad"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-2, -2, 0), (2, -2, 0), (2, 2, 0), (-2, 2, 0)]
+        uniform token subdivisionScheme = "none"
+        float[] primvars:displayOpacity = [0.3]
+}

@@ -1,0 +1,126 @@
+#usda 1.0
+(
+    doc = """Primvars on a PointInstancer apply per instance: vertex/varying/faceVarying take elementSize values per
+instance, constant/uniform apply the whole value to each. Top row: vertex displayColor red, green, blue; bottom row:
+a constant yellow displayColor on a second instancer."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "instance-rate primvars (displayColor)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "instance 0 red",
+   "color": {
+    "region": [
+     -3.3,
+     1.7,
+     -2.7,
+     2.3
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "instance 1 green",
+   "color": {
+    "region": [
+     -0.3,
+     1.7,
+     0.3,
+     2.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "instance 2 blue",
+   "color": {
+    "region": [
+     2.7,
+     1.7,
+     3.3,
+     2.3
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "constant yellow",
+   "color": {
+    "region": [
+     -0.3,
+     -2.3,
+     0.3,
+     -1.7
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Top"
+{
+    point3f[] positions = [(-3, 2, 0), (0, 2, 0), (3, 2, 0)]
+    int[] protoIndices = [0, 0, 0]
+    rel prototypes = [</Top/Prototypes/cube>]
+    color3f[] primvars:displayColor = [(0.9, 0.05, 0.05), (0.05, 0.9, 0.05), (0.05, 0.05, 0.9)] (
+        interpolation = "vertex"
+    )
+    def Scope "Prototypes"
+    {
+    def Cube "cube"
+    {
+            double size = 1.5
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    }
+}
+def PointInstancer "Bottom"
+{
+    point3f[] positions = [(-3, -2, 0), (0, -2, 0), (3, -2, 0)]
+    int[] protoIndices = [0, 0, 0]
+    rel prototypes = [</Bottom/Prototypes/cube>]
+    color3f[] primvars:displayColor = [(0.9, 0.9, 0.05)] (
+        interpolation = "constant"
+    )
+    def Scope "Prototypes"
+    {
+    def Cube "cube"
+    {
+            double size = 1.5
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    }
+}

@@ -1,0 +1,62 @@
+#usda 1.0
+(
+    doc = """color tints the emission. A red light on a grey wall lights it red."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "color",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "red light",
+   "color": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ]
+   },
+   "rgb": [
+    1,
+    0,
+    0
+   ],
+   "tol": 0.08
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity = 1
+        color3f inputs:color = (1, 0, 0)
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

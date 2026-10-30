@@ -1,0 +1,68 @@
+#usda 1.0
+(
+    doc = """displacement moves the surface along its normal by the given distance (renderers may need dense geometry).
+A 4 x 4 quad facing the camera with displacement 1 moves 1 unit closer, so it projects 10/9 larger: its edge passes
+x = 2.1, where an undisplaced quad ends at 2."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "displacement",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "displaced quad reaches further",
+   "value": {
+    "region": [
+     2.05,
+     -1,
+     2.18,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "body",
+   "value": {
+    "region": [
+     -1,
+     -1,
+     1,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "M"
+{
+    token outputs:surface.connect = </M/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            float inputs:displacement = 1
+        token outputs:surface
+    }
+}
+def Mesh "Quad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-2, -2, 0), (2, -2, 0), (2, 2, 0), (-2, 2, 0)]
+        uniform token subdivisionScheme = "catmullClark"
+        rel material:binding = </M>
+}

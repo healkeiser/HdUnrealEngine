@@ -1,0 +1,198 @@
+#usda 1.0
+(
+    doc = """Primvar interpolation: constant (one value), uniform (one per face), vertex (one per point, interpolated),
+faceVarying (one per face corner). Four two-face strips, top to bottom: constant red; uniform red | green; vertex
+blue on the left points, yellow on the right; faceVarying blue on face 0, yellow on face 1."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "displayColor constant, uniform, vertex, faceVarying",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "constant",
+   "color": {
+    "region": [
+     -2.5,
+     3.1,
+     -1.5,
+     4.1
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "constant right (under the highlight)",
+   "color": {
+    "region": [
+     0.6,
+     3.2,
+     1.4,
+     4.0
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.32
+  },
+  {
+   "name": "uniform face 0",
+   "color": {
+    "region": [
+     -2.5,
+     0.7,
+     -1.5,
+     1.7
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "uniform face 1",
+   "color": {
+    "region": [
+     1.5,
+     0.7,
+     2.5,
+     1.7
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "vertex left",
+   "color": {
+    "region": [
+     -3.85,
+     -1.45,
+     -3.35,
+     -0.95
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "vertex right",
+   "color": {
+    "region": [
+     3.35,
+     -1.45,
+     3.85,
+     -0.95
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.9,
+    0.05
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "faceVarying face 0",
+   "color": {
+    "region": [
+     -2.5,
+     -4.1,
+     -1.5,
+     -3.1
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "faceVarying face 1",
+   "color": {
+    "region": [
+     1.5,
+     -4.1,
+     2.5,
+     -3.1
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Constant"
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-4, 2.7, 0), (0, 2.7, 0), (4, 2.7, 0), (-4, 4.5, 0), (0, 4.5, 0), (4, 4.5, 0)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.9, 0.05, 0.05)] (
+            interpolation = "constant"
+        )
+}
+def Mesh "Uniform"
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-4, 0.3, 0), (0, 0.3, 0), (4, 0.3, 0), (-4, 2.1, 0), (0, 2.1, 0), (4, 2.1, 0)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.9, 0.05, 0.05), (0.05, 0.9, 0.05)] (
+            interpolation = "uniform"
+        )
+}
+def Mesh "Vertex"
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-4, -2.1, 0), (0, -2.1, 0), (4, -2.1, 0), (-4, -0.3, 0), (0, -0.3, 0), (4, -0.3, 0)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.9), (0.05, 0.05, 0.9), (0.9, 0.9, 0.05), (0.05, 0.05, 0.9), (0.05, 0.05, 0.9), (0.9, 0.9, 0.05)] (
+            interpolation = "vertex"
+        )
+}
+def Mesh "FaceVarying"
+{
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4]
+        point3f[] points = [(-4, -4.5, 0), (0, -4.5, 0), (4, -4.5, 0), (-4, -2.7, 0), (0, -2.7, 0), (4, -2.7, 0)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.9), (0.05, 0.05, 0.9), (0.05, 0.05, 0.9), (0.05, 0.05, 0.9), (0.9, 0.9, 0.05), (0.9, 0.9, 0.05), (0.9, 0.9, 0.05), (0.9, 0.9, 0.05)] (
+            interpolation = "faceVarying"
+        )
+}

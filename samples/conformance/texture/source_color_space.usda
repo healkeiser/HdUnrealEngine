@@ -1,0 +1,190 @@
+#usda 1.0
+(
+    doc = """sourceColorSpace: raw reads texels as stored, sRGB decodes them (128/255 -> 0.216), auto decodes 8-bit colour
+data like sRGB. A grey 128 texture: left raw, middle sRGB, right auto."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "sourceColorSpace raw, sRGB, auto",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "raw / sRGB = 0.502 / 0.216",
+   "ratio": [
+    {
+     "region": [
+      -3.8,
+      -0.8,
+      -2.2,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -0.8,
+      -0.8,
+      0.8,
+      0.8
+     ]
+    }
+   ],
+   "min": 1.9,
+   "max": 2.8
+  },
+  {
+   "name": "auto decodes like sRGB",
+   "ratio": [
+    {
+     "region": [
+      2.2,
+      -0.8,
+      3.8,
+      0.8
+     ]
+    },
+    {
+     "region": [
+      -0.8,
+      -0.8,
+      0.8,
+      0.8
+     ]
+    }
+   ],
+   "min": 0.85,
+   "max": 1.15
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Raw"
+{
+    token outputs:surface.connect = </Raw/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Raw/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.png@
+        float2 inputs:st.connect = </Raw/st.outputs:result>
+        token inputs:sourceColorSpace = "raw"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Srgb"
+{
+    token outputs:surface.connect = </Srgb/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Srgb/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.png@
+        float2 inputs:st.connect = </Srgb/st.outputs:result>
+        token inputs:sourceColorSpace = "sRGB"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Auto"
+{
+    token outputs:surface.connect = </Auto/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Auto/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.png@
+        float2 inputs:st.connect = </Auto/st.outputs:result>
+        token inputs:sourceColorSpace = "auto"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "RawQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.2, -1.5, 0), (-1.8, -1.5, 0), (-1.8, 1.5, 0), (-4.2, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Raw>
+}
+def Mesh "SrgbQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.2, -1.5, 0), (1.2, -1.5, 0), (1.2, 1.5, 0), (-1.2, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Srgb>
+}
+def Mesh "AutoQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.8, -1.5, 0), (4.2, -1.5, 0), (4.2, 1.5, 0), (1.8, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Auto>
+}

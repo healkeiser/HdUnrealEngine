@@ -1,0 +1,89 @@
+#usda 1.0
+(
+    doc = """opacityThreshold > 0 makes opacity a mask: fragments with opacity below the threshold are cut out, the rest
+are fully opaque. Both quads have opacity 0.3: left threshold 0.5 (cut out), right threshold 0.2 (opaque)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "opacityThreshold (cutout)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "below threshold cut out",
+   "value": {
+    "region": [
+     -3.5,
+     -1,
+     -1.5,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "above threshold fully opaque",
+   "value": {
+    "region": [
+     1.5,
+     -1,
+     3.5,
+     1
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.95
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Cut"
+{
+    token outputs:surface.connect = </Cut/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            float inputs:opacity = 0.3
+            float inputs:opacityThreshold = 0.5
+        token outputs:surface
+    }
+}
+def Material "Keep"
+{
+    token outputs:surface.connect = </Keep/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            float inputs:opacity = 0.3
+            float inputs:opacityThreshold = 0.2
+        token outputs:surface
+    }
+}
+def Mesh "CutQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, -1.5, 0), (-1, -1.5, 0), (-1, 1.5, 0), (-4, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </Cut>
+}
+def Mesh "KeepQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1, -1.5, 0), (4, -1.5, 0), (4, 1.5, 0), (1, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </Keep>
+}

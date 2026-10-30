@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """faceVertexCounts allows any polygon, including concave ones, which must be triangulated without covering
+their notch. One L-shaped hexagon: arms covered, the notch (upper right) empty."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "concave n-gon",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "bottom arm",
+   "value": {
+    "region": [
+     0.5,
+     -1.5,
+     1.5,
+     -0.5
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "left arm",
+   "value": {
+    "region": [
+     -1.5,
+     0.5,
+     -0.5,
+     1.5
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "notch",
+   "value": {
+    "region": [
+     0.7,
+     0.7,
+     1.7,
+     1.7
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "L"
+{
+        int[] faceVertexCounts = [6]
+        int[] faceVertexIndices = [0, 1, 2, 3, 4, 5]
+        point3f[] points = [(-2, -2, 0), (2, -2, 0), (2, 0, 0), (0, 0, 0), (0, 2, 0), (-2, 2, 0)]
+        uniform token subdivisionScheme = "none"
+}

@@ -1,0 +1,42 @@
+#usda 1.0
+(
+    doc = """pixelAspectRatio is the width / height of one pixel. With 2 on a square 128 x 128 image of a square
+aperture, each pixel covers twice the width: a sphere spans half as many pixels across as down."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "pixelAspectRatio",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "sphere half as wide in pixels",
+   "value": {
+    "stat": "bbox_aspect"
+   },
+   "min": 0.4,
+   "max": 0.6
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform float pixelAspectRatio = 2
+    }
+}
+def Sphere "Ball"
+{
+        double radius = 2
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

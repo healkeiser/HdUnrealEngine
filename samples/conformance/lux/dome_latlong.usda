@@ -1,0 +1,80 @@
+#usda 1.0
+(
+    doc = """A latlong dome follows the OpenEXR convention: +Y up, longitude 0 (the image centre) towards +Z. The texture
+is red around +Z (behind the camera) and blue around -Z. A white sphere's camera-facing side is lit from +Z: red.
+Frame 2 rotates the dome 180 degrees about Y: blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux DomeLight",
+ "feature": "texture:format latlong orientation",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "lit from +Z: red",
+   "color": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "rgb": [
+    1,
+    0,
+    0
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "rotated 180: blue",
+   "color": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ],
+    "frame": 2
+   },
+   "rgb": [
+    0,
+    0,
+    1
+   ],
+   "tol": 0.2
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def DomeLight "L"
+{
+        float inputs:intensity = 1
+        asset inputs:texture:file = @../textures/dome_front_blue_back_red.exr@
+        token inputs:texture:format = "latlong"
+        float3 xformOp:rotateXYZ.timeSamples = {1: (0, 0, 0), 2: (0, 180, 0)}
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+}
+def Sphere "Ball"
+{
+        double radius = 1.5
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.8)]
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

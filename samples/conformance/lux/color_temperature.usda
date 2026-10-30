@@ -1,0 +1,82 @@
+#usda 1.0
+(
+    doc = """With enableColorTemperature, the blackbody colour of colorTemperature (Kelvin) multiplies color. Frame 1:
+2700 K, warm (red > green > blue); frame 2: 6500 K, close to white."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "enableColorTemperature, colorTemperature",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "2700 K is warm",
+   "color": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ]
+   },
+   "rgb": [
+    1,
+    0.6,
+    0.3
+   ],
+   "tol": 0.1
+  },
+  {
+   "name": "6500 K is near white",
+   "color": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ],
+    "frame": 2
+   },
+   "rgb": [
+    1,
+    1,
+    1
+   ],
+   "tol": 0.06
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def SphereLight "L"
+{
+        float inputs:radius = 0.25
+        float inputs:exposure = 8
+        float inputs:intensity = 1
+        bool inputs:enableColorTemperature = 1
+        float inputs:colorTemperature.timeSamples = {1: 2700, 2: 6500}
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -1,0 +1,438 @@
+#usda 1.0
+(
+    doc = """wrapS/wrapT decide how st outside [0, 1] reads the texture (left half red, right half blue). Each row spans
+u = -1..2: repeat tiles it, clamp extends the edge texels, mirror reflects every other tile, black returns black
+(the bias). Rows top to bottom: repeat, clamp, mirror, black."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "wrapS / wrapT: repeat, clamp, mirror, black",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "repeat u -0.75 red",
+   "color": {
+    "region": [
+     -4.15,
+     2.6,
+     -3.35,
+     3.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "repeat u -0.25 blue",
+   "color": {
+    "region": [
+     -2.65,
+     2.6,
+     -1.85,
+     3.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "repeat u 1.25 red",
+   "color": {
+    "region": [
+     1.85,
+     2.6,
+     2.65,
+     3.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "repeat u 1.75 blue",
+   "color": {
+    "region": [
+     3.35,
+     2.6,
+     4.15,
+     3.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "clamp u -0.75 red",
+   "color": {
+    "region": [
+     -4.15,
+     0.6,
+     -3.35,
+     1.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "clamp u -0.25 red",
+   "color": {
+    "region": [
+     -2.65,
+     0.6,
+     -1.85,
+     1.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "clamp u 1.25 blue",
+   "color": {
+    "region": [
+     1.85,
+     0.6,
+     2.65,
+     1.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "clamp u 1.75 blue",
+   "color": {
+    "region": [
+     3.35,
+     0.6,
+     4.15,
+     1.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "mirror u -0.75 blue",
+   "color": {
+    "region": [
+     -4.15,
+     -1.4,
+     -3.35,
+     -0.6
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "mirror u -0.25 red",
+   "color": {
+    "region": [
+     -2.65,
+     -1.4,
+     -1.85,
+     -0.6
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "mirror u 1.25 blue",
+   "color": {
+    "region": [
+     1.85,
+     -1.4,
+     2.65,
+     -0.6
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "mirror u 1.75 red",
+   "color": {
+    "region": [
+     3.35,
+     -1.4,
+     4.15,
+     -0.6
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "black outside [0, 1] (u -0.5)",
+   "ratio": [
+    {
+     "region": [
+      -3.5,
+      -3.5,
+      -2.5,
+      -2.5
+     ]
+    },
+    {
+     "region": [
+      -1.15,
+      -3.4,
+      -0.35,
+      -2.6
+     ]
+    }
+   ],
+   "max": 0.1
+  },
+  {
+   "name": "black outside [0, 1] (u 1.5)",
+   "ratio": [
+    {
+     "region": [
+      2.5,
+      -3.5,
+      3.5,
+      -2.5
+     ]
+    },
+    {
+     "region": [
+      0.35,
+      -3.4,
+      1.15,
+      -2.6
+     ]
+    }
+   ],
+   "max": 0.1
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Repeat"
+{
+    token outputs:surface.connect = </Repeat/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Repeat/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:st.connect = </Repeat/st.outputs:result>
+        token inputs:wrapS = "repeat"
+        token inputs:wrapT = "repeat"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "RepeatQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, 2.2, 0), (4.5, 2.2, 0), (4.5, 3.8, 0), (-4.5, 3.8, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(-1, 0), (2, 0), (2, 1), (-1, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Repeat>
+}
+def Material "Clamp"
+{
+    token outputs:surface.connect = </Clamp/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Clamp/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:st.connect = </Clamp/st.outputs:result>
+        token inputs:wrapS = "clamp"
+        token inputs:wrapT = "clamp"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "ClampQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, 0.19999999999999996, 0), (4.5, 0.19999999999999996, 0), (4.5, 1.8, 0), (-4.5, 1.8, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(-1, 0), (2, 0), (2, 1), (-1, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Clamp>
+}
+def Material "Mirror"
+{
+    token outputs:surface.connect = </Mirror/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Mirror/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:st.connect = </Mirror/st.outputs:result>
+        token inputs:wrapS = "mirror"
+        token inputs:wrapT = "mirror"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "MirrorQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, -1.8, 0), (4.5, -1.8, 0), (4.5, -0.19999999999999996, 0), (-4.5, -0.19999999999999996, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(-1, 0), (2, 0), (2, 1), (-1, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Mirror>
+}
+def Material "Black"
+{
+    token outputs:surface.connect = </Black/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </Black/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:st.connect = </Black/st.outputs:result>
+        token inputs:wrapS = "black"
+        token inputs:wrapT = "black"
+        float3 outputs:rgb
+        float outputs:r
+        float outputs:a
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "BlackQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, -3.8, 0), (4.5, -3.8, 0), (4.5, -2.2, 0), (-4.5, -2.2, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(-1, 0), (2, 0), (2, 1), (-1, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Black>
+}

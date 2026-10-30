@@ -1,0 +1,179 @@
+#usda 1.0
+(
+    doc = """UsdTransform2d computes in * scale, rotated by rotation degrees, plus translation. The red | blue texture
+(repeat): top quad translated by (0.5, 0) shows blue | red; bottom quad rotated 180 degrees shows blue | red too."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdTransform2d",
+ "feature": "UsdTransform2d translation, rotation",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "translated left blue",
+   "color": {
+    "region": [
+     -2.6,
+     1.4,
+     -1.4,
+     2.6
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "translated right red",
+   "color": {
+    "region": [
+     1.4,
+     1.4,
+     2.6,
+     2.6
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "rotated left blue",
+   "color": {
+    "region": [
+     -2.6,
+     -2.6,
+     -1.4,
+     -1.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "rotated right red",
+   "color": {
+    "region": [
+     1.4,
+     -2.6,
+     2.6,
+     -1.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Translated"
+{
+    token outputs:surface.connect = </Translated/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </Translated/t.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        token inputs:wrapS = "repeat"
+        token inputs:wrapT = "repeat"
+        float2 inputs:st.connect = </Translated/xf.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "xf"
+    {
+        uniform token info:id = "UsdTransform2d"
+        float2 inputs:in.connect = </Translated/st.outputs:result>
+        float2 inputs:translation = (0.5, 0)
+        float2 outputs:result
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Rotated"
+{
+    token outputs:surface.connect = </Rotated/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </Rotated/t.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        token inputs:wrapS = "repeat"
+        token inputs:wrapT = "repeat"
+        float2 inputs:st.connect = </Rotated/xf.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "xf"
+    {
+        uniform token info:id = "UsdTransform2d"
+        float2 inputs:in.connect = </Rotated/st.outputs:result>
+        float inputs:rotation = 180
+        float2 outputs:result
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "TranslatedQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, 1, 0), (4, 1, 0), (4, 3, 0), (-4, 3, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Translated>
+}
+def Mesh "RotatedQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, -3, 0), (4, -3, 0), (4, -1, 0), (-4, -1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Rotated>
+}

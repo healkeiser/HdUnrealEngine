@@ -1,0 +1,58 @@
+#usda 1.0
+(
+    doc = """Aperture offsets shift the film back (lens shift) in the same units as the apertures: offsets of 10 with
+aperture 40 move the frustum a quarter frame right and up, so a cube at the origin appears at (-2.5, -2.5)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomCamera",
+ "feature": "horizontalApertureOffset, verticalApertureOffset",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "cube shifted to (-2.5, -2.5)",
+   "value": {
+    "region": [
+     -2.8,
+     -2.8,
+     -2.2,
+     -2.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "not at the centre",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Camera"
+{
+    float horizontalApertureOffset = 10
+    float verticalApertureOffset = 10
+}
+def Cube "Cube"
+{
+        double size = 1.0
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

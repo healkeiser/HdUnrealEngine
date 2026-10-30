@@ -1,0 +1,78 @@
+#usda 1.0
+(
+    doc = """orientationsf (quatf) is the float-precision orientation; when both are authored orientationsf is preferred.
+orientations says identity for both bars, orientationsf rotates instance 1 by 90 degrees about Z: it must be vertical."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "orientationsf (quatf), preferred over orientations",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "bar 0 horizontal",
+   "value": {
+    "region": [
+     -2.8,
+     -0.1,
+     -1.2,
+     0.1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "bar 1 vertical (orientationsf wins)",
+   "value": {
+    "region": [
+     1.9,
+     -0.8,
+     2.1,
+     0.8
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "bar 1 not horizontal",
+   "value": {
+    "region": [
+     2.5,
+     -0.1,
+     2.9,
+     0.1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions = [(-2, 0, 0), (2, 0, 0)]
+    int[] protoIndices = [0, 0]
+    rel prototypes = [</Instancer/Prototypes/bar>]
+    quath[] orientations = [(1, 0, 0, 0), (1, 0, 0, 0)]
+    quatf[] orientationsf = [(1, 0, 0, 0), (0.7071068, 0, 0, 0.7071068)]
+    def Scope "Prototypes"
+    {
+    def Mesh "bar"
+    {
+            int[] faceVertexCounts = [4]
+            int[] faceVertexIndices = [0, 1, 2, 3]
+            point3f[] points = [(-1, -0.2, 0), (1, -0.2, 0), (1, 0.2, 0), (-1, 0.2, 0)]
+            uniform token subdivisionScheme = "none"
+    }
+    }
+}

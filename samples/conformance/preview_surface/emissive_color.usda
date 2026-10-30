@@ -1,0 +1,79 @@
+#usda 1.0
+(
+    doc = """emissiveColor is emitted radiance, independent of lights. With every light off, a sphere with black diffuse
+and emissiveColor (0, 1, 0) renders green at about luminance 0.7."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "emissiveColor",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "green emission",
+   "color": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "bright without lights",
+   "value": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ],
+    "stat": "luma"
+   },
+   "min": 0.35
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Material "M"
+{
+    token outputs:surface.connect = </M/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 0, 0)
+            color3f inputs:emissiveColor = (0, 1, 0)
+        token outputs:surface
+    }
+}
+def Sphere "Ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        double radius = 1.5
+        rel material:binding = </M>
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

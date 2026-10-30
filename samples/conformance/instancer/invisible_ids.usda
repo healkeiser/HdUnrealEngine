@@ -1,0 +1,97 @@
+#usda 1.0
+(
+    doc = """invisibleIds (animatable) hides the instances whose id (from the ids attribute when authored) is listed.
+ids = [10, 11, 12, 13], invisibleIds = [11]: the second instance (x = -1) is hidden, three remain."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "invisibleIds (with ids)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "id 10",
+   "value": {
+    "region": [
+     -3.3,
+     -0.3,
+     -2.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "id 11 hidden",
+   "value": {
+    "region": [
+     -1.3,
+     -0.3,
+     -0.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "id 12",
+   "value": {
+    "region": [
+     0.7,
+     -0.3,
+     1.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "id 13",
+   "value": {
+    "region": [
+     2.7,
+     -0.3,
+     3.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "3 instances in the id AOVs",
+   "value": {
+    "stat": "instances"
+   },
+   "equals": 3
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions = [(-3, 0, 0), (-1, 0, 0), (1, 0, 0), (3, 0, 0)]
+    int[] protoIndices = [0, 0, 0, 0]
+    rel prototypes = [</Instancer/Prototypes/cube>]
+    int64[] ids = [10, 11, 12, 13]
+    int64[] invisibleIds = [11]
+    def Scope "Prototypes"
+    {
+    def Cube "cube"
+    {
+            double size = 1.0
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    }
+}

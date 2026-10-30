@@ -1,0 +1,53 @@
+#usda 1.0
+(
+    doc = """GeometryLight emits from a referenced mesh. hdUE renders nothing for it and must say so."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "GeometryLight (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names GeometryLight",
+   "log": "not supported and renders nothing",
+   "present": true
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def Mesh "Emitter"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]
+        uniform token subdivisionScheme = "none"
+}
+def GeometryLight "L"
+{
+    rel geometry = </Emitter>
+    float inputs:intensity = 1
+}
