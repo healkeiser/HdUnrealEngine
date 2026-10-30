@@ -20,6 +20,7 @@
       "rendererStage": "rendererStage",
       "totalClockTime": "totalClockTime",
       "percentDone": "percentDone",
+      "peakMemory": "peakMemory",
       "renderProgressAnnotation": "renderProgressAnnotation",
       "renderStatsAnnotation": "renderStatsAnnotation"
     },

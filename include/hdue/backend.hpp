@@ -68,4 +68,5 @@ private:
 
 void write_pfm(const std::filesystem::path& path, const HdueFrameInfo& frame, const float* rgba);
 std::optional<uint64_t> gpu_memory_bytes();
+uint64_t peak_memory_bytes();  // the process's peak working set (Houdini's peakMemory render stat)
 }  // namespace hdue

@@ -152,7 +152,8 @@ class Selection:
         bounds = UsdGeom.BBoxCache(
             Usd.TimeCode.Default(), ["default", "render"]
         )
-        for target in targets:
+
+        def click(target, expected):
             centre = bounds.ComputeWorldBound(
                 stage.GetPrimAtPath(target)
             ).ComputeCentroid()
@@ -178,8 +179,22 @@ class Selection:
             yield from self.wait(1)
             picked = viewer.currentSceneGraphSelection()
             self.log(step="click", target=target, at=(x, y), picked=picked)
-            if not picked or not picked[0].startswith(target):
+            # A point instance reads <instancer>[<index>:<prototype>].
+            if len(picked) != 1 or picked[0].split(":")[0] != expected:
                 raise AssertionError(f"Clicking {target} selected {picked}")
+
+        for target in targets:
+            yield from click(target, target)
+        # Point instance selection reads instanceId: the instancer's middle instance (index 1) sits at its centre.
+        instancers = [
+            t
+            for t in targets
+            if stage.GetPrimAtPath(t).IsA(UsdGeom.PointInstancer)
+        ]
+        if instancers:
+            viewer.setSelectionPointInstances(False)
+            for target in instancers:
+                yield from click(target, target + "[1")
         viewer.setCurrentSceneGraphSelection(())
         viewer.enterViewState()
 
