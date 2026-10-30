@@ -3,25 +3,53 @@
 This page describes what hdUE adds to a process, on which threads it runs and how one frame travels from Hydra to UE and back, so that each part can be checked in Process Explorer or a debugger. Statements come from the code (file names are given) or from live observation of husk and Houdini 22.0.368 on Windows 11 with an RTX 4090 and a 16-core Ryzen 9 5950X (October 2026, Cornell box). Anything that was not observed or read in the code is marked *inferred*.
 
 ```mermaid
-flowchart TB
-    subgraph Process["One process: houdini.exe / husk.exe / hython / usdview"]
+flowchart LR
+    subgraph Host[" 🔶 Houdini · husk · hython · usdview "]
         direction TB
-        Host["Host thread<br/>Houdini UI thread, husk main thread<br/>Hydra Sync, HdRenderPass::Execute"]
-        Delegate["hdUE_Houdini22.dll<br/>HdUEState: dirty sets, ScenePacket<br/>render buffers, OCIO, OIDN"]
-        GT["GameThread (an std::thread of hdUE_Houdini22.dll)<br/>queue + tick loop, C ABI calls"]
-        Backend["HdUEBackend-h22-&lt;hash&gt;.dll<br/>monolithic UE 5.8.4 (UELibrary)"]
-        UEThreads["RenderThread 0, RHIThread, RHISubmissionThread,<br/>Foreground/Background Workers, PSOPrecompilePool, ..."]
-        GL["Houdini GL viewport<br/>(Solaris only)"]
-
-        Host -->|"Sync: copies into HdUEState"| Delegate
-        Delegate -->|"run() / post(): std::function on the queue"| GT
-        GT -->|"apply_scene, request_render, tick,<br/>poll_frame, copy_frame, extensions"| Backend
-        Backend --> UEThreads
-        UEThreads -->|"readback: float RGBA under FrameMutex"| Delegate
-        Delegate -->|"HdRenderBuffer::Map / GetResource"| Host
-        UEThreads -.->|"gpu_api.h: shared D3D12 textures + fences"| GL
+        H1("🧵 Host thread<br/>Hydra Sync · Execute")
+        H2("🖥️ GL viewport<br/>Solaris only")
     end
-    UEThreads -->|"D3D12"| GPU["GPU: Lumen / Path Tracer"]
+
+    subgraph Delegate[" ⚡ hdUE_Houdini22.dll "]
+        direction TB
+        D1("📋 HdUEState<br/>dirty sets · scene packets")
+        D2("🧵 GameThread<br/>hdUE's own thread · tick loop")
+        D3("🖼️ Render buffers<br/>OCIO · OIDN · AOVs")
+        D1 --> D2
+    end
+
+    subgraph Unreal[" 🎮 HdUEBackend-h22-‹hash›.dll · UE 5.8.4 "]
+        direction TB
+        U1("🌐 UELibrary<br/>World · scene · materials")
+        U2("🧵 RenderThread · RHIThread<br/>task workers · PSO pool")
+        U3("💡 Lumen · Path Tracer")
+        U1 --> U2 --> U3
+    end
+
+    GPU("🟩 GPU · D3D12")
+
+    H1 -- "Hydra 2 sync" --> D1
+    D2 -- "C ABI · apply · render · poll" --> U1
+    U3 --> GPU
+    U2 -. "CPU readback" .-> D3
+    D3 -- "Map · GetResource" --> H1
+    U2 -. "shared D3D12 textures · fences" .-> H2
+
+    classDef hostBox fill:#fff5f0,stroke:#e8c4a8,stroke-width:1px,color:#2d3748,rx:12,ry:12
+    classDef delegateBox fill:#eef6f0,stroke:#a8d5b8,stroke-width:1px,color:#2d3748,rx:12,ry:12
+    classDef unrealBox fill:#f0f4ff,stroke:#b8c9e8,stroke-width:1px,color:#2d3748,rx:12,ry:12
+    classDef hostNode fill:#fde4d0,stroke:#e0a87c,stroke-width:1px,color:#2d3748,rx:8,ry:8
+    classDef delegateNode fill:#d4edda,stroke:#82c896,stroke-width:1px,color:#2d3748,rx:8,ry:8
+    classDef unrealNode fill:#dbe4f8,stroke:#96b0dc,stroke-width:1px,color:#2d3748,rx:8,ry:8
+    classDef gpuNode fill:#e8f5e9,stroke:#66bb6a,stroke-width:1px,color:#2d3748,rx:8,ry:8
+
+    class Host hostBox
+    class Delegate delegateBox
+    class Unreal unrealBox
+    class H1,H2 hostNode
+    class D1,D2,D3 delegateNode
+    class U1,U2,U3 unrealNode
+    class GPU gpuNode
 ```
 
 ## Processes
