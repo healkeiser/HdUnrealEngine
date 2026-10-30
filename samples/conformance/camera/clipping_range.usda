@@ -1,8 +1,7 @@
 #usda 1.0
 (
     doc = """clippingRange (near, far) bounds what renders. With (2, 8): the cube 1.5 from the camera (x = -2 on screen)
-and the cube 10 away (centre) are clipped; the cube 5 away (x = 2 on screen) renders. UE's Path Tracer traces rays past any far plane: hdUE clips far
-in realtime only and warns in path traced renders."""
+and the cube 10 away (centre) are clipped; the cube 5 away (x = 2 on screen) renders."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomCamera",
@@ -33,17 +32,7 @@ in realtime only and warns in path traced renders."""
     ],
     "stat": "coverage"
    },
-   "max": 0.05,
-   "modes": [
-    "realtime"
-   ]
-  },
-  {
-   "name": "Path Tracer far clip warned",
-   "log": "Path Tracer ignores the camera's far clipping plane",
-   "modes": [
-    "pathtraced"
-   ]
+   "max": 0.05
   },
   {
    "name": "before near",
