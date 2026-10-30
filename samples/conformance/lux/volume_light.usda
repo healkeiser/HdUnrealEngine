@@ -1,0 +1,54 @@
+#usda 1.0
+(
+    doc = """VolumeLightAPI turns a Volume into a light that emits from its field. hdUE does not support volume lights and
+must say so; the volume itself still renders."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux VolumeLightAPI",
+ "feature": "VolumeLightAPI (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names the volume light",
+   "log": "hdUE warning:.*[Vv]olume ?[Ll]ight",
+   "present": true
+  },
+  {
+   "name": "the volume still renders",
+   "value": {
+    "region": [
+     -1,
+     -1,
+     1,
+     1
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Volume "Fog" (
+    prepend apiSchemas = ["VolumeLightAPI"]
+)
+{
+    rel field:density = </Fog/density>
+    float inputs:intensity = 1
+    float inputs:exposure = 2
+    double3 xformOp:scale = (3, 3, 3)
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+    def OpenVDBAsset "density"
+    {
+        asset filePath = @../../cornell/fog.vdb@
+        token fieldName = "density"
+    }
+}

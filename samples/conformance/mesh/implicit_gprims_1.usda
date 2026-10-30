@@ -1,0 +1,115 @@
+#usda 1.0
+(
+    doc = """Cylinder_1 and Capsule_1 have separate radiusTop and radiusBottom (axis Y here). Cylinder_1 at x = -2.5:
+height 4, radiusTop 0.2, radiusBottom 1.5, a truncated cone (narrow at the top). Capsule_1 at x = 2.5: height 2.5,
+radiusTop 0.3, radiusBottom 1.4, with spherical caps of those radii. Strips near the top of each body are much
+narrower than strips near the bottom (a plain Cylinder or Capsule would give equal widths)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeom gprims",
+ "feature": "Cylinder_1, Capsule_1 radiusTop, radiusBottom",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "Cylinder_1 renders",
+   "value": {
+    "region": [
+     -2.7,
+     -0.2,
+     -2.3,
+     0.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Cylinder_1 narrows to radiusTop",
+   "ratio": [
+    {
+     "region": [
+      -4.2,
+      1.6,
+      -0.8,
+      1.8
+     ],
+     "stat": "coverage"
+    },
+    {
+     "region": [
+      -4.2,
+      -1.8,
+      -0.8,
+      -1.6
+     ],
+     "stat": "coverage"
+    }
+   ],
+   "max": 0.5
+  },
+  {
+   "name": "Capsule_1 renders",
+   "value": {
+    "region": [
+     2.3,
+     -0.2,
+     2.7,
+     0.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "Capsule_1 narrows to radiusTop",
+   "ratio": [
+    {
+     "region": [
+      0.8,
+      0.9,
+      4.2,
+      1.1
+     ],
+     "stat": "coverage"
+    },
+    {
+     "region": [
+      0.8,
+      -1.1,
+      4.2,
+      -0.9
+     ],
+     "stat": "coverage"
+    }
+   ],
+   "max": 0.55
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Cylinder_1 "Cylinder"
+{
+    double height = 4
+    double radiusTop = 0.2
+    double radiusBottom = 1.5
+    uniform token axis = "Y"
+    double3 xformOp:translate = (-2.5, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Capsule_1 "Capsule"
+{
+    double height = 2.5
+    double radiusTop = 0.3
+    double radiusBottom = 1.4
+    uniform token axis = "Y"
+    double3 xformOp:translate = (2.5, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

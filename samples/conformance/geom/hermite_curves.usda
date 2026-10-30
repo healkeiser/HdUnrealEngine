@@ -1,0 +1,57 @@
+#usda 1.0
+(
+    doc = """HermiteCurves: cubic Hermite segments between points with tangents. One segment from (-4, -2) to (4, -2) with
+tangents (0, 12) and (0, -12): at its middle p = (p0 + p1) / 2 + (m0 - m1) / 8 = (0, 1), an arch; a linear stand-in
+would stay on y = -2. widths 0.3."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomHermiteCurves",
+ "feature": "HermiteCurves",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "curve arches through its middle",
+   "value": {
+    "region": [
+     -0.4,
+     0.8,
+     0.4,
+     1.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.3
+  },
+  {
+   "name": "curve is not the straight chord",
+   "value": {
+    "region": [
+     -0.5,
+     -2.2,
+     0.5,
+     -1.8
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def HermiteCurves "Curve"
+{
+    int[] curveVertexCounts = [2]
+    point3f[] points = [(-4, -2, 0), (4, -2, 0)]
+    vector3f[] tangents = [(0, 12, 0), (0, -12, 0)]
+    float[] widths = [0.3] (
+        interpolation = "constant"
+    )
+}

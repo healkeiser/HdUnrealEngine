@@ -1,0 +1,75 @@
+#usda 1.0
+(
+    doc = """ShadowAPI shadow:distance is the maximum distance shadows are cast, measured from the shaded point to the
+occluder (-1, the default, is no limit); shadow:falloff fades the shadow over that last stretch. With distance 0.5
+and falloff 0.25 a cube 2.5 units in front of the wall casts no shadow on it. hdUE does not implement it and must say
+so; the light still renders."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux ShadowAPI",
+ "feature": "shadow:distance, shadow:falloff (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names shadow:distance",
+   "log": "hdUE warning:.*shadow:distance",
+   "present": true
+  },
+  {
+   "name": "the light still renders",
+   "value": {
+    "region": [
+     2.5,
+     -1,
+     4,
+     1
+    ],
+    "stat": "luma"
+   },
+   "min": 0.01
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def Cube "Occluder"
+{
+    double size = 1
+    double3 xformOp:translate = (0, 0, 0.5)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def SphereLight "L" (
+    prepend apiSchemas = ["ShadowAPI"]
+)
+{
+    float inputs:radius = 0.1
+    float inputs:exposure = 7
+    float inputs:shadow:distance = 0.5
+    float inputs:shadow:falloff = 0.25
+    double3 xformOp:translate = (0, 0, 4)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

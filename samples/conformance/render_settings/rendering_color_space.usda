@@ -1,0 +1,51 @@
+#usda 1.0
+(
+    doc = """renderingColorSpace is the renderer's working (linear) colour space, in which all renderer and shader maths
+happens; unauthored, the renderer uses its own default. lin_ap1_scene (ACEScg) is requested here. hdUE renders in
+linear Rec.709 and must say it ignores the request; the scene still renders."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "renderingColorSpace (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names renderingColorSpace",
+   "log": "hdUE warning:.*renderingColorSpace",
+   "present": true
+  },
+  {
+   "name": "the scene still renders",
+   "value": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform token renderingColorSpace = "lin_ap1_scene"
+    }
+}
+def Cube "Box"
+{
+    double size = 1.5
+}

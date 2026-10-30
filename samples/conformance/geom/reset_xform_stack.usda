@@ -1,0 +1,78 @@
+#usda 1.0
+(
+    doc = """"!resetXformStack!" as the first entry of xformOpOrder makes a prim ignore its ancestors' transforms. A parent
+Xform translated to x = 3 holds two cubes translated by -3: the plain one lands at x = 0, the one that resets the
+stack at x = -3."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomXformable",
+ "feature": "!resetXformStack!",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "plain child composes with its parent",
+   "value": {
+    "region": [
+     -0.3,
+     1.2,
+     0.3,
+     1.8
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "reset child ignores its parent",
+   "value": {
+    "region": [
+     -3.3,
+     -1.8,
+     -2.7,
+     -1.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "reset child is not at the composed place",
+   "value": {
+    "region": [
+     -0.3,
+     -1.8,
+     0.3,
+     -1.2
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Xform "Parent"
+{
+    double3 xformOp:translate = (3, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Cube "Plain"
+    {
+        double size = 1.2
+    double3 xformOp:translate = (-3, 1.5, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def Cube "Reset"
+    {
+        double size = 1.2
+        double3 xformOp:translate = (-3, -1.5, 0)
+        uniform token[] xformOpOrder = ["!resetXformStack!", "xformOp:translate"]
+    }
+}

@@ -1,0 +1,85 @@
+#usda 1.0
+(
+    doc = """creaseIndices / creaseLengths / creaseSharpnesses: a crease with sharpness 10 or more is infinitely sharp
+(OpenSubdiv's SHARPNESS_INFINITE), so a catmullClark cube cage whose 12 edges are all creased keeps its edges and
+corners: its limit surface is the cage. Two cube cages: x = -2.5 plain catmullClark (a rounded blob), x = 2.5 with
+two 5-vertex loops (front and back faces) and four 2-vertex side edges creased at 10, one sharpness per crease."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "creaseIndices, creaseLengths, creaseSharpnesses",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "plain catmullClark rounds the corner",
+   "value": {
+    "region": [
+     -3.52,
+     0.88,
+     -3.38,
+     1.02
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "creased cube keeps its corner",
+   "value": {
+    "region": [
+     1.48,
+     0.88,
+     1.62,
+     1.02
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "creased cube keeps its top edge",
+   "value": {
+    "region": [
+     2.2,
+     0.95,
+     2.8,
+     1.05
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Smooth"
+{
+    int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+    int[] faceVertexIndices = [0, 1, 2, 3, 5, 4, 7, 6, 4, 0, 3, 7, 1, 5, 6, 2, 3, 2, 6, 7, 4, 5, 1, 0]
+    point3f[] points = [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1), (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+    double3 xformOp:translate = (-2.5, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Mesh "Creased"
+{
+    int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+    int[] faceVertexIndices = [0, 1, 2, 3, 5, 4, 7, 6, 4, 0, 3, 7, 1, 5, 6, 2, 3, 2, 6, 7, 4, 5, 1, 0]
+    point3f[] points = [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1), (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+    int[] creaseIndices = [0, 1, 2, 3, 0, 4, 5, 6, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]
+    int[] creaseLengths = [5, 5, 2, 2, 2, 2]
+    float[] creaseSharpnesses = [10, 10, 10, 10, 10, 10]
+    double3 xformOp:translate = (2.5, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

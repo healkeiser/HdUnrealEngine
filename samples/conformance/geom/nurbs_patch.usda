@@ -1,0 +1,76 @@
+#usda 1.0
+(
+    doc = """NurbsPatch: a clamped (open-uniform) bicubic patch, 4 x 4 control points, uOrder = vOrder = 4, knots
+[0, 0, 0, 0, 1, 1, 1, 1]: a Bezier patch, which interpolates its corner control points and stays inside the hull. Its
+top boundary is the Bezier curve of the top row, (-3, 1.5), (-1, 4.5), (1, 4.5), (3, 1.5), whose highest point is
+y = 3.75 at x = 0; the control hull reaches y = 4.5. The surface must cover y = 3.3..3.6 at x = 0 and leave
+y = 4.0..4.4 empty."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomNurbsPatch",
+ "feature": "NurbsPatch surface (not its control hull)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "patch renders",
+   "value": {
+    "region": [
+     -0.5,
+     -1,
+     0.5,
+     0
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "surface reaches its Bezier top",
+   "value": {
+    "region": [
+     -0.2,
+     3.3,
+     0.2,
+     3.55
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "surface stays below the control hull",
+   "value": {
+    "region": [
+     -0.3,
+     4.0,
+     0.3,
+     4.4
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def NurbsPatch "Patch"
+{
+    int uVertexCount = 4
+    int vVertexCount = 4
+    int uOrder = 4
+    int vOrder = 4
+    double[] uKnots = [0, 0, 0, 0, 1, 1, 1, 1]
+    double[] vKnots = [0, 0, 0, 0, 1, 1, 1, 1]
+    double2 uRange = (0, 1)
+    double2 vRange = (0, 1)
+    point3f[] points = [(-3, -3.5, 0), (-1, -3.5, 0), (1, -3.5, 0), (3, -3.5, 0), (-3, -1.2, 0), (-1, -1.2, 0), (1, -1.2, 0), (3, -1.2, 0), (-3, 1, 0), (-1, 1, 0), (1, 1, 0), (3, 1, 0), (-3, 1.5, 0), (-1, 4.5, 0), (1, 4.5, 0), (3, 1.5, 0)]
+    uniform bool doubleSided = 1
+}

@@ -1,0 +1,52 @@
+#usda 1.0
+(
+    doc = """PluginLight names an external light shader through NodeDefAPI (info:id); a renderer without that shader cannot
+draw it. hdUE must say it renders nothing; the other lights still work."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "PluginLight (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names the plugin light",
+   "log": "pluginLight is not supported",
+   "present": true
+  },
+  {
+   "name": "the key light still lights the wall",
+   "value": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ],
+    "stat": "luma"
+   },
+   "min": 0.01
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "Wall"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def PluginLight "Plugin"
+{
+    uniform token info:id = "NoSuchLightShader"
+}

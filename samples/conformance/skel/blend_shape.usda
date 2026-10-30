@@ -1,0 +1,149 @@
+#usda 1.0
+(
+    doc = """BlendShape: offsets added to the points times the animation's blendShapeWeights; an inbetween shape
+(inbetweens:<name>, with its weight) is matched exactly at that weight. A: shape "shift" offsets every point by
+(4, 0, 0) at weight 1, so the quad at (-3, -2.5) renders at (1, -2.5). B: shape "lift" (offsets (4, 0, 0)) has an
+inbetween at weight 0.5 offsetting (0, 2.5, 0), and the weight is 0.5: the quad at (-3, 1.5) renders at (-3, 4)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdSkelBlendShape",
+ "feature": "BlendShape offsets, inbetweens",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "A leaves its rest place",
+   "value": {
+    "region": [
+     -3.3,
+     -2.8,
+     -2.7,
+     -2.2
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "A is shifted by its blend shape",
+   "value": {
+    "region": [
+     0.7,
+     -2.8,
+     1.3,
+     -2.2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "B is at its inbetween shape",
+   "value": {
+    "region": [
+     -3.3,
+     3.7,
+     -2.7,
+     4.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "B leaves its rest place",
+   "value": {
+    "region": [
+     -3.3,
+     1.2,
+     -2.7,
+     1.8
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def SkelRoot "Rig"
+{
+    def Skeleton "Skel" (
+        prepend apiSchemas = ["SkelBindingAPI"]
+    )
+    {
+        uniform token[] joints = ["root"]
+        uniform matrix4d[] bindTransforms = [((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))]
+        uniform matrix4d[] restTransforms = [((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))]
+        rel skel:animationSource = </Rig/Skel/Anim>
+        def SkelAnimation "Anim"
+        {
+            uniform token[] joints = ["root"]
+            float3[] translations = [(0, 0, 0)]
+            quatf[] rotations = [(1, 0, 0, 0)]
+            half3[] scales = [(1, 1, 1)]
+            uniform token[] blendShapes = ["shift", "lift"]
+            float[] blendShapeWeights = [1, 0.5]
+        }
+    }
+def Mesh "A" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-3.75, -3.25, 0), (-2.25, -3.25, 0), (-2.25, -1.75, 0), (-3.75, -1.75, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    int[] primvars:skel:jointIndices = [0, 0, 0, 0] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    float[] primvars:skel:jointWeights = [1, 1, 1, 1] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    rel skel:skeleton = </Rig/Skel>
+    uniform token[] skel:blendShapes = ["shift"]
+    rel skel:blendShapeTargets = [</Rig/A/shift>]
+    def BlendShape "shift"
+    {
+        uniform vector3f[] offsets = [(4, 0, 0), (4, 0, 0), (4, 0, 0), (4, 0, 0)]
+    }
+}
+def Mesh "B" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-3.75, 0.75, 0), (-2.25, 0.75, 0), (-2.25, 2.25, 0), (-3.75, 2.25, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    int[] primvars:skel:jointIndices = [0, 0, 0, 0] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    float[] primvars:skel:jointWeights = [1, 1, 1, 1] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    rel skel:skeleton = </Rig/Skel>
+    uniform token[] skel:blendShapes = ["lift"]
+    rel skel:blendShapeTargets = [</Rig/B/lift>]
+    def BlendShape "lift"
+    {
+        uniform vector3f[] offsets = [(4, 0, 0), (4, 0, 0), (4, 0, 0), (4, 0, 0)]
+        uniform vector3f[] inbetweens:half = [(0, 2.5, 0), (0, 2.5, 0), (0, 2.5, 0), (0, 2.5, 0)] (
+            weight = 0.5
+        )
+    }
+}
+}

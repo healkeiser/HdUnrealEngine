@@ -1,0 +1,100 @@
+#usda 1.0
+(
+    doc = """UsdSkel linear blend skinning: a Skeleton with joints root and root/tip (tip bound at y = 2) whose SkelAnimation
+moves tip to (3, 2) relative to root; a mesh under the SkelRoot binds its lower quad (y = -4..-1) to root and its upper
+quad (y = 1..4) to tip with weight 1. Skinned, the upper quad moves 3 units along +X; the lower one stays."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdSkel",
+ "feature": "SkelRoot, Skeleton, SkelAnimation skinning",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "root-bound quad stays",
+   "value": {
+    "region": [
+     -0.5,
+     -3,
+     0.5,
+     -2
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "tip-bound quad leaves its rest place",
+   "value": {
+    "region": [
+     -0.5,
+     2,
+     0.5,
+     3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "tip-bound quad follows the joint",
+   "value": {
+    "region": [
+     2.5,
+     2,
+     3.5,
+     3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def SkelRoot "Rig"
+{
+    def Skeleton "Skel" (
+        prepend apiSchemas = ["SkelBindingAPI"]
+    )
+    {
+        uniform token[] joints = ["root", "root/tip"]
+        uniform matrix4d[] bindTransforms = [((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)), ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 2, 0, 1))]
+        uniform matrix4d[] restTransforms = [((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)), ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 2, 0, 1))]
+        rel skel:animationSource = </Rig/Skel/Anim>
+        def SkelAnimation "Anim"
+        {
+            uniform token[] joints = ["root", "root/tip"]
+            float3[] translations = [(0, 0, 0), (3, 2, 0)]
+            quatf[] rotations = [(1, 0, 0, 0), (1, 0, 0, 0)]
+            half3[] scales = [(1, 1, 1), (1, 1, 1)]
+        }
+    }
+def Mesh "Bar" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4, 4]
+    int[] faceVertexIndices = [0, 1, 2, 3, 4, 5, 6, 7]
+    point3f[] points = [(-1, -4, 0), (1, -4, 0), (1, -1, 0), (-1, -1, 0), (-1, 1, 0), (1, 1, 0), (1, 4, 0), (-1, 4, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    int[] primvars:skel:jointIndices = [0, 0, 0, 0, 1, 1, 1, 1] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    float[] primvars:skel:jointWeights = [1, 1, 1, 1, 1, 1, 1, 1] (
+        elementSize = 1
+        interpolation = "vertex"
+    )
+    matrix4d primvars:skel:geomBindTransform = ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))
+    rel skel:skeleton = </Rig/Skel>
+}
+}

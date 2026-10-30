@@ -1,0 +1,52 @@
+#usda 1.0
+(
+    doc = """CoordSysAPI binds a named coordinate system (coordSys:<name>:binding) to a prim and its descendants, for
+shaders that project in that space. No Preview Surface or Standard Surface input uses it, so the scene must render as
+if it were absent: the quad renders with its displayColor."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdShadeCoordSysAPI",
+ "feature": "coordSys:<name>:binding (no visible effect)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "the bound mesh renders",
+   "value": {
+    "region": [
+     -1.5,
+     -1.5,
+     1.5,
+     1.5
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Xform "Projector"
+{
+    double3 xformOp:translate = (0, 0, 3)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Mesh "Quad" (
+    prepend apiSchemas = ["CoordSysAPI:proj"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-2, -2, 0), (2, -2, 0), (2, 2, 0), (-2, 2, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    rel coordSys:proj:binding = </Projector>
+    color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}

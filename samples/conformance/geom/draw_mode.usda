@@ -1,0 +1,120 @@
+#usda 1.0
+(
+    doc = """GeomModelAPI model:drawMode replaces a model's subtree (kind component applies it without model:applyDrawMode)
+with proxy geometry: "bounds" draws the model's bounding box as lines, so the sphere's middle is empty; "cards" with
+model:cardGeometry "box" draws textured quads on the faces of the extents: only axes with a texture are drawn, and
+model:cardTextureZPos (green) faces the camera on the box's +Z face. Left: no draw mode (the sphere); middle: bounds;
+right: cards."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomModelAPI",
+ "feature": "model:drawMode bounds, cards (model:cardGeometry, model:cardTexture*)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "default draws the model",
+   "value": {
+    "region": [
+     -3.7,
+     -0.4,
+     -2.9,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "bounds replaces the model by lines",
+   "value": {
+    "region": [
+     -0.4,
+     -0.4,
+     0.4,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "cards draws the +Z card",
+   "value": {
+    "region": [
+     2.9,
+     -0.4,
+     3.7,
+     0.4
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "the +Z card shows cardTextureZPos",
+   "color": {
+    "region": [
+     2.9,
+     -0.4,
+     3.7,
+     0.4
+    ]
+   },
+   "rgb": [
+    0,
+    1,
+    0
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Xform "Default" (
+    kind = "component"
+    prepend apiSchemas = ["GeomModelAPI"]
+)
+{
+    double3 xformOp:translate = (-3.3, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Sphere "Ball"
+    {
+        double radius = 1.2
+    }
+}
+def Xform "Bounds" (
+    kind = "component"
+    prepend apiSchemas = ["GeomModelAPI"]
+)
+{
+    uniform token model:drawMode = "bounds"
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Sphere "Ball"
+    {
+        double radius = 1.2
+    }
+}
+def Xform "Cards" (
+    kind = "component"
+    prepend apiSchemas = ["GeomModelAPI"]
+)
+{
+    uniform token model:drawMode = "cards"
+    uniform token model:cardGeometry = "box"
+    asset model:cardTextureZPos = @../textures/green.png@
+    double3 xformOp:translate = (3.3, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Sphere "Ball"
+    {
+        double radius = 1.2
+    }
+}
