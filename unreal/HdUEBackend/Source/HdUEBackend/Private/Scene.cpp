@@ -33,6 +33,7 @@
 #include "Hash/CityHash.h"
 #include "NaniteBuilder.h"
 #include "Rendering/NaniteResources.h"
+#include "RayTracingGeometryManagerInterface.h"
 #include "StaticMeshResources.h"
 #include "Tasks/Task.h"
 #include "mikktspace.h"
@@ -634,6 +635,20 @@ void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> Rend
     }
     if (Built->bSupportRayTracing && IsRayTracingAllowed()) Data.InitializeRayTracingRepresentationFromRenderingLODs();
     Built->InitResources();
+#if RHI_RAYTRACING
+    // A Nanite proxy leaves its ray-tracing fallback out while that BLAS waits for its build, which UE starts only
+    // when the next frame renders: Lumen's first frame then traced an empty scene, and its radiance caches kept that
+    // sky light through the warmup (a roofed room under a sky was 31% too bright after 4 frames, Sponza 4.5 times
+    // after 16). Build it before the proxy exists.
+    if (Nanite && Data.RayTracingProxy) {
+        ENQUEUE_RENDER_COMMAND(HdueBuildRayTracing)(
+            [Proxy = Data.RayTracingProxy](FRHICommandListImmediate& RHICmdList) {
+                TArray<const FRayTracingGeometry*> Geometries;
+                for (const FStaticMeshRayTracingProxyLOD& LOD : Proxy->LODs) Geometries.Add(LOD.RayTracingGeometry);
+                GRayTracingGeometryManager->ForceBuildIfPending(RHICmdList, Geometries);
+            });
+    }
+#endif
     Data.Bounds = Bounds;
     Built->CalculateExtendedBounds();
     Data.ScreenSize[0].Default = 1.f;
