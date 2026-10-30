@@ -78,6 +78,9 @@ def render(path, mode, frames, out, env, timeout):
         str(frames),
         "-V",
         "2",
+        # husk adds its own headlight when no light is visible (lux/invisible_light); the scenes test USD only.
+        "--headlight",
+        "none",
         # Tf warnings (TF_WARN) reach husk's output only in its end-of-render summary.
         "--error-summary",
         "force",
