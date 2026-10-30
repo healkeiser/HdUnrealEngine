@@ -289,6 +289,58 @@ TArray<FImage> MipChain(FImage&& Image) {
     }
     return Chain;
 }
+// UE's "scale mips for alpha coverage" (UTexture::bDoScaleMipsForAlphaCoverage, TextureCompressorModule.cpp
+// ComputeAlphaCoverage / ComputeAlphaScale / GenerateMip2x2): a mip's channel is the 2x2 average of the previous level
+// times the scale, found by binary search in [0, 4] (8 steps), that gives the level the top level's coverage (texels >=
+// Threshold). Levels stay unclamped floats down the chain, clamped only when stored, as in UE. Two changes, both ones
+// UE's ComputeAlphaScale comment names but keeps for stable cooks: the scale is searched on the level it scales (UE
+// measures the previous level, a level late: thin branches then lost more than plain mips), and the closest tested
+// scale wins (UE returns an untested midpoint: 2x2 and 1x1 levels went fully opaque). And a level is only ever scaled
+// up: with a clip below 0.5, averaging grows chunky cutouts (Sponza's cypress leaves: 6.4% of texels at the top, 9.5%
+// at 32x32), and thinning them back left Lumen's tree 12% less covered than the Path Tracer's, against 3% more
+// unscaled. Without it, thin cutouts (branches) average below the clip value and vanish with distance.
+void ScaleAlphaCoverage(TArray<FImage>& Chain, uint8 Read, float Threshold) {
+    static const uint8 Bytes[4] = {2, 1, 0, 3};  // byte of each RGBA channel in an FColor
+    const auto Coverage = [Threshold](const TArray<float>& Level, float Scale) {
+        int64 Covered = 0;
+        for (float Value : Level) Covered += Value * Scale >= Threshold;
+        return float(Covered) / float(Level.Num());
+    };
+    for (int32 Channel = 0; Channel < 4; ++Channel) {
+        if (!(Read & (1 << Channel))) continue;
+        TArray<float> Previous;
+        Previous.SetNumUninitialized(int64(Chain[0].SizeX) * Chain[0].SizeY);
+        for (int64 I = 0; I < Previous.Num(); ++I) Previous[I] = Chain[0].RawData[I * 4 + Bytes[Channel]] / 255.f;
+        const float Goal = Coverage(Previous, 1);
+        for (int32 Level = 1; Level < Chain.Num(); ++Level) {
+            const int32 SW = Chain[Level - 1].SizeX, SH = Chain[Level - 1].SizeY;
+            FImage& Mip = Chain[Level];
+            TArray<float> Next;
+            Next.SetNumUninitialized(int64(Mip.SizeX) * Mip.SizeY);
+            const auto Tap = [&](int32 X, int32 Y) {
+                return Previous[int64(FMath::Min(Y, SH - 1)) * SW + FMath::Min(X, SW - 1)];
+            };
+            for (int32 Y = 0; Y < Mip.SizeY; ++Y)
+                for (int32 X = 0; X < Mip.SizeX; ++X)
+                    Next[int64(Y) * Mip.SizeX + X] = (Tap(2 * X, 2 * Y) + Tap(2 * X + 1, 2 * Y) +
+                                                      Tap(2 * X, 2 * Y + 1) + Tap(2 * X + 1, 2 * Y + 1)) *
+                                                     .25f;
+            float Min = 0, Max = 4, Scale = 1, Best = 1, BestError = 2;
+            for (int32 Step = 0; Step < 8; ++Step) {
+                const float Computed = Coverage(Next, Scale), Error = FMath::Abs(Computed - Goal);
+                if (Error < BestError) BestError = Error, Best = Scale;
+                if (Error < KINDA_SMALL_NUMBER || (Step == 0 && Computed > Goal)) break;  // only ever thickens
+                (Computed < Goal ? Min : Max) = Scale;
+                Scale = (Min + Max) * .5f;
+            }
+            for (int64 I = 0; I < Next.Num(); ++I) {
+                Next[I] *= Best;
+                Mip.RawData[I * 4 + Bytes[Channel]] = uint8(FMath::Clamp(FMath::RoundToInt(Next[I] * 255.f), 0, 255));
+            }
+            Previous = MoveTemp(Next);
+        }
+    }
+}
 // Block compression by ispc_texcomp.dll, delay-loaded from the engine's third-party binaries (staged with the runtime).
 // Without it, textures stay uncompressed.
 bool BlockCompression() {
@@ -351,7 +403,9 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
         Image.CopyTo(Converted, ERawImageFormat::BGRA8, Image.GammaSpace);
         Image = MoveTemp(Converted);
     }
-    const TArray<FImage> Chain = MipChain(MoveTemp(Image));
+    TArray<FImage> Chain = MipChain(MoveTemp(Image));
+    if (Texture.Coverage > 0.f && Chain[0].Format == ERawImageFormat::BGRA8)  // ponytail: float cutouts keep plain mips
+        ScaleAlphaCoverage(Chain, Texture.Read, Texture.Coverage);
     const bool Compress = Chain[0].Format == ERawImageFormat::BGRA8 && Chain[0].SizeX % 4 == 0 &&
                           Chain[0].SizeY % 4 == 0 && BlockCompression();
     auto Data = MakeUnique<FTexturePlatformData>();
@@ -386,9 +440,11 @@ FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Textur
                                                 TEXT("hdUE"), TEXT("TextureCache"));
     const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
     if (!Stat.bIsValid) return FString();
-    const FString Key = FString::Printf(TEXT("%s|%lld|%lld|%d|%d|%d|%d"), *FPaths::ConvertRelativePathToFull(File),
-                                        Stat.ModificationTime.GetTicks(), Stat.FileSize, SRGB, Texture.Read,
-                                        Texture.Vector, CacheVersion);
+    const FString Key =
+        FString::Printf(TEXT("%s|%lld|%lld|%d|%d|%d|%d"), *FPaths::ConvertRelativePathToFull(File),
+                        Stat.ModificationTime.GetTicks(), Stat.FileSize, SRGB, Texture.Read, Texture.Vector,
+                        CacheVersion) +
+        (Texture.Coverage > 0.f ? FString::Printf(TEXT("|coverage up %g"), Texture.Coverage) : FString());
     return Root / FString::Printf(TEXT("%016llx.bin"),
                                   CityHash64(reinterpret_cast<const char*>(*Key), Key.Len() * sizeof(TCHAR)));
 }
@@ -445,10 +501,24 @@ bool TextureSRGB(const HdueTextureDesc& Texture, int32 Slot) {
 TextureAddress TextureWrap(uint32 Wrap) {
     return Wrap == HDUE_WRAP_REPEAT ? TA_Wrap : Wrap == HDUE_WRAP_MIRROR ? TA_Mirror : TA_Clamp;
 }
-// One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture).
-FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot) {
-    return FString::Printf(TEXT("%s|%s|%d|%d"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
-                           int32(TextureWrap(Texture.wrap[0])), int32(TextureWrap(Texture.wrap[1])));
+// The texel value a masked material's opacity texture is clipped at, (clip - bias) / scale of the channel it reads, or
+// 0 for any other use. ponytail: inverted maps (scale <= 0) keep plain mips.
+float CoverageThreshold(const HdueMaterialDesc& Desc, int32 Slot) {
+    if (Slot != HDUE_TEXTURE_OPACITY || Desc.opacity_threshold <= 0.f) return 0;
+    const HdueTextureDesc& Texture = Desc.textures[Slot];
+    for (int32 Channel = 0; Channel < 4; ++Channel)
+        if (Texture.channel_mask[Channel] != 0.f) {
+            const float Scale = Texture.scale[Channel],
+                        Texel = Scale > 0.f ? (Desc.opacity_threshold - Texture.bias[Channel]) / Scale : 0.f;
+            return Texel > 0.f && Texel <= 1.f ? Texel : 0.f;
+        }
+    return 0;
+}
+// One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), and the clip value its
+// mips keep the coverage of: other uses of the file keep plain mips.
+FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot, float Coverage) {
+    return FString::Printf(TEXT("%s|%s|%d|%d|%g"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
+                           int32(TextureWrap(Texture.wrap[0])), int32(TextureWrap(Texture.wrap[1])), Coverage);
 }
 // Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
 bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
@@ -887,7 +957,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 const auto& Texture = Desc.textures[Slot];
                 if (!Texture.file || !*Texture.file) continue;
-                const FString File = UTF8_TO_TCHAR(Texture.file), Key = TextureKey(File, Texture, Slot);
+                const FString File = UTF8_TO_TCHAR(Texture.file),
+                              Key = TextureKey(File, Texture, Slot, CoverageThreshold(Desc, Slot));
                 const bool Vector = !ScalarSlot(Slot);
                 uint8 Read = 0;
                 for (int32 Channel = 0; Channel < 4; ++Channel)
@@ -897,6 +968,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Entry.Read |= Read;
                 Entry.Vector |= Vector;
                 Entry.SRGB = TextureSRGB(Texture, Slot);
+                Entry.Coverage = CoverageThreshold(Desc, Slot);
                 for (int32 Axis = 0; Axis < 2; ++Axis) Entry.Address[Axis] = uint8(TextureWrap(Texture.wrap[Axis]));
                 Files.FindOrAdd(File).AddUnique(Key);
             }
@@ -994,7 +1066,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const FPreviewTexture* Image = nullptr;
                     if (HasTexture(Slot)) {
                         FString TextureError;
-                        Image = PreviewTexture(TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot), TextureError);
+                        Image = PreviewTexture(
+                            TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot, CoverageThreshold(Desc, Slot)),
+                            TextureError);
                         if (!Image)
                             UE_LOG(LogTemp, Warning, TEXT("hdUE material %s: %s; %s stays untextured."),
                                    UTF8_TO_TCHAR(Desc.id), *TextureError, *Name);
