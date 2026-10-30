@@ -156,14 +156,14 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 
 | Area | What you get | Not yet |
 |------|--------------|---------|
-| **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP, an **Unreal Engine** tab on Render Settings and Light LOPs, selection highlight, installable package | Houdini versions other than 22.0 |
-| **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames, about 0.25 s per simple 1080p Lumen frame | |
-| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested), UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs) | True or adaptive displacement (Preview Surface displacement moves existing vertices along normals), adaptive subdivision, varying `displayOpacity` |
+| **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP; hdUE Render Settings, Standard Render Vars and Render Products LOPs (`hdue::hduerendersettings::1.0`, ...) under TAB > Rendering > hdUE, with Output Picture on top as on Karma's; an **Unreal Engine** tab on Render Settings, Render Geometry Settings and Light LOPs; an hdUE Substrate Material Builder TAB tool; progress and stats in the viewport and in husk (`-V`); selection highlight; installable package | Houdini versions other than 22.0 |
+| **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames (a moved mesh keeps its uploaded geometry), Nanite for meshes and instancer prototypes (millions of instances), a bundled PSO cache, about 0.25 s per simple 1080p Lumen frame | |
+| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested, `protoIndices`, masks, half and float orientations, per-instance primvars on bound materials, instanced volumes) and native instancing, UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs), two-sided by default as in Karma (`hdUE:cullBackface` honours `doubleSided`) | Adaptive subdivision and adaptive displacement, varying `displayOpacity`, shear in instances (warned) |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
-| **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); primvar readers; MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals) |
-| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI, `poleAxis`), UsdLux units, spot cones, IES profiles (`normalize`, `angleScale`), light and shadow linking (up to three linked collections, UE's lighting channels) | Portals, light filters, shadow colour |
-| **Camera** | Perspective, orthographic, lens shift, depth of field, exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`), render regions, husk tiles, overscan, pixel aspect ratio | Lens distortion, a finite far clip |
-| **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, albedo, normal, roughness, metallic, specular, occlusion, `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer (Houdini build) | LPE AOVs other than the beauty (written black, with a warning), cryptomatte, deep output |
+| **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); several UV sets per mesh; primvar readers; true displacement (Preview Surface and MaterialX, diced on the CPU so the Path Tracer sees it); MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals), vector displacement |
+| **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI, `poleAxis`), UsdLux units, spot cones, IES profiles (`normalize`, `angleScale`), light and shadow linking (up to three linked collections, UE's lighting channels), Virtual Shadow Maps | Portals, light filters, shadow colour (warned) |
+| **Camera** | Perspective, orthographic, lens shift, depth of field (`disableDepthOfField`), exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities` and `accelerations`), render regions, husk tiles, overscan, pixel aspect ratio, `includedPurposes`, material binding purposes | Lens distortion, a finite far clip, instance motion from time-sampled positions or `angularVelocities` |
+| **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, every UE buffer visualization as an AOV (albedo, normal, roughness, metallic, specular, occlusion, AO, subsurface colour, ...), lighting components under Karma's names (diffuse, glossy reflection, emission, volume; direct, indirect, combined), Cryptomatte (object and material, with manifest), `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer with its albedo and normal guides | Deep output, motion vectors |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 
 <!-- ARCHITECTURE -->
@@ -223,7 +223,7 @@ Requires Houdini 22.0 on Windows x64 and a DirectX 12 GPU with hardware ray trac
 > There is no public binary download. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. [Build the package from source](docs/building.md) with your own Unreal Engine access.
 
 1. Build `hdUE-<version>-houdini22.0.<build>-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/houdini.md#installing-on-another-machine)).
-2. Copy it somewhere writable: UE writes its shader cache and logs next to the runtime.
+2. Unzip it anywhere; the folder may be shared and read-only, since UE writes its shader cache and logs per user.
 3. Run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`.
 4. Restart Houdini.
 
@@ -246,6 +246,7 @@ Renderer settings live on any Render Settings LOP, on its **Unreal Engine** tab:
 | Render settings, geometry, cameras, motion blur, post-processing, lights, volumes | [docs/rendering.md](docs/rendering.md) |
 | MaterialX, Substrate, COP textures, cooked native assets | [docs/materials.md](docs/materials.md) |
 | Architecture and the C ABI | [docs/architecture.md](docs/architecture.md) |
+| USD conformance: what each schema attribute does in hdUE | [docs/conformance.md](docs/conformance.md) |
 | What was measured | [VERIFICATION.md](VERIFICATION.md) |
 
 <!-- ENVIRONMENT VARIABLES -->
@@ -259,6 +260,8 @@ The package file sets the first two; the rest are for development and debugging.
 | `HDUE_HOUDINI_ENABLE` | `1` lets hdUE's Python host start in Houdini's UI when a viewer selects hdUE |
 | `HDUE_BACKEND_DLL` | Backend DLL, overriding the runtime profile |
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |
+| `HDUE_NANITE` | `0` builds regular static meshes instead of Nanite |
+| `HDUE_USER_DIR` | Where UE writes its logs and shader cache (set by the package) |
 | `HDUE_GPU_FRAMES` | `0` reads Houdini viewport frames back to the CPU instead of sharing GPU textures |
 | `HDUE_TRACE_PASS` | `1` prints one line per render pass to stderr |
 | `HDUE_TRACE_SETTINGS` | `1` prints every render setting the delegate receives |
@@ -270,16 +273,18 @@ The package file sets the first two; the rest are for development and debugging.
 Building needs the Unreal Engine 5.8.4 source, Visual Studio 2022, OpenUSD 26.03 for the standalone delegate and Houdini 22.0 for Solaris; see [Building from source](docs/building.md).
 
 ```powershell
+.\scripts\Build-Host.ps1               # standalone delegate and hosts (OpenUSD)
+.\scripts\Prepare-Content.ps1          # UE content: parent materials, ID and volume materials
 .\scripts\Build-Backend.ps1            # UE backend DLL
 .\scripts\Stage-Runtime.ps1            # cooked runtime under out/runtime
 .\scripts\Build-Houdini.ps1            # Houdini delegate and its unit tests
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
-.\scripts\Verify.ps1 -WithUsdview      # native, Hydra and usdview regression
-.\scripts\Test-Houdini.ps1             # Solaris regression in a GUI Houdini
+.\scripts\Test.ps1 -Suite all          # unit, Hydra/usdview and Houdini suites
+hython scripts\run_conformance.py       # USD conformance set (docs/conformance.md)
 .\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly
 ```
 
-[CI](.github/workflows/ci.yml) builds the client library, runs the C ABI layout test, the repository scope tests, Python byte-compilation and a PowerShell parse check. GitHub's runners have no UE, Houdini or ray-tracing GPU, so the rendering suites above run locally.
+[CI](.github/workflows/ci.yml) builds the client library, runs the C ABI layout test, the unit suite (`Test.ps1 -Suite unit`: repository scope, Python tests, the gallery's brightness bands against Karma), the installer under Windows PowerShell 5.1, and the format and lint checks (Black, Ruff, clang-format, clang-tidy, PSScriptAnalyzer, actionlint). GitHub's runners have no UE, Houdini or ray-tracing GPU, so the rendering suites and the [conformance set](docs/conformance.md) run locally.
 
 <!-- CREDITS -->
 ## Credits
