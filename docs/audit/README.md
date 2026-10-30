@@ -49,11 +49,20 @@ Second round (larger features, `801456f` to `4679bb4`):
 - **Parity:** HOU-02 in part (render settings through Hydra, the options side channel removed, cooked libraries as `hdUE:materialxLibrary`/`hdUE:substrateLibrary`, husk warns about `op:` images and missing cooked libraries), HOU-15 (`houdini:interactive`), HOU-16, ALT-01, ALT-03, ALT-17.
 - **Lumen gap (LGT-02):** husk passed no stage units, so metre scenes reached UE at 1 cm per unit and Lumen built no surface-cache cards. Fixed, plus offline hit lighting: Cornell Lumen 0.66x -> 0.76x Karma (0.85x at 128 warmup frames).
 
+Third round (on `main`, `4a8d783` onward):
+
+- **Instancing**, checked against the USD, Hydra and Houdini docs: unit quaternions as `UsdGeomPointInstancer` normalizes them, nested velocities and accelerations, points and curves under instancers take their motion, per-instance primvars reach bound materials (nearest authoring instancer wins), instanced volumes, picking through instances. Nanite for instancer prototypes and in husk; its ray-tracing fallback is built before the proxy exists (Lumen traced an empty scene on its first frame and stayed over-lit). Shear in instances warns once (UE instances are FTransforms).
+- **Hydra:** HYD-07 (generic meshes uploaded in local space; transform-only edits keep their geometry), HYD-14 (`doubleSided`: single-sided meshes draw one-sided material twins).
+- **Materials:** MAT-07 (each texture reads its own UV set; C ABI 10), MAT-08 (displacement diced and applied on the CPU in the delegate, so the Path Tracer sees it).
+- **Unreal backend:** UE-11 (Virtual Shadow Maps on), UE-16 (8192-pixel limit stated, husk tiles for larger images), UE-17 (UE's game thread is the host's; the smoke test runs UE on a worker thread). UE-10 kept: the public VT API cannot report residency.
+- **Houdini:** HOU-09 (`hdue::<name>::1.0` render LOPs, old names aliased in `OPcustomize`), HOU-11 (Render Geometry Settings tab), HOU-17 (progress and stats annotations, husk verbose callback).
+- **Alternatives:** ALT-13 (one canonical setting key), ALT-15 (no boot readiness loop), ALT-18 (one `Backend::boot`), ALT-19 (one renderer id, `HdUEHoudiniRendererPlugin`), and husk exits with code 1 instead of hanging when UE fails to boot. Declined with reasons: ALT-06 (only Houdini's viewport has a GL Hgi), ALT-07 (no OpenVDB in standalone OpenUSD), ALT-09 (already the proposed design), ALT-14 (the per-key blocks differ), ALT-20 (stock usdview/usdrecord hang in UE at Python exit).
+
 Open:
 
-- **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook).
+- **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.
 - **Not feasible as specified:** MAT-05 (`transparent` opacity renders dark in UE's Path Tracer; Karma renders it like `presence`), HYD-15 far clip (UE's Path Tracer ignores a finite far plane), `hdue:asset` on Xform/Scope and cooked MaterialX/Substrate preparation in husk (host-only Python), ALT-04, ALT-12.
-- **Remaining:** SIM-01 (one API table), HYD-07 rest (local-space upload), HYD-14, MAT-07, MAT-08, UE-10/11/15/16/17, ALT-05..20, BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04, HOU-09, HOU-11, HOU-17.
+- **Remaining:** SIM-01 (one API table), ALT-05/08/12/16/17 (in progress), BLD-01 rest, BLD-02, BLD-03, TST-03 (image baselines), TST-04 (in progress), ALT-10/11 (wait for UE-01).
 - **Investigate:** with `PathTracingMaxBounces=1`, hdUE's Path Tracer renders the floor and box tops black where Karma's direct-only render lights them.
 
 ## Then
