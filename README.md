@@ -35,6 +35,7 @@
 - [About](#about)
 - [Gallery](#gallery)
 - [Features](#features)
+- [How It Works](#how-it-works)
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -165,6 +166,18 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 | **Camera** | Perspective, orthographic, lens shift, depth of field (`disableDepthOfField`), exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities` and `accelerations`), render regions, husk tiles, overscan, pixel aspect ratio, `includedPurposes`, material binding purposes | Lens distortion, a finite far clip, instance motion from time-sampled positions or `angularVelocities` |
 | **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, every UE buffer visualization as an AOV (albedo, normal, roughness, metallic, specular, occlusion, AO, subsurface colour, ...), lighting components under Karma's names (diffuse, glossy reflection, emission, volume; direct, indirect, combined), Cryptomatte (object and material, with manifest), `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer with its albedo and normal guides | Deep output, motion vectors |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
+
+<!-- HOW IT WORKS -->
+## How It Works
+
+Houdini describes a scene in USD and hands it to a renderer through Hydra, the same plug-in slot Karma and Storm use. hdUE is such a renderer, except that it does not draw anything itself: it passes the scene to Unreal Engine, which renders it, and hands the picture back.
+
+1. **Houdini sends the scene.** When you pick hdUE in the viewport, or render with husk, Houdini gives hdUE every mesh, light, material and camera, and later only what changed.
+2. **hdUE translates it.** Meshes become Unreal meshes (Nanite for large and instanced ones), USD lights become Unreal lights in the same physical units, and UsdPreviewSurface and MaterialX materials become Unreal materials. Where Unreal already has a way to do something, such as importing MaterialX or USD lights, hdUE does it the same way.
+3. **Unreal renders.** Unreal runs inside the Houdini (or husk) process, as a library, with no Unreal Editor and no window. It renders with Lumen for fast, real-time images or with its Path Tracer for reference quality.
+4. **hdUE hands the image back.** Houdini's viewport shows each frame as Unreal renders it, then draws its grid, guides and selection highlight over it; husk receives the finished image, with any AOVs (depth, normals, Cryptomatte, ...), and writes it to disk.
+
+Unreal starts once per Houdini or husk session, so a render does not pay that cost again for every frame, and editing the scene only resends what you changed.
 
 <!-- ARCHITECTURE -->
 ## Architecture
