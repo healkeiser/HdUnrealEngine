@@ -19,13 +19,17 @@
     "statsdatapaths": {
       "rendererStage": "rendererStage",
       "totalClockTime": "totalClockTime",
-      "percentDone": "percentDone"
+      "percentDone": "percentDone",
+      "renderProgressAnnotation": "renderProgressAnnotation",
+      "renderStatsAnnotation": "renderStatsAnnotation"
     },
     "viewstats": [
       "nativeActors",
       "nativeMeshes",
       "completedSamples"
     ],
+    "husk.verbose_callback": "hdue_stats.py",
+    "husk.verbose_interval": 1,
     "husk.stats_metadata": "",
     "husk.metadata": {
       "float OpenEXR:frame": "$frame",
