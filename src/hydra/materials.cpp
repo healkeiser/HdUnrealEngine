@@ -208,8 +208,21 @@ private:
             const auto& asset = file.UncheckedGet<SdfAssetPath>();
             t.file = asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
             if (t.file.empty()) return;
-            source.image = &node;
             const bool usd = type == "UsdUVTexture";
+            const auto& output = link.upstreamOutputName.GetString();
+            // A file the resolver cannot find is unreadable: UsdUVTexture then yields its fallback (UDIM patterns and
+            // host images resolve later).
+            if (usd && asset.GetResolvedPath().empty() && !HdUEHostTexture(t.file) &&
+                t.file.find("<UDIM>") == std::string::npos) {
+                const auto fallback = value(param(node, "fallback"), GfVec4f(0, 0, 0, 1));
+                const auto channel = output.size() == 1 ? std::string("rgba").find(output[0]) : std::string::npos;
+                source.constant = channel != std::string::npos
+                                      ? VtValue(fallback[channel])
+                                      : VtValue(GfVec3f(fallback[0], fallback[1], fallback[2]));
+                t.file.clear();
+                return;
+            }
+            source.image = &node;
             // UsdUVTexture's sourceColorSpace (raw, sRGB, auto), else the file's colorSpace metadata, which Hydra
             // passes as colorSpace:file, as it does MaterialX's colorspace attribute (srgb_texture, lin_rec709,
             // acescg, ...). It selects sRGB decoding of 8-bit texels (auto: by slot) and, for colour inputs, the OCIO
@@ -239,7 +252,6 @@ private:
             if (usd) {
                 affine(value(param(node, "scale"), GfVec4f(1)), value(param(node, "bias"), GfVec4f(0)));
                 // A single-channel output (r, g, b, a) selects that channel; rgb keeps all.
-                const auto& output = link.upstreamOutputName.GetString();
                 if (output.size() == 1 && std::string("rgba").find(output[0]) != std::string::npos)
                     source.channel = int(std::string("rgba").find(output[0]));
             }
