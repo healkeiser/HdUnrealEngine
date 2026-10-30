@@ -734,6 +734,18 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         const auto& vertices = diced ? diced->points : points;
         const auto& vertexNormals = diced ? diced->normals : data.normals;
         const size_t count = vertices.size();
+        // Nothing to draw (and UE's Nanite builder asserts on it): every triangle degenerate, as a draw-mode stand-in
+        // of a model without extentsHint.
+        bool area = false;
+        for (size_t t = 0; !area && t + 2 < data.indices.size(); t += 3)
+            if (std::max({data.indices[t], data.indices[t + 1], data.indices[t + 2]}) < count)
+                area = GfCross(vertices[data.indices[t + 1]] - vertices[data.indices[t]],
+                               vertices[data.indices[t + 2]] - vertices[data.indices[t]])
+                           .GetLengthSq() > 0;
+        if (!area) {
+            packet.removed.push_back(packet.own(id));
+            continue;
+        }
         // UV sets one after another (HdueMeshDesc uv_set_count).
         std::vector<const std::vector<GfVec2f>*> sets;
         if (diced)
