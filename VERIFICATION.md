@@ -4,7 +4,7 @@ This document covers repository-owned code and synthetic fixtures. Local configu
 
 ## Environments and evidence
 
-Validation targets Windows x64, UE 5.8.4, DirectX 12 hardware ray tracing, OpenUSD 26.03 for standalone/usdview, and Houdini 22.0 with bundled USD 26.05/Python 3.13 (tested on 22.0.368; upstream verified 22.0.466). The delegate builds are ABI-isolated. All Python execution uses `uv`.
+Validation targets Windows x64, UE 5.8.4, DirectX 12 hardware ray tracing, OpenUSD 26.03 for standalone/usdview, and Houdini 22.0 with bundled USD 26.05/Python 3.13 (built and tested on 22.0.368; see [Supported Houdini builds](docs/building.md#supported-houdini-builds)). The delegate builds are ABI-isolated. All Python execution uses `uv`.
 
 Each rendering run must create fresh images, metrics, logs, and `verified.json` in an ignored output directory. Exit code zero is insufficient. One UE initialization per process and final STOPPED state are required.
 

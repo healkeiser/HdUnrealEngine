@@ -222,7 +222,7 @@ Requires Houdini 22.0 on Windows x64 and a DirectX 12 GPU with hardware ray trac
 > [!NOTE]
 > There is no public binary download. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. [Build the package from source](docs/building.md) with your own Unreal Engine access.
 
-1. Build `hdUE-<version>-houdini22.0-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/houdini.md#installing-on-another-machine)).
+1. Build `hdUE-<version>-houdini22.0.<build>-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/houdini.md#installing-on-another-machine)).
 2. Copy it somewhere writable: UE writes its shader cache and logs next to the runtime.
 3. Run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`.
 4. Restart Houdini.

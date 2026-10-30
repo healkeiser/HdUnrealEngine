@@ -5,6 +5,17 @@ file(STRINGS "${HDUE_HOUDINI_ROOT}/toolkit/include/pxr/pxr.h" _pxr_version REGEX
 if(NOT _pxr_version MATCHES "2605$")
     message(FATAL_ERROR "Houdini 22.0 is expected to provide its USD 26.05 ABI")
 endif()
+# The HDK has no ABI promise between daily builds (HDK_API_VERSION is the build number): the build is stamped into
+# the DLL's version resource and the package, and plugin.cpp warns when another build loads the delegate.
+file(STRINGS "${HDUE_HOUDINI_ROOT}/toolkit/include/SYS/SYS_Version.h" HDUE_HOUDINI_BUILD REGEX "^#define SYS_VERSION_FULL ")
+string(REGEX REPLACE "[^\"]*\"([^\"]*)\".*" "\\1" HDUE_HOUDINI_BUILD "${HDUE_HOUDINI_BUILD}")
+execute_process(COMMAND git describe --tags --always --dirty WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    OUTPUT_VARIABLE HDUE_GIT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT HDUE_GIT_VERSION)
+    set(HDUE_GIT_VERSION "${PROJECT_VERSION}")
+endif()
+message(STATUS "hdUE ${HDUE_GIT_VERSION} for Houdini ${HDUE_HOUDINI_BUILD}")
+configure_file(resources/version.rc.in "${CMAKE_BINARY_DIR}/version.rc" @ONLY)
 add_library(hdue_hdk INTERFACE)
 target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_glf.lib"
@@ -17,15 +28,18 @@ target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty
 target_compile_definitions(hdue_hdk INTERFACE HDUE_HOUDINI=1
     _SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
 add_library(hdUE SHARED src/houdini/diagnostics.cpp src/houdini/volume_fields.cpp src/hydra/delegate.cpp src/hydra/color_management.cpp src/hydra/materials.cpp src/hydra/prims.cpp
-    src/hydra/render_buffer.cpp src/hydra/plugin.cpp src/hydra/picking.cpp src/hydra/implicit_surfaces.cpp src/hydra/gpu_frames.cpp)
+    src/hydra/render_buffer.cpp src/hydra/plugin.cpp src/hydra/picking.cpp src/hydra/implicit_surfaces.cpp src/hydra/gpu_frames.cpp
+    "${CMAKE_BINARY_DIR}/version.rc")
 set_target_properties(hdUE PROPERTIES OUTPUT_NAME hdUE_Houdini22)
 target_compile_definitions(hdUE PRIVATE HDUE_HYDRA_EXPORTS)
 target_include_directories(hdUE PUBLIC src/hydra)
 # gpu_frames.cpp: HgiGL textures and the GL interop entry points HgiGL loaded through garch.
-target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk opengl32
+target_link_libraries(hdUE PRIVATE hdue_client hdue_hdk opengl32 version
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hgi.lib" "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_garch.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_hio.lib")
-target_compile_options(hdUE PRIVATE /W3 /utf-8 /bigobj)
+target_compile_options(hdUE PRIVATE /W3 /utf-8 /bigobj /Zi)
+# A Release PDB, archived per release (Package-Houdini.ps1 -Zip) so crash dumps from users can be symbolised.
+target_link_options(hdUE PRIVATE /DEBUG /OPT:REF /OPT:ICF)
 set(HDUE_PLUGIN_NAME hdUEHoudini22)
 set(HDUE_PLUGIN_LIBRARY "Release/hdUE_Houdini22.dll")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/resources")
