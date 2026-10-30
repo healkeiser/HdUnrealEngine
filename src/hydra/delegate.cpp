@@ -2273,8 +2273,12 @@ public:
                     request.time_seconds = s.setting<double>("timeSeconds", 0);
                     const auto camera = view.GetInverse();
                     const auto eye = s.convert(camera.ExtractTranslation());
-                    const auto target = s.convert(camera.Transform(GfVec3d(0, 0, -1)));
-                    const auto up = s.convert(camera.TransformDir(GfVec3d(0, 1, 0)), true);
+                    // Directions only, normalized: a camera under a scaled (e.g. 0.01) or sheared transform gave a
+                    // target and up so short or skewed that the backend rejected the camera as degenerate.
+                    const auto forward = s.convert(camera.TransformDir(GfVec3d(0, 0, -1)), true).GetNormalized();
+                    auto up = s.convert(camera.TransformDir(GfVec3d(0, 1, 0)), true);
+                    up = (up - forward * GfDot(up, forward)).GetNormalized();
+                    const auto target = eye + forward * 100;  // 1 m ahead
                     for (int c = 0; c < 3; ++c) {
                         request.eye[c] = eye[c];
                         request.target[c] = target[c];

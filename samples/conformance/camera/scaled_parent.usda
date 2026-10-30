@@ -1,0 +1,74 @@
+#usda 1.0
+(
+    doc = """A camera's world transform composes its ancestors', scale included (UsdGeomXformable). The rig scales by
+1e-5 and the camera's own translate (0, 0, 1e6) puts it at the shared camera's place, (0, 0, 10), looking down -Z: the
+cube at the origin fills the centre as with an unscaled camera. A renderer that kept the scaled view and up vectors
+saw a camera with no view direction."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomCamera",
+ "feature": "camera under a scaled transform",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "cube in the centre",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "background around it",
+   "value": {
+    "region": [
+     3.5,
+     3.5,
+     4.5,
+     4.5
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Xform "Rig"
+{
+    double3 xformOp:scale = (1e-05, 1e-05, 1e-05)
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+    def Camera "Camera"
+    {
+        float focalLength = 40
+        float horizontalAperture = 40
+        float verticalAperture = 40
+        float2 clippingRange = (0.1, 1000)
+        double3 xformOp:translate = (0, 0, 1000000)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+over "Render"
+{
+    over "Settings"
+    {
+        rel camera = </Rig/Camera>
+    }
+}
+def Cube "Box"
+{
+    double size = 2
+}
