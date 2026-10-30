@@ -377,7 +377,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
     try {
         ready.get();
     } catch (...) {
-        host.worker.join();
+        host.stop();  // the thread keeps serving its queue after a failed boot: join alone waited forever
         throw;
     }
 }
