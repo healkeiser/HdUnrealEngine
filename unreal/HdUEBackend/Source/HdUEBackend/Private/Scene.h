@@ -65,7 +65,7 @@ public:
         uint8 Address[2] = {};  // TextureAddress for u and v (wrapS, wrapT): sampler state, part of the key
         TUniquePtr<FTexturePlatformData> Pending;  // built on workers by Apply; PreviewTexture gives it to Texture
     };
-    explicit FHdueScene(UWorld* InWorld);
+    FHdueScene(UWorld* InWorld, bool InInteractive);
     ~FHdueScene();
     bool Apply(const HdueSceneBatch& Batch, FString& Error);
     void TickConversions();
@@ -90,6 +90,9 @@ public:
 
 private:
     UWorld* World;
+    // HDUE_INIT_INTERACTIVE (Houdini's viewport): meshes show without Lumen cards and Nanite first, and
+    // TickConversions swaps in versions built in the background. Offline hosts (husk) build both before the frame.
+    bool Interactive;
     TMap<FString, AActor*> Actors;
     TMap<FString, FVector> CameraLightDirections;
     TMap<FString, FString> MeshMaterials;

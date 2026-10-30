@@ -38,8 +38,8 @@
 #include "Tasks/Task.h"
 #include "mikktspace.h"
 
-FHdueScene::FHdueScene(UWorld* InWorld)
-    : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld) {}
+FHdueScene::FHdueScene(UWorld* InWorld, bool InInteractive)
+    : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld), Interactive(InInteractive) {}
 FHdueScene::~FHdueScene() {
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
@@ -543,10 +543,6 @@ void FHdueScene::BindMaterials() {
     }
 }
 namespace {
-bool Interactive_() {
-    static const bool Value = FParse::Param(FCommandLine::Get(), TEXT("hdUEInteractive"));
-    return Value;
-}
 // One Hydra vertex for static and Nanite meshes (any thread). Hydra meshes carry no tangents: the frame around the
 // normal is arbitrary until HydraTangents derives it from the UVs. Colours stay linear in 8 bits, as dynamic meshes
 // store them.
@@ -1100,9 +1096,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // ray-tracing instances every frame, and building its scene proxies held the first frame of a large scene on the
     // game thread (3.8 s for Sponza's 454 meshes), and UE's dynamic meshes get Lumen cards from their bounds only,
     // which left Lumen's bounces inside concave meshes black. Wet surface effects edit their meshes and keep them
-    // dynamic. Offline hosts (husk) build Lumen cards here, for their first frame; interactive hosts (Houdini's
-    // viewport) show meshes without cards first and swap in versions with cards built in the background by
-    // TickConversions.
+    // dynamic. Card and Nanite timing follow Interactive (see Scene.h).
     const auto StaticGenerated = [&](const HdueMeshDesc& Desc) {
         return !(Desc.native_asset && *Desc.native_asset) &&
                (Desc.instance_transforms || !(Desc.flags & HDUE_MESH_EDITABLE));
@@ -1128,8 +1122,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const auto& Desc = Batch.meshes[Index];
             if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
             if (StaticGenerated(Desc)) {
-                StaticData[Index] = BuildStatic(Desc, !Interactive_());
-                if (NaniteMeshes && !Interactive_()) StaticData[Index].Nanite = BuildNanite(Desc);
+                StaticData[Index] = BuildStatic(Desc, !Interactive);
+                if (NaniteMeshes && !Interactive) StaticData[Index].Nanite = BuildNanite(Desc);
             } else
                 BuiltMeshes[Index] = BuildDynamicMesh(Desc);
         },
@@ -1203,7 +1197,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     InstanceMesh = Built;
                 else
                     Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-                if (Interactive_()) {
+                if (Interactive) {
                     // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s).

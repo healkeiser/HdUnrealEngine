@@ -1588,6 +1588,11 @@ public:
         // keep ticking for a while so a realtime frame takes its GPU time rather than husk's polling interval.
         auto& host = selfHost();
         if (!host.worker.joinable()) {
+            // Houdini is quitting: UE ended (hdue_shutdown_ue) with its session, under viewports that still draw.
+            if (host.continuous) {
+                converged_ = true;
+                return;
+            }
             ueRun([&] { executeOnce(pass); });
             return;
         }

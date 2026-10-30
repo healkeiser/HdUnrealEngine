@@ -148,7 +148,6 @@ void Backend::boot(uint64_t instance, uint64_t window, const std::string& projec
     // as spaced-out text; -stdout writes the same lines as UTF-8. HDUE_USER_DIR (set by the Houdini package): UE's
     // Saved (logs, shader caches) per user, not in a possibly shared or read-only install folder.
     std::string arguments = (show.empty() || show == "0" || show == "false" ? "-RenderOffscreen -stdout" : "-stdout");
-    if (interactive) arguments += " -hdUEInteractive";
     arguments += " " + env("HDUE_UE_ARGS");
     if (const auto user = env("HDUE_USER_DIR"); !user.empty()) arguments += " -userdir=\"" + user + "\"";
     HdueInitDesc init{};
@@ -158,6 +157,7 @@ void Backend::boot(uint64_t instance, uint64_t window, const std::string& projec
     init.project_path = project.c_str();
     init.map_path = "/Game/HdUETest";
     init.extra_arguments = arguments.c_str();
+    init.flags = interactive ? HDUE_INIT_INTERACTIVE : 0;
     initialize(init);
 }
 void Backend::shutdown() {

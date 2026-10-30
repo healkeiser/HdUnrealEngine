@@ -59,9 +59,13 @@ enum {
  * Strings are UTF-8 and are copied during the call. No UE/pxr/STL type, native
  * allocation or exception crosses this ABI. All calls except get_api execute
  * on the thread that called initialize. One engine lifetime per process. */
+/* HdueInitDesc.flags. INTERACTIVE: a viewport (Houdini's UI) that renders while the user works: meshes are drawn
+ * first and their Lumen cards and Nanite data built in the background, frames are paced for navigation and do not
+ * wait for PSOs or texture streaming. Without it, the offline profile (husk): everything is built before the frame. */
+enum { HDUE_INIT_INTERACTIVE = 1 };
 typedef struct HdueInitDesc {
     uint32_t struct_size;
-    uint32_t reserved;
+    uint32_t flags; /* HDUE_INIT_* */
     uint64_t instance_handle;
     uint64_t window_handle;
     const char* project_path;

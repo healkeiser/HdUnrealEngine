@@ -18,7 +18,7 @@ _run_task = Task(lambda work: work())
 class InitDesc(C.Structure):
     _fields_ = [
         ("struct_size", U32),
-        ("reserved", U32),
+        ("flags", U32),  # HDUE_INIT_*
         ("instance", U64),
         ("window", U64),
         ("project", C.c_char_p),

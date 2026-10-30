@@ -12,7 +12,7 @@ import traceback
 from pathlib import Path
 
 import hou
-from pxr import Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
+from pxr import Plug, Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT = Path(__file__).resolve().parents[3]
 # Appended: hdUE's modules must not shadow Houdini's or another package's.
@@ -92,9 +92,11 @@ class Host:
             self.log_dir / "ue.log",
             start=False,
         )
-        self.api = Viewport(
-            self.runtime, os.environ["HDUE_HOUDINI_PLUGIN"]
-        )  # set by the package and Launch-Houdini.ps1
+        # The delegate DLL Houdini registered (PXR_PLUGINPATH_NAME): the host's diagnostics live in the same module.
+        plugin = Plug.Registry().GetPluginForType(Tf.Type.FindByName(PLUGIN))
+        if plugin is None:
+            raise RuntimeError(PLUGIN + " is not on PXR_PLUGINPATH_NAME")
+        self.api = Viewport(self.runtime, plugin.path)
         from hdue_materialx import PreparedMaterials
         from substrate_live import LivePreparation
 
@@ -405,26 +407,11 @@ class Host:
         except BaseException:
             _report(traceback.format_exc())
         self.live_substrate.close()
-        # Switch viewers away so their sessions end before UE shuts down (deactivated hdUE delegates only pause).
-        try:
-            for viewer in hou.ui.paneTabs():
-                if isinstance(
-                    viewer, hou.SceneViewer
-                ) and viewer.currentHydraRenderer() in (LABEL, PLUGIN):
-                    others = [
-                        name
-                        for name in viewer.hydraRenderers()
-                        if name not in (LABEL, PLUGIN)
-                    ]
-                    viewer.setHydraRenderer(
-                        others[0] if others else "Houdini GL"
-                    )
-        except BaseException:
-            _report(traceback.format_exc())
         if self.viewer:
             self.viewer.hide()
         self.runtime.close()
-        # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process).
+        # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process). The
+        # live session ends with UE, and the delegate stops rendering viewports that still draw.
         shutdown = getattr(self.api.library, "hdue_shutdown_ue", None)
         if shutdown:
             shutdown.argtypes = []
@@ -450,16 +437,12 @@ def _hdue_selected():
 
 def start_when_selected():
     """uiready.py: a cheap 500 ms watch; the host (DLL loads, material preparation, its 16 ms timer) starts only when a
-    Scene Viewer selects hdUE, so sessions that never use hdUE pay nothing. Tests and launches with a scene start now.
+    Scene Viewer selects hdUE, so sessions that never use hdUE pay nothing. Launches with a scene start now.
     """
     global _watcher
     if any(
         os.environ.get(name)
-        for name in (
-            "HDUE_HOUDINI_TEST",
-            "HDUE_HOUDINI_INPUT",
-            "HDUE_HOUDINI_HIP",
-        )
+        for name in ("HDUE_HOUDINI_INPUT", "HDUE_HOUDINI_HIP")
     ):
         return start()
     from PySide6 import QtCore
@@ -494,11 +477,6 @@ def start():
             QtCore.QTimer.singleShot(
                 500, lambda: hdefereval.execute_deferred(activate_saved_hip)
             )
-        if os.environ.get("HDUE_HOUDINI_TEST"):
-            # tests/houdini (on HOUDINI_PATH for test runs only) picks the test.
-            import hdue_tests
-
-            hdue_tests.start(_host)
     except BaseException:
         _failure = traceback.format_exc()
         _report(_failure)
