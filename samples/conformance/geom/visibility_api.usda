@@ -1,0 +1,144 @@
+#usda 1.0
+(
+    doc = """VisibilityAPI purpose visibility: renderVisibility controls prims of purpose "render" (invisible hides them,
+inherited/unauthored keeps the overall visibility); it does not affect purpose "default". guideVisibility controls
+purpose "guide" and falls back to invisible: a guide is drawn only with guideVisibility = visible (the render settings
+include guides here). From left: render purpose + renderVisibility invisible (hidden), render purpose (visible),
+default purpose + renderVisibility invisible (visible), guide + guideVisibility visible (visible), guide with no
+opinion (hidden)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomVisibilityAPI",
+ "feature": "renderVisibility, guideVisibility",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "renderVisibility invisible hides a render prim",
+   "value": {
+    "region": [
+     -4.3,
+     -0.3,
+     -3.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "render prim without opinion is visible",
+   "value": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "renderVisibility does not hide a default prim",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "guideVisibility visible shows a guide",
+   "value": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "guides are invisible by default",
+   "value": {
+    "region": [
+     3.7,
+     -0.3,
+     4.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        uniform token[] includedPurposes = ["default", "render", "guide"]
+    }
+}
+def Cube "RenderHidden" (
+    prepend apiSchemas = ["VisibilityAPI"]
+)
+{
+    double size = 1.2
+    uniform token purpose = "render"
+    uniform token renderVisibility = "invisible"
+    double3 xformOp:translate = (-4, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "RenderPurpose" (
+    prepend apiSchemas = ["VisibilityAPI"]
+)
+{
+    double size = 1.2
+    uniform token purpose = "render"
+    double3 xformOp:translate = (-2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Default" (
+    prepend apiSchemas = ["VisibilityAPI"]
+)
+{
+    double size = 1.2
+    uniform token renderVisibility = "invisible"
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "GuideShown" (
+    prepend apiSchemas = ["VisibilityAPI"]
+)
+{
+    double size = 1.2
+    uniform token purpose = "guide"
+    uniform token guideVisibility = "visible"
+    double3 xformOp:translate = (2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "GuideHidden" (
+    prepend apiSchemas = ["VisibilityAPI"]
+)
+{
+    double size = 1.2
+    uniform token purpose = "guide"
+    double3 xformOp:translate = (4, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

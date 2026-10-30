@@ -1,0 +1,78 @@
+#usda 1.0
+(
+    doc = """A UsdUVTexture file with a <UDIM> pattern reads tile 1001 for u in [0, 1] and 1002 for u in [1, 2]: a quad
+whose st spans u = 0..2 shows tile 1001 (red) on its left half and 1002 (blue) on its right half. hdUE does not import
+uncooked UDIMs at runtime (docs/materials.md) and must say so (a warning naming the file); the quad still renders."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "<UDIM> file pattern (unsupported at runtime, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names the UDIM texture",
+   "log": "hdUE.*<UDIM>",
+   "present": true
+  },
+  {
+   "name": "the quad still renders",
+   "value": {
+    "region": [
+     -3.5,
+     -1.5,
+     3.5,
+     1.5
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Udim"
+{
+    token outputs:surface.connect = </Udim/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </Udim/t.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/udim.<UDIM>.png@
+        float2 inputs:st.connect = </Udim/st.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "Quad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-4, -2, 0), (4, -2, 0), (4, 2, 0), (-4, 2, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    texCoord2f[] primvars:st = [(0, 0), (2, 0), (2, 1), (0, 1)] (
+        interpolation = "faceVarying"
+    )
+    int[] primvars:st:indices = [0, 1, 2, 3]
+    rel material:binding = </Udim>
+}

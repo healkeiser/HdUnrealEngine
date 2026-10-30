@@ -1,0 +1,127 @@
+#usda 1.0
+(
+    doc = """interpolateBoundary and cornerIndices / cornerSharpnesses on four single-quad catmullClark meshes (2 x 2):
+edgeAndCorner (the default) keeps boundary edges and corners sharp, so the quad stays a square; edgeOnly keeps the
+edges but smooths the corners, which round off (the limit corner moves to 2/3 of the way out); edgeOnly with
+cornerIndices = all four vertices at sharpness 10 restores sharp corners; none applies no boundary interpolation and
+"boundary faces are effectively treated as holes", so a single quad (all boundary) renders nothing."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomMesh",
+ "feature": "interpolateBoundary, cornerIndices, cornerSharpnesses",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "edgeAndCorner keeps the corner",
+   "value": {
+    "region": [
+     -2.95,
+     0.8,
+     -2.8,
+     0.95
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "edgeOnly rounds the corner",
+   "value": {
+    "region": [
+     -0.44999999999999996,
+     0.8,
+     -0.30000000000000004,
+     0.95
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "edgeOnly keeps the edge middle",
+   "value": {
+    "region": [
+     -1.45,
+     0.8,
+     -1.05,
+     0.87
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "cornerIndices sharpen the corner again",
+   "value": {
+    "region": [
+     2.05,
+     0.8,
+     2.2,
+     0.95
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "none: boundary faces are holes",
+   "value": {
+    "region": [
+     2.75,
+     -1,
+     4.75,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Mesh "EdgeAndCorner"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-4.75, -1, 0), (-2.75, -1, 0), (-2.75, 1, 0), (-4.75, 1, 0)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+
+}
+def Mesh "EdgeOnly"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-2.25, -1, 0), (-0.25, -1, 0), (-0.25, 1, 0), (-2.25, 1, 0)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+    token interpolateBoundary = "edgeOnly"
+}
+def Mesh "Corners"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(0.25, -1, 0), (2.25, -1, 0), (2.25, 1, 0), (0.25, 1, 0)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+    token interpolateBoundary = "edgeOnly"
+    int[] cornerIndices = [0, 1, 2, 3]
+    float[] cornerSharpnesses = [10, 10, 10, 10]
+}
+def Mesh "None"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(2.75, -1, 0), (4.75, -1, 0), (4.75, 1, 0), (2.75, 1, 0)]
+    uniform token subdivisionScheme = "catmullClark"
+    uniform bool doubleSided = 1
+    token interpolateBoundary = "none"
+}

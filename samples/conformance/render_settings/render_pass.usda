@@ -1,0 +1,74 @@
+#usda 1.0
+(
+    doc = """RenderPass: the pass's renderVisibility collection (includeRoot false, includes A) sets what renders when the
+pass is rendered; renderSource names its render settings. husk renders the pass (--pass Pass): A renders, B does not."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderPass",
+ "feature": "collection:renderVisibility, renderSource",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "member of renderVisibility renders",
+   "value": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "non-member does not render",
+   "value": {
+    "region": [
+     1.7,
+     -0.3,
+     2.3,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  }
+ ],
+ "husk": [
+  "--pass",
+  "Pass"
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    def RenderPass "Pass" (
+        prepend apiSchemas = ["CollectionAPI:renderVisibility"]
+    )
+    {
+        rel renderSource = </Render/Settings>
+        uniform bool collection:renderVisibility:includeRoot = 0
+        rel collection:renderVisibility:includes = [</A>]
+    }
+}
+def Cube "A"
+{
+    double size = 1.2
+    double3 xformOp:translate = (-2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "B"
+{
+    double size = 1.2
+    double3 xformOp:translate = (2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

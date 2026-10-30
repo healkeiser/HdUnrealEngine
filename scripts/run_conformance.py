@@ -6,7 +6,8 @@ checks each scene's expected results and prints a pass/fail table; writes out/co
         [--houdini HFS] [--build DIR] [--integrations DIR] [--runtime-config FILE] [--timeout SECONDS]
 
 Each scene's customLayerData["conformance"] is a JSON string: what the spec says is in the layer's doc string, what
-to verify is "checks" (see `measure` and `verify`). Exits 1 when a check fails or a render does not finish.
+to verify is "checks" (see `measure` and `verify`), extra husk options are "husk" (render_settings/render_pass).
+Exits 1 when a check fails or a render does not finish.
 """
 
 import argparse
@@ -58,8 +59,10 @@ def spec_of(path):
     return spec
 
 
-def render(path, mode, frames, out, env, timeout):
-    """Renders `frames` frames of `path` in `mode` into `out`; returns (seconds, log, error)."""
+def render(path, mode, frames, out, env, timeout, extra=()):
+    """Renders `frames` frames of `path` in `mode` into `out` (with husk options `extra`); returns (seconds, log,
+    error).
+    """
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -85,6 +88,7 @@ def render(path, mode, frames, out, env, timeout):
         # Tf warnings (TF_WARN) reach husk's output only in its end-of-render summary.
         "--error-summary",
         "force",
+        *extra,
         str(root),
     ]
     start = time.perf_counter()
@@ -266,7 +270,9 @@ def verify(check, frames, log):
 def run_scene(name, path, spec, mode, env, timeout):
     frames = spec.get("frames", 1)
     out = OUT / name / mode
-    seconds, log, error = render(path, mode, frames, out, env, timeout)
+    seconds, log, error = render(
+        path, mode, frames, out, env, timeout, spec.get("husk", ())
+    )
     entry = {"seconds": round(seconds, 1), "checks": []}
     loaded = {}
     for frame in range(1, frames + 1):

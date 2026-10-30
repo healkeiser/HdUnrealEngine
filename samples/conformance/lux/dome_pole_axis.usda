@@ -1,0 +1,77 @@
+#usda 1.0
+(
+    doc = """DomeLight_1 poleAxis rotates the dome alone so that its texture's pole points along that axis (DomeLight has
+no poleAxis; "scene" follows the stage up axis, Y here). The latlong texture is blue on its upper half (the pole's
+hemisphere) and red on its lower half. With poleAxis = "Z" the blue hemisphere faces +Z, the camera: the sphere is
+blue at its top and at its bottom alike (with the default Y pole its bottom would be red)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux DomeLight_1",
+ "feature": "poleAxis",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "upper front blue",
+   "color": {
+    "region": [
+     -0.5,
+     0.7,
+     0.5,
+     1.1
+    ]
+   },
+   "rgb": [
+    0,
+    0,
+    1
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "lower front blue (not red)",
+   "color": {
+    "region": [
+     -0.5,
+     -1.1,
+     0.5,
+     -0.7
+    ]
+   },
+   "rgb": [
+    0,
+    0,
+    1
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def DomeLight_1 "L"
+{
+    float inputs:intensity = 1
+    asset inputs:texture:file = @../textures/dome_top_blue_bottom_red.exr@
+    token inputs:texture:format = "latlong"
+    uniform token poleAxis = "Z"
+}
+def Sphere "Ball"
+{
+    double radius = 1.5
+    color3f[] primvars:displayColor = [(0.8, 0.8, 0.8)]
+}

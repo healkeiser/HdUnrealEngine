@@ -1,0 +1,202 @@
+#usda 1.0
+(
+    doc = """A NodeGraph groups shaders and exposes their outputs as its own; connecting a surface input to a NodeGraph
+output is the same as connecting it to the shader inside. Left: a UsdPreviewSurface whose diffuseColor reads a
+NodeGraph wrapping a UsdUVTexture (green). Middle: a MaterialX standard_surface whose base_color reads a NodeGraph
+wrapping an ND_image_color3 (green). Right: a MaterialX NodeGraph multiplying that image by 0.25 (ND_multiply_color3): a
+quarter as bright as the middle quad."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdShadeNodeGraph",
+ "feature": "NodeGraph outputs (Preview Surface and MaterialX)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "Preview Surface through a NodeGraph: green",
+   "color": {
+    "region": [
+     -4,
+     -0.8,
+     -2.5,
+     0.8
+    ]
+   },
+   "rgb": [
+    0,
+    1,
+    0
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "MaterialX through a NodeGraph: green",
+   "color": {
+    "region": [
+     -0.75,
+     -0.8,
+     0.75,
+     0.8
+    ]
+   },
+   "rgb": [
+    0,
+    1,
+    0
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "ND_multiply_color3 scales the image by 0.25",
+   "ratio": [
+    {
+     "region": [
+      2.5,
+      -0.8,
+      4,
+      0.8
+     ],
+     "stat": "luma"
+    },
+    {
+     "region": [
+      -0.75,
+      -0.8,
+      0.75,
+      0.8
+     ],
+     "stat": "luma"
+    }
+   ],
+   "min": 0.15,
+   "max": 0.4
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Preview"
+{
+    token outputs:surface.connect = </Preview/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </Preview/Graph.outputs:rgb>
+        token outputs:surface
+    }
+    def NodeGraph "Graph"
+    {
+        color3f outputs:rgb.connect = </Preview/Graph/t.outputs:rgb>
+        def Shader "t"
+        {
+            uniform token info:id = "UsdUVTexture"
+            asset inputs:file = @../textures/green.png@
+            float2 inputs:st.connect = </Preview/Graph/st.outputs:result>
+            float3 outputs:rgb
+        }
+        def Shader "st"
+        {
+            uniform token info:id = "UsdPrimvarReader_float2"
+            string inputs:varname = "st"
+            float2 outputs:result
+        }
+    }
+}
+def Material "Mtlx"
+{
+    token outputs:mtlx:surface.connect = </Mtlx/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Mtlx/Graph.outputs:out>
+        token outputs:out
+    }
+    def NodeGraph "Graph"
+    {
+        color3f outputs:out.connect = </Mtlx/Graph/image.outputs:out>
+        def Shader "image"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @../textures/green.png@
+            color3f outputs:out
+        }
+    }
+}
+def Material "MtlxMath"
+{
+    token outputs:mtlx:surface.connect = </MtlxMath/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </MtlxMath/Graph.outputs:out>
+        token outputs:out
+    }
+    def NodeGraph "Graph"
+    {
+        color3f outputs:out.connect = </MtlxMath/Graph/multiply.outputs:out>
+        def Shader "image"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @../textures/green.png@
+            color3f outputs:out
+        }
+        def Shader "multiply"
+        {
+            uniform token info:id = "ND_multiply_color3"
+            color3f inputs:in1.connect = </MtlxMath/Graph/image.outputs:out>
+            color3f inputs:in2 = (0.25, 0.25, 0.25)
+            color3f outputs:out
+        }
+    }
+}
+def Mesh "PreviewQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-4.25, -1, 0), (-2.25, -1, 0), (-2.25, 1, 0), (-4.25, 1, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+        interpolation = "faceVarying"
+    )
+    int[] primvars:st:indices = [0, 1, 2, 3]
+    rel material:binding = </Preview>
+}
+def Mesh "MtlxQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+        interpolation = "faceVarying"
+    )
+    int[] primvars:st:indices = [0, 1, 2, 3]
+    rel material:binding = </Mtlx>
+}
+def Mesh "MathQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(2.25, -1, 0), (4.25, -1, 0), (4.25, 1, 0), (2.25, 1, 0)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+        interpolation = "faceVarying"
+    )
+    int[] primvars:st:indices = [0, 1, 2, 3]
+    rel material:binding = </MtlxMath>
+}

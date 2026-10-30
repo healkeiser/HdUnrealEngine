@@ -1,0 +1,106 @@
+#usda 1.0
+(
+    doc = """bindMaterialAs on a collection-based binding: an ancestor's collection binding marked strongerThanDescendants
+overrides the member's own direct binding; with the default weakerThanDescendants the member's own binding wins.
+/World binds Red to collection "strong" (member A, strongerThanDescendants) and to collection "weak" (member B); A and
+B both bind Blue directly: A renders red, B blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdShadeMaterialBindingAPI",
+ "feature": "collection binding bindMaterialAs strongerThanDescendants",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "strong collection binding wins: red",
+   "color": {
+    "region": [
+     -2.4,
+     -0.4,
+     -1.6,
+     0.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.2
+  },
+  {
+   "name": "weak collection binding loses: blue",
+   "color": {
+    "region": [
+     1.6,
+     -0.4,
+     2.4,
+     0.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.2
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        token outputs:surface
+    }
+}
+def Material "Blue"
+{
+    token outputs:surface.connect = </Blue/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.05, 0.05, 0.9)
+        token outputs:surface
+    }
+}
+def Xform "World" (
+    prepend apiSchemas = ["MaterialBindingAPI", "CollectionAPI:strong", "CollectionAPI:weak"]
+)
+{
+    rel collection:strong:includes = [</World/A>]
+    rel collection:weak:includes = [</World/B>]
+    rel material:binding:collection:strong = [</World.collection:strong>, </Red>] (
+        bindMaterialAs = "strongerThanDescendants"
+    )
+    rel material:binding:collection:weak = [</World.collection:weak>, </Red>]
+    def Cube "A" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.6
+        rel material:binding = </Blue>
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def Cube "B" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.6
+        rel material:binding = </Blue>
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}

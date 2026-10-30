@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """PortalLight marks an opening through which a dome light's light enters (it guides the dome's sampling and does
+not emit itself). hdUE does not support portals and must say so; the dome still lights the scene."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdLux",
+ "feature": "PortalLight (unsupported, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names the portal light",
+   "log": "(?i)portal ?light is not supported",
+   "present": true
+  },
+  {
+   "name": "the dome still lights the wall",
+   "value": {
+    "region": [
+     -2,
+     -2,
+     2,
+     2
+    ],
+    "stat": "luma"
+   },
+   "min": 0.01
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+    uniform token subdivisionScheme = "none"
+    uniform bool doubleSided = 1
+    color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def DomeLight "Dome"
+{
+    float inputs:intensity = 1
+}
+def PortalLight "Portal"
+{
+    float inputs:width = 2
+    float inputs:height = 2
+    double3 xformOp:translate = (0, 0, 3)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
