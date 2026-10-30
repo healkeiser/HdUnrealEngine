@@ -258,10 +258,9 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         Light = NewObject<UDirectionalLightComponent>(Actor);
     else if (D.type == HDUE_RECT_LIGHT || D.type == HDUE_DISK_LIGHT)
         Light = NewObject<URectLightComponent>(Actor);
-    // A sphere light is a spot below 90 degrees. ShapingAPI's default cone (90, a hemisphere) stays a point light: UE
-    // clamps spots to 89 degrees with no penumbra, and the Path Tracer then lit a 90-degree cone at 0.2-0.4x Karma, and
-    // cut a straight-down IES beam to 0.63x (the light in a Z-up Cornell box). Light above the horizon is kept (1.15x).
-    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle < 90)
+    // A sphere light with ShapingAPI is a spot, as UE's USD import makes it (UsdUtils::GetActorTypeForPrim); the API's
+    // default 90-degree cone is the lower hemisphere (UsdLux). Wider cones have no UE spot and stay point lights.
+    else if (D.type == HDUE_SPHERE_LIGHT && D.cone_angle <= 90)
         Light = NewObject<USpotLightComponent>(Actor);
     else
         Light = NewObject<UPointLightComponent>(Actor);
@@ -303,13 +302,15 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         }
         if (D.flags & HDUE_LIGHT_NORMALIZE) Intensity /= float(FMath::Max(Area, 1e-12));
         if (D.type == HDUE_RECT_LIGHT || D.type == HDUE_DISK_LIGHT) {
-            // UE nits use the rect's own area, but its rect lights measured 2.05x a Lambertian emitter
-            // (Lumen and Path Tracer, 0.5 m rect at 1 m); halve to match UsdLux luminance.
+            // UE stores nits times the rect's area (URectLightComponent::ComputeLightBrightness), and its proxy
+            // divides that by half the area (FRectLightSceneProxy::GetLightShaderParameters: Color /= 0.5 * W * H),
+            // which deferred lighting and the Path Tracer emit as radiance: 2x the nits. Halve to emit UsdLux's.
             Local->SetIntensityUnits(ELightUnits::Nits);
             Intensity *= .5f;
         } else {
-            // UE point-light nits spread over the whole capsule surface; UsdLux luminance seen
-            // from outside is luminous intensity over the projected area.
+            // UE point-light nits multiply by the whole capsule surface (UPointLightComponent::ComputeLightBrightness),
+            // but sphere lights emit power / (pi r^2) (PathTracingPointLight.ush): 4x the nits. Candelas times the
+            // projected area emit UsdLux's luminance.
             Local->SetIntensityUnits(ELightUnits::Candelas);
             Intensity *= float(Projected);
         }
@@ -328,7 +329,10 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         }
     }
     if (auto* Spot = Cast<USpotLightComponent>(Light)) {
-        Spot->SetOuterConeAngle(FMath::Clamp(D.cone_angle, .01f, 89.9f));
+        // UE clamps spots to 89 degrees (USpotLightComponent::GetCosHalfConeAngle), but at 89 both Lumen and the Path
+        // Tracer lit only part of the cone (a quadrant of a Cornell box below a downward spot; 88 lit all of it).
+        // ponytail: 88-degree cap for that UE bug; raise it when UE renders its own 89-degree maximum whole.
+        Spot->SetOuterConeAngle(FMath::Clamp(D.cone_angle, .01f, 88.f));
         Spot->SetInnerConeAngle(FMath::Clamp(D.cone_angle * (1 - D.cone_softness), 0.f, Spot->OuterConeAngle));
     }
     if (auto* Sun = Cast<UDirectionalLightComponent>(Light)) Sun->LightSourceAngle = D.angle_degrees;

@@ -84,20 +84,18 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
     return HdInterpolationConstant;
 }
 // The material of a prim without a bound one (mesh, points, curves): its displayColor, or white times its vertex
-// colours, and its displayOpacity. Karma shades these with a default surface whose diffuse albedo is 0.4 x
-// displayColor, with a rough dielectric specular (measured against a bound UsdPreviewSurface under a distant light);
-// this slab (roughness 0.5) keeps 95% of its albedo after its specular, hence 0.42. The material's id is the prim's
-// with ".displayColor".
+// colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
+// DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color). The
+// material's id is the prim's with ".displayColor".
 HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh) {
-    constexpr float KarmaDefaultAlbedo = .42f;
     HdUEMaterialData material;
     material.id = mesh.id + ".displayColor";
     const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
     material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
     if (material.vertexColor)
-        material.color = GfVec3f(KarmaDefaultAlbedo);
+        material.color = GfVec3f(1);
     else if (!color.empty())
-        material.color = HdUEFromSceneLinear(color[0]) * KarmaDefaultAlbedo;
+        material.color = HdUEFromSceneLinear(color[0]);
     const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
     if (!opacity.empty()) {
         // The generic ABI carries one opacity per material. Constant primvars (and identical values in other domains)

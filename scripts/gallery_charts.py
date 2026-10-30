@@ -179,7 +179,7 @@ def setup_lines():
     )
     return [
         scenes,
-        f"Up to 8 bounces · hdUE Lumen: 16 warmup frames · {setup['machine']}",
+        f"Up to 32 bounces · hdUE Lumen: 32 warmup frames · {setup['machine']}",
     ]
 
 

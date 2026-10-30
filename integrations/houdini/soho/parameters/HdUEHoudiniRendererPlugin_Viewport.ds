@@ -25,7 +25,7 @@
             label "Warmup Frames"
             type int
             size 1
-            default { 16 }
+            default { 32 }
             range { 0! 256 }
             help "Realtime frames before a frame counts as converged."
             parmtag { "spare_category" "Rendering" }

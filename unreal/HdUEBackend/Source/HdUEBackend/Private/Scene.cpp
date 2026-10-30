@@ -44,28 +44,6 @@ FHdueScene::~FHdueScene() {
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
-bool FHdueScene::HasRefractiveMaterials() const {
-    for (const auto& Entry : Materials) {
-        const auto* Base = Entry.Value->GetMaterial();
-        if (Base && Base->BlendMode == BLEND_TranslucentColoredTransmittance &&
-            (Base->RefractionMethod == RM_IndexOfRefraction || Base->RefractionMethod == RM_IndexOfRefractionFromF0))
-            return true;
-    }
-    for (auto* Actor : Assets.GetActors()) {
-        TArray<UMeshComponent*> Meshes;
-        Actor->GetComponents(Meshes);
-        for (const auto* Mesh : Meshes)
-            for (int32 I = 0; I < Mesh->GetNumMaterials(); ++I) {
-                const auto* Material = Mesh->GetMaterial(I);
-                const auto* Base = Material ? Material->GetMaterial() : nullptr;
-                if (Base && Base->BlendMode == BLEND_TranslucentColoredTransmittance &&
-                    (Base->RefractionMethod == RM_IndexOfRefraction ||
-                     Base->RefractionMethod == RM_IndexOfRefractionFromF0))
-                    return true;
-            }
-    }
-    return false;
-}
 TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
     TSet<UTexture2D*> Unique;
     TArray<TStrongObjectPtr<UTexture2D>> Result;

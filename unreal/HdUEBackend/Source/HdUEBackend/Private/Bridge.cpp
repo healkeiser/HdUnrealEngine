@@ -392,8 +392,8 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         // Offline hosts (husk) get Movie Render Queue's Game Overrides: Cinematic scalability (keeping the screen
         // percentage), fully loaded texture streaming (Draw waits for it) and no GPU timeout for long Path Tracer
         // dispatches. Lumen's surface cache updates every frame so bounce lighting converges within the warmup frames
-        // (Sponza: 16 warmup frames come within ~15% of 128 in the shade, at the same frame time). Set before any
-        // session, so authored hdUE:cvar:* values override them.
+        // (as Movie Render Graph's layer warm-ups raise its update rates, DeferredLayerWarmUpHelpers.cpp). Set before
+        // any session, so authored hdUE:cvar:* values override them.
         Scalability::FQualityLevels Levels = Scalability::GetQualityLevels();
         const float Resolution = Levels.ResolutionQuality;
         Levels.SetFromSingleQualityLevelRelativeToMax(0);
@@ -682,17 +682,14 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
     Settings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
     Settings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
-    Settings.PathTracingMaxBounces = Session.Scene->HasRefractiveMaterials() ? 16 : 8;
     Settings.LumenFrontLayerTranslucencyReflections = true;
     if (!IsInteractive()) {
         // Offline frames use Lumen's final-frame quality (UE's defaults are game quality); authored values override it.
         Settings.LumenFinalGatherQuality = FMath::Max(Settings.LumenFinalGatherQuality, 2.f);
         Settings.LumenSceneLightingQuality = FMath::Max(Settings.LumenSceneLightingQuality, 2.f);
         Settings.LumenSceneDetail = FMath::Max(Settings.LumenSceneDetail, 2.f);
-        // Hit lighting: bounce rays shade their hits instead of reading the surface cache, which undershot the Cornell
-        // box's indirect light (0.77 of Karma's frame mean with it, 0.66 without; about 2 ms more per 1024² frame).
-        // Without hardware ray tracing UE keeps the surface cache.
-        Settings.LumenRayLightingMode = ELumenRayLightingModeOverride::HitLighting;
+        // Ray lighting stays UE's: the project's r.Lumen.HardwareRayTracing.LightingMode (surface cache), which
+        // neither Cinematic scalability nor Movie Render Queue changes. Authored LumenRayLightingMode still wins.
     }
     if (Components) {
         // The Path Tracer's Lighting Components (MRQ/MRG render layers use the same settings); realtime drops Lumen's
