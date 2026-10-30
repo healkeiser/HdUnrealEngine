@@ -1358,8 +1358,9 @@ class Pass final : public HdRenderPass {
                 if (bound) bound->setResource(nullptr);
             if (options.enabled) {
                 frames->setSession(s.session);
-                buffer.setResource(
-                    [frames, target = &buffer] { return frames->color(target->GetWidth(), target->GetHeight()); });
+                buffer.setResource([frames, target = &buffer] {
+                    return frames->color(target->GetWidth(), target->GetHeight(), target->IsConverged());
+                });
                 if (depth) depth->setResource([frames] { return frames->depth(); });
             }
             gpuOptions_ = options;

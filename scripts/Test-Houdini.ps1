@@ -23,3 +23,18 @@ if (-not $Result.passed -or -not $Result.native_solaris_compositor_verified -or 
     throw "Incomplete Houdini / UE evidence: $RunOutput"
 }
 Write-Output "Verified Solaris / same-process UE: $RunOutput"
+# Selection highlight and click picking: a Y-up metre stage (cube, mesh, instancer, points, curves) in the free view,
+# and the Z-up Cornell box through its camera (render buffers of another size than the viewport).
+foreach ($Case in @(
+        @{ Name = 'selection'; Usd = 'tests\houdini\selection.usda'; Camera = ''; Select = '/World/Cube,/World/Mesh,/World/Instancer,/World/Points,/World/Curves' },
+        @{ Name = 'selection-cornell'; Usd = 'samples\cornell\cornell.usda'; Camera = '/cornell_box/camera'; Select = '/cornell_box/tall_box_front/tall_box_front,/cornell_box/short_box_front/short_box_front' })) {
+    $env:HDUE_TEST_CAMERA = $Case.Camera
+    $env:HDUE_TEST_SELECT = $Case.Select
+    try {
+        $CaseOutput = Join-Path $RunOutput $Case.Name
+        & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot $Case.Usd) -LogDirectory $CaseOutput -TestKind selection -TimeoutSeconds $TimeoutSeconds
+    }
+    finally { Remove-Item Env:HDUE_TEST_CAMERA, Env:HDUE_TEST_SELECT -ErrorAction SilentlyContinue }
+    if (-not (Get-Content -LiteralPath (Join-Path $CaseOutput 'selection.json') -Raw | ConvertFrom-Json).passed) { throw "Selection test failed: $CaseOutput" }
+    Write-Output "Verified Solaris selection ($($Case.Name)): $CaseOutput"
+}

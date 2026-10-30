@@ -181,17 +181,7 @@ class Test:
 
         for _ in range(24):
             yield
-        # The native selection highlight needs the primId/instanceId AOVs, which the viewport renders only on request.
-        settings = viewer.currentNode()
-        ids = settings.parent().createNode("pythonscript", "hdUE_id_aovs")
-        ids.setInput(0, settings)
-        ids.parm("python").set(
-            "from pxr import Sdf\n"
-            "hou.pwd().editableStage().GetPrimAtPath('/Render/rendersettings').CreateAttribute("
-            "'hdUE:viewportIdAovs', Sdf.ValueTypeNames.Bool).Set(True)"
-        )
-        ids.setDisplayFlag(True)
-        ids.setCurrent(True, clear_all_selected=True)
+        # The selection highlight below relies on hdUE:viewportIdAovs at its default (on).
         hdefereval.execute_deferred(viewer.curViewport().frameAll)
         for _ in range(8):
             yield

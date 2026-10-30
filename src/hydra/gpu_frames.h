@@ -19,8 +19,11 @@ public:
     void setSession(HdueSession session) { session_ = session; }
     bool failed() const { return failed_; }
     // GL thread (HdUERenderBuffer::GetResource). color copies the newest frame, colour and depth, and returns its
-    // colour texture; depth returns the depth copied with it. Empty (the CPU path) without a frame of this size.
-    VtValue color(uint32_t width, uint32_t height);
+    // colour texture; depth returns the depth copied with it. Empty (the CPU path) without a frame of this size, and
+    // once the CPU buffers hold the converged frame: Solaris draws its selection highlight from the CPU primId and
+    // instanceId buffers, and only lines them up with a CPU colour buffer (a GPU texture of another size than the
+    // viewport, as through a camera, left the highlight out).
+    VtValue color(uint32_t width, uint32_t height, bool converged);
     VtValue depth() const { return depthCopied_ ? VtValue(depthTexture_) : VtValue(); }
     // GL thread, before the delegate goes: frees the GL objects. Later calls return empty.
     void release();
