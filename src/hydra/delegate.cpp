@@ -2120,7 +2120,8 @@ public:
                         request.projection_offset[0] = -projection[2][0];
                         request.projection_offset[1] = -projection[2][1];
                     }
-                    if (lens[0] > 0 && lens[1] > 0) {
+                    // UsdRenderSettings disableDepthOfField renders every camera in focus.
+                    if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
                         request.fstop = lens[0];
                         request.focus_distance_cm = float(lens[1] * cmPerUnit);
                         request.focal_length_cm =
@@ -2757,10 +2758,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     if (key == TfToken("renderMode") || key == TfToken("samplesPerPixel") || key == TfToken("warmupFrames") ||
         key == TfToken("lumenEnabled") || key == TfToken("timeSeconds") || key == TfToken("motionBlur") ||
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
-        key == TfToken("instantaneousShutter") || key == TfToken("tonemapper") ||
-        key == TfToken("postProcessMaterials") || key == TfToken("denoiser") || key == TfToken("debugView") ||
-        key == TfToken("viewportIdAovs") || TfStringStartsWith(key.GetString(), "postProcess:") ||
-        TfStringStartsWith(key.GetString(), "cvar:"))
+        key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
+        key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("denoiser") ||
+        key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
+        TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {
         const double frame = state_->setting<double>("houdini:frame", 1.);
