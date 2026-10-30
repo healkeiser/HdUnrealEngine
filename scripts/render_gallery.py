@@ -4,7 +4,10 @@ comparison images, docs/gallery.md and the README blocks. Two independent sets:
 - cornell: the CC0 Cornell box (samples/cornell) and one layer per feature in samples/cornell/variants;
 - sponza: Intel's Sponza 2022 (CC BY 4.0, not included) from its main camera, lit by samples/sponza/lighting.usda.
 
-    hython scripts/render_gallery.py [--set cornell|sponza] [--sponza FILE] [--addon FILE ...] [--dev] [--only NAME ...] [--docs-only]
+    hython scripts/render_gallery.py [--set cornell|sponza] [--sponza FILE] [--addon FILE ...] [--dev] [--only NAME ...] [--docs-only] [--bless]
+
+It then fails (exit 1) when a scene's brightness against Karma CPU leaves its band (scripts/check_gallery.py) or a
+Cornell hdUE render departs from its tile baseline in tests/gallery_baselines.json; --bless stores new baselines.
 
 Sponza is read from samples/sponza/intel by default (samples/sponza/README.md).
 
@@ -36,6 +39,10 @@ SPONZA_ADDONS = [
 OUT = ROOT / "out" / "gallery"
 IMAGES = ROOT / "docs" / "images" / "gallery"
 HUSK = Path(os.environ.get("HFS", "")) / "bin" / "husk.exe"
+BASELINES = ROOT / "tests" / "gallery_baselines.json"
+# 95th-percentile relative tile error allowed against the baseline: Lumen's temporal GI varies between runs, the
+# Path Tracer's tiles agree within 1%.
+TILE_LIMITS = {"lumen": 0.3, "pathtraced": 0.05}
 
 # name, title, layer (relative to samples/cornell); captions come from each layer's doc string.
 CORNELL_SCENES = [
@@ -400,6 +407,45 @@ def luminance(image):
     return float((image @ np.array([0.2126, 0.7152, 0.0722])).mean())
 
 
+def tiles(image, rows=9, columns=16):
+    """Mean luminance per tile: a small, noise-averaged picture of a render."""
+    lum = image @ np.array([0.2126, 0.7152, 0.0722])
+    lum = lum[
+        : len(lum) - len(lum) % rows, : lum.shape[1] - lum.shape[1] % columns
+    ]
+    return lum.reshape(rows, len(lum) // rows, columns, -1).mean(axis=(1, 3))
+
+
+def check_baselines(bless):
+    """Compares each Cornell hdUE render with its stored tile baseline (tests/gallery_baselines.json): a
+    regression of one region (a light, a material) fails even when the mean brightness stays in its band.
+    --bless stores the current renders instead.
+    """
+    stored = json.loads(BASELINES.read_text()) if BASELINES.exists() else {}
+    failures = []
+    for name, _, _ in CORNELL_SCENES:
+        for key in TILE_LIMITS:
+            path = OUT / f"{name}_{key}.exr"
+            if not path.exists():
+                continue
+            current = tiles(pixels(path))
+            if bless:
+                stored.setdefault(name, {})[key] = np.round(current, 5).tolist()
+            elif key not in stored.get(name, {}):
+                failures.append(f"{name} {key}: no baseline (--bless)")
+            else:
+                base = np.array(stored[name][key])
+                error = np.abs(current - base) / (base + 0.05 * base.mean())
+                p95 = float(np.percentile(error, 95))
+                if p95 > TILE_LIMITS[key]:
+                    failures.append(
+                        f"{name} {key}: 95th-percentile tile error {p95:.3f} > {TILE_LIMITS[key]}"
+                    )
+    if bless:
+        BASELINES.write_text(json.dumps(stored, separators=(",", ":")) + "\n")
+    return failures
+
+
 def duration(seconds):
     return "< 0.1 s" if seconds < 0.05 else f"{seconds:.1f} s"
 
@@ -585,6 +631,11 @@ def main():
         action="store_true",
         help="rebuild images and tables from the last renders",
     )
+    parser.add_argument(
+        "--bless",
+        action="store_true",
+        help="store the Cornell hdUE renders as the new tile baselines (tests/gallery_baselines.json)",
+    )
     args = parser.parse_args()
     if args.dev:
         dev_environment()
@@ -670,6 +721,13 @@ def main():
             if not args.only or name in args.only:
                 compose(args.set, name, entry, samples, resolution)
     write_docs(hardware())
+    from check_gallery import check
+
+    failures = check()[1]
+    if args.set == "cornell":
+        failures += check_baselines(args.bless)
+    print("\n".join(failures) or "Gallery check passed.")
+    return 1 if failures else 0
 
 
 def section(which, results, machine):
