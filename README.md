@@ -179,6 +179,8 @@ Houdini describes a scene in USD and hands it to a renderer through Hydra, the s
 
 Unreal starts once per Houdini or husk session, so a render does not pay that cost again for every frame, and editing the scene only resends what you changed.
 
+Under the hood, for developers: [docs/architecture.md](docs/architecture.md) lists what to look for in Process Explorer or a debugger. That covers the two DLLs hdUE adds and the shared libraries they take from Houdini, the `GameThread` that hdUE starts, UE's named threads, the C ABI calls behind one frame, and how UE starts and stops.
+
 <!-- ARCHITECTURE -->
 ## Architecture
 
