@@ -2102,8 +2102,15 @@ public:
                                   s.setting<std::string>("upAxis", "Y").c_str());
                     const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
                     request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
-                    if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip)
+                    if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip) {
                         request.far_clip_cm = float(pass->farClip * cmPerUnit);
+                        // Below UsdGeomCamera's fallback (1e6), the far plane is authored to clip something.
+                        static std::once_flag farWarned;
+                        if (request.mode == HDUE_PATH_TRACED && pass->farClip < 1e6)
+                            std::call_once(farWarned, [] {
+                                TF_WARN("hdUE: the Path Tracer ignores the camera's far clipping plane");
+                            });
+                    }
                     // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
                     if (projection[3][3] == 1) {
                         request.orthographic = 1;

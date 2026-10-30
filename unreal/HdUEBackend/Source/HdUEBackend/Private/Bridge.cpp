@@ -678,9 +678,15 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
                     FPlane(0, 0, -1 / Range, 0),
                     FPlane(Request.projection_offset[0], Request.projection_offset[1], Request.far_clip_cm / Range, 1));
     } else {
+        // A finite far clip (the camera's clippingRange) clips in raster; 0 keeps UE's infinite far plane. The Path
+        // Tracer's rays ignore it (the delegate warns).
+        const double HalfFov = FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5;
         Options.ProjectionMatrix =
-            FReversedZPerspectiveMatrix(double(FMath::DegreesToRadians(Request.horizontal_fov_degrees) * 0.5),
-                                        double(Session.Width), double(Session.Height), double(Request.near_clip_cm));
+            Request.far_clip_cm > Request.near_clip_cm
+                ? FMatrix(FReversedZPerspectiveMatrix(HalfFov, double(Session.Width), double(Session.Height),
+                                                      double(Request.near_clip_cm), double(Request.far_clip_cm)))
+                : FMatrix(FReversedZPerspectiveMatrix(HalfFov, double(Session.Width), double(Session.Height),
+                                                      double(Request.near_clip_cm)));
         // Hydra's conformed window and lens shift (aperture offsets).
         if (Request.projection_scale[0] > 0 && Request.projection_scale[1] > 0) {
             Options.ProjectionMatrix.M[0][0] = Request.projection_scale[0];
