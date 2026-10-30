@@ -29,7 +29,7 @@ HDA = OTLS / "hdue_rendersettings.hda"
 # the names of the unversioned types these replace, so scenes saved with them load these.
 VERSION = "1.0"
 NAME, LABEL, ICON = (
-    f"hdue::rendersettings::{VERSION}",
+    f"hdue::hduerendersettings::{VERSION}",
     "hdUE Render Settings",
     "HDUE_hduerenderproperties",
 )
@@ -142,7 +142,7 @@ TOOL = """<?xml version="1.0" encoding="UTF-8"?>
     <toolMenuContext name="network">
       <contextOpType>$HDA_TABLE_AND_NAME</contextOpType>
     </toolMenuContext>
-    <toolSubmenu>Rendering</toolSubmenu>
+    <toolSubmenu>Rendering/hdUE</toolSubmenu>
     <script scriptType="python"><![CDATA[import loptoolutils
 loptoolutils.genericTool(kwargs, '$HDA_NAME')]]></script>
   </tool>
@@ -311,6 +311,22 @@ def build():
             "render with, also where the input stage brings render settings of its own.",
         )
     )
+    no_builtin = {hou.parmCondType.HideWhen: "{ outputproducts == upstream }"}
+    # Above the camera, as Karma Render Settings' Output Picture.
+    group.append(
+        hou.StringParmTemplate(
+            "picture",
+            "Output Picture",
+            1,
+            default_value=("$HIP/render/$HIPNAME.$OS.$F4.exr",),
+            string_type=hou.stringParmType.FileReference,
+            conditionals={
+                hou.parmCondType.DisableWhen: "{ outputproducts == upstream }"
+            },
+            tags={"filechooser_mode": "write"},
+            help="Image the built-in render product writes (husk, USD Render ROP): its productName.",
+        )
+    )
     for name, text in TOP_HELP.items():
         template = settings.parmTemplateGroup().find(name)
         template.setHelp(text)
@@ -318,7 +334,6 @@ def build():
     output = hou.FolderParmTemplate(
         "hdUE_ImageOutputTab", "Image Output", folder_type=hou.folderType.Tabs
     )
-    no_builtin = {hou.parmCondType.HideWhen: "{ outputproducts == upstream }"}
     output.addParmTemplate(
         hou.StringParmTemplate(
             "outputproducts",
@@ -331,7 +346,7 @@ def build():
                 "Upstream Products",
                 "Built-in and Upstream Products",
             ),
-            help="Which render products the render settings render: this node's own product (Output Picture and AOVs below), "
+            help="Which render products the render settings render: this node's own product (Output Picture above, AOVs below), "
             "the render products authored upstream (hdUE Render Products, Render Product LOPs), or both.",
         )
     )
@@ -343,17 +358,6 @@ def build():
             "Product",
             "Render products of the input stage the render settings also render.",
             {hou.parmCondType.HideWhen: "{ outputproducts == builtin }"},
-        )
-    )
-    output.addParmTemplate(
-        hou.StringParmTemplate(
-            "picture",
-            "Output Picture",
-            1,
-            default_value=("$HIP/render/$HIPNAME.$OS.$F4.exr",),
-            string_type=hou.stringParmType.FileReference,
-            conditionals=no_builtin,
-            help="Image the built-in render product writes (husk, USD Render ROP).",
         )
     )
     aovs = hou.FolderParmTemplate(
@@ -605,7 +609,7 @@ def build_standard_render_vars():
 
     network = hou.node("/stage")
     name, label = (
-        f"hdue::standardrendervars::{VERSION}",
+        f"hdue::hduestandardrendervars::{VERSION}",
         "hdUE Standard Render Vars",
     )
     subnet = network.createNode("subnet", "standardrendervars")
@@ -726,7 +730,7 @@ def build_render_products():
 
     network = hou.node("/stage")
     name, label = (
-        f"hdue::renderproducts::{VERSION}",
+        f"hdue::hduerenderproducts::{VERSION}",
         "hdUE Render Products",
     )
     subnet = network.createNode("subnet", "renderproducts")

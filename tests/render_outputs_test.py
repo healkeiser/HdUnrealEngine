@@ -8,15 +8,19 @@ from pxr import UsdRender
 for name, type_name, icon in (
     (
         "hdue_rendersettings",
-        "hdue::rendersettings::1.0",
+        "hdue::hduerendersettings::1.0",
         "hduerenderproperties",
     ),
     (
         "hdue_standardrendervars",
-        "hdue::standardrendervars::1.0",
+        "hdue::hduestandardrendervars::1.0",
         "hduestandardrendervars",
     ),
-    ("hdue_renderproducts", "hdue::renderproducts::1.0", "hduerenderproducts"),
+    (
+        "hdue_renderproducts",
+        "hdue::hduerenderproducts::1.0",
+        "hduerenderproducts",
+    ),
 ):
     hda = str(
         Path(__file__).resolve().parents[1]
@@ -32,6 +36,11 @@ for name, type_name, icon in (
         name,
         definition.icon(),
     )  # by name only
+    # TAB menu > Rendering > hdUE, as Karma's LOPs are under Rendering > Karma.
+    assert (
+        "<toolSubmenu>Rendering/hdUE</toolSubmenu>"
+        in definition.sections()["Tools.shelf"].contents()
+    ), name
 # Scenes saved with the unversioned names load the namespaced types (integrations/houdini/OPcustomize).
 for line in (
     (Path(__file__).resolve().parents[1] / "integrations/houdini/OPcustomize")
@@ -46,16 +55,16 @@ for line in (
         ), line
 network = hou.node("/stage")
 camera = network.createNode("camera")
-rendervars = network.createNode("hdue::standardrendervars::1.0")
+rendervars = network.createNode("hdue::hduestandardrendervars::1.0")
 rendervars.setInput(0, camera)
 rendervars.parm("aov_primId").set(1)
-products = network.createNode("hdue::renderproducts::1.0")
+products = network.createNode("hdue::hduerenderproducts::1.0")
 products.setInput(0, rendervars)
 products.parm("products").set(2)
 products.parm("primname_2").set("depthonly")
 products.parm("doorderedVars_2").set(1)
 products.parm("orderedVars_2").set("/Render/Products/Vars/depth")
-settings = network.createNode("hdue::rendersettings::1.0")
+settings = network.createNode("hdue::hduerendersettings::1.0")
 settings.setInput(0, products)
 VARS = "/Render/Products/Vars/"
 
@@ -124,9 +133,20 @@ _, result = render("builtin", importvars=1)
 assert list(result) == ["/Render/Products/renderproduct"] and sorted(
     result["/Render/Products/renderproduct"]
 ) == sorted(upstream["/Render/Products/product1"]), result
-alone = network.createNode("hdue::rendersettings::1.0")
+alone = network.createNode("hdue::hduerendersettings::1.0")
 alone.setInput(0, camera)
+# Output Picture above the camera, as in Karma Render Settings, is the built-in product's productName.
+top = [t.name() for t in alone.parmTemplateGroup().entries()]
+assert top.index("picture") < top.index("camera"), top
+alone.parm("picture").set("$HIP/elsewhere/shot.$F4.exr")
+hou.setFrame(7)
 stage = alone.stage()
+assert (
+    stage.GetPrimAtPath("/Render/Products/renderproduct")
+    .GetAttribute("productName")
+    .Get(7)
+    .endswith("/elsewhere/shot.0007.exr")
+)
 assert UsdRender.Settings(
     stage.GetPrimAtPath("/Render/rendersettings")
 ).GetProductsRel().GetTargets() == ["/Render/Products/renderproduct"]

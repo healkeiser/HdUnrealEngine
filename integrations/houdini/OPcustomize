@@ -1,5 +1,9 @@
-// hdUE's LOPs were unversioned before 1.0: scenes saved with those type names load the namespaced assets
-// (scripts/build_render_settings_hda.py). Same mechanism as $HFS/houdini/OPcustomize's karmarendersettings aliases.
-opalias Lop hdue::rendersettings::1.0 hdue_rendersettings
-opalias Lop hdue::standardrendervars::1.0 hdue_standardrendervars
-opalias Lop hdue::renderproducts::1.0 hdue_renderproducts
+// Scenes saved with earlier type names of hdUE's LOPs load the current assets (scripts/build_render_settings_hda.py):
+// the unversioned names from before 1.0, and hdue::<name>::1.0 from before the Karma-style hdue::hdue<name>::1.0.
+// Same mechanism as $HFS/houdini/OPcustomize's karmarendersettings aliases.
+opalias Lop hdue::hduerendersettings::1.0 hdue_rendersettings
+opalias Lop hdue::hduestandardrendervars::1.0 hdue_standardrendervars
+opalias Lop hdue::hduerenderproducts::1.0 hdue_renderproducts
+opalias Lop hdue::hduerendersettings::1.0 hdue::rendersettings::1.0
+opalias Lop hdue::hduestandardrendervars::1.0 hdue::standardrendervars::1.0
+opalias Lop hdue::hduerenderproducts::1.0 hdue::renderproducts::1.0
