@@ -17,7 +17,7 @@ public class HdUEBackend : ModuleRules
             PrivateIncludePaths.Add(Path.Combine(GetModuleDirectory("Renderer"), "Internal"));
             PrivateDependencyModuleNames.Add("UELibrary");
             PrivateDefinitions.Add("HDUE_BRIDGE_EXPORTS=1");
-            // Shared frame textures and fences (SharedFrames.cpp, hdue/gpu_api.h).
+            // Shared frame textures and fences (SharedFrames.cpp, hdue/bridge.h).
             PrivateDependencyModuleNames.Add("D3D12RHI");
             AddEngineThirdPartyPrivateStaticDependencies(Target, "DX12");
             // Lumen mesh cards: MeshCards.cpp compiles MeshUtilities' card builder (the module itself links the editor).

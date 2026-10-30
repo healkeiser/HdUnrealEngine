@@ -1,4 +1,4 @@
-"""Caller-owned ctypes mirror of the optional lighting diagnostics ABI."""
+"""Caller-owned ctypes mirror of the lighting diagnostics ABI (include/hdue/bridge.h)."""
 
 import ctypes as C
 
@@ -26,29 +26,14 @@ class Status(C.Structure):
     ]
 
 
-class Api(C.Structure):
-    _fields_ = [
-        ("struct_size", U32),
-        ("abi_version", U32),
-        ("upsert", C.c_void_p),
-        ("get_status", C.c_void_p),
-    ]
-
-
 class Lighting:
     def __init__(self, runtime):
-        if C.sizeof(Status) != 56 or C.sizeof(Api) != 24:
+        if C.sizeof(Status) != 56:
             raise RuntimeError("Invalid lighting ABI layout")
         self.runtime = runtime
-        get = runtime.library.hdue_get_lighting_api
-        get.argtypes = [U32, U32, C.POINTER(Api)]
-        get.restype = Result
-        api = Api()
-        runtime.check(get(3, C.sizeof(api), C.byref(api)), "lighting API")
-        if api.struct_size != C.sizeof(api) or api.abi_version != 3:
-            raise RuntimeError("Unsupported lighting ABI")
         self.get_status = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Status)), api.get_status
+            C.CFUNCTYPE(Result, U64, C.POINTER(Status)),
+            runtime.api.get_lighting_status,
         )
 
     def status(self, session):

@@ -3,7 +3,7 @@
 import ctypes as C
 from pathlib import Path
 
-from hdue_runtime import ABI_VERSION, U32, U64, Api, Result, Task
+from hdue_runtime import U32, U64, Result, Task
 from material_api import Parameter
 
 
@@ -53,15 +53,6 @@ class Status(C.Structure):
         + [(n, U32) for n in ("mode", "meshes", "materials", "lights")]
         + [("frame", Frame), ("error", C.c_char * 512)]
     )
-
-
-class DepthApi(C.Structure):
-    _fields_ = [
-        ("struct_size", U32),
-        ("abi_version", U32),
-        ("set_enabled", C.c_void_p),
-        ("copy_depth", C.c_void_p),
-    ]
 
 
 class Material(C.Structure):
@@ -155,32 +146,16 @@ class Viewport:
             raise RuntimeError("Invalid viewport surface ABI")
         if C.sizeof(Material) != 32 or C.sizeof(Materials) != 32:
             raise RuntimeError("Invalid viewport material ABI")
-        api = Api()
-        runtime.check(
-            runtime.library.hdue_get_api(
-                ABI_VERSION, C.sizeof(api), C.byref(api)
-            ),
-            "readback API",
-        )
+        api = runtime.api
         self.poll = C.CFUNCTYPE(Result, U64, C.POINTER(Frame))(api.poll_frame)
         self.copy = C.CFUNCTYPE(Result, U64, U64, C.c_void_p, U64)(
             api.copy_frame
         )
-        self.get_depth = runtime.library.hdue_get_depth_api
-        self.get_depth.argtypes = [U32, U32, C.POINTER(DepthApi)]
-        self.get_depth.restype = Result
-        extension = DepthApi()
-        runtime.check(
-            self.get_depth(1, C.sizeof(extension), C.byref(extension)),
-            "depth extension",
-        )
-        if extension.struct_size != 24 or extension.abi_version != 1:
-            raise RuntimeError("Invalid depth extension layout")
         self.set_depth = runtime.bind(
-            C.CFUNCTYPE(Result, U64, U32), extension.set_enabled
+            C.CFUNCTYPE(Result, U64, U32), api.set_depth_enabled
         )
         self.copy_depth = C.CFUNCTYPE(Result, U64, U64, C.c_void_p, U64)(
-            extension.copy_depth
+            api.copy_depth
         )
 
     def status(self):

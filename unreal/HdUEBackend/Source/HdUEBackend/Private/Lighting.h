@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "hdue/lighting_api.h"
+#include "hdue/bridge.h"
 #include "ImageCore.h"
 #include "RenderingThread.h"
 #include "RenderCommandFence.h"

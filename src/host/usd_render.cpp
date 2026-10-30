@@ -353,18 +353,17 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             auto dome = UsdLuxDomeLight(stage->GetPrimAtPath(SdfPath("/World/Lights/Dome")));
             auto rect = UsdLuxRectLight(stage->GetPrimAtPath(SdfPath("/World/Lights/Rect")));
             check(bool(dome) && bool(rect), "Lighting test requires samples/lighting/lighting.usda");
-            check(backend->lighting_api().get_status != nullptr, "Lighting extension is missing");
             const auto session = stat<uint64_t>(raw->GetRenderStats(), "sessionHandle", 0);
             HdueLightingStatus status{};
             status.struct_size = sizeof(status);
-            backend->require(backend->lighting_api().get_status(session, &status), "lighting status");
+            backend->require(backend->api().get_lighting_status(session, &status), "lighting status");
             check(status.dome_count == 1 && status.environment_max_radiance > 1,
                   "HDR environment lost its dynamic range");
             HdueLight invalid{};
             invalid.struct_size = sizeof(invalid);
             invalid.id = "invalid";
             HdueLightBatch invalidBatch{sizeof(HdueLightBatch), 1, &invalid};
-            check(backend->lighting_api().upsert(session, &invalidBatch) == HDUE_INVALID_ARGUMENT,
+            check(backend->api().upsert_lights(session, &invalidBatch) == HDUE_INVALID_ARGUMENT,
                   "Invalid light was accepted");
             if (!realtimeReference.empty()) previous = realtimeReference;
             raw->SetRenderSetting(TfToken("renderMode"), VtValue(std::string("realtime")));

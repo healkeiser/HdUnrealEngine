@@ -1,4 +1,4 @@
-"""Optional, versioned VT residency C ABI. All calls belong to the UE owner thread."""
+"""VT residency C ABI (include/hdue/bridge.h). All calls belong to the UE owner thread."""
 
 import ctypes as C
 
@@ -36,30 +36,16 @@ class Status(C.Structure):
     )
 
 
-class Api(C.Structure):
-    _fields_ = [
-        ("struct_size", U32),
-        ("abi_version", U32),
-        ("configure", C.c_void_p),
-        ("get_status", C.c_void_p),
-    ]
-
-
 class ResidencyApi:
     def __init__(self, runtime):
         self.runtime = runtime
-        get = runtime.library.hdue_get_residency_api
-        get.argtypes = [U32, U32, C.POINTER(Api)]
-        get.restype = Result
-        api = Api()
-        runtime.check(get(1, C.sizeof(Api), C.byref(api)), "VT residency API")
-        if api.struct_size != C.sizeof(Api) or api.abi_version != 1:
-            raise RuntimeError("Incompatible VT residency ABI")
         self.configure_fn = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Options)), api.configure
+            C.CFUNCTYPE(Result, U64, C.POINTER(Options)),
+            runtime.api.configure_residency,
         )
         self.status_fn = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Status)), api.get_status
+            C.CFUNCTYPE(Result, U64, C.POINTER(Status)),
+            runtime.api.get_residency_status,
         )
 
     def configure(self, session, maximum_pages=0, timeout_seconds=120):

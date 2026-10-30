@@ -199,8 +199,7 @@ int run(int argc, wchar_t** argv) {
               "Unexpected UE version");
         HdueRendererInfo renderer_info{};
         renderer_info.struct_size = sizeof(renderer_info);
-        check(backend.material_api().get_renderer_info != nullptr, "Material extension is missing");
-        backend.require(backend.material_api().get_renderer_info(&renderer_info), "get_renderer_info");
+        backend.require(backend.api().get_renderer_info(&renderer_info), "get_renderer_info");
         check(renderer_info.substrate_enabled && renderer_info.adaptive_gbuffer &&
                   renderer_info.project_closures_per_pixel >= 4 && renderer_info.bytes_per_pixel >= 128,
               "Expected Substrate Adaptive GBuffer with the configured material budget");
@@ -247,7 +246,6 @@ int run(int argc, wchar_t** argv) {
             request.up[2] = 1;
             const std::string prefix = "cycle-" + std::to_string(cycle);
             if (!options.wetBase.empty()) {
-                check(backend.surface_api().apply != nullptr, "Surface extension missing");
                 const float points[] = {-180, -140, 0, 180, -140, 0, 180,  140, 0,
                                         -180, -140, 0, 180, 140,  0, -180, 140, 0};
                 const float normals[] = {0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1};
@@ -290,10 +288,8 @@ int run(int argc, wchar_t** argv) {
                 batch.lights = &light;
                 backend.require(backend.api().apply_scene(session, &batch), "wet fixture");
                 HdueMaterialStats baseStats{sizeof(HdueMaterialStats)}, wetStats{sizeof(HdueMaterialStats)};
-                backend.require(backend.material_api().get_material_stats(session, "base", &baseStats),
-                                "dry shader cost");
-                backend.require(backend.material_api().get_material_stats(session, "variant", &wetStats),
-                                "wet shader cost");
+                backend.require(backend.api().get_material_stats(session, "base", &baseStats), "dry shader cost");
+                backend.require(backend.api().get_material_stats(session, "variant", &wetStats), "wet shader cost");
                 check(wetStats.closure_count > baseStats.closure_count && wetStats.closure_count <= 4 &&
                           wetStats.bytes_per_pixel <= 128,
                       "Water slab was simplified or exceeded its budget");
@@ -318,10 +314,10 @@ int run(int argc, wchar_t** argv) {
                         }
                         if (step == 4) wet.flags = HDUE_WET_MASK_PREVIEW;
                         HdueSurfaceBatch surface{sizeof(surface), step ? 1u : 0u, &wet};
-                        backend.require(backend.surface_api().apply(session, &surface), "wet binding");
+                        backend.require(backend.api().apply_surfaces(session, &surface), "wet binding");
                         if (step == 3) {
                             ++wet.geometry_revision;
-                            check(backend.surface_api().apply(session, &surface) == HDUE_STALE_FRAME,
+                            check(backend.api().apply_surfaces(session, &surface) == HDUE_STALE_FRAME,
                                   "Obsolete mask accepted");
                             --wet.geometry_revision;
                         }
@@ -333,7 +329,7 @@ int run(int argc, wchar_t** argv) {
                     }
                 }
                 HdueSurfaceStatus surface{sizeof(surface)};
-                backend.require(backend.surface_api().get_status(session, &surface), "wet status");
+                backend.require(backend.api().get_surface_status(session, &surface), "wet status");
                 check(surface.geometry_uploads == 1 && surface.mask_uploads == 2,
                       "Mask/scalar edits uploaded geometry or redundant masks");
                 std::cout << "Surface gate: geometry=" << surface.geometry_uploads << ", masks=" << surface.mask_uploads
@@ -362,24 +358,22 @@ int run(int argc, wchar_t** argv) {
             check(backend.api().destroy_session(session) == HDUE_INVALID_ARGUMENT,
                   "Destroyed session remained accessible");
         }
-        // Exercise the optional extension after image comparisons: these
+        // Exercise native picking after image comparisons: these
         // scene edits deliberately replace the commandlet's reference world.
-        const auto& pick = backend.native_pick_api();
-        check(pick.pick_native && pick.get_material_info, "Native picking extension is missing");
-        const auto get_pick = reinterpret_cast<HdueGetNativePickApiFn>(
-            GetProcAddress(GetModuleHandleW(L"HdUEBackend.dll"), "hdue_get_native_pick_api"));
-        HdueNativePickApi table{};
-        check(get_pick && get_pick(999, sizeof(table), &table) == HDUE_ABI_MISMATCH,
-              "Native extension ABI mismatch was accepted");
-        check(get_pick(1, sizeof(table) - 1, &table) == HDUE_BUFFER_TOO_SMALL && !table.pick_native,
-              "Short extension table was modified");
+        const auto& pick = backend.api();
+        const auto get_api = reinterpret_cast<HdueGetApiFn>(
+            GetProcAddress(GetModuleHandleW(options.backend.filename().c_str()), "hdue_get_api"));
+        HdueApi table{};
+        check(get_api && get_api(999, sizeof(table), &table) == HDUE_ABI_MISMATCH, "ABI mismatch was accepted");
+        check(get_api(HDUE_ABI_VERSION, sizeof(table) - 1, &table) == HDUE_BUFFER_TOO_SMALL && !table.pick_native,
+              "Short API table was modified");
         HduePickMaterialInfo material_info{};
         material_info.struct_size = sizeof(material_info);
-        backend.require(pick.get_material_info("/Game/HdUE/M_Native.M_Native", &material_info),
+        backend.require(pick.get_pick_material_info("/Game/HdUE/M_Native.M_Native", &material_info),
                         "native material metadata");
         check(material_info.flags == HDUE_PICK_MATERIAL_OPAQUE, "Unexpected native material metadata");
         std::thread pick_worker(
-            [&] { other_thread = pick.get_material_info("/Game/HdUE/M_Native.M_Native", &material_info); });
+            [&] { other_thread = pick.get_pick_material_info("/Game/HdUE/M_Native.M_Native", &material_info); });
         pick_worker.join();
         check(other_thread == HDUE_WRONG_THREAD, "Native picking ignored the UE owner thread");
         HdueSessionDesc pick_desc{};

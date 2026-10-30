@@ -1,5 +1,5 @@
 #pragma once
-// Houdini's GL viewport reads UE's frames straight from the backend's shared D3D12 ring (hdue/gpu_api.h): each redraw
+// Houdini's GL viewport reads UE's frames straight from the backend's shared D3D12 ring (hdue/bridge.h): each redraw
 // makes GL wait for UE's fence on the GPU and copies the newest frame into HgiGL textures, which HdxAovInputTask
 // composites instead of mapping and uploading the CPU render buffers. Any failure switches to the CPU path for good.
 #include "hdue/backend.hpp"

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 11u
+#define HDUE_ABI_VERSION 12u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -134,7 +134,7 @@ enum {
     HDUE_AOV_PRIM_ID = 7,
     /* Same encoding as PRIM_ID with the Hydra instance index of instanced meshes; -1 elsewhere. */
     HDUE_AOV_INSTANCE_ID = 8,
-    /* ABI 11: one raster render of the buffer visualizations set with HdueAovApi.set_buffers (hdue/aov_api.h). */
+    /* ABI 11: one raster render of the buffer visualizations set with set_aov_buffers. */
     HDUE_AOV_BUFFERS = 9,
     /* ABI 11: the beauty (same mode, samples, warmup, Lumen, exposure) restricted to the lighting components in bits
        8-15 (HDUE_AOV_LIGHTING | HDUE_LIGHTING_* << 8): UE's Path Tracer Lighting Components post-process settings;
@@ -291,29 +291,6 @@ typedef struct HdueSceneBatch {
     const char* const* removed_ids;
 } HdueSceneBatch;
 
-typedef struct HdueApi {
-    uint32_t struct_size;
-    uint32_t abi_version;
-    HdueResult(HDUE_CALL* initialize)(const HdueInitDesc* desc);
-    HdueResult(HDUE_CALL* get_status)(HdueStatus* status);
-    HdueResult(HDUE_CALL* tick)(void);
-    HdueResult(HDUE_CALL* create_session)(const HdueSessionDesc* desc, HdueSession* session);
-    HdueResult(HDUE_CALL* destroy_session)(HdueSession session);
-    HdueResult(HDUE_CALL* request_render)(HdueSession session, const HdueRenderRequest* request);
-    HdueResult(HDUE_CALL* poll_frame)(HdueSession session, HdueFrameInfo* frame);
-    HdueResult(HDUE_CALL* copy_frame)(HdueSession session, uint64_t frame_id, void* buffer, uint64_t capacity);
-    HdueResult(HDUE_CALL* window_message)(uint64_t hwnd, uint32_t message, uint64_t wparam, int64_t lparam,
-                                          int64_t* result);
-    HdueResult(HDUE_CALL* shutdown)(void);
-    HdueResult(HDUE_CALL* apply_scene)(HdueSession session, const HdueSceneBatch* batch);
-} HdueApi;
-
-/* Does not initialize the engine. The DLL must remain loaded until process exit. */
-typedef HdueResult(HDUE_CALL* HdueGetApiFn)(uint32_t version, uint32_t capacity, HdueApi* api);
-HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t version, uint32_t capacity, HdueApi* api);
-
-/* Optional versioned extension. The original v1 function table stays unchanged. */
-#define HDUE_NATIVE_PICK_ABI_VERSION 1u
 enum { HDUE_NATIVE_PICK_LOD0 = 1, HDUE_NATIVE_PICK_NANITE_FALLBACK = 2 };
 enum { HDUE_PICK_MATERIAL_OPAQUE = 1, HDUE_PICK_MATERIAL_TWO_SIDED = 2, HDUE_PICK_MATERIAL_DEFORMED = 4 };
 typedef struct HdueNativeRay {
@@ -338,18 +315,321 @@ typedef struct HduePickMaterialInfo {
     uint32_t struct_size;
     uint32_t flags;
 } HduePickMaterialInfo;
-typedef struct HdueNativePickApi {
+enum { HDUE_PARAMETER_SCALAR = 0, HDUE_PARAMETER_VECTOR = 1, HDUE_PARAMETER_TEXTURE = 2 };
+typedef struct HdueRendererInfo {
+    uint32_t struct_size;
+    uint32_t substrate_enabled;
+    uint32_t adaptive_gbuffer;
+    uint32_t project_closures_per_pixel;
+    uint32_t bytes_per_pixel;
+} HdueRendererInfo;
+typedef struct HdueMaterialParameter {
+    const char* name;
+    uint32_t type;
+    uint32_t reserved;
+    float value[4];
+    /* A cooked UE texture path for HDUE_PARAMETER_TEXTURE. Caller owned UTF-8. */
+    const char* texture_asset;
+} HdueMaterialParameter;
+typedef struct HdueMaterialUpdate {
+    uint32_t struct_size;
+    uint32_t parameter_count;
+    const char* material_id;
+    const HdueMaterialParameter* parameters;
+} HdueMaterialUpdate;
+typedef struct HdueMaterialStats {
+    uint32_t struct_size;
+    uint32_t substrate_enabled;
+    uint32_t closure_count;
+    uint32_t bytes_per_pixel;
+    uint32_t scalar_parameters;
+    uint32_t vector_parameters;
+    uint32_t texture_parameters;
+    uint32_t blend_mode;
+} HdueMaterialStats;
+enum { HDUE_RESIDENCY_IDLE, HDUE_RESIDENCY_PREPARING, HDUE_RESIDENCY_READY, HDUE_RESIDENCY_FAILED };
+typedef struct HdueResidencyOptions {
+    uint32_t struct_size;
+    uint32_t maximum_pages; /* 0: use physical pool capacity; otherwise also enforce this total budget. */
+    double timeout_seconds; /* Positive, preparation only. Default 120 seconds. */
+} HdueResidencyOptions;
+typedef struct HdueResidencyStatus {
+    uint32_t struct_size;
+    uint32_t phase;
+    uint64_t generation;
+    uint64_t required_pages;
+    uint64_t resident_pages;
+    uint64_t locked_tiles;
+    uint64_t required_mappings;
+    uint64_t ready_mappings;
+    uint32_t textures;
+    uint32_t preparation_frames;
+    double preparation_ms;
+    char message[512];
+} HdueResidencyStatus;
+enum {
+    HDUE_ASSET_UNKNOWN = 0,
+    HDUE_ASSET_STATIC_MESH = 1,
+    HDUE_ASSET_SKELETAL_MESH = 2,
+    HDUE_ASSET_ACTOR = 3,
+    HDUE_ASSET_LEVEL = 4,
+    HDUE_ASSET_RESOURCE = 5
+};
+enum { HDUE_ASSET_LOADING = 0, HDUE_ASSET_READY = 1, HDUE_ASSET_FAILED = 2 };
+typedef struct HdueAssetDesc {
+    uint32_t struct_size, visible;
+    const char* id;
+    const char* asset_path; /* Cooked UE object path; input copied during the call. */
+    double transform[16];   /* Native asset cm -> UE world cm, row-major. */
+} HdueAssetDesc;
+typedef struct HdueAssetStatus {
+    uint32_t struct_size, kind, state, actors, meshes, lights;
+    double bounds_min[3], bounds_max[3]; /* UE world cm. */
+    char message[512];                   /* Caller owned; no allocation crosses the DLL boundary. */
+} HdueAssetStatus;
+typedef struct HdueAssetSceneStatus {
+    uint32_t struct_size, instances, loading, failed, actors, meshes, lights, reserved;
+    char message[512];
+} HdueAssetSceneStatus;
+typedef struct HdueMeshTransform {
+    const char* id;
+    uint32_t count;
+    const double* matrices;
+} HdueMeshTransform;
+/* set_post_process: overrides for the beauty (never for AOVs). names are FPostProcessSettings property
+ * names (BloomIntensity, ColorSaturation, ...) and values their text: numbers, True/False, enum
+ * names, object paths, or whitespace/comma-separated numbers filling a struct's fields in order
+ * (FVector4 X Y Z W, FLinearColor R G B A). Each listed property also sets its bOverride_ flag.
+ * materials are cooked post-process material paths added as blendables with weight 1.
+ * tonemapper 0 keeps the beauty linear (default); 1 runs UE's tonemapper, bloom, grading, vignette,
+ * grain and lens effects, and the beauty becomes UE's tone-mapped image as display-linear Rec.709 (what UE's sRGB
+ * output decodes to). exposure_stops (the host camera's exposure) adds to AutoExposureBias.
+ * Names containing a dot set that console variable instead (process-wide, e.g. r.ScreenPercentage, sg.ShadowQuality;
+ * True/False become 1/0); a variable dropped from a later set gets back the value it had before hdUE set it.
+ * Unknown names and unparsable values are skipped with a warning in the UE log. Replaces the
+ * previous set; applies to the next request. */
+typedef struct HduePostProcessDesc {
+    uint32_t struct_size;
+    const char* const* names;
+    const char* const* values;
+    uint32_t count;
+    const char* const* materials;
+    uint32_t material_count;
+    int32_t tonemapper;
+    float exposure_stops;
+} HduePostProcessDesc;
+/* upsert_volume: dense density volumes rendered as UE heterogeneous volumes. density holds
+ * width * height * depth floats, x fastest; voxel (i, j, k) covers the unit cube
+ * [i, i+1] x [j, j+1] x [k, k+1] of the volume's local space, which transform
+ * (row-major, row vectors) maps to UE world centimeters. Extinction per cm is
+ * density * extinction_scale. The descriptor and its arrays are caller-owned and
+ * copied. */
+typedef struct HdueVolumeDesc {
+    uint32_t struct_size;
+    uint32_t visible;
+    const char* id;
+    uint32_t width, height, depth;
+    uint32_t reserved;
+    const float* density;
+    double transform[16];
+    float albedo[3];
+    float extinction_scale;
+} HdueVolumeDesc;
+enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
+enum {
+    HDUE_LIGHT_SHADOWS = 1,
+    HDUE_LIGHT_NORMALIZE = 2,
+    HDUE_LIGHT_POINT = 4,
+    HDUE_LIGHT_BACKGROUND = 8,
+    HDUE_LIGHT_MEGALIGHTS = 16
+};
+enum { HDUE_ENVIRONMENT_AUTOMATIC = 0, HDUE_ENVIRONMENT_LATLONG = 1 };
+typedef struct HdueLight {
+    uint32_t struct_size, type, visible, flags;
+    const char* id;
+    const char* texture_file;
+    double position_cm[3];
+    /* World-space UE vectors for the light's local USD +X,+Y,+Z axes. Dome maps use local +Y as the pole and +Z at
+       longitude zero; the delegate folds DomeLight_1 poleAxis (Hydra's domeOffset) into these axes. */
+    double axes[9];
+    float color[3], intensity;
+    float width_cm, height_cm, length_cm, angle_degrees;
+    float diffuse, specular, cone_angle, cone_softness;
+    uint32_t cube_resolution, texture_format;
+    /* UsdLux ShapingAPI IES profile (point, sphere, spot, rect and disk lights); empty for none. */
+    const char* ies_file;
+    float ies_angle_scale; /* UsdLux theta remap: > 0 theta / s, < 0 (theta - pi) / -s + pi, 0 none */
+    uint32_t ies_normalize;
+    /* UE lighting channels (bit per channel) of a linked light; 0 for every channel (unlinked). */
+    uint32_t lighting_channels, reserved;
+} HdueLight;
+/* Light and shadow linking per object (mesh ID): lighting channels in bits 0-2, and NO_SHADOW when the object is
+   outside every shadow-casting light's shadowLink. Objects not listed use every channel and cast shadows. */
+enum { HDUE_LINK_CHANNELS = 7, HDUE_LINK_NO_SHADOW = 8 };
+typedef struct HdueLightBatch {
+    uint32_t struct_size, light_count;
+    const HdueLight* lights;
+    /* With HDUE_LIGHT_BATCH_LINKS, object_ids/object_links replace the whole object table. */
+    uint32_t flags, object_count;
+    const char* const* object_ids;
+    const uint32_t* object_links;
+} HdueLightBatch;
+enum { HDUE_LIGHT_BATCH_LINKS = 1 };
+typedef struct HdueLightingStatus {
+    uint32_t struct_size, light_count, dome_count, environment_pending;
+    uint32_t mega_lights_project, mega_lights_allowed, mega_lights_active, cube_resolution;
+    uint64_t frame_id, generation;
+    float environment_max_radiance;
+    uint32_t reserved;
+} HdueLightingStatus;
+enum { HDUE_WET_MASK_PREVIEW = 1u, HDUE_SURFACE_GRAPH = 2u };
+/* apply_surfaces: a full snapshot of enabled bindings. An empty snapshot restores dry bindings.
+ * geometry_revision starts at 1 and increments on every base mesh upsert in
+ * this session, resetting when removed. Masks address expanded mesh vertices.
+ * count=0 selects uniform coverage. All data is copied before return. */
+typedef struct HdueWetBinding {
+    uint32_t struct_size, flags;
+    const char* object_id;
+    const char* variant_asset;
+    const char* preview_asset;
+    uint64_t geometry_revision;
+    float amount, roughness;
+    uint32_t mask_count, reserved;
+    const float* mask;
+} HdueWetBinding;
+typedef struct HdueSurfaceBatch {
+    uint32_t struct_size, binding_count;
+    const HdueWetBinding* bindings;
+} HdueSurfaceBatch;
+typedef struct HdueSurfaceStatus {
+    uint32_t struct_size, binding_count, upload_pending, reserved;
+    uint64_t mask_uploads, mask_bytes, geometry_uploads, updates;
+} HdueSurfaceStatus;
+#define HDUE_GPU_SLOTS 3u
+/* Zero-copy frames for a host that composites with its own graphics API (Houdini's GL
+ * viewport), D3D12 RHI only. While enabled, every beauty draw is also written into a ring of
+ * HDUE_GPU_SLOTS shared textures: RGBA16F colour (RGB times color_scale, straight alpha) and,
+ * with depth, R32F linear axial depth times depth_scale (centimetres to the host's units;
+ * FLT_MAX where nothing was hit). Rows are bottom-up (first row = bottom of the image), the
+ * layout of a GL texture. After writing a frame, UE's queue signals the shared ready fence with
+ * the frame's value. The colour readback (poll_frame/copy_frame/copy_depth) then runs only for
+ * converged frames, so CPU consumers still get every converged image.
+ *
+ * configure_gpu_frames and poll_gpu_frame use the runtime owner thread. acquire_gpu_frame may be called
+ * from any thread (the host's graphics thread): it returns the newest frame and keeps UE from
+ * writing its slot until the host signals the shared release fence with frame.frame_id, which
+ * the host must do right after reading. Pass the last seen frame.ring; when the ring changed
+ * (first call, resize, depth toggled), the handle fields hold new NT handles (textures and
+ * fences) that the caller owns and must close, else they are null. */
+typedef struct HdueGpuOptions {
+    uint32_t struct_size;
+    uint32_t enabled;
+    uint32_t depth;
+    float color_scale;
+    float depth_scale;
+} HdueGpuOptions;
+typedef struct HdueGpuFrame {
+    uint32_t struct_size;
+    uint32_t slot;     /* texture of this frame in the ring */
+    uint64_t ring;     /* in: last ring seen; out: current ring */
+    uint64_t frame_id; /* ready fence value once the frame is written; increasing */
+    uint64_t generation;
+    uint32_t width, height, converged, has_depth;
+    uint64_t color_bytes, depth_bytes; /* allocation size of each texture, for the import */
+    uint64_t color[HDUE_GPU_SLOTS], depth[HDUE_GPU_SLOTS];
+    uint64_t ready_fence, release_fence;
+    uint8_t adapter_luid[8]; /* LUID of UE's adapter: the importer must use the same GPU */
+} HdueGpuFrame;
+
+/* The function table. The delegate and the backend come from the same build: hdue_get_api fills every entry of the
+ * table for HDUE_ABI_VERSION or fails (HDUE_ABI_MISMATCH for another version, HDUE_BUFFER_TOO_SMALL when capacity is
+ * smaller than sizeof(HdueApi)). Every call runs on the thread that called initialize unless noted. */
+typedef struct HdueApi {
     uint32_t struct_size;
     uint32_t abi_version;
-    /* Owner thread only. No Tick/render wait. On a hit, ID includes a trailing
-       NUL; BUFFER_TOO_SMALL fills hit.required_id_bytes without touching ID.
-       StaticMesh uses CPU-readable resident LOD0, Nanite uses fallback LOD0. */
+    HdueResult(HDUE_CALL* initialize)(const HdueInitDesc* desc);
+    HdueResult(HDUE_CALL* get_status)(HdueStatus* status);
+    HdueResult(HDUE_CALL* tick)(void);
+    HdueResult(HDUE_CALL* create_session)(const HdueSessionDesc* desc, HdueSession* session);
+    HdueResult(HDUE_CALL* destroy_session)(HdueSession session);
+    /* Resizes the session's render target, keeping its scene. */
+    HdueResult(HDUE_CALL* resize_session)(HdueSession session, uint32_t width, uint32_t height);
+    HdueResult(HDUE_CALL* request_render)(HdueSession session, const HdueRenderRequest* request);
+    HdueResult(HDUE_CALL* poll_frame)(HdueSession session, HdueFrameInfo* frame);
+    HdueResult(HDUE_CALL* copy_frame)(HdueSession session, uint64_t frame_id, void* buffer, uint64_t capacity);
+    HdueResult(HDUE_CALL* window_message)(uint64_t hwnd, uint32_t message, uint64_t wparam, int64_t lparam,
+                                          int64_t* result);
+    HdueResult(HDUE_CALL* shutdown)(void);
+    HdueResult(HDUE_CALL* apply_scene)(HdueSession session, const HdueSceneBatch* batch);
+
+    /* No Tick/render wait. On a hit, object_id includes a trailing NUL; BUFFER_TOO_SMALL fills hit.required_id_bytes
+       without touching object_id. StaticMesh uses CPU-readable resident LOD0, Nanite uses fallback LOD0. */
     HdueResult(HDUE_CALL* pick_native)(HdueSession session, const HdueNativeRay* ray, HdueNativeHit* hit,
                                        char* object_id, uint32_t id_capacity);
-    HdueResult(HDUE_CALL* get_material_info)(const char* asset_path, HduePickMaterialInfo* info);
-} HdueNativePickApi;
-typedef HdueResult(HDUE_CALL* HdueGetNativePickApiFn)(uint32_t version, uint32_t capacity, HdueNativePickApi* api);
-HDUE_EXPORT HdueResult HDUE_CALL hdue_get_native_pick_api(uint32_t version, uint32_t capacity, HdueNativePickApi* api);
+    HdueResult(HDUE_CALL* get_pick_material_info)(const char* asset_path, HduePickMaterialInfo* info);
+
+    HdueResult(HDUE_CALL* get_renderer_info)(HdueRendererInfo* info);
+    /* Validates the complete batch before changing any value. Successful edits cancel the current render; request a
+       newer generation. */
+    HdueResult(HDUE_CALL* set_material_parameters)(HdueSession session, const HdueMaterialUpdate* update);
+    HdueResult(HDUE_CALL* get_material_stats)(HdueSession session, const char* material_id, HdueMaterialStats* stats);
+
+    /* Configure before request_render; changes cancel the current request. */
+    HdueResult(HDUE_CALL* configure_residency)(HdueSession session, const HdueResidencyOptions* options);
+    HdueResult(HDUE_CALL* get_residency_status)(HdueSession session, HdueResidencyStatus* status);
+
+    HdueResult(HDUE_CALL* upsert_asset)(HdueSession session, const HdueAssetDesc* desc);
+    HdueResult(HDUE_CALL* remove_asset)(HdueSession session, const char* id);
+    HdueResult(HDUE_CALL* get_asset_status)(HdueSession session, const char* id, HdueAssetStatus* status);
+    HdueResult(HDUE_CALL* get_asset_scene_status)(HdueSession session, HdueAssetSceneStatus* status);
+
+    /* Depth readback. Enable before requesting a generation. copy_depth uses the color frame_id and caller-owned
+     * float32 storage: top-down axial camera distance in centimeters, zero for background. A stale color/depth pair
+     * must be discarded and polled again. */
+    HdueResult(HDUE_CALL* set_depth_enabled)(HdueSession session, uint32_t enabled);
+    HdueResult(HDUE_CALL* copy_depth)(HdueSession session, uint64_t frame_id, float* output, uint64_t capacity_bytes);
+
+    /* AOV requests (HdueRenderRequest.aov other than HDUE_AOV_COLOR) render on their own view state and publish into
+     * their own frame slot, so the beauty's history, poll_frame, copy_frame and copy_depth are unaffected. poll_aov
+     * reports the newest frame of the newest AOV request; copy_frame copies it by its frame_id. AOV generations are
+     * independent of beauty generations. */
+    HdueResult(HDUE_CALL* poll_aov)(HdueSession session, HdueFrameInfo* frame);
+    /* The buffers HDUE_AOV_BUFFERS requests render, all in one raster render (Movie Render Queue's buffer
+     * visualization pipes): keys of UE's [Engine.BufferVisualizationMaterials] (BaseColor, WorldNormal, ...) or
+     * post-process material paths. Unknown names fail with HDUE_INVALID_ARGUMENT. */
+    HdueResult(HDUE_CALL* set_aov_buffers)(HdueSession session, const char* const* names, uint32_t count);
+    /* Buffer index (of set_aov_buffers) of the BUFFERS frame frame_id: RGBA float32, top row first, the frame's
+     * required_bytes. */
+    HdueResult(HDUE_CALL* copy_aov_buffer)(HdueSession session, uint64_t frame_id, uint32_t index, void* pixels,
+                                           uint64_t capacity);
+
+    /* Moves already-submitted meshes without resending their geometry, for motion-blur sub-frames.
+     * matrices holds count row-major UE world matrices (16 doubles each) in the convention of
+     * HdueMeshDesc: count 1 replaces transform, count == instance_count replaces instance_transforms.
+     * Unknown ids and mismatched counts are ignored. Applies to the next request. */
+    HdueResult(HDUE_CALL* set_transforms)(HdueSession session, const HdueMeshTransform* meshes, uint32_t count);
+
+    HdueResult(HDUE_CALL* set_post_process)(HdueSession session, const HduePostProcessDesc* desc);
+
+    HdueResult(HDUE_CALL* upsert_volume)(HdueSession session, const HdueVolumeDesc* volume);
+    HdueResult(HDUE_CALL* remove_volume)(HdueSession session, const char* id);
+
+    HdueResult(HDUE_CALL* upsert_lights)(HdueSession session, const HdueLightBatch* batch);
+    HdueResult(HDUE_CALL* get_lighting_status)(HdueSession session, HdueLightingStatus* status);
+
+    HdueResult(HDUE_CALL* apply_surfaces)(HdueSession session, const HdueSurfaceBatch* batch);
+    HdueResult(HDUE_CALL* get_surface_status)(HdueSession session, HdueSurfaceStatus* status);
+
+    HdueResult(HDUE_CALL* configure_gpu_frames)(HdueSession session, const HdueGpuOptions* options);
+    /* The newest shared frame (frame_id, generation, size, converged) without holding it. */
+    HdueResult(HDUE_CALL* poll_gpu_frame)(HdueSession session, HdueFrameInfo* frame);
+    /* Any thread (see HdueGpuFrame). */
+    HdueResult(HDUE_CALL* acquire_gpu_frame)(HdueSession session, HdueGpuFrame* frame);
+} HdueApi;
+
+/* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */
+typedef HdueResult(HDUE_CALL* HdueGetApiFn)(uint32_t version, uint32_t capacity, HdueApi* api);
+HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t version, uint32_t capacity, HdueApi* api);
 
 #ifdef __cplusplus
 }

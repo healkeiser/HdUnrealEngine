@@ -42,41 +42,27 @@ class AssetSceneStatus(C.Structure):
     ] + [("message", C.c_char * 512)]
 
 
-class AssetApi(C.Structure):
-    _fields_ = [("struct_size", U32), ("abi_version", U32)] + [
-        (n, C.c_void_p)
-        for n in ("upsert", "remove", "get_instance_status", "get_scene_status")
-    ]
-
-
 class Assets:
     def __init__(self, runtime):
         if tuple(
-            C.sizeof(t)
-            for t in (AssetDesc, AssetStatus, AssetSceneStatus, AssetApi)
-        ) != (152, 584, 544, 40):
+            C.sizeof(t) for t in (AssetDesc, AssetStatus, AssetSceneStatus)
+        ) != (152, 584, 544):
             raise RuntimeError("Wrong native asset C ABI layout")
         self.runtime = runtime
-        get = runtime.library.hdue_get_asset_api
-        get.argtypes = [U32, U32, C.POINTER(AssetApi)]
-        get.restype = Result
-        api = AssetApi()
-        runtime.check(get(1, C.sizeof(api), C.byref(api)), "get_asset_api")
-        if api.struct_size != 40 or api.abi_version != 1:
-            raise RuntimeError("Invalid asset extension")
+        api = runtime.api
         self.upsert = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(AssetDesc)), api.upsert
+            C.CFUNCTYPE(Result, U64, C.POINTER(AssetDesc)), api.upsert_asset
         )
         self.remove = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.c_char_p), api.remove
+            C.CFUNCTYPE(Result, U64, C.c_char_p), api.remove_asset
         )
         self.get_status = runtime.bind(
             C.CFUNCTYPE(Result, U64, C.c_char_p, C.POINTER(AssetStatus)),
-            api.get_instance_status,
+            api.get_asset_status,
         )
         self.get_scene = runtime.bind(
             C.CFUNCTYPE(Result, U64, C.POINTER(AssetSceneStatus)),
-            api.get_scene_status,
+            api.get_asset_scene_status,
         )
 
     def status(self, session, id):

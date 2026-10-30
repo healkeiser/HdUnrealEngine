@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "hdue/gpu_api.h"
+#include "hdue/bridge.h"
 
 class FRDGBuilder;
 class FRDGTexture;
@@ -8,8 +8,9 @@ class FRHITexture;
 class FRHICommandListImmediate;
 class FSceneView;
 
-// hdue/gpu_api.h: beauty frames shared with the host's graphics API (Houdini's GL viewport) through a ring of
-// shared D3D12 textures and fences, so the host composites them without a GPU->CPU readback or a CPU upload.
+// configure_gpu_frames (hdue/bridge.h): beauty frames shared with the host's graphics API (Houdini's GL viewport)
+// through a ring of shared D3D12 textures and fences, so the host composites them without a GPU->CPU readback or a CPU
+// upload.
 namespace HdueSharedFrames {
 // Runtime owner thread.
 HdueResult Configure(HdueSession Session, const HdueGpuOptions& Options);

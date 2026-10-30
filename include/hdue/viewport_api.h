@@ -1,7 +1,6 @@
 #ifndef HDUE_VIEWPORT_API_H
 #define HDUE_VIEWPORT_API_H
 #include "hdue/bridge.h"
-#include "hdue/material_api.h"
 #ifdef HDUE_VIEWPORT_EXPORTS
 #define HDUE_VIEWPORT_EXPORT __declspec(dllexport)
 #else

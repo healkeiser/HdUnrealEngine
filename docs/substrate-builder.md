@@ -223,7 +223,7 @@ The running UE instance continues ticking while the editor compiles. The resolve
 
 Compilation is asynchronous rather than instantaneous. Progress and failures appear in Houdini's status bar, `runtime-state.json`, and the session's `substrate-live` output directory. Failed graphs retain the last valid display and retry on a different topology or the retry button. In-flight editor jobs are allowed to finish their immutable output if the host closes. Generated variants are cached for the process and are not automatically unloaded or deleted.
 
-Runtime material instances retain the prepared graph and its base texture parameters. Per-mesh mask instances are isolated. The optional surface C ABI copies caller data, validates the session and geometry revision, and publishes updates on the owner thread. A mask-selector edit can fetch a newly selected primvar from the synchronized Hydra delegate using cached triangulation, without requiring a geometry upload.
+Runtime material instances retain the prepared graph and its base texture parameters. Per-mesh mask instances are isolated. The surface C ABI functions copy caller data, validates the session and geometry revision, and publishes updates on the owner thread. A mask-selector edit can fetch a newly selected primvar from the synchronized Hydra delegate using cached triangulation, without requiring a geometry upload.
 
 Path Tracer accumulation is reset after relevant edits. It starts after material/mask publication and required virtual-texture residency are ready. Older image generations are discarded. A missing mask or unprepared graph produces a specific error and does not qualify as a completed render of the requested material.
 
