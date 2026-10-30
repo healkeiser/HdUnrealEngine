@@ -309,17 +309,27 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         HMODULE Self = nullptr;
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                            reinterpret_cast<LPCWSTR>(&Initialize), &Self);
-        wchar_t Path[MAX_PATH] = {};
-        if (Self && GetModuleFileNameW(Self, Path, MAX_PATH)) {
+        TArray<wchar_t> Path;
+        Path.SetNumZeroed(32768);  // long install paths: MAX_PATH truncates
+        if (Self && GetModuleFileNameW(Self, Path.GetData(), Path.Num())) {
             for (const TCHAR* Name : {TEXT("tbb12.dll"), TEXT("embree4.dll")}) {
                 if (GetModuleHandleW(Name)) continue;
-                FString Dll = FPaths::GetPath(FString(Path)) / Name;
+                FString Dll = FPaths::GetPath(FString(Path.GetData())) / Name;
                 FPaths::MakePlatformFilename(Dll);
                 if (!LoadLibraryExW(*Dll, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS))
                     UE_LOG(LogTemp, Warning,
                            TEXT("hdUE: cannot load %s (error %u): no Nanite or Lumen cards for generated meshes."),
                            *Dll, GetLastError());
             }
+        }
+        // Embree needs a tbb12 at least as new as the one it was built with (scripts/check_shared_dlls.py checks the
+        // package against Houdini's): log the one this process uses.
+        if (HMODULE Tbb = GetModuleHandleW(L"tbb12.dll")) {
+            using FVersion = int (*)();
+            const auto Version = reinterpret_cast<FVersion>(GetProcAddress(Tbb, "TBB_runtime_interface_version"));
+            GetModuleFileNameW(Tbb, Path.GetData(), Path.Num());
+            UE_LOG(LogTemp, Log, TEXT("hdUE: tbb12 interface version %d from %s"), Version ? Version() : -1,
+                   Path.GetData());
         }
     }
     FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound "

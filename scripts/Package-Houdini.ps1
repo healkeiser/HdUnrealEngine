@@ -5,6 +5,8 @@ param(
     [string]$RuntimeConfig = '',
     [string]$BuildDirectory = '',
     [switch]$Zip,
+    # Package a build from uncommitted changes, or one stamped with another commit: never for a release.
+    [switch]$AllowDirty,
     # The backend links Developer modules (Engine Tools): the Unreal Engine EULA (6(d)) allows such a package only
     # through Fab or a fork of Epic's UnrealEngine GitHub network, never as a public download.
     [switch]$UnrealLicenseesOnly
@@ -41,8 +43,16 @@ foreach ($Path in $BackendDll, $Project, $Delegate, (Join-Path $Build 'resources
     if (-not (Test-Path -LiteralPath $Path)) { throw "Missing $Path; build and stage first." }
 }
 $Version = (& git -C $TaskRoot describe --tags --always --dirty).Trim()
+# The delegate's version resource (resources/version.rc.in) names the commit and the Houdini build it was built from.
+$Stamp = (Get-Item -LiteralPath $Delegate).VersionInfo
+$HoudiniBuild = $Stamp.Comments -replace '^Houdini ', ''
+if ($HoudiniBuild -notmatch '^\d+\.\d+\.\d+$') { throw "$Delegate has no Houdini build in its version resource: run Build-Houdini.ps1." }
+if (-not $AllowDirty) {
+    if ($Version -like '*-dirty') { throw "The tree has uncommitted changes ($Version): commit them, or pass -AllowDirty." }
+    if ($Stamp.ProductVersion -ne $Version) { throw "$Delegate was built from $($Stamp.ProductVersion), not ${Version}: run Build-Houdini.ps1, or pass -AllowDirty." }
+}
 $Out = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot 'out\package' }
-$Name = "hdUE-$Version-houdini22.0-win64"
+$Name = "hdUE-$Version-houdini$HoudiniBuild-win64"
 $Package = Join-Path $Out $Name
 if (Test-Path -LiteralPath $Package) { Remove-Item -LiteralPath $Package -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Package | Out-Null
@@ -67,8 +77,11 @@ $RuntimeTarget = Join-Path $Package 'runtime\Windows'
 Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp d3d12SDKLayers.dll VkLayer_*
 $BinTarget = Join-Path $RuntimeTarget ([IO.Path]::GetRelativePath($RuntimeRoot, (Split-Path $BackendDll)))
 Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
+# Houdini's own tbb12.dll is loaded first: every staged DLL must still find its imports there.
+& uv run --quiet (Join-Path $PSScriptRoot 'check_shared_dlls.py') $RuntimeTarget (Join-Path (Get-HdUELocalPath -Key houdini_root) 'bin')
+if ($LASTEXITCODE) { throw 'A staged DLL imports symbols that Houdini''s copy of the same DLL lacks.' }
 $Relative = { param($Path) 'runtime/Windows/' + ([IO.Path]::GetRelativePath($RuntimeRoot, $Path) -replace '\\', '/') }
-$Runtime = [ordered]@{version = 1; backend_dll = (& $Relative $BackendDll); runtime_project = (& $Relative $Project) }
+$Runtime = [ordered]@{version = 1; hdue_version = $Version; houdini_build = $HoudiniBuild; backend_dll = (& $Relative $BackendDll); runtime_project = (& $Relative $Project) }
 [IO.File]::WriteAllText((Join-Path $Package 'runtime.json'), ($Runtime | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 Copy-Item -Path (Join-Path $TaskRoot 'packaging\houdini\*') -Destination $Package
 # License terms: hdUE's MIT license, the package terms the Unreal Engine EULA requires (4(c), 7(a)) and the
@@ -84,4 +97,16 @@ if ($Zip) {
     & (Join-Path $env:SystemRoot 'System32\tar.exe') -a -c -f $Archive -C $Out $Name
     if ($LASTEXITCODE) { throw 'Zip failed.' }
     Write-Output "Archive: $Archive"
+    # Symbols stay out of the package; keep this archive with the release to symbolise users' crash dumps.
+    $Symbols = Join-Path $Out "$Name-symbols"
+    if (Test-Path -LiteralPath $Symbols) { Remove-Item -LiteralPath $Symbols -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $Symbols | Out-Null
+    foreach ($Pdb in [IO.Path]::ChangeExtension($Delegate, 'pdb'), [IO.Path]::ChangeExtension($BackendDll, 'pdb')) {
+        if (-not (Test-Path -LiteralPath $Pdb)) { throw "Missing $Pdb." }
+        Copy-Item -LiteralPath $Pdb -Destination $Symbols
+    }
+    & (Join-Path $env:SystemRoot 'System32\tar.exe') -a -c -f "$Symbols.zip" -C $Out "$Name-symbols"
+    if ($LASTEXITCODE) { throw 'Symbols zip failed.' }
+    Remove-Item -LiteralPath $Symbols -Recurse -Force
+    Write-Output "Symbols: $Symbols.zip"
 }
