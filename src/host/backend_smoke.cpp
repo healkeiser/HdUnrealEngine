@@ -163,9 +163,7 @@ void render(hdue::Backend& backend, HdueSession session, HdueRenderRequest reque
     std::cout << file.string() << ": " << frame.width << 'x' << frame.height << ", samples=" << frame.completed_samples
               << ", elapsed=" << seconds(start) << " s\n";
 }
-}  // namespace
-
-int wmain(int argc, wchar_t** argv) {
+int run(int argc, wchar_t** argv) {
     HWND window = nullptr;
     try {
         const Options options = parse(argc, argv);
@@ -459,4 +457,13 @@ int wmain(int argc, wchar_t** argv) {
         std::cerr << "FAIL: " << error.what() << '\n';
         return 1;
     }
+}
+}  // namespace
+
+// UE runs on a thread of the host's, as in Houdini and husk, and the process exits on its main thread, which runs UE's
+// static destructors (the game-thread handover in Bridge.cpp Shutdown).
+int wmain(int argc, wchar_t** argv) {
+    int code = 1;
+    std::thread([&] { code = run(argc, argv); }).join();
+    return code;
 }
