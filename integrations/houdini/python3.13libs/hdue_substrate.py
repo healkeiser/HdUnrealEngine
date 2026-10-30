@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import hou
+import voptoolutils
 from pxr import Sdf, UsdShade
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -17,6 +18,16 @@ PREFIX = "hdue::substrate_"
 HDA_VERSION = "1.3"
 REVISION_PARM = "hdue_graph_revision"
 HDA = Path(__file__).resolve().parents[1] / "otls/hdue_substrate.hda"
+# The earlier builder asset (hdue::substrate_builder::1.3), kept so scenes saved with it load; see upgrade().
+LEGACY_HDA = (
+    Path(__file__).resolve().parents[1]
+    / "otls/hdue_substrate_builder_legacy.hda"
+)
+# A builder is a plain VOP subnet, as SideFX's Karma Material Builder (voptoolutils.createMaskedMtlXSubnet): its
+# render context marks it, and its TAB menu offers the hdUE Substrate nodes and the subnet output connector only.
+RENDER_CONTEXT_PARM = "shader_rendercontextname"
+RENDER_CONTEXT = "hdue"
+TAB_MASK = "hdUE subnetconnector"
 
 
 def _revision_parameter():
@@ -33,20 +44,88 @@ def type_name(kind):
 
 def install():
     """Load the shipped Substrate VOPs where the integration is not on HOUDINI_PATH (plain hython)."""
-    if not hou.nodeType(hou.vopNodeTypeCategory(), type_name("builder")):
+    if not hou.nodeType(hou.vopNodeTypeCategory(), type_name("slab")):
         hou.hda.installFile(str(HDA))
+    if not hou.nodeType(hou.vopNodeTypeCategory(), type_name("builder")):
+        hou.hda.installFile(str(LEGACY_HDA))
+
+
+def is_builder(node):
+    """An hdUE Substrate Material Builder: a VOP subnet whose render context is hdue (set up by builder()), or a
+    builder saved as the earlier hdue::substrate_builder::1.3 asset.
+    """
+    if node.type().name() == type_name("builder"):
+        return True
+    parm = node.parm(RENDER_CONTEXT_PARM)
+    return (
+        node.type().name() == "subnet"
+        and parm is not None
+        and parm.evalAsString() == RENDER_CONTEXT
+    )
+
+
+def builder(subnet):
+    """Make a VOP subnet an hdUE Substrate Material Builder, as voptoolutils.createMaskedMtlXSubnet makes the
+    Karma Material Builder: the same Material Builder parameters (TAB menu mask limited to the hdUE Substrate
+    nodes, render context hdue), the material flag, and a Slab wired to a surface output.
+    """
+    voptoolutils._addMtlSubnetParms(
+        subnet, TAB_MASK, RENDER_CONTEXT, "hdUE Substrate Material Builder"
+    )
+    for child in subnet.children():
+        child.destroy()
+    output = subnet.createNode("subnetconnector", "surface_output")
+    output.setParms(
+        dict(
+            parmname="surface",
+            parmlabel="Surface",
+            parmtype="surface",
+            connectorkind="output",
+            useasparmdefiner=0,
+        )
+    )
+    output.setColor(hou.Color((0.89, 0.69, 0.6)))  # as Karma's surface output
+    output.setInput(0, subnet.createNode(type_name("slab"), "slab"))
+    subnet.layoutChildren()
+    subnet.setMaterialFlag(True)
+    return subnet
+
+
+def tool(kwargs):
+    """TAB menu and shelf tool: an hdUE Substrate Material Builder where the user places it, or in /mat from a
+    shelf when no network editor shows a material network.
+    """
+    install()
+    pane = kwargs.get("pane")
+    if not (
+        isinstance(pane, hou.NetworkEditor)
+        and pane.pwd().childTypeCategory() == hou.vopNodeTypeCategory()
+    ):
+        return create()
+    with hou.undos.group("Create Substrate Builder"):
+        return builder(voptoolutils.genericTool(kwargs, "subnet", "substrate"))
+
+
+def upgrade(node):
+    """Turn an hdue::substrate_builder::1.3 asset (scenes before the Material Builder subnet) into an hdUE Substrate
+    Material Builder subnet, keeping its name, network and wiring; returns the subnet.
+    """
+    subnet = node.changeNodeType(
+        "subnet", keep_network_contents=True, keep_parms=False
+    )
+    voptoolutils._addMtlSubnetParms(
+        subnet, TAB_MASK, RENDER_CONTEXT, "hdUE Substrate Material Builder"
+    )
+    subnet.setMaterialFlag(True)
+    return subnet
 
 
 def create(parent=None, preset="slab", material="/Looks/Base"):
     install()
     parent = parent or hou.node("/mat")
     with hou.undos.group("Create Substrate Builder"):
-        network = parent.createNode(type_name("builder"), "substrate_builder")
-        output = next(
-            n
-            for n in network.children()
-            if n.type().name() == "subnetconnector"
-        )
+        network = builder(parent.createNode("subnet", "substrate"))
+        output = network.node("surface_output")
         if preset == "wet":
             network.node("slab").destroy()
             base = network.createNode(type_name("materialx"), "base")
@@ -354,19 +433,6 @@ def publish(network=None):
     import hdue_houdini
 
     if network is None:
-
-        def is_builder(node):
-            definition = node.type().definition()
-            section = (
-                definition.sections().get("HDUE.Substrate.json")
-                if definition
-                else None
-            )
-            return (
-                section
-                and json.loads(section.contents()).get("operation") == "builder"
-            )
-
         selected = [n for n in hou.selectedNodes() if is_builder(n)]
         if len(selected) != 1:
             raise ValueError(

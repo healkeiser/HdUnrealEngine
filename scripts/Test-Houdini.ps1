@@ -9,8 +9,9 @@ $ErrorActionPreference = 'Stop'
 $HoudiniRoot = Get-HdUELocalPath -Key houdini_root -Value $HoudiniRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $RunOutput = New-HdUERun -Name houdini -Path $OutputDirectory
-# LOP cook, native asset proxies, stage space, render outputs and the material re-preparation change filter.
-foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test') {
+# LOP cook, native asset proxies, stage space, render outputs, the material re-preparation change filter and the
+# Substrate Material Builder.
+foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test') {
     & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot "tests\$Test.py")
     if ($LASTEXITCODE) { throw "$Test failed." }
 }

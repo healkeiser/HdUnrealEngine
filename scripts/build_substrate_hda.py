@@ -1,8 +1,10 @@
 """Build the hdUE Substrate VOPs (integrations/houdini/otls/hdue_substrate.hda) from scripts/substrate_graph.py.
 
-Like Karma's or MaterialX's VOPs, each node carries the render mask hdUE, by which a Material Library LOP hands
-an hdUE Substrate Builder to integrations/houdini/husdplugins/shadertranslators/hdue.py, and the TAB menu shows
-them under hdUE. Run it after any edit of NODES or the help below, and commit the result:
+They are locked leaf nodes, like MaterialX's VOPs. Like those, each carries a render mask (hdUE), by which a
+Material Library LOP hands an hdUE Substrate Material Builder to integrations/houdini/husdplugins/shadertranslators/
+hdue.py, and the TAB menu shows them under hdUE. The builder itself is no asset: like the Karma Material Builder,
+it is a plain VOP subnet a tool sets up (hdue_substrate.tool, toolbar/hdUE.shelf). Run this after any edit of NODES
+or the help below, and commit the result:
 
     python scripts/build_substrate_hda.py
 
@@ -11,8 +13,11 @@ It restarts itself in hython (HDUE_HOUDINI_ROOT, HFS or houdini_root).
 
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,11 +26,6 @@ sys.path[:0] = [
     str(ROOT / "integrations/houdini/python3.13libs"),
 ]
 ICON = "HDUE_hdue"
-BUILDER_HELP = (
-    "Composes a UE Substrate material from hdUE Substrate nodes. Like a Karma Material Builder, it goes in a "
-    "Material Library LOP (or /mat, with the library's Material VOP pointing at it), which authors the "
-    "material's typed USD graph; hdUE prepares that graph into a native Substrate material."
-)
 # Node summaries and help for each input and parameter, by node kind; HELP[None] holds what several kinds share.
 HELP = {
     None: {
@@ -250,11 +250,8 @@ def help_page(kind, summary, group, inputs):
     """The node's help card (wiki markup): summary, inputs and parameters with their help."""
     from hdue_substrate import type_name
 
-    title = (
-        "hdUE Substrate Builder" if kind == "builder" else NODES[kind]["label"]
-    )
     lines = [
-        f"= {title} =",
+        f"= {NODES[kind]['label']} =",
         "",
         "#type: node",
         "#context: vop",
@@ -263,12 +260,9 @@ def help_page(kind, summary, group, inputs):
         "",
         f'"""{summary}"""',
         "",
+        "It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.",
+        "",
     ]
-    if kind != "builder":
-        lines += [
-            "It is part of an hdUE Substrate Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.",
-            "",
-        ]
     if inputs:
         lines += ["@inputs", ""] + [
             line
@@ -287,20 +281,31 @@ def help_page(kind, summary, group, inputs):
 
 
 def finish(asset, kind, summary, group, inputs, keyword):
-    import re
+    from hdue_substrate import type_name
 
     definition = asset.type().definition()
     # VOP asset creation generates parameters from the connectors and resets numeric defaults.
     definition.setParmTemplateGroup(group)
-    # The render mask selects the hdUE shader translator; Type Properties > Node writes it in the dialog script.
+    # An external shader, as Karma's kma_* and MaterialX's hmtlx* VOPs: no network inside, a render mask selecting
+    # the hdUE shader translator and a shader type, in the dialog script as Type Properties > Node writes them.
+    # Surface nodes are surface shaders, so a Material Library translates the one wired to a Material Builder's
+    # surface output (with the whole builder graph); the others are generic, as kma_ao.
+    shader_type = (
+        "surface" if "surface" in outputs(NODES[kind]).values() else "generic"
+    )
     script = definition.sections()["DialogScript"].contents()
     definition.addSection(
         "DialogScript",
         re.sub(
-            r"(\n    label\s.*\n)", r"\1    rendermask\thdUE\n", script, count=1
+            r"(\n    label\s.*\n)",
+            rf"\1    rendermask\thdUE\n    externalshader 1\n    shadertype\t{shader_type}\n",
+            script,
+            count=1,
         ),
     )
-    definition.setExtraInfo(keyword)  # VopNet mask, which TAB menu masks test
+    definition.addSection("FunctionName", type_name(kind))
+    # Type Properties' VopNet mask, which TAB menu masks test.
+    definition.setExtraInfo(f"shadertype={shader_type} vopnetmask='{keyword}' ")
     definition.setIcon(ICON)
     definition.addSection("Tools.shelf", TOOL.replace("KEYWORD", keyword))
     definition.addSection("Help", help_page(kind, summary, group, inputs))
@@ -346,48 +351,25 @@ def build():
         )
         asset.setMaterialFlag(False)
         asset.destroy()
-
-    # The builder ships with a Slab wired to its surface output; new builders are unlocked, like Karma's.
-    builder = scratch.createNode("subnet", "builder")
-    for child in builder.children():
-        child.destroy()
-    output = connector(builder, "surface", "output", "surface")
-    asset = builder.createDigitalAsset(
-        name=type_name("builder"),
-        hda_file_name=str(HDA),
-        description="hdUE Substrate Builder",
-        min_num_inputs=0,
-        max_num_inputs=0,
-    )
-    asset.allowEditingOfContents()
-    output = asset.node(output.name())
-    output.setInput(0, asset.createNode(type_name("slab"), "slab"))
-    asset.layoutChildren()
-    mask = hou.properties.parmTemplate("op", "tabmenumask")
-    mask.setDefaultValue(("hdUE",))
-    mask.setHelp(
-        "Nodes the TAB menu offers inside the builder: the hdUE Substrate nodes, the only ones it translates."
-    )
-    group = hou.ParmTemplateGroup((mask,))
-    definition = asset.type().definition()
-    definition.updateFromNode(asset)
-    options = definition.options()
-    options.setUnlockNewInstances(True)
-    definition.setOptions(options)
-    # The builder is a material, like Houdini's material builders; its keyword matches Material Library's *builder mask.
-    finish(asset, "builder", BUILDER_HELP, group, [], "hdUE_builder")
-    definition.addSection("OnCreated", "kwargs['node'].setMaterialFlag(True)\n")
-    definition.setExtraFileOption("OnCreated/IsPython", True)
-    definition.save(str(HDA), asset, options)
-    asset.destroy()
     scratch.destroy()
     # Saving embeds a copy of a resolvable icon; keep the name only (config/Icons on HOUDINI_PATH resolves it).
     for saved in hou.hda.definitionsInFile(str(HDA)):
         if "IconSVG" in saved.sections():
             saved.removeSection("IconSVG")
             saved.setIcon(ICON)
+        saved.removeSection("Contents.gz")  # external shaders have no network
     shutil.rmtree(HDA.parent / "backup", ignore_errors=True)
-    print(f"{HDA}: {len(NODES) + 1} node types")
+    # Assets made from subnets stay subnets in the library index; mark them as SideFX's shaderhda.py writes
+    # external shader VOPs (Subnet: false), with hotl as it does, so they are leaf nodes, not networks to dive in.
+    hotl = Path(os.environ["HFS"]) / "bin/hotl"
+    with tempfile.TemporaryDirectory() as expanded:
+        subprocess.run([hotl, "-x", expanded, HDA], check=True)
+        index = Path(expanded) / "INDEX__SECTION"
+        index.write_text(
+            re.sub(r"(?m)^(Subnet:\s*)true$", r"\1false", index.read_text())
+        )
+        subprocess.run([hotl, "-l", expanded, HDA], check=True)
+    print(f"{HDA}: {len(NODES)} node types")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ from pxr import UsdShade
 
 
 def _builder(node):
-    while node and node.type().name() != hdue_substrate.type_name("builder"):
+    while node and not hdue_substrate.is_builder(node):
         node = node.parent()
     return node
 

@@ -7,3 +7,6 @@ opalias Lop hdue::hduerenderproducts::1.0 hdue_renderproducts
 opalias Lop hdue::hduerendersettings::1.0 hdue::rendersettings::1.0
 opalias Lop hdue::hduestandardrendervars::1.0 hdue::standardrendervars::1.0
 opalias Lop hdue::hduerenderproducts::1.0 hdue::renderproducts::1.0
+// The Substrate builder is a plain VOP subnet now (hdUE Substrate Material Builder, as Karma's Material Builder);
+// otls/hdue_substrate_builder_legacy.hda keeps the earlier asset loading.
+opdeprecate -r "Use the hdUE Substrate Material Builder (TAB menu > hdUE); hdue_substrate.upgrade(node) converts this one" 22.0 Vop hdue::substrate_builder::1.3

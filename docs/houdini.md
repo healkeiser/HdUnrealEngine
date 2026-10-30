@@ -87,7 +87,7 @@ Whatever LOP is displayed, the host adds nothing to the graph. Instanceable refe
 
 ## Substrate materials
 
-UE Substrate materials are authored like Karma's: an **hdUE Substrate Builder** (TAB menu > hdUE) in a Material Library LOP, holding hdUE Substrate nodes (Slab, Vertical Layer, Texture Sample, ...). The VOPs ship in `integrations/houdini/otls/hdue_substrate.hda`, built by `scripts/build_substrate_hda.py`. Their render mask, `hdUE`, makes the Material Library hand the builder to hdUE's shader translator (`integrations/houdini/husdplugins/shadertranslators/hdue.py`, found on `HOUDINI_PATH` as SideFX describes for [custom shader translators](https://www.sidefx.com/docs/houdini/solaris/shader_framework.html)), which authors it as one typed USD material that hdUE prepares into a native UE material. See [Substrate Builder](substrate-builder.md).
+UE Substrate materials are authored like Karma's: an **hdUE Substrate Material Builder** (TAB menu > hdUE) in a Material Library LOP, an editable VOP subnet like the Karma Material Builder, holding hdUE Substrate nodes (Slab, Vertical Layer, Texture Sample, ...). Those leaf VOPs ship in `integrations/houdini/otls/hdue_substrate.hda`, built by `scripts/build_substrate_hda.py`. Their render mask, `hdUE`, makes the Material Library hand the builder to hdUE's shader translator (`integrations/houdini/husdplugins/shadertranslators/hdue.py`, found on `HOUDINI_PATH` as SideFX describes for [custom shader translators](https://www.sidefx.com/docs/houdini/solaris/shader_framework.html)), which authors it as one typed USD material that hdUE prepares into a native UE material. See [Substrate Builder](substrate-builder.md).
 
 ## Rendering to disk with husk
 

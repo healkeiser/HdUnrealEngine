@@ -4,7 +4,7 @@ Status: experimental implementation. Houdini VOP authoring, USD graph serializat
 
 ## Purpose and scope
 
-Substrate Builder lets artists compose UE Substrate materials in a Houdini VOP network. A prepared MaterialX surface can become an input to a larger graph. Slabs, coverage weights, and layer operators are authored explicitly. Water coating is an example network built from these nodes.
+The hdUE Substrate Material Builder lets artists compose UE Substrate materials in a Houdini VOP network. A prepared MaterialX surface can become an input to a larger graph. Slabs, coverage weights, and layer operators are authored explicitly. Water coating is an example network built from these nodes.
 
 The initial implementation targets generic USD meshes in Solaris. Prepared graphs also render through the standalone Hydra host. Automatic Builder-library binding in stock usdview is a subsequent integration step; its existing MaterialX workflow remains available.
 
@@ -36,13 +36,13 @@ Houdini supplies the node editor, connections, parameters, and undo. hdUE export
 
 ## Authoring in Houdini
 
-The hdUE Substrate VOPs ship in `integrations/houdini/otls/hdue_substrate.hda`, so they are in the TAB menu's **hdUE** submenu from startup, in `/mat` and inside a Material Library LOP. As with Karma's or MaterialX's VOPs, each carries a render mask (`hdUE`) by which Solaris picks its shader translator, here `integrations/houdini/husdplugins/shadertranslators/hdue.py`.
+The hdUE Substrate VOPs ship in `integrations/houdini/otls/hdue_substrate.hda`, so they are in the TAB menu's **hdUE** submenu from startup, in `/mat` and inside a Material Library LOP. Like Karma's and MaterialX's VOPs (`kma_*`, `hmtlx*`), they are locked external-shader leaf nodes (`hdue::substrate_<kind>::1.3`, no network inside): Slabs, layers and mixes are surface shaders, the others generic. Each carries a render mask (`hdUE`) by which Solaris picks its shader translator, here `integrations/houdini/husdplugins/shadertranslators/hdue.py`.
 
-**hdUE Substrate Builder** is the material: a VOP subnet with the material flag on and a Slab wired to its surface output, whose TAB menu offers only the hdUE Substrate nodes (`tabmenumask`). Put it in a Material Library LOP, or leave it in `/mat` and point the library's **Material VOP** at it. The library authors the builder as one USD material (the graph described [below](#usd-representation-and-identity)), assigns it like any other material, and re-authors it on parameter edits, rewiring and node changes. No Python LOP is involved.
+**hdUE Substrate Material Builder** is the material, made the way SideFX makes the Karma Material Builder. That one is no asset: the TAB tool `vop_karmamtlxsubnet` (`$HFS/houdini/toolbar/ExtraTools.shelf`, TAB menu > Karma wherever a Material Builder can go) calls `voptoolutils.createMaskedMtlXSubnet`, which creates a plain VOP subnet, adds its Material Builder parameters (`tabmenumask`, `shader_rendercontextname`, `shader_forcechildren`, the USD class inherit controls), fills it with a starter network and turns its material flag on. The tool `vop_hduesubstratebuilder` (`integrations/houdini/toolbar/hdUE.shelf`, TAB menu > hdUE in `/mat` and Material Library LOPs, and the hdUE shelf) does the same through `hdue_substrate.tool`: an editable subnet with the same parameters (render context `hdue`, TAB menu mask `hdUE subnetconnector`: the hdUE Substrate nodes and the output connector, the only nodes it translates), a Slab wired to a `surface` output connector, and the material flag. Its render context is what marks a subnet as a builder (`hdue_substrate.is_builder`). Put it in a Material Library LOP, or leave it in `/mat` and point the library's **Material VOP** at it. The library authors the builder as one USD material (the graph described [below](#usd-representation-and-identity)), assigns it like any other material, and re-authors it on parameter edits, rewiring and node changes. No Python LOP is involved.
 
 The **hdUE** shelf provides:
 
-- **Substrate Builder**: create a builder in `/mat`.
+- **hdUE Substrate Material Builder**: create a builder (in `/mat` from the shelf).
 - **Water Coating Example**: create a builder with a MaterialX base, clear water Slab, public coverage/roughness parameters, float mask, Weight, and Vertical Layer.
 - **Author Substrate USD**: add a Material Library LOP after the displayed LOP that authors the selected builder at `/Looks/<builder name>`, bound to the current Scene Graph selection.
 
@@ -62,7 +62,9 @@ hdue_substrate.author_lop(water, "/Looks/Water", hou.node("/stage/sphere1"), ["/
 
 `author_lop(builder, material_path, input_node, prim_paths)` configures the builder's own Material Library, or adds one after `input_node` that references a builder elsewhere. Source USD files and referenced materials remain independently editable. Scenes saved with the earlier Python authoring LOP keep working; that LOP still calls `hdue_substrate.cook()`.
 
-`scripts/build_substrate_hda.py` builds the asset from `scripts/substrate_graph.py`, with the help of each node and parameter: run it after editing either and commit the result. The type names (`hdue::substrate_<kind>::1.3`) are unchanged, so earlier scenes load the shipped definitions.
+`scripts/build_substrate_hda.py` builds the leaf VOPs from `scripts/substrate_graph.py`, with the help of each node and parameter: run it after editing either and commit the result. The type names (`hdue::substrate_<kind>::1.3`) are unchanged, so earlier scenes load the shipped definitions.
+
+Builders saved before the Material Builder subnet are instances of the asset `hdue::substrate_builder::1.3`. `integrations/houdini/otls/hdue_substrate_builder_legacy.hda` keeps that definition, deprecated in `OPcustomize` (out of the TAB menu), so those scenes load, author and render unchanged. `hdue_substrate.upgrade(node)` turns one into a Material Builder subnet with the same name, network and parameters on its nodes.
 
 ## Available nodes
 
