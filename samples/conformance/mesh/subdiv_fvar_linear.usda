@@ -1,10 +1,11 @@
 #usda 1.0
 (
-    doc = """faceVaryingLinearInterpolation decides how face-varying primvars are refined: "all" interpolates them linearly
-(bilinear on a quad, so a corner keeps its value), "none" smooths them everywhere, as edgeOnly boundary interpolation
-does, so a lone bright corner value is averaged with its dark neighbours (towards (1 + 4 x 1 + 1) / 6 of the way at
-the limit). Two catmullClark quads with an indexed face-varying displayColor, white at the top-right corner and dark
-grey elsewhere: the top-right corner of "none" is darker than that of "all"."""
+    doc = """faceVaryingLinearInterpolation decides how face-varying primvars are refined: "all" interpolates them linearly,
+"none" smooths them everywhere (on the mesh boundary they still follow interpolateBoundary, whose default
+edgeAndCorner keeps corners sharp, so a single quad refines the same either way). A 2 x 2 catmullClark grid with an
+indexed face-varying displayColor, white at the interior vertex and dark grey elsewhere: "all" keeps the centre white
+(bilinear), "none" averages it with its neighbours ((16 + 16 x 0.1 + 4 x 0.1) / 36 = 0.5 at the limit), so the
+centre of "none" is darker than that of "all"."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomMesh",
@@ -12,23 +13,23 @@ grey elsewhere: the top-right corner of "none" is darker than that of "all"."""
  "frames": 1,
  "checks": [
   {
-   "name": "none darkens the bright corner",
+   "name": "none darkens the bright centre",
    "ratio": [
     {
      "region": [
-      3.8,
-      0.8,
-      3.95,
-      0.95
+      2.9,
+      -0.1,
+      3.1,
+      0.1
      ],
      "stat": "luma"
     },
     {
      "region": [
-      -1.2,
-      0.8,
-      -1.05,
-      0.95
+      -2.1,
+      -0.1,
+      -1.9,
+      0.1
      ],
      "stat": "luma"
     }
@@ -36,13 +37,13 @@ grey elsewhere: the top-right corner of "none" is darker than that of "all"."""
    "max": 0.9
   },
   {
-   "name": "all keeps the corner bright",
+   "name": "all keeps the centre bright",
    "value": {
     "region": [
-     -1.2,
-     0.8,
-     -1.05,
-     0.95
+     -2.1,
+     -0.1,
+     -1.9,
+     0.1
     ],
     "stat": "luma"
    },
@@ -61,27 +62,27 @@ grey elsewhere: the top-right corner of "none" is darker than that of "all"."""
 )
 def Mesh "All"
 {
-    int[] faceVertexCounts = [4]
-    int[] faceVertexIndices = [0, 1, 2, 3]
-    point3f[] points = [(-3, -1, 0), (-1, -1, 0), (-1, 1, 0), (-3, 1, 0)]
+    int[] faceVertexCounts = [4, 4, 4, 4]
+    int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
+    point3f[] points = [(-3.5, -1.5, 0), (-2, -1.5, 0), (-0.5, -1.5, 0), (-3.5, 0, 0), (-2, 0, 0), (-0.5, 0, 0), (-3.5, 1.5, 0), (-2, 1.5, 0), (-0.5, 1.5, 0)]
     uniform token subdivisionScheme = "catmullClark"
     uniform bool doubleSided = 1
-    color3f[] primvars:displayColor = [(0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (1, 1, 1), (0.1, 0.1, 0.1)] (
+    color3f[] primvars:displayColor = [(0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (1, 1, 1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1)] (
         interpolation = "faceVarying"
     )
-    int[] primvars:displayColor:indices = [0, 1, 2, 3]
+    int[] primvars:displayColor:indices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
     token faceVaryingLinearInterpolation = "all"
 }
 def Mesh "None"
 {
-    int[] faceVertexCounts = [4]
-    int[] faceVertexIndices = [0, 1, 2, 3]
-    point3f[] points = [(2, -1, 0), (4, -1, 0), (4, 1, 0), (2, 1, 0)]
+    int[] faceVertexCounts = [4, 4, 4, 4]
+    int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
+    point3f[] points = [(1.5, -1.5, 0), (3, -1.5, 0), (4.5, -1.5, 0), (1.5, 0, 0), (3, 0, 0), (4.5, 0, 0), (1.5, 1.5, 0), (3, 1.5, 0), (4.5, 1.5, 0)]
     uniform token subdivisionScheme = "catmullClark"
     uniform bool doubleSided = 1
-    color3f[] primvars:displayColor = [(0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (1, 1, 1), (0.1, 0.1, 0.1)] (
+    color3f[] primvars:displayColor = [(0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (1, 1, 1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1)] (
         interpolation = "faceVarying"
     )
-    int[] primvars:displayColor:indices = [0, 1, 2, 3]
+    int[] primvars:displayColor:indices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
     token faceVaryingLinearInterpolation = "none"
 }
