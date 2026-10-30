@@ -15,6 +15,7 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 | `hdUE:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
 | `hdUE:debugView` | `off` | One of UE's viewport view modes instead of the realtime beauty; see [debug views](#debug-views) |
 | `hdUE:subdivisionLevel` | 2 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
+| `hdUE:cullBackface` | 0 | Meshes whose `doubleSided` is off render their front faces only; see [geometry](#geometry) |
 | `hdUE:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
 | `hdUE:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
 | `hdUE:cvar:<console variable>` | | A UE console variable, with `:` for `.` (`int hdUE:cvar:r:Shadow:Virtual:Enable = 0`); see [engine quality](#engine-quality) |
@@ -34,6 +35,8 @@ Generic Hydra translation supports meshes, cameras, materials, and distant, sphe
 Meshes reach UE indexed: the triangle corners of a point share one vertex unless a face-varying normal, UV, color or wet mask differs between them, so UE holds about as many vertices as the USD mesh has points. A mesh UE cannot take (more than about 715 million vertices, or broken indices) is skipped with a warning naming it in the UE log; the rest of the scene still loads.
 
 Material-binding GeomSubsets partition triangles by their original USD face while preserving UVs, normals, transforms, visibility, and picking paths. Unassigned faces retain the mesh material; overlapping or invalid material subsets are rejected. Subset edits and removals update the generated meshes.
+
+Every mesh renders both sides, as in Karma (whose `karma:object:cull_backface` defaults to off). `hdUE:cullBackface` opts into USD's `doubleSided`: meshes without it then draw a one-sided twin of their material and cull their back faces. Karma's per-object `karma:object:cull_backface` primvar is not read; `doubleSided` is the per-mesh switch.
 
 Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not apply subdivision creases.
 

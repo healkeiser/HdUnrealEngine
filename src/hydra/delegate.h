@@ -79,7 +79,7 @@ struct HdUEMeshData {
     TfToken renderTag;                    // purpose; hidden while the render pass does not draw it
     int primId = -1;                      // HdRprim::GetPrimId, written by the ID pass
     VtArray<TfToken> categories;          // light/shadow link collections that include the prim (GetCategories)
-    bool doubleSided = true;              // UsdGeomGprim doubleSided; single-sided meshes cull their back faces
+    bool doubleSided = true;              // UsdGeomGprim doubleSided; hdUE:cullBackface culls single-sided backs
     bool instanced = false;               // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances;    // USD world matrices (prototype transform included)
     std::vector<GfVec3f> instanceColors;  // per instance: an instance-rate displayColor (or material colour primvar)

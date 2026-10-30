@@ -323,6 +323,18 @@
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__hdUErequireNanite_control_qhb == block } { xn__hdUErequireNanite_control_qhb == none })"
             }
+            HDUE_CONTROL("xn__hdUEcullBackface_control_3fb", "Cull Backface")
+            parm {
+                name    "xn__hdUEcullBackface_21a"
+                label   "Cull Backface"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "Meshes whose USD doubleSided is off render their front faces only, as USD allows. Off, every mesh renders both sides, as in Karma."
+                parmtag { "spare_category" "Geometry" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__hdUEcullBackface_control_3fb == block } { xn__hdUEcullBackface_control_3fb == none })"
+            }
             HDUE_CONTROL("xn__hdUEupAxis_control_c5a", "Stage Up Axis")
             parm {
                 name    "xn__hdUEupAxis_bsa"

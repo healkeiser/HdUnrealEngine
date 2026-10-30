@@ -1,21 +1,35 @@
 #usda 1.0
 (
     doc = """doubleSided = true instructs every renderer to draw both sides and to light each side with a forward-facing
-normal. Left: a reference quad facing the camera. Right: the same quad wound clockwise (facing away), doubleSided:
-it must be visible and lit like the reference. (Culling single-sided back faces is allowed, not required.)"""
+normal; a single-sided mesh may cull its back faces, which hdUE does under hdUE:cullBackface (set here). Left: a
+single-sided reference quad facing the camera. Middle: the same quad wound clockwise (facing away), doubleSided: it
+must be visible and lit like the reference. Right: the clockwise quad, single-sided: culled."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomMesh",
- "feature": "doubleSided",
+ "feature": "doubleSided (hdUE:cullBackface)",
  "frames": 1,
  "checks": [
+  {
+   "name": "front face visible",
+   "value": {
+    "region": [
+     -4.0,
+     -1,
+     -2.0,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
   {
    "name": "double-sided back face visible",
    "value": {
     "region": [
-     1,
+     -1.0,
      -1,
-     3,
+     1.0,
      1
     ],
     "stat": "coverage"
@@ -27,23 +41,36 @@ it must be visible and lit like the reference. (Culling single-sided back faces 
    "ratio": [
     {
      "region": [
-      1,
+      -1.0,
       -1,
-      3,
+      1.0,
       1
      ]
     },
     {
      "region": [
-      -3,
+      -4.0,
       -1,
-      -1,
+      -2.0,
       1
      ]
     }
    ],
    "min": 0.6,
    "max": 1.6
+  },
+  {
+   "name": "single-sided back face culled",
+   "value": {
+    "region": [
+     2.0,
+     -1,
+     4.0,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.1
   }
  ]
 }"""
@@ -56,18 +83,32 @@ it must be visible and lit like the reference. (Culling single-sided back faces 
     renderSettingsPrimPath = "/Render/Settings"
     subLayers = [@../common/stage.usda@]
 )
+over "Render"
+{
+    over "Settings"
+    {
+        bool hdUE:cullBackface = 1
+    }
+}
 def Mesh "Front"
 {
         int[] faceVertexCounts = [4]
         int[] faceVertexIndices = [0, 1, 2, 3]
-        point3f[] points = [(-3.5, -1.5, 0), (-0.5, -1.5, 0), (-0.5, 1.5, 0), (-3.5, 1.5, 0)]
+        point3f[] points = [(-4.4, -1.5, 0), (-1.6, -1.5, 0), (-1.6, 1.5, 0), (-4.4, 1.5, 0)]
         uniform token subdivisionScheme = "none"
 }
 def Mesh "Back"
 {
         int[] faceVertexCounts = [4]
         int[] faceVertexIndices = [0, 3, 2, 1]
-        point3f[] points = [(0.5, -1.5, 0), (3.5, -1.5, 0), (3.5, 1.5, 0), (0.5, 1.5, 0)]
+        point3f[] points = [(-1.4, -1.5, 0), (1.4, -1.5, 0), (1.4, 1.5, 0), (-1.4, 1.5, 0)]
         uniform token subdivisionScheme = "none"
         uniform bool doubleSided = 1
+}
+def Mesh "Culled"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 3, 2, 1]
+        point3f[] points = [(1.6, -1.5, 0), (4.4, -1.5, 0), (4.4, 1.5, 0), (1.6, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
 }

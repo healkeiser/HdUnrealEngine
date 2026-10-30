@@ -53,7 +53,8 @@ enum {
     HDUE_MESH_EDITABLE = 2,
     HDUE_MESH_SINGLE_SIDED = 4
 }; /* EDITABLE: geometry edited after upload (surface effects); others build static meshes. SINGLE_SIDED:
-      UsdGeomGprim doubleSided = 0, its generated surface material culls back faces (older backends ignore it). */
+      UsdGeomGprim doubleSided = 0 under hdUE:cullBackface: its generated surface material culls back faces (older
+      backends ignore it). */
 
 /* Every descriptor is caller-owned. Set struct_size to sizeof(the descriptor).
  * Strings are UTF-8 and are copied during the call. No UE/pxr/STL type, native
