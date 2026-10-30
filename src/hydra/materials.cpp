@@ -6,9 +6,11 @@
 #include "pxr/usd/sdf/assetPath.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
+#include <algorithm>
 #include <cmath>
 #include <mutex>
 #include <set>
+#include <tuple>
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
@@ -93,10 +95,25 @@ TfToken colorPrimvar(const HdMaterialNode2& node) {
                ? token(param(node, "geomprop"))
                : TfToken();
 }
+// The UV primvar a coordinate reader reads (UsdPrimvarReader_float2 varname, MaterialX geompropvalue geomprop:
+// exporters name it map1, UVMap, ...); empty otherwise.
+TfToken uvPrimvar(const HdMaterialNode2& node) {
+    if (node.nodeTypeId == TfToken("UsdPrimvarReader_float2")) return token(param(node, "varname"));
+    return node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? token(param(node, "geomprop")) : TfToken();
+}
+// The UV primvars a material reads, in node order: its meshes' UV sets 0, 1, ...
+TfTokenVector uvPrimvars(const HdMaterialNetwork2& network) {
+    TfTokenVector names;
+    for (const auto& [path, node] : network.nodes)
+        if (const auto name = uvPrimvar(node);
+            !name.IsEmpty() && std::find(names.begin(), names.end(), name) == names.end())
+            names.push_back(name);
+    return names;
+}
 class SurfaceReader {
 public:
     SurfaceReader(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data)
-        : network_(network), shader_(shader), data_(data) {}
+        : network_(network), shader_(shader), data_(data), uvNames_(uvPrimvars(network)) {}
     // Reads an input's constant into out (which holds the fallback). With texture, an image driving the input fills it
     // and returns true; without, a textured input keeps its constant, with a warning. Colour images are converted
     // from their authored colour space (OCIO) to linear Rec.709.
@@ -129,6 +146,7 @@ public:
             return false;
         }
         *texture = source.texture;
+        texture->uvSet = uvSet(*source.image);
         // A host image (op:) exists only once the host exported it: converted when the scene is packed.
         if (color) {
             texture->convert = true;
@@ -266,9 +284,26 @@ private:
             warnOnce("MaterialX place2d is not translated; textures use their mesh UVs");
         return true;
     }
+    // The UV set an image reads: its st / texcoord reader's primvar, also through a UsdTransform2d; 0 unconnected.
+    uint32_t uvSet(const HdMaterialNode2& image) const {
+        const auto* st = connection(image, image.nodeTypeId == TfToken("UsdUVTexture") ? "st" : "texcoord");
+        for (int hop = 0; st && hop < 2; ++hop) {
+            const auto node = network_.nodes.find(st->upstreamNode);
+            if (node == network_.nodes.end()) break;
+            if (const auto name = uvPrimvar(node->second); !name.IsEmpty()) {
+                const auto set = size_t(std::find(uvNames_.begin(), uvNames_.end(), name) - uvNames_.begin());
+                if (set < 4) return uint32_t(set);
+                warnOnce("materials read up to 4 UV primvars; textures reading others use the first");
+                return 0;
+            }
+            st = connection(node->second, "in");  // UsdTransform2d
+        }
+        return 0;
+    }
     const HdMaterialNetwork2& network_;
     const HdMaterialNode2& shader_;
     HdUEMaterialData& data_;
+    const TfTokenVector uvNames_;
     bool uvSet_ = false;
 };
 
@@ -445,6 +480,25 @@ const HdMaterialNode2* surface(const HdMaterialNetwork2& network) {
         if (node.nodeTypeId == TfToken("UsdPreviewSurface")) return &node;
     return nullptr;
 }
+// MaterialX displacement (ND_displacement_float): displacement * scale along the normal. UsdPreviewSurface reads its
+// own.
+void readDisplacement(const HdMaterialNetwork2& network, HdUEMaterialData& data) {
+    const auto terminal = network.terminals.find(HdMaterialTerminalTokens->displacement);
+    const auto node =
+        terminal == network.terminals.end() ? network.nodes.end() : network.nodes.find(terminal->second.upstreamNode);
+    if (node == network.nodes.end() || !TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_displacement_"))
+        return;
+    if (node->second.nodeTypeId != TfToken("ND_displacement_float")) {
+        warnOnce("MaterialX vector displacement is not translated");
+        return;
+    }
+    SurfaceReader(network, node->second, data).read("displacement", data.displacement, HDUE_TEXTURE_DISPLACEMENT);
+    const float scale = value(param(node->second, "scale"), 1.f);
+    auto& texture = data.textures[HDUE_TEXTURE_DISPLACEMENT];
+    data.displacement *= scale;
+    texture.scale *= scale;
+    texture.bias *= scale;
+}
 void readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) {
     SurfaceReader reader(network, shader, data);
     const auto& type = shader.nodeTypeId.GetString();
@@ -467,9 +521,21 @@ public:
         HdUEMaterialData data;
         data.id = GetId().GetString();
         const auto net = network(delegate, GetId());
+        readDisplacement(net, data);
         if (const auto* shader = surface(net)) readSurface(net, *shader, data);
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->mutex);
+        // Displacement moves vertices when meshes are packed: a change re-packs the meshes bound to the material.
+        const auto displacement = [](const HdUEMaterialData& m) {
+            const auto& t = m.textures[HDUE_TEXTURE_DISPLACEMENT];
+            return std::tuple(m.displacement, t.file, t.scale, t.bias, t.mask, t.uvSet, t.wrap[0], t.wrap[1],
+                              m.uvTransform);
+        };
+        const auto previous = state->materials.find(data.id);
+        if (displacement(previous == state->materials.end() ? HdUEMaterialData() : previous->second) !=
+            displacement(data))
+            for (const auto& [id, mesh] : state->meshes)
+                if (mesh.material == data.id) state->dirtyMeshes.insert(id);
         state->materials[data.id] = data;
         state->dirtyMaterials.insert(data.id);
         ++state->revision;
@@ -479,18 +545,15 @@ public:
 };
 }  // namespace
 
-// The UV primvar a material reads (UsdPrimvarReader_float2 varname or MaterialX geompropvalue geomprop: exporters
-// name it map1, UVMap, ...) and the vec3 primvar it reads as vertex colours (displayColor, Cd, ...); empty when none.
-std::pair<TfToken, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material) {
-    std::pair<TfToken, TfToken> names;
+// The UV primvars a material reads (its meshes' UV sets, uvPrimvars) and the vec3 primvar it reads as vertex colours
+// (displayColor, Cd, ...); empty when none.
+std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material) {
+    std::pair<TfTokenVector, TfToken> names;
     if (material.IsEmpty()) return names;
-    for (const auto& [path, node] : network(delegate, material).nodes) {
-        const char* input = node.nodeTypeId == TfToken("UsdPrimvarReader_float2")    ? "varname"
-                            : node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? "geomprop"
-                                                                                     : nullptr;
-        if (input && names.first.IsEmpty()) names.first = token(param(node, input));
+    const auto net = network(delegate, material);
+    names.first = uvPrimvars(net);
+    for (const auto& [path, node] : net.nodes)
         if (names.second.IsEmpty()) names.second = colorPrimvar(node);
-    }
     return names;
 }
 HdSprim* HdUECreateMaterial(const SdfPath& id) { return new Material(id); }

@@ -4,6 +4,12 @@
 #include "Tasks/Task.h"
 #include "Rendering/NaniteResources.h"
 #include "hdue/bridge.h"
+// UV sets a mesh carries (ABI 10 uv_set_count, of which UE keeps 4: Nanite's limit); 1 without UVs.
+inline int32 HdueUVSets(const HdueMeshDesc& Desc) { return FMath::Clamp<int32>(int32(Desc.uv_set_count), 1, 4); }
+// UV channels of static and dynamic mesh vertices: the sets, the last one repeated. The parent materials read 4, and UE
+// 5.8's local vertex factory shaded them with constant UVs on meshes with fewer (Nanite clamps them correctly).
+// ponytail: 12 bytes more per vertex for one-set meshes; per-material channel counts if memory matters.
+constexpr int32 HdueVertexUVs = 4;
 // A mesh descriptor with its own copies of the arrays, for Nanite builds that outlive Apply's batch.
 struct FNaniteSource {
     TArray<float> Positions, Normals, UV, Colors;
@@ -17,7 +23,8 @@ struct FNaniteSource {
             Desc.normals = Normals.GetData();
         }
         if (In.uv) {
-            UV = TArray<float>(In.uv, int32(In.vertex_count * 2));
+            UV = TArray<float>(In.uv, int32(In.vertex_count * 2) * HdueUVSets(In));
+            Desc.uv_set_count = uint32(HdueUVSets(In));
             Desc.uv = UV.GetData();
         }
         if (In.colors) {

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 9u
+#define HDUE_ABI_VERSION 10u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -178,7 +178,7 @@ typedef struct HdueTextureDesc {
     float channel_mask[4];
     uint32_t wrap[2];  /* HDUE_WRAP_* for u (wrapS) and v (wrapT) */
     uint32_t encoding; /* HDUE_TEXTURE_ENCODING_* */
-    uint32_t reserved;
+    uint32_t uv_set;   /* ABI 10: the mesh UV set (HdueMeshDesc uv) the texture reads */
 } HdueTextureDesc;
 typedef struct HdueMaterialDesc {
     const char* id;
@@ -238,6 +238,8 @@ typedef struct HdueMeshDesc {
     /* Hydra instanceId per instance for the HDUE_AOV_INSTANCE_ID pass (instance_count entries,
      * -1 for none). NULL: the instance's index. */
     const int32_t* instance_ids;
+    /* ABI 10: UV sets in uv, vertex_count * 2 floats each, one after another (0 counts as 1). The backend keeps 4. */
+    uint32_t uv_set_count;
 } HdueMeshDesc;
 typedef struct HdueLightDesc {
     const char* id;

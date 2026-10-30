@@ -2,6 +2,9 @@
 #include "depth.h"
 #include "surface_settings.h"
 #include "color_management.h"
+#include "displacement.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/rprim.h"
@@ -576,6 +579,43 @@ std::string textureFile(HdUEState& state, const std::string& file, bool convert 
     return convert ? HdUELinearRec709Texture(it->second.UncheckedGet<std::string>(), colorSpace)
                    : it->second.UncheckedGet<std::string>();
 }
+// A displacement image as floats; empty when it cannot be read.
+HdUEImage displacementImage(const std::string& file) {
+    HdUEImage image;
+    const auto source = file.empty() ? nullptr : HioImage::OpenForReading(file);
+    if (!source) return image;
+    HioImage::StorageSpec spec;
+    spec.width = source->GetWidth();
+    spec.height = source->GetHeight();
+    spec.format = source->GetFormat();
+    std::vector<uint8_t> raw(size_t(spec.width) * spec.height * source->GetBytesPerPixel());
+    spec.data = raw.data();
+    const auto type = HioGetHioType(spec.format);
+    if (raw.empty() || !source->Read(spec)) return image;
+    const size_t count = size_t(spec.width) * spec.height * HioGetComponentCount(spec.format);
+    image.texels.resize(count);
+    for (size_t i = 0; i < count; ++i) switch (type) {
+            case HioTypeUnsignedByte:
+            case HioTypeUnsignedByteSRGB:
+                image.texels[i] = raw[i] / 255.f;
+                break;
+            case HioTypeUnsignedShort:
+                image.texels[i] = reinterpret_cast<const uint16_t*>(raw.data())[i] / 65535.f;
+                break;
+            case HioTypeHalfFloat:
+                image.texels[i] = reinterpret_cast<const GfHalf*>(raw.data())[i];
+                break;
+            case HioTypeFloat:
+                image.texels[i] = reinterpret_cast<const float*>(raw.data())[i];
+                break;
+            default:
+                return {};
+        }
+    image.width = spec.width;
+    image.height = spec.height;
+    image.channels = HioGetComponentCount(spec.format);
+    return image;
+}
 void prepareMaterials(HdUEState& state, ScenePacket& packet) {
     const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
     const float units = float(state.setting<double>("metersPerUnit", 0.01) * 100);
@@ -601,15 +641,15 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
             out.wrap[0] = texture.wrap[0];
             out.wrap[1] = texture.wrap[1];
             out.encoding = texture.encoding;
-            // Displacement is a distance: scene units to UE centimetres.
-            const float scale = slot == HDUE_TEXTURE_DISPLACEMENT ? units : 1.f;
+            out.uv_set = texture.uvSet;
             for (int i = 0; i < 4; ++i) {
-                out.scale[i] = texture.scale[i] * scale;
-                out.bias[i] = texture.bias[i] * scale;
+                out.scale[i] = texture.scale[i];
+                out.bias[i] = texture.bias[i];
                 out.channel_mask[i] = texture.mask[i];
             }
         }
-        desc.displacement = data.displacement * units;
+        // Displacement moves the mesh's vertices when it is packed (prepareMeshes).
+        desc.textures[HDUE_TEXTURE_DISPLACEMENT] = {};
         desc.occlusion = data.occlusion;
         desc.clearcoat = data.clearcoat;
         desc.clearcoat_roughness = data.clearcoatRoughness;
@@ -654,6 +694,39 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         packet.materialUpdates.push_back(update);
     }
 }
+// The mesh diced and displaced by its material's displacement (displacement.h), in object space and units; nullopt when
+// its material does not displace. ponytail: meshes with surface effects keep their vertices (their masks are per
+// uploaded vertex).
+std::optional<HdUEDicedMesh> displaced(HdUEState& state, const HdUEMeshData& data, const std::vector<GfVec3f>& points) {
+    const auto material = state.materials.find(data.material);
+    if (material == state.materials.end() || data.normals.size() != points.size() ||
+        (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()))
+        return std::nullopt;
+    const auto& texture = material->second.textures[HDUE_TEXTURE_DISPLACEMENT];
+    const float constant = material->second.displacement;
+    if (texture.file.empty() && constant == 0) return std::nullopt;
+    HdUEDicedMesh mesh{points, data.normals, data.colors, {}, data.indices};
+    if (data.uv.size() == points.size()) {
+        mesh.uvs.push_back(data.uv);
+        mesh.uvs.insert(mesh.uvs.end(), data.uvSets.begin(), data.uvSets.end());
+    }
+    const auto image = texture.file.empty() ? HdUEImage() : displacementImage(textureFile(state, texture.file));
+    const bool textured = !image.texels.empty() && texture.uvSet < mesh.uvs.size();
+    if (!texture.file.empty() && !textured)
+        batchWarning("cannot displace with " + texture.file + " (unreadable, or the mesh lacks its UVs)");
+    if (textured) HdUEDice(mesh, HdUEDiceLevels(mesh.indices.size() / 3, size_t(image.width) * image.height));
+    const auto& m = material->second.uvTransform;
+    HdUEDisplace(
+        mesh,
+        [&](size_t i) {
+            if (!textured) return constant;
+            const float u = mesh.uvs[texture.uvSet][i][0], v = 1 - mesh.uvs[texture.uvSet][i][1];  // UE UVs
+            return image.sample(GfVec2f(m[0] * u + m[1] * v + m[2], m[3] * u + m[4] * v + m[5]), texture.wrap,
+                                texture.scale, texture.bias, texture.mask);
+        },
+        textured);
+    return mesh;
+}
 void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto convert = state.converter();
     const auto basis = sceneBasis(state);
@@ -680,37 +753,49 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         const auto normalTransform = bake.GetInverse().GetTranspose();
         const auto moved = packet.points.find(id);
         const auto& points = moved != packet.points.end() ? moved->second : data.points;
-        const size_t count = points.size();
-        const bool normals = data.normals.size() == data.points.size(), uvs = data.uv.size() == data.points.size();
-        std::vector<float> p(count * 3), n(normals ? count * 3 : 0), uv(uvs ? count * 2 : 0);
+        const auto diced = nativeAsset.empty() ? displaced(state, data, points) : std::nullopt;
+        const auto& vertices = diced ? diced->points : points;
+        const auto& vertexNormals = diced ? diced->normals : data.normals;
+        const size_t count = vertices.size();
+        // UV sets one after another (HdueMeshDesc uv_set_count).
+        std::vector<const std::vector<GfVec2f>*> sets;
+        if (diced)
+            for (const auto& set : diced->uvs) sets.push_back(&set);
+        else if (data.uv.size() == count) {
+            sets.push_back(&data.uv);
+            for (const auto& set : data.uvSets) sets.push_back(&set);
+        }
+        const bool normals = vertexNormals.size() == count;
+        std::vector<float> p(count * 3), n(normals ? count * 3 : 0), uv(count * 2 * sets.size());
         WorkParallelForN(count, [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) {
-                const auto point = convert(bake.Transform(GfVec3d(points[i])));
+                const auto point = convert(bake.Transform(GfVec3d(vertices[i])));
                 for (int c = 0; c < 3; ++c) p[i * 3 + c] = float(point[c]);
                 if (normals) {
                     const auto normal =
-                        convert(normalTransform.TransformDir(GfVec3d(data.normals[i])), true).GetNormalized();
+                        convert(normalTransform.TransformDir(GfVec3d(vertexNormals[i])), true).GetNormalized();
                     for (int c = 0; c < 3; ++c) n[i * 3 + c] = float(normal[c]);
                 }
-                if (uvs) {
-                    uv[i * 2] = data.uv[i][0];
-                    uv[i * 2 + 1] = 1 - data.uv[i][1];
+                for (size_t k = 0; k < sets.size(); ++k) {
+                    uv[(k * count + i) * 2] = (*sets[k])[i][0];
+                    uv[(k * count + i) * 2 + 1] = 1 - (*sets[k])[i][1];
                 }
             }
         });
-        auto index = data.indices;
+        auto index = diced ? diced->indices : data.indices;
         // World transforms are baked into dynamic vertices. Preserve front
         // faces when an authored transform adds another handedness reversal.
         if (bake.GetDeterminant() < 0)
             for (size_t i = 0; i + 2 < index.size(); i += 3) std::swap(index[i + 1], index[i + 2]);
         std::vector<float> colors;
-        colors.reserve(data.colors.size() * 3);
-        for (const auto& c : data.colors) colors.insert(colors.end(), {c[0], c[1], c[2]});
+        const auto& vertexColors = diced ? diced->colors : data.colors;
+        colors.reserve(vertexColors.size() * 3);
+        for (const auto& c : vertexColors) colors.insert(colors.end(), {c[0], c[1], c[2]});
         HdueMeshDesc desc{};
         desc.id = packet.own(data.id);
         desc.material_id = packet.own(data.material);
         desc.native_asset = packet.own(nativeAsset);
-        desc.vertex_count = uint32_t(data.points.size());
+        desc.vertex_count = uint32_t(count);
         desc.index_count = uint32_t(index.size());
         desc.visible = data.visible && state.shown(data.renderTag);
         desc.prim_id = data.primId;
@@ -718,6 +803,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         desc.positions = packet.own(packet.floats, std::move(p));
         desc.normals = packet.own(packet.floats, std::move(n));
         desc.uv = packet.own(packet.floats, std::move(uv));
+        desc.uv_set_count = uint32_t(sets.size());
         desc.indices = packet.own(packet.indices, std::move(index));
         if (data.instanced) {
             // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units.

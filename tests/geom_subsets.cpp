@@ -88,6 +88,8 @@ int main() {
             mesh.points.emplace_back(float(vertex), 1, 2);
             mesh.normals.emplace_back(0, 1, 0);
             mesh.uv.emplace_back(float(vertex), .25f);
+            mesh.uvSets.resize(1);
+            mesh.uvSets[0].emplace_back(.5f, float(vertex));  // a second UV set follows its vertices too
             mesh.masks["wetness"].push_back(vertex / 10.f);
         }
         auto parts = HdUEPartitionSubsets(mesh, topology, params);
@@ -101,7 +103,8 @@ int main() {
         require(parts[0].renderTag == mesh.renderTag && parts[1].renderTag == mesh.renderTag);  // purposes
         for (const auto& part : parts)
             for (size_t i = 0; i < part.points.size(); ++i)
-                require(part.points[i][0] == part.uv[i][0] && part.normals[i] == GfVec3f(0, 1, 0) &&
+                require(part.points[i][0] == part.uv[i][0] && part.points[i][0] == part.uvSets.at(0)[i][1] &&
+                        part.normals[i] == GfVec3f(0, 1, 0) &&
                         std::abs(part.masks.at("wetness")[i] - part.points[i][0] / 10.f) < 1e-6f);
         subset.indices = {0, 1, 2};
         topology.SetGeomSubsets({subset});
