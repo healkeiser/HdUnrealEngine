@@ -5,10 +5,18 @@ from pathlib import Path
 import hou
 from pxr import UsdRender
 
-for name, icon in (
-    ("hdue_rendersettings", "hduerenderproperties"),
-    ("hdue_standardrendervars", "hduestandardrendervars"),
-    ("hdue_renderproducts", "hduerenderproducts"),
+for name, type_name, icon in (
+    (
+        "hdue_rendersettings",
+        "hdue::rendersettings::1.0",
+        "hduerenderproperties",
+    ),
+    (
+        "hdue_standardrendervars",
+        "hdue::standardrendervars::1.0",
+        "hduestandardrendervars",
+    ),
+    ("hdue_renderproducts", "hdue::renderproducts::1.0", "hduerenderproducts"),
 ):
     hda = str(
         Path(__file__).resolve().parents[1]
@@ -16,6 +24,7 @@ for name, icon in (
     )
     hou.hda.installFile(hda)
     definition = hou.hda.definitionsInFile(hda)[0]
+    assert definition.nodeTypeName() == type_name, definition.nodeTypeName()
     assert (
         definition.icon() == "HDUE_" + icon
         and "IconSVG" not in definition.sections()
@@ -23,18 +32,30 @@ for name, icon in (
         name,
         definition.icon(),
     )  # by name only
+# Scenes saved with the unversioned names load the namespaced types (integrations/houdini/OPcustomize).
+for line in (
+    (Path(__file__).resolve().parents[1] / "integrations/houdini/OPcustomize")
+    .read_text()
+    .splitlines()
+):
+    if line.startswith("opalias"):
+        hou.hscript(line)
+        assert (
+            hou.node("/stage").createNode(line.split()[-1]).type().name()
+            == line.split()[-2]
+        ), line
 network = hou.node("/stage")
 camera = network.createNode("camera")
-rendervars = network.createNode("hdue_standardrendervars")
+rendervars = network.createNode("hdue::standardrendervars::1.0")
 rendervars.setInput(0, camera)
 rendervars.parm("aov_primId").set(1)
-products = network.createNode("hdue_renderproducts")
+products = network.createNode("hdue::renderproducts::1.0")
 products.setInput(0, rendervars)
 products.parm("products").set(2)
 products.parm("primname_2").set("depthonly")
 products.parm("doorderedVars_2").set(1)
 products.parm("orderedVars_2").set("/Render/Products/Vars/depth")
-settings = network.createNode("hdue_rendersettings")
+settings = network.createNode("hdue::rendersettings::1.0")
 settings.setInput(0, products)
 VARS = "/Render/Products/Vars/"
 
@@ -103,7 +124,7 @@ _, result = render("builtin", importvars=1)
 assert list(result) == ["/Render/Products/renderproduct"] and sorted(
     result["/Render/Products/renderproduct"]
 ) == sorted(upstream["/Render/Products/product1"]), result
-alone = network.createNode("hdue_rendersettings")
+alone = network.createNode("hdue::rendersettings::1.0")
 alone.setInput(0, camera)
 stage = alone.stage()
 assert UsdRender.Settings(
