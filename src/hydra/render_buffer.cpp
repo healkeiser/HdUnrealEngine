@@ -27,7 +27,11 @@ bool HdUERenderBuffer::Allocate(const GfVec3i& dimensions, HdFormat format, bool
         dimensions[2] != 1 ||
         (format != HdFormatFloat32Vec4 && format != HdFormatFloat16Vec4 && format != HdFormatFloat32Vec3 &&
          format != HdFormatFloat32 && format != HdFormatInt32)) {
-        allocationError_ = "dimensions=" + std::to_string(dimensions[0]) + "," + std::to_string(dimensions[1]) + "," +
+        allocationError_ = std::string(dimensions[0] > 8192 || dimensions[1] > 8192
+                                           ? "images are limited to 8192 pixels per axis (render larger ones in tiles: "
+                                             "husk --tile-count); "
+                                           : "") +
+                           "dimensions=" + std::to_string(dimensions[0]) + "," + std::to_string(dimensions[1]) + "," +
                            std::to_string(dimensions[2]) + " format=" + std::to_string(int(format)) +
                            " multisampled=" + std::to_string(multi) + " maps=" + std::to_string(maps_);
         return false;

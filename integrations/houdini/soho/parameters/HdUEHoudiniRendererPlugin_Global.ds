@@ -3490,7 +3490,7 @@
                 label   "Virtual Shadow Maps"
                 type    toggle
                 size    1
-                default { 0 }
+                default { 1 }
                 help    "Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps for shadowing. Provides high - quality shadows for next - gen projects with simplified setup.High efficiency culling when used with Nanite. Console variable r.Shadow.Virtual.Enable (process-wide)."
                 parmtag { "spare_category" "Shadows" }
                 parmtag { "usdvaluetype" "bool" }
