@@ -448,8 +448,10 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
 
 HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Handle) {
     HDUE_RETURN_UNLESS_READY();
-    if (!Sized(Desc) || !Handle || !Desc->width || !Desc->height || Desc->width > 8192 || Desc->height > 8192)
-        return HDUE_INVALID_ARGUMENT;
+    if (!Sized(Desc) || !Handle) return HDUE_INVALID_ARGUMENT;
+    if (!Desc->width || !Desc->height || Desc->width > 8192 || Desc->height > 8192)
+        return Fail(HDUE_INVALID_ARGUMENT,
+                    *FString::Printf(TEXT("Resolution %u x %u is outside 1..8192."), Desc->width, Desc->height));
     if (Runtime.Session) return Fail(HDUE_INVALID_STATE, TEXT("The initial backend supports one active session."));
     auto Session = MakeShared<FSession, ESPMode::ThreadSafe>();
     Session->Handle = Runtime.NextSession++;
@@ -489,32 +491,50 @@ bool SameView(const HdueRenderRequest& A, const HdueRenderRequest& B) {
 
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
-    if (!ValidSession(Handle) || !Sized(Request) || !Request->generation || Request->mode > HDUE_PATH_TRACED ||
-        Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536 ||
-        (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) ||
-                                    Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
-                                    !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0)) ||
-        (Request->orthographic && (!FMath::IsFinite(Request->near_clip_cm) || !FMath::IsFinite(Request->far_clip_cm) ||
-                                   Request->far_clip_cm <= Request->near_clip_cm ||
-                                   !(Request->projection_scale[0] > 0) || !(Request->projection_scale[1] > 0))) ||
-        !FMath::IsFinite(Request->projection_scale[0]) || !FMath::IsFinite(Request->projection_scale[1]) ||
+    if (!ValidSession(Handle) || !Sized(Request)) return HDUE_INVALID_ARGUMENT;
+    // Each rejection names its reason: a bare HDUE_INVALID_ARGUMENT left hosts with "request_render failed (-1)".
+    const auto Invalid = [](const FString& Reason) { return Fail(HDUE_INVALID_ARGUMENT, *Reason); };
+    if (!Request->generation || Request->mode > HDUE_PATH_TRACED)
+        return Invalid(
+            FString::Printf(TEXT("Invalid request (generation %llu, mode %u)."), Request->generation, Request->mode));
+    if (Request->samples_per_pixel == 0 || Request->samples_per_pixel > 65536)
+        return Invalid(FString::Printf(TEXT("Samples per pixel %u is outside 1..65536."), Request->samples_per_pixel));
+    if (!Request->orthographic && (!FMath::IsFinite(Request->horizontal_fov_degrees) ||
+                                   Request->horizontal_fov_degrees < 1 || Request->horizontal_fov_degrees > 170 ||
+                                   !FMath::IsFinite(Request->near_clip_cm) || Request->near_clip_cm <= 0))
+        return Invalid(FString::Printf(
+            TEXT("Perspective camera: horizontal field of view %g degrees (needs 1..170) and near clip %g cm (needs > "
+                 "0)."),
+            Request->horizontal_fov_degrees, Request->near_clip_cm));
+    if (Request->orthographic && (!FMath::IsFinite(Request->near_clip_cm) || !FMath::IsFinite(Request->far_clip_cm) ||
+                                  Request->far_clip_cm <= Request->near_clip_cm ||
+                                  !(Request->projection_scale[0] > 0) || !(Request->projection_scale[1] > 0)))
+        return Invalid(FString::Printf(
+            TEXT("Orthographic camera: clipping %g..%g cm and projection scale %g x %g (needs a finite range and a "
+                 "positive scale)."),
+            Request->near_clip_cm, Request->far_clip_cm, Request->projection_scale[0], Request->projection_scale[1]));
+    if (!FMath::IsFinite(Request->projection_scale[0]) || !FMath::IsFinite(Request->projection_scale[1]) ||
         !FMath::IsFinite(Request->projection_offset[0]) || !FMath::IsFinite(Request->projection_offset[1]) ||
         !FMath::IsFinite(Request->fstop) || !FMath::IsFinite(Request->focus_distance_cm) ||
-        !FMath::IsFinite(Request->focal_length_cm) || !FMath::IsFinite(Request->time_seconds) ||
-        (Request->aov & 0xffu) >= HDUE_AOV_COUNT ||
+        !FMath::IsFinite(Request->focal_length_cm) || !FMath::IsFinite(Request->time_seconds))
+        return Invalid(TEXT("Non-finite camera projection, lens or time."));
+    if ((Request->aov & 0xffu) >= HDUE_AOV_COUNT ||
         (Request->aov > 0xffu && (Request->aov >> 16 || !LightingComponents(*Request))) ||
-        (Request->aov == HDUE_AOV_LIGHTING))
-        return HDUE_INVALID_ARGUMENT;
+        Request->aov == HDUE_AOV_LIGHTING)
+        return Invalid(FString::Printf(TEXT("Unknown AOV request 0x%x."), Request->aov));
     for (int32 Index = 0; Index < 3; ++Index) {
         if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) ||
             !FMath::IsFinite(Request->up[Index]))
-            return HDUE_INVALID_ARGUMENT;
+            return Invalid(TEXT("Non-finite camera position or orientation."));
     }
     const FVector Eye(Request->eye[0], Request->eye[1], Request->eye[2]);
     const FVector Target(Request->target[0], Request->target[1], Request->target[2]);
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
-    if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
-    if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
+    if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero())
+        return Invalid(TEXT("Degenerate camera: its view direction is zero or parallel to its up vector."));
+    if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing())
+        return Fail(HDUE_NOT_SUPPORTED,
+                    TEXT("The Path Tracer needs hardware ray tracing (DXR), which UE did not enable on this GPU."));
     if (Request->aov == HDUE_AOV_BUFFERS && Runtime.Session->BufferMaterials.IsEmpty())
         return Fail(HDUE_INVALID_ARGUMENT, TEXT("HDUE_AOV_BUFFERS needs set_buffers first."));
     if (Request->aov != HDUE_AOV_COLOR && Request->aov < HDUE_AOV_BUFFERS &&
