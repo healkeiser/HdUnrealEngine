@@ -4,6 +4,7 @@
 #include "color_management.h"
 #include "instancing.h"
 #include "displacement.h"
+#include "render_tags.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
@@ -1671,8 +1672,10 @@ public:
     // Render tags (purposes): prims whose tag the pass does not draw are sent hidden; a change re-sends only the prims
     // whose visibility it flips. Empty tags draw everything.
     void setRenderTags(TfTokenVector tags) {
-        std::sort(tags.begin(), tags.end());
         auto& s = *state_;
+        // husk does not apply UsdRenderSettings includedPurposes to the pass's tags.
+        tags = HdUEIncludedTags(std::move(tags), s.setting<VtTokenArray>("includedPurposes", {}));
+        std::sort(tags.begin(), tags.end());
         std::lock_guard lock(s.mutex);
         if (tags == s.renderTags) return;
         const auto flips = [&](const TfToken& tag) {
