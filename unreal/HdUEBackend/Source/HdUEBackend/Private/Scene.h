@@ -63,6 +63,7 @@ public:
         bool Vector = false;    // channels scalar inputs read (bit per RGBA channel); read by a colour/normal input
         bool SRGB = false;      // 8-bit texels are sRGB-decoded
         uint8 Address[2] = {};  // TextureAddress for u and v (wrapS, wrapT): sampler state, part of the key
+        float Coverage = 0;     // texel value a cutout is clipped at: mips keep its alpha coverage (0: plain mips)
         TUniquePtr<FTexturePlatformData> Pending;  // built on workers by Apply; PreviewTexture gives it to Texture
     };
     FHdueScene(UWorld* InWorld, bool InInteractive);
