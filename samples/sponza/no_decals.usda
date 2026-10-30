@@ -1,0 +1,37 @@
+#usda 1.0
+(
+    doc = """Deactivates Intel Sponza 2022's dirt decal meshes for the gallery. scripts/render_gallery.py sublayers it
+over the scene."""
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+over "root"
+{
+    over "_st_floor"
+    {
+        over "decals_1st_floor" (
+            active = false
+        )
+        {
+        }
+    }
+
+    over "_nd_floor"
+    {
+        over "decals_2nd_floor" (
+            active = false
+        )
+        {
+        }
+    }
+
+    over "_rd_floor"
+    {
+        over "decals_3rd_floor" (
+            active = false
+        )
+        {
+        }
+    }
+}

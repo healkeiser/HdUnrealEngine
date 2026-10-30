@@ -6,6 +6,7 @@ The README's Sponza gallery renders [Intel's Sponza 2022](https://www.intel.com/
 samples/sponza/
 ├── lighting.usda                 sun, sky dome and render settings (tracked)
 ├── materials.usda                MaterialX materials on Intel's textures (tracked, generated)
+├── no_decals.usda                deactivates the three dirt decal meshes (tracked)
 └── intel/                        Intel's download (ignored)
     ├── main/                     "Main Sponza" package
     │   ├── NewSponza_Main_USD_Yup_003.usda

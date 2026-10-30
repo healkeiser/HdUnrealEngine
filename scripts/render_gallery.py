@@ -589,6 +589,7 @@ def scenes(which, sponza_file, addons=()):
             [
                 SPONZA / "lighting.usda",
                 SPONZA_MATERIALS,
+                SPONZA / "no_decals.usda",
                 sponza_file,
                 *fixes,
                 *addons,
@@ -764,7 +765,8 @@ def section(which, results, machine):
             "translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer "
             "image shows more noise than Karma at the same sample count. The scene has no lights, so "
             "[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, "
-            "and levels the camera as Intel's render does."
+            "and levels the camera as Intel's render does; "
+            "[samples/sponza/no_decals.usda](../samples/sponza/no_decals.usda) deactivates the dirt decal meshes."
         )
         addons = sorted(
             {a for entry in results.values() for a in entry.get("addons", [])}
