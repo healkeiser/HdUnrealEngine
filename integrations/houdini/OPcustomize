@@ -1,0 +1,5 @@
+// hdUE's LOPs were unversioned before 1.0: scenes saved with those type names load the namespaced assets
+// (scripts/build_render_settings_hda.py). Same mechanism as $HFS/houdini/OPcustomize's karmarendersettings aliases.
+opalias Lop hdue::rendersettings::1.0 hdue_rendersettings
+opalias Lop hdue::standardrendervars::1.0 hdue_standardrendervars
+opalias Lop hdue::renderproducts::1.0 hdue_renderproducts

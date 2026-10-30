@@ -883,7 +883,7 @@ class NativeAssets:
             layer.Apply(edit)
 
 
-RENDER_SETTINGS_TYPES = ("rendersettings", "hdue_rendersettings")
+RENDER_SETTINGS_TYPES = ("rendersettings", "hdue::rendersettings::1.0")
 
 
 def _settings_prim(stage):

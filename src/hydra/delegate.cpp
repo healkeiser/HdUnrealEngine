@@ -2762,7 +2762,11 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
         if (const auto it = stats.find("error");
             error.empty() && it != stats.end() && it->second.IsHolding<std::string>())
             error = it->second.UncheckedGet<std::string>();
-        stats["rendererStage"] = VtValue(!error.empty() ? error : state_->currentStage());
+        const auto stage = state_->currentStage();
+        stats["rendererStage"] = VtValue(!error.empty() ? error : stage);
+        // The last refresh's progress is stale while UE starts or uploads.
+        if (!error.empty() || stage != "Rendering")
+            stats["renderProgressAnnotation"] = VtValue(!error.empty() ? "Error: " + error : stage);
         return stats;
     }
     VtDictionary stats;
@@ -2803,7 +2807,29 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     const auto error = residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error;
     // husk prints only the exit code: say why.
     if (!error.empty() && !selfHost().continuous) std::fprintf(stderr, "hdUE error: %s\n", error.c_str());
+    // Houdini shows these under the viewport's progress bar and in its render stats; husk -V5 prints the second.
+    const auto spp = state.samplesPerPixel();
+    std::string progress =
+        !error.empty() ? "Error: " + error
+        : state.setting<std::string>("renderMode", "realtime") == "pathtraced"
+            ? "Path Tracer: " + std::to_string(std::min(int(state.lastFrame.completed_samples), spp)) + "/" +
+                  std::to_string(spp) + " samples"
+        : state.lastFrame.converged ? "Realtime: converged"
+                                    : "Realtime: warming up";
+    if (residency.phase == HDUE_RESIDENCY_PREPARING)
+        progress += "\nVirtual textures: " + std::to_string(residency.resident_pages) + "/" +
+                    std::to_string(residency.required_pages) + " pages";
+    if (state.nativeAssets.loading) progress += "\nLoading " + std::to_string(state.nativeAssets.loading) + " assets";
+    char frameTimes[96];
+    std::snprintf(frameTimes, sizeof(frameTimes), "\nLast frame: %.0f ms, readback %.0f ms",
+                  state.lastFrame.request_to_frame_ms, state.lastFrame.readback_ms);
+    const auto statsText = "Meshes: " + std::to_string(state.meshes.size()) + " (" + std::to_string(triangles) +
+                           " triangles)\nMaterials: " + std::to_string(state.materials.size()) +
+                           "\nLights: " + std::to_string(sceneLights) +
+                           "\nNative actors: " + std::to_string(state.nativeAssets.actors) + frameTimes;
     return {
+        {"renderProgressAnnotation", VtValue(progress)},
+        {"renderStatsAnnotation", VtValue(statsText)},
         {"error", VtValue(error)},
         {"generation", VtValue(state.generation)},
         // husk exits with this code (farm managers judge frames by it); Houdini's UI keeps rendering after an error.

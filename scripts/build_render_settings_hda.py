@@ -24,8 +24,12 @@ ROOT = Path(__file__).resolve().parents[1]
 INTEGRATION = ROOT / "integrations/houdini"
 OTLS = INTEGRATION / "otls"
 HDA = OTLS / "hdue_rendersettings.hda"
+# Namespaced and versioned type names (hdue::<name>::<version>, as the Substrate HDAs). Bump the version when a
+# parameter is removed or renamed, and keep the previous definition, so saved scenes keep theirs. OPcustomize aliases
+# the names of the unversioned types these replace, so scenes saved with them load these.
+VERSION = "1.0"
 NAME, LABEL, ICON = (
-    "hdue_rendersettings",
+    f"hdue::rendersettings::{VERSION}",
     "hdUE Render Settings",
     "HDUE_hduerenderproperties",
 )
@@ -200,7 +204,7 @@ def build():
     import hou
 
     network = hou.node("/stage")
-    subnet = network.createNode("subnet", NAME)
+    subnet = network.createNode("subnet", "rendersettings")
     settings = subnet.createNode("rendersettings", "rendersettings")
     renderer = settings.parmTemplateGroup().findFolder("Unreal Engine")
     if renderer is None:
@@ -560,8 +564,11 @@ def build_standard_render_vars():
     import hou
 
     network = hou.node("/stage")
-    name, label = "hdue_standardrendervars", "hdUE Standard Render Vars"
-    subnet = network.createNode("subnet", name)
+    name, label = (
+        f"hdue::standardrendervars::{VERSION}",
+        "hdUE Standard Render Vars",
+    )
+    subnet = network.createNode("subnet", "standardrendervars")
     types = {"C": "color4f", **{a[0]: a[2] for a in AOVS}}
     labels = {"C": "Beauty", **{a[0]: a[1] for a in AOVS}}
     group = hou.ParmTemplateGroup(
@@ -626,7 +633,7 @@ def build_standard_render_vars():
     subnet.layoutChildren()
     save(
         subnet,
-        OTLS / f"{name}.hda",
+        OTLS / "hdue_standardrendervars.hda",
         name,
         label,
         "HDUE_hduestandardrendervars",
@@ -650,8 +657,11 @@ def build_render_products():
     import hou
 
     network = hou.node("/stage")
-    name, label = "hdue_renderproducts", "hdUE Render Products"
-    subnet = network.createNode("subnet", name)
+    name, label = (
+        f"hdue::renderproducts::{VERSION}",
+        "hdUE Render Products",
+    )
+    subnet = network.createNode("subnet", "renderproducts")
     source = subnet.indirectInputs()[0]
     begin = subnet.createNode("begincontextoptionsblock", "foreach_begin")
     begin.setInput(0, source)
@@ -755,7 +765,7 @@ def build_render_products():
     )
     save(
         subnet,
-        OTLS / f"{name}.hda",
+        OTLS / "hdue_renderproducts.hda",
         name,
         label,
         "HDUE_hduerenderproducts",
