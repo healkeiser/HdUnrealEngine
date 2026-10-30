@@ -407,26 +407,11 @@ class Host:
         except BaseException:
             _report(traceback.format_exc())
         self.live_substrate.close()
-        # Switch viewers away so their sessions end before UE shuts down (deactivated hdUE delegates only pause).
-        try:
-            for viewer in hou.ui.paneTabs():
-                if isinstance(
-                    viewer, hou.SceneViewer
-                ) and viewer.currentHydraRenderer() in (LABEL, PLUGIN):
-                    others = [
-                        name
-                        for name in viewer.hydraRenderers()
-                        if name not in (LABEL, PLUGIN)
-                    ]
-                    viewer.setHydraRenderer(
-                        others[0] if others else "Houdini GL"
-                    )
-        except BaseException:
-            _report(traceback.format_exc())
         if self.viewer:
             self.viewer.hide()
         self.runtime.close()
-        # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process).
+        # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process). The
+        # live session ends with UE, and the delegate stops rendering viewports that still draw.
         shutdown = getattr(self.api.library, "hdue_shutdown_ue", None)
         if shutdown:
             shutdown.argtypes = []
@@ -456,7 +441,8 @@ def start_when_selected():
     """
     global _watcher
     if any(
-        os.environ.get(name) for name in ("HDUE_HOUDINI_INPUT", "HDUE_HOUDINI_HIP")
+        os.environ.get(name)
+        for name in ("HDUE_HOUDINI_INPUT", "HDUE_HOUDINI_HIP")
     ):
         return start()
     from PySide6 import QtCore
