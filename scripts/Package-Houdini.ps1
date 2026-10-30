@@ -67,7 +67,14 @@ Copy-Tree (Join-Path $TaskRoot 'integrations\houdini') (Join-Path $Package 'inte
 $Modules = & uv run --quiet --python 3.13 (Join-Path $PSScriptRoot 'runtime_modules.py')
 if ($LASTEXITCODE) { throw 'Cannot list the runtime modules.' }
 Copy-Tree (Join-Path $TaskRoot 'scripts') (Join-Path $Package 'scripts') @($Modules)
-Copy-Tree (Join-Path $TaskRoot 'samples') (Join-Path $Package 'samples') /E
+# Tracked samples only: samples/sponza/intel, samples/jungle_ruins/intel and samples/hdris are local downloads (~12 GB).
+$Samples = & git -C $TaskRoot ls-files -- samples
+if ($LASTEXITCODE) { throw 'Cannot list the tracked samples.' }
+foreach ($File in $Samples) {
+    $Target = Join-Path $Package $File
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $TaskRoot $File) -Destination $Target
+}
 New-Item -ItemType Directory -Force -Path (Join-Path $Package 'plugin\Release'), (Join-Path $Package 'plugin\resources') | Out-Null
 Copy-Item -LiteralPath $Delegate -Destination (Join-Path $Package 'plugin\Release')
 Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json') -Destination (Join-Path $Package 'plugin\resources')
