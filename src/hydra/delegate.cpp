@@ -2535,6 +2535,20 @@ static TfToken HdUECanonicalKey(const TfToken& key, bool& namespaced) {
     if (key == TfToken("stageUpAxis")) return TfToken("upAxis");
     return key;
 }
+// UsdRenderSettings renderingColorSpace: UE renders in linear Rec.709 (its working colour space is a project setting
+// baked into the cooked shaders; UE's USD importer ignores the attribute), so any other space is warned once.
+void HdUEWarnRenderingColorSpace(const VtValue& value) {
+    const auto space = value.IsHolding<TfToken>()       ? value.UncheckedGet<TfToken>().GetString()
+                       : value.IsHolding<std::string>() ? value.UncheckedGet<std::string>()
+                                                        : std::string();
+    const auto lower = TfStringToLower(space);
+    static std::once_flag warned;
+    if (!space.empty() && lower != "lin_rec709_scene" && lower != "lin_rec709" && lower != "linear rec.709 (srgb)" &&
+        !(lower == "scene_linear" && HdUESceneLinearIsRec709()))
+        std::call_once(warned, [&] {
+            TF_WARN("hdUE: renderingColorSpace %s is not supported; hdUE renders in linear Rec.709", space.c_str());
+        });
+}
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
@@ -2555,6 +2569,8 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             state_->settings[canonical] = value;
         }
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
+    if (const auto space = settings.find(TfToken("renderingColorSpace")); space != settings.end())
+        HdUEWarnRenderingColorSpace(space->second);
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
     const bool hostUnits = stageUnits != settings.end() && !VtValue::Cast<double>(stageUnits->second).IsEmpty();
     // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
@@ -2939,6 +2955,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             if (HdUEHostTexture(light.texture)) state_->dirtyLights.insert(id);
         ++state_->revision;
     }
+    if (key == TfToken("renderingColorSpace")) HdUEWarnRenderingColorSpace(value);
     if (key == TfToken("surfaceEffects"))
         state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     if (key == TfToken("surfaceEffects") || key == TfToken("wetMaskPreview") || key == TfToken("wetValidationError")) {
