@@ -313,6 +313,7 @@ def write_matrix(report, specs):
     DOC.write_text(
         f"{head}{start}\n{matrix(report, specs)}\n{end}{rest.split(end, 1)[1]}",
         encoding="utf-8",
+        newline="\n",
     )
 
 
