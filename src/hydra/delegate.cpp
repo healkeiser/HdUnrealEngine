@@ -4,6 +4,7 @@
 #include "color_management.h"
 #include "instancing.h"
 #include "displacement.h"
+#include "render_tags.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
@@ -20,6 +21,7 @@
 #include "pxr/base/vt/types.h"
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/diagnosticMgr.h"
 #include "pxr/base/tf/getenv.h"
 #include <optional>
 #include "pxr/base/work/loops.h"
@@ -171,6 +173,28 @@ void batchWarning(const std::string& message) {
     std::fprintf(stderr, "hdUE warning: %s\n", message.c_str());
     std::fflush(stderr);
 }
+// husk shows no Tf warning of a render delegate, even at -V 6: hdUE's own (issued from its sources) also go through
+// batchWarning, once per message. Houdini's UI and other hosts keep their Tf output.
+class HdUEBatchWarnings final : public TfDiagnosticMgr::Delegate {
+public:
+    HdUEBatchWarnings() { TfDiagnosticMgr::GetInstance().AddDelegate(this); }
+    ~HdUEBatchWarnings() override { TfDiagnosticMgr::GetInstance().RemoveDelegate(this); }
+    void IssueError(const TfError&) override {}
+    void IssueFatalError(const TfCallContext&, const std::string&) override {}
+    void IssueStatus(const TfStatus&) override {}
+    void IssueWarning(const TfWarning& warning) override {
+        static const auto sources = TfStringToLower(std::filesystem::path(__FILE__).parent_path().string());
+        if (!TfStringStartsWith(TfStringToLower(warning.GetSourceFileName()), sources)) return;
+        auto message = warning.GetCommentary();
+        if (TfStringStartsWith(message, "hdUE: ")) message.erase(0, 6);
+        std::lock_guard lock(mutex_);
+        if (seen_.insert(message).second) batchWarning(message);
+    }
+
+private:
+    std::mutex mutex_;
+    std::set<std::string> seen_;
+};
 // Ends UE on its own thread and stops that thread. Houdini's UI calls it when Houdini quits (hdue_shutdown_ue); it is
 // also the exit handler of every process that started UE. std::atexit in this DLL runs at its detach, after ExitProcess
 // has ended UE's thread: UE can no longer shut down, and waiting for that thread, or UE's own teardown, hung the exit.
@@ -289,11 +313,15 @@ std::string runtimeConfig(const char* key) {
 // Houdini's interactive UI (not husk or hython), from the process executable. UE starts with the first delegate, and
 // Hydra says nothing usable by then: the viewport's delegate is created with no settings (houdini:viewport follows),
 // and both the viewport and husk send houdini:renderer = husk.
-bool houdiniUi() {
+std::wstring processName() {
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, path, MAX_PATH);
     auto name = std::filesystem::path(path).filename().wstring();
     for (auto& c : name) c = wchar_t(towlower(c));
+    return name;
+}
+bool houdiniUi() {
+    const auto name = processName();
     for (const auto* gui :
          {L"houdini.exe", L"houdinifx.exe", L"houdinicore.exe", L"basehoudini.exe", L"happrentice.exe", L"hindie.exe",
           L"hescape.exe", L"hedu.exe", L"heducation.exe", L"hexper.exe"})
@@ -1671,8 +1699,10 @@ public:
     // Render tags (purposes): prims whose tag the pass does not draw are sent hidden; a change re-sends only the prims
     // whose visibility it flips. Empty tags draw everything.
     void setRenderTags(TfTokenVector tags) {
-        std::sort(tags.begin(), tags.end());
         auto& s = *state_;
+        // husk does not apply UsdRenderSettings includedPurposes to the pass's tags.
+        tags = HdUEIncludedTags(std::move(tags), s.setting<VtTokenArray>("includedPurposes", {}));
+        std::sort(tags.begin(), tags.end());
         std::lock_guard lock(s.mutex);
         if (tags == s.renderTags) return;
         const auto flips = [&](const TfToken& tag) {
@@ -2102,8 +2132,15 @@ public:
                                   s.setting<std::string>("upAxis", "Y").c_str());
                     const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
                     request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
-                    if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip)
+                    if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip) {
                         request.far_clip_cm = float(pass->farClip * cmPerUnit);
+                        // Below UsdGeomCamera's fallback (1e6), the far plane is authored to clip something.
+                        static std::once_flag farWarned;
+                        if (request.mode == HDUE_PATH_TRACED && pass->farClip < 1e6)
+                            std::call_once(farWarned, [] {
+                                TF_WARN("hdUE: the Path Tracer ignores the camera's far clipping plane");
+                            });
+                    }
                     // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
                     if (projection[3][3] == 1) {
                         request.orthographic = 1;
@@ -2120,7 +2157,8 @@ public:
                         request.projection_offset[0] = -projection[2][0];
                         request.projection_offset[1] = -projection[2][1];
                     }
-                    if (lens[0] > 0 && lens[1] > 0) {
+                    // UsdRenderSettings disableDepthOfField renders every camera in focus.
+                    if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
                         request.fstop = lens[0];
                         request.focus_distance_cm = float(lens[1] * cmPerUnit);
                         request.focal_length_cm =
@@ -2359,6 +2397,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
       registry_(std::make_shared<HdResourceRegistry>()) {
+    if (processName() == L"husk.exe") static HdUEBatchWarnings warnings;
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
@@ -2514,7 +2553,8 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
         HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,    HdPrimTypeTokens->extComputation,
         HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
         HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,   HdPrimTypeTokens->cylinderLight,
-        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight")};
+        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight"),
+        HdPrimTypeTokens->light};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -2555,6 +2595,8 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == HdPrimTypeTokens->cylinderLight) return HdUECreateLight(id, HDUE_CYLINDER_LIGHT);
     if (type == HdPrimTypeTokens->meshLight || type == HdPrimTypeTokens->pluginLight || type == TfToken("portalLight"))
         return HdUECreateUnsupportedLight(id, type);
+    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a UsdLuxGeometryLight
+        return HdUECreateUnsupportedLight(id, TfToken("GeometryLight"));
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {
@@ -2632,6 +2674,12 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
     if (name == HdAovTokens->cameraDepth)
         return HdAovDescriptor(HdFormatFloat32, false, VtValue(std::numeric_limits<float>::max()));
     return HdAovDescriptor();
+}
+// UsdRenderSettings materialBindingPurposes (husk passes it; Hydra resolves one purpose, then allPurpose), else full
+// as a final-quality renderer, as Karma (Hydra's default is preview).
+TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
+    const auto purposes = state_->setting<VtTokenArray>("materialBindingPurposes", {});
+    return purposes.empty() ? HdTokens->full : purposes[0];
 }
 // Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
 // Prefixed families (postProcess:*, cvar:*) and dictionaries set by the Houdini host are not listed.
@@ -2751,10 +2799,10 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     if (key == TfToken("renderMode") || key == TfToken("samplesPerPixel") || key == TfToken("warmupFrames") ||
         key == TfToken("lumenEnabled") || key == TfToken("timeSeconds") || key == TfToken("motionBlur") ||
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
-        key == TfToken("instantaneousShutter") || key == TfToken("tonemapper") ||
-        key == TfToken("postProcessMaterials") || key == TfToken("denoiser") || key == TfToken("debugView") ||
-        key == TfToken("viewportIdAovs") || TfStringStartsWith(key.GetString(), "postProcess:") ||
-        TfStringStartsWith(key.GetString(), "cvar:"))
+        key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
+        key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("denoiser") ||
+        key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
+        TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {
         const double frame = state_->setting<double>("houdini:frame", 1.);

@@ -78,6 +78,10 @@ if(HDUE_BUILD_HYDRA)
         target_include_directories(hdue_instancing_test PRIVATE src/hydra "${OPENUSD_ROOT}/include")
         target_link_libraries(hdue_instancing_test PRIVATE gf vt)
         add_test(NAME instance_transforms COMMAND hdue_instancing_test)
+        add_executable(hdue_render_tags_test tests/render_tags.cpp)
+        target_include_directories(hdue_render_tags_test PRIVATE src/hydra "${OPENUSD_ROOT}/include")
+        target_link_libraries(hdue_render_tags_test PRIVATE tf vt)
+        add_test(NAME render_tag_purposes COMMAND hdue_render_tags_test)
         get_filename_component(_python_lib_dir "${Python3_LIBRARY}" DIRECTORY)
         get_filename_component(_python_runtime "${_python_lib_dir}" DIRECTORY)
         set_tests_properties(render_buffer_snapshots PROPERTIES ENVIRONMENT_MODIFICATION
@@ -86,7 +90,7 @@ if(HDUE_BUILD_HYDRA)
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
         set_tests_properties(mesh_placement PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
-        set_tests_properties(geom_subset_partition instance_transforms PROPERTIES ENVIRONMENT_MODIFICATION
+        set_tests_properties(geom_subset_partition instance_transforms render_tag_purposes PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
     endif()
 endif()

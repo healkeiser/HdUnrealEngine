@@ -380,6 +380,7 @@ public:
     const TfTokenVector& GetSupportedBprimTypes() const override;
     // MaterialX surfaces first (materials.cpp maps them), then the universal UsdPreviewSurface.
     TfTokenVector GetMaterialRenderContexts() const override { return {TfToken("mtlx"), TfToken()}; }
+    TfToken GetMaterialBindingPurpose() const override;
     HdRenderParam* GetRenderParam() const override { return state_.get(); }
     HdResourceRegistrySharedPtr GetResourceRegistry() const override { return registry_; }
     HdRenderPassSharedPtr CreateRenderPass(HdRenderIndex*, const HdRprimCollection&) override;

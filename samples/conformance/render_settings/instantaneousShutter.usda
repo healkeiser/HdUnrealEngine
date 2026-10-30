@@ -59,6 +59,7 @@ over "Camera"
 }
 def Cube "Moving"
 {
+        double size = 1.0
         double3 xformOp:translate.timeSamples = {0: (-2, 0, 0), 1: (0, 0, 0), 2: (2, 0, 0)}
         uniform token[] xformOpOrder = ["xformOp:translate"]
 }
