@@ -135,7 +135,7 @@ UTexture2D* CreateLinearWhite() {
 // one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
 // same inputs to UE's Substrate standard_surface function, whose slabs and layers cost more per pixel.
 UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite, bool Layered = false,
-                         bool Thin = false) {
+                         bool Thin = false, bool TwoSided = true) {
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
@@ -147,7 +147,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         return false;
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
-        Material->TwoSided && Material->GetEditorOnlyData()->WorldPositionOffset.Expression &&
+        Material->TwoSided == TwoSided && Material->GetEditorOnlyData()->WorldPositionOffset.Expression &&
         HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion2") : TEXT("PreviewSurfaceVersion4")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
@@ -408,9 +408,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
-    // Two-sided like Karma and most path tracers, which ignore doubleSided: production assets often leave it unset
-    // on thin single-sided geometry that is meant to be seen from both sides.
-    Material->TwoSided = true;
+    // Two-sided, and a <Name>OneSided twin that the backend draws on meshes whose doubleSided is off.
+    Material->TwoSided = TwoSided;
     // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
     Material->bUsedWithInstancedStaticMeshes = true;
     Material->bUsedWithNanite = true;  // runtime-built Nanite meshes (Scene.cpp BuildNanite)
@@ -708,15 +707,26 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
     UMaterial* Masked = CreateSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
     UMaterial* Translucent =
         CreateSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
+    // One-sided twins (USD doubleSided off). Thin-walled shells stay two-sided.
+    for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentGreyTransmittance})
+        if (!CreateSurface(
+                *FString::Printf(TEXT("M_PreviewSurface%sOneSided"), Blend == BLEND_Masked   ? TEXT("Masked")
+                                                                     : Blend == BLEND_Opaque ? TEXT("")
+                                                                                             : TEXT("Translucent")),
+                Blend, LinearWhite, false, false, false))
+            return 3;
     // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's
     // function).
     for (const bool Thin : {false, true})
         for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked})
-            if (!CreateSurface(
-                    *FString::Printf(TEXT("M_StandardSurface%s%s"), Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""),
-                                     Thin ? TEXT("Thin") : TEXT("")),
-                    Blend, LinearWhite, true, Thin))
-                return 3;
+            for (const bool TwoSided : {true, false})
+                if ((TwoSided || !Thin) &&
+                    !CreateSurface(
+                        *FString::Printf(TEXT("M_StandardSurface%s%s%s"),
+                                         Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""),
+                                         Thin ? TEXT("Thin") : TEXT(""), TwoSided ? TEXT("") : TEXT("OneSided")),
+                        Blend, LinearWhite, true, Thin, TwoSided))
+                    return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial()) return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);

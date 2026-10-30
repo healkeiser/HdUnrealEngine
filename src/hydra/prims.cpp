@@ -366,13 +366,14 @@ public:
                             [&](const std::string& id) { return state->meshes.count(id); })) {
                 for (const auto& id : emitted_) {
                     auto& part = state->meshes[id];
-                    const bool changed = part.transform != transform || part.visible != visible;
+                    const bool shown = part.visible != visible, moved = !shown && HdUEPlacedOnly(part, transform);
+                    const bool changed = part.transform != transform || shown;
                     part.transform = transform;
                     part.visible = visible;
                     part.renderTag = renderTag;
                     part.motionLeft = motion;
                     if (changed) {
-                        state->dirtyMeshes.insert(id);
+                        (moved ? state->movedMeshes : state->dirtyMeshes).insert(id);
                         ++state->revision;
                     }
                 }
@@ -399,6 +400,7 @@ public:
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
+        mesh.doubleSided = delegate->GetDoubleSided(GetId());
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
@@ -609,15 +611,17 @@ public:
             const bool onlyNativeBounds =
                 previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
                 previous->second.transform == part.transform && previous->second.visible == part.visible;
+            const bool moved = previous != missing && HdUEPlacedOnly(previous->second, part.transform);
             const bool meshChanged =
                 !onlyNativeBounds &&
                 (previous == missing || previous->second.points != part.points ||
                  previous->second.indices != part.indices || previous->second.normals != part.normals ||
-                 previous->second.uv != part.uv || previous->second.transform != part.transform ||
+                 previous->second.uv != part.uv || (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
                  previous->second.instances != part.instances || previous->second.colors != part.colors ||
-                 previous->second.instanceColors != part.instanceColors);
+                 previous->second.instanceColors != part.instanceColors ||
+                 previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;
             // Link categories change no geometry: the next upload recomputes the light-link table (prepareLinks).
             const bool maskChanged = previous == missing || previous->second.masks != part.masks ||
@@ -629,14 +633,17 @@ public:
             if (meshChanged) {
                 state->dirtyMeshes.insert(id);
                 ++state->revision;
-            } else if (maskChanged)
+            } else if (moved || maskChanged) {
+                if (moved) state->movedMeshes.insert(id);
                 ++state->revision;
+            }
             current.insert(id);
         }
         for (const auto& id : emitted_)
             if (!current.count(id)) {
                 state->meshes.erase(id);
                 state->dirtyMeshes.erase(id);
+                state->movedMeshes.erase(id);
                 state->removed.insert(id);
                 ++state->revision;
             }

@@ -66,6 +66,10 @@ if(HDUE_BUILD_HYDRA)
         target_include_directories(hdue_pick_test PRIVATE src/hydra "${OPENUSD_ROOT}/include")
         target_link_libraries(hdue_pick_test PRIVATE gf)
         add_test(NAME picking_bvh COMMAND hdue_pick_test)
+        add_executable(hdue_placement_test tests/placement.cpp)
+        target_include_directories(hdue_placement_test PRIVATE src/hydra "${OPENUSD_ROOT}/include")
+        target_link_libraries(hdue_placement_test PRIVATE gf)
+        add_test(NAME mesh_placement COMMAND hdue_placement_test)
         add_executable(hdue_subset_test tests/geom_subsets.cpp)
         target_include_directories(hdue_subset_test PRIVATE src/hydra include "${OPENUSD_ROOT}/include")
         target_link_libraries(hdue_subset_test PRIVATE hd)
@@ -80,6 +84,8 @@ if(HDUE_BUILD_HYDRA)
         set_tests_properties(render_buffer_snapshots PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
         set_tests_properties(picking_bvh PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
+        set_tests_properties(mesh_placement PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
         set_tests_properties(geom_subset_partition instance_transforms PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${OPENUSD_ROOT}/lib;PATH=path_list_prepend:${OPENUSD_ROOT}/bin;PATH=path_list_prepend:${_python_runtime}")
