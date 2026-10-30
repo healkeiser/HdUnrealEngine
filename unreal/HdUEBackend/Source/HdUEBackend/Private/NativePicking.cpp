@@ -107,12 +107,15 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
     for (const auto& Entry : Actors) {
         AActor* Actor = Entry.Value;
         if (!IsValid(Actor) || Actor->IsHidden()) continue;
-        auto* Component = Actor->FindComponentByClass<UMeshComponent>();
-        if (!Component) continue;
+        // Native assets only: the delegate picks generic USD meshes itself, including those converted to runtime
+        // StaticMeshes (outered to their actor, so not assets), whose geometry is not CPU-readable.
+        auto* Static = Actor->FindComponentByClass<UStaticMeshComponent>();
+        UStaticMesh* Source = Static ? Static->GetStaticMesh() : nullptr;
+        if (!Source || !Source->IsAsset()) continue;
         TArray<uint32> MaterialFlags;
-        for (int32 I = 0; I < Component->GetNumMaterials(); ++I) {
+        for (int32 I = 0; I < Static->GetNumMaterials(); ++I) {
             uint32 Flags = 0;
-            const auto Code = InspectMaterial(Component->GetMaterial(I), Flags, Error);
+            const auto Code = InspectMaterial(Static->GetMaterial(I), Flags, Error);
             if (Code != HDUE_OK) return Code;
             if (!(Flags & HDUE_PICK_MATERIAL_OPAQUE) || (Flags & HDUE_PICK_MATERIAL_DEFORMED)) {
                 Error = TEXT("Picking requires opaque materials without vertex/displacement deformation.");
@@ -120,16 +123,13 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
             }
             MaterialFlags.Add(Flags);
         }
-        auto* Static = Cast<UStaticMeshComponent>(Component);
-        if (!Static || !Static->GetStaticMesh()) continue;
-        UStaticMesh* Source = Static->GetStaticMesh();
         auto& Geometry = NativePickGeometry.FindOrAdd(Source->GetPathName());
         if (!Geometry) Geometry = MakeShared<FNativePickGeometry>(Source);
         if (!Geometry->Error.IsEmpty()) {
             Error = Geometry->Error;
             return HDUE_NOT_SUPPORTED;
         }
-        const FMatrix LocalToWorld = Component->GetComponentTransform().ToMatrixWithScale();
+        const FMatrix LocalToWorld = Static->GetComponentTransform().ToMatrixWithScale();
         if (FMath::Abs(LocalToWorld.Determinant()) < UE_SMALL_NUMBER) continue;
         const FMatrix Inverse = LocalToWorld.Inverse();
         const FVector3d LocalOrigin(Inverse.TransformPosition(Origin));
