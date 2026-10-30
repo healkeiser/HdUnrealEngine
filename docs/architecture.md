@@ -19,7 +19,7 @@ flowchart LR
     GPU -->|"Asynchronous readback"| Backend
 ```
 
-The host, delegate, and UE runtime share one process. The C ABI passes fixed-width data, handles, and caller-owned buffers. The host owns UE's lifetime; destroying a delegate releases its scene resources without restarting UE. Under husk, the first delegate starts UE itself (see [husk](houdini.md#rendering-to-disk-with-husk)).
+The host, delegate, and UE runtime share one process. The C ABI passes fixed-width data, handles, and caller-owned buffers. The host owns UE's lifetime; destroying a delegate releases its scene resources without restarting UE. UE starts once per process: UELibrary has no documented 5.x lifecycle (its only page is for 4.27), and after `Shutdown` it cannot initialize again. UE runs on a host thread, not the thread that ran static initialization, so the target defines `IS_RUNNING_GAMETHREAD_ON_EXTERNAL_THREAD`, and `Shutdown` hands the game thread to the exiting thread for UE's static destructors; `hdue_backend_smoke` runs UE on a worker thread through process exit to cover both. Under husk, the first delegate starts UE itself (see [husk](houdini.md#rendering-to-disk-with-husk)).
 
 Hydra changes are batched and applied on the UE owner thread. Rendering and readback run asynchronously, and the delegate publishes completed frames without waiting for another Tick. Frame IDs and generation numbers prevent stale results from being presented as current. Solaris consumes both color and linear depth; the standalone path uses color by default.
 
