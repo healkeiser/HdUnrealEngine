@@ -26,6 +26,10 @@ sys.path[:0] = [
     str(ROOT / "integrations/houdini/python3.13libs"),
 ]
 ICON = "HDUE_hdue"
+# The file chooser's filter for image parameters: the formats UE's texture import reads (the files are copied as is).
+IMAGE_PATTERN = (
+    "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp *.psd *.dds"
+)
 # Node summaries and help for each input and parameter, by node kind; HELP[None] holds what several kinds share.
 HELP = {
     None: {
@@ -179,18 +183,25 @@ def parameter(kind, name, value_type, default):
     import hou
 
     args = dict(help=help_text(kind, name))
-    if value_type in ("string", "asset"):
-        template = hou.StringParmTemplate(
+    if (
+        value_type == "asset"
+    ):  # image files only (Texture Sample), with Houdini's image chooser
+        return hou.StringParmTemplate(
             name,
             label(name),
             1,
             default_value=(default,),
             **args,
-            string_type=(
-                hou.stringParmType.FileReference
-                if value_type == "asset"
-                else hou.stringParmType.Regular
-            ),
+            string_type=hou.stringParmType.FileReference,
+            file_type=hou.fileType.Image,
+            tags={
+                "filechooser_mode": "read",
+                "filechooser_pattern": IMAGE_PATTERN,
+            },
+        )
+    if value_type == "string":
+        template = hou.StringParmTemplate(
+            name, label(name), 1, default_value=(default,), **args
         )
         if name in MENUS:
             template.setMenuItems(tuple(MENUS[name]))

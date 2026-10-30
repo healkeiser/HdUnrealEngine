@@ -73,6 +73,23 @@ def authored(path):
 
 graph = authored("/Looks/Builder")
 assert abs(graph["/Looks/Builder/Graph/slab"]["inputs:roughness"] - 0.25) < 1e-6
+# A Texture Sample's file has Houdini's image chooser and still authors an asset path.
+texture = builder.createNode(hdue_substrate.type_name("texture"), "texture")
+template = texture.parm("file").parmTemplate()
+assert template.stringType() == hou.stringParmType.FileReference
+assert template.fileType() == hou.fileType.Image
+assert template.tags()["filechooser_mode"] == "read"
+assert "*.exr" in template.tags()["filechooser_pattern"]
+texture.parm("file").set("$HIP/tex/base.png")
+slab.setNamedInput("diffuse_albedo", texture, "out")
+file = (
+    library.stage()
+    .GetPrimAtPath("/Looks/Builder/Graph/texture")
+    .GetAttribute("inputs:file")
+)
+assert str(file.GetTypeName()) == "asset" and file.Get().path.replace(
+    "\\", "/"
+).endswith("/tex/base.png"), file
 
 # A builder saved as the earlier asset (otls/hdue_substrate_builder_legacy.hda): it loads, authors and upgrades.
 legacy = library.createNode(hdue_substrate.type_name("builder"), "legacy")

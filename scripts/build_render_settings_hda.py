@@ -34,6 +34,9 @@ NAME, LABEL, ICON = (
     "HDUE_hduerenderproperties",
 )
 VARS = "/Render/Products/Vars/"
+# The asset's Hit Lighting toggle drives this generated menu (hdUE:postProcess:LumenRayLightingMode).
+RAY_LIGHTING = "xn__hdUEpostProcessLumenRayLightingMode_0xbl"
+HIT_LIGHTING = "hdue_lumenHitLighting"
 # AOVs the delegate renders besides the beauty, read from its table (src/hydra/aov_table.h; depth is the delegate's
 # own): (render var and channel name, label, USD data type, husk format).
 TABLE_ROW = re.compile(
@@ -397,6 +400,22 @@ def build():
         if tab.label() == "Engine Quality":
             group.append(output)
         group.append(without_controls(tab))
+    group.insertBefore(
+        RAY_LIGHTING,
+        hou.ToggleParmTemplate(
+            HIT_LIGHTING,
+            "Hit Lighting",
+            default_value=False,
+            help="Lights Lumen's hardware rays where they hit, instead of from the surface cache: brighter, more "
+            "accurate indirect light and reflections, at a cost in render time. Off by default, as in UE. On, it "
+            "sets the Ray Lighting Mode below to Hit Lighting (hdUE:postProcess:LumenRayLightingMode).",
+        ),
+    )
+    ray_lighting = group.find(RAY_LIGHTING)
+    ray_lighting.setConditional(
+        hou.parmCondType.DisableWhen, f"{{ {HIT_LIGHTING} == 1 }}"
+    )
+    group.replace(RAY_LIGHTING, ray_lighting)
     subnet.setParmTemplateGroup(group)
     # The internal Render Settings LOP follows the asset's parameters.
     settings.parm("primpath").set('`chs("../primpath")`')
@@ -426,6 +445,18 @@ def build():
             control.setExpression(
                 control_expression(template, subnet.parmTuple(template.name()))
             )
+    # Hit Lighting authors the Ray Lighting Mode menu's Hit Lighting; off, the menu's own value.
+    mode = settings.parm(RAY_LIGHTING)
+    mode.setExpression(
+        f'ifs(ch("../{HIT_LIGHTING}"), "ELumenRayLightingModeOverride::HitLighting", chs("../{RAY_LIGHTING}"))'
+    )
+    settings.parm(
+        hou.text.encode(hou.text.decode(RAY_LIGHTING) + "_control")
+    ).setExpression(
+        control_expression(
+            group.find(RAY_LIGHTING), subnet.parmTuple(RAY_LIGHTING)
+        ).replace("ifs(", f'ifs(ch("../{HIT_LIGHTING}") || ', 1)
+    )
 
     save(
         subnet,
@@ -803,6 +834,7 @@ def build_render_products():
             default_value=('$HIP/render/$HIPNAME.`chs("primname_#")`.$F4.exr',),
             string_type=hou.stringParmType.FileReference,
             conditionals=disabled,
+            tags={"filechooser_mode": "write"},
             help="Image the render product writes (husk, USD Render ROP), with one channel set per render var.",
         )
     )

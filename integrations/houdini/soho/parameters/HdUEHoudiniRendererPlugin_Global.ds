@@ -364,6 +364,7 @@
                 default { "" }
                 help    "library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: the runtime profile's materialx_library. Houdini's viewport prepares the bound MaterialX materials from it; husk renders the Preview Surface fallback and warns."
                 parmtag { "spare_category" "Materials" }
+                parmtag { "filechooser_mode" "read" }
                 parmtag { "filechooser_pattern" "*.json" }
                 parmtag { "usdvaluetype" "string" }
                 disablewhen R"({ xn__hdUEmaterialxLibrary_control_mmb == block } { xn__hdUEmaterialxLibrary_control_mmb == none })"
@@ -377,6 +378,7 @@
                 default { "" }
                 help    "library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: the runtime profile's substrate_library. Houdini's viewport prepares Substrate Builder materials from it; husk renders the Preview Surface fallback and warns."
                 parmtag { "spare_category" "Materials" }
+                parmtag { "filechooser_mode" "read" }
                 parmtag { "filechooser_pattern" "*.json" }
                 parmtag { "usdvaluetype" "string" }
                 disablewhen R"({ xn__hdUEsubstrateLibrary_control_mmb == block } { xn__hdUEsubstrateLibrary_control_mmb == none })"

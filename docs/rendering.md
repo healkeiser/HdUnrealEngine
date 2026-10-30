@@ -247,7 +247,7 @@ The render settings LOP lists every user-facing `FPostProcessSettings` property 
 | --- | --- |
 | Scalability | `sg.*Quality` (Low to Cinematic): the levels of UE's scalability groups; Epic in the viewport, Cinematic in husk (see below) |
 | Resolution and Anti-Aliasing | `r.AntiAliasingMethod` (None, FXAA, TAA, TSR), `r.ScreenPercentage` (realtime beauty), `r.HdUE.InteractiveResolution` and `r.HdUE.InteractiveScreenPercentage` (Houdini's viewport renders at 50% while moving) |
-| Lumen | `r.Lumen.HardwareRayTracing`, `r.Lumen.Reflections.HardwareRayTracing`; quality and hit lighting are post-process properties |
+| Lumen | `r.Lumen.HardwareRayTracing`, `r.Lumen.Reflections.HardwareRayTracing`; quality and hit lighting are post-process properties (hdUE Render Settings: Hit Lighting, off by default as in UE, authors `LumenRayLightingMode`) |
 | Shadows | `r.Shadow.Virtual.Enable` (on in this project, as in new UE projects; 0 falls back to cascaded shadow maps), resolution biases and soft-shadow rays, `r.Shadow.FilterMethod`, `r.RayTracing.Shadows` |
 | Nanite, MegaLights, Ray Tracing | `r.Nanite`, `r.Nanite.MaxPixelsPerEdge`, `r.MegaLights.NumSamplesPerPixel`, `r.MegaLights.DefaultShadowMethod`, `r.RayTracing.Enable` |
 | Path Tracer | `r.PathTracing.ApproximateCaustics`, `r.PathTracing.FilterWidth` |

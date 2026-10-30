@@ -153,4 +153,44 @@ assert UsdRender.Settings(
 assert UsdRender.Product(
     stage.GetPrimAtPath("/Render/Products/renderproduct")
 ).GetOrderedVarsRel().GetTargets() == [VARS + "C"]
+# File parameters have Houdini's file chooser; the cooked libraries still author strings.
+for name, mode, pattern in (
+    ("picture", "write", None),
+    (hou.text.encode("hdUE:materialxLibrary"), "read", "*.json"),
+    (hou.text.encode("hdUE:substrateLibrary"), "read", "*.json"),
+):
+    template = alone.parm(name).parmTemplate()
+    assert template.stringType() == hou.stringParmType.FileReference, name
+    assert template.tags().get("filechooser_mode") == mode, template.tags()
+    assert (
+        template.tags().get("filechooser_pattern") == pattern
+    ), template.tags()
+alone.parm(hou.text.encode("hdUE:materialxLibrary")).set("$HIP/library.json")
+library = (
+    alone.stage()
+    .GetPrimAtPath("/Render/rendersettings")
+    .GetAttribute("hdUE:materialxLibrary")
+)
+assert str(library.GetTypeName()) == "string" and library.Get().endswith(
+    "/library.json"
+), library
+products = network.createNode("hdue::hduerenderproducts::1.0")
+products.parm("products").set(1)
+assert (
+    products.parm("productName_1").parmTemplate().tags()["filechooser_mode"]
+    == "write"
+)
+# Hit Lighting (off by default, as in UE) authors Lumen's Ray Lighting Mode.
+ray = "hdUE:postProcess:LumenRayLightingMode"
+settings_prim = lambda: alone.stage().GetPrimAtPath("/Render/rendersettings")
+assert not alone.evalParm("hdue_lumenHitLighting")
+assert not settings_prim().GetAttribute(ray), ray
+alone.parm("hdue_lumenHitLighting").set(1)
+attribute = settings_prim().GetAttribute(ray)
+assert (
+    str(attribute.GetTypeName()) == "token"
+    and attribute.Get() == "ELumenRayLightingModeOverride::HitLighting"
+), attribute
+alone.parm("hdue_lumenHitLighting").set(0)
+assert not settings_prim().GetAttribute(ray), ray
 print("render outputs: ok")
