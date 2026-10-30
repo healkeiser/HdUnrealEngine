@@ -2633,6 +2633,12 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
         return HdAovDescriptor(HdFormatFloat32, false, VtValue(std::numeric_limits<float>::max()));
     return HdAovDescriptor();
 }
+// UsdRenderSettings materialBindingPurposes (husk passes it; Hydra resolves one purpose, then allPurpose), else full
+// as a final-quality renderer, as Karma (Hydra's default is preview).
+TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
+    const auto purposes = state_->setting<VtTokenArray>("materialBindingPurposes", {});
+    return purposes.empty() ? HdTokens->full : purposes[0];
+}
 // Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
 // Prefixed families (postProcess:*, cvar:*) and dictionaries set by the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
