@@ -39,7 +39,7 @@ Distributing a backend that contains Unreal Engine code is subject to the Epic E
 What `scripts/Package-Houdini.ps1` does about it:
 
 - Ships `LICENSE` (hdUE, MIT), `LICENSE-PACKAGE.txt` (the end-user terms EULA sections 4(c) and 7(a) require: use only as part of hdUE, no extraction or reuse of the runtime, the disclaimer for the Licensed Technology, Microsoft's redistributable terms), this file, and `licenses\`, a copy of the engine's `Engine/Source/ThirdParty/Licenses` (section 7(b)). The copy is the whole collection, a superset of what the runtime links.
-- Leaves out the backend smoke test, import libraries, `d3d12SDKLayers.dll` and the Vulkan layers.
+- Leaves out the backend smoke test, import libraries, the DirectX Agility SDK (`D3D12Core.dll`, `d3d12SDKLayers.dll`) and the Vulkan layers.
 - Refuses to package while `HdUEBackend.Target.cs` sets `bBuildDeveloperTools`, unless `-UnrealLicenseesOnly` states that the package goes only through Fab or a fork of Epic's UnrealEngine GitHub network. The backend links the Developer module `NaniteBuilder` and compiles MeshUtilities' Lumen card builder (`MeshCards.cpp`), both Engine Tools under section 6(d).
 
 No binary package is published on this repository's GitHub releases.
