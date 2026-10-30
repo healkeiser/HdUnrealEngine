@@ -134,7 +134,7 @@ Any other node (`ND_mix_*`, `ND_place2d_*`, procedurals, ...) leaves the input a
 | `subsurface`, `subsurface_color`, `subsurface_radius` × `subsurface_scale` (`subsurface_weight`, `subsurface_color`, `subsurface_radius_scale` × `subsurface_radius`) | Substrate subsurface scattering, mean free path in scene units |
 | `thin_walled` (`geometry_thin_walled`) | Thin two-sided shell that transmits its subsurface colour (cloth, leaves) |
 | `emission` × `emission_color` (`emission_luminance` × `emission_color`) | Emission (OpenPBR's luminance is used as a plain weight) |
-| `opacity` (`geometry_opacity`) | An image cuts out at 0.5 (masked), as UE's Interchange imports MaterialX; a constant below 1 is see-through |
+| `opacity` (`geometry_opacity`) | An image cuts out at 0.1 (masked); a constant below 1 is see-through. Lumen reads the cutout from mipmaps, where thin foliage averages well below 0.5: at 0.1 a distant tree keeps the Path Tracer's coverage, as UsdPreviewSurface exports usually set (UE's Interchange imports MaterialX at UMaterial's default 1/3) |
 | `transmission` (`transmission_weight`) | Approximated as see-through coverage, opacity × (1 − transmission); no refraction |
 | `normal` (`geometry_normal`) | Tangent-space normal map |
 
