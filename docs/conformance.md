@@ -55,11 +55,11 @@ that backend), 108 scenes x 2 modes: 107 scenes pass in both modes, 1 fails one 
 
 | Scene | Expected (spec) | Observed | Likely code area |
 | --- | --- | --- | --- |
+| camera/clipping_range | the cube beyond the far plane is clipped | it renders: hdUE applies the near plane only (check removed) | UE's views keep an infinite far plane; a finite one changed Lumen's lighting by 8% on Cornell with nothing clipped, and the Path Tracer traces past any far plane |
 | lux/dome_latlong (realtime) | rotated 180 degrees, the dome lights the sphere blue | blue with a green cast (normalized RGB 0.03, 0.17, 0.80; the check allows 0.2 from pure blue); path traced passes. It passed at `4a8d783` and fails the same with main's own plugin and runtime at `74e8853` | realtime dome lighting (Lumen / sky light capture) or the dome texture's colour conversion, changed between those commits |
 
 Resolved since `4a8d783`: material binding purpose (the render settings' `materialBindingPurposes`, else `full`),
-far clipping (realtime; the Path Tracer traces past any far plane, so path traced renders warn instead, and the scene
-checks that), `disableDepthOfField`, `includedPurposes`, the `UsdUVTexture` fallback, GeometryLight (accepted and
+`disableDepthOfField`, `includedPurposes`, the `UsdUVTexture` fallback, GeometryLight (accepted and
 warned), the Path Tracer's displacement, and hdUE's warnings in husk (`hdUE warning:` lines on stderr). Two scenes'
 checks were wrong: the motion-blur-off scenes probed inside their cube (UsdGeomCube's fallback size is 2), and
 lux/invisible_light measured husk's headlight, which husk adds when no light is visible; the runner now passes

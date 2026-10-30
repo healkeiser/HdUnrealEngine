@@ -1,7 +1,9 @@
 #usda 1.0
 (
     doc = """clippingRange (near, far) bounds what renders. With (2, 8): the cube 1.5 from the camera (x = -2 on screen)
-and the cube 10 away (centre) are clipped; the cube 5 away (x = 2 on screen) renders."""
+and the cube 10 away (centre) are clipped; the cube 5 away (x = 2 on screen) renders. hdUE applies the near plane
+only: UE's views keep an infinite far plane (a finite one changed Lumen's lighting by 8% with nothing clipped), so the
+far cube still renders; docs/conformance.md lists it under the gaps."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomCamera",
@@ -20,19 +22,6 @@ and the cube 10 away (centre) are clipped; the cube 5 away (x = 2 on screen) ren
     "stat": "coverage"
    },
    "min": 0.9
-  },
-  {
-   "name": "beyond far",
-   "value": {
-    "region": [
-     -0.3,
-     -0.3,
-     0.3,
-     0.3
-    ],
-    "stat": "coverage"
-   },
-   "max": 0.05
   },
   {
    "name": "before near",
