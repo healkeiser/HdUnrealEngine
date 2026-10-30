@@ -71,8 +71,8 @@ The tables below give the numbers behind both charts; regenerate the charts with
 <!-- gallery:start -->
 Every scene is the [CC0 Cornell box](samples/cornell/) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
 
-- **hdUE Lumen**: realtime mode, 16 warmup frames.
-- **hdUE Path Tracer**: 512 samples per pixel, up to 8 bounces.
+- **hdUE Lumen**: realtime mode, 32 warmup frames.
+- **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 512 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
 - Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
@@ -82,22 +82,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 0.1 s | 2.2 s | 7.8 s | 49.7 s | 65x / 3x | 0.79 / 1.00 |
-| Glossy materials | 0.1 s | 2.2 s | 6.2 s | 32.1 s | 44x / 3x | 0.96 / 1.21 |
-| Depth of field | 0.1 s | 2.2 s | 7.9 s | 49.9 s | 57x / 4x | 0.78 / 1.00 |
-| Motion blur | 0.2 s | 2.3 s | 22.6 s | 52.9 s | 125x / 10x | 0.84 / 1.01 |
-| Subdivision surfaces | 0.1 s | 2.5 s | 7.9 s | 49.6 s | 52x / 3x | 0.79 / 1.00 |
-| Instances, points, curves | 0.1 s | 2.2 s | 10.8 s | 51.2 s | 77x / 5x | 0.79 / 1.01 |
-| Volumes (OpenVDB) | 0.1 s | 2.7 s | 28.9 s | 60.0 s | 222x / 11x | 0.91 / 1.30 |
-| IES profile | 0.1 s | 2.1 s | 9.8 s | 65.8 s | 66x / 5x | 0.88 / 1.08 |
-| Light linking | 0.1 s | 2.3 s | 9.7 s | 64.6 s | 69x / 4x | 1.54 / 1.00 |
-| Clearcoat | 0.3 s | 2.2 s | 6.2 s | 38.8 s | 20x / 3x | 0.85 / 1.00 |
-| Render region | 0.1 s | 2.1 s | 2.4 s | 14.2 s | 20x / 1x | 0.78 / 1.03 |
-| Lens shift | 0.2 s | 2.2 s | 5.8 s | 33.9 s | 36x / 3x | 0.77 / 1.02 |
-| Orthographic camera | 0.1 s | 2.2 s | 7.5 s | 45.6 s | 53x / 3x | 0.71 / 1.04 |
-| Camera exposure | 0.1 s | 2.3 s | 8.8 s | 57.4 s | 74x / 4x | 0.79 / 1.00 |
-| Unreal post-processing | 0.1 s | 2.3 s | 18.3 s | 49.8 s | 141x / 8x | n/a |
-| **All 15** | **2.3 s** | **34.1 s** | **160.6 s** | **715.7 s** | **70x / 5x** | |
+| Global illumination | 0.2 s | 2.4 s | 7.8 s | 49.7 s | 37x / 3x | 0.93 / 1.01 |
+| Glossy materials | 0.2 s | 2.4 s | 6.2 s | 32.1 s | 30x / 3x | 1.03 / 1.22 |
+| Depth of field | 0.2 s | 2.5 s | 7.9 s | 49.9 s | 38x / 3x | 0.93 / 1.01 |
+| Motion blur | 0.3 s | 2.5 s | 22.6 s | 52.9 s | 87x / 9x | 0.94 / 1.01 |
+| Subdivision surfaces | 0.2 s | 2.4 s | 7.9 s | 49.6 s | 37x / 3x | 0.93 / 1.01 |
+| Instances, points, curves | 0.2 s | 2.5 s | 10.8 s | 51.2 s | 54x / 4x | 0.95 / 1.04 |
+| Volumes (OpenVDB) | 0.2 s | 4.1 s | 28.9 s | 60.0 s | 131x / 7x | 1.05 / 1.31 |
+| IES profile | 0.2 s | 2.0 s | 9.8 s | 65.8 s | 45x / 5x | 1.04 / 1.09 |
+| Light linking | 0.2 s | 2.0 s | 9.7 s | 64.6 s | 46x / 5x | 0.95 / 1.00 |
+| Clearcoat | 0.2 s | 2.0 s | 6.2 s | 38.8 s | 27x / 3x | 0.96 / 1.01 |
+| Render region | 0.2 s | 1.9 s | 2.4 s | 14.2 s | 12x / 1x | 0.95 / 1.04 |
+| Lens shift | 0.2 s | 1.9 s | 5.8 s | 33.9 s | 27x / 3x | 0.93 / 1.03 |
+| Orthographic camera | 0.2 s | 2.0 s | 7.5 s | 45.6 s | 36x / 4x | 0.83 / 1.04 |
+| Camera exposure | 0.2 s | 2.0 s | 8.8 s | 57.4 s | 42x / 4x | 0.93 / 1.01 |
+| Unreal post-processing | 0.2 s | 2.0 s | 18.3 s | 49.8 s | 91x / 9x | n/a |
+| **All 15** | **3.2 s** | **34.7 s** | **160.6 s** | **715.7 s** | **50x / 5x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -133,10 +133,10 @@ Regenerate with `hython scripts/render_gallery.py`.
 ### Sponza
 
 <!-- sponza:start -->
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository): 28 UsdPreviewSurface materials with 96 textures, normal maps and alpha cutouts, from its main camera. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
-- **hdUE Lumen**: realtime mode, 16 warmup frames.
-- **hdUE Path Tracer**: 256 samples per pixel, up to 8 bounces.
+- **hdUE Lumen**: realtime mode, 32 warmup frames.
+- **hdUE Path Tracer**: 256 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 256 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
 - Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
@@ -158,7 +158,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 |------|--------------|---------|
 | **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP; hdUE Render Settings, Standard Render Vars and Render Products LOPs (`hdue::hduerendersettings::1.0`, ...) under TAB > Rendering > hdUE, with Output Picture on top as on Karma's; an **Unreal Engine** tab on Render Settings, Render Geometry Settings and Light LOPs; an hdUE Substrate Material Builder TAB tool; progress and stats in the viewport and in husk (`-V`); selection highlight; installable package | Houdini versions other than 22.0 |
 | **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames (a moved mesh keeps its uploaded geometry), Nanite for meshes and instancer prototypes (millions of instances), a bundled PSO cache, about 0.25 s per simple 1080p Lumen frame | |
-| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested, `protoIndices`, masks, half and float orientations, per-instance primvars on bound materials, instanced volumes) and native instancing, UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs), two-sided by default as in Karma (`hdUE:cullBackface` honours `doubleSided`) | Adaptive subdivision and adaptive displacement, varying `displayOpacity`, shear in instances (warned) |
+| **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested, `protoIndices`, masks, half and float orientations, per-instance primvars on bound materials, instanced volumes) and native instancing, UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs), `doubleSided` honoured as in UE's USD importer (`hdUE:cullBackface = 0` renders both sides, as Karma) | Adaptive subdivision and adaptive displacement, varying `displayOpacity`, shear in instances (warned) |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field | Temperature/emission, volume materials, frustum grids, volume shadows in realtime |
 | **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); several UV sets per mesh; primvar readers; true displacement (Preview Surface and MaterialX, diced on the CPU so the Path Tracer sees it); MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals), vector displacement |
 | **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI, `poleAxis`), UsdLux units, spot cones, IES profiles (`normalize`, `angleScale`), light and shadow linking (up to three linked collections, UE's lighting channels), Virtual Shadow Maps | Portals, light filters, shadow colour (warned) |

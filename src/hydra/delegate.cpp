@@ -727,8 +727,9 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto convert = state.converter();
     const auto basis = sceneBasis(state);
     const bool requireNanite = state.setting<bool>("requireNanite", false);
-    // Both sides render unless hdUE:cullBackface opts into USD's culling of single-sided meshes (Karma's default).
-    const bool cullBackface = state.setting<bool>("cullBackface", false);
+    // Single-sided meshes (USD doubleSided off) render their front faces only, as UE's USD importer does;
+    // hdUE:cullBackface = 0 renders both sides, as Karma (karma:object:cull_backface defaults to off).
+    const bool cullBackface = state.setting<bool>("cullBackface", true);
     const auto inverse = basis.GetInverse();
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
     // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
@@ -2885,7 +2886,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Denoiser", TfToken("denoiser"), VtValue(std::string("off"))},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
-            {"Cull Backface", TfToken("cullBackface"), VtValue(false)}};
+            {"Cull Backface", TfToken("cullBackface"), VtValue(true)}};
 }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
@@ -2948,7 +2949,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     const double previousUnits = state_->setting<double>("metersPerUnit", 0.01);
     const std::string previousAxis = state_->setting<std::string>("upAxis", "Y");
     const bool previousNanite = state_->setting<bool>("requireNanite", false);
-    const bool previousCull = state_->setting<bool>("cullBackface", false);
+    const bool previousCull = state_->setting<bool>("cullBackface", true);
     const bool previousInteractive = state_->interactive();
     state_->settings[key] = value;
     // Into or out of tumbling/scrubbing/playing: capped samples and skipped AOVs (or the full image) need a new
@@ -3019,7 +3020,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         (key == TfToken("metersPerUnit") && state_->setting<double>("metersPerUnit", 0.01) != previousUnits) ||
         (key == TfToken("upAxis") && state_->setting<std::string>("upAxis", "Y") != previousAxis) ||
         (key == TfToken("requireNanite") && state_->setting<bool>("requireNanite", false) != previousNanite);
-    if (key == TfToken("cullBackface") && state_->setting<bool>("cullBackface", false) != previousCull) {
+    if (key == TfToken("cullBackface") && state_->setting<bool>("cullBackface", true) != previousCull) {
         for (const auto& [id, v] : state_->meshes) state_->dirtyMeshes.insert(id);
         ++state_->revision;
     }

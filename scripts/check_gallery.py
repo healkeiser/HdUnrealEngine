@@ -13,12 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # (Lumen, Path Tracer) brightness bands relative to Karma CPU. Lumen's GI is approximate and darker in a closed box.
 DEFAULT = ((0.65, 1.15), (0.9, 1.1))
-# Known, documented differences. Light linking: UE's lighting channels, which Lumen's GI ignores. Main view: Sponza
-# without the denoiser, sun and sky fitted to Intel's renders.
+# Known, documented differences. Main view: Sponza without the denoiser, sun and sky fitted to Intel's renders.
 BANDS = {
     "Glossy materials": ((0.65, 1.15), (1.1, 1.3)),
     "Volumes (OpenVDB)": ((0.65, 1.15), (1.2, 1.4)),
-    "Light linking": ((1.4, 1.7), (0.9, 1.1)),
     "Main view": ((0.65, 1.15), (0.8, 1.0)),
 }
 
