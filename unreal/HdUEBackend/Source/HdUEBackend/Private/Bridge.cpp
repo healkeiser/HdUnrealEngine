@@ -86,6 +86,8 @@ struct FReadbackJob {
     bool DepthEnabled = false;
     int32 Slot = -1;  // index into FSession::Readbacks / DepthReadbacks
     TAtomic<bool> DepthQueued{false};
+    bool Guides = false;  // a converging Path Tracer draw: also read back its albedo and normal (FSession::Guides)
+    TAtomic<bool> GuidesQueued{false};
     bool MegaLightsActive = false;
     FTextureRHIRef Environment;
     float EnvironmentScale = 1;
@@ -147,6 +149,13 @@ struct FSession {
     FSceneViewStateInterface* AovViewState = nullptr;
     HdueFrameInfo AovFrame{};
     TArray<float> AovPixels;
+    // The converged Path Tracer beauty's albedo and normal (RGBA, as AovPixels): the buffers UE's Path Tracer
+    // accumulates for its denoiser and hands post-process materials (PathTracingBufferTexture). Path-traced ALBEDO and
+    // NORMAL requests with the same view answer from them (FrameMutex).
+    TUniquePtr<FRHIGPUTextureReadback> GuideReadbacks[ReadbackSlots][2];
+    TArray<float> Guides[2];
+    HdueRenderRequest GuideRequest{};
+    HdueFrameInfo GuideFrame{};
 };
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
@@ -177,6 +186,16 @@ public:
     }
     void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View,
                                          const FPostProcessingInputs& Inputs) override {
+        if (const auto& Traced = Inputs.PathTracingResources;
+            Job->Guides && Traced.bPostProcessEnabled && Traced.Albedo && Traced.Normal) {
+            FRDGTexture* Textures[2] = {Traced.Albedo, Traced.Normal};
+            for (int32 Index = 0; Index < 2; ++Index) {
+                auto& Readback = Session->GuideReadbacks[Job->Slot][Index];
+                if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueGuide"));
+                AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Textures[Index]);
+            }
+            Job->GuidesQueued.Store(true);
+        }
         if (!Inputs.SceneTextures) return;
         FRDGTextureRef Source = Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
         if (!Source) return;
@@ -401,6 +420,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
+        for (auto& Pair : Session->GuideReadbacks)
+            for (auto& R : Pair) R.Reset();
     });
     FlushRenderingCommands();
     Session->InFlight.Reset();
@@ -444,6 +465,17 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
     return HDUE_OK;
 }
 
+// Whether two requests render the same image: mode, camera, projection, lens and time.
+bool SameView(const HdueRenderRequest& A, const HdueRenderRequest& B) {
+    const auto Same = [](const auto& X, const auto& Y) { return !FMemory::Memcmp(&X, &Y, sizeof(X)); };
+    return A.mode == B.mode && A.time_seconds == B.time_seconds && Same(A.eye, B.eye) && Same(A.target, B.target) &&
+           Same(A.up, B.up) && A.horizontal_fov_degrees == B.horizontal_fov_degrees &&
+           A.near_clip_cm == B.near_clip_cm && A.far_clip_cm == B.far_clip_cm &&
+           Same(A.projection_scale, B.projection_scale) && Same(A.projection_offset, B.projection_offset) &&
+           A.orthographic == B.orthographic && A.fstop == B.fstop && A.focus_distance_cm == B.focus_distance_cm &&
+           A.focal_length_cm == B.focal_length_cm;
+}
+
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Request) || !Request->generation || Request->mode > HDUE_PATH_TRACED ||
@@ -479,6 +511,28 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
                     TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
+    // Path-traced ALBEDO and NORMAL (ABI 11) are the converged Path Tracer beauty's own buffers when it showed this
+    // view (anti-aliased, with its depth of field); otherwise (motion-blurred sub-frames) the GBuffer's, as in
+    // realtime.
+    HdueRenderRequest Raster;
+    if (Request->mode == HDUE_PATH_TRACED && (Request->aov == HDUE_AOV_ALBEDO || Request->aov == HDUE_AOV_NORMAL)) {
+        FScopeLock Lock(&Session->FrameMutex);
+        auto& Guide = Session->Guides[Request->aov == HDUE_AOV_NORMAL];
+        if (Guide.Num() == int64(Session->Width) * Session->Height * 4 &&
+            Session->GuideRequest.generation == Session->BeautyRequest.generation &&
+            SameView(Session->GuideRequest, *Request)) {
+            Session->Request = *Request;
+            Session->HasRequest = true;
+            Session->AovPixels = Guide;
+            Session->AovFrame = Session->GuideFrame;
+            Session->AovFrame.generation = Request->generation;
+            Session->AovFrame.frame_id = Runtime.NextFrame++;
+            return HDUE_OK;
+        }
+        Raster = *Request;
+        Raster.mode = HDUE_REALTIME;
+        Request = &Raster;
+    }
     // Pending: the caller retries each tick. The reason is logged once per request generation.
     const auto Pending = [&](const TCHAR* Reason) {
         static uint64 Logged = 0;
@@ -776,6 +830,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                    Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
     Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
+    Job->Guides = PathTracing && ReadBack && Converging;
     if (!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
         Job->Environment = Session->Scene->Lighting->EnvironmentTexture();
         Job->EnvironmentScale = Session->Scene->Lighting->EnvironmentScale();
@@ -888,6 +943,8 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
             const auto& DepthReadback = Session->DepthReadbacks[Job->Slot];
             if (Job->Complete.Load() || !Readback || !Readback->IsReady()) return;
             if (Job->DepthEnabled && (!DepthReadback || !DepthReadback->IsReady())) return;
+            auto& GuideReadbacks = Session->GuideReadbacks[Job->Slot];
+            if (Job->GuidesQueued.Load() && (!GuideReadbacks[0]->IsReady() || !GuideReadbacks[1]->IsReady())) return;
             int32 Pitch = 0, BufferHeight = 0;
             const auto* Data = static_cast<const FFloat16Color*>(Readback->Lock(Pitch, &BufferHeight));
             int32 DepthPitch = 0, DepthHeight = 0;
@@ -936,7 +993,34 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                 Info.converged = Converges(*Job);
                 Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
                 Info.readback_ms = (Now - Job->Started) * 1000;
+                // The Path Tracer's albedo and normal: averages of its samples (FloatRGBA, the view's size).
+                TArray<float> Guides[2];
+                for (int32 Index = 0; Job->GuidesQueued.Load() && Info.converged && Index < 2; ++Index) {
+                    int32 GuidePitch = 0, GuideHeight = 0;
+                    const auto* Texels =
+                        static_cast<const FFloat16Color*>(GuideReadbacks[Index]->Lock(GuidePitch, &GuideHeight));
+                    if (Texels && GuidePitch >= int32(Width) && GuideHeight >= int32(Height)) {
+                        Guides[Index].SetNumUninitialized(int64(Width) * Height * 4);
+                        ParallelFor(int32(Height), [&](int32 Row) {
+                            for (uint32 X = 0; X < Width; ++X) {
+                                const auto& T = Texels[uint64(Row) * GuidePitch + X];
+                                float* P = &Guides[Index][(uint64(Row) * Width + X) * 4];
+                                P[0] = T.R.GetFloat();
+                                P[1] = T.G.GetFloat();
+                                P[2] = T.B.GetFloat();
+                                P[3] = 1.f;
+                            }
+                        });
+                    }
+                    if (Texels) GuideReadbacks[Index]->Unlock();
+                }
                 FScopeLock Lock(&Session->FrameMutex);
+                if (Guides[0].Num() && Guides[1].Num()) {
+                    Session->Guides[0] = MoveTemp(Guides[0]);
+                    Session->Guides[1] = MoveTemp(Guides[1]);
+                    Session->GuideRequest = Request;
+                    Session->GuideFrame = Info;
+                }
                 if (Request.aov != HDUE_AOV_COLOR) {
                     Session->AovPixels = MoveTemp(Pixels);
                     Session->AovFrame = Info;
@@ -1538,6 +1622,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
     ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
+        for (auto& Pair : Session->GuideReadbacks)
+            for (auto& R : Pair) R.Reset();
     });
     FlushRenderingCommands();
     Session->InFlight.Reset();
@@ -1561,6 +1647,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
         Session->AovFrame = {};
         Session->Pixels.Reset();
         Session->DepthPixels.Reset();
+        Session->Guides[0].Reset();
+        Session->Guides[1].Reset();
     }
     return HDUE_OK;
 }

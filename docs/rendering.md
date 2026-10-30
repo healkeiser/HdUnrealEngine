@@ -27,6 +27,18 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 
 In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.
 
+## AOVs
+
+Render vars select AOVs by `sourceName` (the full list is in [Houdini, AOVs](houdini.md#aovs)). UE's Movie Render Queue provides the same three kinds, and hdUE reuses its sources:
+
+| AOV | Realtime | Path traced | UE source |
+| --- | --- | --- | --- |
+| `albedo`, `normal` (Karma's `CDA`, `N`) | GBuffer base colour and world normal, one raster pass each | The Path Tracer's albedo and normal, averaged over its samples (anti-aliased, with depth of field), read from the converged beauty at no extra cost | Buffer visualizations (`BaseColor`, `WorldNormal`); the Path Tracer's denoiser buffers, which post-process materials read with `PathTracingBufferTexture` |
+| `roughness`, `metallic`, `specular`, `occlusion`, `primId`, `instanceId` | GBuffer and ID raster passes | the same | Buffer visualizations; MRQ's Object ID hit proxies |
+| `CryptoObject<NN>`, `CryptoMaterial<NN>` | Cryptomatte layers from 16 sub-pixel ID passes, with metadata and manifest in the image | the same | MRQ's Object ID pass (`MoviePipelineMaskRenderPass`): MurmurHash3 ids, spatial samples, `cryptomatte/<key>/*` metadata |
+
+A motion-blurred Path Tracer beauty gives raster albedo and normal (its sub-frames each show another pose). Lighting AOVs (diffuse, specular, emission, per light) are not rendered: UE's Path Tracer has no light path expressions, and other render vars receive their clear value with a warning.
+
 ## Geometry
 
 Generic Hydra translation supports meshes, cameras, materials, and distant, sphere, rect, disk, cylinder, and dome lights.
@@ -146,7 +158,7 @@ Not offered, because this runtime is a cooked non-editor build: Wireframe (UE co
 
 ## Denoising
 
-With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. hdUE renders albedo and normal passes as guides (internally when they are not bound as AOVs), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
+With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. Its guides are the Path Tracer's own albedo and normal buffers (the `albedo` and `normal` AOVs, read internally when they are not bound; see [AOVs](#aovs)), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
 
 UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the OptiX plugin only writes a 384 x 384 tile of larger frames, and its Open Image Denoise plugin left the image unchanged.
 

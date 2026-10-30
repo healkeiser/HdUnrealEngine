@@ -35,6 +35,7 @@ MARKERS = ("<!-- matrix:start -->", "<!-- matrix:end -->")
 MODES = ("realtime", "pathtraced")
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 VIEW = 5.0  # the shared camera frames x, y in [-VIEW, VIEW] on the z = 0 plane
+METADATA = ":metadata"  # a frame's image metadata, by name, next to its vars
 
 
 def scenes(patterns):
@@ -113,12 +114,13 @@ def read_product(path):
     """{var name: array} for every subimage over the full display window (a data window's outside reads 0); integer
     vars come back as int32 (-1 = no prim).
     """
-    images, sub = {}, 0
+    images, sub = {METADATA: {}}, 0
     while True:
         buf = oiio.ImageBuf(str(path), sub, 0)
         if buf.has_error or buf.nsubimages <= sub:
             break
         spec, full = buf.spec(), buf.spec().roi_full
+        images[METADATA].update({a.name: a.value for a in spec.extra_attribs})
         name = spec.getattribute("name") or "C"
         if spec.format == oiio.TypeDesc("uint"):
             pixels = buf.get_pixels(oiio.UINT32, full).astype(np.uint32)
@@ -131,10 +133,18 @@ def read_product(path):
 
 
 def frame_images(out, frame):
-    images = {}
+    images = {METADATA: {}}
     for path in sorted(out.glob(f"*.{frame:04d}.exr")):
-        images.update(read_product(path))
+        product = read_product(path)
+        images[METADATA].update(product.pop(METADATA))
+        images.update(product)
     return images
+
+
+def cryptomatte(pixels):
+    """Rank-0 ids (float32 bits as uint32; 0 = none) and the summed coverage of a Cryptomatte layer's two ranks."""
+    ids = np.ascontiguousarray(pixels[..., 0], dtype=np.float32).view(np.uint32)
+    return ids, pixels[..., 1] + pixels[..., 3]
 
 
 def region(image, box):
@@ -172,9 +182,33 @@ def measure(frames, probe):
             )
         values, counts = np.unique(pixels[pixels >= 0], return_counts=True)
         return int((counts >= 3).sum())
+    if stat.startswith("crypto_"):
+        # A Cryptomatte layer: distinct rank-0 ids over at least 3 pixels, the most common one (hex), the mean
+        # coverage of ranks 0 and 1, or the share of pixels whose rank-0 coverage is partial (anti-aliasing).
+        ids, coverage = cryptomatte(pixels)
+        values, counts = np.unique(ids[ids != 0], return_counts=True)
+        return {
+            "crypto_ids": lambda: int((counts >= 3).sum()),
+            "crypto_id": lambda: (
+                f"{int(values[counts.argmax()]):08x}" if len(values) else ""
+            ),
+            "crypto_coverage": lambda: float(coverage.mean()),
+            "crypto_soft": lambda: float(
+                ((pixels[..., 1] > 0.01) & (pixels[..., 1] < 0.99)).mean()
+            ),
+        }[stat]()
+    if "channel" in probe:
+        return float(pixels[..., probe["channel"]].mean())
     if image.ndim == 2:
         return float(pixels.mean() if stat != "max" else pixels.max())
-    rgb, alpha = pixels[..., :3].astype(np.float64), pixels[..., 3]
+    rgb = pixels[..., :3].astype(np.float64)
+    alpha = pixels[..., 3] if pixels.shape[-1] > 3 else np.ones(rgb.shape[:-1])
+    if stat == "partial":
+        # Share of pixels between 5% and 95% of the region's brightest: filtered (anti-aliased) edges.
+        luma = rgb @ LUMA
+        return float(
+            ((luma > 0.05 * luma.max()) & (luma < 0.95 * luma.max())).mean()
+        )
     if stat in (
         "bbox_aspect",
         "bbox_height",
@@ -202,6 +236,11 @@ def verify(check, frames, log):
     if "log" in check:
         found = re.search(check["log"], log) is not None
         return found, found == check.get("present", True)
+    if "metadata" in check:  # an image metadata value matching a regex
+        value = str(
+            frames[check.get("frame", 1)][METADATA].get(check["metadata"], "")
+        )
+        return value[:80], re.search(check["match"], value) is not None
     if "color" in check:
         rgb = np.array(measure(frames, {**check["color"], "stat": "rgb"}))
         want = np.array(check["rgb"], dtype=np.float64)
@@ -217,10 +256,11 @@ def verify(check, frames, log):
         value = a / b if b else float("inf") if a else 1.0
     else:
         value = measure(frames, check["value"])
-    passed = check.get("min", -np.inf) <= value <= check.get("max", np.inf)
     if "equals" in check:
-        passed = value == check["equals"]
-    return value, bool(passed)
+        return value, value == check["equals"]
+    return value, bool(
+        check.get("min", -np.inf) <= value <= check.get("max", np.inf)
+    )
 
 
 def run_scene(name, path, spec, mode, env, timeout):

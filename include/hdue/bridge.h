@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 10u
+#define HDUE_ABI_VERSION 11u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -106,7 +106,9 @@ typedef struct HdueRenderRequest {
     float horizontal_fov_degrees;
     float near_clip_cm;
     uint32_t lumen_enabled;
-    uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel */
+    uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel, except in HDUE_PATH_TRACED mode (ABI
+                     11): ALBEDO and NORMAL are the Path Tracer's own buffers of the converged beauty request with the
+                     same view (raster when there is none, e.g. motion-blurred sub-frames) */
     double up[3];
     /* Projection (ABI 7) in view space (cm, +X right, +Y up, +Z forward): NDC = scale * xy / z + offset
        for perspective, scale * xy + offset for orthographic. A zero scale derives it from the FOV. */

@@ -36,7 +36,15 @@
       "float OpenEXR:FramesPerSecond": "$fps",
       "string OpenEXR:husk:command": "$command_line",
       "string OpenEXR:husk:usd_file": "$usdfile",
-      "string OpenEXR:Software": "hdUE (Unreal Engine 5.8) $husk_version"
+      "string OpenEXR:Software": "hdUE (Unreal Engine 5.8) $husk_version",
+      "string OpenEXR:cryptomatte/3ae39a5/name": "${render_stats.CryptoObject_name}",
+      "string OpenEXR:cryptomatte/3ae39a5/hash": "${render_stats.CryptoObject_hash}",
+      "string OpenEXR:cryptomatte/3ae39a5/conversion": "${render_stats.CryptoObject_conversion}",
+      "string OpenEXR:cryptomatte/3ae39a5/manifest": "${render_stats.CryptoObject_manifest}",
+      "string OpenEXR:cryptomatte/be359d6/name": "${render_stats.CryptoMaterial_name}",
+      "string OpenEXR:cryptomatte/be359d6/hash": "${render_stats.CryptoMaterial_hash}",
+      "string OpenEXR:cryptomatte/be359d6/conversion": "${render_stats.CryptoMaterial_conversion}",
+      "string OpenEXR:cryptomatte/be359d6/manifest": "${render_stats.CryptoMaterial_manifest}"
     }
   }
 }

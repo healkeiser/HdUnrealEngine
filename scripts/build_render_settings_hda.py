@@ -49,7 +49,8 @@ AOVS = [
 ]
 AOV_HELP = (
     "Rendered after the beauty converges, from the same camera without Lumen, path tracing, anti-aliasing "
-    "or post effects: one short raster render per AOV and frame."
+    "or post effects: one short raster render per AOV and frame. In path-traced mode albedo and normal are the "
+    "Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field)."
 )
 # hdUE Standard Render Vars: what each var holds, its sections, the husk formats of its 16 and 32 bit precisions.
 AOV_CONTENTS = {
@@ -78,6 +79,13 @@ PRECISIONS = {
     "normal3f": ("half3", "float3"),
     "float": ("half", "float"),
 }
+# Cryptomatte layers (src/hydra/cryptomatte.h): (name, label, what it names). Each adds the render vars <name>00 to
+# <name>02 (ranks 0 to 5), 32-bit float4: the ids are float bit patterns.
+CRYPTOMATTES = [
+    ("CryptoObject", "Crypto Object", "prim paths"),
+    ("CryptoMaterial", "Crypto Material", "bound material paths"),
+]
+CRYPTOMATTE_LAYERS = 3
 VARS_ON = (
     "C",
     "depth",
@@ -608,6 +616,23 @@ def build_standard_render_vars():
                     )
                 )
         group.append(folder)
+    folder = hou.FolderParmTemplate(
+        "section_cryptomatte",
+        "Cryptomatte",
+        folder_type=hou.folderType.Collapsible,
+    )
+    for layer, layer_label, names in CRYPTOMATTES:
+        folder.addParmTemplate(
+            hou.ToggleParmTemplate(
+                "aov_" + layer,
+                layer_label,
+                help=f"Adds the Cryptomatte layer {layer} of {names}: the render vars {layer}00 to "
+                f"{layer}{CRYPTOMATTE_LAYERS - 1:02d} (float4, ranks 0 to {2 * CRYPTOMATTE_LAYERS - 1}), with "
+                "coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's "
+                "metadata and manifest into each image.",
+            )
+        )
+    group.append(folder)
     entries = [
         (
             var,
@@ -622,6 +647,16 @@ def build_standard_render_vars():
         )
         for _, names in VAR_SECTIONS
         for var in names
+    ] + [
+        (
+            f"{layer}{i:02d}",
+            f"{layer}{i:02d}",
+            "float4",
+            "float4",
+            "aov_" + layer,
+        )
+        for layer, _, _ in CRYPTOMATTES
+        for i in range(CRYPTOMATTE_LAYERS)
     ]
     subnet.node("output0").setInput(
         0,
@@ -648,7 +683,8 @@ def build_standard_render_vars():
             "Creates the render vars (AOVs) hdUE renders.",
             "Like Karma Standard Render Vars, it creates a render var prim per enabled output under the parent primitive path, "
             "for hdUE Render Products or hdUE Render Settings (Image Output > Import Upstream Render Vars) to write. The beauty "
-            "is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface "
+            "is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface (path traced: "
+            "albedo and normal from the Path Tracer), Cryptomatte from sub-pixel ID passes "
             "(see AOVs in docs/houdini.md in the hdUE repository).",
         ),
     )

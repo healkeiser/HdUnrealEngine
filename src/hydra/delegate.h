@@ -226,6 +226,9 @@ struct HdUEState : HdRenderParam {
     std::mutex statsMutex;
     VtDictionary stats;
     std::atomic<bool> statsPending{false};
+    // The last Cryptomatte layers' metadata, for the render stats husk writes into images (UsdRenderers.json); guarded
+    // by mutex.
+    VtDictionary cryptomatte;
     HdRenderSettingsMap settingsSnapshot() const {
         std::lock_guard lock(settingsMutex);
         return settings;

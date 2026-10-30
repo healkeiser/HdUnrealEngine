@@ -5,6 +5,7 @@
 #include "instancing.h"
 #include "displacement.h"
 #include "render_tags.h"
+#include "cryptomatte.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
@@ -33,6 +34,9 @@
 #include <cstdarg>
 #include <cstdio>
 #include <map>
+#include <array>
+#include <set>
+#include <unordered_map>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -271,11 +275,12 @@ TfToken HdUEBeauty(const TfToken& name) {
 // Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
 uint32_t HdUEAovId(const TfToken& name) {
     static const std::pair<TfToken, uint32_t> names[] = {
-        {TfToken("albedo"), HDUE_AOV_ALBEDO},           {TfToken("baseColor"), HDUE_AOV_ALBEDO},
-        {HdAovTokens->normal, HDUE_AOV_NORMAL},         {TfToken("roughness"), HDUE_AOV_ROUGHNESS},
-        {TfToken("metallic"), HDUE_AOV_METALLIC},       {TfToken("specular"), HDUE_AOV_SPECULAR},
-        {TfToken("occlusion"), HDUE_AOV_OCCLUSION},     {HdAovTokens->primId, HDUE_AOV_PRIM_ID},
-        {HdAovTokens->instanceId, HDUE_AOV_INSTANCE_ID}};
+        {TfToken("albedo"), HDUE_AOV_ALBEDO},       {TfToken("baseColor"), HDUE_AOV_ALBEDO},
+        {HdAovTokens->normal, HDUE_AOV_NORMAL},     {TfToken("N"), HDUE_AOV_NORMAL},
+        {TfToken("ray:hitN"), HDUE_AOV_NORMAL},  // Karma Standard Render Vars' N
+        {TfToken("roughness"), HDUE_AOV_ROUGHNESS}, {TfToken("metallic"), HDUE_AOV_METALLIC},
+        {TfToken("specular"), HDUE_AOV_SPECULAR},   {TfToken("occlusion"), HDUE_AOV_OCCLUSION},
+        {HdAovTokens->primId, HDUE_AOV_PRIM_ID},    {HdAovTokens->instanceId, HDUE_AOV_INSTANCE_ID}};
     for (const auto& [token, id] : names)
         if (name == token) return id;
     return 0;
@@ -1429,7 +1434,8 @@ class Pass final : public HdRenderPass {
                 normalBuffer.write(0, count * 3 * sizeof(float), normalPixels.data());
                 filter.setImage("normal", normalBuffer, oidn::Format::Float3, width, height);
             }
-            filter.set("cleanAux", true);  // GBuffer guides are noise-free
+            // The guides are the Path Tracer's own albedo and normal (averages of its samples), not prefiltered.
+            filter.set("cleanAux", false);
         }
         filter.set("hdr", true);
         filter.commit();
@@ -1458,9 +1464,7 @@ class Pass final : public HdRenderPass {
             // Int32 buffers hold the integer bit patterns in the float storage.
             std::vector<float> out(count);
             for (size_t i = 0; i < count; ++i) {
-                const float* p = rgba.empty() ? nullptr : &rgba[i * 4];
-                const int32_t value =
-                    p && p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
+                const int32_t value = rgba.empty() ? -1 : idAt(&rgba[i * 4]);
                 std::memcpy(&out[i], &value, sizeof(value));
             }
             target.publish(frame, std::move(out), 1);
@@ -1496,6 +1500,99 @@ class Pass final : public HdRenderPass {
                 for (int c = 0; c < 3; ++c) o[c] /= length;
         }
         target.publish(frame, std::move(out), vector ? 3 : 1);
+    }
+    // The ID passes' encoding (HDUE_AOV_PRIM_ID): R = id / 2048, G = id % 2048, B = 1 where a mesh is visible.
+    static int32_t idAt(const float* p) {
+        return p[2] > .5f ? int32_t(std::lround(p[0])) * 2048 + int32_t(std::lround(p[1])) : -1;
+    }
+    // Cryptomatte render vars (CryptoObject00, CryptoMaterial01, ...): their buffer, kind (HdUECryptomatteLayer) and
+    // layer.
+    struct CryptoVar {
+        HdUERenderBuffer* target = nullptr;
+        int kind = 0, layer = 0;
+        bool operator==(const CryptoVar&) const = default;
+    };
+    static constexpr size_t kCryptomatteSamples = 16;
+    std::unique_ptr<HdUERenderBuffer> cryptoIds_;  // the target of the Cryptomatte ID passes in aovs_
+    std::vector<CryptoVar> cryptoVars_;
+    std::vector<int32_t> cryptoSamples_;  // kCryptomatteSamples prim IDs per pixel
+    size_t cryptoSample() const {
+        return aovSlot_ - size_t(std::find_if(aovs_.begin(), aovs_.end(),
+                                              [&](const auto& aov) { return aov.first == cryptoIds_.get(); }) -
+                                 aovs_.begin());
+    }
+    // One Cryptomatte ID pass joins the samples; the last publishes the layers and their metadata (render stats).
+    void accumulateCryptomatte(HdUEState& s, const HdueFrameInfo& frame, const std::vector<float>& rgba) {
+        constexpr size_t n = kCryptomatteSamples;
+        const size_t count = size_t(frame.width) * frame.height, sample = cryptoSample();
+        if (sample == 0) cryptoSamples_.assign(count * n, -1);
+        if (cryptoSamples_.size() != count * n || rgba.size() < count * 4) return;
+        for (size_t i = 0; i < count; ++i) cryptoSamples_[i * n + sample] = idAt(&rgba[i * 4]);
+        if (sample + 1 < n) return;
+        // Names: the prim's scene path, and its bound material (none for display colours); a GeomSubset's material is
+        // not told apart, the ID pass draws the whole mesh with one ID.
+        std::map<int32_t, std::array<std::string, 2>> names;
+        s.locked([&] {
+            for (const auto& [id, mesh] : s.meshes) {
+                if (mesh.primId < 0) continue;
+                auto& entry = names[mesh.primId];
+                entry[0] = mesh.scenePath;
+                if (mesh.id == mesh.sourceId || entry[1].empty())
+                    entry[1] = TfStringEndsWith(mesh.material, ".displayColor") ? std::string() : mesh.material;
+            }
+        });
+        std::set<int32_t> seen(cryptoSamples_.begin(), cryptoSamples_.end());
+        std::unordered_map<int32_t, std::array<uint32_t, 2>> hashes;
+        std::map<std::string, uint32_t> manifests[2];
+        for (const int32_t id : seen) {
+            const auto it = names.find(id);
+            if (it == names.end()) continue;
+            for (int kind = 0; kind < 2; ++kind)
+                if (!it->second[kind].empty()) {
+                    hashes[id][kind] = HdUECryptomatteHash(it->second[kind]);
+                    manifests[kind][it->second[kind]] = hashes[id][kind];
+                }
+        }
+        size_t layers[2] = {0, 0};
+        for (const auto& var : cryptoVars_) layers[var.kind] = std::max(layers[var.kind], size_t(var.layer) + 1);
+        std::vector<float> ranks[2];
+        for (int kind = 0; kind < 2; ++kind) ranks[kind].resize(count * layers[kind] * 4);
+        WorkParallelForN(count, [&](size_t begin, size_t end) {
+            uint32_t ids[n];
+            for (size_t i = begin; i < end; ++i)
+                for (int kind = 0; kind < 2; ++kind) {
+                    if (!layers[kind]) continue;
+                    for (size_t k = 0; k < n; ++k) {
+                        const auto it = hashes.find(cryptoSamples_[i * n + k]);
+                        ids[k] = it == hashes.end() ? 0 : it->second[kind];
+                    }
+                    HdUECryptomatteRanks(ids, n, &ranks[kind][i * layers[kind] * 4], layers[kind] * 2);
+                }
+        });
+        for (const auto& var : cryptoVars_) {
+            std::vector<float> out(count * 4);
+            for (size_t i = 0; i < count; ++i)
+                std::copy_n(&ranks[var.kind][(i * layers[var.kind] + var.layer) * 4], 4, &out[i * 4]);
+            var.target->publish(frame, std::move(out), 4);
+        }
+        // husk writes these as each layer's cryptomatte/<key>/ metadata (UsdRenderers.json husk.metadata). Prim and
+        // material paths need no JSON escaping.
+        VtDictionary metadata;
+        for (int kind = 0; kind < 2; ++kind) {
+            if (!layers[kind]) continue;
+            std::string manifest;
+            char hex[9];
+            for (const auto& [name, hash] : manifests[kind]) {
+                std::snprintf(hex, sizeof(hex), "%08x", hash);
+                manifest += (manifest.empty() ? "{\"" : ",\"") + name + "\":\"" + hex + "\"";
+            }
+            const std::string layer = kind ? "CryptoMaterial" : "CryptoObject";
+            metadata[layer + "_name"] = VtValue(layer);
+            metadata[layer + "_hash"] = VtValue(std::string("MurmurHash3_32"));
+            metadata[layer + "_conversion"] = VtValue(std::string("uint32_to_float32"));
+            metadata[layer + "_manifest"] = VtValue(manifest.empty() ? "{}" : manifest + "}");
+        }
+        s.locked([&] { s.cryptomatte = std::move(metadata); });
     }
     // A bound render var hdUE does not render (other light path expressions, primvars, unknown names): its clear value,
     // converged, as HdArnold does, so hosts never wait for it; -1 in integer buffers ("no prim").
@@ -1757,6 +1854,7 @@ public:
             HdUERenderBuffer* depth = nullptr;
             HdUERenderBuffer* cameraDepth = nullptr;  // linear, in scene units
             std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
+            std::vector<CryptoVar> crypto;
             extraBeauties_.clear();
             std::vector<HdRenderBuffer*> bound;  // alive buffers, by binding
             for (auto* b : pass->buffers) bound.push_back(HdUERenderBuffer::alive(b) ? b : nullptr);
@@ -1777,12 +1875,19 @@ public:
                 // vars are not rendered.
                 if (sourceType == TfToken("lpe")) {
                     const auto lpe = TfStringReplace(sourceName.GetString(), " ", "");
-                    name = lpe == "C.*" || lpe == "C.*[LO]" || lpe == "C.*[OL]" ? HdAovTokens->color : TfToken();
+                    name = lpe == "C.*" || lpe == "C.*[LO]" || lpe == "C.*[OL]" ? HdAovTokens->color
+                           : lpe == "CDA" ? TfToken("albedo")  // Karma's diffuse albedo; UE's albedo stands in
+                                          : TfToken();
                 } else if (sourceType == TfToken("primvar"))
                     name = TfToken();
                 else if (!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType == TfToken("raw")))
                     name = sourceName;
                 name = HdUEBeauty(name);
+                if (const auto layer = HdUECryptomatteLayer(name.GetString()); layer.first >= 0) {
+                    if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer))
+                        crypto.push_back({target, layer.first, layer.second});
+                    continue;
+                }
                 if (name != HdAovTokens->color && name != HdAovTokens->depth && name != HdAovTokens->cameraDepth &&
                     !HdUEAovId(name)) {
                     if (warnedVars_.insert(aov.aovName).second)
@@ -1826,7 +1931,21 @@ public:
                 guide(guideAlbedo_, HDUE_AOV_ALBEDO, "/__hdUE/denoiseAlbedo");
                 guide(guideNormal_, HDUE_AOV_NORMAL, "/__hdUE/denoiseNormal");
             }
-            if (aovs != aovs_) {
+            // Cryptomatte: kCryptomatteSamples primId passes, each shifted by a sub-pixel offset of a 4 x 4 grid, as
+            // MRQ's Object ID pass accumulates its spatial samples; their ids' share of each pixel is the coverage.
+            if (!crypto.empty() && crypto.front().target->GetWidth()) {
+                const auto* first = crypto.front().target;
+                if (!cryptoIds_ || cryptoIds_->GetWidth() != first->GetWidth() ||
+                    cryptoIds_->GetHeight() != first->GetHeight()) {
+                    cryptoIds_ = std::make_unique<HdUERenderBuffer>(SdfPath("/__hdUE/cryptomatteIds"));
+                    cryptoIds_->Allocate(GfVec3i(int(first->GetWidth()), int(first->GetHeight()), 1), HdFormatInt32,
+                                         false);
+                }
+                aovs.insert(aovs.end(), kCryptomatteSamples, {cryptoIds_.get(), HDUE_AOV_PRIM_ID});
+            }
+            if (aovs != aovs_ || crypto != cryptoVars_) {
+                if (crypto.empty()) s.locked([&] { s.cryptomatte.clear(); });  // no layer: no metadata
+                cryptoVars_ = crypto;
                 aovs_ = aovs;
                 aovSlot_ = 0;
                 aovInFlight_ = false;
@@ -2068,7 +2187,10 @@ public:
                         ++s.staleFrameRetries;
                     else {
                         s.backend->require(copied, "copy_frame");
-                        publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, aovFrame, pixels);
+                        if (aovs_[aovSlot_].first == cryptoIds_.get())
+                            accumulateCryptomatte(s, aovFrame, pixels);
+                        else
+                            publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, aovFrame, pixels);
                         aovInFlight_ = false;
                         ++aovSlot_;
                     }
@@ -2304,6 +2426,7 @@ public:
                     aovsDone_ = aovs_.empty();
                     denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
+                    for (const auto& var : cryptoVars_) var.target->invalidate();
                 }
             }
             // In Houdini's UI the AOV passes (Solaris' primId/instanceId swap every material, ~300 ms each) wait until
@@ -2323,10 +2446,21 @@ public:
                         throw std::runtime_error(
                             "This runtime has no AOV extension; build and stage the current backend");
                     request.generation = std::max(s.generation, s.aovGeneration) + 1;
-                    request.mode = HDUE_REALTIME;
+                    request.aov = aovs_[aovSlot_].second;
+                    // Path-traced albedo and normal come from the Path Tracer's own buffers of the converged beauty
+                    // (ABI 11); everything else is a raster GBuffer pass.
+                    if (request.mode != HDUE_PATH_TRACED ||
+                        (request.aov != HDUE_AOV_ALBEDO && request.aov != HDUE_AOV_NORMAL))
+                        request.mode = HDUE_REALTIME;
                     request.lumen_enabled = 0;
                     request.warmup_frames = 2;
-                    request.aov = aovs_[aovSlot_].second;
+                    if (aovs_[aovSlot_].first == cryptoIds_.get()) {
+                        // The sample's cell centre in a 4 x 4 grid over the pixel; NDC spans 2 per image size.
+                        static_assert(kCryptomatteSamples == 16);
+                        const size_t sample = cryptoSample();
+                        request.projection_offset[0] += ((sample % 4 + .5) / 4 - .5) * 2 / s.width;
+                        request.projection_offset[1] += ((sample / 4 + .5) / 4 - .5) * 2 / s.height;
+                    }
                     const auto requested = s.backend->api().request_render(s.session, &request);
                     if (requested != HDUE_PENDING) {
                         s.backend->require(requested, "request_render");
@@ -2654,6 +2788,8 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
     if (HdUEBeauty(name) == HdAovTokens->color) return HdAovDescriptor(HdFormatFloat16Vec4, false, VtValue(GfVec4f(0)));
     if (const auto aov = HdUEAovId(name); aov == HDUE_AOV_PRIM_ID || aov == HDUE_AOV_INSTANCE_ID)
         return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
+    if (HdUECryptomatteLayer(name.GetString()).first >= 0)  // ids are float32 bit patterns: never half
+        return HdAovDescriptor(HdFormatFloat32Vec4, false, VtValue(GfVec4f(0)));
     if (const auto aov = HdUEAovId(name))
         return aov == HDUE_AOV_ALBEDO || aov == HDUE_AOV_NORMAL
                    ? HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(0)))
@@ -2925,7 +3061,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
                            " triangles)\nMaterials: " + std::to_string(state.materials.size()) +
                            "\nLights: " + std::to_string(sceneLights) +
                            "\nNative actors: " + std::to_string(state.nativeAssets.actors) + frameTimes;
-    return {
+    VtDictionary stats{
         {"renderProgressAnnotation", VtValue(progress)},
         {"renderStatsAnnotation", VtValue(statsText)},
         {"error", VtValue(error)},
@@ -2997,6 +3133,9 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
         {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)},
         {"readbackMs", VtValue(state.lastFrame.readback_ms)}};
+    // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images (UsdRenderers.json).
+    for (const auto& [key, value] : state.cryptomatte) stats[key] = value;
+    return stats;
 }
 bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args) {
     if (command == TfToken("hdue:sampleMemory")) {

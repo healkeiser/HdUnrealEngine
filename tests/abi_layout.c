@@ -34,6 +34,8 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 176, "RenderRequest C ABI layout");
+_Static_assert(HDUE_ABI_VERSION == 11u,
+               "ABI 11: path-traced ALBEDO/NORMAL requests answer with the Path Tracer's buffers");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 56, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");

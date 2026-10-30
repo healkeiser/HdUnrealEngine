@@ -1,0 +1,141 @@
+#usda 1.0
+(
+    doc = """Albedo and normal render vars (the inputs a denoiser takes, Karma's albedo and N): the albedo of a red
+diffuse sphere is red, the background has none; the normal is the world-space unit normal, +Z facing the camera at the
+sphere's centre and +X on its right. In path-traced mode they are the Path Tracer's own buffers, averaged over its
+samples, so the sphere's outline is anti-aliased there."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "albedo and normal render vars",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "albedo is red",
+   "color": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "albedo"
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.15
+  },
+  {
+   "name": "no albedo on the background",
+   "value": {
+    "region": [
+     -4.5,
+     3.5,
+     -3.5,
+     4.5
+    ],
+    "aov": "albedo"
+   },
+   "max": 0.001
+  },
+  {
+   "name": "normal faces the camera at the centre",
+   "value": {
+    "region": [
+     -0.1,
+     -0.1,
+     0.1,
+     0.1
+    ],
+    "aov": "normal",
+    "channel": 2
+   },
+   "min": 0.95
+  },
+  {
+   "name": "normal points +X on the right",
+   "value": {
+    "region": [
+     0.85,
+     -0.05,
+     0.95,
+     0.05
+    ],
+    "aov": "normal",
+    "channel": 0
+   },
+   "min": 0.6
+  },
+  {
+   "name": "path-traced albedo is anti-aliased",
+   "modes": [
+    "pathtraced"
+   ],
+   "value": {
+    "aov": "albedo",
+    "stat": "partial"
+   },
+   "min": 0.002
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Guides>]
+    }
+    def RenderProduct "Guides"
+    {
+        token productName = "guides.$F4.exr"
+        rel orderedVars = [</Render/Vars/albedo>, </Render/Vars/normal>]
+    }
+    over "Vars"
+    {
+        def RenderVar "albedo"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "albedo"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "albedo"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "normal"
+        {
+            uniform token dataType = "normal3f"
+            uniform string sourceName = "normal"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "normal"
+            token driver:parameters:aov:format = "normal3f"
+        }
+    }
+}
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        token outputs:surface
+    }
+}
+def Sphere "Ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double radius = 1
+    rel material:binding = </Red>
+}
