@@ -1,0 +1,287 @@
+#usda 1.0
+(
+    doc = """UE's buffer visualizations as render vars, read in one raster pass: a red dielectric sphere of roughness 0.3 and a
+metallic cube of roughness 0.7. Roughness, metallic and specular (0.5 is UsdPreviewSurface's 4% reflectance) read back
+as authored, the normal faces the camera at the sphere's centre, and the background has no surface."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "buffer visualization render vars",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "sphere roughness 0.3",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "roughness"
+   },
+   "min": 0.28,
+   "max": 0.32
+  },
+  {
+   "name": "cube roughness 0.7",
+   "value": {
+    "region": [
+     2.8,
+     -0.2,
+     3.2,
+     0.2
+    ],
+    "aov": "roughness"
+   },
+   "min": 0.68,
+   "max": 0.72
+  },
+  {
+   "name": "cube metallic",
+   "value": {
+    "region": [
+     2.8,
+     -0.2,
+     3.2,
+     0.2
+    ],
+    "aov": "metallic"
+   },
+   "min": 0.99
+  },
+  {
+   "name": "sphere not metallic",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "metallic"
+   },
+   "max": 0.01
+  },
+  {
+   "name": "specular 0.5",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "specular"
+   },
+   "min": 0.45,
+   "max": 0.55
+  },
+  {
+   "name": "material AO 1",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "occlusion"
+   },
+   "min": 0.99
+  },
+  {
+   "name": "normal faces the camera",
+   "value": {
+    "region": [
+     -0.1,
+     -0.1,
+     0.1,
+     0.1
+    ],
+    "aov": "normal",
+    "channel": 2
+   },
+   "min": 0.95
+  },
+  {
+   "name": "shading model on surfaces",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "shadingModel"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "no surface on the background",
+   "value": {
+    "region": [
+     -4.5,
+     3.5,
+     -3.5,
+     4.5
+    ],
+    "aov": "roughness"
+   },
+   "max": 0.0001
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Buffers>]
+    }
+    def RenderProduct "Buffers"
+    {
+        token productName = "buffers.$F4.exr"
+        rel orderedVars = [</Render/Vars/roughness>, </Render/Vars/metallic>, </Render/Vars/specular>, </Render/Vars/occlusion>, </Render/Vars/normal>, </Render/Vars/tangent>, </Render/Vars/shadingModel>, </Render/Vars/subsurfaceColor>, </Render/Vars/opacity>, </Render/Vars/ambientOcclusion>]
+    }
+    over "Vars"
+    {
+        def RenderVar "roughness"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "roughness"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "roughness"
+            token driver:parameters:aov:format = "float"
+        }
+        def RenderVar "metallic"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "metallic"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "metallic"
+            token driver:parameters:aov:format = "float"
+        }
+        def RenderVar "specular"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "specular"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "specular"
+            token driver:parameters:aov:format = "float"
+        }
+        def RenderVar "occlusion"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "occlusion"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "occlusion"
+            token driver:parameters:aov:format = "float"
+        }
+        def RenderVar "normal"
+        {
+            uniform token dataType = "normal3f"
+            uniform string sourceName = "normal"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "normal"
+            token driver:parameters:aov:format = "normal3f"
+        }
+        def RenderVar "tangent"
+        {
+            uniform token dataType = "normal3f"
+            uniform string sourceName = "tangent"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "tangent"
+            token driver:parameters:aov:format = "normal3f"
+        }
+        def RenderVar "shadingModel"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "shadingModel"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "shadingModel"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "subsurfaceColor"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "subsurfaceColor"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "subsurfaceColor"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "opacity"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "opacity"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "opacity"
+            token driver:parameters:aov:format = "float"
+        }
+        def RenderVar "ambientOcclusion"
+        {
+            uniform token dataType = "float"
+            uniform string sourceName = "ambientOcclusion"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "ambientOcclusion"
+            token driver:parameters:aov:format = "float"
+        }
+    }
+}
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        float inputs:roughness = 0.3
+        token outputs:surface
+    }
+}
+def Material "Metal"
+{
+    token outputs:surface.connect = </Metal/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.2, 0.6, 0.2)
+        float inputs:metallic = 1
+        float inputs:roughness = 0.7
+        color3f inputs:emissiveColor = (0, 0, 2)
+        token outputs:surface
+    }
+}
+def Sphere "Ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double radius = 1
+    rel material:binding = </Red>
+}
+def Cube "Box" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double size = 1
+    rel material:binding = </Metal>
+    double3 xformOp:translate = (3, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Plane "Floor"
+{
+    # Seen edge-on: it bounces light onto the sphere without covering the probed regions.
+    double width = 20
+    double length = 20
+    uniform token axis = "Y"
+    double3 xformOp:translate = (0, -1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

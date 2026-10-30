@@ -6,6 +6,7 @@
 #include "displacement.h"
 #include "render_tags.h"
 #include "cryptomatte.h"
+#include "aov_table.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
@@ -271,19 +272,6 @@ void ueRun(const std::function<void()>& f) {
 // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
 TfToken HdUEBeauty(const TfToken& name) {
     return name == TfToken("Ci") || name == TfToken("C") || name == TfToken("beauty") ? HdAovTokens->color : name;
-}
-// Hydra AOV names hdUE renders after the beauty; 0 for color and unsupported names.
-uint32_t HdUEAovId(const TfToken& name) {
-    static const std::pair<TfToken, uint32_t> names[] = {
-        {TfToken("albedo"), HDUE_AOV_ALBEDO},       {TfToken("baseColor"), HDUE_AOV_ALBEDO},
-        {HdAovTokens->normal, HDUE_AOV_NORMAL},     {TfToken("N"), HDUE_AOV_NORMAL},
-        {TfToken("ray:hitN"), HDUE_AOV_NORMAL},  // Karma Standard Render Vars' N
-        {TfToken("roughness"), HDUE_AOV_ROUGHNESS}, {TfToken("metallic"), HDUE_AOV_METALLIC},
-        {TfToken("specular"), HDUE_AOV_SPECULAR},   {TfToken("occlusion"), HDUE_AOV_OCCLUSION},
-        {HdAovTokens->primId, HDUE_AOV_PRIM_ID},    {HdAovTokens->instanceId, HDUE_AOV_INSTANCE_ID}};
-    for (const auto& [token, id] : names)
-        if (name == token) return id;
-    return 0;
 }
 namespace {
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -1457,10 +1445,10 @@ class Pass final : public HdRenderPass {
     size_t aovSlot_ = 0;
     bool aovInFlight_ = false;
     std::atomic<bool> aovsDone_{true};  // also true while no AOV is bound
-    void publishAov(HdUERenderBuffer& target, uint32_t id, const HdueFrameInfo& frame,
-                    const std::vector<float>& rgba) const {
+    void publishAov(HdUERenderBuffer& target, HdUEAovFormat format, const HdueFrameInfo& frame,
+                    std::vector<float> rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
-        if (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID) {
+        if (format == HdUEAovFormat::Int) {
             // Int32 buffers hold the integer bit patterns in the float storage.
             std::vector<float> out(count);
             for (size_t i = 0; i < count; ++i) {
@@ -1470,7 +1458,16 @@ class Pass final : public HdRenderPass {
             target.publish(frame, std::move(out), 1);
             return;
         }
-        const bool vector = id == HDUE_AOV_ALBEDO || id == HDUE_AOV_NORMAL;
+        if (format == HdUEAovFormat::Beauty) {
+            // A lighting component: exposed and converted like the beauty, so components add up to it.
+            if (lens_[3] != 1.f && state_->exposed())
+                for (size_t i = 0; i + 3 < rgba.size(); i += 4)
+                    for (int c = 0; c < 3; ++c) rgba[i + c] *= lens_[3];
+            HdUEToSceneLinear(rgba);
+            target.publish(frame, std::move(rgba), 4);
+            return;
+        }
+        const bool vector = format != HdUEAovFormat::Float;
         const bool zUp = state_->setting<std::string>("upAxis", "Y") == "Z";
         std::vector<float> out(count * (vector ? 3 : 1));
         for (size_t i = 0; i < count; ++i) {
@@ -1480,12 +1477,12 @@ class Pass final : public HdRenderPass {
                 continue;
             }
             float* o = &out[i * 3];
-            // UE world normals back to USD world: the inverse of HdUEState::convert.
-            if (id == HDUE_AOV_NORMAL && zUp) {
+            // UE world directions back to USD world: the inverse of HdUEState::convert.
+            if (format == HdUEAovFormat::Vector && zUp) {
                 o[0] = p[0];
                 o[1] = -p[1];
                 o[2] = p[2];
-            } else if (id == HDUE_AOV_NORMAL) {
+            } else if (format == HdUEAovFormat::Vector) {
                 o[0] = p[1];
                 o[1] = p[2];
                 o[2] = -p[0];
@@ -1494,12 +1491,34 @@ class Pass final : public HdRenderPass {
                 o[1] = p[1];
                 o[2] = p[2];
             }
-            // SceneTexture WorldNormal is not normalized; background pixels stay zero.
+            // GBuffer normals are not normalized; background pixels stay zero.
             if (const float length = std::sqrt(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]);
-                id == HDUE_AOV_NORMAL && length > 1e-6f)
+                format == HdUEAovFormat::Vector && length > 1e-6f)
                 for (int c = 0; c < 3; ++c) o[c] /= length;
         }
         target.publish(frame, std::move(out), vector ? 3 : 1);
+    }
+    // Buffer visualization render vars (HdUEAovTable Buffer rows), rendered together in one HDUE_AOV_BUFFERS pass.
+    struct BufferVar {
+        HdUERenderBuffer* target = nullptr;
+        const HdUEAovInfo* row = nullptr;
+        bool operator==(const BufferVar&) const = default;
+    };
+    std::vector<BufferVar> bufferVars_;
+    void publishBuffers(HdUEState& s, const HdueFrameInfo& frame) {
+        std::vector<const char*> names;
+        for (const auto& var : bufferVars_) {
+            const auto index = std::find(names.begin(), names.end(), var.row->buffer) - names.begin();
+            if (size_t(index) == names.size()) names.push_back(var.row->buffer);
+            std::vector<float> rgba(size_t(frame.required_bytes / sizeof(float)));
+            s.backend->require(s.backend->aov_api().copy_buffer(s.session, frame.frame_id, uint32_t(index), rgba.data(),
+                                                                frame.required_bytes),
+                               "copy_buffer");
+            // UE's direction buffers (WorldNormal, WorldTangent) are encoded as 0.5 + 0.5 * direction.
+            if (var.row->format == HdUEAovFormat::Vector)
+                for (auto& value : rgba) value = 2 * value - 1;
+            publishAov(*var.target, var.row->format, frame, std::move(rgba));
+        }
     }
     // The ID passes' encoding (HDUE_AOV_PRIM_ID): R = id / 2048, G = id % 2048, B = 1 where a mesh is visible.
     static int32_t idAt(const float* p) {
@@ -1855,6 +1874,8 @@ public:
             HdUERenderBuffer* cameraDepth = nullptr;  // linear, in scene units
             std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
             std::vector<CryptoVar> crypto;
+            std::vector<BufferVar> bufferVars;
+            const bool pathTraced = s.setting<std::string>("renderMode", "realtime") == "pathtraced";
             extraBeauties_.clear();
             std::vector<HdRenderBuffer*> bound;  // alive buffers, by binding
             for (auto* b : pass->buffers) bound.push_back(HdUERenderBuffer::alive(b) ? b : nullptr);
@@ -1871,13 +1892,11 @@ public:
                 };
                 TfToken name = aov.aovName;
                 const auto sourceType = setting("sourceType"), sourceName = setting("sourceName");
-                // The only light path expressions hdUE renders are the whole beauty (Karma's C.*[LO], or C.*); primvar
-                // vars are not rendered.
+                // Light path expressions: the whole beauty (Karma's C.*[LO], or C.*), else a lighting component of
+                // the AOV table (Karma's names: C<RD>.*L, ...); primvar vars are not rendered.
                 if (sourceType == TfToken("lpe")) {
                     const auto lpe = TfStringReplace(sourceName.GetString(), " ", "");
-                    name = lpe == "C.*" || lpe == "C.*[LO]" || lpe == "C.*[OL]" ? HdAovTokens->color
-                           : lpe == "CDA" ? TfToken("albedo")  // Karma's diffuse albedo; UE's albedo stands in
-                                          : TfToken();
+                    name = lpe == "C.*" || lpe == "C.*[LO]" || lpe == "C.*[OL]" ? HdAovTokens->color : TfToken(lpe);
                 } else if (sourceType == TfToken("primvar"))
                     name = TfToken();
                 else if (!sourceName.IsEmpty() && (sourceType.IsEmpty() || sourceType == TfToken("raw")))
@@ -1888,11 +1907,13 @@ public:
                         crypto.push_back({target, layer.first, layer.second});
                     continue;
                 }
+                const auto* row = HdUEFindAov(name.GetString());
                 if (name != HdAovTokens->color && name != HdAovTokens->depth && name != HdAovTokens->cameraDepth &&
-                    !HdUEAovId(name)) {
+                    (!row || !(row->modes & (pathTraced ? HdUEPathTraced : HdUERealtime)))) {
                     if (warnedVars_.insert(aov.aovName).second)
-                        TF_WARN("hdUE does not render the render var %s (%s %s); it receives its clear value",
-                                aov.aovName.GetText(), sourceType.GetText(), sourceName.GetText());
+                        TF_WARN("hdUE does not render the render var %s (%s %s)%s; it receives its clear value",
+                                aov.aovName.GetText(), sourceType.GetText(), sourceName.GetText(),
+                                row ? (pathTraced ? " in path-traced mode" : " in realtime mode") : "");
                     if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
                     continue;
                 }
@@ -1905,11 +1926,15 @@ public:
                 // material twice per converged view (hundreds of ms each on large scenes), so the viewport skips them
                 // unless hdUE:viewportIdAovs is on; husk renders what its render vars ask for.
                 const bool viewportIds = s.setting<bool>("viewportIdAovs", false);
-                const auto id = HdUEAovId(name);
-                const bool skipped =
-                    selfHost().continuous && !viewportIds && (id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID);
-                if (id && !skipped && dynamic_cast<HdUERenderBuffer*>(renderBuffer))
-                    aovs.emplace_back(dynamic_cast<HdUERenderBuffer*>(renderBuffer), id);
+                const bool skipped = row && row->kind == HdUEAovKind::Id && selfHost().continuous && !viewportIds;
+                // Buffer rows render together in one HDUE_AOV_BUFFERS pass; path traced, albedo and normal are the
+                // Path Tracer's own buffers instead.
+                if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer); row && target && !skipped) {
+                    if (row->kind == HdUEAovKind::Buffer && !(pathTraced && row->pathTraced))
+                        bufferVars.push_back({target, row});
+                    else
+                        aovs.emplace_back(target, pathTraced && row->pathTraced ? row->pathTraced : row->aov);
+                }
                 // "No prim" everywhere, so Houdini never reads stale IDs.
                 if (skipped)
                     if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
@@ -1931,6 +1956,7 @@ public:
                 guide(guideAlbedo_, HDUE_AOV_ALBEDO, "/__hdUE/denoiseAlbedo");
                 guide(guideNormal_, HDUE_AOV_NORMAL, "/__hdUE/denoiseNormal");
             }
+            if (!bufferVars.empty()) aovs.emplace_back(bufferVars.front().target, HDUE_AOV_BUFFERS);
             // Cryptomatte: kCryptomatteSamples primId passes, each shifted by a sub-pixel offset of a 4 x 4 grid, as
             // MRQ's Object ID pass accumulates its spatial samples; their ids' share of each pixel is the coverage.
             if (!crypto.empty() && crypto.front().target->GetWidth()) {
@@ -1943,9 +1969,10 @@ public:
                 }
                 aovs.insert(aovs.end(), kCryptomatteSamples, {cryptoIds_.get(), HDUE_AOV_PRIM_ID});
             }
-            if (aovs != aovs_ || crypto != cryptoVars_) {
+            if (aovs != aovs_ || crypto != cryptoVars_ || bufferVars != bufferVars_) {
                 if (crypto.empty()) s.locked([&] { s.cryptomatte.clear(); });  // no layer: no metadata
                 cryptoVars_ = crypto;
+                bufferVars_ = bufferVars;
                 aovs_ = aovs;
                 aovSlot_ = 0;
                 aovInFlight_ = false;
@@ -2187,10 +2214,19 @@ public:
                         ++s.staleFrameRetries;
                     else {
                         s.backend->require(copied, "copy_frame");
+                        const uint32_t id = aovs_[aovSlot_].second;
                         if (aovs_[aovSlot_].first == cryptoIds_.get())
                             accumulateCryptomatte(s, aovFrame, pixels);
+                        else if (id == HDUE_AOV_BUFFERS)
+                            publishBuffers(s, aovFrame);
                         else
-                            publishAov(*aovs_[aovSlot_].first, aovs_[aovSlot_].second, aovFrame, pixels);
+                            publishAov(*aovs_[aovSlot_].first,
+                                       (id & 0xffu) == HDUE_AOV_LIGHTING                      ? HdUEAovFormat::Beauty
+                                       : id == HDUE_AOV_ALBEDO                                ? HdUEAovFormat::Color
+                                       : id == HDUE_AOV_NORMAL                                ? HdUEAovFormat::Vector
+                                       : id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID ? HdUEAovFormat::Int
+                                                                                              : HdUEAovFormat::Float,
+                                       aovFrame, std::move(pixels));
                         aovInFlight_ = false;
                         ++aovSlot_;
                     }
@@ -2427,6 +2463,7 @@ public:
                     denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
                     for (const auto& var : cryptoVars_) var.target->invalidate();
+                    for (const auto& var : bufferVars_) var.target->invalidate();
                 }
             }
             // In Houdini's UI the AOV passes (Solaris' primId/instanceId swap every material, ~300 ms each) wait until
@@ -2447,13 +2484,24 @@ public:
                             "This runtime has no AOV extension; build and stage the current backend");
                     request.generation = std::max(s.generation, s.aovGeneration) + 1;
                     request.aov = aovs_[aovSlot_].second;
-                    // Path-traced albedo and normal come from the Path Tracer's own buffers of the converged beauty
-                    // (ABI 11); everything else is a raster GBuffer pass.
-                    if (request.mode != HDUE_PATH_TRACED ||
-                        (request.aov != HDUE_AOV_ALBEDO && request.aov != HDUE_AOV_NORMAL))
-                        request.mode = HDUE_REALTIME;
-                    request.lumen_enabled = 0;
-                    request.warmup_frames = 2;
+                    // A lighting component renders as the beauty. Path-traced albedo and normal come from the Path
+                    // Tracer's own buffers of the converged beauty (ABI 11); everything else is a raster pass.
+                    if ((request.aov & 0xffu) != HDUE_AOV_LIGHTING) {
+                        if (request.mode != HDUE_PATH_TRACED ||
+                            (request.aov != HDUE_AOV_ALBEDO && request.aov != HDUE_AOV_NORMAL))
+                            request.mode = HDUE_REALTIME;
+                        request.lumen_enabled = 0;
+                        request.warmup_frames = 2;
+                    }
+                    if (request.aov == HDUE_AOV_BUFFERS) {
+                        std::vector<const char*> names;
+                        for (const auto& var : bufferVars_)
+                            if (std::find(names.begin(), names.end(), var.row->buffer) == names.end())
+                                names.push_back(var.row->buffer);
+                        s.backend->require(
+                            s.backend->aov_api().set_buffers(s.session, names.data(), uint32_t(names.size())),
+                            "set_buffers");
+                    }
                     if (aovs_[aovSlot_].first == cryptoIds_.get()) {
                         // The sample's cell centre in a 4 x 4 grid over the pixel; NDC spans 2 per image size.
                         static_assert(kCryptomatteSamples == 16);
@@ -2786,14 +2834,15 @@ HdAovDescriptor HdUERenderDelegate::GetDefaultAovDescriptor(const TfToken& name)
     // float32 image cost its UI thread ~100 ms per frame).
     // Viewports drop AOVs without a descriptor, so the beauty's other names need one too.
     if (HdUEBeauty(name) == HdAovTokens->color) return HdAovDescriptor(HdFormatFloat16Vec4, false, VtValue(GfVec4f(0)));
-    if (const auto aov = HdUEAovId(name); aov == HDUE_AOV_PRIM_ID || aov == HDUE_AOV_INSTANCE_ID)
-        return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
+    const auto* row = HdUEFindAov(name.GetString());
+    if (row && row->format == HdUEAovFormat::Int) return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
     if (HdUECryptomatteLayer(name.GetString()).first >= 0)  // ids are float32 bit patterns: never half
         return HdAovDescriptor(HdFormatFloat32Vec4, false, VtValue(GfVec4f(0)));
-    if (const auto aov = HdUEAovId(name))
-        return aov == HDUE_AOV_ALBEDO || aov == HDUE_AOV_NORMAL
-                   ? HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(0)))
-                   : HdAovDescriptor(HdFormatFloat32, false, VtValue(0.f));
+    if (row && row->format == HdUEAovFormat::Beauty)
+        return HdAovDescriptor(HdFormatFloat32Vec4, false, VtValue(GfVec4f(0)));
+    if (row)
+        return row->format == HdUEAovFormat::Float ? HdAovDescriptor(HdFormatFloat32, false, VtValue(0.f))
+                                                   : HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(0)));
 #if defined(HDUE_HOUDINI)
     if (name == HdAovTokens->depth)
         return HdAovDescriptor(HdFormatFloat32, false, VtValue(std::numeric_limits<float>::max()));

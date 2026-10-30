@@ -133,7 +133,22 @@ enum {
     HDUE_AOV_PRIM_ID = 7,
     /* Same encoding as PRIM_ID with the Hydra instance index of instanced meshes; -1 elsewhere. */
     HDUE_AOV_INSTANCE_ID = 8,
-    HDUE_AOV_COUNT = 9
+    /* ABI 11: one raster render of the buffer visualizations set with HdueAovApi.set_buffers (hdue/aov_api.h). */
+    HDUE_AOV_BUFFERS = 9,
+    /* ABI 11: the beauty (same mode, samples, warmup, Lumen, exposure) restricted to the lighting components in bits
+       8-15 (HDUE_AOV_LIGHTING | HDUE_LIGHTING_* << 8): UE's Path Tracer Lighting Components post-process settings;
+       in realtime its Diffuse, Specular, Direct Lighting and Global Illumination show flags (no volume split). */
+    HDUE_AOV_LIGHTING = 10,
+    HDUE_AOV_COUNT = 11
+};
+enum {
+    HDUE_LIGHTING_EMISSIVE = 1,
+    HDUE_LIGHTING_DIFFUSE = 2,
+    HDUE_LIGHTING_INDIRECT_DIFFUSE = 4,
+    HDUE_LIGHTING_SPECULAR = 8,
+    HDUE_LIGHTING_INDIRECT_SPECULAR = 16,
+    HDUE_LIGHTING_VOLUME = 32,
+    HDUE_LIGHTING_INDIRECT_VOLUME = 64
 };
 
 typedef struct HdueFrameInfo {
