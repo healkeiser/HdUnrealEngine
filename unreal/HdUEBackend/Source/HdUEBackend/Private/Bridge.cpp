@@ -729,6 +729,12 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     }
     if (!Aov) {
         View.OverridePostProcessSettings(Session.PostProcess, 1.f);
+        // DepthOfFieldEnabled (Lens > Depth of Field > Enabled) only switches off the raster DOF: the Path Tracer's
+        // reference DOF reads the show flag, PathTracingEnableReferenceDOF and the focal distance (PathTracing.cpp).
+        if (!Settings.DepthOfFieldEnabled) {
+            Settings.PathTracingEnableReferenceDOF = false;
+            Settings.DepthOfFieldFocalDistance = 0.f;
+        }
         // Authored auto exposure reaches its target in each frame (UE forces it for negative speeds, as on camera
         // cuts), so offline warmup frames and a viewport that stops drawing once converged settle on it. Authored
         // speeds adapt the realtime viewport gradually, as in UE; the Path Tracer's frames carry no time to adapt over.
