@@ -101,7 +101,9 @@ if ($Zip) {
     $Symbols = Join-Path $Out "$Name-symbols"
     if (Test-Path -LiteralPath $Symbols) { Remove-Item -LiteralPath $Symbols -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $Symbols | Out-Null
-    foreach ($Pdb in [IO.Path]::ChangeExtension($Delegate, 'pdb'), [IO.Path]::ChangeExtension($BackendDll, 'pdb')) {
+    # Update-HoudiniRuntime.ps1 copies only the hashed DLL; the staged runtime keeps the backend's symbols unhashed.
+    $BackendPdb = Join-Path (Split-Path -Parent $BackendDll) 'HdUEBackend.pdb'
+    foreach ($Pdb in [IO.Path]::ChangeExtension($Delegate, 'pdb'), $BackendPdb) {
         if (-not (Test-Path -LiteralPath $Pdb)) { throw "Missing $Pdb." }
         Copy-Item -LiteralPath $Pdb -Destination $Symbols
     }
