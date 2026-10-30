@@ -1,0 +1,306 @@
+#usda 1.0
+(
+    doc = """Lighting components (Karma's names and light path expressions): UE's Path Tracer Lighting Components, and in
+realtime its Diffuse, Specular, Direct Lighting and Global Illumination show flags. The red dielectric sphere is mostly
+diffuse, so its combined diffuse is close to the beauty and its direct diffuse less than its combined diffuse; the
+metallic cube has no diffuse, an edge-on floor bounces light onto the sphere (path traced; realtime keeps emission in every component); its blue emission is the
+direct emission AOV, which has nothing on the sphere. Volumes are split only path traced; realtime warns."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "lighting component render vars",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "sphere: combined diffuse ~ beauty",
+   "ratio": [
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "combineddiffuse"
+    },
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "C"
+    }
+   ],
+   "min": 0.75,
+   "max": 1.05
+  },
+  {
+   "name": "sphere: direct < combined diffuse",
+   "ratio": [
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "directdiffuse"
+    },
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "combineddiffuse"
+    }
+   ],
+   "min": 0.6,
+   "max": 0.97
+  },
+  {
+   "name": "sphere: direct + indirect diffuse (lpe) adds up",
+   "ratio": [
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "indirectdiffuse"
+    },
+    {
+     "region": [
+      -0.3,
+      -0.3,
+      0.3,
+      0.3
+     ],
+     "aov": "combineddiffuse"
+    }
+   ],
+   "min": 0.03,
+   "max": 0.4
+  },
+  {
+   "name": "sphere: little glossy",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "glossy"
+   },
+   "max": 0.15
+  },
+  {
+   "name": "cube: no diffuse",
+   "modes": [
+    "pathtraced"
+   ],
+   "value": {
+    "region": [
+     2.8,
+     -0.2,
+     3.2,
+     0.2
+    ],
+    "aov": "combineddiffuse"
+   },
+   "max": 0.001
+  },
+  {
+   "name": "cube: glossy ~ beauty without emission",
+   "modes": [
+    "pathtraced"
+   ],
+   "ratio": [
+    {
+     "region": [
+      2.8,
+      -0.2,
+      3.2,
+      0.2
+     ],
+     "aov": "glossy"
+    },
+    {
+     "region": [
+      2.8,
+      -0.2,
+      3.2,
+      0.2
+     ],
+     "aov": "C"
+    }
+   ],
+   "min": 0.5,
+   "max": 1.1
+  },
+  {
+   "name": "emission is the cube's blue",
+   "color": {
+    "region": [
+     2.8,
+     -0.2,
+     3.2,
+     0.2
+    ],
+    "aov": "emission"
+   },
+   "rgb": [
+    0,
+    0,
+    1
+   ],
+   "tol": 0.05
+  },
+  {
+   "name": "no emission on the sphere",
+   "value": {
+    "region": [
+     -0.3,
+     -0.3,
+     0.3,
+     0.3
+    ],
+    "aov": "emission"
+   },
+   "max": 0.001
+  },
+  {
+   "name": "realtime has no volume split",
+   "modes": [
+    "realtime"
+   ],
+   "log": "does not render the render var volume .* in realtime mode"
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Lighting>]
+    }
+    def RenderProduct "Lighting"
+    {
+        token productName = "lighting.$F4.exr"
+        rel orderedVars = [</Render/Vars/combineddiffuse>, </Render/Vars/directdiffuse>, </Render/Vars/indirectdiffuse>, </Render/Vars/glossy>, </Render/Vars/emission>, </Render/Vars/volume>]
+    }
+    over "Vars"
+    {
+        def RenderVar "combineddiffuse"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "combineddiffuse"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "combineddiffuse"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "directdiffuse"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "C<RD>L"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "directdiffuse"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "indirectdiffuse"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "C<RD>.+L"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "indirectdiffuse"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "glossy"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "C<RG>.*L"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "glossy"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "emission"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "CO"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "emission"
+            token driver:parameters:aov:format = "color3f"
+        }
+        def RenderVar "volume"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "CV.*L"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "volume"
+            token driver:parameters:aov:format = "color3f"
+        }
+    }
+}
+def Material "Red"
+{
+    token outputs:surface.connect = </Red/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+        float inputs:roughness = 0.3
+        token outputs:surface
+    }
+}
+def Material "Metal"
+{
+    token outputs:surface.connect = </Metal/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.2, 0.6, 0.2)
+        float inputs:metallic = 1
+        float inputs:roughness = 0.7
+        color3f inputs:emissiveColor = (0, 0, 2)
+        token outputs:surface
+    }
+}
+def Sphere "Ball" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double radius = 1
+    rel material:binding = </Red>
+}
+def Cube "Box" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double size = 1
+    rel material:binding = </Metal>
+    double3 xformOp:translate = (3, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Plane "Floor"
+{
+    # Seen edge-on: it bounces light onto the sphere without covering the probed regions.
+    double width = 20
+    double length = 20
+    uniform token axis = "Y"
+    double3 xformOp:translate = (0, -1, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 10u
+#define HDUE_ABI_VERSION 11u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -107,7 +107,9 @@ typedef struct HdueRenderRequest {
     float horizontal_fov_degrees;
     float near_clip_cm;
     uint32_t lumen_enabled;
-    uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel */
+    uint32_t aov; /* HDUE_AOV_*; other than COLOR, a rasterized GBuffer channel, except in HDUE_PATH_TRACED mode (ABI
+                     11): ALBEDO and NORMAL are the Path Tracer's own buffers of the converged beauty request with the
+                     same view (raster when there is none, e.g. motion-blurred sub-frames) */
     double up[3];
     /* Projection (ABI 7) in view space (cm, +X right, +Y up, +Z forward): NDC = scale * xy / z + offset
        for perspective, scale * xy + offset for orthographic. A zero scale derives it from the FOV. */
@@ -132,7 +134,22 @@ enum {
     HDUE_AOV_PRIM_ID = 7,
     /* Same encoding as PRIM_ID with the Hydra instance index of instanced meshes; -1 elsewhere. */
     HDUE_AOV_INSTANCE_ID = 8,
-    HDUE_AOV_COUNT = 9
+    /* ABI 11: one raster render of the buffer visualizations set with HdueAovApi.set_buffers (hdue/aov_api.h). */
+    HDUE_AOV_BUFFERS = 9,
+    /* ABI 11: the beauty (same mode, samples, warmup, Lumen, exposure) restricted to the lighting components in bits
+       8-15 (HDUE_AOV_LIGHTING | HDUE_LIGHTING_* << 8): UE's Path Tracer Lighting Components post-process settings;
+       in realtime its Diffuse, Specular, Direct Lighting and Global Illumination show flags (no volume split). */
+    HDUE_AOV_LIGHTING = 10,
+    HDUE_AOV_COUNT = 11
+};
+enum {
+    HDUE_LIGHTING_EMISSIVE = 1,
+    HDUE_LIGHTING_DIFFUSE = 2,
+    HDUE_LIGHTING_INDIRECT_DIFFUSE = 4,
+    HDUE_LIGHTING_SPECULAR = 8,
+    HDUE_LIGHTING_INDIRECT_SPECULAR = 16,
+    HDUE_LIGHTING_VOLUME = 32,
+    HDUE_LIGHTING_INDIRECT_VOLUME = 64
 };
 
 typedef struct HdueFrameInfo {

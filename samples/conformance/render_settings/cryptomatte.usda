@@ -1,0 +1,200 @@
+#usda 1.0
+(
+    doc = """Cryptomatte (specification 1.2, Psyop): layer NN of a Cryptomatte holds ranks 2NN and 2NN + 1 as (id,
+coverage) pairs in RGBA, the id being the MurmurHash3_32 of the name as a float32; the image metadata names each layer
+(cryptomatte/<key>/name, hash, conversion) and maps names to ids (manifest). CryptoObject names prim paths and
+CryptoMaterial bound materials: three prims make three object ids, two of them share a material. Coverage sums to 1
+inside a prim and is partial on its anti-aliased edges."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "Cryptomatte render vars",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "3 objects",
+   "value": {
+    "aov": "CryptoObject00",
+    "stat": "crypto_ids"
+   },
+   "equals": 3
+  },
+  {
+   "name": "2 materials",
+   "value": {
+    "aov": "CryptoMaterial00",
+    "stat": "crypto_ids"
+   },
+   "equals": 2
+  },
+  {
+   "name": "cube id is MurmurHash3 of /A",
+   "value": {
+    "region": [
+     -2.2,
+     -0.2,
+     -1.8,
+     0.2
+    ],
+    "aov": "CryptoObject00",
+    "stat": "crypto_id"
+   },
+   "equals": "8edd078f"
+  },
+  {
+   "name": "sphere material id is MurmurHash3 of /Looks/Red",
+   "value": {
+    "region": [
+     1.9,
+     -0.1,
+     2.1,
+     0.1
+    ],
+    "aov": "CryptoMaterial00",
+    "stat": "crypto_id"
+   },
+   "equals": "d04528d9"
+  },
+  {
+   "name": "coverage sums to 1 inside the cube",
+   "value": {
+    "region": [
+     -2.3,
+     -0.3,
+     -1.7,
+     0.3
+    ],
+    "aov": "CryptoObject00",
+    "stat": "crypto_coverage"
+   },
+   "min": 0.999,
+   "max": 1.001
+  },
+  {
+   "name": "anti-aliased edges",
+   "value": {
+    "aov": "CryptoObject00",
+    "stat": "crypto_soft"
+   },
+   "min": 0.002
+  },
+  {
+   "name": "object manifest",
+   "metadata": "cryptomatte/3ae39a5/manifest",
+   "match": "\\"/A\\":\\"8edd078f\\".*\\"/C\\":\\"c564b44a\\""
+  },
+  {
+   "name": "object layer name",
+   "metadata": "cryptomatte/3ae39a5/name",
+   "match": "^CryptoObject$"
+  },
+  {
+   "name": "material manifest",
+   "metadata": "cryptomatte/be359d6/manifest",
+   "match": "\\"/Looks/Blue\\":\\"b3282186\\""
+  },
+  {
+   "name": "hash and conversion",
+   "metadata": "cryptomatte/be359d6/conversion",
+   "match": "^uint32_to_float32$"
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Crypto>]
+    }
+    def RenderProduct "Crypto"
+    {
+        token productName = "crypto.$F4.exr"
+        rel orderedVars = [</Render/Vars/CryptoObject00>, </Render/Vars/CryptoObject01>, </Render/Vars/CryptoMaterial00>]
+    }
+    over "Vars"
+    {
+        def RenderVar "CryptoObject00"
+        {
+            uniform token dataType = "float4"
+            uniform string sourceName = "CryptoObject00"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "CryptoObject00"
+            token driver:parameters:aov:format = "float4"
+        }
+        def RenderVar "CryptoObject01"
+        {
+            uniform token dataType = "float4"
+            uniform string sourceName = "CryptoObject01"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "CryptoObject01"
+            token driver:parameters:aov:format = "float4"
+        }
+        def RenderVar "CryptoMaterial00"
+        {
+            uniform token dataType = "float4"
+            uniform string sourceName = "CryptoMaterial00"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "CryptoMaterial00"
+            token driver:parameters:aov:format = "float4"
+        }
+    }
+}
+def Scope "Looks"
+{
+    def Material "Red"
+    {
+        token outputs:surface.connect = </Looks/Red/S.outputs:surface>
+        def Shader "S"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.9, 0.05, 0.05)
+            token outputs:surface
+        }
+    }
+    def Material "Blue"
+    {
+        token outputs:surface.connect = </Looks/Blue/S.outputs:surface>
+        def Shader "S"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.05, 0.05, 0.9)
+            token outputs:surface
+        }
+    }
+}
+def Cube "A" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double size = 1.0
+    rel material:binding = </Looks/Red>
+    double3 xformOp:translate = (-2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "B" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double radius = 0.5
+    rel material:binding = </Looks/Red>
+    double3 xformOp:translate = (2, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Sphere "C" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    double radius = 0.5
+    rel material:binding = </Looks/Blue>
+    double3 xformOp:translate = (0, 2, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

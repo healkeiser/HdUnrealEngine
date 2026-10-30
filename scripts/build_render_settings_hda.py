@@ -34,43 +34,72 @@ NAME, LABEL, ICON = (
     "HDUE_hduerenderproperties",
 )
 VARS = "/Render/Products/Vars/"
-# AOVs the delegate renders besides the beauty (HdUEAovId in src/hydra/delegate.cpp):
-# (render var and channel name, label, USD data type, husk format).
-AOVS = [
-    ("depth", "Depth", "float", "float"),
-    ("albedo", "Albedo", "color3f", "color3f"),
-    ("normal", "Normal", "normal3f", "normal3f"),
-    ("roughness", "Roughness", "float", "float"),
-    ("metallic", "Metallic", "float", "float"),
-    ("specular", "Specular", "float", "float"),
-    ("occlusion", "Occlusion", "float", "float"),
-    ("primId", "Prim ID", "int", "int"),
-    ("instanceId", "Instance ID", "int", "int"),
-]
-AOV_HELP = (
-    "Rendered after the beauty converges, from the same camera without Lumen, path tracing, anti-aliasing "
-    "or post effects: one short raster render per AOV and frame."
+# AOVs the delegate renders besides the beauty, read from its table (src/hydra/aov_table.h; depth is the delegate's
+# own): (render var and channel name, label, USD data type, husk format).
+TABLE_ROW = re.compile(
+    r'\{"(\w+)",\s*"[^"]*",\s*HdUEAovKind::(\w+),.*?HdUEAovFormat::(\w+),\s*\w+,\s*\w+,\s*((?:"[^"]*"\s*)+)\}',
+    re.S,
 )
+DATA_TYPES = {
+    "Float": "float",
+    "Color": "color3f",
+    "Vector": "normal3f",
+    "Int": "int",
+    "Beauty": "color3f",
+}
+
+
+def aov_table():
+    """(name, kind, USD data type, description) per row of the delegate's AOV table."""
+    text = (ROOT / "src/hydra/aov_table.h").read_text(encoding="utf-8")
+    text = text[text.index("HdUEAovTable[]") :]
+    return [
+        (name, kind, DATA_TYPES[fmt], "".join(re.findall(r'"([^"]*)"', doc)))
+        for name, kind, fmt, doc in TABLE_ROW.findall(text)
+    ]
+
+
+def aov_label(name):
+    """Label of a render var: combineddiffuse -> Combined Diffuse, primId -> Prim ID."""
+    words = re.sub(r"^(combined|direct|indirect)", r"\1 ", name)
+    words = words.replace("glossyreflection", "glossy reflection")
+    words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", words)
+    return " ".join(w[0].upper() + w[1:] for w in words.split()).replace(
+        " Id", " ID"
+    )
+
+
+TABLE = aov_table()
+AOVS = [("depth", "Depth", "float", "float")] + [
+    (name, aov_label(name), data_type, data_type)
+    for name, _, data_type, _ in TABLE
+]
+AOV_KIND = {"depth": "Depth", **{name: kind for name, kind, _, _ in TABLE}}
+AOV_HELP = {
+    "Depth": "Read back with the beauty.",
+    "Buffer": "One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty "
+    "converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing "
+    "or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead "
+    "(anti-aliased, with its depth of field).",
+    "Lighting": "The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, "
+    "its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): "
+    "one full render per AOV and frame after the beauty converges.",
+    "Id": "An unlit ID pass after the beauty converges: one short raster render per AOV and frame.",
+}
 # hdUE Standard Render Vars: what each var holds, its sections, the husk formats of its 16 and 32 bit precisions.
 AOV_CONTENTS = {
     "C": "The beauty: the rendered image with alpha (color4f, sourceName color).",
     "depth": "Linear axial depth from the camera in stage units (float).",
-    "albedo": "Base color of the nearest opaque surface (color3f, Substrate's first BSDF).",
-    "normal": "World-space shading normal in USD axes, normalized (normal3f).",
-    "roughness": "Roughness of the nearest opaque surface (float).",
-    "metallic": "Metallic of the nearest opaque surface (float).",
-    "specular": "Specular of the nearest opaque surface (float).",
-    "occlusion": "Material ambient occlusion of the nearest opaque surface (float).",
-    "primId": "Hydra prim ID of the visible mesh, -1 for background (int).",
-    "instanceId": "Hydra instance index of an instanced prototype, -1 elsewhere (int).",
+    **{name: f"{doc} ({data_type})" for name, _, data_type, doc in TABLE},
 }
 VAR_SECTIONS = [
     ("Beauty", ["C"]),
+    ("Surface", [name for name, kind, _, _ in TABLE if kind == "Buffer"]),
+    ("Lighting", [name for name, kind, _, _ in TABLE if kind == "Lighting"]),
     (
-        "Surface",
-        ["albedo", "normal", "roughness", "metallic", "specular", "occlusion"],
+        "Utility",
+        ["depth"] + [name for name, kind, _, _ in TABLE if kind == "Id"],
     ),
-    ("Utility", ["depth", "primId", "instanceId"]),
 ]
 PRECISIONS = {
     "color4f": ("color4h", "color4f"),
@@ -78,6 +107,13 @@ PRECISIONS = {
     "normal3f": ("half3", "float3"),
     "float": ("half", "float"),
 }
+# Cryptomatte layers (src/hydra/cryptomatte.h): (name, label, what it names). Each adds the render vars <name>00 to
+# <name>02 (ranks 0 to 5), 32-bit float4: the ids are float bit patterns.
+CRYPTOMATTES = [
+    ("CryptoObject", "Crypto Object", "prim paths"),
+    ("CryptoMaterial", "Crypto Material", "bound material paths"),
+]
+CRYPTOMATTE_LAYERS = 3
 VARS_ON = (
     "C",
     "depth",
@@ -328,7 +364,9 @@ def build():
     )
     for name, label, _, _ in AOVS:
         aovs.addParmTemplate(
-            hou.ToggleParmTemplate("aov_" + name, label, help=AOV_HELP)
+            hou.ToggleParmTemplate(
+                "aov_" + name, label, help=AOV_HELP[AOV_KIND[name]]
+            )
         )
     aovs.addParmTemplate(
         hou.ToggleParmTemplate(
@@ -589,7 +627,7 @@ def build_standard_render_vars():
                     labels[var],
                     default_value=var in VARS_ON,
                     help=f"Adds the render var {var}. {AOV_CONTENTS[var]}"
-                    + ("" if var == "C" else " " + AOV_HELP),
+                    + ("" if var == "C" else " " + AOV_HELP[AOV_KIND[var]]),
                 )
             )
             if types[var] in PRECISIONS:
@@ -608,6 +646,23 @@ def build_standard_render_vars():
                     )
                 )
         group.append(folder)
+    folder = hou.FolderParmTemplate(
+        "section_cryptomatte",
+        "Cryptomatte",
+        folder_type=hou.folderType.Collapsible,
+    )
+    for layer, layer_label, names in CRYPTOMATTES:
+        folder.addParmTemplate(
+            hou.ToggleParmTemplate(
+                "aov_" + layer,
+                layer_label,
+                help=f"Adds the Cryptomatte layer {layer} of {names}: the render vars {layer}00 to "
+                f"{layer}{CRYPTOMATTE_LAYERS - 1:02d} (float4, ranks 0 to {2 * CRYPTOMATTE_LAYERS - 1}), with "
+                "coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's "
+                "metadata and manifest into each image.",
+            )
+        )
+    group.append(folder)
     entries = [
         (
             var,
@@ -622,6 +677,16 @@ def build_standard_render_vars():
         )
         for _, names in VAR_SECTIONS
         for var in names
+    ] + [
+        (
+            f"{layer}{i:02d}",
+            f"{layer}{i:02d}",
+            "float4",
+            "float4",
+            "aov_" + layer,
+        )
+        for layer, _, _ in CRYPTOMATTES
+        for i in range(CRYPTOMATTE_LAYERS)
     ]
     subnet.node("output0").setInput(
         0,
@@ -648,7 +713,8 @@ def build_standard_render_vars():
             "Creates the render vars (AOVs) hdUE renders.",
             "Like Karma Standard Render Vars, it creates a render var prim per enabled output under the parent primitive path, "
             "for hdUE Render Products or hdUE Render Settings (Image Output > Import Upstream Render Vars) to write. The beauty "
-            "is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface "
+            "is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface (path traced: "
+            "albedo and normal from the Path Tracer), Cryptomatte from sub-pixel ID passes "
             "(see AOVs in docs/houdini.md in the hdUE repository).",
         ),
     )

@@ -6,6 +6,9 @@
 #include "hdue/depth_api.h"
 #include "hdue/lighting_api.h"
 #include "hdue/gpu_api.h"
+#include "hdue/aov_api.h"
+_Static_assert(sizeof(HdueAovApi) == 32, "AOV extension layout (AOV ABI 2: set_buffers, copy_buffer)");
+_Static_assert(HDUE_AOV_COUNT == 11 && HDUE_LIGHTING_INDIRECT_VOLUME == 64, "ABI 11 AOV kinds and lighting components");
 _Static_assert(sizeof(HdueGpuOptions) == 20, "GPU frame options layout");
 _Static_assert(sizeof(HdueGpuFrame) == 136, "GPU frame layout");
 _Static_assert(sizeof(HdueGpuApi) == 32, "GPU frame extension layout");
@@ -34,6 +37,8 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 176, "RenderRequest C ABI layout");
+_Static_assert(HDUE_ABI_VERSION == 11u,
+               "ABI 11: path-traced ALBEDO/NORMAL requests answer with the Path Tracer's buffers");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 56, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");

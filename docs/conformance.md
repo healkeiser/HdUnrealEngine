@@ -40,11 +40,15 @@ view units (-5..5, y up).
 | `ratio` | stat(a) / stat(b) lies in `[min, max]` |
 | `color` | the region's mean RGB, normalized to sum 1, is within `tol` of `rgb` normalized |
 | `log` | the regex is found (or, with `"present": false`, absent) in husk's output |
+| `metadata` | the frame's image metadata value named `metadata` matches the regex `match` |
 
 Stats: `luma` (mean, default), `max`, `alpha`, `coverage` (alpha > 0.5), `soft` (0.05 < alpha < 0.95),
-`bbox_aspect`, `bbox_height`, `width`, `height`, `ids` (distinct `primId` values over at least 3 pixels),
-`instances` (distinct `primId`/`instanceId` pairs). All checks are relative or structural; none compares with
-another renderer.
+`partial` (luma between 5% and 95% of the region's maximum: filtered edges), `bbox_aspect`, `bbox_height`, `width`,
+`height`, `ids` (distinct `primId` values over at least 3 pixels), `instances` (distinct `primId`/`instanceId` pairs);
+a probe's `"channel": i` measures the mean of one channel instead. On a Cryptomatte layer: `crypto_ids` (distinct
+rank-0 ids over at least 3 pixels), `crypto_id` (the most common rank-0 id, hex), `crypto_coverage` (mean coverage of
+ranks 0 and 1), `crypto_soft` (share of pixels with partial rank-0 coverage). All checks are relative or structural;
+none compares with another renderer.
 
 ## Support matrix
 

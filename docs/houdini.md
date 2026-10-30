@@ -124,19 +124,21 @@ The backend supports one render session per process, so a Live Render and an hdU
 
 ## AOVs
 
-The beauty is the render var whose `sourceName` is `color`, `C`, `Ci` or `beauty` (`raw`), or any `lpe` source such as Karma's `C.*[LO]`. Besides the beauty and `depth`, render vars may request these `sourceName`s, rendered from the GBuffer (Substrate's first BSDF). The delegate matches a binding by its `sourceName`, so the render var and channel may be named anything.
+The beauty is the render var whose `sourceName` is `color`, `C`, `Ci` or `beauty` (`raw`), or the `lpe` source `C.*[LO]` (Karma's) or `C.*`. Besides the beauty and `depth`, render vars select the AOVs in the [AOV table](rendering.md#aovs) by `sourceName` or light path expression: surface buffers (`albedo`, `normal`, `roughness`, ... from UE's buffer visualizations), lighting components (`combineddiffuse`, `directglossyreflection`, ... Karma's names and expressions), `primId`, `instanceId` and [Cryptomatte](#cryptomatte) layers. The delegate matches a binding by its `sourceName`, so the render var and channel may be named anything. hdUE Standard Render Vars creates them by section (Surface, Lighting, Utility, Cryptomatte); hdUE Render Settings offers them under Image Output.
 
-| AOV | Format | Contents |
-| --- | --- | --- |
-| `albedo` (or `baseColor`) | color3f | Base color |
-| `normal` | normal3f | World-space shading normal in USD axes, normalized |
-| `roughness`, `metallic`, `specular`, `occlusion` | float | Material channels |
-| `primId` | int | Hydra prim ID of the visible mesh, -1 for background |
-| `instanceId` | int | Hydra instance index of an instanced prototype (nested instancers flattened as in hdEmbree), -1 elsewhere |
+After the beauty converges, the bound AOVs render from the same camera and time, each kind as cheaply as UE allows: every surface buffer together in one raster render with Lumen, anti-aliasing and post effects off (so the channels stay exact and pixel-aligned with a Path Tracer beauty), each lighting component as a render of the beauty, each ID AOV as a raster render. Surface buffers describe the nearest opaque surface at the current time (without motion blur). AOV renders use their own UE view state and frame slot (`include/hdue/aov_api.h`), so the beauty's Lumen or Path Tracer history is unaffected.
 
-After the beauty converges, each bound AOV is rasterized from the same camera and time with Lumen, path tracing, anti-aliasing and post effects off, so the channels stay exact and pixel-aligned with a Path Tracer beauty. They describe the nearest opaque surface at the current time (without motion blur); translucent surfaces and emission are not separated. Each extra AOV costs one short raster render per frame. AOV renders use their own UE view state and frame slot (`include/hdue/aov_api.h`), so the beauty's Lumen or Path Tracer history is unaffected.
+In path-traced mode, `albedo` and `normal` are instead the Path Tracer's own buffers, which it accumulates for denoisers and hands to post-process materials (`PathTracingBufferTexture`): averages over its samples, so they are anti-aliased and carry the beauty's depth of field, and they cost nothing extra. The albedo is the denoiser albedo (diffuse and specular reflectance, followed through mirror and glass hits), not the base colour. hdUE reads them back from the converged beauty and answers the AOV request with them when it shows the same view; a motion-blurred beauty (whose sub-frames each show another pose) falls back to the raster GBuffer channels. hdUE's Open Image Denoise uses the same buffers as its guides.
 
 `primId` and `instanceId` come from unlit passes in which every mesh draws `M_HdUEId` with its prim ID in custom primitive data, and instanced meshes their Hydra instance index in per-instance custom data. Cutout opacity is ignored there, so masked foliage selects as its whole card, and meshes placed from the native asset catalog read as background. Because AOVs follow the converged beauty, a viewer that tints its selection from `primId` (usdview, Solaris) can show the previous frame's IDs for a moment after an edit.
+
+### Cryptomatte
+
+Render vars named `CryptoObject<NN>` and `CryptoMaterial<NN>` (`float4`, 32-bit: the ids are float bit patterns, a half format destroys them) hold layer NN of a [Cryptomatte](https://github.com/Psyop/Cryptomatte) (specification 1.2): ranks 2NN and 2NN + 1 as (id, coverage) pairs in RGBA, most coverage first. Three layers (`00` to `02`, six ranks) are the usual set; hdUE Standard Render Vars adds them with **Crypto Object** and **Crypto Material**. An id is the MurmurHash3_32 of the prim's scene path (`CryptoObject`) or of its bound material's path (`CryptoMaterial`, none for unbound `displayColor` geometry), as UE's Movie Render Queue Object ID pass hashes names (`MoviePipelineMaskRenderPass`).
+
+Coverage comes from 16 ID passes after the beauty converges, each shifted by a sub-pixel offset of a 4 x 4 grid, as MRQ accumulates its spatial samples: an id's coverage is its share of the 16 samples (a box filter). The ID passes are rasterized like `primId`, so they ignore depth of field, motion blur, transparency and cutout opacity, and a GeomSubset's material reads as its mesh's. The rest of the image is unaffected; the cost is 16 short raster renders per frame.
+
+husk writes the Cryptomatte metadata of each layer (`cryptomatte/3ae39a5/...` for `CryptoObject`, `cryptomatte/be359d6/...` for `CryptoMaterial`: `name`, `hash`, `conversion` and a `manifest` of the names in the frame) into every image of the frame, through `husk.metadata` in `UsdRenderers.json` from the delegate's render stats. Karma's Cryptomatte LOP does not apply: it authors one Karma-specific render var per layer (`CryptoPrimitives`, `primvar` source `__name`, `driver:parameters:aov:karma:cryptomatte`), which hdUE does not read; Houdini's documentation leaves Cryptomatte to each delegate.
 
 ## COP and embedded textures
 

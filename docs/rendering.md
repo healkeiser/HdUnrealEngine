@@ -28,6 +28,44 @@ Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **U
 
 In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.
 
+## AOVs
+
+A render var selects an AOV by its `sourceName` (`raw`), or by its light path expression (`lpe`): Karma's names and expressions for the same output select the same AOV. The table is data in the delegate (`src/hydra/aov_table.h`), which the hdUE Standard Render Vars and hdUE Render Settings assets read. Every output comes from something UE 5.8 already provides:
+
+- **Buffer visualizations** (`[Engine.BufferVisualizationMaterials]`, UE's Buffer Visualization view mode): all the frame's buffer AOVs render in **one** raster pass after the beauty converges, read back through Movie Render Queue's buffer visualization pipes (`FinalPostProcessSettings.BufferVisualizationPipes`, as `MoviePipelineDeferredPasses` does), from the beauty's camera without Lumen, anti-aliasing or post effects.
+- **The Path Tracer's own albedo and normal**, which it accumulates for denoisers and hands post-process materials (`PathTracingBufferTexture`): read back from the converged beauty, at no extra cost.
+- **Lighting components**: the Path Tracer's Lighting Components post-process settings (`PathTracingIncludeDiffuse`, `IndirectDiffuse`, `Specular`, `IndirectSpecular`, `Emissive`, `Volume`, `IndirectVolume`), which MRQ's render layers use; in realtime, the Diffuse, Specular, Direct Lighting and Global Illumination show flags of UE's Lighting Components menu. Each is a full render of the beauty (its mode, samples, warmup, Lumen and exposure): UE has no light path expressions, so components do not come out of one render.
+- **Cryptomatte**: MRQ's Object ID pass recipe (MurmurHash3 ids, sub-pixel spatial samples, `cryptomatte/<key>/*` metadata); see [Houdini, Cryptomatte](houdini.md#cryptomatte).
+
+| Render var (`sourceName`) | Karma name / LPE | Data type | UE source | Realtime | Path traced |
+| --- | --- | --- | --- | --- | --- |
+| `albedo` (`baseColor`) | `CDA` | color3f | `BaseColor` buffer; path traced, the Path Tracer's albedo (diffuse and specular reflectance, followed through mirrors and glass) | yes | yes |
+| `normal` | `N` (`ray:hitN`) | normal3f | `WorldNormal` buffer; path traced, the Path Tracer's normal | yes | yes |
+| `roughness`, `metallic`, `specular`, `occlusion` | | float | `Roughness`, `Metallic`, `Specular`, `MaterialAO` buffers | yes | yes |
+| `ambientOcclusion` | `AO` | float | `AmbientOcclusion` buffer (screen-space AO of the raster pass) | yes | yes |
+| `opacity` | | float | `Opacity` buffer (UE's GBuffer custom data: subsurface and foliage opacity, 0 for other surfaces) | yes | yes |
+| `subsurfaceColor` | | color3f | `SubsurfaceColor` buffer | yes | yes |
+| `anisotropy` | | float | `Anisotropy` buffer | yes | yes |
+| `tangent` | | normal3f | `WorldTangent` buffer, USD axes | yes | yes |
+| `shadingModel` | | color3f | `ShadingModel` buffer (the colour code of UE's Shading Model view) | yes | yes |
+| `customDepth`, `customStencil` | | float | `CustomDepthWorldUnits`, `CustomStencil` buffers; hdUE meshes do not render custom depth, so far and 0 | yes | yes |
+| `velocity` | | color3f | `Velocity` buffer (encoded, 0.5 still); the raster pass renders one time, so 0.5 | yes | yes |
+| `combineddiffuse` (`diffuse`) | `C<RD>.*L` | color3f | Diffuse + Indirect Diffuse components | yes | yes |
+| `directdiffuse` | `C<RD>L` | color3f | Diffuse component | yes | yes |
+| `indirectdiffuse` | `C<RD>.+L` | color3f | Indirect Diffuse component (realtime: Lumen GI) | yes | yes |
+| `combinedglossyreflection` (`glossy`) | `C<RG>.*L` | color3f | Specular + Indirect Specular components (UE's specular includes transmission) | yes | yes |
+| `directglossyreflection` | `C<RG>L` | color3f | Specular component | yes | yes |
+| `indirectglossyreflection` | `C<RG>.+L` | color3f | Indirect Specular component (realtime: Lumen reflections) | yes | yes |
+| `directemission` (`emission`) | `CO` | color3f | Emissive component | yes | yes |
+| `combinedvolume`, `directvolume`, `indirectvolume` (`volume`) | `CV.*L`, `CVL`, `CV.+L` | color3f | Volume and Indirect Volume components | warned, cleared | yes |
+| `primId`, `instanceId` | | int | hdUE's unlit ID passes | yes | yes |
+| `CryptoObject<NN>`, `CryptoMaterial<NN>` | | float4 | 16 sub-pixel ID passes (Cryptomatte) | yes | yes |
+| `depth`, `cameraDepth` | | float | the beauty's scene depth | yes | yes |
+
+Costs per frame: the buffer AOVs together, one short raster render; each lighting component, one more full render of the beauty; each ID AOV one short raster render, Cryptomatte 16; path-traced albedo and normal nothing. Realtime components are approximations: emission stays in every component (alone it is the image with diffuse and specular off) and volumes are not split. A motion-blurred Path Tracer beauty gives raster albedo and normal (its sub-frames each show another pose); lighting components render without motion blur. Other render vars (other light path expressions, primvars, unknown names) and AOVs a mode cannot produce receive their clear value, with one warning each.
+
+UE buffer visualizations hdUE does not offer: `SceneColor`, `PreTonemapHDRColor`, `PostTonemapHDRColor`, `FinalImage`, `SeparateTranslucencyRGB`/`A` (states of the beauty, which is `C`; in the raster pass they would show its unlit image) and `SceneDepth`/`SceneDepthWorldUnits` (`depth` is the beauty's, in scene units).
+
 ## Geometry
 
 Generic Hydra translation supports meshes, cameras, materials, and distant, sphere, rect, disk, cylinder, and dome lights.
@@ -149,7 +187,7 @@ Not offered, because this runtime is a cooked non-editor build: Wireframe (UE co
 
 ## Denoising
 
-With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. hdUE renders albedo and normal passes as guides (internally when they are not bound as AOVs), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
+With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. Its guides are the Path Tracer's own albedo and normal buffers (the `albedo` and `normal` AOVs, read internally when they are not bound; see [AOVs](#aovs)), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
 
 UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the OptiX plugin only writes a 384 x 384 tile of larger frames, and its Open Image Denoise plugin left the image unchanged.
 

@@ -48,6 +48,8 @@
 #include "SceneViewExtension.h"
 #include "SceneTexturesConfig.h"
 #include "PostProcess/PostProcessInputs.h"
+#include "ImagePixelData.h"
+#include "ImageWriteStream.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
 #include "MaterialDomain.h"
@@ -86,6 +88,9 @@ struct FReadbackJob {
     bool DepthEnabled = false;
     int32 Slot = -1;  // index into FSession::Readbacks / DepthReadbacks
     TAtomic<bool> DepthQueued{false};
+    TArray<TArray<float>> Buffers;  // HDUE_AOV_BUFFERS: each pipe's RGBA, filled on the render thread
+    bool Guides = false;  // a converging Path Tracer draw: also read back its albedo and normal (FSession::Guides)
+    TAtomic<bool> GuidesQueued{false};
     bool MegaLightsActive = false;
     FTextureRHIRef Environment;
     float EnvironmentScale = 1;
@@ -147,6 +152,16 @@ struct FSession {
     FSceneViewStateInterface* AovViewState = nullptr;
     HdueFrameInfo AovFrame{};
     TArray<float> AovPixels;
+    // hdue/aov_api.h set_buffers: the materials HDUE_AOV_BUFFERS renders, and the last BUFFERS frame's outputs.
+    TArray<TStrongObjectPtr<UMaterialInterface>> BufferMaterials;
+    TArray<TArray<float>> AovBuffers;
+    // The converged Path Tracer beauty's albedo and normal (RGBA, as AovPixels): the buffers UE's Path Tracer
+    // accumulates for its denoiser and hands post-process materials (PathTracingBufferTexture). Path-traced ALBEDO and
+    // NORMAL requests with the same view answer from them (FrameMutex).
+    TUniquePtr<FRHIGPUTextureReadback> GuideReadbacks[ReadbackSlots][2];
+    TArray<float> Guides[2];
+    HdueRenderRequest GuideRequest{};
+    HdueFrameInfo GuideFrame{};
 };
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
@@ -177,6 +192,16 @@ public:
     }
     void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View,
                                          const FPostProcessingInputs& Inputs) override {
+        if (const auto& Traced = Inputs.PathTracingResources;
+            Job->Guides && Traced.bPostProcessEnabled && Traced.Albedo && Traced.Normal) {
+            FRDGTexture* Textures[2] = {Traced.Albedo, Traced.Normal};
+            for (int32 Index = 0; Index < 2; ++Index) {
+                auto& Readback = Session->GuideReadbacks[Job->Slot][Index];
+                if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueGuide"));
+                AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Textures[Index]);
+            }
+            Job->GuidesQueued.Store(true);
+        }
         if (!Inputs.SceneTextures) return;
         FRDGTextureRef Source = Inputs.SceneTextures->GetParameters()->SceneDepthTexture;
         if (!Source) return;
@@ -401,6 +426,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
+        for (auto& Pair : Session->GuideReadbacks)
+            for (auto& R : Pair) R.Reset();
     });
     FlushRenderingCommands();
     Session->InFlight.Reset();
@@ -444,6 +471,22 @@ HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Han
     return HDUE_OK;
 }
 
+// HDUE_AOV_LIGHTING's HDUE_LIGHTING_* components; 0 for other requests.
+uint32 LightingComponents(const HdueRenderRequest& Request) {
+    return (Request.aov & 0xffu) == HDUE_AOV_LIGHTING ? Request.aov >> 8 & 0xffu : 0;
+}
+
+// Whether two requests render the same image: mode, camera, projection, lens and time.
+bool SameView(const HdueRenderRequest& A, const HdueRenderRequest& B) {
+    const auto Same = [](const auto& X, const auto& Y) { return !FMemory::Memcmp(&X, &Y, sizeof(X)); };
+    return A.mode == B.mode && A.time_seconds == B.time_seconds && Same(A.eye, B.eye) && Same(A.target, B.target) &&
+           Same(A.up, B.up) && A.horizontal_fov_degrees == B.horizontal_fov_degrees &&
+           A.near_clip_cm == B.near_clip_cm && A.far_clip_cm == B.far_clip_cm &&
+           Same(A.projection_scale, B.projection_scale) && Same(A.projection_offset, B.projection_offset) &&
+           A.orthographic == B.orthographic && A.fstop == B.fstop && A.focus_distance_cm == B.focus_distance_cm &&
+           A.focal_length_cm == B.focal_length_cm;
+}
+
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Request) || !Request->generation || Request->mode > HDUE_PATH_TRACED ||
@@ -458,7 +501,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         !FMath::IsFinite(Request->projection_offset[0]) || !FMath::IsFinite(Request->projection_offset[1]) ||
         !FMath::IsFinite(Request->fstop) || !FMath::IsFinite(Request->focus_distance_cm) ||
         !FMath::IsFinite(Request->focal_length_cm) || !FMath::IsFinite(Request->time_seconds) ||
-        Request->aov >= HDUE_AOV_COUNT)
+        (Request->aov & 0xffu) >= HDUE_AOV_COUNT ||
+        (Request->aov > 0xffu && (Request->aov >> 16 || !LightingComponents(*Request))) ||
+        (Request->aov == HDUE_AOV_LIGHTING))
         return HDUE_INVALID_ARGUMENT;
     for (int32 Index = 0; Index < 3; ++Index) {
         if (!FMath::IsFinite(Request->eye[Index]) || !FMath::IsFinite(Request->target[Index]) ||
@@ -470,7 +515,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const FVector Up(Request->up[0], Request->up[1], Request->up[2]);
     if (Eye.Equals(Target) || FVector::CrossProduct(Target - Eye, Up).IsNearlyZero()) return HDUE_INVALID_ARGUMENT;
     if (Request->mode == HDUE_PATH_TRACED && !HasRayTracing()) return HDUE_NOT_SUPPORTED;
-    if (Request->aov != HDUE_AOV_COLOR &&
+    if (Request->aov == HDUE_AOV_BUFFERS && Runtime.Session->BufferMaterials.IsEmpty())
+        return Fail(HDUE_INVALID_ARGUMENT, TEXT("HDUE_AOV_BUFFERS needs set_buffers first."));
+    if (Request->aov != HDUE_AOV_COLOR && Request->aov < HDUE_AOV_BUFFERS &&
         !LoadObject<UMaterialInterface>(nullptr,
                                         Request->aov == HDUE_AOV_PRIM_ID || Request->aov == HDUE_AOV_INSTANCE_ID
                                             ? TEXT("/Game/HdUE/M_HdUEId.M_HdUEId")
@@ -479,6 +526,28 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
                     TEXT("hdUE AOV materials are missing; run Prepare-Content.ps1 and stage the runtime."));
     const auto Session = Runtime.Session;
     if (Request->generation <= Session->Request.generation) return HDUE_STALE_FRAME;
+    // Path-traced ALBEDO and NORMAL (ABI 11) are the converged Path Tracer beauty's own buffers when it showed this
+    // view (anti-aliased, with its depth of field); otherwise (motion-blurred sub-frames) the GBuffer's, as in
+    // realtime.
+    HdueRenderRequest Raster;
+    if (Request->mode == HDUE_PATH_TRACED && (Request->aov == HDUE_AOV_ALBEDO || Request->aov == HDUE_AOV_NORMAL)) {
+        FScopeLock Lock(&Session->FrameMutex);
+        auto& Guide = Session->Guides[Request->aov == HDUE_AOV_NORMAL];
+        if (Guide.Num() == int64(Session->Width) * Session->Height * 4 &&
+            Session->GuideRequest.generation == Session->BeautyRequest.generation &&
+            SameView(Session->GuideRequest, *Request)) {
+            Session->Request = *Request;
+            Session->HasRequest = true;
+            Session->AovPixels = Guide;
+            Session->AovFrame = Session->GuideFrame;
+            Session->AovFrame.generation = Request->generation;
+            Session->AovFrame.frame_id = Runtime.NextFrame++;
+            return HDUE_OK;
+        }
+        Raster = *Request;
+        Raster.mode = HDUE_REALTIME;
+        Request = &Raster;
+    }
     // Pending: the caller retries each tick. The reason is logged once per request generation.
     const auto Pending = [&](const TCHAR* Reason) {
         static uint64 Logged = 0;
@@ -508,6 +577,12 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
                              Previous.aov == Request->aov;
     if (Aov) {
+        // A lighting component starts from no history, as each Path Tracer beauty request does.
+        if (Session->AovViewState && LightingComponents(*Request)) {
+            FlushRenderingCommands();
+            Session->AovViewState->Destroy();
+            Session->AovViewState = nullptr;
+        }
         if (!Session->AovViewState)
             Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     } else if (!KeepHistory) {
@@ -536,7 +611,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     return HDUE_OK;
 }
 
-FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, float ScreenFraction,
+FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, uint32 Components, float ScreenFraction,
                            EViewModeIndex ViewMode, bool Orthographic) {
     FEngineShowFlags Flags(ESFIM_Game);
     Flags.SetPathTracing(PathTracing);
@@ -550,7 +625,13 @@ FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, 
         ApplyViewMode(ViewMode, !Orthographic, Flags);
         EngineShowFlagOverride(ESFIM_Game, ViewMode, Flags, true);
     }
-    if (Aov) {
+    if (Components) {
+        // UE's Lighting Components show flags (the Path Tracer also reads Diffuse and Specular). Realtime has no volume
+        // or emission split: emission stays in every component, and alone it is the image without diffuse and specular.
+        Flags.SetDiffuse((Components & (HDUE_LIGHTING_DIFFUSE | HDUE_LIGHTING_INDIRECT_DIFFUSE)) != 0);
+        Flags.SetSpecular((Components & (HDUE_LIGHTING_SPECULAR | HDUE_LIGHTING_INDIRECT_SPECULAR)) != 0);
+        if (!PathTracing) Flags.SetDirectLighting((Components & (HDUE_LIGHTING_DIFFUSE | HDUE_LIGHTING_SPECULAR)) != 0);
+    } else if (Aov) {
         Flags.SetAntiAliasing(false);
         Flags.SetTemporalAA(false);
         Flags.SetMotionBlur(false);
@@ -568,6 +649,8 @@ FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, 
 void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FSession& Session, bool PathTracing,
                       bool Aov) {
     const auto& Request = Session.Request;
+    const uint32 Components = LightingComponents(Request);
+    Aov = Aov && !Components;  // a lighting component renders as the beauty
     View.StartFinalPostprocessSettings(Options.ViewOrigin);
     auto& Settings = View.FinalPostProcessSettings;
     // Manual exposure 1 unless authored: the tone curve keeps the linear image's middle grey, and frames do not depend
@@ -590,6 +673,25 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         // box's indirect light (0.77 of Karma's frame mean with it, 0.66 without; about 2 ms more per 1024² frame).
         // Without hardware ray tracing UE keeps the surface cache.
         Settings.LumenRayLightingMode = ELumenRayLightingModeOverride::HitLighting;
+    }
+    if (Components) {
+        // The Path Tracer's Lighting Components (MRQ/MRG render layers use the same settings); realtime drops Lumen's
+        // indirect diffuse or reflections.
+        const auto Include = [&](uint32 Bit) { return (Components & Bit) != 0; };
+        Settings.bOverride_PathTracingIncludeEmissive = Settings.bOverride_PathTracingIncludeDiffuse =
+            Settings.bOverride_PathTracingIncludeIndirectDiffuse = Settings.bOverride_PathTracingIncludeSpecular =
+                Settings.bOverride_PathTracingIncludeIndirectSpecular = Settings.bOverride_PathTracingIncludeVolume =
+                    Settings.bOverride_PathTracingIncludeIndirectVolume = true;
+        Settings.PathTracingIncludeEmissive = Include(HDUE_LIGHTING_EMISSIVE);
+        Settings.PathTracingIncludeDiffuse = Include(HDUE_LIGHTING_DIFFUSE);
+        Settings.PathTracingIncludeIndirectDiffuse = Include(HDUE_LIGHTING_INDIRECT_DIFFUSE);
+        Settings.PathTracingIncludeSpecular = Include(HDUE_LIGHTING_SPECULAR);
+        Settings.PathTracingIncludeIndirectSpecular = Include(HDUE_LIGHTING_INDIRECT_SPECULAR);
+        Settings.PathTracingIncludeVolume = Include(HDUE_LIGHTING_VOLUME);
+        Settings.PathTracingIncludeIndirectVolume = Include(HDUE_LIGHTING_INDIRECT_VOLUME);
+        if (!Include(HDUE_LIGHTING_INDIRECT_DIFFUSE))
+            Settings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
+        if (!Include(HDUE_LIGHTING_INDIRECT_SPECULAR)) Settings.ReflectionMethod = EReflectionMethod::None;
     }
     if (!Aov && !Request.orthographic && Request.fstop > 0 && Request.focus_distance_cm > 0 &&
         Request.focal_length_cm > 0) {
@@ -622,7 +724,7 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
             auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/PP_HdUEAov.PP_HdUEAov"));
             if (Parent) Session.AovMaterial.Reset(UMaterialInstanceDynamic::Create(Parent, Runtime.World));
         }
-        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov == HDUE_AOV_INSTANCE_ID
+        if (auto* Material = Request.aov == HDUE_AOV_PRIM_ID || Request.aov >= HDUE_AOV_INSTANCE_ID
                                  ? nullptr
                                  : Session.AovMaterial.Get()) {
             for (uint32 Index = 1; Index < HDUE_AOV_COUNT; ++Index)
@@ -717,6 +819,10 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
         }
         if (Session.DebugMember) View->*Session.DebugMember = Session.DebugName;
     }
+    // As UGameViewportClient::Draw: without the Diffuse or Specular show flag (a lighting component), the material's
+    // diffuse or specular colour is zeroed.
+    if (!Family.EngineShowFlags.Diffuse) View->DiffuseOverrideParameter = FVector4f(0.f, 0.f, 0.f, 0.f);
+    if (!Family.EngineShowFlags.Specular) View->SpecularOverrideParameter = FVector4f(0.f, 0.f, 0.f, 0.f);
     ApplyPostProcess(*View, Options, Session, PathTracing, Aov);
     Family.Views.Add(View);
 }
@@ -776,6 +882,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                    Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
     Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
+    Job->Guides = PathTracing && ReadBack && Converging;
     if (!PathTracing && !Aov && Session->Scene->Lighting->BackgroundVisible()) {
         Job->Environment = Session->Scene->Lighting->EnvironmentTexture();
         Job->EnvironmentScale = Session->Scene->Lighting->EnvironmentScale();
@@ -784,6 +891,26 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         Job->Slot = FreeSlot;
         Session->InFlight.Add(Job);
         Session->LastReadback = Now;
+    }
+    // HDUE_AOV_BUFFERS: Movie Render Queue's buffer visualization pipes (MoviePipelineDeferredPasses), every requested
+    // buffer read back from this one render, 32-bit, on its converging draw.
+    if (Request.aov == HDUE_AOV_BUFFERS && ReadBack && Converging) {
+        auto& Settings = const_cast<FSceneView*>(Family.Views[0])->FinalPostProcessSettings;
+        Job->Buffers.SetNum(Session->BufferMaterials.Num());
+        for (int32 Index = 0; Index < Session->BufferMaterials.Num(); ++Index) {
+            UMaterialInterface* Material = Session->BufferMaterials[Index].Get();
+            Settings.BufferVisualizationOverviewMaterials.Add(Material);
+            const auto Pipe = MakeShared<FImagePixelPipe, ESPMode::ThreadSafe>();
+            Pipe->bIsExpecting32BitPixelData = true;
+            Pipe->AddEndpoint([Job, Index](TUniquePtr<FImagePixelData>&& Data) {
+                const void* Raw = nullptr;
+                int64 Size = 0;
+                if (Data->GetType() == EImagePixelType::Float32 && Data->GetRawData(Raw, Size))
+                    Job->Buffers[Index] = TArray<float>(static_cast<const float*>(Raw), int32(Size / sizeof(float)));
+            });
+            Settings.BufferVisualizationPipes.Add(Material->GetFName(), Pipe);
+        }
+        Settings.bBufferVisualizationDumpRequired = true;
     }
     Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session, Job));
     if (Sharing) {
@@ -795,7 +922,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Renderer().BeginRenderingViewFamily(&Canvas, &Family);
     Canvas.Flush_GameThread();
     if (!ReadBack && !Sharing) return;
-    const auto State = Session->ViewState;
+    const auto State = Aov ? Session->AovViewState : Session->ViewState;  // a lighting component accumulates there
     ENQUEUE_RENDER_COMMAND(HdueCopyColor)(
         [Session, Job, Resource, State, PathTracing, ReadBack](FRHICommandListImmediate& Commands) {
 #if RHI_RAYTRACING
@@ -818,8 +945,10 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
 void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const auto& Request = Session->Request;
     // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
+    // Lighting components render as the beauty (path traced too), into the AOV slot.
     const bool Aov = Request.aov != HDUE_AOV_COLOR;
-    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && !Session->Preparing && !Aov;
+    const bool PathTracing =
+        Request.mode == HDUE_PATH_TRACED && !Session->Preparing && (!Aov || LightingComponents(Request));
     FString IdError;
     if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID       ? 1
                                    : Request.aov == HDUE_AOV_INSTANCE_ID ? 2
@@ -846,9 +975,9 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
     auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
     FSceneViewFamilyContext Family(
-        FSceneViewFamily::ConstructionValues(
-            Resource, Runtime.World->Scene,
-            ShowFlags(*Session, PathTracing, Aov, ScreenFraction, ViewMode, Request.orthographic != 0))
+        FSceneViewFamily::ConstructionValues(Resource, Runtime.World->Scene,
+                                             ShowFlags(*Session, PathTracing, Aov, LightingComponents(Request),
+                                                       ScreenFraction, ViewMode, Request.orthographic != 0))
             .SetRealtimeUpdate(true)
             .SetResolveScene(true)
             .SetTime(FGameTime::CreateDilated(FPlatformTime::Seconds() - GStartTime, 1.0f / 60, Request.time_seconds,
@@ -888,6 +1017,8 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
             const auto& DepthReadback = Session->DepthReadbacks[Job->Slot];
             if (Job->Complete.Load() || !Readback || !Readback->IsReady()) return;
             if (Job->DepthEnabled && (!DepthReadback || !DepthReadback->IsReady())) return;
+            auto& GuideReadbacks = Session->GuideReadbacks[Job->Slot];
+            if (Job->GuidesQueued.Load() && (!GuideReadbacks[0]->IsReady() || !GuideReadbacks[1]->IsReady())) return;
             int32 Pitch = 0, BufferHeight = 0;
             const auto* Data = static_cast<const FFloat16Color*>(Readback->Lock(Pitch, &BufferHeight));
             int32 DepthPitch = 0, DepthHeight = 0;
@@ -936,8 +1067,36 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                 Info.converged = Converges(*Job);
                 Info.request_to_frame_ms = (Now - RequestedAt) * 1000;
                 Info.readback_ms = (Now - Job->Started) * 1000;
+                // The Path Tracer's albedo and normal: averages of its samples (FloatRGBA, the view's size).
+                TArray<float> Guides[2];
+                for (int32 Index = 0; Job->GuidesQueued.Load() && Info.converged && Index < 2; ++Index) {
+                    int32 GuidePitch = 0, GuideHeight = 0;
+                    const auto* Texels =
+                        static_cast<const FFloat16Color*>(GuideReadbacks[Index]->Lock(GuidePitch, &GuideHeight));
+                    if (Texels && GuidePitch >= int32(Width) && GuideHeight >= int32(Height)) {
+                        Guides[Index].SetNumUninitialized(int64(Width) * Height * 4);
+                        ParallelFor(int32(Height), [&](int32 Row) {
+                            for (uint32 X = 0; X < Width; ++X) {
+                                const auto& T = Texels[uint64(Row) * GuidePitch + X];
+                                float* P = &Guides[Index][(uint64(Row) * Width + X) * 4];
+                                P[0] = T.R.GetFloat();
+                                P[1] = T.G.GetFloat();
+                                P[2] = T.B.GetFloat();
+                                P[3] = 1.f;
+                            }
+                        });
+                    }
+                    if (Texels) GuideReadbacks[Index]->Unlock();
+                }
                 FScopeLock Lock(&Session->FrameMutex);
+                if (Guides[0].Num() && Guides[1].Num()) {
+                    Session->Guides[0] = MoveTemp(Guides[0]);
+                    Session->Guides[1] = MoveTemp(Guides[1]);
+                    Session->GuideRequest = Request;
+                    Session->GuideFrame = Info;
+                }
                 if (Request.aov != HDUE_AOV_COLOR) {
+                    Session->AovBuffers = MoveTemp(Job->Buffers);
                     Session->AovPixels = MoveTemp(Pixels);
                     Session->AovFrame = Info;
                 } else {
@@ -997,6 +1156,10 @@ HdueResult HDUE_CALL Tick() {
             FlushRenderingCommands();
             Session->ViewState->Destroy();
             Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+            if (Session->AovViewState && Session->Request.aov != HDUE_AOV_COLOR) {
+                Session->AovViewState->Destroy();
+                Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+            }
             Session->Preparing = false;
             Session->Draws = 0;
             Session->FullResDraws = 0;
@@ -1218,6 +1381,44 @@ HdueResult HDUE_CALL PollAov(HdueSession Handle, HdueFrameInfo* Frame) {
         Session->AovFrame.generation != Session->Request.generation)
         return HDUE_PENDING;
     *Frame = Session->AovFrame;
+    return HDUE_OK;
+}
+
+// hdue/aov_api.h: a [Engine.BufferVisualizationMaterials] key (BaseColor, WorldNormal, ...; cooked runtimes keep the
+// materials, as debug views use them) or a material path.
+HdueResult HDUE_CALL SetBuffers(HdueSession Handle, const char* const* Names, uint32 Count) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || (Count && !Names) || Count > 64) return HDUE_INVALID_ARGUMENT;
+    TArray<TStrongObjectPtr<UMaterialInterface>> Materials;
+    for (uint32 Index = 0; Index < Count; ++Index) {
+        const FString Name = UTF8_TO_TCHAR(Names[Index] ? Names[Index] : "");
+        FString Entry, Path = Name;
+        if (!Name.StartsWith(TEXT("/")) &&
+            (!GConfig->GetString(TEXT("Engine.BufferVisualizationMaterials"), *Name, Entry, GEngineIni) ||
+             !FParse::Value(*Entry, TEXT("Material="), Path)))
+            return Fail(HDUE_INVALID_ARGUMENT, *FString::Printf(TEXT("Unknown buffer visualization %s."), *Name));
+        auto* Material = LoadObject<UMaterialInterface>(nullptr, *Path.TrimQuotes());
+        if (!Material || Materials.ContainsByPredicate([&](const auto& Other) { return Other.Get() == Material; }))
+            return Fail(HDUE_INVALID_ARGUMENT,
+                        *FString::Printf(TEXT("Buffer visualization %s is missing or repeated."), *Name));
+        Materials.Emplace(Material);
+    }
+    Runtime.Session->BufferMaterials = MoveTemp(Materials);
+    return HDUE_OK;
+}
+
+HdueResult HDUE_CALL CopyBuffer(HdueSession Handle, uint64 FrameId, uint32 Index, void* Pixels, uint64 Capacity) {
+    const auto Session = ReadableSession(Handle);
+    if (!Session || !Pixels) return Runtime.State != HDUE_STATE_READY ? HDUE_INVALID_STATE : HDUE_INVALID_ARGUMENT;
+    FScopeLock Lock(&Session->FrameMutex);
+    if (!FrameId || FrameId != Session->AovFrame.frame_id || Session->Request.aov != HDUE_AOV_BUFFERS)
+        return HDUE_STALE_FRAME;
+    if (Index >= uint32(Session->AovBuffers.Num())) return HDUE_INVALID_ARGUMENT;
+    const auto& Buffer = Session->AovBuffers[Index];
+    // Not read back at the frame's size (no pipe output). Any thread may call: Runtime.Error is not set.
+    if (uint64(Buffer.Num()) * sizeof(float) != Session->AovFrame.required_bytes) return HDUE_ENGINE_ERROR;
+    if (Capacity < Session->AovFrame.required_bytes) return HDUE_BUFFER_TOO_SMALL;
+    FMemory::Memcpy(Pixels, Buffer.GetData(), Session->AovFrame.required_bytes);
     return HDUE_OK;
 }
 
@@ -1518,7 +1719,7 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_volume_api(uint32 Version, 
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_aov_api(uint32 Version, uint32 Capacity, HdueAovApi* Api) {
     if (!Api || Capacity < sizeof(HdueAovApi)) return HDUE_BUFFER_TOO_SMALL;
     if (Version != HDUE_AOV_ABI_VERSION) return HDUE_ABI_MISMATCH;
-    *Api = {sizeof(HdueAovApi), HDUE_AOV_ABI_VERSION, PollAov};
+    *Api = {sizeof(HdueAovApi), HDUE_AOV_ABI_VERSION, PollAov, SetBuffers, CopyBuffer};
     return HDUE_OK;
 }
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_motion_api(uint32 Version, uint32 Capacity, HdueMotionApi* Api) {
@@ -1538,6 +1739,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
     ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
+        for (auto& Pair : Session->GuideReadbacks)
+            for (auto& R : Pair) R.Reset();
     });
     FlushRenderingCommands();
     Session->InFlight.Reset();
@@ -1561,6 +1764,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_resize_session(HdueSession Hand
         Session->AovFrame = {};
         Session->Pixels.Reset();
         Session->DepthPixels.Reset();
+        Session->Guides[0].Reset();
+        Session->Guides[1].Reset();
     }
     return HDUE_OK;
 }
