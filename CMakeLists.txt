@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(hdUE VERSION 0.1.0 LANGUAGES C CXX)
+project(hdUE VERSION 0.2.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "hdUE currently requires Windows x64.")

@@ -8,7 +8,7 @@
 - .NET Framework **4.8 SDK** and **4.6.2 targeting pack** (Visual Studio Installer components `Microsoft.Net.Component.4.8.SDK` and `Microsoft.Net.Component.4.6.2.TargetingPack`). Without them, UnrealBuildTool stops with `Could not find NetFxSDK install dir`.
 - PowerShell 7, Git, and CMake **3.24 or newer**, with Git and CMake available on `PATH`.
 - OpenUSD **26.03** C++ SDK with Hydra/usdImaging, usdview, and Python **3.11** bindings for the standalone host and usdview. Build it with a moderate job count (`-j 8`); 28 parallel MSVC jobs ran out of compiler heap on a 64 GB machine.
-- Houdini **22.0** with its bundled USD **26.05** and Python **3.13**, for Solaris. Builds bundling USD 26.05 are accepted; upstream verified 22.0.466, and the features in this fork were tested on 22.0.368.
+- Houdini **22.0** with its bundled USD **26.05** and Python **3.13**, for Solaris; see [Supported Houdini builds](#supported-houdini-builds).
 - `uv` for all Python execution and dependency management.
 
 The standalone and Houdini delegates use separate builds because their USD ABIs differ. The UE backend disables UE's USD and Python plugins. Dependencies retain their own licensing requirements.
@@ -87,6 +87,24 @@ The monolithic DLL requires a source engine. A matching editor installation can 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
 C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools. Python uses Black and Ruff (`pyproject.toml`: 80 columns, Python 3.11+, Google docstrings): `uvx black scripts tests integrations` and `uvx ruff check --fix ...`. PowerShell uses `Invoke-Formatter` and PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`). `.editorconfig` sets whitespace for everything else. CI checks all of them, and lints the workflow with actionlint.
+
+## Supported Houdini builds
+
+The HDK only guarantees its ABI within one Houdini daily build. `Build-Houdini.ps1` compiles against the build in `houdini_root` and stamps it into the delegate's version resource, `runtime.json` and the package name. The installed package loads from that build up to the last 22.0 build; in any build other than the one it was compiled against, the delegate prints a warning when it starts.
+
+| hdUE | Compiled against | Tested on |
+| --- | --- | --- |
+| v0.2.0 and later | Houdini 22.0.368 | 22.0.368 |
+
+### Release checklist
+
+GitHub runners cannot build Unreal Engine, so releases are built locally:
+
+1. Set `project(hdUE VERSION x.y.z)` in `CMakeLists.txt`, commit, and tag `vx.y.z` on that commit.
+2. `.\scripts\Verify.ps1 -WithUsdview` and `.\scripts\Test.ps1 -Suite all` on a clean tree.
+3. Render the gallery (`hython scripts/render_gallery.py --dev`). It fails when a scene's brightness against Karma CPU leaves its band (`scripts/check_gallery.py`, which CI also runs on the committed `docs/gallery.md`) or a Cornell hdUE render departs from its tile baseline (`tests/gallery_baselines.json`); after an intended change, check the images and store new baselines with `--bless`.
+4. `.\scripts\Build-Houdini.ps1`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes and a delegate built from another commit.
+5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as `docs/houdini.md` describes.
 
 ## Standalone rendering and usdview
 

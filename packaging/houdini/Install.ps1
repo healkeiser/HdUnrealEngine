@@ -15,12 +15,16 @@ if (-not $PackagesDirectory) {
     $PackagesDirectory = Join-Path $Prefs 'packages'
 }
 New-Item -ItemType Directory -Force -Path $PackagesDirectory | Out-Null
+# runtime.json names the Houdini build the plugin was compiled against: older builds may lack symbols it uses, so the
+# package starts there; later builds of the same version load it, and the delegate warns that the build differs.
+$Runtime = Get-Content -LiteralPath (Join-Path $Root 'runtime.json') -Raw | ConvertFrom-Json
+$Oldest = if ($Runtime.houdini_build) { $Runtime.houdini_build } else { $HoudiniVersion }
 $Package = [ordered]@{
-    # The plugin is built for one Houdini minor version on Windows (runtime.json names the exact build).
-    enable            ="houdini_version >= '$HoudiniVersion' and houdini_version < '$HoudiniVersion.999' and houdini_os == 'windows'"
+    enable            ="houdini_version >= '$Oldest' and houdini_version < '$HoudiniVersion.999' and houdini_os == 'windows'"
     load_package_once =$true
     env               =@(
         @{HDUE = ($Root -replace '\\', '/') },
+        @{HDUE_VERSION = "$($Runtime.hdue_version)" },
         @{HDUE_HOUDINI_ENABLE = '1' },
         # UE's Saved folder (logs, shader caches) per user, so the install folder can be shared and read-only.
         @{HDUE_USER_DIR = '$HOUDINI_USER_PREF_DIR/hdUE' },
