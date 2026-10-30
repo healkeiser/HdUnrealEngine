@@ -254,7 +254,6 @@ uint32_t HdUEAovId(const TfToken& name) {
     return 0;
 }
 namespace {
-const bool selfHostVisible = TfGetenvBool("HDUE_SHOW_WINDOW", false);
 LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     const auto& host = selfHost();
     if (host.backend && host.backend->initialized()) {
@@ -320,39 +319,10 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                                           nullptr, instance, nullptr);
             if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
             host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
-            HdueInitDesc init{};
-            init.struct_size = sizeof(init);
-            init.instance_handle = reinterpret_cast<uint64_t>(instance);
-            init.window_handle = reinterpret_cast<uint64_t>(host.window);
-            init.project_path = project.c_str();
-            init.map_path = "/Game/HdUETest";
-            // Frames are read back from render targets, so UE needs no visible window (HDUE_SHOW_WINDOW=1 shows it).
-            // Without -stdout, UE echoes Display/Warning/Error lines with wprintf, which reached the host's console
-            // (Houdini, husk) as UTF-16 and showed as spaced-out text; -stdout writes the same lines as UTF-8.
-            // HDUE_UE_ARGS appends UE command-line arguments (profiling, -dpcvars=...).
-            const std::string arguments =
-                std::string(host.continuous ? (selfHostVisible ? "-stdout -hdUEInteractive"
-                                                               : "-RenderOffscreen -stdout -hdUEInteractive")
-                                            : (selfHostVisible ? "-stdout" : "-RenderOffscreen -stdout")) +
-                " " + TfGetenv("HDUE_UE_ARGS") +
-                // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user,
-                // not in a possibly shared or read-only install folder.
-                (TfGetenv("HDUE_USER_DIR").empty() ? "" : " -userdir=\"" + TfGetenv("HDUE_USER_DIR") + "\"");
-            init.extra_arguments = arguments.c_str();
             host.thread = GetCurrentThreadId();
-            host.backend->initialize(init);
-            // UE reports ready only after its first ticks.
-            HdueStatus status{};
-            status.struct_size = sizeof(status);
-            for (int i = 0; i < 600 && !(status.state == HDUE_STATE_READY && status.world_ready && status.rhi_ready);
-                 ++i) {
-                host.tick();
-                host.backend->require(host.backend->api().get_status(&status), "get_status");
-                if (status.state == HDUE_STATE_FAILED) break;
-                Sleep(10);
-            }
-            if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
-                throw std::runtime_error(std::string("hdUE: UE did not become ready: ") + status.message);
+            // Returns once UE's world and RHI are up (the backend is then ready), or throws.
+            host.backend->boot(reinterpret_cast<uint64_t>(instance), reinterpret_cast<uint64_t>(host.window), project,
+                               host.continuous);
             std::atexit([] { shutdownSelfHost(); });
             started->set_value();
         } catch (const std::exception& e) {
@@ -407,7 +377,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
     try {
         ready.get();
     } catch (...) {
-        host.worker.join();
+        host.stop();  // the thread keeps serving its queue after a failed boot: join alone waited forever
         throw;
     }
 }
@@ -2281,10 +2251,18 @@ public:
 };
 }  // namespace
 
-// hdUE:<name>, or hdue:<name> as lights and prims spell the namespace (USD namespaces are case-sensitive).
-static bool HdUENamespaced(const TfToken& key) {
+// The hdUE setting a host's key stands for: hdUE:<name>, or hdue:<name> as lights and prims spell the namespace (USD
+// namespaces are case-sensitive), and the standard names hosts send: Hydra's enableSceneLights (usdview's "Enable Scene
+// Lights"), stageMetersPerUnit (husk, Houdini) and stageUpAxis (the hdUE host in Houdini's viewport). namespaced: the
+// key was hdUE:<name>, which the bare <name> never overrides (Houdini sends its own renderMode: batch, interactive).
+static TfToken HdUECanonicalKey(const TfToken& key, bool& namespaced) {
     const auto& name = key.GetString();
-    return name.size() > 5 && (name.starts_with("hdUE:") || name.starts_with("hdue:"));
+    namespaced = name.size() > 5 && (name.starts_with("hdUE:") || name.starts_with("hdue:"));
+    if (namespaced) return TfToken(name.substr(5));
+    if (key == HdRenderSettingsTokens->enableSceneLights) return TfToken("sceneLightsEnabled");
+    if (key == TfToken("stageMetersPerUnit")) return TfToken("metersPerUnit");
+    if (key == TfToken("stageUpAxis")) return TfToken("upAxis");
+    return key;
 }
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
@@ -2293,23 +2271,25 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
-    for (const auto& [key, value] : settings) {
-        if (HdUETraceSettings())
-            std::fprintf(stderr, "hdUE initial setting %s = %s\n", key.GetText(), TfStringify(value).c_str());
-        if (HdUENamespaced(key)) {
-            state_->settings[TfToken(key.GetString().substr(5))] = value;
-            state_->namespaced.insert(TfToken(key.GetString().substr(5)));
+    // As SetRenderSetting does: aliases, then hdUE:<name> over both.
+    for (const bool namespacedPass : {false, true})
+        for (const auto& [key, value] : settings) {
+            if (HdUETraceSettings() && !namespacedPass)
+                std::fprintf(stderr, "hdUE initial setting %s = %s\n", key.GetText(), TfStringify(value).c_str());
+            bool namespaced = false;
+            const auto canonical = HdUECanonicalKey(key, namespaced);
+            if (canonical == key || namespaced != namespacedPass) continue;
+            if (namespaced) state_->namespaced.insert(canonical);
+            state_->settings[canonical] = value;
         }
-    }
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
     const bool hostUnits = stageUnits != settings.end() && !VtValue::Cast<double>(stageUnits->second).IsEmpty();
-    if (hostUnits && !state_->namespaced.count(TfToken("metersPerUnit")))
-        state_->settings[TfToken("metersPerUnit")] = VtValue::Cast<double>(stageUnits->second);
     // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
     // (already open in husk). Houdini's viewport sends stageUpAxis from the hdUE host. hdUE:upAxis overrides both.
     if (const auto file = settings.find(TfToken("usdFilename"));
-        file != settings.end() && file->second.IsHolding<std::string>() && !state_->namespaced.count(TfToken("upAxis")))
+        file != settings.end() && file->second.IsHolding<std::string>() &&
+        !state_->namespaced.count(TfToken("upAxis")) && !settings.count(TfToken("stageUpAxis")))
         if (const auto path =
                 (hostDirectory / std::filesystem::u8path(file->second.UncheckedGet<std::string>())).u8string();
             const auto layer = SdfLayer::FindOrOpen(std::string(path.begin(), path.end()))) {
@@ -2603,24 +2583,18 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         std::fprintf(stderr, "hdUE setting %s = %s\n", key.GetText(), TfStringify(value).c_str());
         std::fflush(stderr);
     }
-    if (HdUENamespaced(key)) {
-        const TfToken bare(key.GetString().substr(5));
-        {
+    bool namespaced = false;
+    if (const auto canonical = HdUECanonicalKey(key, namespaced); canonical != key) {
+        if (namespaced) {
             std::lock_guard lock(state_->settingsMutex);
-            state_->namespaced.insert(bare);
+            state_->namespaced.insert(canonical);
         }
-        SetRenderSetting(bare, value, true);
+        SetRenderSetting(canonical, value, namespaced);
         return;
     }
-    // A bare key never overrides its hdUE: form: Houdini sends its own renderMode (batch, interactive).
     if (!fromNamespace) {
         std::lock_guard lock(state_->settingsMutex);
         if (state_->namespaced.count(key)) return;
-    }
-    // Hydra's standard toggle (usdview's "Enable Scene Lights").
-    if (key == HdRenderSettingsTokens->enableSceneLights) {
-        SetRenderSetting(TfToken("sceneLightsEnabled"), value);
-        return;
     }
 #if defined(HDUE_HOUDINI)
     if (key == TfToken("houdini:viewport") && value.IsHolding<bool>() && value.UncheckedGet<bool>())
@@ -2629,14 +2603,6 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     if (key == TfToken("houdini:render_pause")) {
         setPaused(value.IsHolding<bool>() ? value.UncheckedGet<bool>()
                                           : value.IsHolding<int>() && value.UncheckedGet<int>());
-        return;
-    }
-    if (key == TfToken("stageMetersPerUnit")) {
-        SetRenderSetting(TfToken("metersPerUnit"), value);
-        return;
-    }
-    if (key == TfToken("stageUpAxis")) {  // the hdUE host (Houdini's viewport); hdUE:upAxis overrides it
-        SetRenderSetting(TfToken("upAxis"), value);
         return;
     }
     // Houdini repeats settings on redraws: an unchanged value returns without the state lock (held while an upload is

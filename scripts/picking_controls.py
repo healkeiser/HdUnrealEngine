@@ -2,7 +2,7 @@
 
 from pxr import Gf, Sdf
 
-PLUGIN = "HdUERendererPlugin"
+PLUGIN = "HdUEHoudiniRendererPlugin"
 
 
 def install_picking(controller):

@@ -23,7 +23,7 @@ from picking_controls import install_picking
 from pxr import Usd, UsdGeom, Usdviewq, Work
 from pxr.Usdviewq.qt import QtCore, QtWidgets
 
-PLUGIN = "HdUERendererPlugin"
+PLUGIN = "HdUEHoudiniRendererPlugin"
 ROOT = Path(__file__).resolve().parent.parent
 GAME = ROOT / "out/runtime/Windows/HdUEBackend"
 # --hdue-check name: (module, test class); Test-Usdview.ps1 -Check takes the same names.

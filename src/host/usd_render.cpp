@@ -543,30 +543,13 @@ int wmain(int argc, wchar_t** argv) {
         check(window != nullptr, "Cannot create host window");
         hdue::Backend runtime(options.dll);
         backend = &runtime;
-        const auto project = utf8(options.project);
-        HdueInitDesc init{};
-        init.struct_size = sizeof(init);
-        init.instance_handle = reinterpret_cast<uint64_t>(instance);
-        init.window_handle = reinterpret_cast<uint64_t>(window);
-        init.project_path = project.c_str();
-        init.map_path = "/Game/HdUETest";
-        // Headless, as hdUE is inside Houdini (HDUE_SHOW_WINDOW=1 shows UE's window).
-        // HDUE_UE_ARGS appends UE command-line arguments, as for the delegate (-hdUEInteractive: Nanite meshes).
-        const auto arguments =
-            (TfGetenvBool("HDUE_SHOW_WINDOW", false) ? std::string() : std::string("-RenderOffscreen ")) +
-            TfGetenv("HDUE_UE_ARGS");
-        init.extra_arguments = arguments.c_str();
         const auto start = Clock::now();
-        runtime.initialize(init);
+        runtime.boot(reinterpret_cast<uint64_t>(instance), reinterpret_cast<uint64_t>(window), utf8(options.project),
+                     false);
         const double initMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         PlugRegistry::GetInstance().RegisterPlugins(utf8(options.plugins));
         auto& registry = HdRendererPluginRegistry::GetInstance();
-#if defined(HDUE_HOUDINI)
-        // A separate Tf type prevents discovery of the standalone USD ABI.
         auto* plugin = registry.GetRendererPlugin(TfToken("HdUEHoudiniRendererPlugin"));
-#else
-        auto* plugin = registry.GetRendererPlugin(TfToken("HdUERendererPlugin"));
-#endif
         check(plugin != nullptr, "Hydra could not discover the hdUE renderer plugin");
         std::filesystem::create_directories(options.output);
         std::ofstream metrics(options.output / "metrics.json");
