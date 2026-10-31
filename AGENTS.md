@@ -32,6 +32,7 @@ hython scripts\run_conformance.py --runtime-config <absolute path>   # 150+ scen
 
 ## Rules
 
+- **Unreal is the benchmark.** hdUE does what Unreal does: never reimplement a behaviour after another engine (Karma, Storm, Arnold, ...), and never reimplement what Unreal already has: call or configure UE's own feature (its renderer, importers, Movie Render Queue, DDC, ...) instead of writing a parallel version. Other engines are only comparisons.
 - **Baseline order for any translation choice** (defaults, thresholds, how a USD/MaterialX feature maps to UE): what Unreal does first (its USDImporter plugin, Interchange, Movie Render Queue, the runtime), then the USD/MaterialX spec, then Karma. Cite the source. Never tune to one sample scene's values; per-engine look differences are the scene's job.
 - Read the UE source (`Engine/Source`, `Engine/Plugins`) before assuming how UE behaves; the engine root is in `.local/paths.json`.
 - Test on small scenes (Cornell, the conformance set, tiny repros). Sponza and Jungle Ruins renders take minutes: only for a gallery refresh someone asked for. No Karma renders unless asked.
