@@ -22,7 +22,10 @@
 #include "pxr/imaging/hdsi/implicitSurfaceSceneIndex.h"
 #include "pxr/imaging/hdsi/lightLinkingSceneIndex.h"
 #include "pxr/imaging/hdsi/nurbsApproximatingSceneIndex.h"
+#if __has_include("pxr/imaging/hdsi/particleFieldConversionSceneIndex.h")  // not in OpenUSD 26.03
 #include "pxr/imaging/hdsi/particleFieldConversionSceneIndex.h"
+#define HDUE_PARTICLE_FIELDS 1
+#endif
 #include "pxr/imaging/hdsi/renderPassPruneSceneIndex.h"
 #include "pxr/imaging/hdsi/tetMeshConversionSceneIndex.h"
 #include "pxr/imaging/hd/basisCurvesSchema.h"
@@ -217,9 +220,13 @@ protected:
         HdSceneIndexBaseRefPtr result = HdsiTetMeshConversionSceneIndex::New(input);
         result = HdsiNurbsApproximatingSceneIndex::New(
             TfCreateRefPtr(new HdUE_EditingSceneIndex(result, HdUENurbsSampling::edit)));
-        return TfCreateRefPtr(new HdUE_EditingSceneIndex(
+#if defined(HDUE_PARTICLE_FIELDS)
+        result = TfCreateRefPtr(new HdUE_EditingSceneIndex(
             HdsiParticleFieldConversionSceneIndex::New(result, nullptr, nullptr, nullptr), splats));
+#endif
+        return result;
     }
+#if defined(HDUE_PARTICLE_FIELDS)
     // Hydra's particle-field points emit their spherical harmonics' DC term through a primvar reader on
     // emissiveColor (/__DefaultParticleFieldMaterial), which hdUE's materials do not translate: the points take it as
     // displayColor instead, unbound from that material, whose network is dropped (it is added to every scene).
@@ -249,6 +256,7 @@ protected:
             editor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), nullptr);
         return editor.Finish();
     }
+#endif
 };
 // model:drawMode origin/bounds/cards, which UE's USD importer applies (USDGeomXformableTranslator.cpp,
 // UUsdDrawModeComponent): UsdImaging's own draw-mode scene index, which husk does not add for a renderer.
