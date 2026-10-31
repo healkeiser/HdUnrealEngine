@@ -179,7 +179,7 @@ def setup_lines():
     )
     return [
         scenes,
-        f"Up to 32 bounces · hdUE Lumen: 32 warmup frames · {setup['machine']}",
+        f"Up to 32 bounces · hdUE Lumen: 32 warmup frames, then 1 per frame · {setup['machine']}",
     ]
 
 
@@ -229,21 +229,41 @@ def times(theme, data):
         t,
         data,
         "Render time per frame",
-        "Log scale. Same scene, resolution, samples and bounces; startup excluded. Lower is faster.",
+        "Log scale. Same scene, resolution, samples and bounces; startup excluded. Lower is faster. "
+        "Right: times faster than Karma XPU (Lumen / Path Tracer).",
     )
-    seconds = lambda r, k: max(r[k]["seconds"], 0.05)
+    seconds = lambda r, k: max(r[k]["seconds"], 0.005)
     dots(ax, t, data, keys, seconds)
     ax.set_xscale("log")
-    longest = max(seconds(r, k) for _, r in data for k in keys if k in r)
+    values = [seconds(r, k) for _, r in data for k in keys if k in r]
+    shortest, longest = min(values), max(values)
     ticks = [
         v
-        for v in (0.1, 0.3, 1, 3, 10, 30, 100, 300, 1000, 3000)
-        if v <= longest * 1.2
+        for v in (0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100, 300, 1000, 3000)
+        if shortest / 1.2 <= v * 3 and v <= longest * 1.2
     ]
     ax.xaxis.set_major_locator(FixedLocator(ticks))
     ax.xaxis.set_minor_locator(NullLocator())
-    ax.set_xticks(ticks, [f"{v:g} s" for v in ticks])
-    ax.set_xlim(0.04, longest * 1.6)
+    ax.set_xticks(ticks, [f"{v * 1000:g} ms" if v < 1 else f"{v:g} s" for v in ticks])
+    # How many times faster hdUE is than the GPU Karma, at the end of each row.
+    reference = "xpu" if any("xpu" in r for _, r in data) else "karma"
+    for y, (_, r) in enumerate(data):
+        if reference not in r:
+            continue
+        speed = [
+            f"{seconds(r, reference) / seconds(r, k):,.0f}×"
+            for k in ("lumen", "pathtraced")
+            if k in r
+        ]
+        ax.text(
+            max(seconds(r, k) for k in keys if k in r) * 1.5,
+            y,
+            " / ".join(speed),
+            color=t["secondary"],
+            fontsize=9,
+            va="center",
+        )
+    ax.set_xlim(shortest / 1.6, longest * 14)
     legend(fig, t, keys)
     save(fig, f"chart-times-{theme}", t)
     plt.close(fig)

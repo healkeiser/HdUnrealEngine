@@ -74,29 +74,29 @@ Every scene is the [CC0 Cornell box](samples/cornell/) plus one small layer from
 - **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 512 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
-- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run over a 1-frame run (a Lumen time is a sequence frame's, after the first frame's warm-up), Karma as husk's wall time minus its startup on an empty stage.
+- Times are per frame without process or UE startup: hdUE from the delegate's timing trace of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, after its first frame (a Lumen time is a sequence frame's, after the first frame's warm-up),Karma as husk's wall time minus its startup on an empty stage.
 - Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean luminance relative to Karma CPU, the reference (1.00 = same).
 
 Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 56 ms | 2.41 s | 7.83 s | 49.71 s | 139x / 3x | 0.93 / 1.01 |
-| Glossy materials | 49 ms | 2.41 s | 6.20 s | 32.12 s | 127x / 3x | 1.03 / 1.22 |
-| Depth of field | 54 ms | 2.49 s | 7.94 s | 49.91 s | 146x / 3x | 0.93 / 1.01 |
-| Motion blur | 81 ms | 2.55 s | 22.57 s | 52.92 s | 278x / 9x | 0.97 / 1.01 |
-| Subdivision surfaces | 45 ms | 2.44 s | 7.87 s | 49.61 s | 173x / 3x | 0.93 / 1.01 |
-| Instances, points, curves | 52 ms | 2.55 s | 10.79 s | 51.23 s | 207x / 4x | 0.95 / 1.04 |
-| Volumes (OpenVDB) | 51 ms | 4.12 s | 28.87 s | 60.04 s | 562x / 7x | 1.05 / 1.31 |
-| IES profile | 44 ms | 1.99 s | 9.83 s | 65.81 s | 225x / 5x | 1.04 / 1.09 |
-| Light linking | 43 ms | 2.00 s | 9.72 s | 64.61 s | 225x / 5x | 0.95 / 1.00 |
-| Clearcoat | 51 ms | 2.04 s | 6.24 s | 38.75 s | 122x / 3x | 0.96 / 1.01 |
-| Render region | 42 ms | 1.87 s | 2.37 s | 14.18 s | 56x / 1x | 0.95 / 1.04 |
-| Lens shift | 64 ms | 1.93 s | 5.75 s | 33.92 s | 89x / 3x | 0.93 / 1.03 |
-| Orthographic camera | 51 ms | 1.96 s | 7.49 s | 45.64 s | 146x / 4x | 0.83 / 1.04 |
-| Camera exposure | 63 ms | 1.97 s | 8.84 s | 57.44 s | 141x / 4x | 0.93 / 1.01 |
-| Unreal post-processing | 52 ms | 1.99 s | 18.29 s | 49.78 s | 353x / 9x | n/a |
-| **All 15** | **800 ms** | **34.72 s** | **160.60 s** | **715.67 s** | **201x / 5x** | |
+| Global illumination | 57 ms | 2.64 s | 7.83 s | 49.71 s | 138x / 3x | 0.93 / 1.01 |
+| Glossy materials | 56 ms | 2.52 s | 6.20 s | 32.12 s | 112x / 2x | 1.03 / 1.22 |
+| Depth of field | 58 ms | 2.39 s | 7.94 s | 49.91 s | 137x / 3x | 0.93 / 1.01 |
+| Motion blur | 56 ms | 2.55 s | 22.57 s | 52.92 s | 402x / 9x | 0.97 / 1.01 |
+| Subdivision surfaces | 59 ms | 2.37 s | 7.87 s | 49.61 s | 134x / 3x | 0.93 / 1.01 |
+| Instances, points, curves | 56 ms | 2.53 s | 10.79 s | 51.23 s | 193x / 4x | 0.95 / 1.04 |
+| Volumes (OpenVDB) | 57 ms | 4.13 s | 28.87 s | 60.04 s | 510x / 7x | 1.05 / 1.31 |
+| IES profile | 55 ms | 2.39 s | 9.83 s | 65.81 s | 179x / 4x | 1.04 / 1.09 |
+| Light linking | 55 ms | 2.38 s | 9.72 s | 64.61 s | 178x / 4x | 0.95 / 1.00 |
+| Clearcoat | 60 ms | 2.40 s | 6.24 s | 38.75 s | 104x / 3x | 0.96 / 1.01 |
+| Render region | 41 ms | 2.36 s | 2.37 s | 14.18 s | 58x / 1x | 0.95 / 1.04 |
+| Lens shift | 54 ms | 2.38 s | 5.75 s | 33.92 s | 107x / 2x | 0.93 / 1.03 |
+| Orthographic camera | 56 ms | 2.38 s | 7.49 s | 45.64 s | 134x / 3x | 0.83 / 1.04 |
+| Camera exposure | 56 ms | 2.38 s | 8.84 s | 57.44 s | 159x / 4x | 0.93 / 1.01 |
+| Unreal post-processing | 58 ms | 2.61 s | 18.29 s | 49.78 s | 315x / 7x | n/a |
+| **All 15** | **832 ms** | **38.41 s** | **160.60 s** | **715.67 s** | **193x / 4x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -134,18 +134,18 @@ Regenerate with `hython scripts/render_gallery.py`.
 <!-- sponza:start -->
 [Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
-- **hdUE Lumen**: realtime mode, 32 warmup frames.
+- **hdUE Lumen**: realtime mode, 32 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 256 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 256 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
-- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
+- Times are per frame without process or UE startup: hdUE from the delegate's timing trace of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, after its first frame (a Lumen time is a sequence frame's, after the first frame's warm-up),Karma as husk's wall time minus its startup on an empty stage.
 - Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean luminance relative to Karma CPU, the reference (1.00 = same).
 
 Regenerate with `hython scripts/render_gallery.py --set sponza`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 0.4 s | 11.9 s | 42.2 s | 474.6 s | 105x / 4x | 0.88 / 0.94 |
+| Main view | 93 ms | 14.45 s | 42.19 s | 474.65 s | 453x / 3x | 0.88 / 0.94 |
 
 ![Main view: `/root/PhysCamera001`, levelled as in Intel's Render_Main_A, exposure +4.5 stops as authored; sun and sky fitted to Intel's renders.](docs/images/gallery/sponza/PhysCamera001.png)
 <!-- sponza:end -->

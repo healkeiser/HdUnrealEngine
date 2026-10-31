@@ -13,7 +13,7 @@ Cornell hdUE render departs from its tile baseline in tests/gallery_baselines.js
 Sponza is read from samples/sponza/intel by default (samples/sponza/README.md).
 
 hdUE must be registered (installed package), or pass --dev to use this checkout's build and .local runtime profile.
-hdUE times are per frame from the extra time of a 16-frame (Lumen) or 4-frame husk run over a 1-frame run; Karma
+hdUE times are per frame of a 16-frame (Lumen) or 4-frame husk run after its first (the delegate's trace); Karma
 times are husk wall times minus Karma's startup, measured on an empty stage.
 """
 
@@ -151,7 +151,10 @@ def mode_layer(layer, mode, out):
 
 
 def husk(renderer, layer, output, frames=1):
+    """husk's wall time or, for a sequence, its time per frame after the first: the delegate's timing trace between
+    frame changes, so neither UE startup (which varies by seconds) nor the first frame's warm-up counts."""
     start = time.perf_counter()
+    env = {**os.environ, "HDUE_TRACE_TIMING": "1"} if frames > 2 else None
     result = subprocess.run(
         [
             str(HUSK),
@@ -169,6 +172,7 @@ def husk(renderer, layer, output, frames=1):
         capture_output=True,
         text=True,
         errors="replace",
+        env=env,
     )
     elapsed = time.perf_counter() - start
     if frames > 1:
@@ -177,6 +181,14 @@ def husk(renderer, layer, output, frames=1):
         raise RuntimeError(
             f"husk {renderer} {layer.name} failed:\n{result.stdout[-2000:]}{result.stderr[-2000:]}"
         )
+    if env:
+        starts = [
+            float(line.split()[0])
+            for line in (result.stdout + result.stderr).splitlines()
+            if "hdUE setting changed: houdini:frame" in line
+        ][1:]
+        if len(starts) > 1:
+            return (starts[-1] - starts[0]) / (len(starts) - 1) / 1000
     return elapsed
 
 
@@ -276,6 +288,8 @@ def panel_image(target, title, doc, panels):
     matplotlib.use("agg")
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.textpath import TextPath
 
     tiles = [display(image, tonemapped) for image, *_, tonemapped in panels]
     height, width = tiles[0].shape[:2]
@@ -363,17 +377,24 @@ def panel_image(target, title, doc, panels):
             **text,
         )
         settings, brightness = detail
+        # A line longer than the panel shrinks to fit, measured in the caption font.
+        fit = lambda line: detail_px if not line.strip() else min(
+            detail_px,
+            detail_px
+            * (width - 1.2 * margin)
+            / max(TextPath((0, 0), line, size=detail_px, prop=FontProperties(family=FONTS)).get_extents().width, 1),
+        )
         fig.text(
             *at(x + 0.6 * margin, first + 3 * detail_px),
             brightness,
-            size=points(detail_px),
+            size=points(fit(brightness)),
             color=MUTED,
             **text,
         )
         fig.text(
             *at(x + 0.6 * margin, first + 1.5 * detail_px),
             settings,
-            size=points(detail_px),
+            size=points(fit(settings)),
             color=MUTED,
             **text,
         )
@@ -705,18 +726,14 @@ def main():
                 source = mode_layer(layer, mode, out) if mode else layer
                 single = husk(renderer, source, output)
                 if mode:
-                    # hdUE frames are short next to UE startup: time extra frames of the same scene in one process
-                    # (16 for Lumen, whose frames take tenths of a second).
-                    frames = 16 if mode == "realtime" else 4
-                    seconds = (
-                        husk(
-                            renderer,
-                            source,
-                            out / f"{name}_{key}.$F4.exr",
-                            frames=frames,
-                        )
-                        - single
-                    ) / (frames - 1)
+                    # hdUE frames are short next to UE startup: time a sequence's frames in one process (16 for Lumen,
+                    # 4 for the Path Tracer).
+                    seconds = husk(
+                        renderer,
+                        source,
+                        out / f"{name}_{key}.$F4.exr",
+                        frames=16 if mode == "realtime" else 4,
+                    )
                 else:
                     seconds = single - baselines[key]
                 entry["renders"][key] = {
@@ -782,9 +799,9 @@ def section(which, results, machine):
         f"- **hdUE Path Tracer**: {samples} samples per pixel, up to 32 bounces.\n"
         f"- **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, {samples} samples per pixel, 8 diffuse bounces.\n"
         f"- Machine: {machine}.\n"
-        "- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or "
-        "4-frame (Path Tracer) husk run over a 1-frame run (a Lumen time is a sequence frame's, after the first "
-        "frame's warm-up), Karma as husk's wall time minus its startup on an empty stage.\n"
+        "- Times are per frame without process or UE startup: hdUE from the delegate's timing trace of a 16-frame "
+        "(Lumen) or 4-frame (Path Tracer) husk run, after its first frame (a Lumen time is a sequence frame's, after "
+        "the first frame's warm-up),Karma as husk's wall time minus its startup on an empty stage.\n"
         "- Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean "
         "luminance relative to Karma CPU, the reference (1.00 = same).\n\n"
         f"Regenerate with `{command}`."
