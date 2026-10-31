@@ -70,33 +70,33 @@ The tables below give the numbers behind both charts; regenerate the charts with
 <!-- gallery:start -->
 Every scene is the [CC0 Cornell box](samples/cornell/) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
 
-- **hdUE Lumen**: realtime mode, 32 warmup frames.
+- **hdUE Lumen**: realtime mode, 32 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 512 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
-- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.
+- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or 4-frame (Path Tracer) husk run over a 1-frame run (a Lumen time is a sequence frame's, after the first frame's warm-up), Karma as husk's wall time minus its startup on an empty stage.
 - Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean luminance relative to Karma CPU, the reference (1.00 = same).
 
 Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 0.2 s | 2.4 s | 7.8 s | 49.7 s | 37x / 3x | 0.93 / 1.01 |
-| Glossy materials | 0.2 s | 2.4 s | 6.2 s | 32.1 s | 30x / 3x | 1.03 / 1.22 |
-| Depth of field | 0.2 s | 2.5 s | 7.9 s | 49.9 s | 38x / 3x | 0.93 / 1.01 |
-| Motion blur | 0.3 s | 2.5 s | 22.6 s | 52.9 s | 87x / 9x | 0.94 / 1.01 |
-| Subdivision surfaces | 0.2 s | 2.4 s | 7.9 s | 49.6 s | 37x / 3x | 0.93 / 1.01 |
-| Instances, points, curves | 0.2 s | 2.5 s | 10.8 s | 51.2 s | 54x / 4x | 0.95 / 1.04 |
-| Volumes (OpenVDB) | 0.2 s | 4.1 s | 28.9 s | 60.0 s | 131x / 7x | 1.05 / 1.31 |
-| IES profile | 0.2 s | 2.0 s | 9.8 s | 65.8 s | 45x / 5x | 1.04 / 1.09 |
-| Light linking | 0.2 s | 2.0 s | 9.7 s | 64.6 s | 46x / 5x | 0.95 / 1.00 |
-| Clearcoat | 0.2 s | 2.0 s | 6.2 s | 38.8 s | 27x / 3x | 0.96 / 1.01 |
-| Render region | 0.2 s | 1.9 s | 2.4 s | 14.2 s | 12x / 1x | 0.95 / 1.04 |
-| Lens shift | 0.2 s | 1.9 s | 5.8 s | 33.9 s | 27x / 3x | 0.93 / 1.03 |
-| Orthographic camera | 0.2 s | 2.0 s | 7.5 s | 45.6 s | 36x / 4x | 0.83 / 1.04 |
-| Camera exposure | 0.2 s | 2.0 s | 8.8 s | 57.4 s | 42x / 4x | 0.93 / 1.01 |
-| Unreal post-processing | 0.2 s | 2.0 s | 18.3 s | 49.8 s | 91x / 9x | n/a |
-| **All 15** | **3.2 s** | **34.7 s** | **160.6 s** | **715.7 s** | **50x / 5x** | |
+| Global illumination | 56 ms | 2.41 s | 7.83 s | 49.71 s | 139x / 3x | 0.93 / 1.01 |
+| Glossy materials | 49 ms | 2.41 s | 6.20 s | 32.12 s | 127x / 3x | 1.03 / 1.22 |
+| Depth of field | 54 ms | 2.49 s | 7.94 s | 49.91 s | 146x / 3x | 0.93 / 1.01 |
+| Motion blur | 81 ms | 2.55 s | 22.57 s | 52.92 s | 278x / 9x | 0.97 / 1.01 |
+| Subdivision surfaces | 45 ms | 2.44 s | 7.87 s | 49.61 s | 173x / 3x | 0.93 / 1.01 |
+| Instances, points, curves | 52 ms | 2.55 s | 10.79 s | 51.23 s | 207x / 4x | 0.95 / 1.04 |
+| Volumes (OpenVDB) | 51 ms | 4.12 s | 28.87 s | 60.04 s | 562x / 7x | 1.05 / 1.31 |
+| IES profile | 44 ms | 1.99 s | 9.83 s | 65.81 s | 225x / 5x | 1.04 / 1.09 |
+| Light linking | 43 ms | 2.00 s | 9.72 s | 64.61 s | 225x / 5x | 0.95 / 1.00 |
+| Clearcoat | 51 ms | 2.04 s | 6.24 s | 38.75 s | 122x / 3x | 0.96 / 1.01 |
+| Render region | 42 ms | 1.87 s | 2.37 s | 14.18 s | 56x / 1x | 0.95 / 1.04 |
+| Lens shift | 64 ms | 1.93 s | 5.75 s | 33.92 s | 89x / 3x | 0.93 / 1.03 |
+| Orthographic camera | 51 ms | 1.96 s | 7.49 s | 45.64 s | 146x / 4x | 0.83 / 1.04 |
+| Camera exposure | 63 ms | 1.97 s | 8.84 s | 57.44 s | 141x / 4x | 0.93 / 1.01 |
+| Unreal post-processing | 52 ms | 1.99 s | 18.29 s | 49.78 s | 353x / 9x | n/a |
+| **All 15** | **800 ms** | **34.72 s** | **160.60 s** | **715.67 s** | **201x / 5x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 

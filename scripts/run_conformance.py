@@ -88,6 +88,10 @@ def render(path, mode, frames, out, env, timeout, extra=()):
         # Tf warnings (TF_WARN) reach husk's output only in its end-of-render summary.
         "--error-summary",
         "force",
+        # Each frame is its own shot: a sequence keeps UE's temporal history as Movie Render Queue does, so a light
+        # switched between frames would lag a few frames, where the scenes test the switched state.
+        "--restart-delegate",
+        "1",
         *extra,
         str(root),
     ]

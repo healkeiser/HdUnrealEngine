@@ -451,12 +451,12 @@ def check_baselines(bless):
 
 
 def duration(seconds):
-    return "< 0.1 s" if seconds < 0.05 else f"{seconds:.1f} s"
+    return f"{seconds * 1000:.0f} ms" if seconds < 1 else f"{seconds:.2f} s"
 
 
 def detail(key, render, reference, samples, resolution, compared=True):
     """(settings and time per frame, brightness against Karma CPU): the caption's second and third lines."""
-    settings = "32 warmup frames" if key == "lumen" else f"{samples} spp"
+    settings = "32 warmup, then 1" if key == "lumen" else f"{samples} spp"
     if key == "karma":
         brightness = "Brightness reference"
     elif compared and reference:
@@ -720,10 +720,10 @@ def main():
                 else:
                     seconds = single - baselines[key]
                 entry["renders"][key] = {
-                    "seconds": round(max(seconds, 0.0), 2),
+                    "seconds": round(max(seconds, 0.0), 4),
                     "luminance": luminance(pixels(output)),
                 }
-                print(name, key, f"{seconds:.1f}s", flush=True)
+                print(name, key, duration(max(seconds, 0.0)), flush=True)
             results[name] = entry
             results_path.write_text(json.dumps(results, indent=2))
             compose(args.set, name, entry, samples, resolution)
@@ -777,12 +777,14 @@ def section(which, results, machine):
         command = "hython scripts/render_gallery.py --set sponza"
     setup = (
         f"{intro}\n\n"
-        f"- **hdUE Lumen**: realtime mode, 32 warmup frames.\n"
+        "- **hdUE Lumen**: realtime mode, 32 warmup frames on a sequence's first frame, then one draw per frame "
+        "(as Movie Render Queue).\n"
         f"- **hdUE Path Tracer**: {samples} samples per pixel, up to 32 bounces.\n"
         f"- **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, {samples} samples per pixel, 8 diffuse bounces.\n"
         f"- Machine: {machine}.\n"
         "- Times are per frame without process or UE startup: hdUE from the extra time of a 16-frame (Lumen) or "
-        "4-frame (Path Tracer) husk run, Karma as husk's wall time minus its startup on an empty stage.\n"
+        "4-frame (Path Tracer) husk run over a 1-frame run (a Lumen time is a sequence frame's, after the first "
+        "frame's warm-up), Karma as husk's wall time minus its startup on an empty stage.\n"
         "- Speed-ups compare with Karma XPU, the GPU renderer, when it was rendered; brightness is the mean "
         "luminance relative to Karma CPU, the reference (1.00 = same).\n\n"
         f"Regenerate with `{command}`."
@@ -829,7 +831,7 @@ def section(which, results, machine):
         and total.get("lumen", 0) > 0
         and total.get("pathtraced", 0) > 0
     ):
-        cells = " | ".join(f"**{total[k]:.1f} s**" for k, _, _, _ in present)
+        cells = " | ".join(f"**{duration(total[k])}**" for k, _, _, _ in present)
         summary.append(
             f"| **All {len(order)}** | {cells} | **{total[reference] / total['lumen']:.0f}x / "
             f"{total[reference] / total['pathtraced']:.0f}x** | |"

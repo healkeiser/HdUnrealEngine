@@ -9,7 +9,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:renderMode` | `realtime` | `realtime` (Lumen) or `pathtraced` |
 | `unreal:samplesPerPixel` | 64 | Path Tracer samples |
 | `unreal:lumenEnabled` | 1 | Lumen GI and reflections in realtime mode |
-| `unreal:warmupFrames` | 32 | Realtime frames before a frame counts as converged (Movie Render Queue's default render warm-up count) |
+| `unreal:warmupFrames` | 32 | Realtime frames before a frame counts as converged (Movie Render Queue's default render warm-up count). In husk, only a sequence's first frame warms up: each later frame keeps the temporal history and draws once, as Movie Render Queue does after its warm-up |
 | `unreal:motionBlur` | 1 | Motion blur when the camera shutter is open and something moves |
 | `unreal:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
 | `unreal:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |

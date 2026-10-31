@@ -529,8 +529,9 @@ HDUE = [
         "",
         "int",
         32,
-        "Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. "
-        "Divided between motion-blur sub-frames.",
+        "Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. In husk, "
+        "only a sequence's first frame warms up: each later frame continues its history with one draw, as Movie Render "
+        "Queue does.",
         range=(1, 256, True, False),
         category="Rendering",
         uiscope=True,

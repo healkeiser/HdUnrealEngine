@@ -2381,11 +2381,15 @@ public:
                 auto request = build(viewAt(subframes_ > 1 ? subframeTime(subframe_) : 0.f));
                 if (subframes_ > 1) {
                     applyMotion(s, subframeTime(subframe_));
+                    // The sub-frame's own time within the shutter (frames), so UE's world time advances through it.
+                    request.time_seconds += subframeTime(subframe_) / s.setting<double>("houdini:fps", 24.);
                     request.samples_per_pixel =
                         std::max(1u, (request.samples_per_pixel + uint32_t(subframes_) - 1) / uint32_t(subframes_));
-                    // Lumen keeps its history between sub-frames, so the realtime warmup is shared too.
-                    request.warmup_frames =
-                        std::max(2u, (request.warmup_frames + uint32_t(subframes_) - 1) / uint32_t(subframes_));
+                    // Lumen keeps its history between sub-frames, so the realtime warmup is shared too. Offline, the
+                    // backend already draws once per sub-frame that continues the history; the first keeps it all.
+                    if (selfHost().continuous)
+                        request.warmup_frames =
+                            std::max(2u, (request.warmup_frames + uint32_t(subframes_) - 1) / uint32_t(subframes_));
                 }
                 const auto requestStart = std::chrono::steady_clock::now();
                 const auto requested = s.backend->api().request_render(s.session, &request);

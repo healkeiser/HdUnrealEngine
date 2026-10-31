@@ -602,16 +602,21 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (Assets.loading) return Pending(TEXT("native assets"));
     if (Assets.failed) return Fail(HDUE_ENGINE_ERROR, UTF8_TO_TCHAR(Assets.message));
     ReleaseResidency(Session);
-    // A moving realtime camera needs Lumen's persistent temporal history. Scene
-    // edits cancel HasRequest in ApplyScene; mode changes still reset, and every
+    // A moving realtime camera needs Lumen's persistent temporal history. Scene and light edits at the same time cancel
+    // HasRequest and reset it: the request converges again, and a viewport stops drawing once it has (a kept history
+    // held Lumen and the sky light on the old lighting through a whole warm-up). Mode changes reset it too, and every
     // Path Tracer request starts a fresh accumulation.
     const bool Aov = Request->aov != HDUE_AOV_COLOR;
     const auto& Previous = Session->BeautyRequest;
     // Settings changes (Lumen, samples, warmup, post) and time keep it too: rebuilding it blanked and reconverged the
     // image, where UE's own viewport changes instantly and plays Sequencer without camera cuts. Resetting it on every
     // time change froze Houdini's playback on the last image until it stopped.
-    const bool KeepHistory = Session->HasRequest && Previous.mode == HDUE_REALTIME && Request->mode == HDUE_REALTIME &&
-                             Previous.aov == Request->aov;
+    // Offline, the next frame of a sequence (a later time) keeps it whatever changed, as Movie Render Queue keeps it
+    // through a shot (MoviePipelineRendering.cpp: a camera cut only at the shot's first sample) and Lumen follows
+    // animated lights over its next frames.
+    const bool NextFrame = !IsInteractive() && !Aov && Previous.generation && Request->time_seconds != Previous.time_seconds;
+    const bool KeepHistory = (Session->HasRequest || NextFrame) && Previous.mode == HDUE_REALTIME &&
+                             Request->mode == HDUE_REALTIME && Previous.aov == Request->aov;
     if (Aov) {
         // A lighting component starts from no history, as each Path Tracer beauty request does.
         if (Session->AovViewState && LightingComponents(*Request)) {
@@ -627,7 +632,10 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     }
     Session->CameraCut = Aov || !KeepHistory;
+    // That next frame continues the history as Movie Render Queue does after its warm-up: one draw (its default
+    // temporal sample count). The warm-up frames run on a sequence's first frame.
     Session->Request = *Request;
+    if (NextFrame && KeepHistory) Session->Request.warmup_frames = 1;
     if (!Aov) Session->BeautyRequest = *Request;
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
     Session->Draws = 0;
@@ -895,8 +903,8 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Job->Preparing =
         Session->Preparing ||
         Compiling;  // ponytail: Path Tracer samples drawn meanwhile still count; restart its accumulation if that shows
-    // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the first
-    // draw (an immediate preview), the one that should converge, and otherwise at most every 250 ms for progress.
+    // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the one that
+    // should converge and, for the Path Tracer, the first draw (an immediate preview) and at most every 250 ms.
     const double Now = FPlatformTime::Seconds();
     // One readback at a time (they share Session->Readback); a draw that would converge while one is in flight is
     // followed by more draws until it can be read back.
@@ -917,7 +925,10 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         Room &&
         (Sharing
              ? Converging
-             : IsInteractive() || Job->DrawIndex == 1 || Session->Preparing || Now - Session->LastReadback >= 0.25 ||
+             : IsInteractive() || Session->Preparing ||
+                   // Progress only for the Path Tracer (husk snapshots); an offline realtime frame converges in about a
+                   // second, and each progress readback stalled it ~150 ms at 2560x1440.
+                   (PathTracing && (Job->DrawIndex == 1 || Now - Session->LastReadback >= 0.25)) ||
                    Job->DrawIndex >= (PathTracing ? Request.samples_per_pixel : FMath::Max(1u, Request.warmup_frames)));
     Job->ScreenFraction = ScreenFraction;
     Job->DepthEnabled = Session->DepthEnabled && !Aov && ReadBack;
@@ -1862,7 +1873,8 @@ HdueResult HDUE_CALL ResizeSession(HdueSession Handle, uint32 Width, uint32 Heig
     Session->Height = Height;
     Session->Target->InitCustomFormat(Width, Height, PF_FloatRGBA, true);
     Session->Target->UpdateResourceImmediate(true);
-    // Temporal history (Lumen, TSR, Path Tracer samples) is per resolution.
+    // Temporal history (Lumen, TSR, Path Tracer samples) is per resolution; the next request starts a sequence.
+    Session->BeautyRequest = {};
     Session->ViewState->Destroy();
     Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     if (Session->AovViewState) {
