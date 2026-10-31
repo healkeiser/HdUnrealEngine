@@ -80,3 +80,11 @@ def Mesh "Smooth"
     double3 xformOp:translate = (2.5, 0, 0)
     uniform token[] xformOpOrder = ["xformOp:translate"]
 }
+over "Render"
+{
+    over "Settings"
+    {
+        # hdUE leaves subdivision surfaces unrefined by default, as UE's USD Stage Actor does (SubdivisionLevel 0).
+        int unreal:subdivisionLevel = 2
+    }
+}

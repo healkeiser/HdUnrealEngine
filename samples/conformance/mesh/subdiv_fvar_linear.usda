@@ -86,3 +86,11 @@ def Mesh "None"
     int[] primvars:displayColor:indices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
     token faceVaryingLinearInterpolation = "none"
 }
+over "Render"
+{
+    over "Settings"
+    {
+        # hdUE leaves subdivision surfaces unrefined by default, as UE's USD Stage Actor does (SubdivisionLevel 0).
+        int unreal:subdivisionLevel = 2
+    }
+}

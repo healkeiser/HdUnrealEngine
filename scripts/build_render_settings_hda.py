@@ -390,12 +390,11 @@ def build():
             "hdue_primfolder",
             "Render Settings Prim",
             [
-                hou.StringParmTemplate(
+                prim_path(
                     "primpath",
                     "Render Settings Prim",
-                    1,
-                    default_value=("/Render/rendersettings",),
-                    help="Path of the UsdRenderSettings prim this node creates or edits.",
+                    "/Render/rendersettings",
+                    "Path of the UsdRenderSettings prim this node creates or edits.",
                 ),
                 hou.ToggleParmTemplate(
                     "setlayerrendersettings",
@@ -435,15 +434,27 @@ def build():
             template.setMinIsStrict(True)
             template.setMaxValue(16384)
             template.setMaxIsStrict(False)
+        # The stage's cameras as a menu, as Karma Render Settings' camera (its getCameras: loputils.globPrims).
+        if name == "camera":
+            template.setMenuType(hou.menuType.StringReplace)
+            template.setItemGeneratorScript(
+                "import loputils\n"
+                "node = kwargs['node']\n"
+                "source = node.inputs()[0] if node.inputs() and node.inputs()[0] else node\n"
+                "return [p.GetPrimPath().pathString for p in loputils.globPrims(source, '%type:Camera') for _ in range(2)]"
+            )
+            template.setItemGeneratorScriptLanguage(hou.scriptLanguage.Python)
         group.append(template)
+    # The Unreal settings above the tabs (render mode, samples, tonemapper, ...) in a group of their own, apart from
+    # the renderer-independent output, camera and resolution above them. Its box replaces the .ds separator.
     group.append(
-        hou.SeparatorParmTemplate(
-            "hdue_sepcamera",
-            tags={"sidefx::layout_height": "small", "sidefx::look": "blank"},
+        hou.FolderParmTemplate(
+            "hdue_enginefolder",
+            "Unreal Engine",
+            [t for t in main if t.type() != hou.parmTemplateType.Separator],
+            folder_type=hou.folderType.Simple,
         )
     )
-    for template in main:
-        group.append(template)
     output = hou.FolderParmTemplate(
         "hdUE_ImageOutputTab", "Image Output", folder_type=hou.folderType.Tabs
     )
@@ -784,17 +795,36 @@ def save(
     )
 
 
-def parent_path(default, what):
-    """The Parent Primitive Path parameter of the nodes creating render vars or products."""
+def prim_path(name, label, default, help):
+    """A prim path parameter as Karma's render LOPs have it: the prim picker button and the stage's prim paths as a menu
+    (loputils.createPrimPathMenu).
+    """
     import hou
 
     return hou.StringParmTemplate(
-        "parentprimpath",
-        "Parent Primitive Path",
+        name,
+        label,
         1,
         default_value=(default,),
-        tags={"sidefx::usdpathtype": "prim"},
-        help=f"Path of the prim under which this node creates its {what}.",
+        menu_type=hou.menuType.StringReplace,
+        item_generator_script="import loputils\nreturn loputils.createPrimPathMenu()",
+        item_generator_script_language=hou.scriptLanguage.Python,
+        tags={
+            "sidefx::usdpathtype": "prim",
+            "script_action": "import loputils\nloputils.selectPrimsInParm(kwargs, False)",
+            "script_action_icon": "BUTTONS_reselect",
+        },
+        help=help,
+    )
+
+
+def parent_path(default, what):
+    """The Parent Primitive Path parameter of the nodes creating render vars or products."""
+    return prim_path(
+        "parentprimpath",
+        "Parent Primitive Path",
+        default,
+        f"Path of the prim under which this node creates its {what}.",
     )
 
 

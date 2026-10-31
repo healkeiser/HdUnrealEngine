@@ -580,9 +580,9 @@ HDUE = [
         "Subdivision Level",
         "Rendering|Geometry",
         "int",
-        2,
-        "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's "
-        "surfaces closely, 0 renders the cage.",
+        0,
+        "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage "
+        "default, renders the cage; 3 matches Karma's surfaces closely.",
         range=(0, 5, True, False),
         category="Geometry",
         advanced=True,
@@ -1003,7 +1003,9 @@ def parse_post_process(header, defaults, enums, skipped):
         settings.append(
             dict(
                 attribute=f"unreal:postProcess:{name}",
-                label=meta.get("DisplayName") or label_from_name(name),
+                # UE has stray spaces in some (AutoExposureBias: "Exposure Compensation ").
+                label=(meta.get("DisplayName") or "").strip()
+                or label_from_name(name),
                 category=category,
                 kind=kind,
                 size=size,

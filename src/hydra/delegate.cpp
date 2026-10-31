@@ -1782,11 +1782,15 @@ public:
     // whose visibility it flips. Empty tags draw everything.
     void setRenderTags(TfTokenVector tags) {
         auto& s = *state_;
-        // husk does not apply UsdRenderSettings includedPurposes to the pass's tags.
-        tags = HdUEIncludedTags(std::move(tags), s.setting<VtTokenArray>("includedPurposes", {}));
+        // husk does not apply UsdRenderSettings includedPurposes to the pass's tags. Houdini's viewport sends its own
+        // display purposes as the tags (proxy by default, as UE's USD Stage Actor loads), which the stage's render
+        // settings must not override.
+        if (!selfHost().continuous)
+            tags = HdUEIncludedTags(std::move(tags), s.setting<VtTokenArray>("includedPurposes", {}));
         std::sort(tags.begin(), tags.end());
         std::lock_guard lock(s.mutex);
         if (tags == s.renderTags) return;
+        trace("hdUE render tags: %s\n", TfStringJoin(tags.begin(), tags.end(), " ").c_str());
         const auto flips = [&](const TfToken& tag) {
             return HdUEState::tagShown(tags, tag) != HdUEState::tagShown(s.renderTags, tag);
         };
@@ -2858,7 +2862,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Viewer light without scene lights", TfToken("autoViewerLight"), VtValue(false)},
             {"Motion blur", TfToken("motionBlur"), VtValue(true)},
             {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
-            {"Subdivision level", TfToken("subdivisionLevel"), VtValue(2)},
+            {"Subdivision level", TfToken("subdivisionLevel"), VtValue(0)},
             {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
             {"Denoiser", TfToken("denoiser"), VtValue(std::string("off"))},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},

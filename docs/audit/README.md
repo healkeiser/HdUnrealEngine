@@ -64,6 +64,11 @@ Fourth round (2026-10-31):
 
 - **Viewport/husk look:** not hdUE and not UE's editor-vs-MRQ quality. The viewport's frame is 1.03x husk's on Cornell (tonemapper on) and the offline profile changes it by 2%; Houdini 22.0.368's viewport OCIO display shows linear values under ~0.004 as black where OCIO's own CPU and GPU transforms are exact sRGB ([rendering](../rendering.md#unreal-post-processing), `Launch-Houdini.ps1 -TestKind parity`).
 
+- **husk cost (item 2):** Nanite builds cached across processes (`Saved/NaniteCache`, keyed as UE's static mesh DDC; UE's own DDC does not run in a cooked runtime): 450 meshes, 10.5 s -> 0.7 s. husk's EXR writing measured and documented ([houdini](../houdini.md#performance)); the readback stays float. Viewport card/Nanite builds are memory-bound as UE's editor schedules asset builds (`r.HdUE.MeshBuildMaxMemoryUsage`). A race on the Nanite builder's version string, which corrupted the heap (3 crashed husk renders in about 340 today, in Nanite rendering), is fixed.
+- **Staging (item 5):** `Update-HoudiniRuntime.ps1` refreshes the runtime's unhashed `HdUEBackend.dll`, so `.local/runtime.json` passes the ABI check too.
+- **Defaults after UE:** `unreal:subdivisionLevel` defaults to 0 (UE's USD Stage Actor `SubdivisionLevel`); scenes that want smooth subdivision surfaces author it (the Cornell gallery and the subdivision conformance scenes do). The viewport's display purposes are no longer narrowed by the stage's `includedPurposes`.
+- **Heavy scenes:** NVIDIA's Da Vinci Workshop (617M triangles) exceeds 48 GB in hdUE's viewport with its render purpose; Karma XPU holds it in about 37 GB, UE's own runtime USD import passed 62 GB, and the UE editor's import crashes on a UDIM texture. hdUE's duplicate mesh copies are the next work item.
+
 Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.

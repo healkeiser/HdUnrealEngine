@@ -30,3 +30,5 @@ uv.lock
 # Intel Jungle Ruins (CC BY 4.0) and Poly Haven HDRIs (CC0): downloaded locally, never committed (samples/jungle_ruins/README.md)
 /samples/jungle_ruins/intel/
 /samples/hdris/
+# NVIDIA Da Vinci Workshop (NVIDIA One-Way Noncommercial License): a local download outside the repo; local layers over it
+/samples/davinci/

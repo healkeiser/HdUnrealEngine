@@ -456,7 +456,7 @@ public:
         // catmullClark and loop meshes are refined uniformly (unreal:subdivisionLevel), with their subdiv tags and the
         // indices of their face-varying UVs and colours; authored normals do not apply to them.
         std::unique_ptr<HdUESubdivision> subdivision;
-        if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 2) : 0;
+        if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 0) : 0;
             level > 0 && (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark ||
                           topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
             topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));

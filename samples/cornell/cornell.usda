@@ -53,6 +53,9 @@ def Scope "Render"
         uniform int2 resolution = (512, 512)
         rel products = </Render/Product>
         int unreal:samplesPerPixel = 512
+        # hdUE leaves subdivision surfaces unrefined by default, as UE's USD Stage Actor does; the variants' implicit
+        # spheres (USD's coarse catmullClark unit sphere) are refined to match Karma's round spheres.
+        int unreal:subdivisionLevel = 2
         token unreal:renderMode = "pathtraced"
         token karma:global:convergence_mode = "Path Traced"
         int karma:global:pathtracedsamples = 512

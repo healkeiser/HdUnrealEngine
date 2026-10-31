@@ -14,7 +14,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
 | `unreal:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
 | `unreal:debugView` | `off` | One of UE's viewport view modes instead of the realtime beauty; see [debug views](#debug-views) |
-| `unreal:subdivisionLevel` | 2 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
+| `unreal:subdivisionLevel` | 0 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
 | `unreal:cullBackface` | 1 | Meshes whose `doubleSided` is off render their front faces only, as UE's USD importer does; 0 renders both sides, as Karma; see [geometry](#geometry) |
 | `unreal:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
 | `unreal:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
@@ -195,7 +195,7 @@ UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the Opti
 
 ## Subdivision surfaces
 
-Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `unreal:subdivisionLevel` levels, with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
+Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `unreal:subdivisionLevel` levels (0 by default, as UE's USD Stage Actor: `SubdivisionLevel`, `USDStageActor.cpp`; each level has 4x the faces), with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
 
 Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; the default 2 still shows facets on close silhouettes. There is no adaptive or screen-space refinement; a displaced subdivision mesh is diced further (see [Displacement](#displacement)). Wet-surface masks are not translated on subdivided meshes.
 
@@ -207,7 +207,7 @@ Framing is honoured: UE renders exactly the data window into the render buffer, 
 
 The camera's near clip applies in both modes; its far clip does not: UE's views keep an infinite far plane (a finite reversed-Z far plane changed Lumen's lighting by 8% on Cornell with nothing beyond it), and UE's Path Tracer starts primary rays with an unbounded `TMax` (`PathTracing.usf`).
 
-`fStop` and `focusDistance` drive UE's physical depth of field; the render settings' `disableDepthOfField` turns it off. `disableMotionBlur` (and the deprecated `instantaneousShutter`) turn motion blur off, and `includedPurposes` narrows the purposes husk renders (its `--purpose`). Final renders resolve material bindings for the first of the render settings' `materialBindingPurposes`, else `full`, then allPurpose. In husk, hdUE's warnings print as `hdUE warning:` lines, once each. Lens attributes follow USD's convention of tenths of a scene unit, as Hydra and Karma read them (a `focalLength` of 35 in a metres stage is a 3.5 m lens). The Path Tracer ray-traces the thin lens (reference DOF); realtime uses UE's post-process DOF, which approximates it and clamps very large blur.
+`fStop` and `focusDistance` drive UE's physical depth of field; the render settings' `disableDepthOfField` turns it off. `disableMotionBlur` (and the deprecated `instantaneousShutter`) turn motion blur off, and `includedPurposes` narrows the purposes husk renders (its `--purpose`). Houdini's viewport draws the purposes its display options show (render by default, as for Karma), whatever the stage's render settings include, so switching a heavy scene's viewport to proxy works. Final renders resolve material bindings for the first of the render settings' `materialBindingPurposes`, else `full`, then allPurpose. In husk, hdUE's warnings print as `hdUE warning:` lines, once each. Lens attributes follow USD's convention of tenths of a scene unit, as Hydra and Karma read them (a `focalLength` of 35 in a metres stage is a 3.5 m lens). The Path Tracer ray-traces the thin lens (reference DOF); realtime uses UE's post-process DOF, which approximates it and clamps very large blur.
 
 The camera's `exposure` (Hydra's linear exposure scale) scales the beauty, as Karma does, and leaves AOVs untouched; with UE's tonemapper on it is added to `AutoExposureBias` instead. Split diopters and lens distortion are not translated.
 

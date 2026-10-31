@@ -66,3 +66,11 @@ def Mesh "Quad" (
         uniform token subdivisionScheme = "catmullClark"
         rel material:binding = </M>
 }
+over "Render"
+{
+    over "Settings"
+    {
+        # hdUE leaves subdivision surfaces unrefined by default, as UE's USD Stage Actor does (SubdivisionLevel 0).
+        int unreal:subdivisionLevel = 2
+    }
+}

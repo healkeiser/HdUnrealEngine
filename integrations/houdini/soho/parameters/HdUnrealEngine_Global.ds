@@ -119,10 +119,10 @@
         parmtag { "usdvaluetype" "bool" }
         disablewhen R"({ xn__unrealtonemapper_control_5fb == block } { xn__unrealtonemapper_control_5fb == none })"
     }
-    HDUE_CONTROL("xn__unrealpostProcessAutoExposureBias_control_u7bl", "Exposure Compensation ")
+    HDUE_CONTROL("xn__unrealpostProcessAutoExposureBias_control_u7bl", "Exposure Compensation")
     parm {
         name    "xn__unrealpostProcessAutoExposureBias_tubl"
-        label   "Exposure Compensation "
+        label   "Exposure Compensation"
         type    float
         size    1
         default { 0 }
@@ -440,9 +440,9 @@
                 label   "Subdivision Level"
                 type    int
                 size    1
-                default { 2 }
+                default { 0 }
                 range   { 0! 5 }
-                help    "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's surfaces closely, 0 renders the cage."
+                help    "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage default, renders the cage; 3 matches Karma's surfaces closely."
                 parmtag { "spare_category" "Geometry" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealsubdivisionLevel_control_xpb == block } { xn__unrealsubdivisionLevel_control_xpb == none })"

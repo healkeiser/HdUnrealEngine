@@ -125,3 +125,11 @@ def Mesh "None"
     uniform bool doubleSided = 1
     token interpolateBoundary = "none"
 }
+over "Render"
+{
+    over "Settings"
+    {
+        # hdUE leaves subdivision surfaces unrefined by default, as UE's USD Stage Actor does (SubdivisionLevel 0).
+        int unreal:subdivisionLevel = 2
+    }
+}
