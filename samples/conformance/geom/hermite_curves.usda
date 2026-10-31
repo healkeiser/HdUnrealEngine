@@ -2,34 +2,27 @@
 (
     doc = """HermiteCurves: cubic Hermite segments between points with tangents. One segment from (-4, -2) to (4, -2) with
 tangents (0, 12) and (0, -12): at its middle p = (p0 + p1) / 2 + (m0 - m1) / 8 = (0, 1), an arch; a linear stand-in
-would stay on y = -2. widths 0.3."""
+would stay on y = -2. widths 0.3. hdUE does not render HermiteCurves (UE's USD importer has none, and converting them
+through a UsdImaging adapter would change every renderer in the session): it warns and draws nothing."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomHermiteCurves",
- "feature": "HermiteCurves",
+ "feature": "HermiteCurves (unsupported, warned)",
  "frames": 1,
  "checks": [
   {
-   "name": "curve arches through its middle",
+   "name": "warning names HermiteCurves",
+   "log": "HermiteCurves are not supported",
+   "present": true
+  },
+  {
+   "name": "nothing renders in place of the curve",
    "value": {
     "region": [
      -0.4,
      0.8,
      0.4,
      1.2
-    ],
-    "stat": "coverage"
-   },
-   "min": 0.3
-  },
-  {
-   "name": "curve is not the straight chord",
-   "value": {
-    "region": [
-     -0.5,
-     -2.2,
-     0.5,
-     -1.8
     ],
     "stat": "coverage"
    },
