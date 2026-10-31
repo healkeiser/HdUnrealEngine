@@ -560,7 +560,7 @@ protected:
             }
             if (const auto schemas = UsdImagingUsdPrimInfoSchema::GetFromParent(prim.dataSource).GetApiSchemas())
                 for (const auto& schema : schemas->GetTypedValue(0)) {
-                    if (schema == "MeshLightAPI" || schema == "VolumeLightAPI")
+                    if (schema == "VolumeLightAPI")
                         warn(schema, "%s is not supported: %s renders without emitting light", schema.GetText(),
                              entry.primPath.GetText());
                 }

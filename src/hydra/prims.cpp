@@ -36,6 +36,11 @@
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/sceneIndex.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
+#include "pxr/imaging/hd/lightSchema.h"
+#include "pxr/imaging/hd/materialSchema.h"
+#include "pxr/imaging/hd/materialNetworkSchema.h"
+#include "pxr/imaging/hd/materialNodeSchema.h"
+#include "pxr/imaging/hd/materialNodeParameterSchema.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/base/gf/matrix4d.h"
 
@@ -89,6 +94,37 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 // colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
 // DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color). The
 // material's id is the prim's with ".displayColor".
+// UsdLux MeshLightAPI: UsdImaging puts the light (isLight) and its MeshLight node (intensity, exposure, colour,
+// colour temperature) on the mesh prim itself. UE's USD importer ignores MeshLightAPI; UE lights a scene from emissive
+// surfaces (Lumen, Path Tracer), so the mesh emits that radiance from its display-colour material. Zero when the
+// mesh is not a light. ponytail: normalize, materialSyncMode and the bound material's own emission are ignored.
+GfVec3f HdUEMeshLightEmission(HdSceneDelegate* delegate, const SdfPath& id) {
+    const auto source = delegate->GetRenderIndex().GetTerminalSceneIndex()->GetPrim(id).dataSource;
+    const auto isLight =
+        HdLightSchema::GetFromParent(source).GetContainer()
+            ? HdBoolDataSource::Cast(HdLightSchema::GetFromParent(source).GetContainer()->Get(TfToken("isLight")))
+            : nullptr;
+    if (!isLight || !isLight->GetTypedValue(0)) return GfVec3f(0);
+    const auto nodes = HdMaterialSchema::GetFromParent(source).GetMaterialNetwork().GetNodes();
+    for (const auto& name : nodes.GetNames()) {
+        const auto parameters = nodes.Get(name).GetParameters();
+        const auto get = [&](const char* parameter, auto fallback) {
+            using T = decltype(fallback);
+            const auto value = parameters.Get(TfToken(parameter)).GetValue();
+            const auto v = value ? value->GetValue(0) : VtValue();
+            return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback;
+        };
+        if (!parameters.Get(TfToken("intensity")).GetValue() && !parameters.Get(TfToken("exposure")).GetValue())
+            continue;
+        auto color = HdUEFromSceneLinear(get("color", GfVec3f(1)));
+        if (get("enableColorTemperature", false)) {
+            const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(get("colorTemperature", 6500.f));
+            for (int c = 0; c < 3; ++c) color[c] *= temperature[c];
+        }
+        return color * get("intensity", 1.f) * std::exp2(get("exposure", 0.f));
+    }
+    return GfVec3f(1);  // a light without parameters: UsdLux's fallback intensity 1
+}
 HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh) {
     HdUEMaterialData material;
     material.id = mesh.id + ".displayColor";
@@ -106,6 +142,7 @@ HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& 
             TF_WARN("Varying displayOpacity is unsupported at %s; using its first value", id.GetText());
         if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
     }
+    material.emissive = HdUEMeshLightEmission(delegate, id);
     return material;
 }
 // Varying colors only: a uniform displayColor stays the material's constant color.
@@ -598,7 +635,8 @@ public:
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
-        if (mesh.material.empty() && mesh.sceneAsset.empty())
+        if ((mesh.material.empty() || HdUEMeshLightEmission(delegate, GetId()) != GfVec3f(0)) &&
+            mesh.sceneAsset.empty())
             mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh)).id;
         std::vector<HdUEMeshData> parts;
         try {
@@ -612,6 +650,7 @@ public:
             const auto previous = state->materials.find(displayColor->id);
             if (previous == state->materials.end() || previous->second.color != displayColor->color ||
                 previous->second.opacity != displayColor->opacity ||
+                previous->second.emissive != displayColor->emissive ||
                 previous->second.vertexColor != displayColor->vertexColor) {
                 state->materials[displayColor->id] = *displayColor;
                 state->dirtyMaterials.insert(displayColor->id);
