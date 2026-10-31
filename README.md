@@ -4,7 +4,7 @@
 <div align="center">
 
   <p align="center">
-    <img src="https://raw.githubusercontent.com/healkeiser/hdUE/main/docs/images/banner.webp" alt="hdUE: Unreal Engine 5.8 as a Hydra renderer for Houdini Solaris, husk and USD" width="100%">
+    <img src="https://raw.githubusercontent.com/healkeiser/HdUnrealEngine/main/docs/images/banner.webp" alt="hdUE: Unreal Engine 5.8 as a Hydra renderer for Houdini Solaris, husk and USD" width="100%">
   </p>
 
   <p align="center">
@@ -13,18 +13,18 @@
     <!-- License -->
     <img src="https://img.shields.io/badge/License-MIT-brightgreen.svg?&logo=open-source-initiative&logoColor=white" alt="License: MIT"/>&nbsp;&nbsp;
     <!-- GitHub build workflow -->
-    <a href="https://github.com/healkeiser/hdUE/actions/workflows/ci.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/healkeiser/hdUE/ci.yml?branch=main&label=CI&logo=github-actions&logoColor=white" alt="CI"/></a>&nbsp;&nbsp;
+    <a href="https://github.com/healkeiser/HdUnrealEngine/actions/workflows/ci.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/healkeiser/HdUnrealEngine/ci.yml?branch=main&label=CI&logo=github-actions&logoColor=white" alt="CI"/></a>&nbsp;&nbsp;
     <!-- Release -->
-    <a href="https://github.com/healkeiser/hdUE/releases">
-      <img src="https://img.shields.io/github/v/release/healkeiser/hdUE?logo=github&label=Release" alt="Release"/></a>&nbsp;&nbsp;
+    <a href="https://github.com/healkeiser/HdUnrealEngine/releases">
+      <img src="https://img.shields.io/github/v/release/healkeiser/HdUnrealEngine?logo=github&label=Release" alt="Release"/></a>&nbsp;&nbsp;
     <!-- Last Commit -->
-    <img src="https://img.shields.io/github/last-commit/healkeiser/hdUE?logo=github&label=Last%20Commit" alt="Last Commit"/>&nbsp;&nbsp;
+    <img src="https://img.shields.io/github/last-commit/healkeiser/HdUnrealEngine?logo=github&label=Last%20Commit" alt="Last Commit"/>&nbsp;&nbsp;
     <!-- Commit Activity -->
-    <a href="https://github.com/healkeiser/hdUE/pulse" alt="Activity">
-      <img src="https://img.shields.io/github/commit-activity/m/healkeiser/hdUE?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
+    <a href="https://github.com/healkeiser/HdUnrealEngine/pulse" alt="Activity">
+      <img src="https://img.shields.io/github/commit-activity/m/healkeiser/HdUnrealEngine?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
     <!-- GitHub stars -->
-    <img src="https://img.shields.io/github/stars/healkeiser/hdUE" alt="GitHub Stars"/>
+    <img src="https://img.shields.io/github/stars/healkeiser/HdUnrealEngine" alt="GitHub Stars"/>
   </p>
 
 </div>
@@ -335,7 +335,7 @@ hdUE was started by [K240](https://github.com/K240/hdUE): the Hydra delegate, th
 <!-- CONTACT -->
 ## Contact
 
-Project Link: [hdUE](https://github.com/healkeiser/hdUE)
+Project Link: [HdUnrealEngine](https://github.com/healkeiser/HdUnrealEngine)
 
 <p align='center'>
   <!-- GitHub profile -->
