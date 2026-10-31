@@ -25,9 +25,16 @@
 #include "pxr/imaging/hdsi/particleFieldConversionSceneIndex.h"
 #include "pxr/imaging/hdsi/renderPassPruneSceneIndex.h"
 #include "pxr/imaging/hdsi/tetMeshConversionSceneIndex.h"
+#include "pxr/imaging/hd/basisCurvesSchema.h"
+#include "pxr/imaging/hd/basisCurvesTopologySchema.h"
+#include "pxr/usd/usdGeom/hermiteCurves.h"
+#include "pxr/usd/usdGeom/primvarsAPI.h"
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/visibilityAPI.h"
 #include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
+#include "pxr/usdImaging/usdImaging/dataSourceStageGlobals.h"
+#include "pxr/usdImaging/usdImaging/hermiteCurvesAdapter.h"
+#include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/usdImaging/usdImaging/drawModeSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/geomModelSchema.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
@@ -367,6 +374,85 @@ protected:
         return TfCreateRefPtr(new HdUE_EditingSceneIndex(input, HdUEPurposeVisibility::edit));
     }
 };
+// HermiteCurves: UsdImaging's (internal) adapter gives the scene index an untyped prim and UE's USD importer has no
+// Hermite curves, so hdUE follows the spec with an adapter that overrides it: the gprim's own data, typed basisCurves
+// and published as cubic Bezier curves (HdUEHermiteToBezier); vertex widths and displayColor become varying (one per
+// point). ponytail: sampled at the stage time only (no deformation blur).
+class HdUE_HermiteCurvesAdapter final : public UsdImagingHermiteCurvesAdapter {
+public:
+    TfToken GetImagingSubprimType(const UsdPrim&, const TfToken& subprim) override {
+        return subprim.IsEmpty() ? HdPrimTypeTokens->basisCurves : TfToken();
+    }
+    HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim,
+                                                      const UsdImagingDataSourceStageGlobals& globals) override {
+        const auto gprim = UsdImagingHermiteCurvesAdapter::GetImagingSubprimData(prim, subprim, globals);
+        if (!subprim.IsEmpty()) return gprim;
+        const auto curves = HermiteCurves(prim, globals);
+        return curves ? HdOverlayContainerDataSource::New(curves, gprim) : gprim;
+    }
+    HdDataSourceLocatorSet InvalidateImagingSubprim(const UsdPrim& prim, const TfToken& subprim,
+                                                    const TfTokenVector& properties,
+                                                    UsdImagingPropertyInvalidationType type) override {
+        auto locators = UsdImagingHermiteCurvesAdapter::InvalidateImagingSubprim(prim, subprim, properties, type);
+        if (subprim.IsEmpty() && !properties.empty()) {
+            locators.insert(HdBasisCurvesSchema::GetDefaultLocator());
+            locators.insert(HdPrimvarsSchema::GetDefaultLocator());
+        }
+        return locators;
+    }
+
+private:
+    static HdContainerDataSourceHandle HermiteCurves(const UsdPrim& prim,
+                                                     const UsdImagingDataSourceStageGlobals& globals) {
+        const UsdGeomHermiteCurves curves(prim);
+        const auto time = globals.GetTime();
+        VtVec3fArray points, tangents;
+        VtIntArray counts, bezierCounts;
+        curves.GetPointsAttr().Get(&points, time);
+        curves.GetTangentsAttr().Get(&tangents, time);
+        curves.GetCurveVertexCountsAttr().Get(&counts, time);
+        const auto bezier = HdUEHermiteToBezier(points, tangents, counts, bezierCounts);
+        if (bezier.empty()) return nullptr;
+        const auto primvar = [](const VtValue& value, const TfToken& interpolation, const TfToken& role) {
+            return HdPrimvarSchema::Builder()
+                .SetPrimvarValue(HdRetainedSampledDataSource::New(value))
+                .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(interpolation))
+                .SetRole(HdPrimvarSchema::BuildRoleDataSource(role))
+                .Build();
+        };
+        // Per-point values sit on the segment ends: varying.
+        const auto perPoint = [](const TfToken& interpolation) {
+            return interpolation == UsdGeomTokens->vertex ? HdPrimvarSchemaTokens->varying : interpolation;
+        };
+        std::vector<TfToken> names{HdPrimvarsSchemaTokens->points};
+        std::vector<HdDataSourceBaseHandle> values{
+            primvar(VtValue(bezier), HdPrimvarSchemaTokens->vertex, HdPrimvarSchemaTokens->point)};
+        if (VtFloatArray widths; curves.GetWidthsAttr().Get(&widths, time)) {
+            names.push_back(HdTokens->widths);
+            values.push_back(primvar(VtValue(widths), perPoint(curves.GetWidthsInterpolation()), TfToken()));
+        }
+        if (const auto color = curves.GetDisplayColorPrimvar(); color && color.HasValue()) {
+            VtVec3fArray colors;
+            if (color.ComputeFlattened(&colors, time)) {
+                names.push_back(HdTokens->displayColor);
+                values.push_back(
+                    primvar(VtValue(colors), perPoint(color.GetInterpolation()), HdPrimvarSchemaTokens->color));
+            }
+        }
+        return HdRetainedContainerDataSource::New(
+            HdBasisCurvesSchema::GetSchemaToken(),
+            HdBasisCurvesSchema::Builder()
+                .SetTopology(HdBasisCurvesTopologySchema::Builder()
+                                 .SetCurveVertexCounts(HdRetainedTypedSampledDataSource<VtIntArray>::New(bezierCounts))
+                                 .SetBasis(HdRetainedTypedSampledDataSource<TfToken>::New(HdTokens->bezier))
+                                 .SetType(HdRetainedTypedSampledDataSource<TfToken>::New(HdTokens->cubic))
+                                 .SetWrap(HdRetainedTypedSampledDataSource<TfToken>::New(HdTokens->nonperiodic))
+                                 .Build())
+                .Build(),
+            HdPrimvarsSchema::GetSchemaToken(),
+            HdRetainedContainerDataSource::New(names.size(), names.data(), values.data()));
+    }
+};
 // The active render pass's renderVisibility collection (husk --pass): geometry outside it is invisible. Storm's own
 // (HdSt_RenderPassVisibilitySceneIndexPlugin) is registered for GL only and hdsi has none; UE's USD importer has no
 // render passes. ponytail: re-reads the pass when scene globals or the pass prim change, then dirties every prim's
@@ -508,6 +594,8 @@ TF_REGISTRY_FUNCTION(TfType) {
     HdSceneIndexPluginRegistry::Define<HdUE_UnsupportedSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_DrawModeSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_PurposeVisibilitySceneIndexPlugin>();
+    TfType::Define<HdUE_HermiteCurvesAdapter, TfType::Bases<UsdImagingHermiteCurvesAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_HermiteCurvesAdapter>>();
     TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_VisibilityAPIAdapter>>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassVisibilitySceneIndexPlugin>();

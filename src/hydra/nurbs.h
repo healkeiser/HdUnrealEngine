@@ -103,5 +103,27 @@ inline VtVec3fArray HdUENurbsPatch(const VtVec3fArray& points, const VtDoubleArr
     return out;
 }
 
+// HermiteCurves as cubic Bezier curves: each segment P0, P0 + T0 / 3, P1 - T1 / 3, P1. bezierCounts receives
+// 3 (n - 1) + 1 per curve of n points; empty when the counts or tangents do not match the points.
+inline VtVec3fArray HdUEHermiteToBezier(const VtVec3fArray& points, const VtVec3fArray& tangents,
+                                        const VtIntArray& counts, VtIntArray& bezierCounts) {
+    VtVec3fArray out;
+    bezierCounts.clear();
+    if (tangents.size() != points.size()) return {};
+    size_t first = 0;
+    for (const int count : counts) {
+        if (count < 2 || first + count > points.size()) return {};
+        for (int i = 0; i < count; ++i) {
+            const auto& p = points[first + i];
+            if (i) out.push_back(p - tangents[first + i] / 3.f);
+            out.push_back(p);
+            if (i + 1 < count) out.push_back(p + tangents[first + i] / 3.f);
+        }
+        bezierCounts.push_back(3 * (count - 1) + 1);
+        first += count;
+    }
+    return out;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 #endif

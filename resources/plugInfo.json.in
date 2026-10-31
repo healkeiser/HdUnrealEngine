@@ -34,6 +34,9 @@
         "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
         "displayName": "VisibilityAPI purpose visibility for hdUE"
       },
+      "HdUE_HermiteCurvesAdapter": {
+        "bases": ["UsdImagingHermiteCurvesAdapter"], "primTypeName": "HermiteCurves"
+      },
       "HdUE_VisibilityAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },
