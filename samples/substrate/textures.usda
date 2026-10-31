@@ -27,15 +27,15 @@ def "Looks"
 {
     def Material "Textured"
     {
-        custom int hdue:substrate:version = 1
-        token outputs:hdue:surface.connect = </Looks/Textured/Graph/layer.outputs:out>
+        custom int unreal:substrate:version = 1
+        token outputs:unreal:surface.connect = </Looks/Textured/Graph/layer.outputs:out>
         token outputs:surface.connect = </Looks/Textured/Preview.outputs:surface>
 
         def "Graph"
         {
             def Shader "uv"
             {
-                uniform token info:id = "hdue:substrate:uv"
+                uniform token info:id = "unreal:substrate:uv"
                 float inputs:index = 0
                 float2 inputs:offset = (0.125, 0)
                 float2 inputs:scale = (2, 1)
@@ -44,7 +44,7 @@ def "Looks"
 
             def Shader "base_color"
             {
-                uniform token info:id = "hdue:substrate:texture"
+                uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
                 string inputs:color_space = "srgb"
                 asset inputs:file = @textures\color.png@
@@ -59,7 +59,7 @@ def "Looks"
 
             def Shader "packed_data"
             {
-                uniform token info:id = "hdue:substrate:texture"
+                uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
                 string inputs:color_space = "raw"
                 asset inputs:file = @textures\packed.png@
@@ -74,7 +74,7 @@ def "Looks"
 
             def Shader "normal_texture"
             {
-                uniform token info:id = "hdue:substrate:texture"
+                uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
                 string inputs:color_space = "raw"
                 asset inputs:file = @textures\normal.png@
@@ -89,7 +89,7 @@ def "Looks"
 
             def Shader "roughness"
             {
-                uniform token info:id = "hdue:substrate:channel"
+                uniform token info:id = "unreal:substrate:channel"
                 string inputs:channel = "g"
                 color4f inputs:value.connect = </Looks/Textured/Graph/packed_data.outputs:rgba>
                 float outputs:out
@@ -97,7 +97,7 @@ def "Looks"
 
             def Shader "image_mask"
             {
-                uniform token info:id = "hdue:substrate:channel"
+                uniform token info:id = "unreal:substrate:channel"
                 string inputs:channel = "a"
                 color4f inputs:value.connect = </Looks/Textured/Graph/packed_data.outputs:rgba>
                 float outputs:out
@@ -105,7 +105,7 @@ def "Looks"
 
             def Shader "normal_strength"
             {
-                uniform token info:id = "hdue:substrate:scalar"
+                uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "NormalStrength"
                 float inputs:value = 1
                 float outputs:out
@@ -113,7 +113,7 @@ def "Looks"
 
             def Shader "normal"
             {
-                uniform token info:id = "hdue:substrate:normalmap"
+                uniform token info:id = "unreal:substrate:normalmap"
                 color3f inputs:color.connect = </Looks/Textured/Graph/normal_texture.outputs:out>
                 bool inputs:flip_green = 1
                 float inputs:strength.connect = </Looks/Textured/Graph/normal_strength.outputs:out>
@@ -122,7 +122,7 @@ def "Looks"
 
             def Shader "base"
             {
-                uniform token info:id = "hdue:substrate:slab"
+                uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo.connect = </Looks/Textured/Graph/base_color.outputs:out>
                 color3f inputs:f0 = (0.04, 0.04, 0.04)
                 color3f inputs:mfp = (0, 0, 0)
@@ -134,7 +134,7 @@ def "Looks"
 
             def Shader "coat"
             {
-                uniform token info:id = "hdue:substrate:slab"
+                uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo = (0, 0, 0)
                 color3f inputs:f0 = (0.02, 0.02, 0.02)
                 color3f inputs:mfp = (1000000, 1000000, 1000000)
@@ -145,7 +145,7 @@ def "Looks"
 
             def Shader "masked_coat"
             {
-                uniform token info:id = "hdue:substrate:weight"
+                uniform token info:id = "unreal:substrate:weight"
                 token inputs:surface.connect = </Looks/Textured/Graph/coat.outputs:out>
                 float inputs:weight.connect = </Looks/Textured/Graph/image_mask.outputs:out>
                 token outputs:out
@@ -153,7 +153,7 @@ def "Looks"
 
             def Shader "layer"
             {
-                uniform token info:id = "hdue:substrate:vertical"
+                uniform token info:id = "unreal:substrate:vertical"
                 token inputs:base.connect = </Looks/Textured/Graph/base.outputs:out>
                 bool inputs:parameter_blending = 0
                 float inputs:thickness = 0.01

@@ -1,7 +1,7 @@
 """hdUE Substrate shader translator, chosen by the hdUE render mask of the Substrate VOPs.
 
 A Material Library LOP hands it an hdUE Substrate Builder, which it authors whole as the typed USD graph of
-scripts/substrate_graph.py (hdue:substrate:* shaders, outputs:hdue:surface and a Preview Surface fallback):
+scripts/substrate_graph.py (unreal:substrate:* shaders, outputs:unreal:surface and a Preview Surface fallback):
 the builder's nodes are not renderer shaders but a graph hdUE prepares into a UE Substrate material.
 """
 
@@ -25,7 +25,7 @@ class SubstrateTranslator(ShaderTranslator):
         return bool(re.search(r"\bhdUE\b", render_mask))
 
     def renderContextName(self, shader_node, shader_node_output_name):
-        return "hdue"
+        return "unreal"
 
     def createMaterialShader(
         self,
@@ -70,7 +70,7 @@ class SubstratePreviewTranslator(PreviewShaderTranslator):
     """The universal Preview Surface is part of the authored graph already."""
 
     def matchesRenderContext(self, render_context):
-        return render_context == "hdue"
+        return render_context == "unreal"
 
     def createMaterialPreviewShader(self, *args):
         pass

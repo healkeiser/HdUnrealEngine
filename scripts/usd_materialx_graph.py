@@ -95,7 +95,7 @@ def graph_data(material, time=Usd.TimeCode.Default()):
             for p in sorted(
                 shader.GetInputs(), key=lambda p: str(p.GetBaseName())
             )
-            if not str(p.GetBaseName()).startswith("hdue:")
+            if not str(p.GetBaseName()).startswith("unreal:")
         }
         nodes[path] = dict(id=str(identity), inputs=inputs)
         visiting.remove(path)

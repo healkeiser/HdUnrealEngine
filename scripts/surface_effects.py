@@ -4,7 +4,7 @@ import math
 
 from pxr import Sdf, UsdGeom, UsdShade
 
-PREFIX = "hdue:surface:wet:"
+PREFIX = "unreal:surface:wet:"
 FIELDS = {
     "enabled": (Sdf.ValueTypeNames.Bool, False),
     "amount": (Sdf.ValueTypeNames.Float, 1.0),

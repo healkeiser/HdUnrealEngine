@@ -146,7 +146,7 @@ def mode_layer(layer, mode, out):
         out / f"{layer.stem}.{mode}.usda",
         [layer],
         stage_metadata(layer),
-        [f'token hdUE:renderMode = "{mode}"'],
+        [f'token unreal:renderMode = "{mode}"'],
     )
 
 
@@ -197,8 +197,8 @@ def Scope "Render"
     {
         rel camera = </camera>
         uniform int2 resolution = (64, 64)
-        int hdUE:samplesPerPixel = 1
-        int hdUE:warmupFrames = 1
+        int unreal:samplesPerPixel = 1
+        int unreal:warmupFrames = 1
         int karma:global:pathtracedsamples = 1
     }
 }
@@ -516,7 +516,7 @@ def settings_of(layer):
         .replace(", ", " × ")
     )
     return resolution, int(
-        text.split("int hdUE:samplesPerPixel = ")[1].split("\n")[0]
+        text.split("int unreal:samplesPerPixel = ")[1].split("\n")[0]
     )
 
 

@@ -13,7 +13,7 @@ int main() {
         {{geometry, render}, {}, {geometry, render}, "no includedPurposes keeps the pass's tags"},
         {{geometry, render}, {TfToken("default")}, {geometry}, "default is the geometry tag"},
         {{}, {TfToken("default"), render}, {geometry, render}, "a pass drawing every tag gets the purposes"},
-        {{geometry, render}, {proxy}, {TfToken("hdUE:none")}, "no tag left draws nothing, not everything"},
+        {{geometry, render}, {proxy}, {TfToken("unreal:none")}, "no tag left draws nothing, not everything"},
     };
     int failures = 0;
     for (const auto& c : cases)

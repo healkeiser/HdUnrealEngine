@@ -24,15 +24,15 @@ source.parm("python").set(
     """from pxr import UsdGeom, Sdf
 stage=hou.pwd().editableStage()
 prim=UsdGeom.Xform.Define(stage,'/Native').GetPrim()
-prim.CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
+prim.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
 parent=UsdGeom.Xform.Define(stage,'/Parent')
 parent.AddTranslateOp().Set((1,2,3)); parent.AddScaleOp().Set((2,2,2))
 mesh=UsdGeom.Mesh.Define(stage,'/Parent/MeshAsset')
 mesh.CreatePointsAttr([(0,0,0),(1,0,0),(0,1,0)])
 mesh.CreateFaceVertexCountsAttr([3]); mesh.CreateFaceVertexIndicesAttr([0,1,2])
-mesh.GetPrim().CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
+mesh.GetPrim().CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
 asset=stage.DefinePrim('/Prototype/Asset','Xform')
-asset.CreateAttribute('hdue:asset',Sdf.ValueTypeNames.String).Set('%s')
+asset.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
 instance=stage.DefinePrim('/Instance','Xform')
 instance.GetReferences().AddInternalReference('/Prototype'); instance.SetInstanceable(True)
 """
@@ -74,29 +74,29 @@ assert (
 )
 assert integration.render_options(render.stage()) == ("realtime", 64)
 assert not settings.GetAttribute(
-    "hdUE:lumenEnabled"
+    "unreal:lumenEnabled"
 ).HasAuthoredValue(), "settings at their defaults must not author"
 assert not [
     p.name() for p in render.parms() if "_control" in p.name()
 ], "no USD control menus, as Karma Render Settings"
-render.parm(hou.text.encode("hdUE:lumenEnabled")).set(0)
+render.parm(hou.text.encode("unreal:lumenEnabled")).set(0)
 assert (
     render.stage()
     .GetPrimAtPath("/Render/rendersettings")
-    .GetAttribute("hdUE:lumenEnabled")
+    .GetAttribute("unreal:lumenEnabled")
     .Get()
     is False
 ), "a changed setting authors"
-render.parm(hou.text.encode("hdUE:lumenEnabled")).set(1)
-integration._render_property(render, "xn__hdUErenderMode", "pathtraced")
+render.parm(hou.text.encode("unreal:lumenEnabled")).set(1)
+integration._render_property(render, "xn__unrealrenderMode", "pathtraced")
 assert integration.render_options(render.stage()) == ("pathtraced", 64)
 
 # A scene with its own render settings: the node's prim becomes the default, with the scene's camera and hdUE values.
 authored = Path(tempfile.mkdtemp()) / "authored_settings.usda"
 authored.write_text(
     '#usda 1.0\ndef Camera "other" {}\ndef Camera "shot" {}\ndef Scope "Render" {\n'
-    '    def RenderSettings "Settings" {\n        rel camera = </shot>\n        token hdUE:renderMode = "pathtraced"\n'
-    "        int hdUE:samplesPerPixel = 256\n    }\n}\n",
+    '    def RenderSettings "Settings" {\n        rel camera = </shot>\n        token unreal:renderMode = "pathtraced"\n'
+    "        int unreal:samplesPerPixel = 256\n    }\n}\n",
     encoding="utf-8",
 )
 authored_source = network.createNode("sublayer")
@@ -116,7 +116,7 @@ assert [
     .GetCameraRel()
     .GetForwardedTargets()
 ] == ["/shot"]
-edited.parm(hou.text.encode("hdUE:renderMode")).set("realtime")
+edited.parm(hou.text.encode("unreal:renderMode")).set("realtime")
 assert integration.render_options(edited.stage()) == (
     "realtime",
     64,
@@ -143,7 +143,7 @@ for path in ("/Native", "/Parent/MeshAsset", "/Instance/Asset"):
         and proxy.specifier == Sdf.SpecifierDef
         and proxy.typeName == "Mesh"
     ), path
-    assert proxy.attributes["primvars:hdue:asset"].default == ASSET
+    assert proxy.attributes["primvars:unreal:asset"].default == ASSET
     assert proxy.attributes["purpose"].default == "render"
     points = proxy.attributes["points"].default
     assert (
@@ -173,7 +173,7 @@ shader=UsdShade.Shader.Define(stage,'/Prototype/Asset/Looks/Paint/Surface'); sha
 material.CreateSurfaceOutput('mtlx').ConnectToSource(shader.CreateOutput('out',Sdf.ValueTypeNames.Token))
 stage.OverridePrim('/Native').SetActive(False)
 stage.OverridePrim('/Parent').SetActive(False)
-stage.OverridePrim('/Prototype/Asset').GetAttribute('hdue:asset').Set('')"""
+stage.OverridePrim('/Prototype/Asset').GetAttribute('unreal:asset').Set('')"""
 )
 assert not look.errors(), look.errors()
 assert assets.sync(network, look, look.stage())
@@ -189,7 +189,7 @@ assert not overrides().GetPrimAtPath(
 clear = network.createNode("pythonscript", "clear_asset_reference")
 clear.setInput(0, render)
 clear.parm("python").set(
-    'stage=hou.pwd().editableStage()\nstage.GetPrimAtPath("/Parent/MeshAsset").GetAttribute("hdue:asset").Set("")'
+    'stage=hou.pwd().editableStage()\nstage.GetPrimAtPath("/Parent/MeshAsset").GetAttribute("unreal:asset").Set("")'
 )
 assert assets.sync(network, clear, clear.stage())
 layer = overrides()

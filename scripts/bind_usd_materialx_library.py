@@ -58,14 +58,14 @@ def bind(export_file, library_file, output):
                     image_path = field["attribute"].split(".inputs:")[0]
                     bindings.append(
                         dict(
-                            attribute=image_path + ".inputs:hdue:texture",
+                            attribute=image_path + ".inputs:unreal:texture",
                             parameter=p["name"],
                             type="texture",
                             default=p["default"],
                         )
                     )
         for alias, p in entry["bindings"].items():
-            if alias.startswith("hdue:") and p["type"] == "texture":
+            if alias.startswith("unreal:") and p["type"] == "texture":
                 bindings.append(
                     dict(
                         attribute=original["usd_shader"] + ".inputs:" + alias,

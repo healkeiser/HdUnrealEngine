@@ -446,14 +446,14 @@ public:
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
         mesh.doubleSided = delegate->GetDoubleSided(GetId());
-        mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("hdue:asset")), std::string());
+        mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("unreal:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
         const auto computed = computedPrimvars(delegate, GetId());
         auto points = value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray());
         auto topology = delegate->GetMeshTopology(GetId());
         const auto [uvNames, colorName] = meshPrimvars(delegate, delegate->GetMaterialId(GetId()), topology);
-        // catmullClark and loop meshes are refined uniformly (hdUE:subdivisionLevel), with their subdiv tags and the
+        // catmullClark and loop meshes are refined uniformly (unreal:subdivisionLevel), with their subdiv tags and the
         // indices of their face-varying UVs and colours; authored normals do not apply to them.
         std::unique_ptr<HdUESubdivision> subdivision;
         if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 2) : 0;
@@ -1307,8 +1307,8 @@ public:
         if (value(get("normalize"), false)) data.flags |= HDUE_LIGHT_NORMALIZE;
         if (!value(get("shadow:enable"), true)) data.flags &= ~HDUE_LIGHT_SHADOWS;
         if (value(get("treatAsPoint"), false)) data.flags |= HDUE_LIGHT_POINT;
-        if (!value(get("hdue:visibleBackground"), true)) data.flags &= ~HDUE_LIGHT_BACKGROUND;
-        if (!value(get("hdue:megaLights"), true)) data.flags &= ~HDUE_LIGHT_MEGALIGHTS;
+        if (!value(get("unreal:visibleBackground"), true)) data.flags &= ~HDUE_LIGHT_BACKGROUND;
+        if (!value(get("unreal:megaLights"), true)) data.flags &= ~HDUE_LIGHT_MEGALIGHTS;
         data.diffuse = value(get("diffuse"), 1.f);
         data.specular = value(get("specular"), 1.f);
         data.angle = value(get("angle"), .53f);

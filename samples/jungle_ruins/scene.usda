@@ -19,8 +19,8 @@ def Scope "Render"
         rel camera = </root/Camera/Camera>
         uniform int2 resolution = (960, 540)
         rel products = </Render/Product>
-        int hdUE:samplesPerPixel = 256
-        token hdUE:renderMode = "pathtraced"
+        int unreal:samplesPerPixel = 256
+        token unreal:renderMode = "pathtraced"
         token karma:global:convergence_mode = "Path Traced"
         int karma:global:pathtracedsamples = 256
         float karma:object:diffuselimit = 8

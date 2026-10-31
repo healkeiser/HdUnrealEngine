@@ -9,15 +9,15 @@ over "Looks"
 {
     def Material "WaterCoating"
     {
-        custom int hdue:substrate:version = 1
-        token outputs:hdue:surface.connect = </Looks/WaterCoating/Graph/layer.outputs:out>
+        custom int unreal:substrate:version = 1
+        token outputs:unreal:surface.connect = </Looks/WaterCoating/Graph/layer.outputs:out>
         token outputs:surface.connect = </Looks/WaterCoating/Preview.outputs:surface>
 
         def "Graph"
         {
             def Shader "roughness"
             {
-                uniform token info:id = "hdue:substrate:scalar"
+                uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "WaterRoughness"
                 float inputs:value = 0.08
                 float outputs:out
@@ -25,7 +25,7 @@ over "Looks"
 
             def Shader "water"
             {
-                uniform token info:id = "hdue:substrate:slab"
+                uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo = (0, 0, 0)
                 color3f inputs:f0 = (0.020059312, 0.020059312, 0.020059312)
                 color3f inputs:mfp = (1000000, 1000000, 1000000)
@@ -36,7 +36,7 @@ over "Looks"
 
             def Shader "amount"
             {
-                uniform token info:id = "hdue:substrate:scalar"
+                uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "Coverage"
                 float inputs:value = 1
                 float outputs:out
@@ -44,14 +44,14 @@ over "Looks"
 
             def Shader "clamp_amount"
             {
-                uniform token info:id = "hdue:substrate:saturate"
+                uniform token info:id = "unreal:substrate:saturate"
                 float inputs:value.connect = </Looks/WaterCoating/Graph/amount.outputs:out>
                 float outputs:out
             }
 
             def Shader "mask"
             {
-                uniform token info:id = "hdue:substrate:primvar"
+                uniform token info:id = "unreal:substrate:primvar"
                 float inputs:default = 1
                 string inputs:primvar = "wetness"
                 float outputs:out
@@ -59,7 +59,7 @@ over "Looks"
 
             def Shader "coverage"
             {
-                uniform token info:id = "hdue:substrate:multiply"
+                uniform token info:id = "unreal:substrate:multiply"
                 float inputs:a.connect = </Looks/WaterCoating/Graph/clamp_amount.outputs:out>
                 float inputs:b.connect = </Looks/WaterCoating/Graph/mask.outputs:out>
                 float outputs:out
@@ -67,7 +67,7 @@ over "Looks"
 
             def Shader "weight"
             {
-                uniform token info:id = "hdue:substrate:weight"
+                uniform token info:id = "unreal:substrate:weight"
                 token inputs:surface.connect = </Looks/WaterCoating/Graph/water.outputs:out>
                 float inputs:weight.connect = </Looks/WaterCoating/Graph/coverage.outputs:out>
                 token outputs:out
@@ -75,14 +75,14 @@ over "Looks"
 
             def Shader "base"
             {
-                custom rel hdue:materialx = </Looks/SS_Coat>
-                uniform token info:id = "hdue:substrate:materialx"
+                custom rel unreal:materialx = </Looks/SS_Coat>
+                uniform token info:id = "unreal:substrate:materialx"
                 token outputs:out
             }
 
             def Shader "layer"
             {
-                uniform token info:id = "hdue:substrate:vertical"
+                uniform token info:id = "unreal:substrate:vertical"
                 token inputs:base.connect = </Looks/WaterCoating/Graph/base.outputs:out>
                 bool inputs:parameter_blending = 0
                 float inputs:thickness = 0.01
@@ -104,12 +104,12 @@ over "World"
 {
     over "Dry"
     {
-        custom bool hdue:surface:wet:enabled = 0
+        custom bool unreal:surface:wet:enabled = 0
     }
 
     over "Wet"
     {
-        custom bool hdue:surface:wet:enabled = 0
+        custom bool unreal:surface:wet:enabled = 0
 
         over "Sphere" (
             prepend apiSchemas = ["MaterialBindingAPI"]
@@ -124,7 +124,7 @@ over "World"
 
     over "Ramp"
     {
-        custom bool hdue:surface:wet:enabled = 0
+        custom bool unreal:surface:wet:enabled = 0
 
         over "Sphere" (
             prepend apiSchemas = ["MaterialBindingAPI"]

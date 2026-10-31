@@ -10,7 +10,7 @@ def author_proxy(stage, path, asset, catalog, units, axis, is_mesh=False):
     mesh_path = path if is_mesh else path + "/__HdUEAssetProxy"
     if not is_mesh and stage.GetPrimAtPath(mesh_path):
         existing = stage.GetPrimAtPath(mesh_path).GetAttribute(
-            "hdue:generatedAssetProxy"
+            "unreal:generatedAssetProxy"
         )
         if not existing or existing.Get() != True:
             raise ValueError(
@@ -50,9 +50,9 @@ def author_proxy(stage, path, asset, catalog, units, axis, is_mesh=False):
         ]
     )
     UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
-        "hdue:asset", Sdf.ValueTypeNames.String, UsdGeom.Tokens.constant
+        "unreal:asset", Sdf.ValueTypeNames.String, UsdGeom.Tokens.constant
     ).Set(asset)
     mesh.GetPrim().CreateAttribute(
-        "hdue:generatedAssetProxy", Sdf.ValueTypeNames.Bool, custom=True
+        "unreal:generatedAssetProxy", Sdf.ValueTypeNames.Bool, custom=True
     ).Set(True)
     return mesh

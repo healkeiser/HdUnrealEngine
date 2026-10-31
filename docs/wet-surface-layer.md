@@ -59,10 +59,10 @@ The following attributes are authored on a Mesh, its material-binding GeomSubset
 
 | Attribute | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `hdue:surface:wet:enabled` | bool | false | Enable the wet profile for the target binding |
-| `hdue:surface:wet:amount` | float | 1 | Overall coverage multiplier, in [0, 1] |
-| `hdue:surface:wet:roughness` | float | 0.08 | Roughness of the water coating, in [0, 1] |
-| `hdue:surface:wet:maskPrimvar` | token | empty | Primvar base name, for example `wetness`, without `primvars:` |
+| `unreal:surface:wet:enabled` | bool | false | Enable the wet profile for the target binding |
+| `unreal:surface:wet:amount` | float | 1 | Overall coverage multiplier, in [0, 1] |
+| `unreal:surface:wet:roughness` | float | 0.08 | Roughness of the water coating, in [0, 1] |
+| `unreal:surface:wet:maskPrimvar` | token | empty | Primvar base name, for example `wetness`, without `primvars:` |
 
 hdUE resolves each setting from the nearest authored opinion, starting at a subset, then its mesh, then ancestors, followed by the default. This is an explicit hdUE ancestor search: ordinary custom USD attributes do not acquire this inheritance automatically. Normal USD composition determines the winning opinion at each prim. Values may be time sampled.
 
@@ -77,10 +77,10 @@ over "World"
 {
     over "Asset"
     {
-        custom bool hdue:surface:wet:enabled = true
-        custom float hdue:surface:wet:amount = 0.8
-        custom float hdue:surface:wet:roughness = 0.08
-        custom token hdue:surface:wet:maskPrimvar = "wetness"
+        custom bool unreal:surface:wet:enabled = true
+        custom float unreal:surface:wet:amount = 0.8
+        custom float unreal:surface:wet:roughness = 0.08
+        custom token unreal:surface:wet:maskPrimvar = "wetness"
 
         over "Panel"
         {

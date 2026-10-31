@@ -1,5 +1,5 @@
 """Solaris selection on hdUE (Launch-Houdini -TestKind selection): the native highlight and click picking, with
-hdUE:viewportIdAovs at its default.
+unreal:viewportIdAovs at its default.
 
 HDUE_TEST_CAMERA: a camera to look through (default: frame all). HDUE_TEST_SELECT: comma-separated prims to select;
 each one is also clicked at the centre of its bounds and must be what the click selects.

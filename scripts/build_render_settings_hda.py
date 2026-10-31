@@ -3,7 +3,7 @@
 Like Karma Render Settings, it wraps a Render Settings LOP, a Render Product and Render Vars, and shows the
 camera, resolution, output picture and AOVs next to the hdUE settings, in the tabs of
 soho/parameters/HdUnrealEngine_Global.ds. The internal Render Settings LOP keeps those settings as
-tagged spare parameters referencing the asset's, so it authors the same hdUE:* attributes, also where the
+tagged spare parameters referencing the asset's, so it authors the same unreal:* attributes, also where the
 hdUE delegate is not registered. Like Karma Standard Render Vars and Karma Render Products, hdUE Standard Render
 Vars (hdue_standardrendervars.hda) and hdUE Render Products (hdue_renderproducts.hda) author render vars and
 products upstream, which hdUE Render Settings can render. Run it after scripts/generate_render_settings.py or any
@@ -35,8 +35,8 @@ NAME, LABEL, ICON = (
     "HDUE_hduerenderproperties",
 )
 VARS = "/Render/Products/Vars/"
-# The asset's Hit Lighting toggle drives this generated menu (hdUE:postProcess:LumenRayLightingMode).
-RAY_LIGHTING = "xn__hdUEpostProcessLumenRayLightingMode_0xbl"
+# The asset's Hit Lighting toggle drives this generated menu (unreal:postProcess:LumenRayLightingMode).
+RAY_LIGHTING = "xn__unrealpostProcessLumenRayLightingMode_c1bl"
 HIT_LIGHTING = "hdue_lumenHitLighting"
 # AOVs the delegate renders besides the beauty, read from its table (src/hydra/aov_table.h; depth is the delegate's
 # own): (render var and channel name, label, USD data type, husk format).
@@ -521,7 +521,7 @@ def build():
             group.append(output)
         group.append(tab)
     for first, _ in JOINS:  # a range's minimum and maximum on one row
-        template = group.find(encode("hdUE:postProcess:" + first))
+        template = group.find(encode("unreal:postProcess:" + first))
         template.setJoinWithNext(True)
         group.replace(template.name(), template)
     group.insertBefore(
@@ -532,7 +532,7 @@ def build():
             default_value=False,
             help="Lights Lumen's hardware rays where they hit, instead of from the surface cache: brighter, more "
             "accurate indirect light and reflections, at a cost in render time. Off by default, as in UE. On, it "
-            "sets the Ray Lighting Mode below to Hit Lighting (hdUE:postProcess:LumenRayLightingMode).",
+            "sets the Ray Lighting Mode below to Hit Lighting (unreal:postProcess:LumenRayLightingMode).",
         ),
     )
     ray_lighting = group.find(RAY_LIGHTING)
@@ -562,7 +562,7 @@ def build():
             settings.parm(
                 hou.text.encode(hou.text.decode(template.name()) + "_control")
             )
-            if template.name().startswith("xn__hdUE")
+            if template.name().startswith("xn__unreal")
             else None
         )
         if control:

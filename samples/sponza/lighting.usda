@@ -28,7 +28,7 @@ def Xform "lights"
     {
         # Lights the scene without being seen through gaps in the geometry: hdUE's background visibility, and
         # Karma's equivalent (its default) so both renderers are told the same thing.
-        bool hdue:visibleBackground = 0
+        bool unreal:visibleBackground = 0
         bool inputs:karma:light:renderlightgeo = 0
         float inputs:intensity = 1
         float inputs:exposure = -0.69
@@ -54,8 +54,8 @@ def Scope "Render"
         rel camera = </root/PhysCamera001>
         uniform int2 resolution = (960, 540)
         rel products = </Render/Product>
-        int hdUE:samplesPerPixel = 256
-        token hdUE:renderMode = "pathtraced"
+        int unreal:samplesPerPixel = 256
+        token unreal:renderMode = "pathtraced"
         token karma:global:convergence_mode = "Path Traced"
         int karma:global:pathtracedsamples = 256
         float karma:object:diffuselimit = 8

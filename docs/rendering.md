@@ -2,29 +2,29 @@
 
 ## Render settings
 
-Renderer settings are `hdUE:*` attributes on the UsdRenderSettings prim (the **Unreal Engine** tab of Render Settings LOPs, or the hdUE Render Settings LOP, in Houdini; see [Houdini](houdini.md#solaris-viewport)). `hdue:*`, the spelling of hdUE's light and prim attributes, is accepted too. String settings accept `string` or `token` (Houdini's menus author tokens), numbers accept any numeric type. Houdini's viewport and husk read the same prim, so they render the same settings.
+Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the **Unreal Engine** tab of Render Settings LOPs, or the hdUE Render Settings LOP, in Houdini; see [Houdini](houdini.md#solaris-viewport)). `unreal:*`, the spelling of hdUE's light and prim attributes, is accepted too. String settings accept `string` or `token` (Houdini's menus author tokens), numbers accept any numeric type. Houdini's viewport and husk read the same prim, so they render the same settings.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `hdUE:renderMode` | `realtime` | `realtime` (Lumen) or `pathtraced` |
-| `hdUE:samplesPerPixel` | 64 | Path Tracer samples |
-| `hdUE:lumenEnabled` | 1 | Lumen GI and reflections in realtime mode |
-| `hdUE:warmupFrames` | 32 | Realtime frames before a frame counts as converged (Movie Render Queue's default render warm-up count) |
-| `hdUE:motionBlur` | 1 | Motion blur when the camera shutter is open and something moves |
-| `hdUE:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
-| `hdUE:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
-| `hdUE:debugView` | `off` | One of UE's viewport view modes instead of the realtime beauty; see [debug views](#debug-views) |
-| `hdUE:subdivisionLevel` | 2 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
-| `hdUE:cullBackface` | 1 | Meshes whose `doubleSided` is off render their front faces only, as UE's USD importer does; 0 renders both sides, as Karma; see [geometry](#geometry) |
-| `hdUE:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
-| `hdUE:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
-| `hdUE:cvar:<console variable>` | | A UE console variable, with `:` for `.` (`int hdUE:cvar:r:Shadow:Virtual:Enable = 0`); see [engine quality](#engine-quality) |
-| `hdUE:postProcessMaterials` | | Cooked post-process materials added to the beauty |
-| `hdUE:domeResolution` | 512 | Environment cubemap face size |
-| `hdUE:autoViewerLight`, `hdUE:viewerLightIntensity` | | Review light for scenes without lights |
-| `hdUE:upAxis` | stage | Up axis override |
-| `hdUE:materialxLibrary`, `hdUE:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied in Houdini's viewport; husk keeps the Preview Surface fallback and warns |
-| `hdUE:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
+| `unreal:renderMode` | `realtime` | `realtime` (Lumen) or `pathtraced` |
+| `unreal:samplesPerPixel` | 64 | Path Tracer samples |
+| `unreal:lumenEnabled` | 1 | Lumen GI and reflections in realtime mode |
+| `unreal:warmupFrames` | 32 | Realtime frames before a frame counts as converged (Movie Render Queue's default render warm-up count) |
+| `unreal:motionBlur` | 1 | Motion blur when the camera shutter is open and something moves |
+| `unreal:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
+| `unreal:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
+| `unreal:debugView` | `off` | One of UE's viewport view modes instead of the realtime beauty; see [debug views](#debug-views) |
+| `unreal:subdivisionLevel` | 2 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
+| `unreal:cullBackface` | 1 | Meshes whose `doubleSided` is off render their front faces only, as UE's USD importer does; 0 renders both sides, as Karma; see [geometry](#geometry) |
+| `unreal:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
+| `unreal:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
+| `unreal:cvar:<console variable>` | | A UE console variable, with `:` for `.` (`int unreal:cvar:r:Shadow:Virtual:Enable = 0`); see [engine quality](#engine-quality) |
+| `unreal:postProcessMaterials` | | Cooked post-process materials added to the beauty |
+| `unreal:domeResolution` | 512 | Environment cubemap face size |
+| `unreal:autoViewerLight`, `unreal:viewerLightIntensity` | | Review light for scenes without lights |
+| `unreal:upAxis` | stage | Up axis override |
+| `unreal:materialxLibrary`, `unreal:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied in Houdini's viewport; husk keeps the Preview Surface fallback and warns |
+| `unreal:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
 
 In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.
 
@@ -74,7 +74,7 @@ Meshes reach UE indexed: the triangle corners of a point share one vertex unless
 
 Material-binding GeomSubsets partition triangles by their original USD face while preserving UVs, normals, transforms, visibility, and picking paths. Unassigned faces retain the mesh material; overlapping or invalid material subsets are rejected. Subset edits and removals update the generated meshes.
 
-Meshes follow USD's `doubleSided`, as UE's USD importer does: single-sided meshes draw a one-sided twin of their material and cull their back faces. `hdUE:cullBackface = 0` renders every mesh on both sides, as Karma does (its `karma:object:cull_backface` defaults to off). Karma's per-object `karma:object:cull_backface` primvar is not read; `doubleSided` is the per-mesh switch.
+Meshes follow USD's `doubleSided`, as UE's USD importer does: single-sided meshes draw a one-sided twin of their material and cull their back faces. `unreal:cullBackface = 0` renders every mesh on both sides, as Karma does (its `karma:object:cull_backface` defaults to off). Karma's per-object `karma:object:cull_backface` primvar is not read; `doubleSided` is the per-mesh switch.
 
 Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not apply subdivision creases.
 
@@ -157,7 +157,7 @@ UE renders in linear Rec.709. In the Houdini build, hdUE converts at its boundar
 
 ## Alpha
 
-The beauty carries straight alpha: 1 where geometry covers the pixel, 0 where the camera sees no geometry, fractional on anti-aliased edges and see-through surfaces. hdUE turns on UE's `r.PostProcessing.PropagateAlpha` at startup and converts UE's inverted coverage to straight alpha. A dome light hidden from camera rays (`hdue:visibleBackground = 0`) leaves alpha 0 behind it.
+The beauty carries straight alpha: 1 where geometry covers the pixel, 0 where the camera sees no geometry, fractional on anti-aliased edges and see-through surfaces. hdUE turns on UE's `r.PostProcessing.PropagateAlpha` at startup and converts UE's inverted coverage to straight alpha. A dome light hidden from camera rays (`unreal:visibleBackground = 0`) leaves alpha 0 behind it.
 
 ## Displacement
 
@@ -165,11 +165,11 @@ The Preview Surface `displacement` input and MaterialX `ND_displacement_float` (
 
 ## Nanite
 
-Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`hdUE:requireNanite` enforces it). Static meshes hdUE builds from Hydra, and instancer prototypes, become Nanite meshes too. Batch renders (husk) build Nanite data and Lumen cards before the first frame; interactive hosts (Houdini's viewport, which start UE with `HDUE_INIT_INTERACTIVE`) first draw regular static meshes, build both on worker threads, then swap each mesh, one per frame. Every Nanite page stays resident in memory, since UE streams the other pages only from cooked files. Animated or edited meshes stay dynamic. `HDUE_NANITE=0` turns Nanite off.
+Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`unreal:requireNanite` enforces it). Static meshes hdUE builds from Hydra, and instancer prototypes, become Nanite meshes too. Batch renders (husk) build Nanite data and Lumen cards before the first frame; interactive hosts (Houdini's viewport, which start UE with `HDUE_INIT_INTERACTIVE`) first draw regular static meshes, build both on worker threads, then swap each mesh, one per frame. Every Nanite page stays resident in memory, since UE streams the other pages only from cooked files. Animated or edited meshes stay dynamic. `HDUE_NANITE=0` turns Nanite off.
 
 ## Debug views
 
-`hdUE:debugView` (**Debug View** under Rendering, in the viewport's display options and on Render Settings LOPs) replaces the realtime beauty with one of the view modes of UE's viewport **View Mode** menu, set the way UE's game viewport sets them (view mode show flags, the view's visualization name and material overrides). Values are `<mode>` or `<mode>:<visualization>`, with the names UE's `r.*.Visualize` console variables take:
+`unreal:debugView` (**Debug View** under Rendering, in the viewport's display options and on Render Settings LOPs) replaces the realtime beauty with one of the view modes of UE's viewport **View Mode** menu, set the way UE's game viewport sets them (view mode show flags, the view's visualization name and material overrides). Values are `<mode>` or `<mode>:<visualization>`, with the names UE's `r.*.Visualize` console variables take:
 
 | Value | Shows |
 | --- | --- |
@@ -181,19 +181,19 @@ Meshes from the native asset catalog render with Nanite when their cooked asset 
 | `lumen:Overview`, `LumenScene`, `SurfaceCache`, `GeometryNormals`, `ReflectionView` | Lumen's scene and surface cache |
 | `vsm:mip`, `vpage`, `cache` (any Virtual Shadow Map visualization) | Virtual Shadow Map pages |
 
-Buffer views are linear data, like AOVs. The other views are drawn for display through UE's tonemapper, as with `hdUE:tonemapper` (set the viewport colour correction to raw to see them as UE does); lighting views take the camera exposure before it. Debug views apply to the realtime beauty only: AOVs and Path Tracer renders are unchanged.
+Buffer views are linear data, like AOVs. The other views are drawn for display through UE's tonemapper, as with `unreal:tonemapper` (set the viewport colour correction to raw to see them as UE does); lighting views take the camera exposure before it. Debug views apply to the realtime beauty only: AOVs and Path Tracer renders are unchanged.
 
 Not offered, because this runtime is a cooked non-editor build: Wireframe (UE composites it in the editor-primitives pass, compiled into editor builds only), Shader Complexity, Quad Overdraw, LOD coloration and the other material debug modes (their shaders are cooked only with `r.ForceDebugViewModes=1`, for every material), and the Lightmap modes (no static lighting). Cooked runtimes also leave UE's buffer visualization data uninitialized, so hdUE blends the buffer materials (`/Engine/BufferVisualization`, cooked through `DirectoriesToAlwaysCook`) as post-process materials itself.
 
 ## Denoising
 
-With `hdUE:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. Its guides are the Path Tracer's own albedo and normal buffers (the `albedo` and `normal` AOVs, read internally when they are not bound; see [AOVs](#aovs)), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
+With `unreal:denoiser = "oidn"` (the **Denoiser** menu on Render Settings LOPs), the Houdini build denoises the converged Path Tracer beauty with the Open Image Denoise 2.3 library Houdini ships for Karma, on the GPU through CUDA when available, else on the CPU. Its guides are the Path Tracer's own albedo and normal buffers (the `albedo` and `normal` AOVs, read internally when they are not bound; see [AOVs](#aovs)), so edges and textures stay sharp; the frame counts as converged only once the denoised image is published, so husk writes the denoised beauty. Other AOVs are not denoised, Lumen is unaffected, and progressive viewport updates stay noisy until the image converges. The standalone OpenUSD build has no denoiser. On the Cornell box at 32 samples, denoising cut the noise on a flat wall from 0.0071 to 0.0031 (standard deviation) with the mean brightness unchanged.
 
 UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the OptiX plugin only writes a 384 x 384 tile of larger frames, and its Open Image Denoise plugin left the image unchanged.
 
 ## Subdivision surfaces
 
-Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `hdUE:subdivisionLevel` levels, with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
+Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `unreal:subdivisionLevel` levels, with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
 
 Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; the default 2 still shows facets on close silhouettes. There is no adaptive or screen-space refinement; a displaced subdivision mesh is diced further (see [Displacement](#displacement)). Wet-surface masks are not translated on subdivided meshes.
 
@@ -211,7 +211,7 @@ The camera's `exposure` (Hydra's linear exposure scale) scales the beauty, as Ka
 
 ## Motion blur
 
-With the render camera's `shutter:open` before `shutter:close` and something moving, hdUE averages `hdUE:motionSamples` sub-frames spread over the shutter. Moving means:
+With the render camera's `shutter:open` before `shutter:close` and something moving, hdUE averages `unreal:motionSamples` sub-frames spread over the shutter. Moving means:
 
 - transform samples on meshes, curves, points and their ancestors;
 - PointInstancer transform samples, and per-instance `velocities` and `accelerations` (a nested instancer's add its parent instance's);
@@ -219,15 +219,15 @@ With the render camera's `shutter:open` before `shutter:close` and something mov
 - deforming meshes: time-sampled `points` with a constant point count, else per-point `velocities` (Houdini's `v`);
 - camera transform samples.
 
-`velocities` are in units per second, converted with `houdini:fps` when husk provides it, else `hdUE:framesPerSecond` (24). Matrices are interpolated linearly between samples, so fast rotations shorten slightly within a frame. Deforming meshes are uploaded again for each sub-frame, which costs time on dense meshes. `angularVelocities` turn each instance about its position, and `motion:blurScale` scales a prim's motion (its sub-frame times). Time-sampled instance `positions`/`orientations` without `velocities` are not blurred. Lumen keeps its history between sub-frames, so the realtime warmup and the Path Tracer samples are divided between sub-frames and the total stays about the same. Too few sub-frames show discrete copies of fast objects.
+`velocities` are in units per second, converted with `houdini:fps` when husk provides it, else `unreal:framesPerSecond` (24). Matrices are interpolated linearly between samples, so fast rotations shorten slightly within a frame. Deforming meshes are uploaded again for each sub-frame, which costs time on dense meshes. `angularVelocities` turn each instance about its position, and `motion:blurScale` scales a prim's motion (its sub-frame times). Time-sampled instance `positions`/`orientations` without `velocities` are not blurred. Lumen keeps its history between sub-frames, so the realtime warmup and the Path Tracer samples are divided between sub-frames and the total stays about the same. Too few sub-frames show discrete copies of fast objects.
 
 ## Unreal post-processing
 
 By default the beauty is linear scene-referred HDR, like Karma's, so colour management and compositing work as usual. UE's post-processing can be applied on top:
 
-- `hdUE:postProcess:<Property>` sets any [`FPostProcessSettings`](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/Engine/FPostProcessSettings) property by name, and its override flag: `float hdUE:postProcess:BloomIntensity = 2`, `float4 hdUE:postProcess:ColorSaturation = (0, 0, 0, 1)`. Numbers, booleans, enum names, object paths and tuples (filling a struct's fields in order) are accepted. Unknown names or values are skipped with a warning in the UE log (`HdUEBackend\Saved\Logs`).
-- `hdUE:postProcessMaterials` lists cooked post-process material paths (a string array, or one string separated by spaces), added as blendables.
-- `hdUE:tonemapper` runs UE's tonemapper. Bloom, colour grading (saturation, contrast, gamma, gain, offset, white balance, LUTs), the film curve, vignette, grain, chromatic aberration and lens flares only happen inside it, so they need it on. UE's on-screen warnings are never drawn into hdUE frames.
+- `unreal:postProcess:<Property>` sets any [`FPostProcessSettings`](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/Engine/FPostProcessSettings) property by name, and its override flag: `float unreal:postProcess:BloomIntensity = 2`, `float4 unreal:postProcess:ColorSaturation = (0, 0, 0, 1)`. Numbers, booleans, enum names, object paths and tuples (filling a struct's fields in order) are accepted. Unknown names or values are skipped with a warning in the UE log (`HdUEBackend\Saved\Logs`).
+- `unreal:postProcessMaterials` lists cooked post-process material paths (a string array, or one string separated by spaces), added as blendables.
+- `unreal:tonemapper` runs UE's tonemapper. Bloom, colour grading (saturation, contrast, gamma, gain, offset, white balance, LUTs), the film curve, vignette, grain, chromatic aberration and lens flares only happen inside it, so they need it on. UE's on-screen warnings are never drawn into hdUE frames.
 
 With the tonemapper on, the beauty is UE's tone-mapped image as display-linear Rec.709: the film curve's output before UE encodes it for an sRGB monitor, as UE writes float back buffers and Movie Render Queue renders (`SCS_FinalToneCurveHDR`). Houdini's default view (sRGB display, Un-tone-mapped) then shows exactly what UE shows on an sRGB monitor, in the viewport and in husk's EXR. Keep that view: Raw shows it too dark, and the ACES views tone map it a second time. It does not match Karma, which does not tone map. Grey ramp at exposure 1, beauty value: 0.0625 gives 0.037, 0.18 gives 0.18, 1 gives 0.72, 4 gives 0.94.
 
@@ -237,13 +237,13 @@ Exposure stays manual unless authored: exposure 1 times 2^`AutoExposureBias` (hd
 
 Depth of field, post-process materials with a "Before Tonemapping" blendable location, and the other settings apply with the tonemapper off too. Post-processing applies to the beauty only; AOVs stay raw. Changing a post-process setting restarts Path Tracer accumulation.
 
-The render settings LOP lists every user-facing `FPostProcessSettings` property (212) in UE's own categories, names, ranges, tooltips and defaults, in the order of UE's Details panel, a tab per UE category ([layout](houdini.md#solaris-viewport)): Lens, Color Grading (with Film and Film Grain), Lighting (Global Illumination, Reflections), Rendering Features, and Path Tracing under Rendering. Lens' effects other than Camera and Depth of Field, Color Grading, Film and Film Grain need the tonemapper and are disabled while it is off. Defaults are UE's, except where hdUE sets its own per view (shown in the tooltips): manual exposure, Lumen GI and reflections from `hdUE:lumenEnabled`, front-layer translucency reflections on, auto exposure reaching its target every frame unless a speed is set and depth of field from the USD camera. `scripts/generate_render_settings.py` generates them from the engine source. It leaves out: `WeightedBlendables` (use `hdUE:postProcessMaterials`), `PathTracingSamplesPerPixel` (use `hdUE:samplesPerPixel`), `PathTracingEnableDenoiser` (the runtime has no UE denoiser plugin; use `hdUE:denoiser`), the mobile depth of field, and the fixed-size arrays `LensFlareTints` and `DepthOfFieldMatteBoxFlags`. Curve properties take a cooked asset path.
+The render settings LOP lists every user-facing `FPostProcessSettings` property (212) in UE's own categories, names, ranges, tooltips and defaults, in the order of UE's Details panel, a tab per UE category ([layout](houdini.md#solaris-viewport)): Lens, Color Grading (with Film and Film Grain), Lighting (Global Illumination, Reflections), Rendering Features, and Path Tracing under Rendering. Lens' effects other than Camera and Depth of Field, Color Grading, Film and Film Grain need the tonemapper and are disabled while it is off. Defaults are UE's, except where hdUE sets its own per view (shown in the tooltips): manual exposure, Lumen GI and reflections from `unreal:lumenEnabled`, front-layer translucency reflections on, auto exposure reaching its target every frame unless a speed is set and depth of field from the USD camera. `scripts/generate_render_settings.py` generates them from the engine source. It leaves out: `WeightedBlendables` (use `unreal:postProcessMaterials`), `PathTracingSamplesPerPixel` (use `unreal:samplesPerPixel`), `PathTracingEnableDenoiser` (the runtime has no UE denoiser plugin; use `unreal:denoiser`), the mobile depth of field, and the fixed-size arrays `LensFlareTints` and `DepthOfFieldMatteBoxFlags`. Curve properties take a cooked asset path.
 
-Texture properties (Ambient Cubemap, Exposure Metering Mask, convolution bloom Kernel, Dirt Mask Texture, Color Grading LUT, Lens Flare BokehShape, Vignette Texture, Film Grain Texture) take a cooked texture path (`/Game/...`, `/Engine/...`) or an image file (exr, hdr, png, jpg, tif, tga, bmp), which the LOP shows with a file chooser and authors as a USD asset path, so a relative path resolves against its layer: `asset hdUE:postProcess:BloomDirtMask = @textures/dirt.png@`. The backend imports a file at render time as UE's texture defaults would: 8-bit files sRGB, float files linear, unfiltered mips; the Color Grading LUT is UE's 256 x 16 strip of 16 slices, read edge to edge (red across a slice, green down, blue across the slices); film grain tiles, the others clamp. Ambient Cubemap takes a lat-long panorama, made a cubemap as UE's texture build makes one (box-filtered mips rather than UE's angular filter); its import is verified, but UE's ambient cubemap composite has shown no visible effect in hdUE's renders so far. A file is imported again only when its modification time or size changes, so editing the image updates the render and unchanged files cost nothing per frame; a file that cannot be read is skipped with a warning in the UE log. [render_settings/postprocess_texture_file](../samples/conformance/render_settings/postprocess_texture_file.usda) masks half the frame with a vignette texture from a PNG.
+Texture properties (Ambient Cubemap, Exposure Metering Mask, convolution bloom Kernel, Dirt Mask Texture, Color Grading LUT, Lens Flare BokehShape, Vignette Texture, Film Grain Texture) take a cooked texture path (`/Game/...`, `/Engine/...`) or an image file (exr, hdr, png, jpg, tif, tga, bmp), which the LOP shows with a file chooser and authors as a USD asset path, so a relative path resolves against its layer: `asset unreal:postProcess:BloomDirtMask = @textures/dirt.png@`. The backend imports a file at render time as UE's texture defaults would: 8-bit files sRGB, float files linear, unfiltered mips; the Color Grading LUT is UE's 256 x 16 strip of 16 slices, read edge to edge (red across a slice, green down, blue across the slices); film grain tiles, the others clamp. Ambient Cubemap takes a lat-long panorama, made a cubemap as UE's texture build makes one (box-filtered mips rather than UE's angular filter); its import is verified, but UE's ambient cubemap composite has shown no visible effect in hdUE's renders so far. A file is imported again only when its modification time or size changes, so editing the image updates the render and unchanged files cost nothing per frame; a file that cannot be read is skipped with a warning in the UE log. [render_settings/postprocess_texture_file](../samples/conformance/render_settings/postprocess_texture_file.usda) masks half the frame with a vignette texture from a PNG.
 
 ## Engine quality
 
-`hdUE:cvar:<name>` sets a UE console variable for the process (`:` stands for `.`, which USD attribute names cannot hold); removing the attribute restores the value the variable had before. Booleans are written as 1 and 0. Read-only variables (`ECVF_ReadOnly`, such as `r.RayTracing`) cannot change at runtime and are skipped with a warning. The render settings LOP's **Engine Quality** tab, and the viewport's display options for the interactive ones, offer:
+`unreal:cvar:<name>` sets a UE console variable for the process (`:` stands for `.`, which USD attribute names cannot hold); removing the attribute restores the value the variable had before. Booleans are written as 1 and 0. Read-only variables (`ECVF_ReadOnly`, such as `r.RayTracing`) cannot change at runtime and are skipped with a warning. The render settings LOP's **Engine Quality** tab, and the viewport's display options for the interactive ones, offer:
 
 | Folder | Console variables |
 | --- | --- |
@@ -254,7 +254,7 @@ Texture properties (Ambient Cubemap, Exposure Metering Mask, convolution bloom K
 | Nanite, MegaLights, Ray Tracing | `r.Nanite`, `r.Nanite.MaxPixelsPerEdge`, `r.MegaLights.NumSamplesPerPixel`, `r.MegaLights.DefaultShadowMethod`, `r.RayTracing.Enable` |
 | Path Tracer | `r.PathTracing.ApproximateCaustics`, `r.PathTracing.FilterWidth` |
 
-Batch renders (husk, the USD Render ROP) apply an offline profile like Movie Render Queue's Game Overrides: Cinematic scalability (the screen percentage stays), all used textures fully streamed in before frames count (`r.Streaming.FullyLoadUsedTextures`, pending virtual-texture tiles loaded), `r.D3D12.GPUTimeout 0` so long Path Tracer dispatches are not reset by Windows, Lumen final gather, scene lighting and scene detail quality of at least 2 (ray lighting stays the project's surface cache, as neither Cinematic scalability nor Movie Render Queue changes it). Authored `hdUE:cvar:*` and `hdUE:postProcess:*` values win. The Houdini viewport keeps UE's interactive defaults.
+Batch renders (husk, the USD Render ROP) apply an offline profile like Movie Render Queue's Game Overrides: Cinematic scalability (the screen percentage stays), all used textures fully streamed in before frames count (`r.Streaming.FullyLoadUsedTextures`, pending virtual-texture tiles loaded), `r.D3D12.GPUTimeout 0` so long Path Tracer dispatches are not reset by Windows, Lumen final gather, scene lighting and scene detail quality of at least 2 (ray lighting stays the project's surface cache, as neither Cinematic scalability nor Movie Render Queue changes it). Authored `unreal:cvar:*` and `unreal:postProcess:*` values win. The Houdini viewport keeps UE's interactive defaults.
 
 Other console variables work as attributes too. `scripts/Test-RenderSettings.ps1 -RuntimeConfig <config>` renders with every generated setting at its default and fails if UE skipped one or if a console variable's generated default differs from UE's value.
 
@@ -268,9 +268,9 @@ The dome's full transform, color, intensity, exposure, color temperature, visibi
 
 Local lights support temperature, exposure, normalization, shadows, diffuse/specular scales, source dimensions, and sphere-light cone angle/softness up to 90° (a UE spot light, as UE's USD import makes a sphere light with ShapingAPI; the default 90° cone is the lower hemisphere). Spots are capped at 88°: at UE's own 89° maximum, Lumen and the Path Tracer lit only part of the cone. Wider cones stay point lights. RectLight also accepts image emission. DiskLight uses a masked rectangular source, and CylinderLight uses a capsule source; these are approximations. Intensity is luminance in nits as UsdLux defines it: local lights use UE nits on their own emitting area, and DistantLight illuminance is intensity × π·sin²(angle∕2), or intensity in lux when normalized. With a fully rough bound Preview Surface under a normalized distant light, hdUE and Karma agree to 0.1%; glossier surfaces come out up to about 1.4x brighter in hdUE because UE's specular model differs from Karma's. RectLights are created without UE's barn doors, which UsdLux does not have.
 
-On the Cornell box (see the [gallery](gallery.md)), the Path Tracer's brightness matches Karma's to 0.2% with the same sample count and bounce depth (Karma's diffuse limit defaults to 1 bounce; set `karma:object:diffuselimit` to compare). Lumen reaches about 0.7x there with UE's own offline settings (surface-cache ray lighting, 32 warmup frames): directly lit surfaces match, and the rest is indirect light after several bounces, which dominates a closed, diffuse room. Authoring `hdUE:postProcess:LumenRayLightingMode` = `HitLighting` raises it to about 0.8x.
+On the Cornell box (see the [gallery](gallery.md)), the Path Tracer's brightness matches Karma's to 0.2% with the same sample count and bounce depth (Karma's diffuse limit defaults to 1 bounce; set `karma:object:diffuselimit` to compare). Lumen reaches about 0.7x there with UE's own offline settings (surface-cache ray lighting, 32 warmup frames): directly lit surfaces match, and the rest is indirect light after several bounces, which dominates a closed, diffuse room. Authoring `unreal:postProcess:LumenRayLightingMode` = `HitLighting` raises it to about 0.8x.
 
-The Path Tracer's `hdUE:postProcess:PathTracingMaxBounces` (UE's `PathTracingMaxBounces`, default 32; hdUE passes it through unchanged) counts the scattering events of a path, as UE defines it: its kernel runs once for the camera ray and once per bounce up to that number (`PathTracing.usf`, `for (Bounce = 0; Bounce <= MaxBounces; ...)`); each hit samples the lights, and the last ray only collects emission (`PathTracingCore.ush`). 0 shows only what the camera sees directly (emissive surfaces, and visible lights), so lit surfaces render black; 1 is direct light alone; N matches Karma with `karma:object:diffuselimit` N − 1. The one limit applies to every kind of bounce (diffuse, specular, refraction, volume), where Karma has a limit per kind. Measured on the Cornell box at 256 pixels and 64 samples, hdUE's mean brightness was 0.0000, 0.0314 and 0.0467 at 0, 1 and 2 bounces, and Karma CPU's 0.0325 and 0.0477 at diffuse limits 0 and 1. On a grey wall lit by a single RectLight, SphereLight, DiskLight or DistantLight, 0 bounces was black and 1 matched Karma's diffuse limit 0 at the wall's centre (to 0.3%; 3% for the masked DiskLight).
+The Path Tracer's `unreal:postProcess:PathTracingMaxBounces` (UE's `PathTracingMaxBounces`, default 32; hdUE passes it through unchanged) counts the scattering events of a path, as UE defines it: its kernel runs once for the camera ray and once per bounce up to that number (`PathTracing.usf`, `for (Bounce = 0; Bounce <= MaxBounces; ...)`); each hit samples the lights, and the last ray only collects emission (`PathTracingCore.ush`). 0 shows only what the camera sees directly (emissive surfaces, and visible lights), so lit surfaces render black; 1 is direct light alone; N matches Karma with `karma:object:diffuselimit` N − 1. The one limit applies to every kind of bounce (diffuse, specular, refraction, volume), where Karma has a limit per kind. Measured on the Cornell box at 256 pixels and 64 samples, hdUE's mean brightness was 0.0000, 0.0314 and 0.0467 at 0, 1 and 2 bounces, and Karma CPU's 0.0325 and 0.0477 at diffuse limits 0 and 1. On a grey wall lit by a single RectLight, SphereLight, DiskLight or DistantLight, 0 bounces was black and 1 matched Karma's diffuse limit 0 at the wall's centre (to 0.3%; 3% for the masked DiskLight).
 
 Light linking (`collection:lightLink`) uses UE's three lighting channels. Channels only restrict direct light: Lumen's indirect light still bounces a linked light onto every surface (the Path Tracer honours links exactly). Hydra's light-linking scene index (`HdUE_LightLinkingSceneIndexPlugin`) turns each collection into a category; each distinct lightLink collection gets a channel, lights whose collection includes everything keep every channel, and then channel 0 is shared by all objects so those lights still reach objects outside every collection. That leaves room for 3 collections without unlinked lights, or 2 with them; further linked lights light everything, with a warning. Dome lights become UE's sky light, which has no channels, so their lightLink is ignored with a warning. Shadow linking (`collection:shadowLink`): UE has no per-light shadow exclusion, so an object stops casting shadows only when it is outside the shadowLink of every shadow-casting light. A single light's exclusions are exact; with several lights an object excluded from only some of them still shadows all of them (warned once). Against Karma XPU on the Cornell box, two sphere lights linked to the tall and short box with the unlinked ceiling light dimmed gave a mean ratio of 0.983, and the ceiling light's shadowLink excluding the tall box gave 0.984 (0.909 before).
 
@@ -280,12 +280,12 @@ IES profiles (`shaping:ies:file` on point, sphere, spot, rect and disk lights) a
 
 MegaLights is enabled by default for supported local lights in realtime rendering. Directional lights use the regular directional-light path. The Path Tracer uses its own lighting implementation. The render statistics report both project enablement and whether MegaLights actually ran for the delivered frame; supported D3D12 hardware and ray tracing remain required.
 
-Per-light hdUE settings are `hdue:*` attributes on the light (the **Unreal Engine** tab of Light LOPs in Houdini):
+Per-light hdUE settings are `unreal:*` attributes on the light (the **Unreal Engine** tab of Light LOPs in Houdini):
 
 | Attribute | Default | Meaning |
 | --- | --- | --- |
-| `hdue:visibleBackground` | 1 | DomeLight: draw the environment as the background. Off, it still lights the scene, and camera rays that escape see black (Karma's default for domes, `karma:light:renderlightgeo`) |
-| `hdue:megaLights` | 1 | Realtime: shade this local light with MegaLights; off uses UE's regular deferred lighting |
+| `unreal:visibleBackground` | 1 | DomeLight: draw the environment as the background. Off, it still lights the scene, and camera rays that escape see black (Karma's default for domes, `karma:light:renderlightgeo`) |
+| `unreal:megaLights` | 1 | Realtime: shade this local light with MegaLights; off uses UE's regular deferred lighting |
 
 A visible dome shows through any gap in the geometry. In Intel's Sponza, cracks around the far door and in a window grille let camera rays escape (Karma's alpha drops to 0.5-0.9 there): with the dome visible hdUE drew the sky in them, while Karma, whose dome is not visible by default, drew black. hdUE always writes alpha 1, so background pixels cannot be separated by alpha yet.
 

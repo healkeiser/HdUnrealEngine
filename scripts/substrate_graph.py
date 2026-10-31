@@ -167,7 +167,7 @@ USD_TYPES = {
     "color4": Sdf.ValueTypeNames.Color4f,
 }
 COMPILER_VERSION = 2
-ERROR_ATTRIBUTE = "hdue:substrate:authoringError"
+ERROR_ATTRIBUTE = "unreal:substrate:authoringError"
 
 
 def live_type(kind, category, port):
@@ -445,7 +445,7 @@ def author(stage, path, graph, replace=True):
     validate(graph)
     existing = stage.GetPrimAtPath(path)
     if replace and existing:
-        if existing.GetAttribute("hdue:substrate:version").Get() != 1:
+        if existing.GetAttribute("unreal:substrate:version").Get() != 1:
             raise ValueError(
                 "Refusing to replace a material not owned by Substrate Builder: "
                 + path
@@ -455,7 +455,7 @@ def author(stage, path, graph, replace=True):
     if material.GetPrim().GetAttribute(ERROR_ATTRIBUTE):
         material.GetPrim().GetAttribute(ERROR_ATTRIBUTE).Block()
     material.GetPrim().CreateAttribute(
-        "hdue:substrate:version", Sdf.ValueTypeNames.Int
+        "unreal:substrate:version", Sdf.ValueTypeNames.Int
     ).Set(1)
     shaders = {
         name: UsdShade.Shader.Define(stage, path + "/Graph/" + name)
@@ -464,7 +464,7 @@ def author(stage, path, graph, replace=True):
     for name, node in graph["nodes"].items():
         shader = shaders[name]
         definition = NODES[node["type"]]
-        shader.CreateIdAttr("hdue:substrate:" + node["type"])
+        shader.CreateIdAttr("unreal:substrate:" + node["type"])
         for port, kind in outputs(definition).items():
             shader.CreateOutput(port, USD_TYPES[kind])
         for category in ("inputs", "properties"):
@@ -472,7 +472,7 @@ def author(stage, path, graph, replace=True):
                 value = node.get(category, {}).get(port, default)
                 if node["type"] == "materialx" and port == "material":
                     shader.GetPrim().CreateRelationship(
-                        "hdue:materialx"
+                        "unreal:materialx"
                     ).SetTargets([Sdf.Path(value)])
                     continue
                 attribute = shader.CreateInput(port, USD_TYPES[kind])
@@ -498,7 +498,7 @@ def author(stage, path, graph, replace=True):
                         if kind in constructors
                         else Sdf.AssetPath(value) if kind == "asset" else value
                     )
-    material.CreateSurfaceOutput("hdue").ConnectToSource(
+    material.CreateSurfaceOutput("unreal").ConnectToSource(
         shaders[graph["output"]].ConnectableAPI(), "out"
     )
     preview = UsdShade.Shader.Define(stage, path + "/Preview")
@@ -517,9 +517,9 @@ def read(material, time):
     error = material.GetPrim().GetAttribute(ERROR_ATTRIBUTE)
     if error and error.Get(time):
         raise ValueError(str(material.GetPath()) + ": " + error.Get(time))
-    if material.GetPrim().GetAttribute("hdue:substrate:version").Get() != 1:
+    if material.GetPrim().GetAttribute("unreal:substrate:version").Get() != 1:
         raise ValueError("Unsupported Substrate material version")
-    terminal = material.GetSurfaceOutput("hdue").GetConnectedSource()
+    terminal = material.GetSurfaceOutput("unreal").GetConnectedSource()
     if not terminal:
         raise ValueError(
             str(material.GetPath()) + ": missing hdue surface output"
@@ -530,7 +530,7 @@ def read(material, time):
         name = shader.GetPrim().GetName()
         if name in nodes:
             return name
-        kind = str(shader.GetIdAttr().Get()).removeprefix("hdue:substrate:")
+        kind = str(shader.GetIdAttr().Get()).removeprefix("unreal:substrate:")
         if kind not in NODES:
             raise ValueError(
                 "Unsupported Substrate shader: " + str(shader.GetPath())
@@ -542,7 +542,7 @@ def read(material, time):
                 if kind == "materialx" and port == "material":
                     targets = (
                         shader.GetPrim()
-                        .GetRelationship("hdue:materialx")
+                        .GetRelationship("unreal:materialx")
                         .GetForwardedTargets()
                     )
                     if len(targets) != 1:
@@ -565,7 +565,7 @@ def read(material, time):
                         raise ValueError("Invalid property connection")
                     source = UsdShade.Shader(connection[0].GetPrim())
                     source_kind = str(source.GetIdAttr().Get()).removeprefix(
-                        "hdue:substrate:"
+                        "unreal:substrate:"
                     )
                     if (
                         source_kind not in NODES

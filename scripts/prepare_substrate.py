@@ -23,7 +23,7 @@ def collect(stage, time, entries):
     records = []
     for prim in stage.Traverse():
         if not prim.IsA(UsdShade.Material) or not prim.GetAttribute(
-            "hdue:substrate:version"
+            "unreal:substrate:version"
         ):
             continue
         graph = read(UsdShade.Material(prim), time)

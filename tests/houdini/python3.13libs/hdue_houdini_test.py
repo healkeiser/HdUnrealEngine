@@ -181,7 +181,7 @@ class Test:
 
         for _ in range(24):
             yield
-        # The selection highlight below relies on hdUE:viewportIdAovs at its default (on).
+        # The selection highlight below relies on unreal:viewportIdAovs at its default (on).
         hdefereval.execute_deferred(viewer.curViewport().frameAll)
         for _ in range(8):
             yield
@@ -217,15 +217,15 @@ class Test:
         integration._report("Settings node: " + str(node))
         # The smoke cube is animated and the viewport camera has a shutter; this test checks
         # Path Tracer accumulation of whole frames, so keep motion-blur sub-frames out of it.
-        integration.set_render_setting("xn__hdUEmotionBlur", 0)
+        integration.set_render_setting("xn__unrealmotionBlur", 0)
         integration.set_mode("pathtraced")
-        # Houdini passes the render settings prim's hdUE:renderMode to the delegate on its next update.
+        # Houdini passes the render settings prim's unreal:renderMode to the delegate on its next update.
         for _ in range(200):
             if self.api.status()["mode"] == 1:
                 break
             yield
         else:
-            raise AssertionError("hdUE:renderMode did not reach the viewport")
+            raise AssertionError("unreal:renderMode did not reach the viewport")
         if self.api.status()["frame"]["frame_id"]:
             raise AssertionError(
                 "The previous Lumen image was exposed as a pending Path Tracer result"
@@ -248,17 +248,19 @@ class Test:
             raise AssertionError("Transform did not change the image")
         native = edit.parent().createNode("pythonscript", "hdUE_native_test")
         native.setInput(0, edit)
-        native.parm("python").set("""from pxr import UsdGeom,Sdf,Gf
+        native.parm("python").set(
+            """from pxr import UsdGeom,Sdf,Gf
 s=hou.pwd().editableStage()
 p=UsdGeom.Xform.Define(s,"/Native").GetPrim()
-p.CreateAttribute("hdue:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
+p.CreateAttribute("unreal:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
 UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,2,0))
 parent=UsdGeom.Xform.Define(s,"/NativeParent")
 parent.AddTranslateOp().Set(Gf.Vec3d(-2,0,0)); parent.AddScaleOp().Set(Gf.Vec3f(1.5))
 p=UsdGeom.Mesh.Define(s,"/NativeParent/MeshAsset").GetPrim()
-p.CreateAttribute("hdue:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
+p.CreateAttribute("unreal:asset",Sdf.ValueTypeNames.String).Set("/Game/HdUE/SM_Nanite.SM_Nanite")
 UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
-""")
+"""
+        )
         prepared = integration.settings_node(native)
         prepared.setDisplayFlag(True)
         prepared.setCurrent(True, clear_all_selected=True)

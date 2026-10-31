@@ -65,7 +65,7 @@ static_assert(ENGINE_MAJOR_VERSION == HDUE_ENGINE_MAJOR && ENGINE_MINOR_VERSION 
               "Use the pinned UE 5.8.4 source, not a different installed/source engine.");
 
 namespace {
-// hdUE's interactive resolution, set like any console variable (hdUE:cvar:r:HdUE:...).
+// hdUE's interactive resolution, set like any console variable (unreal:cvar:r:HdUE:...).
 TAutoConsoleVariable<int32> CVarInteractiveResolution(
     TEXT("r.HdUE.InteractiveResolution"), 1,
     TEXT("Interactive hosts: render realtime frames at r.HdUE.InteractiveScreenPercentage while requests keep coming "
@@ -133,7 +133,7 @@ struct FSession {
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
     bool Preparing = false;
     bool ResidencyFailed = false;
-    // hdUE:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
+    // unreal:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
     EViewModeIndex DebugView = VMI_Lit;
     FName FSceneView::* DebugMember = nullptr;
     FName DebugName;
@@ -400,7 +400,7 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         // percentage), fully loaded texture streaming (Draw waits for it) and no GPU timeout for long Path Tracer
         // dispatches. Lumen's surface cache updates every frame so bounce lighting converges within the warmup frames
         // (as Movie Render Graph's layer warm-ups raise its update rates, DeferredLayerWarmUpHelpers.cpp). Set before
-        // any session, so authored hdUE:cvar:* values override them.
+        // any session, so authored unreal:cvar:* values override them.
         Scalability::FQualityLevels Levels = Scalability::GetQualityLevels();
         const float Resolution = Levels.ResolutionQuality;
         Levels.SetFromSingleQualityLevelRelativeToMax(0);

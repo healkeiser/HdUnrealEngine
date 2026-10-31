@@ -11,7 +11,7 @@
         label "Rendering"
         parmtag { "uiscope" "viewport" }
         parm {
-            name "xn__hdUErenderMode_tya"
+            name "xn__unrealrenderMode_41a"
             label "Render Mode"
             type string
             size 1
@@ -21,7 +21,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name "xn__hdUEwarmupFrames_21a"
+            name "xn__unrealwarmupFrames_e5a"
             label "Warmup Frames"
             type int
             size 1
@@ -30,10 +30,10 @@
             help "Realtime frames before a frame counts as converged."
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+            hidewhen "{ xn__unrealrenderMode_41a == pathtraced }"
         }
         parm {
-            name "xn__hdUEsamplesPerPixel_y6a"
+            name "xn__unrealsamplesPerPixel_99a"
             label "Path Tracer Samples"
             type int
             size 1
@@ -41,10 +41,10 @@
             range { 1! 4096 }
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
+            hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
         }
         parm {
-            name "xn__hdUEdenoiser_kva"
+            name "xn__unrealdenoiser_vya"
             label "Denoiser"
             type string
             size 1
@@ -53,10 +53,10 @@
             help "Denoises the converged Path Tracer image."
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__hdUErenderMode_tya != pathtraced }"
+            hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
         }
         parm {
-            name "xn__hdUEdebugView_6wa"
+            name "xn__unrealdebugView_i0a"
             label "Debug View"
             type string
             size 1
@@ -65,10 +65,10 @@
             help "Shows one of UE's viewport view modes instead of the lit image, as its View Mode menu does: buffers, Nanite, Lumen and Virtual Shadow Map (with Virtual Shadow Maps on) visualizations. Realtime only; AOVs are unaffected."
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+            hidewhen "{ xn__unrealrenderMode_41a == pathtraced }"
         }
         parm {
-            name "xn__hdUEmotionBlur_tya"
+            name "xn__unrealmotionBlur_41a"
             label "Motion Blur"
             type toggle
             size 1
@@ -82,17 +82,17 @@
         label "Lighting"
         parmtag { "uiscope" "viewport" }
         parm {
-            name "xn__hdUElumenEnabled_21a"
+            name "xn__unreallumenEnabled_e5a"
             label "Lumen"
             type toggle
             size 1
             default { 1 }
             parmtag { "spare_category" "Lighting" }
             parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__hdUErenderMode_tya == pathtraced }"
+            hidewhen "{ xn__unrealrenderMode_41a == pathtraced }"
         }
         parm {
-            name "xn__hdUEautoViewerLight_y6a"
+            name "xn__unrealautoViewerLight_99a"
             label "Light Unlit Scenes"
             type toggle
             size 1
@@ -101,7 +101,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name "xn__hdUEviewerLightIntensity_3fb"
+            name "xn__unrealviewerLightIntensity_fjb"
             label "Viewer Light Intensity"
             type float
             size 1
@@ -117,7 +117,7 @@
         label "Geometry and Post"
         parmtag { "uiscope" "viewport" }
         parm {
-            name "xn__hdUEsubdivisionLevel_l8a"
+            name "xn__unrealsubdivisionLevel_wcb"
             label "Subdivision Level"
             type int
             size 1
@@ -127,7 +127,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name "xn__hdUEtonemapper_tya"
+            name "xn__unrealtonemapper_41a"
             label "Unreal Tonemapper"
             type toggle
             size 1
@@ -143,7 +143,7 @@
         label "Engine Quality"
         parmtag { "uiscope" "viewport" }
         parm {
-            name    "xn__hdUEcvarsgShadowQuality_hebec"
+            name    "xn__unrealcvarsgShadowQuality_shbec"
             label   "Shadows"
             type    int
             size    1
@@ -154,7 +154,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarsgGlobalIlluminationQuality_0xbec"
+            name    "xn__unrealcvarsgGlobalIlluminationQuality_c1bec"
             label   "Global Illumination"
             type    int
             size    1
@@ -165,7 +165,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarsgReflectionQuality_zkbec"
+            name    "xn__unrealcvarsgReflectionQuality_bobec"
             label   "Reflections"
             type    int
             size    1
@@ -176,7 +176,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrAntiAliasingMethod_zkbeb"
+            name    "xn__unrealcvarrAntiAliasingMethod_bobeb"
             label   "Anti-Aliasing Method"
             type    int
             size    1
@@ -187,7 +187,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrScreenPercentage_qhbeb"
+            name    "xn__unrealcvarrScreenPercentage_1kbeb"
             label   "Screen Percentage"
             type    float
             size    1
@@ -198,7 +198,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrHdUEInteractiveResolution_ewbebe"
+            name    "xn__unrealcvarrHdUEInteractiveResolution_pzbebe"
             label   "Lower Resolution While Moving"
             type    toggle
             size    1
@@ -208,7 +208,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrHdUEInteractiveScreenPercentage_55bebe"
+            name    "xn__unrealcvarrHdUEInteractiveScreenPercentage_h9bebe"
             label   "Moving Screen Percentage"
             type    float
             size    1
@@ -219,7 +219,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrLumenHardwareRayTracing_4sbebf"
+            name    "xn__unrealcvarrLumenHardwareRayTracing_gwbebf"
             label   "Hardware Ray Tracing"
             type    toggle
             size    1
@@ -229,7 +229,7 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
-            name    "xn__hdUEcvarrShadowVirtualEnable_mmbebgh"
+            name    "xn__unrealcvarrShadowVirtualEnable_xpbebgh"
             label   "Virtual Shadow Maps"
             type    toggle
             size    1

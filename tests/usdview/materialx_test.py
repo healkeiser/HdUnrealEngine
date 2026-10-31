@@ -45,8 +45,8 @@ class MaterialXTest(SmokeTest):
                 path.name.removeprefix("inputs:"), Sdf.ValueTypeNames.String
             )
         else:
-            field = entry["bindings"]["hdue:base_color_texture"]
-            port = self.shader_for(name).GetInput("hdue:base_color_texture")
+            field = entry["bindings"]["unreal:base_color_texture"]
+            port = self.shader_for(name).GetInput("unreal:base_color_texture")
         return port, port.Get() or field["default"]
 
     def image(self, label, previous=0, samples=0):
@@ -55,7 +55,7 @@ class MaterialXTest(SmokeTest):
         )
         stats = self.stats()
         if not self.view._renderer.InvokeRendererCommand(
-            "hdue:sampleMemory", {}
+            "unreal:sampleMemory", {}
         ):
             raise AssertionError("GPU memory sampling is unavailable")
         stats = self.stats()

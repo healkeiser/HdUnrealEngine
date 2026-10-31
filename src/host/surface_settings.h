@@ -49,7 +49,7 @@ VtDictionary readRendererSettings(const std::filesystem::path& path) {
 template <class T>
 T wetOpinion(UsdPrim prim, const char* name, UsdTimeCode time, T fallback) {
     for (; prim && !prim.IsPseudoRoot(); prim = prim.GetParent()) {
-        const auto attr = prim.GetAttribute(TfToken(std::string("hdue:surface:wet:") + name));
+        const auto attr = prim.GetAttribute(TfToken(std::string("unreal:surface:wet:") + name));
         if (!attr || !attr.HasAuthoredValueOpinion()) continue;
         T value;
         if (!attr.Get(&value, time))

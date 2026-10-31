@@ -136,7 +136,7 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_up_axis(u
     if (!state || !Delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     using namespace PXR_NS;
-    // Like Houdini's stageMetersPerUnit: an authored hdUE:upAxis overrides it.
+    // Like Houdini's stageMetersPerUnit: an authored unreal:upAxis overrides it.
     Delegate->SetRenderSetting(TfToken("stageUpAxis"), VtValue(std::string(z_up ? "Z" : "Y")));
     return HDUE_OK;
 }

@@ -356,7 +356,7 @@ class Host:
 
     def sync_scene(self, session, key, materials=False):
         """What the delegate cannot read from USD by itself, kept out of the LOP graph: images of op:/opdef: texture
-        paths (exported here, outside any cook) and bounds meshes for hdue:asset prims (viewport overrides).
+        paths (exported here, outside any cook) and bounds meshes for unreal:asset prims (viewport overrides).
         """
         from hdue_op_textures import cache, prepare_stage
 
@@ -497,7 +497,7 @@ def start():
 
 RENDER_ROOT = Sdf.Path("/Render")
 VIEWER_CAMERA = Sdf.Path("/__HoudiniFreeCamera__")
-SHADING_PROPERTIES = ("material:binding", "hdue:surface:wet:")
+SHADING_PROPERTIES = ("material:binding", "unreal:surface:wet:")
 
 
 def _shading_change(stage, path, info_only):
@@ -528,7 +528,7 @@ def _materials_animated(stage):
         for attr in prim.GetAttributes()
         if prim.IsA(UsdShade.Material)
         or prim.IsA(UsdShade.Shader)
-        or attr.GetName().startswith("hdue:surface:wet:")
+        or attr.GetName().startswith("unreal:surface:wet:")
     )
 
 
@@ -590,7 +590,9 @@ def activate_saved_hip():
                 viewer.curViewport().frameBoundingBox(
                     hou.BoundingBox(*bounds.GetMin(), *bounds.GetMax())
                 )
-        builder = hou.node(stage_network.userData("hdue:startupBuilder") or "")
+        builder = hou.node(
+            stage_network.userData("unreal:startupBuilder") or ""
+        )
         if builder:
             editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
             if editor:
@@ -731,11 +733,11 @@ def _materialx(prim):
 
 
 class NativeAssets:
-    """hdue:asset prims, shown to Hydra as bounds meshes carrying the asset (the delegate places the cooked UE asset).
+    """unreal:asset prims, shown to Hydra as bounds meshes carrying the asset (the delegate places the cooked UE asset).
 
     Like usdview's session layer: authored only into the LOP network's viewport overrides (Houdini's session-only
-    layer over the displayed stage), never into the graph or its layers. A Mesh with hdue:asset becomes a guide.
-    Instances are left to Hydra, except around what the host maps by stage path (asset prims, hdue:surface:*
+    layer over the displayed stage), never into the graph or its layers. A Mesh with unreal:asset becomes a guide.
+    Instances are left to Hydra, except around what the host maps by stage path (asset prims, unreal:surface:*
     attributes, and MaterialX materials when a cooked library is set): those instances are made non-instanceable
     there, as a prototype's Hydra paths are not its stage paths.
     """
@@ -758,20 +760,20 @@ class NativeAssets:
             path for kind, path in self.authored if kind == "instanceable"
         }
         for prim in Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies()):
-            attr = prim.GetAttribute("hdue:asset")
+            attr = prim.GetAttribute("unreal:asset")
             asset = attr.Get() if attr else None
             if asset:
                 if isinstance(asset, Sdf.AssetPath):
                     asset = asset.path
                 if not isinstance(asset, str):
                     raise ValueError(
-                        "hdue:asset requires a UE object path string: "
+                        "unreal:asset requires a UE object path string: "
                         + str(prim.GetPath())
                     )
                 refs[str(prim.GetPath())] = (asset, prim.IsA(UsdGeom.Mesh))
             elif not prim.IsInstanceProxy() or not (
                 any(
-                    name.startswith("hdue:surface:")
+                    name.startswith("unreal:surface:")
                     for name in prim.GetPropertyNames()
                 )
                 or (materials and _materialx(prim))
@@ -928,17 +930,17 @@ def render_settings_node(input_node, mode="realtime", samples=64):
     if camera:
         node.parm("camera").set(str(camera.GetPath()))
     for name, value in (("renderMode", mode), ("samplesPerPixel", samples)):
-        attr = existing.GetAttribute("hdUE:" + name) if existing else None
+        attr = existing.GetAttribute("unreal:" + name) if existing else None
         _render_property(
             node,
-            "xn__hdUE" + name,
+            "xn__unreal" + name,
             attr.Get() if attr and attr.HasAuthoredValue() else value,
         )
     return node
 
 
 def _render_property(node, prefix, value):
-    # Encoded hdUE:* parameter names come from HdUnrealEngine_Global.ds. Houdini adds
+    # Encoded unreal:* parameter names come from HdUnrealEngine_Global.ds. Houdini adds
     # them only while the hdUE delegate is registered, so add the same tagged spare parms otherwise.
     find = lambda control: next(
         (
@@ -950,7 +952,7 @@ def _render_property(node, prefix, value):
         None,
     )
     if find(False) is None:
-        attribute = "hdUE:" + prefix[len("xn__hdUE") :]
+        attribute = "unreal:" + prefix[len("xn__unreal") :]
         tags = {
             "spare_category": "Global",
             "usdvaluetype": "string" if isinstance(value, str) else "int",
@@ -983,21 +985,21 @@ def render_options(stage):
     prim = _settings_prim(stage)
 
     def get(name, default):
-        attr = prim.GetAttribute("hdUE:" + name) if prim else None
+        attr = prim.GetAttribute("unreal:" + name) if prim else None
         return attr.Get() if attr and attr.HasAuthoredValue() else default
 
     return get("renderMode", "realtime"), get("samplesPerPixel", 64)
 
 
 def libraries(stage, node=None):
-    """(cooked MaterialX, prepared Substrate) library files: hdUE:materialxLibrary and hdUE:substrateLibrary on the
+    """(cooked MaterialX, prepared Substrate) library files: unreal:materialxLibrary and unreal:substrateLibrary on the
     stage's render settings prim, as husk sees them; else an older hdUE_settings subnet's fields, HDUE_*_LIBRARY or
     the runtime profile's materialx_library / substrate_library. None where there is none.
     """
     prim = _settings_prim(stage)
     result = []
     for name in ("materialx", "substrate"):
-        attr = prim.GetAttribute(f"hdUE:{name}Library") if prim else None
+        attr = prim.GetAttribute(f"unreal:{name}Library") if prim else None
         value = attr.Get() if attr and attr.HasAuthoredValue() else None
         parm = node.parm(f"hdue_{name}_library") if node else None
         value = (
@@ -1036,11 +1038,11 @@ def open_usd(path):
 def set_mode(mode):
     if mode not in ("realtime", "pathtraced"):
         raise ValueError(mode)
-    set_render_setting("xn__hdUErenderMode", mode)
+    set_render_setting("xn__unrealrenderMode", mode)
 
 
 def set_render_setting(prefix, value):
-    """Author an hdUE:* setting on the displayed chain's Render Settings LOP, adding one if there is none."""
+    """Author an unreal:* setting on the displayed chain's Render Settings LOP, adding one if there is none."""
     viewer = scene_viewer()
     network = viewer.pwd()
     display = (

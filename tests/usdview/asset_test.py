@@ -179,7 +179,7 @@ class AssetTest(SmokeTest):
                 self.inspect("/World/Blueprint", 3)
             # Invalid resources/missing paths become recoverable per-instance failures.
             prim = stage.GetPrimAtPath("/World/Mesh")
-            attr = prim.GetAttribute("hdue:asset")
+            attr = prim.GetAttribute("unreal:asset")
             asset = attr.Get()
             attr.Set("/Game/HdUE/M_PreviewSurface.M_PreviewSurface")
             for _ in range(100):

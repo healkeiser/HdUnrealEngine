@@ -26,7 +26,7 @@ LEGACY_HDA = (
 # A builder is a plain VOP subnet, as SideFX's Karma Material Builder (voptoolutils.createMaskedMtlXSubnet): its
 # render context marks it, and its TAB menu offers the hdUE Substrate nodes and the subnet output connector only.
 RENDER_CONTEXT_PARM = "shader_rendercontextname"
-RENDER_CONTEXT = "hdue"
+RENDER_CONTEXT = "unreal"
 TAB_MASK = "hdUE subnetconnector"
 
 
@@ -275,12 +275,12 @@ def translate(stage, path, network, replace=True):
         if (
             replace
             and existing
-            and existing.GetAttribute("hdue:substrate:version").Get() != 1
+            and existing.GetAttribute("unreal:substrate:version").Get() != 1
         ):
             raise
         material = UsdShade.Material.Define(stage, path)
         material.GetPrim().CreateAttribute(
-            "hdue:substrate:version", Sdf.ValueTypeNames.Int
+            "unreal:substrate:version", Sdf.ValueTypeNames.Int
         ).Set(1)
         material.GetPrim().CreateAttribute(
             ERROR_ATTRIBUTE, Sdf.ValueTypeNames.String

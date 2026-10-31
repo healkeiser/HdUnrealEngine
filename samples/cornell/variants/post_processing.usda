@@ -19,14 +19,14 @@ over "Render"
 {
     over "Settings"
     {
-        bool hdUE:tonemapper = 1
-        float hdUE:postProcess:BloomIntensity = 1.5
-        float hdUE:postProcess:VignetteIntensity = 0.5
-        float hdUE:postProcess:AutoExposureBias = 2.5
-        float hdUE:postProcess:SceneFringeIntensity = 4
-        float hdUE:postProcess:FilmGrainIntensity = 0.35
-        float hdUE:postProcess:LensFlareIntensity = 2
-        float hdUE:postProcess:WhiteTemp = 5200
-        float4 hdUE:postProcess:ColorSaturation = (1, 1, 1, 1.15)
+        bool unreal:tonemapper = 1
+        float unreal:postProcess:BloomIntensity = 1.5
+        float unreal:postProcess:VignetteIntensity = 0.5
+        float unreal:postProcess:AutoExposureBias = 2.5
+        float unreal:postProcess:SceneFringeIntensity = 4
+        float unreal:postProcess:FilmGrainIntensity = 0.35
+        float unreal:postProcess:LensFlareIntensity = 2
+        float unreal:postProcess:WhiteTemp = 5200
+        float4 unreal:postProcess:ColorSaturation = (1, 1, 1, 1.15)
     }
 }

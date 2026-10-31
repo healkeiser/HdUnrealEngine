@@ -52,8 +52,8 @@ def Scope "Render"
         rel camera = </cornell_box/camera>
         uniform int2 resolution = (512, 512)
         rel products = </Render/Product>
-        int hdUE:samplesPerPixel = 512
-        token hdUE:renderMode = "pathtraced"
+        int unreal:samplesPerPixel = 512
+        token unreal:renderMode = "pathtraced"
         token karma:global:convergence_mode = "Path Traced"
         int karma:global:pathtracedsamples = 512
         # Karma traces one diffuse bounce by default; the UE Path Tracer up to 32 (PathTracingMaxBounces).

@@ -25,14 +25,14 @@ assert not changed(
 assert not changed("/cameras/orbit.xformOp:rotateXYZ") and not changed(
     "/geo/mesh.xformOp:translate"
 )  # playback
-assert not changed("/Render/Settings.hdUE:renderMode") and not changed(
+assert not changed("/Render/Settings.unreal:renderMode") and not changed(
     "/Render", False
 )
 assert changed("/materials/m/surface.inputs:roughness") and changed(
     "/lights/dome.inputs:texture:file"
 )
 assert changed("/geo/mesh.material:binding") and changed(
-    "/geo/mesh.hdue:surface:wet:amount"
+    "/geo/mesh.unreal:surface:wet:amount"
 )
 assert changed("/geo/new", False)  # structure changes always count
 print("shading changes: ok")

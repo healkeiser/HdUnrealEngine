@@ -268,7 +268,7 @@ def save_hip(file, hip, runtime_config):
         "DIRECT SUBSTRATE TEXTURES\n\nOne mesh. RGB: sRGB base color.\nRaw G: roughness. Raw A: coat coverage.\nRaw normal RGB: Normal Map conversion.\n\nUV, Slab values, channels and normal controls update live.\nNode/wire edits prepare automatically in the background.\nThe new graph appears when compilation is ready.\nIncomplete wiring pauses safely; no Houdini restart is needed."
     )
     lopnet.layoutChildren()
-    lopnet.setUserData("hdue:startupBuilder", network.path())
+    lopnet.setUserData("unreal:startupBuilder", network.path())
     assert not author_node.errors() and author_node.stage()
     assert signature(hdue_substrate.graph(network)) == signature(graph)
     hou.hipFile.save(str(hip))

@@ -409,8 +409,8 @@ void HdUEState::erase(const std::string& id) {
     ++revision;
 }
 namespace {
-constexpr const char* AutoKey = "hdUE:viewer:key";
-constexpr const char* AutoFill = "hdUE:viewer:fill";
+constexpr const char* AutoKey = "unreal:viewer:key";
+constexpr const char* AutoFill = "unreal:viewer:fill";
 bool active(const HdUELightData& light) {
     return light.visible && std::isfinite(light.intensity) && light.intensity > 0 &&
            (light.color[0] > 0 || light.color[1] > 0 || light.color[2] > 0);
@@ -694,7 +694,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto basis = sceneBasis(state);
     const bool requireNanite = state.setting<bool>("requireNanite", false);
     // Single-sided meshes (USD doubleSided off) render their front faces only, as UE's USD importer does;
-    // hdUE:cullBackface = 0 renders both sides, as Karma (karma:object:cull_backface defaults to off).
+    // unreal:cullBackface = 0 renders both sides, as Karma (karma:object:cull_backface defaults to off).
     const bool cullBackface = state.setting<bool>("cullBackface", true);
     const auto inverse = basis.GetInverse();
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
@@ -1290,7 +1290,7 @@ class Pass final : public HdRenderPass {
     std::unique_ptr<HdUERenderBuffer> internalColor_;  // beauty target when no color AOV is bound
     HdueRenderRequest beautyRequest_{};
     std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs_;
-    // hdUE:denoiser = oidn: the converged Path Tracer beauty waits for albedo and normal guides, then Open Image
+    // unreal:denoiser = oidn: the converged Path Tracer beauty waits for albedo and normal guides, then Open Image
     // Denoise (Houdini's, GPU when available) replaces it. Guides render as AOVs, internally when not bound.
     std::unique_ptr<HdUERenderBuffer> guideAlbedo_, guideNormal_;
     std::vector<float> beautyPixels_;  // top-down RGBA of the converged beauty, before denoising
@@ -1890,7 +1890,7 @@ public:
                 if (name == HdAovTokens->cameraDepth) cameraDepth = dynamic_cast<HdUERenderBuffer*>(renderBuffer);
                 // Houdini's viewport draws its selection highlight from primId/instanceId. Rendering them swaps every
                 // material twice per view (hundreds of ms on large scenes), so the viewport skips them while the user
-                // tumbles, scrubs or plays and renders them once the view settles; hdUE:viewportIdAovs = 0 skips them
+                // tumbles, scrubs or plays and renders them once the view settles; unreal:viewportIdAovs = 0 skips them
                 // always (no highlight). husk renders what its render vars ask for.
                 const bool viewportIds = s.setting<bool>("viewportIdAovs", true) && !s.interactive();
                 const bool skipped = row && row->kind == HdUEAovKind::Id && selfHost().continuous && !viewportIds;
@@ -2287,10 +2287,10 @@ public:
                     return request;
                 };
                 if (needsRequest) {
-                    // hdUE:postProcess:<FPostProcessSettings property>, hdUE:postProcessMaterials, hdUE:tonemapper, and
-                    // hdUE:cvar:<console variable, ':' for '.'> (USD attribute names cannot hold dots), and
-                    // hdUE:debugView. With the tonemapper on, the camera exposure goes in before it rather than onto
-                    // display values.
+                    // unreal:postProcess:<FPostProcessSettings property>, unreal:postProcessMaterials,
+                    // unreal:tonemapper, and unreal:cvar:<console variable, ':' for '.'> (USD attribute names cannot
+                    // hold dots), and unreal:debugView. With the tonemapper on, the camera exposure goes in before it
+                    // rather than onto display values.
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
                     // The tone-mapped beauty is display-linear. It is still converted to scene_linear's primaries
@@ -2522,14 +2522,15 @@ public:
 };
 }  // namespace
 
-// The hdUE setting a host's key stands for: hdUE:<name>, or hdue:<name> as lights and prims spell the namespace (USD
-// namespaces are case-sensitive), and the standard names hosts send: Hydra's enableSceneLights (usdview's "Enable Scene
-// Lights"), stageMetersPerUnit (husk, Houdini) and stageUpAxis (the hdUE host in Houdini's viewport). namespaced: the
-// key was hdUE:<name>, which the bare <name> never overrides (Houdini sends its own renderMode: batch, interactive).
+// The hdUE setting a host's key stands for: unreal:<name>, and the standard names hosts send: Hydra's enableSceneLights
+// (usdview's "Enable Scene Lights"), stageMetersPerUnit (husk, Houdini) and stageUpAxis (the hdUE host in Houdini's
+// viewport). namespaced: the key was unreal:<name>, which the bare <name> never overrides (Houdini sends its own
+// renderMode: batch, interactive).
 static TfToken HdUECanonicalKey(const TfToken& key, bool& namespaced) {
     const auto& name = key.GetString();
-    namespaced = name.size() > 5 && (name.starts_with("hdUE:") || name.starts_with("hdue:"));
-    if (namespaced) return TfToken(name.substr(5));
+    constexpr std::string_view prefix = "unreal:";
+    namespaced = name.size() > prefix.size() && name.starts_with(prefix);
+    if (namespaced) return TfToken(name.substr(prefix.size()));
     if (key == HdRenderSettingsTokens->enableSceneLights) return TfToken("sceneLightsEnabled");
     if (key == TfToken("stageMetersPerUnit")) return TfToken("metersPerUnit");
     if (key == TfToken("stageUpAxis")) return TfToken("upAxis");
@@ -2557,7 +2558,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
     state_->settings = settings;
-    // As SetRenderSetting does: aliases, then hdUE:<name> over both.
+    // As SetRenderSetting does: aliases, then unreal:<name> over both.
     for (const bool namespacedPass : {false, true})
         for (const auto& [key, value] : settings) {
             if (HdUETraceSettings() && !namespacedPass)
@@ -2574,7 +2575,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
     const bool hostUnits = stageUnits != settings.end() && !VtValue::Cast<double>(stageUnits->second).IsEmpty();
     // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
-    // (already open in husk). Houdini's viewport sends stageUpAxis from the hdUE host. hdUE:upAxis overrides both.
+    // (already open in husk). Houdini's viewport sends stageUpAxis from the hdUE host. unreal:upAxis overrides both.
     if (const auto file = settings.find(TfToken("usdFilename"));
         file != settings.end() && file->second.IsHolding<std::string>() &&
         !state_->namespaced.count(TfToken("upAxis")) && !settings.count(TfToken("stageUpAxis")))
@@ -2653,7 +2654,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     if (selfHosted_ && !host.continuous)
         for (const char* library : {"materialxLibrary", "substrateLibrary"})
             if (!state_->setting<std::string>(library, "").empty())
-                batchWarning(std::string("hdUE:") + library +
+                batchWarning(std::string("unreal:") + library +
                              " is set, but husk renders MaterialX and Substrate Builder materials with their Preview "
                              "Surface fallback: cooked libraries apply in Houdini's viewport only.");
 }
@@ -3184,14 +3185,14 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     return stats;
 }
 bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args) {
-    if (command == TfToken("hdue:sampleMemory")) {
+    if (command == TfToken("unreal:sampleMemory")) {
         const auto memory = hdue::gpu_memory_bytes();
         std::lock_guard lock(state_->mutex);
         state_->gpuMemoryAvailable = memory.has_value();
         state_->gpuLocalMemoryBytes = memory.value_or(0);
         return true;
     }
-    if (command != TfToken("hdue:pickRay")) return false;
+    if (command != TfToken("unreal:pickRay")) return false;
     std::lock_guard lock(state_->mutex);
     auto& result = state_->pickResult;
     result = {{"hit", VtValue(false)}, {"path", VtValue(std::string())}, {"error", VtValue(std::string())}};

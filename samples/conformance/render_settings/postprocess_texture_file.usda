@@ -75,13 +75,13 @@ over "Render"
 {
     over "Settings"
     {
-        bool hdUE:tonemapper = 1
-        token hdUE:postProcess:VignetteType = "EVignetteType::Texture"
-        float hdUE:postProcess:VignetteIntensity.timeSamples = {
+        bool unreal:tonemapper = 1
+        token unreal:postProcess:VignetteType = "EVignetteType::Texture"
+        float unreal:postProcess:VignetteIntensity.timeSamples = {
             1: 0,
             2: 1,
         }
-        asset hdUE:postProcess:VignetteTexture = @../textures/black_left.png@
+        asset unreal:postProcess:VignetteTexture = @../textures/black_left.png@
     }
 }
 def Cube "Wall"

@@ -25,7 +25,7 @@ class Test(MaterialTest):
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(1)
-        network = hou.node(hou.node("/stage").userData("hdue:startupBuilder"))
+        network = hou.node(hou.node("/stage").userData("unreal:startupBuilder"))
         self.session = self.api.status()["session"]
         self.pid = os.getpid()
         original = yield from self.image("01-before-topology-edit", 0)

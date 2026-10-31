@@ -1,4 +1,4 @@
-/// hdUE geometry settings, authored as hdue:* attributes on Mesh, Xform or Scope prims.
+/// hdUE geometry settings, authored as unreal:* attributes on Mesh, Xform or Scope prims.
 /// With the delegate registered, Render Geometry Settings LOPs show them on an "Unreal Engine" tab.
 
 #include "$HFS/houdini/soho/parameters/CommonMacros.ds"
@@ -26,9 +26,9 @@
     parmtag     { spare_opfilter        "!!SHOP/PROPERTIES!!" }
     parmtag     { spare_classtags       "render" }
 
-    HDUE_CONTROL("xn__hdueasset_control_p3a", "Native Asset")
+    HDUE_CONTROL("xn__unrealasset_control_06a", "Native Asset")
     parm {
-        name    "xn__hdueasset_oqa"
+        name    "xn__unrealasset_zta"
         label   "Native Asset"
         type    string
         size    1
@@ -36,11 +36,11 @@
         help    "Cooked UE object this prim stands for: a StaticMesh, SkeletalMesh, Actor Blueprint or Level, as an object path (/Game/HdUE/SM_Nanite.SM_Nanite). It renders in place of the prim's own geometry."
         parmtag { "spare_category" "Native Asset" }
         parmtag { "usdvaluetype" "string" }
-        disablewhen R"({ xn__hdueasset_control_p3a == block } { xn__hdueasset_control_p3a == none })"
+        disablewhen R"({ xn__unrealasset_control_06a == block } { xn__unrealasset_control_06a == none })"
     }
-    HDUE_CONTROL("xn__hduesurfacewetenabled_control_8nbhd", "Wet Surface")
+    HDUE_CONTROL("xn__unrealsurfacewetenabled_control_krbhd", "Wet Surface")
     parm {
-        name    "xn__hduesurfacewetenabled_79ahd"
+        name    "xn__unrealsurfacewetenabled_jebhd"
         label   "Wet Surface"
         type    toggle
         size    1
@@ -48,11 +48,11 @@
         help    "Coats the bound material with a water layer, on this prim, its subsets and the meshes below it. The material must be prepared with a wet profile (-WetProfile)."
         parmtag { "spare_category" "Wet Surface" }
         parmtag { "usdvaluetype" "bool" }
-        disablewhen R"({ xn__hduesurfacewetenabled_control_8nbhd == block } { xn__hduesurfacewetenabled_control_8nbhd == none })"
+        disablewhen R"({ xn__unrealsurfacewetenabled_control_krbhd == block } { xn__unrealsurfacewetenabled_control_krbhd == none })"
     }
-    HDUE_CONTROL("xn__hduesurfacewetamount_control_mmbhd", "Amount")
+    HDUE_CONTROL("xn__unrealsurfacewetamount_control_xpbhd", "Amount")
     parm {
-        name    "xn__hduesurfacewetamount_l8ahd"
+        name    "xn__unrealsurfacewetamount_wcbhd"
         label   "Amount"
         type    float
         size    1
@@ -61,11 +61,11 @@
         help    "Fraction of the surface the water covers, multiplied by the mask primvar."
         parmtag { "spare_category" "Wet Surface" }
         parmtag { "usdvaluetype" "float" }
-        disablewhen R"({ xn__hduesurfacewetamount_control_mmbhd == block } { xn__hduesurfacewetamount_control_mmbhd == none })"
+        disablewhen R"({ xn__unrealsurfacewetamount_control_xpbhd == block } { xn__unrealsurfacewetamount_control_xpbhd == none })"
     }
-    HDUE_CONTROL("xn__hduesurfacewetroughness_control_irbhd", "Roughness")
+    HDUE_CONTROL("xn__unrealsurfacewetroughness_control_tubhd", "Roughness")
     parm {
-        name    "xn__hduesurfacewetroughness_hebhd"
+        name    "xn__unrealsurfacewetroughness_shbhd"
         label   "Roughness"
         type    float
         size    1
@@ -74,11 +74,11 @@
         help    "Roughness of the water coating."
         parmtag { "spare_category" "Wet Surface" }
         parmtag { "usdvaluetype" "float" }
-        disablewhen R"({ xn__hduesurfacewetroughness_control_irbhd == block } { xn__hduesurfacewetroughness_control_irbhd == none })"
+        disablewhen R"({ xn__unrealsurfacewetroughness_control_tubhd == block } { xn__unrealsurfacewetroughness_control_tubhd == none })"
     }
-    HDUE_CONTROL("xn__hduesurfacewetmaskPrimvar_control_rubhd", "Mask Primvar")
+    HDUE_CONTROL("xn__unrealsurfacewetmaskPrimvar_control_2xbhd", "Mask Primvar")
     parm {
-        name    "xn__hduesurfacewetmaskPrimvar_qhbhd"
+        name    "xn__unrealsurfacewetmaskPrimvar_1kbhd"
         label   "Mask Primvar"
         type    string
         size    1
@@ -86,6 +86,6 @@
         help    "Float primvar of the mesh that scales the coverage, by its base name (wetness for primvars:wetness). Empty covers the whole surface."
         parmtag { "spare_category" "Wet Surface" }
         parmtag { "usdvaluetype" "token" }
-        disablewhen R"({ xn__hduesurfacewetmaskPrimvar_control_rubhd == block } { xn__hduesurfacewetmaskPrimvar_control_rubhd == none })"
+        disablewhen R"({ xn__unrealsurfacewetmaskPrimvar_control_2xbhd == block } { xn__unrealsurfacewetmaskPrimvar_control_2xbhd == none })"
     }
 }

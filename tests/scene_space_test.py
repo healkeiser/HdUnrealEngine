@@ -85,7 +85,7 @@ class SpaceTest(unittest.TestCase):
                 prim = UsdGeom.Xform.Define(stage, "/World/Asset").GetPrim()
                 UsdGeom.Xformable(prim).AddTranslateOp().Set(Gf.Vec3d(1, 2, 3))
                 prim.CreateAttribute(
-                    "hdue:asset", Sdf.ValueTypeNames.String
+                    "unreal:asset", Sdf.ValueTypeNames.String
                 ).Set("/Game/A.A")
                 old = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(
                     Usd.TimeCode.Default()
@@ -99,7 +99,7 @@ class SpaceTest(unittest.TestCase):
                 proxy = author_proxy(
                     stage, str(prim.GetPath()), "/Game/A.A", {}, 100.0, "Y"
                 )
-                correction = prim.GetAttribute("hdue:assetSpace")
+                correction = prim.GetAttribute("unreal:assetSpace")
                 UsdGeom.Xformable(proxy).AddTransformOp().Set(
                     correction.Get() if correction else Gf.Matrix4d(1)
                 )

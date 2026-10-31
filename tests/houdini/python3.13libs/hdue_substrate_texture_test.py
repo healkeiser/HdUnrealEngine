@@ -23,7 +23,7 @@ class Test(MaterialTest):
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(0)
-        network = hou.node(hou.node("/stage").userData("hdue:startupBuilder"))
+        network = hou.node(hou.node("/stage").userData("unreal:startupBuilder"))
         if not network:
             raise AssertionError("The texture Builder was not loaded from HIP")
         initial = yield from self.image("01-texture-lumen", 0, minimum_meshes=1)

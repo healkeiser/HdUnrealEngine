@@ -189,7 +189,7 @@ def build(reports, destination):
                     # it is an explicit hdUE override on the sourceAsset shader.
                     p = parameters[field.get("nodename")]
                     if p["type"] == "texture":
-                        bindings["hdue:" + name + "_texture"] = dict(
+                        bindings["unreal:" + name + "_texture"] = dict(
                             parameter=p["name"],
                             type="texture",
                             default=p["default"],

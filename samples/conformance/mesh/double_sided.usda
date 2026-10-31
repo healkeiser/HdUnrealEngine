@@ -1,13 +1,13 @@
 #usda 1.0
 (
     doc = """doubleSided = true instructs every renderer to draw both sides and to light each side with a forward-facing
-normal; a single-sided mesh may cull its back faces, which hdUE does under hdUE:cullBackface (set here). Left: a
+normal; a single-sided mesh may cull its back faces, which hdUE does under unreal:cullBackface (set here). Left: a
 single-sided reference quad facing the camera. Middle: the same quad wound clockwise (facing away), doubleSided: it
 must be visible and lit like the reference. Right: the clockwise quad, single-sided: culled."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomMesh",
- "feature": "doubleSided (hdUE:cullBackface)",
+ "feature": "doubleSided (unreal:cullBackface)",
  "frames": 1,
  "checks": [
   {
@@ -87,7 +87,7 @@ over "Render"
 {
     over "Settings"
     {
-        bool hdUE:cullBackface = 1
+        bool unreal:cullBackface = 1
     }
 }
 def Mesh "Front"

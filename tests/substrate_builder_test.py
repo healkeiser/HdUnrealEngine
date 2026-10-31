@@ -40,7 +40,7 @@ builder = hou.node("/mat/substrate")
 assert builder.type().name() == "subnet" and builder.type().definition() is None
 assert builder.isMaterialFlagSet() and hdue_substrate.is_builder(builder)
 assert builder.parm("tabmenumask").eval() == "hdUE subnetconnector"
-assert builder.parm("shader_rendercontextname").eval() == "hdue"
+assert builder.parm("shader_rendercontextname").eval() == "unreal"
 assert sorted((c.name(), c.type().name()) for c in builder.children()) == [
     ("slab", hdue_substrate.type_name("slab")),
     ("surface_output", "subnetconnector"),
@@ -62,7 +62,7 @@ slab.parm("roughness").set(0.25)
 def authored(path):
     prim = library.stage().GetPrimAtPath(path)
     assert not library.errors(), library.errors()
-    assert prim.GetAttribute("hdue:substrate:version").Get() == 1, path
+    assert prim.GetAttribute("unreal:substrate:version").Get() == 1, path
     return {
         str(p.GetPath()): {
             a.GetName(): a.Get() for a in p.GetAuthoredAttributes()

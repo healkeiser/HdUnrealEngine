@@ -26,7 +26,9 @@ class TextureTest(SmokeTest):
                 "/Looks/" + name + "/Image"
             )
         )
-        shader.CreateInput("hdue:texture", Sdf.ValueTypeNames.String).Set(value)
+        shader.CreateInput("unreal:texture", Sdf.ValueTypeNames.String).Set(
+            value
+        )
 
     def strengths(self, value):
         for name in ("SS_Normal", "OP_Normal", "UDIM_Normal"):
@@ -124,7 +126,7 @@ class TextureTest(SmokeTest):
             or not stats["adaptiveGBuffer"]
         ):
             raise AssertionError(f"Incorrect texture scene: {stats}")
-        self.view._renderer.InvokeRendererCommand("hdue:sampleMemory", {})
+        self.view._renderer.InvokeRendererCommand("unreal:sampleMemory", {})
         self.frames[-1]["gpuLocalMemoryBytes"] = self.stats()[
             "gpuLocalMemoryBytes"
         ]

@@ -21,9 +21,9 @@ class AssetProxyTest(unittest.TestCase):
         UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.z)
         UsdGeom.SetStageMetersPerUnit(self.stage, 0.01)
         self.prim = UsdGeom.Xform.Define(self.stage, "/Asset").GetPrim()
-        self.prim.CreateAttribute("hdue:asset", Sdf.ValueTypeNames.String).Set(
-            "/Game/M.M"
-        )
+        self.prim.CreateAttribute(
+            "unreal:asset", Sdf.ValueTypeNames.String
+        ).Set("/Game/M.M")
         model = SimpleNamespace(
             stage=self.stage,
             currentFrame=Usd.TimeCode.Default(),
@@ -43,22 +43,22 @@ class AssetProxyTest(unittest.TestCase):
         )
         self.assertEqual(str(proxy.GetExtentAttr().Get()[0]), "(1, -20, 3)")
         self.assertEqual(
-            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("hdue:asset").Get(),
+            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("unreal:asset").Get(),
             "/Game/M.M",
         )
         self.assertEqual(self.stage.GetRootLayer().ExportToString(), original)
         self.stage.SetEditTarget(self.stage.GetSessionLayer())
-        self.prim.GetAttribute("hdue:asset").Set("/Game/N.N")
+        self.prim.GetAttribute("unreal:asset").Set("/Game/N.N")
         self.refs.invalidate()
         self.refs.sync()
         proxy = UsdGeom.Mesh(
             self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy")
         )
         self.assertEqual(
-            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("hdue:asset").Get(),
+            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("unreal:asset").Get(),
             "/Game/N.N",
         )
-        self.prim.GetAttribute("hdue:asset").Set("")
+        self.prim.GetAttribute("unreal:asset").Set("")
         self.refs.invalidate()
         self.refs.sync()
         self.assertFalse(self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy"))

@@ -70,7 +70,7 @@ def render(path, mode, frames, out, env, timeout, extra=()):
         out / "root.usda",
         [path],
         stage_metadata(path),
-        [f'token hdUE:renderMode = "{mode}"'],
+        [f'token unreal:renderMode = "{mode}"'],
     )
     command = [
         str(env["HFS"] + "/bin/husk.exe"),

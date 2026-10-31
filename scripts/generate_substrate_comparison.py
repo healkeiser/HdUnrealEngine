@@ -146,7 +146,7 @@ def generate(output, hip=None, runtime_config=None, single=False):
         )
         lopnet.layoutChildren()
         network.layoutChildren()
-        lopnet.setUserData("hdue:startupBuilder", network.path())
+        lopnet.setUserData("unreal:startupBuilder", network.path())
         author_node.setDisplayFlag(True)
         author_node.setCurrent(True, clear_all_selected=True)
         assert not author_node.errors() and author_node.stage()

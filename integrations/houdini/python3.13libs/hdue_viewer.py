@@ -155,7 +155,7 @@ class Viewer(QtWidgets.QDialog):
     def change_samples(self, value):
         import hdue_houdini as integration
 
-        integration.set_render_setting("xn__hdUEsamplesPerPixel", value)
+        integration.set_render_setting("xn__unrealsamplesPerPixel", value)
 
     def frame_all(self):
         import hdefereval

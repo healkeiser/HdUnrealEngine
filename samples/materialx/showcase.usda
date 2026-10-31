@@ -554,7 +554,7 @@ def "Looks"
             float inputs:base = 0.9
             float inputs:coat = 0.9
             float inputs:coat_roughness = 0.07
-            string inputs:hdue:base_color_texture = "/Game/HdUE/MaterialX/Standard/warm_png.warm_png"
+            string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/Standard/warm_png.warm_png"
             float inputs:metalness = 0.02
             float inputs:specular_roughness = 0.32
             token outputs:surface
@@ -700,7 +700,7 @@ def "Looks"
             float inputs:base_weight = 0.9
             float inputs:coat_roughness = 0.07
             float inputs:coat_weight = 0.9
-            string inputs:hdue:base_color_texture = "/Game/HdUE/MaterialX/OpenPBR/cool_png.cool_png"
+            string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/OpenPBR/cool_png.cool_png"
             float inputs:specular_roughness = 0.32
             token outputs:surface
         }

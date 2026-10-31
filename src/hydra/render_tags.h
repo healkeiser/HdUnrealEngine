@@ -15,7 +15,7 @@ inline std::vector<TfToken> HdUEIncludedTags(std::vector<TfToken> tags, const Vt
     if (tags.empty()) tags = allowed;
     std::erase_if(tags,
                   [&](const TfToken& tag) { return std::find(allowed.begin(), allowed.end(), tag) == allowed.end(); });
-    if (tags.empty()) tags.push_back(TfToken("hdUE:none"));
+    if (tags.empty()) tags.push_back(TfToken("unreal:none"));
     return tags;
 }
 PXR_NAMESPACE_CLOSE_SCOPE

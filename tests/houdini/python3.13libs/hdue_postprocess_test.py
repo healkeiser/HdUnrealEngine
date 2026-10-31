@@ -7,7 +7,7 @@ import numpy as np
 from hdue_houdini_test import Test as ViewportTest
 
 _test = None
-TEMP = "xn__hdUEpostProcessWhiteTemp_3fbl"
+TEMP = "xn__unrealpostProcessWhiteTemp_fjbl"
 
 
 class Test(ViewportTest):
@@ -20,7 +20,7 @@ class Test(ViewportTest):
         hdefereval.execute_deferred(viewer.curViewport().frameAll)
         for _ in range(8):
             yield
-        integration.set_render_setting("xn__hdUEtonemapper", 1)
+        integration.set_render_setting("xn__unrealtonemapper", 1)
         node = viewer.pwd().displayNode()
         while node.type().name() != integration.RENDER_SETTINGS_TYPES[1]:
             node = node.inputs()[0]

@@ -1,4 +1,4 @@
-"""Expose hdue:asset on USD Xforms through Hydra's mesh compatibility path.
+"""Expose unreal:asset on USD Xforms through Hydra's mesh compatibility path.
 
 Only an anonymous session sublayer is changed. The box supplies host bounds and
 selection; hdUE instantiates the native asset instead of rendering the box.
@@ -49,14 +49,14 @@ class AssetReferences:
             return
         refs = {}
         for prim in stage.Traverse():
-            attr = prim.GetAttribute("hdue:asset")
+            attr = prim.GetAttribute("unreal:asset")
             value = attr.Get() if attr else None
             if value:
                 if isinstance(value, Sdf.AssetPath):
                     value = value.path
                 if not isinstance(value, str):
                     raise ValueError(
-                        f"hdue:asset requires a UE object path string at {prim.GetPath()}"
+                        f"unreal:asset requires a UE object path string at {prim.GetPath()}"
                     )
                 refs[str(prim.GetPath())] = (value, prim.IsA(UsdGeom.Mesh))
         units = UsdGeom.GetStageMetersPerUnit(stage) * 100

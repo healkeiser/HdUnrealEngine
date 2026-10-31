@@ -79,7 +79,7 @@ struct HdUEMeshData {
     TfToken renderTag;                    // purpose; hidden while the render pass does not draw it
     int primId = -1;                      // HdRprim::GetPrimId, written by the ID pass
     VtArray<TfToken> categories;          // light/shadow link collections that include the prim (GetCategories)
-    bool doubleSided = true;              // UsdGeomGprim doubleSided; hdUE:cullBackface culls single-sided backs
+    bool doubleSided = true;              // UsdGeomGprim doubleSided; unreal:cullBackface culls single-sided backs
     bool instanced = false;               // prototype of a Hydra instancer: drawn once per entry of instances
     std::vector<GfMatrix4d> instances;    // USD world matrices (prototype transform included)
     std::vector<GfVec3f> instanceColors;  // per instance: an instance-rate displayColor (or material colour primvar)
@@ -225,7 +225,7 @@ struct HdUEState : HdRenderParam {
     HdRenderSettingsMap settings;
     // Guards settings: Houdini's UI thread writes them (SetRenderSetting) while hdUE's UE thread reads them.
     mutable std::recursive_mutex settingsMutex;
-    std::set<TfToken> namespaced;  // settings set as hdUE:<name>, which the bare <name> no longer overrides
+    std::set<TfToken> namespaced;  // settings set as unreal:<name>, which the bare <name> no longer overrides
     // GetRenderStats' last result; the UE thread refreshes it (Houdini's UI asks often and must not wait on UE).
     std::mutex statsMutex;
     VtDictionary stats;
@@ -304,13 +304,13 @@ struct HdUEState : HdRenderParam {
         const int samples = std::max(1, setting<int>("samplesPerPixel", 64));
         return interactive() ? std::min(samples, 8) : samples;  // ponytail: fixed cap; a setting if users ask
     }
-    // hdUE:debugView, which replaces the realtime beauty only.
+    // unreal:debugView, which replaces the realtime beauty only.
     std::string debugView() const {
         return setting<std::string>("renderMode", "realtime") == "realtime" ? setting<std::string>("debugView", "off")
                                                                             : "off";
     }
-    // UE's tonemapper draws the beauty (hdUE:tonemapper, or a debug view drawn for display as UE's viewport does): the
-    // camera exposure goes in before it. Buffer debug views stay linear data.
+    // UE's tonemapper draws the beauty (unreal:tonemapper, or a debug view drawn for display as UE's viewport does):
+    // the camera exposure goes in before it. Buffer debug views stay linear data.
     bool toneMapped() const {
         const auto view = debugView();
         return setting<bool>("tonemapper", false) || (view != "off" && !view.starts_with("buffer:"));

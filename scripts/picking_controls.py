@@ -54,7 +54,7 @@ def install_picking(controller):
             )
             maximum = float((frustum.nearFar.GetMax() - offset) / cosine)
             if not renderer.InvokeRendererCommand(
-                "hdue:pickRay",
+                "unreal:pickRay",
                 {
                     "origin": ray.startPoint,
                     "direction": direction,

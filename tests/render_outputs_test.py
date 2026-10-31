@@ -156,8 +156,8 @@ assert UsdRender.Product(
 # File parameters have Houdini's file chooser; the cooked libraries still author strings.
 for name, mode, pattern in (
     ("picture", "write", None),
-    (hou.text.encode("hdUE:materialxLibrary"), "read", "*.json"),
-    (hou.text.encode("hdUE:substrateLibrary"), "read", "*.json"),
+    (hou.text.encode("unreal:materialxLibrary"), "read", "*.json"),
+    (hou.text.encode("unreal:substrateLibrary"), "read", "*.json"),
 ):
     template = alone.parm(name).parmTemplate()
     assert template.stringType() == hou.stringParmType.FileReference, name
@@ -165,11 +165,11 @@ for name, mode, pattern in (
     assert (
         template.tags().get("filechooser_pattern") == pattern
     ), template.tags()
-alone.parm(hou.text.encode("hdUE:materialxLibrary")).set("$HIP/library.json")
+alone.parm(hou.text.encode("unreal:materialxLibrary")).set("$HIP/library.json")
 library = (
     alone.stage()
     .GetPrimAtPath("/Render/rendersettings")
-    .GetAttribute("hdUE:materialxLibrary")
+    .GetAttribute("unreal:materialxLibrary")
 )
 assert str(library.GetTypeName()) == "string" and library.Get().endswith(
     "/library.json"
@@ -187,7 +187,7 @@ for prop in (
     "VignetteTexture",
 ):
     template = alone.parm(
-        hou.text.encode("hdUE:postProcess:" + prop)
+        hou.text.encode("unreal:postProcess:" + prop)
     ).parmTemplate()
     tags = template.tags()
     assert template.stringType() == hou.stringParmType.FileReference, prop
@@ -197,21 +197,21 @@ for prop in (
     ) and "*.exr" in tags.get("filechooser_pattern", ""), (prop, tags)
     assert tags.get("usdvaluetype") == "asset", (prop, tags)
 assert (
-    alone.parm(hou.text.encode("hdUE:postProcess:AutoExposureBiasCurve"))
+    alone.parm(hou.text.encode("unreal:postProcess:AutoExposureBiasCurve"))
     .parmTemplate()
     .stringType()
     == hou.stringParmType.Regular
 )
-alone.parm(hou.text.encode("hdUE:tonemapper")).set(
+alone.parm(hou.text.encode("unreal:tonemapper")).set(
     1
 )  # lens settings apply with it
-alone.parm(hou.text.encode("hdUE:postProcess:BloomDirtMask")).set(
+alone.parm(hou.text.encode("unreal:postProcess:BloomDirtMask")).set(
     "$HIP/dirt.png"
 )
 dirt = (
     alone.stage()
     .GetPrimAtPath("/Render/rendersettings")
-    .GetAttribute("hdUE:postProcess:BloomDirtMask")
+    .GetAttribute("unreal:postProcess:BloomDirtMask")
 )
 assert str(dirt.GetTypeName()) == "asset" and dirt.Get().path.endswith(
     "/dirt.png"
@@ -223,7 +223,7 @@ assert (
     == "write"
 )
 # Hit Lighting (off by default, as in UE) authors Lumen's Ray Lighting Mode.
-ray = "hdUE:postProcess:LumenRayLightingMode"
+ray = "unreal:postProcess:LumenRayLightingMode"
 settings_prim = lambda: alone.stage().GetPrimAtPath("/Render/rendersettings")
 assert not alone.evalParm("hdue_lumenHitLighting")
 assert not settings_prim().GetAttribute(ray), ray
@@ -275,30 +275,30 @@ for once in (
 assert "Lumen" not in labels and "Path Tracer" not in labels, labels
 encode = lambda attribute: hou.text.encode(attribute)
 # Advanced settings hide in Essential and are still authored (the internal LOP has no Essential | Advanced strip).
-subdivision = group.find(encode("hdUE:subdivisionLevel"))
+subdivision = group.find(encode("unreal:subdivisionLevel"))
 assert "hdue_show == 0" in subdivision.conditionals().get(
     hou.parmCondType.HideWhen, ""
 ), subdivision.conditionals()
 assert "hdue_show" not in group.find(
-    encode("hdUE:renderMode")
+    encode("unreal:renderMode")
 ).conditionals().get(hou.parmCondType.HideWhen, "")
 alone.parm("hdue_show").set(0)
-alone.parm(encode("hdUE:subdivisionLevel")).set(3)
-alone.parm(encode("hdUE:samplesPerPixel")).set(16)
-assert settings_prim().GetAttribute("hdUE:subdivisionLevel").Get() == 3
+alone.parm(encode("unreal:subdivisionLevel")).set(3)
+alone.parm(encode("unreal:samplesPerPixel")).set(16)
+assert settings_prim().GetAttribute("unreal:subdivisionLevel").Get() == 3
 # As in a Render Settings LOP, a setting the render mode hides is not authored (samples: Path Tracer only).
-assert not settings_prim().GetAttribute("hdUE:samplesPerPixel")
-alone.parm(encode("hdUE:renderMode")).set("pathtraced")
-assert settings_prim().GetAttribute("hdUE:samplesPerPixel").Get() == 16
-alone.parm(encode("hdUE:renderMode")).set("realtime")
+assert not settings_prim().GetAttribute("unreal:samplesPerPixel")
+alone.parm(encode("unreal:renderMode")).set("pathtraced")
+assert settings_prim().GetAttribute("unreal:samplesPerPixel").Get() == 16
+alone.parm(encode("unreal:renderMode")).set("realtime")
 # Ranges lock where UE clamps (ClampMin/ClampMax) and only guide the slider where it does not (UIMin/UIMax).
 for attribute, lo, hi, lo_locked, hi_locked in (
-    ("hdUE:postProcess:BloomIntensity", 0, 8, True, False),
-    ("hdUE:postProcess:PathTracingMaxBounces", 0, 100, True, True),
-    ("hdUE:postProcess:WhiteTemp", 1500, 15000, False, False),
-    ("hdUE:postProcess:LumenFinalGatherQuality", 0.25, 2, True, False),
-    ("hdUE:samplesPerPixel", 1, 65536, True, True),
-    ("hdUE:warmupFrames", 1, 256, True, False),
+    ("unreal:postProcess:BloomIntensity", 0, 8, True, False),
+    ("unreal:postProcess:PathTracingMaxBounces", 0, 100, True, True),
+    ("unreal:postProcess:WhiteTemp", 1500, 15000, False, False),
+    ("unreal:postProcess:LumenFinalGatherQuality", 0.25, 2, True, False),
+    ("unreal:samplesPerPixel", 1, 65536, True, True),
+    ("unreal:warmupFrames", 1, 256, True, False),
 ):
     t = group.find(encode(attribute))
     assert (t.minValue(), t.maxValue(), t.minIsStrict(), t.maxIsStrict()) == (

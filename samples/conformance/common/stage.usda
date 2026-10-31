@@ -45,9 +45,9 @@ def Scope "Render"
         rel camera = </Camera>
         uniform int2 resolution = (128, 128)
         rel products = [</Render/Beauty>, </Render/Ids>]
-        int hdUE:samplesPerPixel = 16
-        int hdUE:warmupFrames = 8
-        token hdUE:renderMode = "realtime"
+        int unreal:samplesPerPixel = 16
+        int unreal:warmupFrames = 8
+        token unreal:renderMode = "realtime"
     }
 
     # The IDs go to their own product, so a scene can drop them; render_settings/multi_var_product.usda puts every

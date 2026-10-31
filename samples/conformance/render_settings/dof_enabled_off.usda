@@ -1,12 +1,12 @@
 #usda 1.0
 (
-    doc = """hdUE:postProcess:DepthOfFieldEnabled = 0 (the hdUE Render Settings LOP's Lens > Depth of Field > Enabled) turns
+    doc = """unreal:postProcess:DepthOfFieldEnabled = 0 (the hdUE Render Settings LOP's Lens > Depth of Field > Enabled) turns
 depth of field off in both modes: the sphere far behind the focus plane stays as sharp as the one in focus. UE's
 DepthOfFieldEnabled only stops its raster DOF; the Path Tracer's reference DOF ignored it."""
     customLayerData = {
         string conformance = """{
  "schema": "hdUE render settings",
- "feature": "hdUE:postProcess:DepthOfFieldEnabled",
+ "feature": "unreal:postProcess:DepthOfFieldEnabled",
  "frames": 1,
  "checks": [
   {
@@ -48,7 +48,7 @@ over "Render"
 {
     over "Settings"
     {
-        bool hdUE:postProcess:DepthOfFieldEnabled = 0
+        bool unreal:postProcess:DepthOfFieldEnabled = 0
     }
 }
 over "Camera"

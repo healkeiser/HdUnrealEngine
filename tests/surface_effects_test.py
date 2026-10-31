@@ -36,7 +36,7 @@ class SurfaceTests(unittest.TestCase):
 
     def author(self, path, name, kind, value):
         self.stage.GetPrimAtPath(path).CreateAttribute(
-            "hdue:surface:wet:" + name, kind
+            "unreal:surface:wet:" + name, kind
         ).Set(value)
 
     def test_nearest_independent_opinions_and_subset(self):
@@ -107,7 +107,7 @@ class SurfaceTests(unittest.TestCase):
         )
         self.author("/World/Mesh", "maskPrimvar", Sdf.ValueTypeNames.Token, "")
         attr = self.mesh.GetPrim().CreateAttribute(
-            "hdue:surface:wet:amount", Sdf.ValueTypeNames.Float
+            "unreal:surface:wet:amount", Sdf.ValueTypeNames.Float
         )
         attr.Set(0, 1)
         attr.Set(1, 3)

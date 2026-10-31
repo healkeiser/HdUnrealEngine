@@ -69,10 +69,10 @@ def normalize_stage(stage, axis, meters):
         xform = UsdGeom.Xformable(prim)
         if xform and (not has_xform_parent(prim) or xform.GetResetXformStack()):
             _matrix_op(xform, Gf.Matrix4d(1), conversion, "hdueSolarisSpace")
-        asset = prim.GetAttribute("hdue:asset")
+        asset = prim.GetAttribute("unreal:asset")
         if asset and asset.Get() and (xform or has_xform_parent(prim)):
             prim.CreateAttribute(
-                "hdue:assetSpace", Sdf.ValueTypeNames.Matrix4d, custom=True
+                "unreal:assetSpace", Sdf.ValueTypeNames.Matrix4d, custom=True
             ).Set(conversion.GetInverse())
     # Camera filmback axes are always Y-up/-Z, regardless of stage up axis.
     # Remove only the unit scale from their basis, and convert optical lengths.

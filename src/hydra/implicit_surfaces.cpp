@@ -318,7 +318,7 @@ protected:
 // ComputeVisibility, USDPrimConversion.cpp), so hdUE follows the spec (UsdGeomImageable::ComputeEffectiveVisibility):
 // this adapter publishes the authored tokens, HdUEPurposeVisibility hides render/proxy/guide gprims they make
 // invisible. ponytail: an edit on an ancestor does not dirty its descendants.
-TF_DEFINE_PRIVATE_TOKENS(HdUEPurposeVisibilityTokens, ((container, "hdUE:purposeVisibility"))(render)(proxy)(guide));
+TF_DEFINE_PRIVATE_TOKENS(HdUEPurposeVisibilityTokens, ((container, "unreal:purposeVisibility"))(render)(proxy)(guide));
 class HdUE_VisibilityAPIAdapter final : public UsdImagingAPISchemaAdapter {
 public:
     HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim, const TfToken&,
@@ -354,7 +354,7 @@ public:
                                                       const UsdImagingDataSourceStageGlobals& globals) override {
         const auto data = UsdImagingHermiteCurvesAdapter::GetImagingSubprimData(prim, subprim, globals);
         if (!subprim.IsEmpty()) return data;
-        static const TfToken key("hdUE:hermiteCurves");
+        static const TfToken key("unreal:hermiteCurves");
         return HdOverlayContainerDataSource::OverlayedContainerDataSources(
             HdRetainedContainerDataSource::New(key, HdRetainedTypedSampledDataSource<bool>::New(true)), data);
     }
@@ -501,7 +501,7 @@ protected:
             }
             // HermiteCurves (HdUE_HermiteCurvesAdapter): UE's USD importer has none; converting them in a UsdImaging
             // adapter would change every renderer in the session, so hdUE only warns.
-            if (prim.dataSource->Get(TfToken("hdUE:hermiteCurves")))
+            if (prim.dataSource->Get(TfToken("unreal:hermiteCurves")))
                 warn(TfToken("HermiteCurves"), "HermiteCurves are not supported and render nothing (%s)",
                      entry.primPath.GetText());
             if (const auto schemas = UsdImagingUsdPrimInfoSchema::GetFromParent(prim.dataSource).GetApiSchemas())
