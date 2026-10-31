@@ -37,6 +37,7 @@ hython scripts\run_conformance.py --runtime-config <absolute path>   # 150+ scen
 - Read the UE source (`Engine/Source`, `Engine/Plugins`) before assuming how UE behaves; the engine root is in `.local/paths.json`.
 - Test on small scenes (Cornell, the conformance set, tiny repros). Sponza and Jungle Ruins renders take minutes: only for a gallery refresh someone asked for. No Karma renders unless asked.
 - Lights in samples: intensity 1, tune with `inputs:exposure`. Never replace a scene's own lights or HDRI.
+- **Verification is tiered.** Every change: build, unit tests, the conformance scenes it touches (`run_conformance.py --only <area>/*`) and a Cornell husk render compared with the previous build; changes to Hydra sync, scene upload or the ABI also run the in-Houdini test they touch (`Launch-Houdini.ps1 -TestKind surfaces|selection|...`). The full conformance run (0 failing runs) and the Cornell gallery check run once per group of commits, before pushing.
 - Work on `main` (the only branch); verified work is committed and pushed there. Never push to Epic's or the upstream fork's repositories.
 - Comments explain why, at the density of the surrounding code; docs follow the existing prose style (plain, concrete, no marketing).
 - C++: `.clang-format` (Google style, 4 spaces, 120 columns). Python: Black and Ruff (`pyproject.toml`). PowerShell: PSScriptAnalyzer. CI checks all of them.
