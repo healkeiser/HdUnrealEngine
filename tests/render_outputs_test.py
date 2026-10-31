@@ -308,9 +308,31 @@ for attribute, lo, hi, lo_locked, hi_locked in (
         hi_locked,
     ), (attribute, t.minValue(), t.maxValue(), t.minIsStrict(), t.maxIsStrict())
 resolution = group.find("resolution")
-assert (resolution.minValue(), resolution.maxValue()) == (1, 8192) and (
-    resolution.minIsStrict() and resolution.maxIsStrict()
+assert (resolution.minValue(), resolution.maxValue()) == (1, 16384) and (
+    resolution.minIsStrict() and not resolution.maxIsStrict()
 )
+# Essential names the changed settings it hides; Show in Advanced switches the strip.
+notice = alone.parm("hdue_hiddenchanges")
+alone.parm("hdue_show").set(0)
+# Changed above: the subdivision level and the cooked MaterialX library.
+assert notice.evalAsString().startswith(
+    "2 changed settings hidden in Advanced: "
+)
+moving = next(
+    p
+    for p in alone.parms()
+    if p.parmTemplate().label() == "Moving Screen Percentage"
+)
+moving.set(moving.eval() + 10)
+assert notice.evalAsString().startswith(
+    "3 changed settings hidden in Advanced: "
+) and (
+    "Moving Screen Percentage (Rendering > Anti-Aliasing)"
+    in notice.evalAsString()
+), notice.evalAsString()
+alone.parm("hdue_showhidden").pressButton()
+assert alone.evalParm("hdue_show") == 1 and notice.evalAsString() == ""
+moving.revertToDefaults()
 # Second input, as Karma Render Settings': Import Render Vars From Second Input appends its render vars to the
 # built-in product's ordered vars, after its own.
 assert alone.type().maxNumInputs() == 2 and alone.inputLabels() == (

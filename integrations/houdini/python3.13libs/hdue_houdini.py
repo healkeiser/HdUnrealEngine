@@ -4,7 +4,9 @@ redraws). UE runs on the delegate's own thread; the host starts when a Scene Vie
 
 import atexit
 import json
+import operator
 import os
+import re
 import sys
 import threading
 import time
@@ -1060,3 +1062,99 @@ def set_render_setting(prefix, value):
         node.setDisplayFlag(True)
     node.cook(force=True)
     viewer.curViewport().draw()
+
+
+_HIDE_GROUP = re.compile(r"\{([^}]*)\}")
+_HIDE_TERM = re.compile(r'(\w+)\s*(==|!=|<=|>=|<|>)\s*("[^"]*"|[^\s}]+)')
+_COMPARE = {
+    "==": operator.eq,
+    "!=": operator.ne,
+    "<": operator.lt,
+    ">": operator.gt,
+    "<=": operator.le,
+    ">=": operator.ge,
+}
+_hide_rules = {}
+
+
+def _hide_rules_of(node_type):
+    """(parm name, label, section, hide-when groups) of each setting of the type: its own hide-when and its folders'.
+
+    Cached per type: an asset's templates do not change in a session.
+    """
+    rules = _hide_rules.get(node_type.name())
+    if rules is not None:
+        return rules
+    rules = []
+
+    def walk(templates, path, groups):
+        for t in templates:
+            folder = t.type() == hou.parmTemplateType.Folder
+            texts = [t.conditionals().get(hou.parmCondType.HideWhen, "")]
+            if folder:
+                texts.append(
+                    t.tabConditionals().get(hou.parmCondType.HideWhen, "")
+                )
+            terms = groups + [
+                _HIDE_TERM.findall(g)
+                for text in texts
+                for g in _HIDE_GROUP.findall(text)
+            ]
+            if folder:
+                walk(t.parmTemplates(), path + [t.label()], terms)
+            elif t.type() not in (
+                hou.parmTemplateType.Label,
+                hou.parmTemplateType.Button,
+                hou.parmTemplateType.Separator,
+            ):
+                rules.append((t.name(), t.label(), " > ".join(path), terms))
+
+    walk(node_type.parmTemplateGroup().parmTemplates(), [], [])
+    _hide_rules[node_type.name()] = rules
+    return rules
+
+
+def _hidden(node, groups, show):
+    """Whether a hide-when (OR-ed groups of AND-ed terms) holds with the Essential | Advanced strip at show."""
+
+    def holds(name, op, value):
+        value = value.strip('"')
+        parm = node.parm(name)
+        if name == "hdue_show":
+            actual = show
+        elif parm is None:
+            return False
+        else:
+            actual = parm.eval()
+        try:
+            return _COMPARE[op](float(actual), float(value))
+        except (TypeError, ValueError):
+            return _COMPARE[op](parm.evalAsString(), value)
+
+    return any(terms and all(holds(*t) for t in terms) for terms in groups)
+
+
+def hidden_changes(node=None, limit=3):
+    """The notice of hdUE Render Settings in Essential: the changed settings (not at their default) only Advanced shows,
+    e.g. "2 changed settings hidden in Advanced: Intensity (Lens > Bloom), ...". Empty in Advanced or without any.
+    Settings hidden in both (the other render mode) are not authored, so not counted. UI only: the parameter
+    dialog evaluates it when it refreshes; nothing cooks it.
+    """
+    node = node or hou.pwd()
+    if node.evalParm("hdue_show") != 0:
+        return ""
+    changed = [
+        f"{label} ({section})" if section else label
+        for name, label, section, groups in _hide_rules_of(node.type())
+        if (parms := node.parmTuple(name))
+        and not all(p.isAtDefault() for p in parms)
+        and _hidden(node, groups, 0)
+        and not _hidden(node, groups, 1)
+    ]
+    if not changed:
+        return ""
+    names = ", ".join(changed[:limit])
+    if len(changed) > limit:
+        names += f" and {len(changed) - limit} more"
+    plural = "s" if len(changed) > 1 else ""
+    return f"{len(changed)} changed setting{plural} hidden in Advanced: {names}"
