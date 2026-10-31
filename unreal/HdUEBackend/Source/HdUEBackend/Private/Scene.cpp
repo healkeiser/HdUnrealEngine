@@ -30,7 +30,13 @@
 #include "ispc_texcomp.h"
 #include "UObject/Package.h"
 #include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
+#include "Hash/Blake3.h"
 #include "Hash/CityHash.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
 #include "NaniteBuilder.h"
 #include "Rendering/NaniteResources.h"
 #include "RayTracingGeometryManagerInterface.h"
@@ -688,8 +694,46 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     FMeshNaniteSettings Settings;
     Settings.bEnabled = true;
     Settings.TargetMinimumResidencyInKB = MAX_uint32;
+    // The Nanite build is most of a scene's conversion (450 meshes, 4.4M triangles: 10.5 s of 11.2 s), so builds are
+    // kept across runs as UE's derived data cache keeps a static mesh's (FStaticMeshRenderData::Cache, StaticMesh.cpp):
+    // keyed by the builder's version and the mesh's content, the resources as Serialize writes them (bCooked false).
+    // UE's cache itself is unavailable here: GetCache() creates none where RequiresCookedData() (cooked runtimes,
+    // DerivedDataCacheModule.cpp), so this keeps a file per mesh under Saved/NaniteCache.
+    FBlake3 Hasher;
+    const FString Version = Nanite::IBuilderModule::Get().GetVersionString();
+    Hasher.Update(*Version, Version.Len() * sizeof(TCHAR));
+    const auto Add = [&](const auto& Array) { Hasher.Update(Array.GetData(), Array.Num() * Array.GetTypeSize()); };
+    Add(Input.Vertices.Position);
+    Add(Input.Vertices.TangentX);
+    Add(Input.Vertices.TangentY);
+    Add(Input.Vertices.TangentZ);
+    for (const auto& UVs : Input.Vertices.UVs) Add(UVs);
+    Add(Input.Vertices.Color);
+    Add(Input.TriangleIndices);
+    const FString Path =
+        FPaths::ProjectSavedDir() / TEXT("NaniteCache") / LexToString(Hasher.Finalize()) + TEXT(".nanite");
     auto Resources = MakeShared<Nanite::FResources>();
+    TArray<uint8> Bytes;
+    if (FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) {
+        FMemoryReader Reader(Bytes);  // not persistent: see the writer
+        Resources->Serialize(Reader, nullptr, false);
+        if (!Reader.IsError()) {
+            IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
+            return Resources;
+        }
+        *Resources = Nanite::FResources();
+    }
     if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
+    // Every page is a root page, so StreamablePages (bulk data) is empty. Runtime builds cannot save bulk data
+    // (USE_RUNTIME_BULKDATA, BulkData.cpp) but still read its header; a non-persistent archive skips it both ways.
+    if (Resources->StreamablePages.GetBulkDataSize()) return Resources;
+    Bytes.Reset();
+    FMemoryWriter Writer(Bytes);
+    Resources->Serialize(Writer, nullptr, false);
+    // Another task may build the same mesh: write a private file, then move it into place.
+    const FString Temporary = FPaths::CreateTempFilename(*FPaths::GetPath(Path), TEXT("nanite"));
+    if (FFileHelper::SaveArrayToFile(Bytes, *Temporary) && !IFileManager::Get().Move(*Path, *Temporary, true))
+        IFileManager::Get().Delete(*Temporary);
     return Resources;
 }
 UStaticMesh* NewStaticMesh(UObject* Outer) {
@@ -794,12 +838,45 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
 
 // Replaces one static mesh queued by Apply with its version with Lumen cards (and Nanite data) once that build has
 // finished. Both must be attached before a mesh's GPU resources exist, so that version is a second static mesh.
+// UE's Editor.AsyncAssetCompilationMaxMemoryUsage for hdUE's background mesh builds (UE's applies to the editor only).
+static TAutoConsoleVariable<int32> CVarMeshBuildMaxMemoryUsage(
+    TEXT("r.HdUE.MeshBuildMaxMemoryUsage"), 0,
+    TEXT("Interactive hosts: 0 - background mesh builds start while system memory is available; N - keep their "
+         "estimated "
+         "memory under N GB."));
+
 void FHdueScene::TickConversions() {
+    // Builds start while their memory fits, as UE's editor schedules asset builds (FMemoryBoundQueuedThreadPoolWrapper,
+    // AssetCompilingManager.cpp, editor-only): an estimate of 7 times the source mesh (UStaticMesh::
+    // GetBuildRequiredMemoryEstimate, StaticMesh.cpp) against the available physical and virtual memory less 64 MB,
+    // with builds already started (or finished and waiting to be swapped in) holding theirs.
+    if (PendingStatic.Num()) {
+        const FPlatformMemoryStats Stats = FPlatformMemory::GetStats();
+        int64 Available = int64(FMath::Min(Stats.AvailablePhysical, Stats.AvailableVirtual)) - 64 * 1024 * 1024;
+        Available -= ReservedMemory;
+        if (const int64 Limit = int64(CVarMeshBuildMaxMemoryUsage.GetValueOnGameThread()) << 30)
+            Available = FMath::Min(Available, Limit - ReservedMemory);
+        for (auto& [Id, Pending] : PendingStatic) {
+            if (Pending.Task.IsValid()) continue;
+            if (ReservedMemory && Pending.Memory > Available) break;  // one build always runs
+            Available -= Pending.Memory;
+            ReservedMemory += Pending.Memory;
+            Pending.Task = UE::Tasks::Launch(
+                TEXT("HdueConversion"),
+                [Source = MoveTemp(Pending.Source)]() -> TSharedPtr<FConversion> {
+                    auto Result = MakeShared<FConversion>(BuildStatic(Source->Desc, true));
+                    if (Source->Nanite) Result->Nanite = BuildNanite(Source->Desc);
+                    return Result;
+                },
+                UE::Tasks::ETaskPriority::BackgroundLow);
+        }
+    }
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
-        if (!It.Value().IsCompleted()) continue;  // not built yet
+        if (!It.Value().Task.IsValid() || !It.Value().Task.IsCompleted()) continue;  // queued or not built yet
+        ReservedMemory -= It.Value().Memory;
         AActor* Actor = Actors.FindRef(It.Key());
         auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr;
-        const TSharedPtr<FConversion> Conversion = It.Value().GetResult();
+        const TSharedPtr<FConversion> Conversion = It.Value().Task.GetResult();
         if (!Component) {
             It.RemoveCurrent();
             continue;
@@ -1157,7 +1234,20 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // scattered prototype drew all its triangles (Jungle Ruins' 8.7 million instances hung the GPU).
     // HDUE_NANITE=0 keeps regular static meshes.
     static const bool NaniteMeshes = FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_NANITE")) != TEXT("0");
-    if (NaniteMeshes) Nanite::IBuilderModule::Get();  // load the builder on this thread before worker tasks use it
+    // Load the builder on this thread before worker tasks use it, and fill its version string, which BuildNanite's
+    // cache key reads on workers: GetVersionString builds a function-local static string without a lock
+    // (NaniteBuilder.cpp), and two workers filling it at once corrupted the heap.
+    if (NaniteMeshes) Nanite::IBuilderModule::Get().GetVersionString();
+    static const bool Evicted = [] {
+        // Cached Nanite builds (BuildNanite) unused for a week go, as the OCIO texture cache's do.
+        const FString Folder = FPaths::ProjectSavedDir() / TEXT("NaniteCache");
+        TArray<FString> Files;
+        IFileManager::Get().FindFiles(Files, *(Folder / TEXT("*.nanite")), true, false);
+        for (const FString& File : Files)
+            if (FDateTime::UtcNow() - IFileManager::Get().GetTimeStamp(*(Folder / File)) > FTimespan::FromDays(7))
+                IFileManager::Get().Delete(*(Folder / File));
+        return true;
+    }();
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes;
     BuiltMeshes.SetNum(Batch.mesh_count);
     TArray<FConversion> StaticData;
@@ -1237,7 +1327,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                    Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
-            PendingStatic.Remove(Id);  // a background build for the previous geometry finishes unused
+            // A background build for the previous geometry finishes unused (its memory is released with it).
+            if (const FPendingStatic* Previous = PendingStatic.Find(Id)) {
+                if (Previous->Task.IsValid()) ReservedMemory -= Previous->Memory;
+                PendingStatic.Remove(Id);
+            }
             if (Static) {
                 auto* Built = NewStaticMesh(Actor);
                 // Nanite draws opaque and masked materials only.
@@ -1252,17 +1346,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 if (Interactive) {
                     // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
-                    // normal-priority Nanite tasks starved its rendering for 15 s).
+                    // normal-priority Nanite tasks starved its rendering for 15 s). TickConversions starts them.
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    const bool WithNanite = NaniteMeshes;
-                    PendingStatic.Add(Id, UE::Tasks::Launch(
-                                              TEXT("HdueConversion"),
-                                              [Copy, WithNanite]() -> TSharedPtr<FConversion> {
-                                                  auto Result = MakeShared<FConversion>(BuildStatic(Copy->Desc, true));
-                                                  if (WithNanite) Result->Nanite = BuildNanite(Copy->Desc);
-                                                  return Result;
-                                              },
-                                              UE::Tasks::ETaskPriority::BackgroundLow));
+                    Copy->Nanite = NaniteMeshes;
+                    const int64 Source = Copy->Positions.GetAllocatedSize() + Copy->Normals.GetAllocatedSize() +
+                                         Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
+                                         Copy->Indices.GetAllocatedSize();
+                    PendingStatic.Add(Id, {Copy, 7 * Source, {}});
                 }
             } else
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));

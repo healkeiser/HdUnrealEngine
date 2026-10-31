@@ -15,6 +15,7 @@ struct FNaniteSource {
     TArray<float> Positions, Normals, UV, Colors;
     TArray<uint32> Indices;
     HdueMeshDesc Desc{};
+    bool Nanite = false;  // build Nanite data too
     explicit FNaniteSource(const HdueMeshDesc& In) : Desc(In) {
         Positions = TArray<float>(In.positions, int32(In.vertex_count * 3));
         Desc.positions = Positions.GetData();
@@ -123,7 +124,14 @@ private:
         TSharedPtr<Nanite::FResources> Nanite;
     };
     static FConversion BuildStatic(const HdueMeshDesc& Desc, bool Cards);
-    TMap<FString, UE::Tasks::TTask<TSharedPtr<FConversion>>> PendingStatic;  // background card and Nanite builds
+    // Background card and Nanite builds (interactive hosts), queued until memory allows them (TickConversions).
+    struct FPendingStatic {
+        TSharedPtr<FNaniteSource> Source;                // the mesh's arrays, released once its build starts
+        int64 Memory = 0;                                // reserved from launch until the mesh is swapped in
+        UE::Tasks::TTask<TSharedPtr<FConversion>> Task;  // invalid while queued
+    };
+    TMap<FString, FPendingStatic> PendingStatic;
+    int64 ReservedMemory = 0;
     const FPreviewTexture* PreviewTexture(const FString& Key, FString& Error);
     struct FWet {
         FString Asset;
