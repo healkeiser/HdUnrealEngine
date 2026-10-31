@@ -15,6 +15,7 @@ It restarts itself in hython, with the integration and the delegate's plugInfo.j
 (HDUE_HOUDINI_ROOT, HFS or houdini_root; HDUE_HOUDINI_BUILD_ROOT, houdini_build_root or build/houdini).
 """
 
+import itertools
 import os
 import re
 import shutil
@@ -136,6 +137,20 @@ TOP_HELP = {
     "resolutionMenu": "Common image sizes.",
     "pixelAspectRatio": "Width of a pixel relative to its height.",
 }
+# The second input's render vars, after the built-in product's own (as Karma Render Settings appends them).
+APPEND_VARS = """from pxr import UsdRender
+
+node = hou.pwd()
+asset = node.parent()
+product = node.editableStage().GetPrimAtPath("/Render/Products/renderproduct")
+if product and asset.evalParm("importsecondaryinputvars"):
+    ordered = UsdRender.Product(product).GetOrderedVarsRel()
+    targets = ordered.GetTargets()
+    for prim in asset.node("secondary_vars").stage().Traverse():
+        if prim.IsA(UsdRender.Var) and prim.GetPath() not in targets:
+            targets.append(prim.GetPath())
+    ordered.SetTargets(targets)
+"""
 TOOL = """<?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
   <tool name="$HDA_DEFAULT_TOOL" label="$HDA_LABEL" icon="$HDA_ICON">
@@ -243,6 +258,9 @@ def help_page(
 
 def build():
     import hou
+    from generate_render_settings import JOINS, SHOW, SHOW_HELP
+
+    encode = hou.text.encode
 
     network = hou.node("/stage")
     subnet = network.createNode("subnet", "rendersettings")
@@ -273,8 +291,34 @@ def build():
         ),
     )
     # As Karma Render Settings: the viewport and husk render with this prim even where the input brings its own.
+    # As Karma Render Settings' second input: Import Render Vars From Second Input merges its render vars (its other
+    # prims deactivated) and appends them to the built-in product's ordered vars.
+    prune = subnet.createNode("prune", "additional_vars")
+    prune.setInput(0, subnet.indirectInputs()[1])
+    for parm, value in (
+        ("pruneunselected", 1),
+        ("method", "deactivate"),
+        ("pruneancestors", 1),
+        ("targetmethod1", "primtype"),
+        ("primtype1", "UsdRenderVar"),
+    ):
+        prune.parm(parm).set(value)
+    secondary = switch(
+        subnet,
+        "secondary_vars",
+        subnet.createNode("null", "no_secondary_vars"),
+        prune,
+        'ch("../importsecondaryinputvars")',
+    )
+    merge = subnet.createNode("merge", "merge_secondary_vars")
+    merge.parm("mergestyle").set("separate")
+    merge.setInput(0, settings)
+    merge.setInput(1, secondary)
+    append = subnet.createNode("pythonscript", "append_secondary_vars")
+    append.setInput(0, merge)
+    append.parm("python").set(APPEND_VARS)
     default = subnet.createNode("configurelayer", "default_settings")
-    default.setInput(0, settings)
+    default.setInput(0, append)
     default.parm("setrendersettings").setExpression(
         'ch("../setlayerrendersettings")'
     )
@@ -295,23 +339,50 @@ def build():
     )
     subnet.layoutChildren()
 
-    group = hou.ParmTemplateGroup()
-    group.append(
-        hou.StringParmTemplate(
-            "primpath",
-            "Render Settings Prim",
-            1,
-            default_value=("/Render/rendersettings",),
-            help="Path of the UsdRenderSettings prim this node creates or edits.",
+    # The renderer tab: the Essential | Advanced strip, the main settings, a separator, then the tabs.
+    renderer = [
+        with_level(without_controls(t))
+        for t in renderer.parmTemplates()
+        if "_control" not in t.name()
+    ]
+    show = hou.MenuParmTemplate(
+        SHOW,
+        "Show",
+        ("essential", "advanced"),
+        ("Essential", "Advanced"),
+        is_button_strip=True,
+        help=SHOW_HELP,
+    )
+    main = list(
+        itertools.takewhile(
+            lambda t: t.type() != hou.parmTemplateType.Folder, renderer
         )
     )
+    tabs = renderer[len(main) :]
+    group = hou.ParmTemplateGroup([show])
+    # As Karma Render Settings: the prim path in the header of a closed section.
     group.append(
-        hou.ToggleParmTemplate(
-            "setlayerrendersettings",
-            "Set as Default Render Settings Prim",
-            default_value=True,
-            help="Makes this prim the stage's default render settings (renderSettingsPrimPath), which the viewport and husk "
-            "render with, also where the input stage brings render settings of its own.",
+        hou.FolderParmTemplate(
+            "hdue_primfolder",
+            "Render Settings Prim",
+            [
+                hou.StringParmTemplate(
+                    "primpath",
+                    "Render Settings Prim",
+                    1,
+                    default_value=("/Render/rendersettings",),
+                    help="Path of the UsdRenderSettings prim this node creates or edits.",
+                ),
+                hou.ToggleParmTemplate(
+                    "setlayerrendersettings",
+                    "Set as Default Render Settings Prim",
+                    default_value=True,
+                    help="Makes this prim the stage's default render settings (renderSettingsPrimPath), which the "
+                    "viewport and husk render with, also where the input stage brings render settings of its own.",
+                ),
+            ],
+            folder_type=hou.folderType.Collapsible,
+            tags={"sidefx::header_parm": "primpath", "group_default": "0"},
         )
     )
     no_builtin = {hou.parmCondType.HideWhen: "{ outputproducts == upstream }"}
@@ -333,6 +404,21 @@ def build():
     for name, text in TOP_HELP.items():
         template = settings.parmTemplateGroup().find(name)
         template.setHelp(text)
+        if (
+            name == "resolution"
+        ):  # UE renders at most 8192 pixels on a side (r.ScreenPercentage aside)
+            template.setMinValue(1)
+            template.setMinIsStrict(True)
+            template.setMaxValue(8192)
+            template.setMaxIsStrict(True)
+        group.append(template)
+    group.append(
+        hou.SeparatorParmTemplate(
+            "hdue_sepcamera",
+            tags={"sidefx::layout_height": "small", "sidefx::look": "blank"},
+        )
+    )
+    for template in main:
         group.append(template)
     output = hou.FolderParmTemplate(
         "hdUE_ImageOutputTab", "Image Output", folder_type=hou.folderType.Tabs
@@ -395,11 +481,25 @@ def build():
             show_label=False,
         )
     )
+    aovs.addParmTemplate(
+        hou.ToggleParmTemplate(
+            "importsecondaryinputvars",
+            "Import Render Vars From Second Input",
+            help="As Karma Render Settings: merges the render vars of the second input (Additional Render Vars: hdUE "
+            "Standard Render Vars, Render Var LOPs; its other prims are deactivated) and appends them to the built-in "
+            "product's ordered vars, after the vars above. As in Karma's merge, a var at the path of a built-in one "
+            "is stronger (its format, for example).",
+        )
+    )
     output.addParmTemplate(aovs)
-    for tab in renderer.parmTemplates():
+    for tab in tabs:
         if tab.label() == "Engine Quality":
             group.append(output)
-        group.append(without_controls(tab))
+        group.append(tab)
+    for first, _ in JOINS:  # a range's minimum and maximum on one row
+        template = group.find(encode("hdUE:postProcess:" + first))
+        template.setJoinWithNext(True)
+        group.replace(template.name(), template)
     group.insertBefore(
         RAY_LIGHTING,
         hou.ToggleParmTemplate(
@@ -467,6 +567,8 @@ def build():
         group,
         help_page(group),
         "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n",
+        max_inputs=2,
+        input_labels=("Input Stage", "Additional Render Vars"),
     )
 
 
@@ -491,6 +593,30 @@ def without_controls(template):
             template.conditionals()[hou.parmCondType.DisableWhen],
         ).strip()
         template.setConditional(hou.parmCondType.DisableWhen, rest)
+    return template
+
+
+def with_level(template):
+    """The template with its Essential | Advanced hide-when (the generator's tag) added, and its folders' contents."""
+    import hou
+    from generate_render_settings import LEVEL_TAG
+
+    folder = template.type() == hou.parmTemplateType.Folder
+    if folder:
+        template.setParmTemplates(
+            [with_level(t) for t in template.parmTemplates()]
+        )
+    level = template.tags().get(LEVEL_TAG)
+    if level:  # a folder's own hide-when is its tab conditional (hidewhentab)
+        conditions = (
+            template.tabConditionals() if folder else template.conditionals()
+        )
+        hide = (
+            f"{conditions.get(hou.parmCondType.HideWhen, '')} {level}".strip()
+        )
+        (template.setTabConditional if folder else template.setConditional)(
+            hou.parmCondType.HideWhen, hide
+        )
     return template
 
 
@@ -585,6 +711,7 @@ def save(
     help_text,
     on_created=None,
     max_inputs=1,
+    input_labels=(),
 ):
     """Turn the subnet into the asset saved to hda, with the parameters, icon, TAB menu entry and help card."""
     import hou
@@ -614,6 +741,19 @@ def save(
     if "IconSVG" in saved.sections():
         saved.removeSection("IconSVG")
         saved.setIcon(icon)
+    if (
+        input_labels
+    ):  # the Type Properties' input labels (inputlabel lines of the dialog script)
+        script = saved.sections()["DialogScript"]
+        contents = script.contents()
+        for i, text in enumerate(input_labels, 1):
+            contents = re.sub(
+                rf'^(\s*inputlabel\s+{i}\s+)"[^"]*"',
+                lambda m, text=text: f'{m.group(1)}"{text}"',
+                contents,
+                flags=re.M,
+            )
+        script.setContents(contents)
     shutil.rmtree(hda.parent / "backup", ignore_errors=True)
     print(
         f"{hda}: {len(definition.parmTemplateGroup().entriesWithoutFolders())} parameters"

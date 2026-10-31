@@ -235,4 +235,121 @@ assert (
 ), attribute
 alone.parm("hdue_lumenHitLighting").set(0)
 assert not settings_prim().GetAttribute(ray), ray
+# Layout: the Essential | Advanced strip first, then UE's categories as tabs, each sub-category in one place.
+group = alone.parmTemplateGroup()
+strip = group.entries()[0]
+assert strip.name() == "hdue_show" and strip.isButtonStrip(), strip
+assert strip.menuItems() == ("essential", "advanced"), strip.menuItems()
+tabs = [
+    t.label()
+    for t in group.entries()
+    if t.type() == hou.parmTemplateType.Folder
+    and t.folderType() == hou.folderType.Tabs
+]
+assert tabs == [
+    "Rendering",
+    "Lens",
+    "Color Grading",
+    "Lighting",
+    "Rendering Features",
+    "Image Output",
+    "Engine Quality",
+], tabs
+
+
+def folders(templates):
+    for t in templates:
+        if t.type() == hou.parmTemplateType.Folder:
+            yield t
+            yield from folders(t.parmTemplates())
+
+
+labels = [f.label() for f in folders(group.entries())]
+for once in (
+    "Motion Blur",
+    "Path Tracing",
+    "Global Illumination",
+    "Reflections",
+):
+    assert labels.count(once) == 1, (once, labels)
+assert "Lumen" not in labels and "Path Tracer" not in labels, labels
+encode = lambda attribute: hou.text.encode(attribute)
+# Advanced settings hide in Essential and are still authored (the internal LOP has no Essential | Advanced strip).
+subdivision = group.find(encode("hdUE:subdivisionLevel"))
+assert "hdue_show == 0" in subdivision.conditionals().get(
+    hou.parmCondType.HideWhen, ""
+), subdivision.conditionals()
+assert "hdue_show" not in group.find(
+    encode("hdUE:renderMode")
+).conditionals().get(hou.parmCondType.HideWhen, "")
+alone.parm("hdue_show").set(0)
+alone.parm(encode("hdUE:subdivisionLevel")).set(3)
+alone.parm(encode("hdUE:samplesPerPixel")).set(16)
+assert settings_prim().GetAttribute("hdUE:subdivisionLevel").Get() == 3
+# As in a Render Settings LOP, a setting the render mode hides is not authored (samples: Path Tracer only).
+assert not settings_prim().GetAttribute("hdUE:samplesPerPixel")
+alone.parm(encode("hdUE:renderMode")).set("pathtraced")
+assert settings_prim().GetAttribute("hdUE:samplesPerPixel").Get() == 16
+alone.parm(encode("hdUE:renderMode")).set("realtime")
+# Ranges lock where UE clamps (ClampMin/ClampMax) and only guide the slider where it does not (UIMin/UIMax).
+for attribute, lo, hi, lo_locked, hi_locked in (
+    ("hdUE:postProcess:BloomIntensity", 0, 8, True, False),
+    ("hdUE:postProcess:PathTracingMaxBounces", 0, 100, True, True),
+    ("hdUE:postProcess:WhiteTemp", 1500, 15000, False, False),
+    ("hdUE:postProcess:LumenFinalGatherQuality", 0.25, 2, True, False),
+    ("hdUE:samplesPerPixel", 1, 65536, True, True),
+    ("hdUE:warmupFrames", 1, 256, True, False),
+):
+    t = group.find(encode(attribute))
+    assert (t.minValue(), t.maxValue(), t.minIsStrict(), t.maxIsStrict()) == (
+        lo,
+        hi,
+        lo_locked,
+        hi_locked,
+    ), (attribute, t.minValue(), t.maxValue(), t.minIsStrict(), t.maxIsStrict())
+resolution = group.find("resolution")
+assert (resolution.minValue(), resolution.maxValue()) == (1, 8192) and (
+    resolution.minIsStrict() and resolution.maxIsStrict()
+)
+# Second input, as Karma Render Settings': Import Render Vars From Second Input appends its render vars to the
+# built-in product's ordered vars, after its own.
+assert alone.type().maxNumInputs() == 2 and alone.inputLabels() == (
+    "Input Stage",
+    "Additional Render Vars",
+), alone.inputLabels()
+extra = network.createNode("rendervar")
+extra.parm("primpath").set(VARS + "extra")
+extra.parm("sourceName").set("extra")
+standard = network.createNode("hdue::hduestandardrendervars::1.0")
+standard.setInput(0, extra)
+standard.parm("aov_albedo").set(1)
+alone.setInput(1, standard)
+builtin = UsdRender.Product(
+    alone.stage().GetPrimAtPath("/Render/Products/renderproduct")
+).GetOrderedVarsRel()
+assert builtin.GetTargets() == [VARS + "C"], builtin.GetTargets()
+alone.parm("importsecondaryinputvars").set(1)
+stage = alone.stage()
+targets = [
+    str(p)
+    for p in UsdRender.Product(
+        stage.GetPrimAtPath("/Render/Products/renderproduct")
+    )
+    .GetOrderedVarsRel()
+    .GetTargets()
+]
+assert targets[0] == VARS + "C" and sorted(targets) == sorted(
+    VARS + v for v in ("C", "extra", "depth", "normal", "albedo")
+), targets
+# As in Karma's merge, an additional var at a built-in var's path is stronger (here the 16-bit beauty).
+assert (
+    stage.GetPrimAtPath(VARS + "C")
+    .GetAttribute("driver:parameters:aov:husk:format")
+    .Get()
+    == "color4h"
+)
+assert (
+    stage.GetPrimAtPath(VARS + "extra").GetAttribute("sourceName").Get()
+    == "extra"
+)
 print("render outputs: ok")

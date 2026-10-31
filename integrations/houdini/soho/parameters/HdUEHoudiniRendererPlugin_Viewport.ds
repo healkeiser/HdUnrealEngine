@@ -183,7 +183,7 @@
             default { 4 }
             menu { "0" "None" "1" "FXAA" "2" "TAA" "4" "TSR" }
             help    "Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide)."
-            parmtag { "spare_category" "Resolution and Anti-Aliasing" }
+            parmtag { "spare_category" "Anti-Aliasing" }
             parmtag { "uiscope" "viewport" }
         }
         parm {
@@ -194,7 +194,7 @@
             default { 100 }
             range   { 10! 200! }
             help    "To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, >0 and <=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.<=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide)."
-            parmtag { "spare_category" "Resolution and Anti-Aliasing" }
+            parmtag { "spare_category" "Anti-Aliasing" }
             parmtag { "uiscope" "viewport" }
         }
         parm {
@@ -204,7 +204,7 @@
             size    1
             default { 1 }
             help    "Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide)."
-            parmtag { "spare_category" "Resolution and Anti-Aliasing" }
+            parmtag { "spare_category" "Anti-Aliasing" }
             parmtag { "uiscope" "viewport" }
         }
         parm {
@@ -215,7 +215,7 @@
             default { 50 }
             range   { 10! 100! }
             help    "Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide)."
-            parmtag { "spare_category" "Resolution and Anti-Aliasing" }
+            parmtag { "spare_category" "Anti-Aliasing" }
             parmtag { "uiscope" "viewport" }
         }
         parm {
@@ -225,7 +225,7 @@
             size    1
             default { 1 }
             help    "Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall back to Software Ray Tracing otherwise. Note: Hardware ray tracing has significant scene update costs for scenes with more than 100k instances. Console variable r.Lumen.HardwareRayTracing (process-wide)."
-            parmtag { "spare_category" "Lumen" }
+            parmtag { "spare_category" "Lumen Global Illumination" }
             parmtag { "uiscope" "viewport" }
         }
         parm {

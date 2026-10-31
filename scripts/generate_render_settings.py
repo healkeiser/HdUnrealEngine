@@ -26,23 +26,129 @@ BEGIN, END = (
 )
 TONEMAPPER = "xn__hdUEtonemapper_tya"
 RENDER_MODE = "xn__hdUErenderMode_tya"
-# Tab of each UE post-process category; whatever needs the tonemapper goes to Post-Processing.
-POST_PROCESS_TABS = {
-    "Lens": "Camera Effects",
-    "Path Tracing": "Rendering",
-}  # others: Lighting
-OPEN_SECTIONS = (
-    "Scalability",
-    "Resolution and Anti-Aliasing",
-)  # expanded by default; the other sections start collapsed
-# Sections for one render mode only, hidden in the other (as the hand-written Lumen and Path Tracer settings).
-MODE_SECTIONS = {
-    "Path Tracing": "pathtraced",
-    "Path Tracer": "pathtraced",
-    "Global Illumination": "realtime",
-    "Reflections": "realtime",
-    "Lumen": "realtime",
+# hdUE Render Settings' Essential | Advanced button strip at the top (as Redshift's): Essential hides what UE's
+# Details panel keeps behind its "Advanced" expanders. A UI parameter: it authors nothing. Its hide-when terms are
+# in the LEVEL_TAG tag of each parameter and folder, which scripts/build_render_settings_hda.py adds.
+SHOW = "hdue_show"
+ESSENTIAL = f"{SHOW} == 0"
+LEVEL_TAG = "hdue::essential_hidewhen"
+SHOW_HELP = (
+    "Essential shows the settings UE's editor shows by default; Advanced adds those it keeps behind its Advanced "
+    "expanders (AdvancedDisplay), the console variables it shows only in the console, and hdUE's rarely changed "
+    "settings. Essential also hides the Unreal Tonemapper's effects while it is off. Settings for the other render "
+    "mode are hidden in both and, as in a Render Settings LOP, not authored; those Essential hides are."
+)
+
+# Layout, as close to UE's editor as Houdini allows. Tabs: hdUE's render-level settings (Movie Render Queue's
+# Rendering and Anti-aliasing), then UE's Post Process Volume root categories in the Details panel's order (Lens,
+# Color Grading with Film and Film Grain, Global Illumination and Reflections under Lighting, Rendering Features), then
+# Engine Quality (UE's Engine Scalability Settings). Each UE sub-category is a collapsible section, its own
+# sub-categories simple folders. Sections not listed in SECTIONS follow UE's order: the first property of each.
+TABS = (
+    "Rendering",
+    "Lens",
+    "Color Grading",
+    "Lighting",
+    "Rendering Features",
+    "Engine Quality",
+)
+SECTIONS = {
+    "Rendering": (
+        "Anti-Aliasing",
+        "Path Tracing",
+        "View Mode",
+        "Geometry",
+        "Materials",
+    ),
+    "Lighting": (
+        "Global Illumination",
+        "Reflections",
+        "Shadows",
+        "Dome and Viewer Lights",
+    ),
+    "Engine Quality": ("Scalability", "Nanite", "Ray Tracing"),
 }
+# Where each UE post-process category goes: (tab, section); a third level becomes a simple folder.
+CATEGORY_PLACES = {
+    "Lens": "Lens",
+    "Color Grading": "Color Grading",
+    "Film": "Color Grading|Film",
+    "Film Grain": "Color Grading|Film Grain",
+    "Global Illumination": "Lighting|Global Illumination",
+    "Reflections": "Lighting|Reflections",
+    "Rendering Features": "Rendering Features",
+    "Path Tracing": "Rendering|Path Tracing",
+}
+# Root-category properties that get a section of their own next to their console variables.
+PLACES = {
+    "bMegaLights": "Rendering Features|MegaLights",
+    "MegaLightsFrontLayerTranslucency": "Rendering Features|MegaLights",
+    "AutoExposureBias": "",  # Exposure Compensation: above the tabs, with the render mode and samples
+}
+OPEN = {  # expanded by default; the other sections start collapsed
+    "Rendering|Anti-Aliasing",
+    "Rendering|Path Tracing",
+    "Lens|Exposure",
+    "Color Grading|Global",
+    "Lighting|Global Illumination",
+    "Engine Quality|Scalability",
+}
+# Sections whose toggle sits in the header (sidefx::header_toggle, as Karma's Motion Blur); True disables the
+# section's other settings while the toggle is off. They start collapsed: Houdini draws the toggle in the header
+# of an asset's collapsible section only while it is closed (an open one shows it among the section's settings).
+HEADER_TOGGLES = {
+    "Lens|Depth of Field": ("hdUE:postProcess:DepthOfFieldEnabled", False),
+    "Rendering Features|MegaLights": ("hdUE:postProcess:bMegaLights", True),
+    "Rendering Features|Ray Tracing Ambient Occlusion": (
+        "hdUE:postProcess:RayTracingAO",
+        True,
+    ),
+    "Rendering Features|Motion Blur": ("hdUE:motionBlur", False),
+}
+# Folders for one choice of a menu only, hidden for the others: (menu attribute, values it shows for).
+CHOICE_FOLDERS = {
+    "Lens|Bloom|Gaussian": ("hdUE:postProcess:BloomMethod", ("BM_SOG",)),
+    "Lens|Bloom|Convolution": ("hdUE:postProcess:BloomMethod", ("BM_FFT",)),
+    "Lighting|Global Illumination|Lumen Global Illumination": (
+        "hdUE:postProcess:DynamicGlobalIlluminationMethod",
+        ("EDynamicGlobalIlluminationMethod::Lumen",),
+    ),
+    "Lighting|Reflections|Lumen Reflections": (
+        "hdUE:postProcess:ReflectionMethod",
+        ("EReflectionMethod::Lumen",),
+    ),
+    "Lighting|Reflections|Screen Space Reflections": (
+        "hdUE:postProcess:ReflectionMethod",
+        ("EReflectionMethod::ScreenSpace",),
+    ),
+}
+# Render mode of the settings that apply to one only (hidden in the other): the Path Tracer ignores Lumen, screen
+# space and raster effects, MegaLights, shadow maps and the realtime anti-aliasing.
+PATH_TRACED = ("Rendering|Path Tracing",)
+REALTIME = (
+    "Rendering|Anti-Aliasing|r.AntiAliasingMethod",
+    "Rendering|Anti-Aliasing|r.HdUE.InteractiveResolution",
+    "Rendering|Anti-Aliasing|r.HdUE.InteractiveScreenPercentage",
+    "Rendering|View Mode",
+    "Lighting|Global Illumination",
+    "Lighting|Reflections",
+    "Lighting|Shadows",
+    "Rendering Features|MegaLights",
+    "Rendering Features|Ambient Cubemap",
+    "Rendering Features|Ambient Occlusion",
+    "Rendering Features|Ray Tracing Ambient Occlusion",
+    "Rendering Features|Motion Blur|MotionBlur",  # UE's velocity motion blur, not hdUE's sub-frames
+    "Rendering Features|Translucency",
+)
+# Pairs shown on one row in hdUE Render Settings (minimum and maximum of one range).
+JOINS = (
+    ("AutoExposureMinBrightness", "AutoExposureMaxBrightness"),
+    ("AutoExposureLowPercent", "AutoExposureHighPercent"),
+    ("HistogramLogMin", "HistogramLogMax"),
+    ("AutoExposureSpeedUp", "AutoExposureSpeedDown"),
+    ("ColorCorrectionHighlightsMin", "ColorCorrectionHighlightsMax"),
+    ("FilmGrainHighlightsMin", "FilmGrainHighlightsMax"),
+)
 
 # Properties hdUE drives itself or that cannot work here, with the reason (reported, not generated).
 SKIP = {
@@ -109,91 +215,91 @@ CVARS = [
     (
         "sg.ViewDistanceQuality",
         "View Distance",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.AntiAliasingQuality",
         "Anti-Aliasing",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.ShadowQuality",
         "Shadows",
-        "Scalability",
+        "Engine Quality|Scalability",
         True,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.GlobalIlluminationQuality",
         "Global Illumination",
-        "Scalability",
+        "Engine Quality|Scalability",
         True,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.ReflectionQuality",
         "Reflections",
-        "Scalability",
+        "Engine Quality|Scalability",
         True,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.PostProcessQuality",
         "Post-Processing",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.TextureQuality",
         "Textures",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.EffectsQuality",
         "Effects",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.FoliageQuality",
         "Foliage",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "sg.ShadingQuality",
         "Shading",
-        "Scalability",
+        "Engine Quality|Scalability",
         False,
         dict(menu=QUALITY, help=SCALABILITY),
     ),
     (
         "r.AntiAliasingMethod",
         "Anti-Aliasing Method",
-        "Resolution and Anti-Aliasing",
+        "Rendering|Anti-Aliasing",
         True,
         dict(menu=[(0, "None"), (1, "FXAA"), (2, "TAA"), (4, "TSR")]),
     ),
     (
         "r.ScreenPercentage",
         "Screen Percentage",
-        "Resolution and Anti-Aliasing",
+        "Rendering|Anti-Aliasing",
         True,
         dict(range=(10, 200, True), default=100.0),
     ),
     (
         "r.HdUE.InteractiveResolution",
         "Lower Resolution While Moving",
-        "Resolution and Anti-Aliasing",
+        "Rendering|Anti-Aliasing",
         True,
         dict(
             kind="toggle",
@@ -206,7 +312,7 @@ CVARS = [
     (
         "r.HdUE.InteractiveScreenPercentage",
         "Moving Screen Percentage",
-        "Resolution and Anti-Aliasing",
+        "Rendering|Anti-Aliasing",
         True,
         dict(
             type="float",
@@ -218,122 +324,405 @@ CVARS = [
     (
         "r.Lumen.HardwareRayTracing",
         "Hardware Ray Tracing",
-        "Lumen",
+        "Lighting|Global Illumination|Lumen Global Illumination",
         True,
         dict(kind="toggle"),
     ),
     (
         "r.Lumen.Reflections.HardwareRayTracing",
         "Hardware Ray Traced Reflections",
-        "Lumen",
+        "Lighting|Reflections|Lumen Reflections",
         False,
         dict(kind="toggle"),
     ),
     (
         "r.Shadow.Virtual.Enable",
         "Virtual Shadow Maps",
-        "Shadows",
+        "Lighting|Shadows",
         True,
         dict(kind="toggle"),
     ),
     (
         "r.Shadow.Virtual.ResolutionLodBiasDirectional",
         "Directional Resolution Bias",
-        "Shadows",
+        "Lighting|Shadows",
         False,
         dict(range=(-2, 2, False)),
     ),
     (
         "r.Shadow.Virtual.ResolutionLodBiasLocal",
         "Local Resolution Bias",
-        "Shadows",
+        "Lighting|Shadows",
         False,
         dict(range=(-2, 2, False)),
     ),
     (
         "r.Shadow.Virtual.SMRT.RayCountDirectional",
         "Directional Soft Shadow Rays",
-        "Shadows",
+        "Lighting|Shadows",
         False,
-        dict(range=(0, 16, False)),
+        dict(range=(0, 16, True, False)),
     ),
     (
         "r.Shadow.Virtual.SMRT.SamplesPerRayDirectional",
         "Directional Samples per Ray",
-        "Shadows",
+        "Lighting|Shadows",
         False,
-        dict(range=(0, 16, False)),
+        dict(range=(0, 16, True, False)),
     ),
     (
         "r.Shadow.Virtual.SMRT.RayCountLocal",
         "Local Soft Shadow Rays",
-        "Shadows",
+        "Lighting|Shadows",
         False,
-        dict(range=(0, 16, False)),
+        dict(range=(0, 16, True, False)),
     ),
     (
         "r.Shadow.Virtual.SMRT.SamplesPerRayLocal",
         "Local Samples per Ray",
-        "Shadows",
+        "Lighting|Shadows",
         False,
-        dict(range=(0, 16, False)),
+        dict(range=(0, 16, True, False)),
     ),
     (
         "r.Shadow.FilterMethod",
         "Shadow Map Filter",
-        "Shadows",
+        "Lighting|Shadows",
         False,
         dict(menu=[(0, "PCF"), (1, "PCSS")]),
     ),
     (
         "r.RayTracing.Shadows",
         "Ray Traced Shadows",
-        "Shadows",
+        "Lighting|Shadows",
         False,
         dict(kind="toggle"),
     ),
-    ("r.Nanite", "Nanite", "Nanite", False, dict(kind="toggle")),
+    ("r.Nanite", "Nanite", "Engine Quality|Nanite", False, dict(kind="toggle")),
     (
         "r.Nanite.MaxPixelsPerEdge",
         "Max Pixels per Edge",
-        "Nanite",
+        "Engine Quality|Nanite",
         False,
         dict(range=(0.25, 8, False)),
     ),
     (
         "r.MegaLights.NumSamplesPerPixel",
         "Samples per Pixel",
-        "MegaLights",
+        "Rendering Features|MegaLights",
         False,
         dict(menu=[(2, "2"), (4, "4"), (8, "8"), (16, "16")]),
     ),
     (
         "r.MegaLights.DefaultShadowMethod",
         "Default Shadow Method",
-        "MegaLights",
+        "Rendering Features|MegaLights",
         False,
         dict(menu=[(0, "Ray Tracing"), (1, "Virtual Shadow Maps")]),
     ),
     (
         "r.RayTracing.Enable",
         "Ray Tracing",
-        "Ray Tracing",
+        "Engine Quality|Ray Tracing",
         False,
         dict(kind="toggle"),
     ),
     (
         "r.PathTracing.ApproximateCaustics",
         "Approximate Caustics",
-        "Path Tracer",
+        "Rendering|Path Tracing",
         False,
         dict(kind="toggle"),
     ),
     (
         "r.PathTracing.FilterWidth",
         "Pixel Filter Width",
-        "Path Tracer",
+        "Rendering|Path Tracing",
         False,
-        dict(range=(0, 6, False)),
+        dict(range=(0, 6, True, False)),
+    ),
+]
+# Console variables UE's editor shows outside the console, so Essential: the scalability groups (Settings > Engine
+# Scalability Settings, sg.*), the Project Settings ones without AdvancedDisplay (read from RendererSettings.h) and
+# r.ScreenPercentage (the scalability panel's Resolution Scale).
+ESSENTIAL_CVARS = ("r.ScreenPercentage",)
+
+DEBUG_VIEWS = [
+    ("off", "Lit"),
+    ("unlit", "Unlit"),
+    ("lightingOnly", "Lighting Only"),
+    ("detailLighting", "Detail Lighting"),
+    ("reflections", "Reflections"),
+    ("lightComplexity", "Light Complexity"),
+    ("buffer:BaseColor", "Buffer: Base Color"),
+    ("buffer:Metallic", "Buffer: Metallic"),
+    ("buffer:Roughness", "Buffer: Roughness"),
+    ("buffer:Specular", "Buffer: Specular"),
+    ("buffer:WorldNormal", "Buffer: World Normal"),
+    ("buffer:SceneDepth", "Buffer: Scene Depth"),
+    ("buffer:ShadingModel", "Buffer: Shading Model"),
+    ("nanite:Mask", "Nanite: Mask"),
+    ("nanite:Triangles", "Nanite: Triangles"),
+    ("nanite:Clusters", "Nanite: Clusters"),
+    ("nanite:Primitives", "Nanite: Primitives"),
+    ("nanite:Instances", "Nanite: Instances"),
+    ("nanite:Overdraw", "Nanite: Overdraw"),
+    ("lumen:Overview", "Lumen: Overview"),
+    ("lumen:LumenScene", "Lumen: Lumen Scene"),
+    ("lumen:SurfaceCache", "Lumen: Surface Cache"),
+    ("lumen:GeometryNormals", "Lumen: Geometry Normals"),
+    ("lumen:ReflectionView", "Lumen: Reflection View"),
+    ("vsm:mip", "Virtual Shadow Map: Mip Level"),
+    ("vsm:vpage", "Virtual Shadow Map: Virtual Page"),
+    ("vsm:cache", "Virtual Shadow Map: Cached Page"),
+]
+
+
+def hdue(name, label, place, kind, default, help_text, **options):
+    """One of hdUE's own settings (hdUE:<name>), placed at "Tab|Section" ("" above the tabs)."""
+    return dict(
+        attribute="hdUE:" + name,
+        label=label,
+        place=place,
+        category=options.pop("category"),
+        kind=kind,
+        size=1,
+        default=[default],
+        help=help_text,
+        menu=options.pop("menu", []),
+        range=options.pop("range", None),
+        advanced=options.pop("advanced", False),
+        **options,
+    )
+
+
+# hdUE's own settings. Essential: the render mode, samples, warmup, denoiser, tonemapper, motion blur and Lumen;
+# the rest Advanced. Ranges lock what the delegate clamps (samples and warmup at least 1).
+HDUE = [
+    hdue(
+        "renderMode",
+        "Render Mode",
+        "",
+        "menu",
+        "realtime",
+        "Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. "
+        "Path Tracer accumulates UE's reference path tracer.",
+        menu=[("realtime", "Realtime (Lumen)"), ("pathtraced", "Path Tracer")],
+        category="Rendering",
+        uiscope=True,
+    ),
+    hdue(
+        "samplesPerPixel",
+        "Path Tracer Samples",
+        "",
+        "int",
+        64,
+        "Samples per pixel. Divided between motion-blur sub-frames.",
+        range=(1, 65536, True, True),
+        category="Rendering",
+        uiscope=True,
+        mode="pathtraced",
+    ),
+    hdue(
+        "warmupFrames",
+        "Warmup Frames",
+        "",
+        "int",
+        32,
+        "Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. "
+        "Divided between motion-blur sub-frames.",
+        range=(1, 256, True, False),
+        category="Rendering",
+        uiscope=True,
+        mode="realtime",
+    ),
+    hdue(
+        "denoiser",
+        "Denoiser",
+        "",
+        "menu",
+        "off",
+        "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), "
+        "guided by albedo and normal passes. AOVs and Lumen are unaffected.",
+        menu=[("off", "Off"), ("oidn", "Open Image Denoise")],
+        category="Rendering",
+        mode="pathtraced",
+    ),
+    hdue(
+        "tonemapper",
+        "Unreal Tonemapper",
+        "",
+        "toggle",
+        False,
+        "Run UE's tonemapper, bloom, colour grading, vignette and grain. The beauty becomes UE's tone-mapped image "
+        "(display-linear): view it with the default sRGB view, not Raw or ACES.",
+        category="Post-Processing",
+    ),
+    hdue(
+        "debugView",
+        "Debug View",
+        "Rendering|View Mode",
+        "menu",
+        "off",
+        "Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer "
+        "channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with "
+        "Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer "
+        "views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime "
+        "beauty only: AOVs are unaffected.",
+        menu=DEBUG_VIEWS,
+        category="Rendering",
+        uiscope=True,
+        advanced=True,
+    ),
+    hdue(
+        "subdivisionLevel",
+        "Subdivision Level",
+        "Rendering|Geometry",
+        "int",
+        2,
+        "Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 3 matches Karma's "
+        "surfaces closely, 0 renders the cage.",
+        range=(0, 5, True, False),
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
+        "requireNanite",
+        "Require Nanite",
+        "Rendering|Geometry",
+        "toggle",
+        False,
+        "Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). "
+        "Meshes built from Hydra are unaffected.",
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
+        "cullBackface",
+        "Cull Backface",
+        "Rendering|Geometry",
+        "toggle",
+        True,
+        "Meshes whose USD doubleSided is off render their front faces only, as UE's USD importer does. Off, every "
+        "mesh renders both sides, as in Karma.",
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
+        "upAxis",
+        "Stage Up Axis",
+        "Rendering|Geometry",
+        "menu",
+        "Y",
+        "Overrides the stage's upAxis metadata.",
+        menu=[("Y", "Y"), ("Z", "Z")],
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
+        "materialxLibrary",
+        "Cooked MaterialX Library",
+        "Rendering|Materials",
+        "file",
+        "",
+        "library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: the "
+        "runtime profile's materialx_library. Houdini's viewport prepares the bound MaterialX materials from it; "
+        "husk renders the Preview Surface fallback and warns.",
+        category="Materials",
+        pattern="*.json",
+        advanced=True,
+    ),
+    hdue(
+        "substrateLibrary",
+        "Prepared Substrate Library",
+        "Rendering|Materials",
+        "file",
+        "",
+        "library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: the runtime "
+        "profile's substrate_library. Houdini's viewport prepares Substrate Builder materials from it; husk renders "
+        "the Preview Surface fallback and warns.",
+        category="Materials",
+        pattern="*.json",
+        advanced=True,
+    ),
+    hdue(
+        "lumenEnabled",
+        "Lumen",
+        "Lighting|Global Illumination",
+        "toggle",
+        True,
+        "Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal "
+        "Engine tab.",
+        category="Lighting",
+        uiscope=True,
+    ),
+    hdue(
+        "domeResolution",
+        "Environment Cube Resolution",
+        "Lighting|Dome and Viewer Lights",
+        "intmenu",
+        512,
+        "Face size of the cubemap dome lights are baked into, for lighting, reflections and the background.",
+        menu=[(v, str(v)) for v in (32, 64, 128, 256, 512, 1024, 2048)],
+        category="Lighting",
+        uiscope=True,
+        advanced=True,
+    ),
+    hdue(
+        "autoViewerLight",
+        "Light Unlit Scenes",
+        "Lighting|Dome and Viewer Lights",
+        "toggle",
+        True,
+        "Add a camera-relative key and fill light when the scene has no lights, so unlit scenes are reviewable.",
+        category="Lighting",
+        uiscope=True,
+        advanced=True,
+    ),
+    hdue(
+        "viewerLightIntensity",
+        "Viewer Light Intensity",
+        "Lighting|Dome and Viewer Lights",
+        "float",
+        4.0,
+        "Intensity of the unlit-scene lights and of the viewport's headlight.",
+        range=(0, 100, True, False),
+        category="Lighting",
+        uiscope=True,
+        advanced=True,
+    ),
+    hdue(
+        "postProcessMaterials",
+        "Post-Process Materials",
+        "Rendering Features",
+        "string",
+        "",
+        "Cooked post-process material paths, separated by spaces, added as blendables to the beauty. Before "
+        "Tonemapping materials work with the Unreal tonemapper off.",
+        category="Post-Processing",
+        advanced=True,
+    ),
+    hdue(
+        "motionBlur",
+        "Motion Blur",
+        "Rendering Features|Motion Blur",
+        "toggle",
+        True,
+        "Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes "
+        "from the camera's fStop and focusDistance.",
+        category="Motion Blur",
+    ),
+    hdue(
+        "motionSamples",
+        "Motion Samples",
+        "Rendering Features|Motion Blur",
+        "int",
+        16,
+        "Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show "
+        "discrete copies of fast objects.",
+        range=(1, 64, True, False),
+        category="Motion Blur",
+        disable=["xn__hdUEmotionBlur_tya == 0"],
     ),
 ]
 
@@ -609,6 +998,7 @@ def parse_post_process(header, defaults, enums, skipped):
                 + " "
                 + note
             ).strip()
+        translucency = meta.get("TranslucencyType")
         settings.append(
             dict(
                 attribute=f"hdUE:postProcess:{name}",
@@ -620,24 +1010,52 @@ def parse_post_process(header, defaults, enums, skipped):
                 help=help_text.strip(),
                 menu=[(v, l) for v, l in enum],
                 range=ranges(meta, kind),
+                # UE's Details panel shows AdvancedDisplay properties under each group's "Advanced" expander.
+                advanced="AdvancedDisplay" in specifiers,
+                # The Details panel shows a translucency property only for its TranslucencyType
+                # (PostProcessSettingsCustomization.cpp CustomizeProperty).
+                hide=(
+                    [
+                        f'{houdini_name("hdUE:postProcess:TranslucencyType")} != "ETranslucencyType::{translucency}"'
+                    ]
+                    if translucency
+                    else []
+                ),
             )
         )
     return settings
 
 
 def ranges(meta, kind):
+    """Houdini range (lo, hi, lo locked, hi locked): UE's ClampMin/ClampMax lock the value (UE clamps there), else
+    UIMin/UIMax give the slider. Houdini has one range for both, so a clamp wins over the slider bound on its side.
+    """
+
     def number(key):
         return float(meta[key]) if key in meta else None
 
-    lo, hi = number("UIMin"), number("UIMax")
+    ui_lo, ui_hi = number("UIMin"), number("UIMax")
     clamp_lo, clamp_hi = number("ClampMin"), number("ClampMax")
-    lo = lo if lo is not None else clamp_lo
-    hi = hi if hi is not None else clamp_hi
     if (
-        hi is not None and lo is not None and hi < lo
+        ui_hi is not None and ui_lo is not None and ui_hi < ui_lo
     ):  # UE's own metadata typo (LumenDiffuseColorBoost UIMax ".01")
-        hi = clamp_hi
-    if lo is None or hi is None or hi < lo or kind not in ("float", "int"):
+        ui_hi = None
+    lo = clamp_lo if clamp_lo is not None else ui_lo
+    hi = clamp_hi if clamp_hi is not None else ui_hi
+    if kind not in ("float", "int") or (lo is None and hi is None):
+        return None
+    # One open side: a slider of 10 from the bound that exists (or from the UI bound on the open side).
+    lo = (
+        lo
+        if lo is not None
+        else (ui_lo if ui_lo is not None else min(0.0, hi - 10))
+    )
+    hi = (
+        hi
+        if hi is not None
+        else (ui_hi if ui_hi is not None and ui_hi > lo else max(lo, 0.0) + 10)
+    )
+    if hi < lo:
         return None
     return (lo, hi, lo == clamp_lo, hi == clamp_hi)
 
@@ -717,9 +1135,26 @@ def ini_values(engine_root):
     return values
 
 
+def project_settings_cvars(engine_root):
+    """Console variables UE's Project Settings > Rendering shows (URendererSettings properties with a ConsoleVariable),
+    except the AdvancedDisplay ones.
+    """
+    text = (
+        engine_root
+        / "Engine/Source/Runtime/Engine/Classes/Engine/RendererSettings.h"
+    ).read_text(encoding="utf-8")
+    shown = set()
+    for match in re.finditer(r"UPROPERTY\((.*?)\)\)\s*\n", text, re.S):
+        name = re.search(r'ConsoleVariable\s*=\s*"([^"]+)"', match.group(1))
+        if name and "AdvancedDisplay" not in match.group(1):
+            shown.add(name.group(1))
+    return shown
+
+
 def console_settings(engine_root):
     declared = parse_cvars(engine_root / "Engine/Source", {c[0] for c in CVARS})
     configured = ini_values(engine_root)
+    project_settings = project_settings_cvars(engine_root)
     settings = []
     for name, label, folder, viewport, options in CVARS:
         type_name, default, help_text, read_only = declared.get(
@@ -748,7 +1183,10 @@ def console_settings(engine_root):
             kind, value = "int", [int(float(default))]
         else:
             kind, value = "float", [float(default)]
-        lo, hi, strict = options.get("range", (None, None, False))
+        # (lo, hi, locked) or (lo, hi, lo locked, hi locked)
+        bounds = options.get("range")
+        if bounds and len(bounds) == 3:
+            bounds = (*bounds, bounds[2])
         help_text = re.sub(
             r"\s+", " ", options.get("help") or help_text
         ).strip()
@@ -756,13 +1194,19 @@ def console_settings(engine_root):
             dict(
                 attribute="hdUE:cvar:" + name.replace(".", ":"),
                 label=label,
-                category=folder,
+                place=folder,
+                category=folder.split("|")[-1],
                 kind=kind,
                 size=1,
                 default=value,
                 help=f"{help_text} Console variable {name} (process-wide).",
                 menu=options.get("menu", []),
-                range=(lo, hi, strict, strict) if lo is not None else None,
+                range=bounds,
+                advanced=not (
+                    name.startswith("sg.")
+                    or name in ESSENTIAL_CVARS
+                    or name in project_settings
+                ),
                 viewport=viewport,
                 cvar=name,
                 declared_default=(
@@ -789,6 +1233,22 @@ def ds_number(value):
 
 # Formats FImageUtils::LoadImage reads (the backend's runtime import).
 IMAGE_PATTERN = "*.exr *.hdr *.png *.jpg *.jpeg *.tif *.tiff *.tga *.bmp"
+# HDUE_CONTROL_HIDE of the .ds, for hide-when conditions the macro cannot take.
+HDUE_CONTROL_BODY = """parm {{
+    name    "{name}"
+    label   {label}
+    type    string
+    default {{ "none" }}
+    menujoin {{
+        [ "import loputils" ]
+        [ "value = kwargs['node'].parm(hou.text.encode(hou.text.decode(kwargs['parm'].name())[:-len('_control')]))" ]
+        [ "return loputils.createEditPropertiesControlMenu(kwargs, value.parmTemplate().tags().get('usdvaluetype', 'int') if value else 'int')" ]
+        language python
+    }}
+    help    "How this node edits the setting: Set or Create authors the value, Set If Exists changes it only where it is authored, Block removes it, Do Nothing keeps the input's."
+    parmtag {{ "sidefx::look" "icon" }}
+    hidewhen {hide}
+}}"""
 
 
 def ds_parm(setting, indent, viewport):
@@ -804,11 +1264,13 @@ def ds_parm(setting, indent, viewport):
         "menu": "string",
         "string": "string",
         "image": "file",
+        "file": "file",
     }[kind]
     usd_type = {
         "toggle": "bool",
         "menu": "token",  # as Karma's menus
         "string": "string",
+        "file": "string",
         "image": "asset",
         "int": "int",
         "intmenu": "int",
@@ -818,10 +1280,26 @@ def ds_parm(setting, indent, viewport):
         ds_string(v) if isinstance(v, str) else ds_number(v)
         for v in setting["default"]
     )
+    hide = "" if viewport else hide_condition(setting)
     lines = (
         []
         if viewport
-        else [f'HDUE_CONTROL("{control}", {ds_string(setting["label"])})']
+        else (
+            [
+                (
+                    f'HDUE_CONTROL("{control}", {ds_string(setting["label"])})'
+                    if not hide
+                    else f'HDUE_CONTROL_HIDE("{control}", {ds_string(setting["label"])}, {ds_string(hide)})'
+                )
+            ]
+            if '"' not in hide
+            # Houdini's cpp takes no escaped quotes in macro arguments: the macro's body, written out.
+            else HDUE_CONTROL_BODY.format(
+                name=control,
+                label=ds_string(setting["label"]),
+                hide=ds_string(hide),
+            ).splitlines()
+        )
     )
     lines += [
         "parm {",
@@ -846,21 +1324,58 @@ def ds_parm(setting, indent, viewport):
     lines.append(
         f"    parmtag {{ \"spare_category\" {ds_string(setting['category'])} }}"
     )
-    if kind == "image":
+    if kind in ("image", "file"):
         lines.append('    parmtag { "filechooser_mode" "read" }')
         lines.append(
-            f'    parmtag {{ "filechooser_pattern" "{IMAGE_PATTERN}" }}'
+            f'    parmtag {{ "filechooser_pattern" "{setting.get("pattern", IMAGE_PATTERN)}" }}'
         )
-    if viewport:
+    if viewport or setting.get("uiscope"):
         lines.append('    parmtag { "uiscope" "viewport" }')
-    else:
+    if not viewport:
         lines.append(f'    parmtag {{ "usdvaluetype" "{usd_type}" }}')
         condition = f"{{ {control} == block }} {{ {control} == none }}"
         if setting.get("tonemapper"):
             condition += f" {{ {TONEMAPPER} == 0 }}"
+        condition += "".join(
+            f" {{ {term} }}" for term in setting.get("disable", [])
+        )
         lines.append(f'    disablewhen R"({condition})"')
+        if hide:
+            lines.append(f"    hidewhen {ds_string(hide)}")
+        tag = level_tag(mode_terms(setting))
+        if tag:
+            lines.append(f"    parmtag {{ {tag} }}")
     lines.append("}")
     return [indent + line for line in lines]
+
+
+def mode_terms(setting):
+    """Hide-when groups of a setting: Advanced while Essential shows, the other render mode, its own (OR-ed)."""
+    terms = [ESSENTIAL] if setting.get("advanced") else []
+    if setting.get("tonemapper") and not setting.get("place") == "":
+        terms.append(
+            f"{ESSENTIAL} {TONEMAPPER} == 0"
+        )  # does nothing while the tonemapper is off
+    if setting.get("mode"):
+        terms.append(f"{RENDER_MODE} != {setting['mode']}")
+    return terms + setting.get("hide", [])
+
+
+def conditions(terms):
+    return " ".join(f"{{ {term} }}" for term in terms)
+
+
+def hide_condition(setting):
+    """The .ds hide-when: render mode and choice menus. A Render Settings LOP authors no hidden setting, so the
+    Essential | Advanced terms go to the "hdue::essential_hidewhen" tag, which only hdUE Render Settings' own
+    interface adds: its internal Render Settings LOP has no strip, so what Essential hides is still authored.
+    """
+    return conditions(t for t in mode_terms(setting) if SHOW not in t)
+
+
+def level_tag(terms):
+    level = [t for t in terms if SHOW in t]
+    return f'"{LEVEL_TAG}" {ds_string(conditions(level))}' if level else None
 
 
 def group_id(*parts):
@@ -875,51 +1390,169 @@ def ds_folder(kind, name, label, indent, *tags):
     ] + [indent + "    " + tag for tag in tags]
 
 
-def section_of(category):
-    """(section, sub-section) of a UE category; Lens' sub-categories (Bloom, Depth of Field, ...) are sections."""
-    parts = category.split("|")
-    parts = parts[1:] if parts[0] == "Lens" else parts
-    return parts[0], " - ".join(parts[1:])
+def place_of(setting):
+    """The "Tab|Section|Sub" a setting goes to ("" above the tabs)."""
+    if "place" in setting:
+        return setting["place"]
+    name = setting["attribute"].split(":")[-1]
+    if name in PLACES:
+        return PLACES[name]
+    root, *rest = setting["category"].split("|")
+    return "|".join([CATEGORY_PLACES[root], *rest])
 
 
-def ds_sections(settings, indent, tab):
-    """A collapsible section per category, holding a simple folder per sub-category (after the section's own settings)."""
-    tree = {}
-    for setting in settings:
-        section, sub = section_of(setting["category"])
-        tree.setdefault(section, {}).setdefault(sub, []).append(setting)
-    lines = []
-    for section, subs in tree.items():
-        tags = [
-            f'grouptag {{ "group_default" "{int(section in OPEN_SECTIONS)}" }}'
-        ]
-        if section in MODE_SECTIONS:
-            tags.append(
-                f'hidewhentab "{{ {RENDER_MODE} != {MODE_SECTIONS[section]} }}"'
-            )
-        lines += [""] + ds_folder(
-            "groupcollapsible",
-            group_id("hdUE", tab, section),
-            section,
-            indent,
-            *tags,
+def layout(settings):
+    """Assign each setting its place, render mode and level, in the order the panel shows them: a tree
+    {tab: {section: {sub: [settings]}}} ("" for a level's own settings), each level in UE's order.
+    """
+    for index, setting in enumerate(settings):
+        setting["place"] = place_of(setting)
+        identity = setting.get("cvar") or setting["attribute"].removeprefix(
+            "hdUE:postProcess:"
         )
-        for sub, entries in sorted(
-            subs.items(), key=lambda item: item[0] != ""
-        ):
-            body = indent + "    "
-            if sub:
-                lines += [""] + ds_folder(
-                    "groupsimple",
-                    group_id("hdUE", tab, section, sub),
-                    sub,
-                    body,
+        key = f"{setting['place']}|{identity}"
+        if key.startswith(PATH_TRACED):
+            setting["mode"] = "pathtraced"
+        elif key.startswith(REALTIME):
+            setting["mode"] = "realtime"
+        # hdUE's own first, then UE's properties in struct order, then console variables; Advanced last (UE's
+        # "Advanced" expander closes each group).
+        rank = (
+            2
+            if "cvar" in setting
+            else int(setting["attribute"].startswith("hdUE:postProcess:"))
+        )
+        setting["order"] = (setting.get("advanced", False), rank, index)
+    tree = {}
+    for setting in sorted(
+        settings, key=lambda s: s["order"][1:]
+    ):  # first appearance, by rank
+        tab, section, sub = (setting["place"].split("|") + ["", ""])[:3]
+        tree.setdefault(tab, {}).setdefault(section, {}).setdefault(
+            sub, []
+        ).append(setting)
+    ordered = {}
+    for tab in ("",) + TABS:
+        sections = tree.pop(tab, {})
+        names = [s for s in SECTIONS.get(tab, ()) if s in sections]
+        names = [""] + names + [s for s in sections if s not in names and s]
+        ordered[tab] = {
+            section: {
+                sub: sorted(entries, key=lambda s: s["order"])
+                for sub, entries in sorted(
+                    sections[section].items(), key=lambda item: item[0] != ""
                 )
-                body += "    "
-            for setting in entries:
-                lines += ds_parm(setting, body, False)
-            if sub:
-                lines.append(f"{indent}    }}")
+            }
+            for section in names
+            if section in sections
+        }
+    if tree:
+        raise SystemExit(f"settings placed in unknown tabs: {list(tree)}")
+    return ordered
+
+
+def folder_terms(entries, path):
+    """Hide-when groups shared by every setting of a folder (so the folder hides with them), plus its choice menu's."""
+    terms = [
+        t
+        for t in mode_terms(entries[0])
+        if all(t in mode_terms(e) for e in entries)
+    ]
+    for mode in (
+        "realtime",
+        "pathtraced",
+    ):  # Advanced, or for one render mode only: empty in Essential otherwise
+        if all(
+            e.get("advanced") or e.get("mode") == mode for e in entries
+        ) and not all(e.get("advanced") for e in entries):
+            if not all(e.get("mode") == mode for e in entries):
+                terms.append(f"{ESSENTIAL} {RENDER_MODE} != {mode}")
+    if path in CHOICE_FOLDERS:
+        menu, values = CHOICE_FOLDERS[path]
+        terms.append(" ".join(f'{houdini_name(menu)} != "{v}"' for v in values))
+    return terms
+
+
+def folder_tags(entries, path, open_default=None):
+    tags = []
+    if open_default is not None:
+        tags.append(f'grouptag {{ "group_default" "{int(open_default)}" }}')
+    if path in HEADER_TOGGLES:
+        toggle, disables = HEADER_TOGGLES[path]
+        tags.append(
+            f'grouptag {{ "sidefx::header_toggle" "{houdini_name(toggle)}" }}'
+        )
+        if disables:
+            tags.append(f'disablewhentab "{{ {houdini_name(toggle)} == 0 }}"')
+    terms = folder_terms(entries, path)
+    hide = [t for t in terms if SHOW not in t]
+    if hide:
+        tags.append(f"hidewhentab {ds_string(conditions(hide))}")
+    if level_tag(terms):
+        tags.append(f"grouptag {{ {level_tag(terms)} }}")
+    return tags
+
+
+def ds_layout(tree, indent):
+    """The renderer tab's body: the Essential | Advanced strip and the main settings, then a tab per UE category
+    with a collapsible section per sub-category and a simple folder per sub-sub-category.
+    """
+    lines = []
+    for setting in tree[""][""][""]:
+        lines += ds_parm(setting, indent, False)
+    lines += [
+        f"{indent}parm {{",
+        f'{indent}    name    "hdue_sepmain"',
+        f'{indent}    label   "Separator"',
+        f"{indent}    type    separator",
+        f'{indent}    default {{ "" }}',
+        f"{indent}}}",
+    ]
+    for tab in TABS:
+        sections = tree[tab]
+        everything = [
+            s
+            for subs in sections.values()
+            for entries in subs.values()
+            for s in entries
+        ]
+        lines += [""] + ds_folder(
+            "group",
+            group_id("hdUE", tab, "Tab"),
+            tab,
+            indent,
+            *folder_tags(everything, tab),
+        )
+        body = indent + "    "
+        for section, subs in sections.items():
+            path = f"{tab}|{section}"
+            if section:
+                entries = [s for e in subs.values() for s in e]
+                lines += [""] + ds_folder(
+                    "groupcollapsible",
+                    group_id("hdUE", tab, section),
+                    section,
+                    body,
+                    *folder_tags(entries, path, path in OPEN),
+                )
+            inner = body + ("    " if section else "")
+            for sub, entries in subs.items():
+                deeper = inner
+                if sub:
+                    lines += [""] + ds_folder(
+                        "groupsimple",
+                        group_id("hdUE", tab, section, sub),
+                        sub,
+                        inner,
+                        *folder_tags(entries, f"{path}|{sub}"),
+                    )
+                    deeper += "    "
+                for setting in entries:
+                    lines += ds_parm(setting, deeper, False)
+                if sub:
+                    lines.append(f"{inner}}}")
+            if section:
+                lines.append(f"{body}}}")
         lines.append(f"{indent}}}")
     return lines
 
@@ -1046,24 +1679,10 @@ def main():
         )
         return
 
-    tabs = {"Engine Quality": console}
-    for setting in post:
-        tab = (
-            "Post-Processing"
-            if setting["tonemapper"]
-            else POST_PROCESS_TABS.get(
-                setting["category"].split("|")[0], "Lighting"
-            )
-        )
-        tabs.setdefault(tab, []).append(setting)
+    tree = layout(post + console + HDUE)
     replace_generated(
         PARAMETERS / "HdUEHoudiniRendererPlugin_Global.ds",
-        {
-            tab: lambda indent, tab=tab, settings=settings: ds_sections(
-                settings, indent, tab
-            )
-            for tab, settings in tabs.items()
-        },
+        {"Unreal Engine": lambda indent: ds_layout(tree, indent)},
     )
     replace_generated(
         PARAMETERS / "HdUEHoudiniRendererPlugin_Viewport.ds",
@@ -1073,13 +1692,16 @@ def main():
             )
         },
     )
-    counts = {}
-    for setting in post + console:
-        counts[setting["category"]] = counts.get(setting["category"], 0) + 1
-    for category, count in counts.items():
-        print(f"{count:4} {category}")
+    for tab, sections in tree.items():
+        for section, subs in sections.items():
+            entries = [s for e in subs.values() for s in e]
+            essential = sum(not s.get("advanced") for s in entries)
+            print(
+                f"{essential:4} / {len(entries):4} {tab or '(top)'}|{section}"
+            )
     print(
-        f"{len(post)} post-process settings, {len(console)} console variables"
+        f"{len(post)} post-process settings, {len(console)} console variables, {len(HDUE)} hdUE settings "
+        f"({sum(not s.get('advanced') for s in post + console + HDUE)} Essential)"
     )
     for name, reason in skipped:
         print(f"skipped {name}: {reason}")
