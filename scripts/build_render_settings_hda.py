@@ -2,7 +2,7 @@
 
 Like Karma Render Settings, it wraps a Render Settings LOP, a Render Product and Render Vars, and shows the
 camera, resolution, output picture and AOVs next to the hdUE settings, in the tabs of
-soho/parameters/HdUEHoudiniRendererPlugin_Global.ds. The internal Render Settings LOP keeps those settings as
+soho/parameters/HdUnrealEngine_Global.ds. The internal Render Settings LOP keeps those settings as
 tagged spare parameters referencing the asset's, so it authors the same hdUE:* attributes, also where the
 hdUE delegate is not registered. Like Karma Standard Render Vars and Karma Render Products, hdUE Standard Render
 Vars (hdue_standardrendervars.hda) and hdUE Render Products (hdue_renderproducts.hda) author render vars and

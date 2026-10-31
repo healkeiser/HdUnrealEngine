@@ -8,7 +8,7 @@ from pxr import Gf, Sdf, Usd, UsdGeom
 from pxr.Usdviewq.common import PickModes
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
-PLUGIN = "HdUEHoudiniRendererPlugin"
+PLUGIN = "HdUnrealEngine"
 
 
 class SmokeTest:

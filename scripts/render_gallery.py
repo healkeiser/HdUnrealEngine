@@ -72,11 +72,11 @@ CORNELL_SCENES = [
 ]
 SPONZA_CAMERAS = ["PhysCamera001"]  # the main view, Intel's Render_Main_A
 RENDERERS = [  # key, label, husk renderer, hdUE render mode
-    ("lumen", "hdUE Lumen", "HdUEHoudiniRendererPlugin", "realtime"),
+    ("lumen", "hdUE Lumen", "HdUnrealEngine", "realtime"),
     (
         "pathtraced",
         "hdUE Path Tracer",
-        "HdUEHoudiniRendererPlugin",
+        "HdUnrealEngine",
         "pathtraced",
     ),
     ("xpu", "Karma XPU", "BRAY_HdKarmaXPU", None),

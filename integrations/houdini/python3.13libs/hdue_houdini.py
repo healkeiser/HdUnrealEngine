@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[3]
 # Appended: hdUE's modules must not shadow Houdini's or another package's.
 if str(ROOT / "scripts") not in sys.path:
     sys.path.append(str(ROOT / "scripts"))
-PLUGIN = "HdUEHoudiniRendererPlugin"
+PLUGIN = "HdUnrealEngine"
 LABEL = "Unreal Engine"
 _host = None
 _failure = None
@@ -938,7 +938,7 @@ def render_settings_node(input_node, mode="realtime", samples=64):
 
 
 def _render_property(node, prefix, value):
-    # Encoded hdUE:* parameter names come from HdUEHoudiniRendererPlugin_Global.ds. Houdini adds
+    # Encoded hdUE:* parameter names come from HdUnrealEngine_Global.ds. Houdini adds
     # them only while the hdUE delegate is registered, so add the same tagged spare parms otherwise.
     find = lambda control: next(
         (

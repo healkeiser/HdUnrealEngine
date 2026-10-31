@@ -15,7 +15,7 @@ hython scripts/run_conformance.py [--only AREA/FEATURE|PATTERN ...] [--mode real
     [--houdini HFS] [--build build/houdini] [--integrations integrations/houdini] [--runtime-config FILE]
 ```
 
-It renders every scene with husk (`HdUEHoudiniRendererPlugin`) in each mode, one husk at a time with a timeout,
+It renders every scene with husk (`HdUnrealEngine`) in each mode, one husk at a time with a timeout,
 prints a pass/fail table, writes `out/conformance/report.json` and, with `--matrix`, rewrites the matrix below. It
 exits 1 when a check fails or a render does not finish. Each run takes about 5-12 s (UE startup dominates), so the
 whole set (150 scenes, both modes) takes about 35 minutes; use `--only` and `--mode` while iterating. A scene's

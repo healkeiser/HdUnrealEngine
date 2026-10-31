@@ -548,7 +548,7 @@ int wmain(int argc, wchar_t** argv) {
         const double initMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         PlugRegistry::GetInstance().RegisterPlugins(utf8(options.plugins));
         auto& registry = HdRendererPluginRegistry::GetInstance();
-        auto* plugin = registry.GetRendererPlugin(TfToken("HdUEHoudiniRendererPlugin"));
+        auto* plugin = registry.GetRendererPlugin(TfToken("HdUnrealEngine"));
         check(plugin != nullptr, "Hydra could not discover the hdUE renderer plugin");
         std::filesystem::create_directories(options.output);
         std::ofstream metrics(options.output / "metrics.json");

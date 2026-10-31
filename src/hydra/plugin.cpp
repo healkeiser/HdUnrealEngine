@@ -44,7 +44,7 @@ static void HdUEWarnOnHoudiniBuildMismatch() {
 #endif
 // One renderer id for every build (Houdini scenes, ROPs and husk command lines name it); each USD build finds its own
 // library through PXR_PLUGINPATH_NAME.
-class HdUEHoudiniRendererPlugin final : public HdRendererPlugin {
+class HdUnrealEngine final : public HdRendererPlugin {
 public:
     HdRenderDelegate* CreateRenderDelegate() override { return CreateRenderDelegate({}); }
     HdRenderDelegate* CreateRenderDelegate(const HdRenderSettingsMap& settings) override {
@@ -64,5 +64,5 @@ public:
         return true;
     }
 };
-TF_REGISTRY_FUNCTION(TfType) { HdRendererPluginRegistry::Define<HdUEHoudiniRendererPlugin>(); }
+TF_REGISTRY_FUNCTION(TfType) { HdRendererPluginRegistry::Define<HdUnrealEngine>(); }
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -1681,11 +1681,11 @@ def main():
 
     tree = layout(post + console + HDUE)
     replace_generated(
-        PARAMETERS / "HdUEHoudiniRendererPlugin_Global.ds",
+        PARAMETERS / "HdUnrealEngine_Global.ds",
         {"Unreal Engine": lambda indent: ds_layout(tree, indent)},
     )
     replace_generated(
-        PARAMETERS / "HdUEHoudiniRendererPlugin_Viewport.ds",
+        PARAMETERS / "HdUnrealEngine_Viewport.ds",
         {
             "Engine Quality": lambda indent: ds_viewport(
                 [s for s in console if s["viewport"]], indent

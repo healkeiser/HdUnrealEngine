@@ -75,7 +75,7 @@ def render(path, mode, frames, out, env, timeout, extra=()):
     command = [
         str(env["HFS"] + "/bin/husk.exe"),
         "--renderer",
-        "HdUEHoudiniRendererPlugin",
+        "HdUnrealEngine",
         "-f",
         "1",
         "-n",

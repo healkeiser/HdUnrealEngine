@@ -16,7 +16,7 @@ samples/jungle_ruins/
 `scene.usda` sublayers Intel's `USD/JungleRuins_Karma.usda` unchanged, its sky dome included, and adds a 960 x 540 render setup shared by hdUE and Karma (path traced, 256 samples, camera `/root/Camera/Camera`). Render it with husk or open it in Solaris:
 
 ```
-husk --renderer HdUEHoudiniRendererPlugin -f 1 -o jungle_ruins.exr samples/jungle_ruins/scene.usda
+husk --renderer HdUnrealEngine -f 1 -o jungle_ruins.exr samples/jungle_ruins/scene.usda
 ```
 
 Poly Haven HDRIs for scenes without their own lighting go in `samples/hdris/` (also ignored).
