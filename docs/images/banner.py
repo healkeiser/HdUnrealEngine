@@ -1,7 +1,6 @@
 """Generate the README banner from hdUE renders of Intel's Sponza.
 
-The render bleeds full frame under a halftone dot lattice on its left side and the title: the type and the
-lattice of fxhoudinimotion's banner.
+The render bleeds full frame under the title, set in fxhoudinimotion's banner type.
 
 1. Render samples/sponza/intel/banner/banner.hip (/root/PhysCamera004, frames 1-96, 2560x1440) and convert
    each EXR to an sRGB PNG, 001.png..096.png.
@@ -18,20 +17,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageFilter
 
 W, H = 2560, 1280  # 2x the 1280x640 layout
-BG = np.array([0x12, 0x11, 0x10], float)
-DOT = np.array([0xF1, 0xEB, 0xE3], float)
-STEP = 40  # lattice pitch (20 px at 1x, as fxhoudinimotion)
-SS = 3  # dot supersampling
 FRAMES, STILL = 96, 48
 LUT = np.load(Path(__file__).with_name("banner_lut.npy"))
-
-
-def smooth(e0, e1, x):
-    t = np.clip((x - e0) / (e1 - e0), 0, 1)
-    return t * t * (3 - 2 * t)
 
 
 def compose(frame: Path, text: Image.Image) -> Image.Image:
@@ -41,35 +31,10 @@ def compose(frame: Path, text: Image.Image) -> Image.Image:
     # banner_lut.npy: per-channel curves (histogram matching) from husk's EXR to the same frame in Houdini's
     # viewport, whose image is darker and more contrasted than husk's for the same settings.
     photo = np.stack([LUT[c][photo[..., c]] for c in range(3)], -1)
-    x = np.linspace(0, 1, W)[None, :, None]
-    # The render bleeds full frame; the dot lattice covers its left side.
-    fade = smooth(0.06, 0.46, x)
     out = photo.astype(float)
     # A soft shadow under the title keeps it legible over the render.
     shade = np.asarray(text.getchannel("A").filter(ImageFilter.GaussianBlur(12)), float)[..., None] / 255
     out = out * (1 - 0.8 * np.clip(shade * 2.5, 0, 1))
-    # Halftone lattice over the render's left side: cream dots on its dark areas, dark dots on its bright ones, so the
-    # lattice reads everywhere without hiding the image.
-    lum = (photo @ [0.2126, 0.7152, 0.0722]) / 255
-    knock = np.asarray(text.getchannel("A").filter(ImageFilter.GaussianBlur(26)), float) / 255
-    layers = {"light": Image.new("L", (W * SS, H * SS)), "dark": Image.new("L", (W * SS, H * SS))}
-    draws = {k: ImageDraw.Draw(v) for k, v in layers.items()}
-    for cy in range(STEP // 2, H, STEP):
-        for cx in range(STEP // 2, W, STEP):
-            w = 1 - fade[0, cx, 0]
-            if w <= 0.02:
-                continue
-            l = lum[max(0, cy - 6):cy + 6, max(0, cx - 6):cx + 6].mean()
-            r = 2.2 + 3.2 * w
-            a = 0.42 * w * (1 - 0.9 * min(1.0, knock[cy, cx] * 3))
-            if a < 0.01:
-                continue
-            draws["light" if l < 0.4 else "dark"].ellipse(
-                [(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=int(255 * a)
-            )
-    for name, color in (("light", DOT), ("dark", BG)):
-        alpha = np.asarray(layers[name].resize((W, H), Image.LANCZOS), float)[..., None] / 255
-        out = out + (color - out) * alpha
     img = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
     img.paste(text, (0, 0), text)
     return img

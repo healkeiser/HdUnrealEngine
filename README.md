@@ -1,6 +1,3 @@
-> [!IMPORTANT]
-> This project is a Windows x64 proof of concept and subject to large changes.
-
 <div align="center">
 
   <p align="center">
