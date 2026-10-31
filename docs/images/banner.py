@@ -1,6 +1,6 @@
 """Generate the README banner from hdUE renders of Intel's Sponza.
 
-The render bleeds in from the right and dissolves into a halftone dot lattice under the title: the type and the
+The render bleeds full frame under a halftone dot lattice on its left side and the title: the type and the
 lattice of fxhoudinimotion's banner.
 
 1. Render samples/sponza/intel/banner/banner.hip (/root/PhysCamera004, frames 1-96, 2560x1440) and convert
@@ -11,7 +11,8 @@ lattice of fxhoudinimotion's banner.
 3. uv run --with numpy --with pillow python banner.py FRAMES_DIR OUT_DIR
    writes banner.png (frame 48, 2x) and the 1280x640 frames into OUT_DIR.
 4. Forward then backward, an 8 s loop: OUT_DIR's frames 1..96 then 95..2 as loop/001.png.., then
-       ffmpeg -framerate 24 -i loop/%03d.png -c:v libwebp -quality 65 -compression_level 6 -loop 0 banner.webp
+       ffmpeg -framerate 24 -i loop/%03d.png -vf fps=16 -c:v libwebp -quality 40 -compression_level 6 -loop 0 banner.webp
+   (16 fps, quality 40: under the 5 MB GitHub's image proxy, camo, defaults to)
 """
 import sys
 from pathlib import Path
@@ -41,33 +42,34 @@ def compose(frame: Path, text: Image.Image) -> Image.Image:
     # viewport, whose image is darker and more contrasted than husk's for the same settings.
     photo = np.stack([LUT[c][photo[..., c]] for c in range(3)], -1)
     x = np.linspace(0, 1, W)[None, :, None]
-    y = np.linspace(-1, 1, H)[:, None, None]
-    fade = smooth(0.06, 0.46, x) * (1 - 0.35 * y**2)
-    out = BG + (photo - BG) * fade
+    # The render bleeds full frame; the dot lattice covers its left side.
+    fade = smooth(0.06, 0.46, x)
+    out = photo.astype(float)
     # A soft shadow under the title keeps it legible over the render.
-    shade = np.asarray(text.getchannel("A").filter(ImageFilter.GaussianBlur(48)), float)[..., None] / 255
-    out = BG + (out - BG) * (1 - 0.75 * np.clip(shade * 2.5, 0, 1))
-    # Halftone: dots sized by the render's luminance where the render fades out.
+    shade = np.asarray(text.getchannel("A").filter(ImageFilter.GaussianBlur(12)), float)[..., None] / 255
+    out = out * (1 - 0.8 * np.clip(shade * 2.5, 0, 1))
+    # Halftone lattice over the render's left side: cream dots on its dark areas, dark dots on its bright ones, so the
+    # lattice reads everywhere without hiding the image.
     lum = (photo @ [0.2126, 0.7152, 0.0722]) / 255
     knock = np.asarray(text.getchannel("A").filter(ImageFilter.GaussianBlur(26)), float) / 255
-    dots = Image.new("L", (W * SS, H * SS))
-    draw = ImageDraw.Draw(dots)
+    layers = {"light": Image.new("L", (W * SS, H * SS)), "dark": Image.new("L", (W * SS, H * SS))}
+    draws = {k: ImageDraw.Draw(v) for k, v in layers.items()}
     for cy in range(STEP // 2, H, STEP):
         for cx in range(STEP // 2, W, STEP):
             w = 1 - fade[0, cx, 0]
             if w <= 0.02:
                 continue
             l = lum[max(0, cy - 6):cy + 6, max(0, cx - 6):cx + 6].mean()
-            # The halftone is strongest where the render dissolves, quieter towards the left edge.
-            k = 0.08 + 0.92 * float(smooth(0.02, 0.22, cx / W))
-            l = min(1.0, l * 2.2) * k
-            r = (1.6 + 8.0 * l ** 0.8) * w ** 0.7
-            a = (0.07 + 0.30 * l) * w * (1 - 0.9 * min(1.0, knock[cy, cx] * 3))
+            r = 2.2 + 3.2 * w
+            a = 0.42 * w * (1 - 0.9 * min(1.0, knock[cy, cx] * 3))
             if a < 0.01:
                 continue
-            draw.ellipse([(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=int(255 * a))
-    alpha = np.asarray(dots.resize((W, H), Image.LANCZOS), float)[..., None] / 255
-    out = out + (DOT - out) * alpha
+            draws["light" if l < 0.4 else "dark"].ellipse(
+                [(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=int(255 * a)
+            )
+    for name, color in (("light", DOT), ("dark", BG)):
+        alpha = np.asarray(layers[name].resize((W, H), Image.LANCZOS), float)[..., None] / 255
+        out = out + (color - out) * alpha
     img = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
     img.paste(text, (0, 0), text)
     return img
