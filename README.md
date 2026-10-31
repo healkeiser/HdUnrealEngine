@@ -4,7 +4,7 @@
 <div align="center">
 
   <p align="center">
-    <img src="https://raw.githubusercontent.com/healkeiser/HdUnrealEngine/main/docs/images/banner.webp" alt="hdUE: Unreal Engine 5.8 as a Hydra renderer for Houdini Solaris, husk and USD" width="100%">
+    <img src="https://raw.githubusercontent.com/healkeiser/HdUnrealEngine/main/docs/images/banner.webp" alt="HdUnrealEngine: Unreal Engine as a Hydra render delegate in SideFX Houdini" width="100%">
   </p>
 
   <p align="center">
