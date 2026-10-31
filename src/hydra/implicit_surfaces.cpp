@@ -553,28 +553,28 @@ TF_REGISTRY_FUNCTION(TfType) {
 TF_REGISTRY_FUNCTION(HdSceneIndexPlugin) {
     // The renderer display name from plugInfo.json.
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_ImplicitSurfaceSceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_ImplicitSurfaceSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_LightLinkingSceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_LightLinkingSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_ConversionSceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_ConversionSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_RenderPassPruneSceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_RenderPassPruneSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_DrawModeSceneIndexPlugin"), nullptr, 1,
+        "Unreal Engine", TfToken("HdUE_DrawModeSceneIndexPlugin"), nullptr, 1,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_UnsupportedSceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_UnsupportedSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_PurposeVisibilitySceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_PurposeVisibilitySceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-        "Unreal Engine (hdUE)", TfToken("HdUE_RenderPassVisibilitySceneIndexPlugin"), nullptr, 0,
+        "Unreal Engine", TfToken("HdUE_RenderPassVisibilitySceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
 }
 PXR_NAMESPACE_CLOSE_SCOPE

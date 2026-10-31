@@ -1,7 +1,7 @@
 {
   "HdUEHoudiniRendererPlugin": {
     "valid": "env:HDUE_RUNTIME_CONFIG",
-    "menulabel": "Unreal Engine (hdUE)",
+    "menulabel": "Unreal Engine",
     "menupriority": 30,
     "allowbackgroundupdate": false,
     "viewportrenderer": false,

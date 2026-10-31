@@ -8,9 +8,9 @@ Install
      (UE writes its shader cache and logs into runtime\Windows\HdUEBackend\Saved).
   2. Double-click Install.cmd (or run Install.ps1). It writes
      Documents\houdini22.0\packages\hdUE.json pointing at this folder.
-  3. Restart Houdini. Pick "Unreal Engine (hdUE)" in the Solaris viewport
+  3. Restart Houdini. Pick "Unreal Engine" in the Solaris viewport
      renderer menu, or as the renderer of a USD Render ROP / husk:
-       husk --renderer HdUEHoudiniRendererPlugin -o out.exr scene.usd
+       husk --renderer "Unreal Engine" -o out.exr scene.usd
 
 Uninstall
   Run Uninstall.cmd, then delete this folder.

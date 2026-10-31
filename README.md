@@ -273,10 +273,10 @@ For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_P
 <!-- USAGE -->
 ## Usage
 
-Pick **Unreal Engine (hdUE)** in the Solaris viewport's renderer menu, or render to disk:
+Pick **Unreal Engine** in the Solaris viewport's renderer menu, or render to disk:
 
 ```powershell
-husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 24 -o render.$F4.exr scene.usd
+husk --renderer "Unreal Engine" -f 1 -n 24 -o render.$F4.exr scene.usd
 ```
 
 Renderer settings live on any Render Settings LOP, on its **Unreal Engine** tab: render mode (Lumen or Path Tracer), samples, motion blur and motion samples, Lumen, environment resolution, and Unreal post-processing (tonemapper, bloom, grading, post-process materials). They are `hdUE:*` attributes on the UsdRenderSettings prim, so files rendered on a farm carry them. Render one frame range per husk call, and give farm tasks chunks of frames: each process starts UE once.

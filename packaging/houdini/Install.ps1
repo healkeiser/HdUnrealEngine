@@ -38,4 +38,4 @@ $Target = Join-Path $PackagesDirectory 'hdUE.json'
 $Json = ($Package | ConvertTo-Json -Depth 5) -replace '\\u0027', "'" -replace '\\u003c', '<' -replace '\\u003e', '>'
 [IO.File]::WriteAllText($Target, $Json, [Text.UTF8Encoding]::new($false))
 Write-Output "hdUE installed for Houdini $HoudiniVersion -> $Target"
-Write-Output 'Restart Houdini, then pick "Unreal Engine (hdUE)" in the Solaris viewport renderer menu or on a USD Render ROP.'
+Write-Output 'Restart Houdini, then pick "Unreal Engine" in the Solaris viewport renderer menu or on a USD Render ROP.'

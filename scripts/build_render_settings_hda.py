@@ -195,7 +195,7 @@ def help_page(
     name=NAME,
     label=LABEL,
     icon=ICON,
-    summary="Renders the stage with Unreal Engine (hdUE): render settings, camera, resolution, output and AOVs.",
+    summary="Renders the stage with Unreal Engine: render settings, camera, resolution, output and AOVs.",
     overview="Like Karma Render Settings, it creates the render settings prim, its render product and render vars, and "
     "makes that prim the stage's default render settings. It authors the hdUE settings changed from their "
     "defaults; the others keep hdUE's defaults (see docs/rendering.md in the hdUE repository). In Image Output, it can also render the render products "

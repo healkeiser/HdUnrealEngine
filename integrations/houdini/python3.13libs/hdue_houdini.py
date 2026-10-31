@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.append(str(ROOT / "scripts"))
 PLUGIN = "HdUEHoudiniRendererPlugin"
-LABEL = "Unreal Engine (hdUE)"
+LABEL = "Unreal Engine"
 _host = None
 _failure = None
 _catalog_cache = {}
@@ -308,7 +308,7 @@ class Host:
                     self.viewer.status.setText(state["error"])
                 elif not state["active"]:
                     self.viewer.status.setText(
-                        "Select Unreal Engine (hdUE) in Solaris to resume"
+                        "Select Unreal Engine in Solaris to resume"
                     )
             if (
                 self.viewer

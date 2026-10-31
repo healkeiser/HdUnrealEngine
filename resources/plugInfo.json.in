@@ -4,34 +4,34 @@
     "LibraryPath": "@HDUE_PLUGIN_LIBRARY@", "ResourcePath": "resources",
     "Info": { "Types": {
       "HdUEHoudiniRendererPlugin": {
-        "bases": ["HdRendererPlugin"], "displayName": "Unreal Engine (hdUE)", "priority": 0
+        "bases": ["HdRendererPlugin"], "displayName": "Unreal Engine", "priority": 0
       },
       "HdUE_ImplicitSurfaceSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "Implicit surfaces to meshes for hdUE"
       },
       "HdUE_LightLinkingSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "Light and shadow linking categories for hdUE"
       },
       "HdUE_ConversionSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "TetMesh, NURBS and particle fields to meshes, curves and points for hdUE"
       },
       "HdUE_RenderPassPruneSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "Render pass prune collection for hdUE"
       },
       "HdUE_DrawModeSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "model:drawMode stand-ins for hdUE"
       },
       "HdUE_RenderPassVisibilitySceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "Render pass renderVisibility collection for hdUE"
       },
       "HdUE_PurposeVisibilitySceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "VisibilityAPI purpose visibility for hdUE"
       },
       "HdUE_HermiteCurvesAdapter": {
@@ -41,7 +41,7 @@
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },
       "HdUE_UnsupportedSceneIndexPlugin": {
-        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine (hdUE)", "priority": 0,
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "Warnings for what hdUE does not render"
       }
     } }

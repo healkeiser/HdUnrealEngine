@@ -18,7 +18,7 @@ The package's `uiready.py` runs alongside Houdini's own (Houdini runs every `uir
 
 ## Solaris viewport
 
-Pick **Unreal Engine (hdUE)** in the viewport's renderer menu. Renderer settings are `hdUE:*` attributes on a UsdRenderSettings prim, so any Render Settings LOP drives hdUE: with the delegate registered, Render Settings LOPs show them on an **Unreal Engine** tab (`integrations/houdini/soho/parameters/HdUEHoudiniRendererPlugin_Global.ds`), laid out as UE's editor lays them out. Above the tabs: the render mode, the Path Tracer samples and denoiser or the realtime warmup frames, the Unreal Tonemapper and the exposure compensation. Then a tab per UE category, each UE sub-category a collapsible section (its own sub-categories simple folders) in the order of UE's Details panel, the common ones expanded:
+Pick **Unreal Engine** in the viewport's renderer menu. Renderer settings are `hdUE:*` attributes on a UsdRenderSettings prim, so any Render Settings LOP drives hdUE: with the delegate registered, Render Settings LOPs show them on an **Unreal Engine** tab (`integrations/houdini/soho/parameters/HdUEHoudiniRendererPlugin_Global.ds`), laid out as UE's editor lays them out. Above the tabs: the render mode, the Path Tracer samples and denoiser or the realtime warmup frames, the Unreal Tonemapper and the exposure compensation. Then a tab per UE category, each UE sub-category a collapsible section (its own sub-categories simple folders) in the order of UE's Details panel, the common ones expanded:
 
 | Tab | Sections |
 | --- | --- |
@@ -58,7 +58,7 @@ In the Houdini UI, UE runs on its own thread and ticks continuously; the viewpor
 
 ### Development launcher
 
-From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine (hdUE)` for its process without editing the user's Houdini environment file:
+From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine` for its process without editing the user's Houdini environment file:
 
 ```powershell
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local/runtime.json -SetDefault
@@ -95,7 +95,7 @@ UE Substrate materials are authored like Karma's: an **hdUE Substrate Material B
 husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), and ticks it from the render pass. UE allows one lifetime per process, so it stays until the process exits: husk `--restart-delegate` creates its next delegates on the same UE.
 
 ```powershell
-husk --renderer HdUEHoudiniRendererPlugin -f 1 -n 24 -o render.$F4.exr scene.usd
+husk --renderer "Unreal Engine" -f 1 -n 24 -o render.$F4.exr scene.usd
 ```
 
 Render settings' data window (`dataWindowNDC`: crops and overscan), `pixelAspectRatio` and husk's tiling (`--tile-count`, `--tile-index`, `--autotile`) are honoured: each render covers only its data window (see [Cameras](rendering.md#cameras)).

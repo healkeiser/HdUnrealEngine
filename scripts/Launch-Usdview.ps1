@@ -32,7 +32,7 @@ try {
     if ($GlassProfile) { $Arguments += @('--hdue-glass-profile', [IO.Path]::GetFullPath($GlassProfile)) }
     if ($RuntimeConfig) { $Arguments += @('--hdue-runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) }
     # Use stock usdview modules via the SDK, never its @python .cmd wrappers.
-    & uv run --python 3.11 --script (Join-Path $PSScriptRoot 'usdview_hdue.py') $InputUsd --renderer 'Unreal Engine (hdUE)' @Arguments @UsdviewArguments
+    & uv run --python 3.11 --script (Join-Path $PSScriptRoot 'usdview_hdue.py') $InputUsd --renderer 'Unreal Engine' @Arguments @UsdviewArguments
     if ($LASTEXITCODE) { throw 'usdview / hdUE failed.' }
     if ($TestOutput) {
         $ResultPath = Join-Path $TestOutput 'verified.json'
