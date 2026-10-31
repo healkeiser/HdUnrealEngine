@@ -359,7 +359,31 @@ def build():
         )
     )
     tabs = renderer[len(main) :]
-    group = hou.ParmTemplateGroup([show])
+    # In Essential, the changed settings it hides (hdue_houdini.hidden_changes, evaluated by the parameter
+    # dialog's refresh, never cooked) with a button showing them: the notice and button hide while there are none.
+    hidden = {
+        hou.parmCondType.HideWhen: '{ hdue_show == 1 } { hdue_hiddenchanges == "" }'
+    }
+    notice = hou.LabelParmTemplate(
+        "hdue_hiddenchanges",
+        "",
+        column_labels=(
+            "`pythonexprs(\"__import__('hdue_houdini').hidden_changes()\")`",
+        ),
+        is_label_hidden=True,
+        conditionals=hidden,
+        help="Settings changed from their default that Essential hides: they are still rendered.",
+    )
+    reveal = hou.ButtonParmTemplate(
+        "hdue_showhidden",
+        "Show in Advanced",
+        script_callback="hou.pwd().parm('hdue_show').set(1)",
+        script_callback_language=hou.scriptLanguage.Python,
+        join_with_next=True,
+        conditionals=hidden,
+        help="Switches Show to Advanced, which shows the changed settings Essential hides.",
+    )
+    group = hou.ParmTemplateGroup([show, reveal, notice])
     # As Karma Render Settings: the prim path in the header of a closed section.
     group.append(
         hou.FolderParmTemplate(
@@ -404,13 +428,13 @@ def build():
     for name, text in TOP_HELP.items():
         template = settings.parmTemplateGroup().find(name)
         template.setHelp(text)
-        if (
-            name == "resolution"
-        ):  # UE renders at most 8192 pixels on a side (r.ScreenPercentage aside)
+        # UE renders at most 16384 pixels on a side (D3D12's largest texture); larger
+        # images render in husk tiles, so the slider stops there but the value does not.
+        if name == "resolution":
             template.setMinValue(1)
             template.setMinIsStrict(True)
-            template.setMaxValue(8192)
-            template.setMaxIsStrict(True)
+            template.setMaxValue(16384)
+            template.setMaxIsStrict(False)
         group.append(template)
     group.append(
         hou.SeparatorParmTemplate(

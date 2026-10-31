@@ -453,12 +453,21 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     return HDUE_OK;
 }
 
+// The render target is a UTextureRenderTarget2D: its size is bounded by the RHI's largest 2D texture
+// (GetMax2DTextureDimension: D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION, 16384, on D3D12). Larger images render in tiles.
+HdueResult CheckResolution(uint32 Width, uint32 Height) {
+    const uint32 Max = GetMax2DTextureDimension();
+    if (Width && Height && Width <= Max && Height <= Max) return HDUE_OK;
+    return Fail(
+        HDUE_INVALID_ARGUMENT,
+        *FString::Printf(TEXT("Resolution %u x %u is outside 1..%u, the largest texture this GPU's RHI renders; "
+                              "render larger images in tiles (husk --tile-count)."),
+                         Width, Height, Max));
+}
 HdueResult HDUE_CALL CreateSession(const HdueSessionDesc* Desc, HdueSession* Handle) {
     HDUE_RETURN_UNLESS_READY();
     if (!Sized(Desc) || !Handle) return HDUE_INVALID_ARGUMENT;
-    if (!Desc->width || !Desc->height || Desc->width > 8192 || Desc->height > 8192)
-        return Fail(HDUE_INVALID_ARGUMENT,
-                    *FString::Printf(TEXT("Resolution %u x %u is outside 1..8192."), Desc->width, Desc->height));
+    if (const HdueResult Size = CheckResolution(Desc->width, Desc->height); Size != HDUE_OK) return Size;
     if (Runtime.Session) return Fail(HDUE_INVALID_STATE, TEXT("The initial backend supports one active session."));
     auto Session = MakeShared<FSession, ESPMode::ThreadSafe>();
     Session->Handle = Runtime.NextSession++;
@@ -1032,7 +1041,23 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
                 });
         }
     }
+    // MegaLights traces a light sample buffer of the view size / r.MegaLights.DownsampleMode x
+    // r.MegaLights.NumSamplesPerPixel (twice the view at Cinematic: full resolution, 2x2 samples). Past UE's largest
+    // texture UE clamps it and lights only part of the image, so, as UE raises Lumen's screen probe downsampling for
+    // such views (LumenScreenProbeGather.cpp), these frames trace at half resolution (2x2, UE's Epic level), which
+    // keeps the buffer within the view.
+    IConsoleVariable* Downsample =
+        PathTracing ? nullptr : IConsoleManager::Get().FindConsoleVariable(TEXT("r.MegaLights.DownsampleMode"));
+    const int32 DownsampleWas = Downsample ? Downsample->GetInt() : 2;
+    const int32 Samples = CVarInt(TEXT("r.MegaLights.NumSamplesPerPixel"));
+    const uint32 Max = GetMax2DTextureDimension();
+    const bool Overflows =
+        DownsampleWas < 2 &&
+        (FMath::DivideAndRoundUp(Session->Width, DownsampleWas ? 2u : 1u) * (Samples >= 2 ? 2u : 1u) > Max ||
+         Session->Height * (Samples >= 4 ? 2u : 1u) > Max);
+    if (Overflows) Downsample->Set(2, ECVF_SetByCode);
     RenderAndReadBack(Session, Family, Resource, PathTracing, Aov, Moving, ScreenFraction);
+    if (Overflows) Downsample->Set(DownsampleWas, ECVF_SetByCode);
 }
 
 void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
@@ -1820,7 +1845,8 @@ HdueResult HDUE_CALL AssetSceneStatus(HdueSession Handle, HdueAssetSceneStatus* 
 // rebuilt every mesh, material and texture (seconds on large scenes, e.g. leaving a camera in Houdini).
 HdueResult HDUE_CALL ResizeSession(HdueSession Handle, uint32 Width, uint32 Height) {
     HDUE_RETURN_UNLESS_READY();
-    if (!ValidSession(Handle) || !Width || !Height || Width > 8192 || Height > 8192) return HDUE_INVALID_ARGUMENT;
+    if (!ValidSession(Handle)) return HDUE_INVALID_ARGUMENT;
+    if (const HdueResult Size = CheckResolution(Width, Height); Size != HDUE_OK) return Size;
     const auto Session = Runtime.Session;
     if (Session->Width == Width && Session->Height == Height) return HDUE_OK;
     // In-flight readbacks reference the old target size: release them after the commands already queued.
