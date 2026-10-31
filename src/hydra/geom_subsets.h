@@ -49,6 +49,9 @@ inline std::vector<HdUEMeshData> HdUEPartitionSubsets(HdUEMeshData mesh, const H
     prototype.motionLeft = mesh.motionLeft;
     prototype.motionRight = mesh.motionRight;
     prototype.velocities = mesh.velocities;
+    prototype.accelerations = mesh.accelerations;
+    prototype.angularVelocities = mesh.angularVelocities;
+    prototype.blurScale = mesh.blurScale;
     prototype.deformTimes = mesh.deformTimes;
     prototype.deformOffsets.resize(mesh.deformOffsets.size());
     prototype.uvSets.resize(mesh.uvSets.size());

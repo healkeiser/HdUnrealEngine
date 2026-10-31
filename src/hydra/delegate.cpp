@@ -8,6 +8,7 @@
 #include "cryptomatte.h"
 #include "aov_table.h"
 #include "pxr/imaging/hio/image.h"
+#include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/half.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -734,6 +735,18 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         const auto& vertices = diced ? diced->points : points;
         const auto& vertexNormals = diced ? diced->normals : data.normals;
         const size_t count = vertices.size();
+        // Nothing to draw (and UE's Nanite builder asserts on it): every triangle degenerate, as a draw-mode stand-in
+        // of a model without extentsHint.
+        bool area = false;
+        for (size_t t = 0; !area && t + 2 < data.indices.size(); t += 3)
+            if (std::max({data.indices[t], data.indices[t + 1], data.indices[t + 2]}) < count)
+                area = GfCross(vertices[data.indices[t + 1]] - vertices[data.indices[t]],
+                               vertices[data.indices[t + 2]] - vertices[data.indices[t]])
+                           .GetLengthSq() > 0;
+        if (!area) {
+            packet.removed.push_back(packet.own(id));
+            continue;
+        }
         // UV sets one after another (HdueMeshDesc uv_set_count).
         std::vector<const std::vector<GfVec2f>*> sets;
         if (diced)
@@ -1211,14 +1224,21 @@ class Pass final : public HdRenderPass {
         const auto nativeMeshes = s.setting<VtDictionary>("nativeMeshAssets", {});
         for (const auto& [id, mesh] : s.meshes) {
             if (!mesh.moving()) continue;
-            const auto left = mesh.motionLeft.at(t), right = mesh.motionRight.at(t);
+            const float tm = t * mesh.blurScale;
+            const auto left = mesh.motionLeft.at(tm), right = mesh.motionRight.at(tm);
             const auto place = [&](GfMatrix4d m, size_t instance) {
                 m = left * m * right;
                 const bool velocity = mesh.velocities.size() > instance,
                            acceleration = mesh.accelerations.size() > instance;
                 for (int c = 0; c < 3; ++c)
-                    m[3][c] += (velocity ? mesh.velocities[instance][c] * t : 0.f) +
-                               (acceleration ? mesh.accelerations[instance][c] * t * t / 2 : 0.f);
+                    m[3][c] += (velocity ? mesh.velocities[instance][c] * tm : 0.f) +
+                               (acceleration ? mesh.accelerations[instance][c] * tm * tm / 2 : 0.f);
+                if (mesh.angularVelocities.size() > instance && mesh.angularVelocities[instance] != GfVec3f(0)) {
+                    const GfVec3d axis(mesh.angularVelocities[instance]), at = m.ExtractTranslation();
+                    m = m * GfMatrix4d(1).SetTranslate(-at) *
+                        GfMatrix4d(1).SetRotate(GfRotation(axis, axis.GetLength() * tm)) *
+                        GfMatrix4d(1).SetTranslate(at);
+                }
                 return m;
             };
             auto& out = storage.emplace_back();
@@ -1239,7 +1259,7 @@ class Pass final : public HdRenderPass {
         std::map<std::string, std::vector<GfVec3f>> deformed;
         for (const auto& [id, mesh] : s.meshes)
             if (!mesh.deformTimes.empty() && mesh.sceneAsset.empty()) {
-                deformed[id] = mesh.pointsAt(t);
+                deformed[id] = mesh.pointsAt(t * mesh.blurScale);
                 s.dirtyMeshes.insert(id);
             }
         std::vector<std::string> names;
@@ -2515,6 +2535,20 @@ static TfToken HdUECanonicalKey(const TfToken& key, bool& namespaced) {
     if (key == TfToken("stageUpAxis")) return TfToken("upAxis");
     return key;
 }
+// UsdRenderSettings renderingColorSpace: UE renders in linear Rec.709 (its working colour space is a project setting
+// baked into the cooked shaders; UE's USD importer ignores the attribute), so any other space is warned once.
+void HdUEWarnRenderingColorSpace(const VtValue& value) {
+    const auto space = value.IsHolding<TfToken>()       ? value.UncheckedGet<TfToken>().GetString()
+                       : value.IsHolding<std::string>() ? value.UncheckedGet<std::string>()
+                                                        : std::string();
+    const auto lower = TfStringToLower(space);
+    static std::once_flag warned;
+    if (!space.empty() && lower != "lin_rec709_scene" && lower != "lin_rec709" && lower != "linear rec.709 (srgb)" &&
+        !(lower == "scene_linear" && HdUESceneLinearIsRec709()))
+        std::call_once(warned, [&] {
+            TF_WARN("hdUE: renderingColorSpace %s is not supported; hdUE renders in linear Rec.709", space.c_str());
+        });
+}
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
@@ -2535,6 +2569,8 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             state_->settings[canonical] = value;
         }
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
+    if (const auto space = settings.find(TfToken("renderingColorSpace")); space != settings.end())
+        HdUEWarnRenderingColorSpace(space->second);
     const auto stageUnits = settings.find(TfToken("stageMetersPerUnit"));
     const bool hostUnits = stageUnits != settings.end() && !VtValue::Cast<double>(stageUnits->second).IsEmpty();
     // husk names its USD file (usdFilename) but, unlike stageMetersPerUnit, passes no up axis: read the root layer's
@@ -2715,8 +2751,8 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == HdPrimTypeTokens->cylinderLight) return HdUECreateLight(id, HDUE_CYLINDER_LIGHT);
     if (type == HdPrimTypeTokens->meshLight || type == HdPrimTypeTokens->pluginLight || type == TfToken("portalLight"))
         return HdUECreateUnsupportedLight(id, type);
-    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a UsdLuxGeometryLight
-        return HdUECreateUnsupportedLight(id, TfToken("GeometryLight"));
+    if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a GeometryLight or PortalLight
+        return HdUECreateUnsupportedLight(id, type);
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {
@@ -2919,6 +2955,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             if (HdUEHostTexture(light.texture)) state_->dirtyLights.insert(id);
         ++state_->revision;
     }
+    if (key == TfToken("renderingColorSpace")) HdUEWarnRenderingColorSpace(value);
     if (key == TfToken("surfaceEffects"))
         state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     if (key == TfToken("surfaceEffects") || key == TfToken("wetMaskPreview") || key == TfToken("wetValidationError")) {

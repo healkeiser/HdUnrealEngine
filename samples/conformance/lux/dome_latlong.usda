@@ -1,8 +1,9 @@
 #usda 1.0
 (
     doc = """A latlong dome follows the OpenEXR convention: +Y up, longitude 0 (the image centre) towards +Z. The texture
-is red around +Z (behind the camera) and blue around -Z. A white sphere's camera-facing side is lit from +Z: red.
-Frame 2 rotates the dome 180 degrees about Y: blue."""
+is red around +Z (behind the camera), blue around -Z and green in a cap around +Y (marking up). A white sphere's
+camera-facing side is lit from +Z: red, with the green the cap adds from above (the Path Tracer's normalized RGB is
+0.82, 0.17, 0.01). Frame 2 rotates the dome 180 degrees about Y: blue (0.01, 0.17, 0.82)."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdLux DomeLight",
@@ -20,11 +21,11 @@ Frame 2 rotates the dome 180 degrees about Y: blue."""
     ]
    },
    "rgb": [
-    1,
-    0,
-    0
+    0.82,
+    0.17,
+    0.01
    ],
-   "tol": 0.2
+   "tol": 0.1
   },
   {
    "name": "rotated 180: blue",
@@ -38,11 +39,11 @@ Frame 2 rotates the dome 180 degrees about Y: blue."""
     "frame": 2
    },
    "rgb": [
-    0,
-    0,
-    1
+    0.01,
+    0.17,
+    0.82
    ],
-   "tol": 0.2
+   "tol": 0.1
   }
  ]
 }"""

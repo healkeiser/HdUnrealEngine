@@ -2,17 +2,25 @@
 (
     doc = """MotionAPI motion:blurScale (inherited) scales the rendered motion blur per object: 0 removes it, 2 doubles it.
 Two cubes move 2 units per frame along +X with the shutter open from -0.5 to 0.5 frames: the bottom one (blurScale 1)
-smears 1 unit each side; the top one has blurScale 0 and must stay sharp. hdUE does not implement it and must say so."""
+smears 1 unit each side; the top one has blurScale 0 and must stay sharp."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomMotionAPI",
- "feature": "motion:blurScale (unsupported, warned)",
+ "feature": "motion:blurScale",
  "frames": 1,
  "checks": [
   {
-   "name": "warning names motion:blurScale",
-   "log": "hdUE warning:.*blurScale",
-   "present": true
+   "name": "blurScale 0 keeps the top cube sharp",
+   "value": {
+    "region": [
+     0.7,
+     1.8,
+     1.3,
+     2.2
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.02
   },
   {
    "name": "the default cube is blurred",

@@ -55,36 +55,32 @@ none compares with another renderer.
 
 ## Support matrix
 
-Last full run: `0e0ecf2` plus the new scenes (main's Houdini build and `.local/runtime-houdini.json`), 150 scenes x 2
-modes: 133 scenes pass in both modes, 17 fail (33 failing runs). The 33 scenes added at `0e0ecf2` (Capsule_1 /
-Cylinder_1, TetMesh, NURBS, HermiteCurves, subdivision tags, draw modes, VisibilityAPI, MotionAPI, `!resetXformStack!`,
-`angularVelocities`, DomeLight_1 `poleAxis`, portal / plugin / mesh / volume lights, LightListAPI, `treatAsPoint`,
-ShadowAPI distance, NodeGraph, CoordSysAPI, UDIMs, collection binding strength, UsdSkel skinning and blend shapes,
-RenderPass, `renderingColorSpace`, ParticleField, SpatialAudio, GenerativeProcedural) account for 16 of the 17.
+Last full run: this branch at `5ebd75f` (its Houdini plugin, `.local/runtime-houdini.json`), 150 scenes x
+2 modes: all 150 pass in both modes (133 at `0e0ecf2`). Each fix below follows, in order: what UE does (its USD
+importer and runtime), else the USD spec, else other renderers.
 
 ### Gaps found
 
-| Scene | Expected (spec) | Observed | Likely code area |
-| --- | --- | --- | --- |
-| camera/clipping_range | the cube beyond the far plane is clipped | it renders: hdUE applies the near plane only (check removed) | UE's views keep an infinite far plane; a finite one changed Lumen's lighting by 8% on Cornell with nothing clipped, and the Path Tracer traces past any far plane |
-| lux/dome_latlong (realtime) | rotated 180 degrees, the dome lights the sphere blue | blue with a green cast (normalized RGB 0.03, 0.17, 0.80; the check allows 0.2 from pure blue); path traced passes. It passed at `4a8d783` and fails the same with main's own plugin and runtime at `74e8853` | realtime dome lighting (Lumen / sky light capture) or the dome texture's colour conversion, changed between those commits |
+| Scene | Expected (spec) | Status |
+| --- | --- | --- |
+| camera/clipping_range | the cube beyond the far plane is clipped | open: hdUE applies the near plane only (check removed); UE's views keep an infinite far plane, a finite one changed Lumen's lighting by 8% on Cornell with nothing clipped, and the Path Tracer traces past any far plane |
+| geom/tet_mesh | TetMesh draws its surface faces | fixed: Hydra's `HdsiTetMeshConversionSceneIndex`, registered for hdUE (src/hydra/implicit_surfaces.cpp) |
+| geom/nurbs_patch, geom/nurbs_curves | the evaluated surface / curve | fixed: `HdsiNurbsApproximatingSceneIndex` draws the control hull, so hdUE first replaces the control points with points sampled on the curve or surface (src/hydra/nurbs.h, rational weights and ranges; trim curves ignored, as by Hydra) |
+| geom/hermite_curves | the Hermite arch | fixed: UsdImaging's (internal) adapter gave an untyped prim; hdUE's adapter overrides it with cubic Bezier basisCurves |
+| geom/draw_mode | bounds / cards replace the model | fixed: UE's USD importer applies draw modes (USDGeomXformableTranslator.cpp); hdUE adds UsdImaging's `UsdImagingDrawModeSceneIndex`, which husk does not add for a renderer, and computes the model's extent when `extentsHint` is not authored. Meshes with no area are skipped (UE's Nanite builder asserts on them) |
+| geom/visibility_api | purpose visibility | fixed: UE's importer reads `visibility` only and UsdImaging publishes no purpose visibility, so hdUE follows `ComputeEffectiveVisibility`: an API schema adapter publishes the tokens, a scene index hides render/proxy/guide gprims (an ancestor's edit does not dirty descendants) |
+| render_settings/render_pass | `husk --pass` renders renderVisibility's members only | fixed: `HdsiRenderPassPruneSceneIndex` (prune collection) and an hdUE scene index for renderVisibility (Storm's is registered for GL only) |
+| mesh/subdiv_fvar_linear | none smooths face-varying values | scene fixed: on one quad, `interpolateBoundary` edgeAndCorner keeps face-varying corners sharp in OpenSubdiv, so all and none agree; hdUE already refined through the face-varying channel. The scene now tests an interior value |
+| lux/dome_latlong (realtime) | red / blue | scene fixed: the "green cast" is the texture's green +Y cap; the Path Tracer measures the same (0.82, 0.17, 0.01) as Lumen (0.80, 0.17, 0.03), and the check now expects it within 0.1 |
+| lux/volume_light | the volume renders; VolumeLightAPI warned | scene fixed: the volume never vanished, the check probed where fog.vdb is not; VolumeLightAPI is warned (UE's importer ignores it) |
+| lux/mesh_light | the mesh emits | fixed: UE lights from emissive surfaces, so the mesh emits `color` x `intensity` x 2^`exposure` (Lumen lights the wall about 1% as much as the Path Tracer) |
+| lux/portal_light | portals warned | fixed: the generic `light` Sprim is named by its USD type (PortalLight, GeometryLight) |
+| lux/shadow_distance | `shadow:distance` limits shadows, or a warning | warned: UE lights have no shadow length limit; UE's importer maps `shadow:enable` only (USDLightConversion.cpp) |
+| instancer/angular_velocities | instances spin within the shutter | fixed: per-instance rotation about the instance's position |
+| geom/motion_blur_scale | `motion:blurScale` scales motion | fixed: the prim's sub-frame times are scaled |
+| render_settings/rendering_color_space | rendering in `renderingColorSpace`, or a warning | warned: UE's working colour space is a project setting baked into cooked shaders; UE's importer ignores the attribute |
+| volume/particle_field | Gaussian splats, or a warning | approximated and warned: `HdsiParticleFieldConversionSceneIndex` points (spheres) coloured by the DC term |
 
-| lux/dome_latlong (realtime) | (as above) | at `0e0ecf2` both frames fail: the +Z red frame also reads 0.80, 0.17, 0.03 | as above: a green cast in realtime dome lighting |
-| geom/tet_mesh | TetMesh draws its surfaceFaceVertexIndices | nothing renders, no warning | hdUE's rprims are mesh/points/basisCurves; Hydra's `HdsiTetMeshConversionSceneIndex` (tetMesh to mesh) is not in hdUE's scene index chain (register it as `HdUE_ImplicitSurfaceSceneIndexPlugin` is) |
-| geom/nurbs_patch, geom/nurbs_curves | NurbsPatch / NurbsCurves render their evaluated surface / curve | nothing renders, no warning | same: `HdsiNurbsApproximatingSceneIndex` (NURBS to mesh / basisCurves) is not registered for hdUE |
-| geom/hermite_curves | HermiteCurves render the Hermite arch | nothing renders, no warning | UsdImaging's HermiteCurves adapter gives no prim hdUE accepts; at least warn |
-| geom/draw_mode | `model:drawMode` bounds / cards replace the component model | the sphere renders in every mode (cards grey, no card texture) | husk's UsdImaging pipeline (draw-mode scene index / `UsdImagingDelegate` draw modes) is not applying draw modes for hdUE; check what the delegate or host must enable |
-| geom/visibility_api | renderVisibility invisible hides render-purpose prims; guides need guideVisibility visible | both still render | UsdImaging passes only `visibility`; purpose visibility (`ComputeEffectiveVisibility(purpose)`) reaches no renderer here; a scene index or the delegate would have to apply it |
-| render_settings/render_pass | `husk --pass Pass` renders only renderVisibility's members | the non-member renders too | the render pass prune scene index (`HdsiRenderPassPruneSceneIndex`, driven by the active render pass) is not in hdUE's chain |
-| mesh/subdiv_fvar_linear | faceVaryingLinearInterpolation none smooths face-varying values | "none" and "all" render the same bilinear colours | src/hydra/subdivision.h: the face-varying displayColor is not refined through the OpenSubdiv face-varying channel (or ignores `faceVaryingLinearInterpolation`) |
-| lux/volume_light | VolumeLightAPI emits; the volume renders | the volume disappears (alpha 0), nothing warned | the Volume with VolumeLightAPI no longer reaches hdUE as a volume rprim; its light sprim type is not accepted |
-| lux/mesh_light | mesh lights warned (src/hydra/delegate.cpp accepts `meshLight`) | the mesh renders, unlit, no warning | no `meshLight` Sprim reaches hdUE in husk; warn from the mesh (it carries MeshLightAPI) instead |
-| lux/portal_light | portals warned (README) | warned as "GeometryLight is not supported (/Portal)" | src/hydra/delegate.cpp: PortalLight arrives as the generic `light` Sprim, which is labelled GeometryLight |
-| instancer/angular_velocities | `angularVelocities` blur, or a warning (README lists it as unsupported) | silently not blurred | src/hydra/delegate.cpp instancer motion: warn once when `angularVelocities` are authored |
-| geom/motion_blur_scale | `motion:blurScale` 0 removes blur, or a warning | silently ignored | instancer / prim motion sampling |
-| lux/shadow_distance | `shadow:distance` limits shadows, or a warning | silently ignored | src/hydra/prims.cpp light Sync (next to the `shadow:color` warning) |
-| render_settings/rendering_color_space | rendering in `renderingColorSpace`, or a warning | silently ignored | render settings translation in src/hydra/delegate.cpp |
-| volume/particle_field | Gaussian splats render, or a warning | nothing renders, no warning (the rest of the scene renders) | `HdsiParticleFieldConversionSceneIndex` is not registered for hdUE, and nothing warns |
 Resolved since `4a8d783`: material binding purpose (the render settings' `materialBindingPurposes`, else `full`),
 `disableDepthOfField`, `includedPurposes`, the `UsdUVTexture` fallback, GeometryLight (accepted and
 warned), the Path Tracer's displacement, and hdUE's warnings in husk (`hdUE warning:` lines on stderr). Two scenes'
@@ -101,7 +97,8 @@ above exists. Not tested yet (no scene): dome `mirroredBall`/`angular`/`cubeMapV
 `specular` multiplier, `shaping:focus`/`cone:softness`, IES `angleScale`/`normalize`, semi-sharp creases,
 `UsdGeomSubset` partition validation, NURBS trim curves, cards `cross`/`fromTexture`, `proxyVisibility`,
 `motion:nonlinearSampleCount` and `velocityScale` (deprecated) effects, BlendShape `normalOffsets`, RenderPass
-`cameraVisibility`/`matte`/`prune` collections, MaterialX nodes beyond image, multiply and opacity.
+`cameraVisibility`/`matte`/`prune` collections (prune goes through `HdsiRenderPassPruneSceneIndex`; cameraVisibility
+and matte are not applied), MaterialX nodes beyond image, multiply and opacity.
 
 Generated by `run_conformance.py --matrix` from the last run (pass, partial passed/total, fail, error):
 
@@ -121,16 +118,16 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdGeomCamera | shutter:open / shutter:close | [camera/motion_blur](../samples/conformance/camera/motion_blur.usda) | pass | pass |  |
 | UsdGeomCamera | projection orthographic | [camera/orthographic](../samples/conformance/camera/orthographic.usda) | pass | pass |  |
 | UsdGeomCamera | camera under a scaled transform | [camera/scaled_parent](../samples/conformance/camera/scaled_parent.usda) | pass | pass |  |
-| UsdGeomModelAPI | model:drawMode bounds, cards (model:cardGeometry, model:cardTexture*) | [geom/draw_mode](../samples/conformance/geom/draw_mode.usda) | partial 2/4 | partial 2/4 | bounds replaces the model by lines (pathtraced); bounds replaces the model by lines (realtime); the +Z card shows cardTextureZPos (pathtraced); the +Z card shows cardTextureZPos (realtime) |
-| UsdGeomHermiteCurves | HermiteCurves | [geom/hermite_curves](../samples/conformance/geom/hermite_curves.usda) | partial 1/2 | partial 1/2 | curve arches through its middle (pathtraced); curve arches through its middle (realtime) |
-| UsdGeomMotionAPI | motion:blurScale (unsupported, warned) | [geom/motion_blur_scale](../samples/conformance/geom/motion_blur_scale.usda) | partial 1/2 | partial 1/2 | warning names motion:blurScale (pathtraced); warning names motion:blurScale (realtime) |
-| UsdGeomNurbsCurves | NurbsCurves (evaluated, not the control hull) | [geom/nurbs_curves](../samples/conformance/geom/nurbs_curves.usda) | partial 1/2 | partial 1/2 | curve passes through its peak (pathtraced); curve passes through its peak (realtime) |
-| UsdGeomNurbsPatch | NurbsPatch surface (not its control hull) | [geom/nurbs_patch](../samples/conformance/geom/nurbs_patch.usda) | partial 1/3 | partial 1/3 | patch renders (pathtraced); patch renders (realtime); surface reaches its Bezier top (pathtraced); surface reaches its Bezier top (realtime) |
+| UsdGeomModelAPI | model:drawMode bounds, cards (model:cardGeometry, model:cardTexture*) | [geom/draw_mode](../samples/conformance/geom/draw_mode.usda) | pass | pass |  |
+| UsdGeomHermiteCurves | HermiteCurves | [geom/hermite_curves](../samples/conformance/geom/hermite_curves.usda) | pass | pass |  |
+| UsdGeomMotionAPI | motion:blurScale | [geom/motion_blur_scale](../samples/conformance/geom/motion_blur_scale.usda) | pass | pass |  |
+| UsdGeomNurbsCurves | NurbsCurves (evaluated, not the control hull) | [geom/nurbs_curves](../samples/conformance/geom/nurbs_curves.usda) | pass | pass |  |
+| UsdGeomNurbsPatch | NurbsPatch surface (not its control hull) | [geom/nurbs_patch](../samples/conformance/geom/nurbs_patch.usda) | pass | pass |  |
 | UsdGeomXformable | !resetXformStack! | [geom/reset_xform_stack](../samples/conformance/geom/reset_xform_stack.usda) | pass | pass |  |
-| UsdGeomTetMesh | TetMesh surface | [geom/tet_mesh](../samples/conformance/geom/tet_mesh.usda) | fail | fail | its surface renders (pathtraced); its surface renders (realtime) |
-| UsdGeomVisibilityAPI | renderVisibility, guideVisibility | [geom/visibility_api](../samples/conformance/geom/visibility_api.usda) | partial 3/5 | partial 3/5 | guides are invisible by default (pathtraced); guides are invisible by default (realtime); renderVisibility invisible hides a render prim (pathtraced); renderVisibility invisible hides a render prim (realtime) |
+| UsdGeomTetMesh | TetMesh surface | [geom/tet_mesh](../samples/conformance/geom/tet_mesh.usda) | pass | pass |  |
+| UsdGeomVisibilityAPI | renderVisibility, guideVisibility | [geom/visibility_api](../samples/conformance/geom/visibility_api.usda) | pass | pass |  |
 | UsdGeomPointInstancer | accelerations motion blur | [instancer/accelerations](../samples/conformance/instancer/accelerations.usda) | pass | pass |  |
-| UsdGeomPointInstancer | angularVelocities (unsupported, warned) | [instancer/angular_velocities](../samples/conformance/instancer/angular_velocities.usda) | partial 1/2 | partial 1/2 | warning names angularVelocities (pathtraced); warning names angularVelocities (realtime) |
+| UsdGeomPointInstancer | angularVelocities | [instancer/angular_velocities](../samples/conformance/instancer/angular_velocities.usda) | pass | pass |  |
 | UsdGeomPointInstancer | instance-rate primvars (displayColor) | [instancer/display_color](../samples/conformance/instancer/display_color.usda) | pass | pass |  |
 | UsdGeomPointInstancer | inactiveIds metadata | [instancer/inactive_ids](../samples/conformance/instancer/inactive_ids.usda) | pass | pass |  |
 | UsdGeomPointInstancer | PointInstancer's own transform | [instancer/instancer_transform](../samples/conformance/instancer/instancer_transform.usda) | pass | pass |  |
@@ -149,7 +146,7 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdLux | diffuse multiplier | [lux/diffuse_multiplier](../samples/conformance/lux/diffuse_multiplier.usda) | pass | pass |  |
 | UsdLux | DiskLight, exposure | [lux/disk_light](../samples/conformance/lux/disk_light.usda) | pass | pass |  |
 | UsdLux | DistantLight, exposure | [lux/distant_light](../samples/conformance/lux/distant_light.usda) | pass | pass |  |
-| UsdLux DomeLight | texture:format latlong orientation | [lux/dome_latlong](../samples/conformance/lux/dome_latlong.usda) | fail | pass | lit from +Z: red (realtime); rotated 180: blue (realtime) |
+| UsdLux DomeLight | texture:format latlong orientation | [lux/dome_latlong](../samples/conformance/lux/dome_latlong.usda) | pass | pass |  |
 | UsdLux | DomeLight, exposure | [lux/dome_light](../samples/conformance/lux/dome_light.usda) | pass | pass |  |
 | UsdLux DomeLight_1 | poleAxis | [lux/dome_pole_axis](../samples/conformance/lux/dome_pole_axis.usda) | pass | pass |  |
 | UsdLux | GeometryLight (unsupported, warned) | [lux/geometry_light](../samples/conformance/lux/geometry_light.usda) | pass | pass |  |
@@ -158,13 +155,13 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdLuxLightFilter | light:filters (unsupported, warned) | [lux/light_filter](../samples/conformance/lux/light_filter.usda) | pass | pass |  |
 | UsdLux | light linking (collection:lightLink) | [lux/light_link](../samples/conformance/lux/light_link.usda) | pass | pass |  |
 | UsdLux LightListAPI | lightList, lightList:cacheBehavior (a discovery cache) | [lux/light_list](../samples/conformance/lux/light_list.usda) | pass | pass |  |
-| UsdLux MeshLightAPI | MeshLightAPI, light:materialSyncMode (unsupported, warned) | [lux/mesh_light](../samples/conformance/lux/mesh_light.usda) | partial 1/2 | partial 1/2 | warning names the mesh light (pathtraced); warning names the mesh light (realtime) |
+| UsdLux MeshLightAPI | MeshLightAPI, light:materialSyncMode | [lux/mesh_light](../samples/conformance/lux/mesh_light.usda) | pass | pass |  |
 | UsdLux | normalize | [lux/normalize](../samples/conformance/lux/normalize.usda) | pass | pass |  |
 | UsdLux | PluginLight (unsupported, warned) | [lux/plugin_light](../samples/conformance/lux/plugin_light.usda) | pass | pass |  |
-| UsdLux | PortalLight (unsupported, warned) | [lux/portal_light](../samples/conformance/lux/portal_light.usda) | partial 1/2 | partial 1/2 | warning names the portal light (pathtraced); warning names the portal light (realtime) |
+| UsdLux | PortalLight (unsupported, warned) | [lux/portal_light](../samples/conformance/lux/portal_light.usda) | pass | pass |  |
 | UsdLux | RectLight, exposure | [lux/rect_light](../samples/conformance/lux/rect_light.usda) | pass | pass |  |
 | UsdLux ShadowAPI | shadow:color (unsupported, warned) | [lux/shadow_color](../samples/conformance/lux/shadow_color.usda) | pass | pass |  |
-| UsdLux ShadowAPI | shadow:distance, shadow:falloff (unsupported, warned) | [lux/shadow_distance](../samples/conformance/lux/shadow_distance.usda) | partial 1/2 | partial 1/2 | warning names shadow:distance (pathtraced); warning names shadow:distance (realtime) |
+| UsdLux ShadowAPI | shadow:distance, shadow:falloff (unsupported, warned) | [lux/shadow_distance](../samples/conformance/lux/shadow_distance.usda) | pass | pass |  |
 | UsdLux ShadowAPI | shadow:enable | [lux/shadow_enable](../samples/conformance/lux/shadow_enable.usda) | pass | pass |  |
 | UsdLux | shadow linking (collection:shadowLink) | [lux/shadow_link](../samples/conformance/lux/shadow_link.usda) | pass | pass |  |
 | UsdLux | ShapingAPI cone angle | [lux/shaping_cone](../samples/conformance/lux/shaping_cone.usda) | pass | pass |  |
@@ -172,7 +169,7 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdLux | light size without normalize | [lux/size_unnormalized](../samples/conformance/lux/size_unnormalized.usda) | pass | pass |  |
 | UsdLux | SphereLight, exposure | [lux/sphere_light](../samples/conformance/lux/sphere_light.usda) | pass | pass |  |
 | UsdLux SphereLight | treatAsPoint | [lux/treat_as_point](../samples/conformance/lux/treat_as_point.usda) | pass | pass |  |
-| UsdLux VolumeLightAPI | VolumeLightAPI (unsupported, warned) | [lux/volume_light](../samples/conformance/lux/volume_light.usda) | fail | fail | the volume still renders (pathtraced); the volume still renders (realtime); warning names the volume light (pathtraced); warning names the volume light (realtime) |
+| UsdLux VolumeLightAPI | VolumeLightAPI (unsupported, warned) | [lux/volume_light](../samples/conformance/lux/volume_light.usda) | pass | pass |  |
 | MaterialX standard_surface (as UE Interchange imports it) | opacity (masked at OpacityMaskClipValue 1/3) | [materialx/opacity](../samples/conformance/materialx/opacity.usda) | pass | pass |  |
 | MaterialX standard_surface (as UE Interchange imports it) | opacity cutout keeps coverage with distance (alpha-coverage mips) | [materialx/opacity_mips](../samples/conformance/materialx/opacity_mips.usda) | pass | pass |  |
 | UsdGeomMesh | concave n-gon | [mesh/concave_polygon](../samples/conformance/mesh/concave_polygon.usda) | pass | pass |  |
@@ -189,7 +186,7 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdGeomMesh | hdUE:cullBackface = 0 renders single-sided back faces (as Karma) | [mesh/single_sided](../samples/conformance/mesh/single_sided.usda) | pass | pass |  |
 | UsdGeomMesh | interpolateBoundary, cornerIndices, cornerSharpnesses | [mesh/subdiv_boundary_corners](../samples/conformance/mesh/subdiv_boundary_corners.usda) | pass | pass |  |
 | UsdGeomMesh | creaseIndices, creaseLengths, creaseSharpnesses | [mesh/subdiv_creases](../samples/conformance/mesh/subdiv_creases.usda) | pass | pass |  |
-| UsdGeomMesh | faceVaryingLinearInterpolation all vs none | [mesh/subdiv_fvar_linear](../samples/conformance/mesh/subdiv_fvar_linear.usda) | partial 1/2 | partial 1/2 | none darkens the bright corner (pathtraced); none darkens the bright corner (realtime) |
+| UsdGeomMesh | faceVaryingLinearInterpolation all vs none | [mesh/subdiv_fvar_linear](../samples/conformance/mesh/subdiv_fvar_linear.usda) | pass | pass |  |
 | UsdGeomMesh | subdivisionScheme none vs catmullClark | [mesh/subdivision_scheme](../samples/conformance/mesh/subdivision_scheme.usda) | pass | pass |  |
 | UsdGeomMesh | triangleSubdivisionRule catmullClark vs smooth | [mesh/triangle_subdivision_rule](../samples/conformance/mesh/triangle_subdivision_rule.usda) | pass | pass |  |
 | UsdGeomMesh | multiple UV sets (st, st1) | [mesh/uv_sets](../samples/conformance/mesh/uv_sets.usda) | pass | pass |  |
@@ -241,8 +238,8 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdRenderProduct | several RenderVars in one product | [render_settings/multi_var_product](../samples/conformance/render_settings/multi_var_product.usda) | pass | pass |  |
 | UsdRenderSettings | pixelAspectRatio | [render_settings/pixel_aspect_ratio](../samples/conformance/render_settings/pixel_aspect_ratio.usda) | pass | pass |  |
 | hdUE post-process | texture setting from an image file | [render_settings/postprocess_texture_file](../samples/conformance/render_settings/postprocess_texture_file.usda) | pass | pass |  |
-| UsdRenderPass | collection:renderVisibility, renderSource | [render_settings/render_pass](../samples/conformance/render_settings/render_pass.usda) | partial 1/2 | partial 1/2 | non-member does not render (pathtraced); non-member does not render (realtime) |
-| UsdRenderSettings | renderingColorSpace (unsupported, warned) | [render_settings/rendering_color_space](../samples/conformance/render_settings/rendering_color_space.usda) | partial 1/2 | partial 1/2 | warning names renderingColorSpace (pathtraced); warning names renderingColorSpace (realtime) |
+| UsdRenderPass | collection:renderVisibility, renderSource | [render_settings/render_pass](../samples/conformance/render_settings/render_pass.usda) | pass | pass |  |
+| UsdRenderSettings | renderingColorSpace (unsupported, warned) | [render_settings/rendering_color_space](../samples/conformance/render_settings/rendering_color_space.usda) | pass | pass |  |
 | UsdRenderSettings | resolution | [render_settings/resolution](../samples/conformance/render_settings/resolution.usda) | pass | pass |  |
 | UsdRenderVar | unsupported RenderVar (warned) | [render_settings/unsupported_var](../samples/conformance/render_settings/unsupported_var.usda) | pass | pass |  |
 | UsdShadeCoordSysAPI | coordSys:<name>:binding (no visible effect) | [shade/coord_sys](../samples/conformance/shade/coord_sys.usda) | pass | pass |  |
@@ -258,5 +255,5 @@ Generated by `run_conformance.py --matrix` from the last run (pass, partial pass
 | UsdUVTexture | <UDIM> file pattern (unsupported at runtime, warned) | [texture/udim](../samples/conformance/texture/udim.usda) | pass | pass |  |
 | UsdUVTexture | wrapS / wrapT: repeat, clamp, mirror, black | [texture/wrap_modes](../samples/conformance/texture/wrap_modes.usda) | pass | pass |  |
 | UsdVolVolume | Volume with an OpenVDBAsset density field | [volume/openvdb](../samples/conformance/volume/openvdb.usda) | pass | pass |  |
-| UsdVolParticleField3DGaussianSplat | ParticleField3DGaussianSplat (unsupported, warned) | [volume/particle_field](../samples/conformance/volume/particle_field.usda) | partial 1/2 | partial 1/2 | warning names the particle field (pathtraced); warning names the particle field (realtime) |
+| UsdVolParticleField3DGaussianSplat | ParticleField3DGaussianSplat (as points, warned) | [volume/particle_field](../samples/conformance/volume/particle_field.usda) | pass | pass |  |
 <!-- matrix:end -->

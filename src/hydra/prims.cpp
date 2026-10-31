@@ -34,6 +34,13 @@
 #include "wet_mask.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hd/renderIndex.h"
+#include "pxr/imaging/hd/sceneIndex.h"
+#include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
+#include "pxr/imaging/hd/lightSchema.h"
+#include "pxr/imaging/hd/materialSchema.h"
+#include "pxr/imaging/hd/materialNetworkSchema.h"
+#include "pxr/imaging/hd/materialNodeSchema.h"
+#include "pxr/imaging/hd/materialNodeParameterSchema.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/base/gf/matrix4d.h"
 
@@ -87,6 +94,37 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 // colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
 // DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color). The
 // material's id is the prim's with ".displayColor".
+// UsdLux MeshLightAPI: UsdImaging puts the light (isLight) and its MeshLight node (intensity, exposure, colour,
+// colour temperature) on the mesh prim itself. UE's USD importer ignores MeshLightAPI; UE lights a scene from emissive
+// surfaces (Lumen, Path Tracer), so the mesh emits that radiance from its display-colour material. Zero when the
+// mesh is not a light. ponytail: normalize, materialSyncMode and the bound material's own emission are ignored.
+GfVec3f HdUEMeshLightEmission(HdSceneDelegate* delegate, const SdfPath& id) {
+    const auto source = delegate->GetRenderIndex().GetTerminalSceneIndex()->GetPrim(id).dataSource;
+    const auto isLight =
+        HdLightSchema::GetFromParent(source).GetContainer()
+            ? HdBoolDataSource::Cast(HdLightSchema::GetFromParent(source).GetContainer()->Get(TfToken("isLight")))
+            : nullptr;
+    if (!isLight || !isLight->GetTypedValue(0)) return GfVec3f(0);
+    const auto nodes = HdMaterialSchema::GetFromParent(source).GetMaterialNetwork().GetNodes();
+    for (const auto& name : nodes.GetNames()) {
+        const auto parameters = nodes.Get(name).GetParameters();
+        const auto get = [&](const char* parameter, auto fallback) {
+            using T = decltype(fallback);
+            const auto value = parameters.Get(TfToken(parameter)).GetValue();
+            const auto v = value ? value->GetValue(0) : VtValue();
+            return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback;
+        };
+        if (!parameters.Get(TfToken("intensity")).GetValue() && !parameters.Get(TfToken("exposure")).GetValue())
+            continue;
+        auto color = HdUEFromSceneLinear(get("color", GfVec3f(1)));
+        if (get("enableColorTemperature", false)) {
+            const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(get("colorTemperature", 6500.f));
+            for (int c = 0; c < 3; ++c) color[c] *= temperature[c];
+        }
+        return color * get("intensity", 1.f) * std::exp2(get("exposure", 0.f));
+    }
+    return GfVec3f(1);  // a light without parameters: UsdLux's fallback intensity 1
+}
 HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh) {
     HdUEMaterialData material;
     material.id = mesh.id + ".displayColor";
@@ -104,6 +142,7 @@ HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& 
             TF_WARN("Varying displayOpacity is unsupported at %s; using its first value", id.GetText());
         if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
     }
+    material.emissive = HdUEMeshLightEmission(delegate, id);
     return material;
 }
 // Varying colors only: a uniform displayColor stays the material's constant color.
@@ -192,6 +231,11 @@ HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& 
         delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
     return HdUERelativeMotion(times, values, count, current, left);
 }
+// UsdGeomMotionAPI motion:blurScale (inherited), which UsdImaging publishes as blurScale.
+float HdUEBlurScale(HdSceneDelegate* delegate, const SdfPath& id) {
+    const auto scale = delegate->Get(id, HdTokens->blurScale);
+    return scale.IsHolding<float>() ? std::max(0.f, scale.UncheckedGet<float>()) : 1.f;
+}
 // USD velocities are per second; motion blur times are in frames.
 double HdUEFramesPerSecond(const HdUEState& state) {
     std::lock_guard lock(state.settingsMutex);
@@ -217,7 +261,7 @@ class Instancer final : public HdInstancer {
                    : dynamic_cast<const Instancer*>(GetDelegate()->GetRenderIndex().GetInstancer(GetParentId()));
     }
     // A per-instance vector primvar (velocities, accelerations; instancer space) in world space for each flattened
-    // instance, plus its parent instance's own; empty when no level authors it. Angular velocities are not applied.
+    // instance, plus its parent instance's own; empty when no level authors it.
     std::vector<GfVec3f> ComputeInstanceVectors(const SdfPath& prototype, const TfToken& name) const {
         if (!visible_) return {};
         const auto values = primvar(name);
@@ -271,6 +315,7 @@ public:
         };
         mesh.velocities = perFrame(HdTokens->velocities, fps);
         mesh.accelerations = perFrame(HdTokens->accelerations, fps * fps);
+        mesh.angularVelocities = perFrame(HdTokens->angularVelocities, fps);
     }
     // An instance-rate colour primvar (displayColor, or the one a bound material reads) for each flattened instance,
     // from the nearest instancer that authors it, as Storm resolves nested instance primvars; empty when none does.
@@ -397,6 +442,7 @@ public:
         if (instancer)
             instancer->ComputeInstanceMotion(GetId(), HdUEFramesPerSecond(*state), mesh.instances.size(), mesh);
         mesh.motionLeft = HdUETransformMotion(delegate, GetId(), mesh.transform, true);
+        mesh.blurScale = HdUEBlurScale(delegate, GetId());
         mesh.primId = GetPrimId();
         mesh.categories = delegate->GetCategories(GetId());
         mesh.doubleSided = delegate->GetDoubleSided(GetId());
@@ -589,7 +635,8 @@ public:
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
-        if (mesh.material.empty() && mesh.sceneAsset.empty())
+        if ((mesh.material.empty() || HdUEMeshLightEmission(delegate, GetId()) != GfVec3f(0)) &&
+            mesh.sceneAsset.empty())
             mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh)).id;
         std::vector<HdUEMeshData> parts;
         try {
@@ -603,6 +650,7 @@ public:
             const auto previous = state->materials.find(displayColor->id);
             if (previous == state->materials.end() || previous->second.color != displayColor->color ||
                 previous->second.opacity != displayColor->opacity ||
+                previous->second.emissive != displayColor->emissive ||
                 previous->second.vertexColor != displayColor->vertexColor) {
                 state->materials[displayColor->id] = *displayColor;
                 state->dirtyMaterials.insert(displayColor->id);
@@ -762,6 +810,7 @@ HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     mesh.renderTag = delegate->GetRenderTag(prim.GetId());
     mesh.primId = prim.GetPrimId();
     mesh.categories = delegate->GetCategories(prim.GetId());
+    mesh.blurScale = HdUEBlurScale(delegate, prim.GetId());
     return mesh;
 }
 // Widths per vertex (or with a matching count), else the first (constant), else the fallback.
@@ -833,6 +882,7 @@ public:
                                                    : GfVec3f(0)) +
                                               (placed.velocities.empty() ? GfVec3f(0) : placed.velocities[p]));
                 if (!placed.accelerations.empty()) mesh.accelerations.push_back(placed.accelerations[p]);
+                if (!placed.angularVelocities.empty()) mesh.angularVelocities.push_back(placed.angularVelocities[p]);
                 const double radius = .5 * HdUEWidth(widths, i, .1f);
                 mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) *
                                          GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placements[p]);
@@ -1285,6 +1335,13 @@ public:
             std::call_once(shadowColorWarned, [&] {
                 TF_WARN("hdUE: shadow:color is not supported; shadows stay black (%s)", GetId().GetText());
             });
+        // UE lights have no shadow length limit (UE's USD importer maps shadow:enable only, USDLightConversion.cpp).
+        static std::once_flag shadowDistanceWarned;
+        if (value(get("shadow:distance"), -1.f) >= 0 || value(get("shadow:falloff"), -1.f) >= 0)
+            std::call_once(shadowDistanceWarned, [&] {
+                TF_WARN("hdUE: shadow:distance and shadow:falloff are not supported; shadows reach any distance (%s)",
+                        GetId().GetText());
+            });
         auto texture = get("texture:file");
         if (applicationLight.IsHolding<GlfSimpleLight>() &&
             applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())
@@ -1409,11 +1466,19 @@ HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
         TfToken type;
         Unsupported(const SdfPath& id, const TfToken& type) : HdLight(id), type(type) {}
         HdDirtyBits GetInitialDirtyBitsMask() const override { return AllDirty; }
-        void Sync(HdSceneDelegate*, HdRenderParam*, HdDirtyBits* bits) override {
+        void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
+            // The generic light Sprim (GeometryLight, PortalLight) is named by its USD type.
+            auto name = type;
+            if (type == HdPrimTypeTokens->light && !GetId().IsEmpty())
+                if (const auto typeName =
+                        UsdImagingUsdPrimInfoSchema::GetFromParent(
+                            delegate->GetRenderIndex().GetTerminalSceneIndex()->GetPrim(GetId()).dataSource)
+                            .GetTypeName())
+                    name = typeName->GetTypedValue(0);
             static std::mutex mutex;
             static std::set<TfToken> warned;
-            if (std::lock_guard lock(mutex); !GetId().IsEmpty() && warned.insert(type).second)
-                TF_WARN("hdUE: %s is not supported and renders nothing (%s)", type.GetText(), GetId().GetText());
+            if (std::lock_guard lock(mutex); !GetId().IsEmpty() && warned.insert(name).second)
+                TF_WARN("hdUE: %s is not supported and renders nothing (%s)", name.GetText(), GetId().GetText());
             *bits = Clean;
         }
     };
