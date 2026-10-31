@@ -60,6 +60,10 @@ Third round (on `main`, `4a8d783` onward):
 - **Build and tests:** BLD-01 (build stamped, warning in another Houdini build), BLD-02 (version, symbols, clean-tree packages), BLD-03 (tbb12 export check), TST-03 (gallery brightness bands in CI, Cornell tile baselines), TST-04 (`scripts/Test.ps1`). ALT-05 (interactive policy as an init flag), ALT-08 (OCIO built-in linear Rec.709, cache eviction), ALT-12, ALT-16, ALT-17.
 - **Alternatives:** ALT-13 (one canonical setting key), ALT-15 (no boot readiness loop), ALT-18 (one `Backend::boot`), ALT-19 (one renderer id, `HdUEHoudiniRendererPlugin`), and husk exits with code 1 instead of hanging when UE fails to boot. Declined with reasons: ALT-06 (only Houdini's viewport has a GL Hgi), ALT-07 (no OpenVDB in standalone OpenUSD), ALT-09 (already the proposed design), ALT-14 (the per-key blocks differ), ALT-20 (stock usdview/usdrecord hang in UE at Python exit).
 
+Fourth round (2026-10-31):
+
+- **Viewport/husk look:** not hdUE and not UE's editor-vs-MRQ quality. The viewport's frame is 1.03x husk's on Cornell (tonemapper on) and the offline profile changes it by 2%; Houdini 22.0.368's viewport OCIO display shows linear values under ~0.004 as black where OCIO's own CPU and GPU transforms are exact sRGB ([rendering](../rendering.md#unreal-post-processing), `Launch-Houdini.ps1 -TestKind parity`).
+
 Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.

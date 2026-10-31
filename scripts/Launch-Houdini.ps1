@@ -8,7 +8,7 @@ param(
     [string]$MaterialXLibrary = '',
     [string]$SubstrateLibrary = '',
     # Runs that in-Houdini test (tests/houdini) and waits for it; empty: an interactive session.
-    [ValidateSet('', 'integration', 'viewport', 'selection', 'optextures', 'materials', 'lighting', 'references', 'surfaces', 'substrate', 'substrate-textures', 'substrate-live', 'postprocess')][string]$TestKind = '',
+    [ValidateSet('', 'integration', 'viewport', 'selection', 'optextures', 'materials', 'lighting', 'references', 'surfaces', 'substrate', 'substrate-textures', 'substrate-live', 'postprocess', 'parity')][string]$TestKind = '',
     [int]$TimeoutSeconds = 420
 )
 $ErrorActionPreference = 'Stop'

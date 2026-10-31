@@ -15,6 +15,7 @@ MODULES = {
     "optextures": "hdue_op_texture_test",
     "viewport": "hdue_solaris_probe",
     "selection": "hdue_selection_test",
+    "parity": "hdue_parity_test",
 }
 
 
