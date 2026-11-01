@@ -8,7 +8,7 @@ from pathlib import Path
 
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
-ABI_VERSION = 12  # HDUE_ABI_VERSION
+ABI_VERSION = 13  # HDUE_ABI_VERSION
 Task = C.CFUNCTYPE(
     None, C.py_object
 )  # hdue_run_on_ue_thread's task, called with the Python callable to run
@@ -86,6 +86,7 @@ class Api(C.Structure):
             "configure_gpu_frames",
             "poll_gpu_frame",
             "acquire_gpu_frame",
+            "update_meshes",
         )
     ]
 
@@ -102,7 +103,7 @@ class Runtime:
         if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (
             48,
             552,
-            320,
+            328,
         ):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()

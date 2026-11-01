@@ -51,7 +51,7 @@ class SurfaceApi:
             C.CFUNCTYPE(Result, U64, C.POINTER(Batch)), table.apply_surfaces
         )
         self.get_status = runtime.bind(
-            C.CFUNCTYPE(Result, U64, C.POINTER(Status)), table.get_status
+            C.CFUNCTYPE(Result, U64, C.POINTER(Status)), table.get_surface_status
         )
 
     def status(self, session):

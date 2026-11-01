@@ -78,7 +78,40 @@ TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
     }
     return Result;
 }
+// Whether a mesh's Nanite data fits in UE's root page pool, reserving its pages if so. UE's pool is one buffer of at
+// most 2 GB on NVIDIA (4 GB on AMD, the GPU's largest buffer view), less the streaming pool, and UE ends the process
+// when a root page does not fit ("Cannot allocate more root pages", NaniteStreamingManager.cpp). Runtime meshes keep
+// every page resident (BuildNanite), so a scene past it (NVIDIA's Da Vinci Workshop: ~600M triangles) keeps its
+// remaining meshes as regular static meshes instead, with a warning. 10% stays free: released meshes return their pages
+// when UE's garbage collection frees them, after this count does.
+bool FHdueScene::NaniteFits(const FString& Id, const Nanite::FResources* Nanite) {
+    if (const uint32* Previous = NaniteRootPages.Find(Id)) {
+        NaniteRootPagesUsed -= *Previous;
+        NaniteRootPages.Remove(Id);
+    }
+    if (!Nanite) return false;
+    static const auto* StreamingPool =
+        IConsoleManager::Get().FindConsoleVariable(TEXT("r.Nanite.Streaming.StreamingPoolSize"));
+    const uint64 PoolMB =
+        FMath::Min<uint64>(IsRHIDeviceAMD() ? 4095 : 2048, GRHIGlobals.MaxViewSizeBytesForNonTypedBuffer >> 20);
+    const uint64 RootMB = PoolMB - FMath::Min<uint64>(PoolMB, StreamingPool ? uint64(StreamingPool->GetInt()) : 512);
+    const int64 Budget = int64((RootMB << 20) >> NANITE_ROOT_PAGE_GPU_SIZE_BITS) * 9 / 10;
+    if (NaniteRootPagesUsed + Nanite->NumRootPages > Budget) {
+        static bool Warned = false;
+        if (!Warned)
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: UE's Nanite root page pool is full (%lld of %lld pages); further meshes render without "
+                        "Nanite"),
+                   NaniteRootPagesUsed, Budget);
+        Warned = true;
+        return false;
+    }
+    NaniteRootPages.Add(Id, Nanite->NumRootPages);
+    NaniteRootPagesUsed += Nanite->NumRootPages;
+    return true;
+}
 void FHdueScene::Remove(const FString& Id) {
+    NaniteFits(Id, nullptr);  // returns its root pages
     Lighting->Remove(Id);
     RemoveVolume(Id);
     CameraLightDirections.Remove(Id);
@@ -199,6 +232,43 @@ void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Ma
         Instances->BatchUpdateInstancesTransforms(0, Transforms, true, true, true);
     } else if (Count == 1)
         Actor->SetActorTransform(ToTransform(0), false, nullptr, ETeleportType::TeleportPhysics);
+}
+void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
+    if (IdMode) {
+        FString Ignored;
+        SetIdMode(0, Ignored);
+    }
+    for (uint32 Index = 0; Index < Count; ++Index) {
+        auto& Mesh = Meshes[Index];
+        const FString Id = UTF8_TO_TCHAR(Mesh.id);
+        AActor* Actor = Actors.FindRef(Id);
+        const auto* Root = IsValid(Actor) ? Actor->GetRootComponent() : nullptr;
+        const auto* Static = Cast<UStaticMeshComponent>(Root);
+        const UStaticMesh* Built = Static ? Static->GetStaticMesh() : nullptr;
+        const auto Translucent = [&](const FString& MaterialId) {
+            const auto* Material = Materials.Find(MaterialId);
+            return Material && IsTranslucentBlendMode(*Material->Get());
+        };
+        const FString MaterialId = Mesh.material_id ? UTF8_TO_TCHAR(Mesh.material_id) : TEXT("");
+        // Apply's choices that depend on these fields: a static mesh built here (not editable) or a dynamic one, and
+        // Nanite for opaque and masked materials only.
+        const bool WantStatic = Cast<UInstancedStaticMeshComponent>(Root) || !(Mesh.flags & HDUE_MESH_EDITABLE);
+        if (!Root || !MeshMaterials.Contains(Id) || bool(Static) != WantStatic ||
+            (Static &&
+             (!Built || Built->GetOuter() != Actor || Translucent(MeshMaterials[Id]) != Translucent(MaterialId)))) {
+            Mesh.needs_upload = 1;
+            continue;
+        }
+        Mesh.needs_upload = 0;
+        Actor->SetActorHiddenInGame(!Mesh.visible);
+        MeshMaterials.Add(Id, MaterialId);
+        if (Mesh.flags & HDUE_MESH_SINGLE_SIDED)
+            SingleSided.Add(Id);
+        else
+            SingleSided.Remove(Id);
+        PrimIds.Add(Id, Mesh.prim_id);
+    }
+    BindMaterials();
 }
 bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
     if (Mode == IdMode) return true;
@@ -726,14 +796,17 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
     // Every page is a root page, so StreamablePages (bulk data) is empty. Runtime builds cannot save bulk data
     // (USE_RUNTIME_BULKDATA, BulkData.cpp) but still read its header; a non-persistent archive skips it both ways.
-    if (Resources->StreamablePages.GetBulkDataSize()) return Resources;
+    // Identical meshes share a key: one written by another task is kept as it is.
+    if (Resources->StreamablePages.GetBulkDataSize() || IFileManager::Get().FileExists(*Path)) return Resources;
     Bytes.Reset();
     FMemoryWriter Writer(Bytes);
     Resources->Serialize(Writer, nullptr, false);
-    // Another task may build the same mesh: write a private file, then move it into place.
+    // Another task may build the same mesh: write a private file, then move it into place, once (UE's Move retries for
+    // seconds while the other task's file is in the way).
     const FString Temporary = FPaths::CreateTempFilename(*FPaths::GetPath(Path), TEXT("nanite"));
-    if (FFileHelper::SaveArrayToFile(Bytes, *Temporary) && !IFileManager::Get().Move(*Path, *Temporary, true))
-        IFileManager::Get().Delete(*Temporary);
+    if (FFileHelper::SaveArrayToFile(Bytes, *Temporary) &&
+        !IFileManager::Get().Move(*Path, *Temporary, true, false, false, true))
+        IFileManager::Get().Delete(*Temporary, false, false, true);
     return Resources;
 }
 UStaticMesh* NewStaticMesh(UObject* Outer) {
@@ -813,15 +886,18 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
     Result.RenderData->AllocateLODResources(1);
     if (Indices.IsEmpty()) return Result;
     FStaticMeshLODResources& LOD = Result.RenderData->LODResources[0];
-    LOD.VertexBuffers.PositionVertexBuffer.Init(Vertices);
+    // No CPU copies once the GPU has the buffers, as UE's runtime mesh builds (FBuildMeshDescriptionsParams::
+    // bAllowCpuAccess false); they were as large as the delegate's copy of the scene. The cards below read the
+    // buffers before InitResources; native picking reads cooked native meshes only.
+    LOD.VertexBuffers.PositionVertexBuffer.Init(Vertices, false);
     FStaticMeshVertexBufferFlags Flags;
-    Flags.bNeedsCPUAccess = true;
+    Flags.bNeedsCPUAccess = false;
     Flags.bUseBackwardsCompatibleF16TruncUVs = false;
     LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, HdueVertexUVs, Flags);
     if (Colored)
-        LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices);
+        LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices, false);
     else
-        LOD.VertexBuffers.ColorVertexBuffer.InitFromSingleColor(FColor::White, Count);
+        LOD.VertexBuffers.ColorVertexBuffer.InitFromColorArray(&FColor::White, Count, 0, false);
     LOD.bHasColorVertexData = true;
     FStaticMeshSection& Section = LOD.Sections.AddDefaulted_GetRef();
     Section.MaterialIndex = 0;
@@ -883,7 +959,9 @@ void FHdueScene::TickConversions() {
         }
         const UMaterialInterface* Material = Component->GetMaterial(0);
         // Nanite draws opaque and masked materials only.
-        const bool Nanite = Conversion->Nanite && !(Material && IsTranslucentBlendMode(*Material));
+        const bool Nanite = NaniteFits(It.Key(), Conversion->Nanite && !(Material && IsTranslucentBlendMode(*Material))
+                                                     ? Conversion->Nanite.Get()
+                                                     : nullptr);
         UStaticMesh* Built = NewStaticMesh(Actor);
         FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds,
                          Nanite ? Conversion->Nanite.Get() : nullptr);
@@ -1109,8 +1187,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
             const FString ParentName =
                 Layered       ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
-                                          Thin ? TEXT("Thin") : TEXT(""))
-                      : Masked ? TEXT("M_PreviewSurfaceMasked")
+                                                Thin ? TEXT("Thin") : TEXT(""))
+                : Masked      ? TEXT("M_PreviewSurfaceMasked")
                 : Translucent ? TEXT("M_PreviewSurfaceTranslucent")
                               : TEXT("M_PreviewSurface");
             auto* Parent = LoadObject<UMaterialInterface>(
@@ -1336,7 +1414,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 auto* Built = NewStaticMesh(Actor);
                 // Nanite draws opaque and masked materials only.
                 const auto* Material = Desc.material_id ? Materials.Find(UTF8_TO_TCHAR(Desc.material_id)) : nullptr;
-                const bool Nanite = StaticData[Index].Nanite && !(Material && IsTranslucentBlendMode(*Material->Get()));
+                const bool Nanite =
+                    NaniteFits(Id, StaticData[Index].Nanite && !(Material && IsTranslucentBlendMode(*Material->Get()))
+                                       ? StaticData[Index].Nanite.Get()
+                                       : nullptr);
                 FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds,
                                  Nanite ? StaticData[Index].Nanite.Get() : nullptr);
                 if (Instanced)

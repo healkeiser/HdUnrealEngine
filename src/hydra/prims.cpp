@@ -48,6 +48,20 @@ PXR_NAMESPACE_OPEN_SCOPE
 std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate,
                                                        const SdfPath& material);  // materials.cpp
 namespace {
+// HDUE_TRACE_SCENE: running totals of the mesh data Hydra sync stores in the delegate's state (its own copy of the
+// scene, triangulated, a vertex per distinct corner), every 250 meshes.
+void traceStored(const HdUEMeshData& m) {
+    if (!HdUETraceScene()) return;
+    static std::mutex lock;
+    static uint64_t meshes = 0, vertices = 0, triangles = 0, bytes = 0;
+    std::lock_guard guard(lock);
+    bytes += HdUEMeshBytes(m);
+    vertices += m.points.size();
+    triangles += m.indices.size() / 3;
+    if (++meshes % 250 == 0)
+        std::fprintf(stderr, "hdUE stored meshes: %llu, %.1fM vertices, %.1fM triangles, %.2f GB\n",
+                     (unsigned long long)meshes, vertices / 1e6, triangles / 1e6, bytes / double(1ull << 30));
+}
 template <class T>
 T value(const VtValue& v, T fallback) {
     return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback;
@@ -386,10 +400,48 @@ struct MeshSyncTimer {
 };
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
-    HdMeshTopology maskTopology_;
-    VtVec3iArray maskTriangles_;
-    VtIntArray maskParameters_;
-    size_t pointCount_ = 0;
+
+    struct Shape {
+        VtVec3fArray points;
+        HdMeshTopology topology;
+        std::unique_ptr<HdUESubdivision> subdivision;
+        VtVec3iArray triangles;
+        VtIntArray parameters;  // source face per triangle
+        TfTokenVector uvNames;  // the material's UV primvars, in order
+        TfToken colorName;
+    };
+    // The mesh as hdUE draws it: catmullClark and loop meshes refined uniformly (unreal:subdivisionLevel), with their
+    // subdiv tags and the indices of their face-varying UVs and colours (authored normals do not apply to them), then
+    // triangulated. Sync and the wet-mask refresh compute it from the scene delegate: kept per prim for the refresh, it
+    // held about 16 bytes per triangle of every mesh whether or not a mask was ever used.
+    Shape triangulate(HdSceneDelegate* delegate, const HdUEState& state, bool asset, VtVec3fArray points) const {
+        Shape shape;
+        shape.topology = delegate->GetMeshTopology(GetId());
+        std::tie(shape.uvNames, shape.colorName) =
+            meshPrimvars(delegate, delegate->GetMaterialId(GetId()), shape.topology);
+        if (const int level = asset ? 0 : state.setting<int>("subdivisionLevel", 0);
+            level > 0 && (shape.topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark ||
+                          shape.topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
+            shape.topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
+            std::vector<VtIntArray> fvarIndices;
+            auto names = shape.uvNames;
+            names.push_back(shape.colorName);
+            for (const auto& name : names)
+                if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
+                    VtIntArray indices;
+                    delegate->GetIndexedPrimvar(GetId(), name, &indices);
+                    if (!indices.empty()) fvarIndices.push_back(indices);
+                }
+            shape.subdivision = HdUESubdivision::Create(shape.topology, level, std::move(fvarIndices));
+        }
+        if (shape.subdivision) {
+            points = shape.subdivision->refine(points, HdInterpolationVertex);
+            shape.topology = shape.subdivision->topology();
+        }
+        HdMeshUtil(&shape.topology, GetId()).ComputeTriangleIndices(&shape.triangles, &shape.parameters);
+        shape.points = std::move(points);
+        return shape;
+    }
 
 public:
     explicit Mesh(const SdfPath& id) : HdMesh(id) {}
@@ -450,39 +502,16 @@ public:
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
         const auto computed = computedPrimvars(delegate, GetId());
-        auto points = value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray());
-        auto topology = delegate->GetMeshTopology(GetId());
-        const auto [uvNames, colorName] = meshPrimvars(delegate, delegate->GetMaterialId(GetId()), topology);
-        // catmullClark and loop meshes are refined uniformly (unreal:subdivisionLevel), with their subdiv tags and the
-        // indices of their face-varying UVs and colours; authored normals do not apply to them.
-        std::unique_ptr<HdUESubdivision> subdivision;
-        if (const int level = mesh.sceneAsset.empty() ? state->setting<int>("subdivisionLevel", 0) : 0;
-            level > 0 && (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark ||
-                          topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
-            topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
-            std::vector<VtIntArray> fvarIndices;
-            auto names = uvNames;
-            names.push_back(colorName);
-            for (const auto& name : names)
-                if (!name.IsEmpty() && interpolation(delegate, GetId(), name) == HdInterpolationFaceVarying) {
-                    VtIntArray indices;
-                    delegate->GetIndexedPrimvar(GetId(), name, &indices);
-                    if (!indices.empty()) fvarIndices.push_back(indices);
-                }
-            subdivision = HdUESubdivision::Create(topology, level, std::move(fvarIndices));
-        }
-        if (subdivision) {
-            points = subdivision->refine(points, HdInterpolationVertex);
-            topology = subdivision->topology();
-        }
+        auto shape = triangulate(delegate, *state, !mesh.sceneAsset.empty(),
+                                 value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray()));
+        auto& points = shape.points;
+        auto& topology = shape.topology;
+        const auto& subdivision = shape.subdivision;
+        const auto& triangles = shape.triangles;
+        const auto& parameters = shape.parameters;
+        const auto& uvNames = shape.uvNames;
+        const auto& colorName = shape.colorName;
         HdMeshUtil util(&topology, GetId());
-        VtVec3iArray triangles;
-        VtIntArray parameters;
-        util.ComputeTriangleIndices(&triangles, &parameters);
-        maskTopology_ = topology;
-        maskTriangles_ = triangles;
-        maskParameters_ = parameters;
-        pointCount_ = points.size();
         // Authored normals (subdivision surfaces ignore them, and so do computed points without computed normals); zero
         // or missing ones are generated below.
         const auto computedNormals = computed.find(HdTokens->normals);
@@ -645,7 +674,7 @@ public:
             TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
             return;
         }
-        std::lock_guard lock(state->mutex);
+        std::unique_lock lock(state->mutex);
         if (displayColor) {
             const auto previous = state->materials.find(displayColor->id);
             if (previous == state->materials.end() || previous->second.color != displayColor->color ||
@@ -664,8 +693,8 @@ public:
             const bool revived = previous == state->meshes.end() && state->erasedMeshes.count(part.id);
             if (revived) previous = state->erasedMeshes.find(part.id);
             const auto missing = revived ? state->erasedMeshes.end() : state->meshes.end();
-            if (previous != missing && previous->second.points == part.points &&
-                previous->second.indices == part.indices)
+            part.geometryHash = HdUEGeometryHash(part);
+            if (previous != missing && previous->second.geometryHash == part.geometryHash)
                 part.pickMesh = previous->second.pickMesh;
             // Pick structures are built on the first pick (HdUERenderDelegate pick): building a BVH for every mesh
             // here, under the state mutex, serialized scene loads (tens of seconds on Sponza).
@@ -673,15 +702,15 @@ public:
                 previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
                 previous->second.transform == part.transform && previous->second.visible == part.visible;
             const bool moved = previous != missing && HdUEPlacedOnly(previous->second, part.transform);
+            // A mesh UE asked for in full (fullUploads) uploads even when nothing changed since it was released.
             const bool meshChanged =
                 !onlyNativeBounds &&
-                (previous == missing || previous->second.points != part.points ||
-                 previous->second.indices != part.indices || previous->second.normals != part.normals ||
-                 previous->second.uv != part.uv || previous->second.uvSets != part.uvSets ||
+                (previous == missing || state->fullUploads.count(part.id) ||
+                 previous->second.geometryHash != part.geometryHash ||
                  (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
-                 previous->second.instances != part.instances || previous->second.colors != part.colors ||
+                 previous->second.instances != part.instances ||
                  previous->second.instanceColors != part.instanceColors ||
                  previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;
@@ -689,11 +718,24 @@ public:
             const bool maskChanged = previous == missing || previous->second.masks != part.masks ||
                                      previous->second.maskErrors != part.maskErrors ||
                                      previous->second.categories != part.categories;
+            // A released mesh Hydra resent with the same geometry stays released: UE has it, and update_meshes (or a
+            // move) carries what changed, unless UE asked for it in full (fullUploads).
+            if (!revived && previous != missing && previous->second.released && !state->fullUploads.count(id) &&
+                previous->second.geometryHash == part.geometryHash && part.sceneAsset.empty() &&
+                previous->second.sceneAsset.empty() && previous->second.instanced == part.instanced &&
+                previous->second.instances == part.instances &&
+                previous->second.instanceColors == part.instanceColors &&
+                (previous->second.transform == part.transform || moved) && HdUEReleasable(*state, part))
+                HdUEReleaseGeometry(part);
+            traceStored(part);
             state->meshes[id] = std::move(part);
+            state->fullUploads.erase(id);
             state->removed.erase(id);
+            state->repull.erase(state->meshes[id].sourceId);
+            state->repullMarked.erase(state->meshes[id].sourceId);
             state->erasedMeshes.erase(id);
             if (meshChanged) {
-                state->dirtyMeshes.insert(id);
+                if (state->dirtyMeshes.insert(id).second) state->pendingBytes += HdUEMeshBytes(state->meshes[id]);
                 ++state->revision;
             } else if (moved || maskChanged) {
                 if (moved) state->movedMeshes.insert(id);
@@ -710,30 +752,39 @@ public:
                 ++state->revision;
             }
         emitted_ = std::move(current);
+        lock.unlock();
+        HdUEStreamMeshes(*state);
     }
     void RefreshSelectedMasks(HdSceneDelegate* delegate, HdUEState& state) const {
         // A renderer-setting edit does not change a scene-index data source.
         // Some hosts therefore do not run Rprim Sync for a new mask selector.
-        // Fetch only that primvar from the synchronized Hydra delegate, using
-        // the cached triangulation and subset corner mapping.
+        // Fetch only that primvar from the synchronized Hydra delegate, triangulated as Sync triangulated the mesh
+        // and mapped through the parts' source corners.
         std::lock_guard lock(state.mutex);
         const auto& bindings = *state.wetBindings;
         std::set<std::string> needed;
         for (const auto& id : emitted_) {
             const auto part = state.meshes.find(id);
-            if (part == state.meshes.end()) continue;
+            // A released mesh has no arrays to map a mask onto; its wet binding re-syncs it (update_meshes).
+            if (part == state.meshes.end() || part->second.released) continue;
             const auto name = HdUEWetValue<std::string>(HdUEWetSettings(bindings, part->second), "maskPrimvar", "");
             if (!name.empty() && !part->second.masks.count(name) && !part->second.maskErrors.count(name))
                 needed.insert(name);
         }
+        if (needed.empty()) return;
+        const auto first = state.meshes.find(*emitted_.begin());
+        const bool asset = first != state.meshes.end() && !first->second.sceneAsset.empty();
+        const auto shape = triangulate(
+            delegate, state, asset,
+            value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray()));
+        HdMeshUtil util(&shape.topology, GetId());
         for (const auto& name : needed) {
             std::vector<float> values;
             std::string error;
-            HdMeshUtil util(&maskTopology_, GetId());
             try {
                 values = HdUEExpandWetMask(delegate->Get(GetId(), TfToken(name)),
-                                           interpolation(delegate, GetId(), TfToken(name)), pointCount_, maskTopology_,
-                                           maskTriangles_, maskParameters_, util);
+                                           interpolation(delegate, GetId(), TfToken(name)), shape.points.size(),
+                                           shape.topology, shape.triangles, shape.parameters, util);
             } catch (const std::invalid_argument& e) {
                 error = name + ": " + e.what();
             }
@@ -779,21 +830,21 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
         }
     }
     const auto previous = state.meshes.find(mesh.id);
-    const bool changed = previous == state.meshes.end() || previous->second.points != mesh.points ||
-                         previous->second.indices != mesh.indices || previous->second.normals != mesh.normals ||
-                         previous->second.uv != mesh.uv || previous->second.transform != mesh.transform ||
-                         previous->second.material != mesh.material || previous->second.visible != mesh.visible ||
-                         previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
-                         previous->second.colors != mesh.colors ||
+    mesh.geometryHash = HdUEGeometryHash(mesh);
+    const bool sameGeometry = previous != state.meshes.end() && previous->second.geometryHash == mesh.geometryHash;
+    const bool changed = !sameGeometry || state.fullUploads.count(mesh.id) ||
+                         previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
+                         previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced ||
+                         previous->second.instances != mesh.instances ||
                          previous->second.instanceColors != mesh.instanceColors;
-    mesh.pickMesh = previous != state.meshes.end() && previous->second.points == mesh.points &&
-                            previous->second.indices == mesh.indices
-                        ? previous->second.pickMesh
-                        : nullptr;  // built on first pick
+    mesh.pickMesh = sameGeometry ? previous->second.pickMesh : nullptr;  // built on first pick
     const bool relinked = previous != state.meshes.end() && previous->second.categories != mesh.categories;
     const auto key = mesh.id;
     state.meshes[key] = std::move(mesh);
+    state.fullUploads.erase(key);
     state.removed.erase(key);
+    state.repull.erase(state.meshes[key].sourceId);
+    state.repullMarked.erase(state.meshes[key].sourceId);
     if (changed) {
         state.dirtyMeshes.insert(key);
         ++state.revision;

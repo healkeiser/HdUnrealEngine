@@ -82,6 +82,7 @@ public:
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
     void RemoveVolume(const FString& Id);
     void SetTransforms(const FString& Id, uint32 Count, const double* Matrices);  // set_transforms
+    void UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count);                      // update_meshes
     void ApplyLinks();  // Lighting's object table to every mesh (after a light batch replaced it)
     FHdueNativeAssets Assets;
     TUniquePtr<FHdueLighting> Lighting;
@@ -132,6 +133,11 @@ private:
     };
     TMap<FString, FPendingStatic> PendingStatic;
     int64 ReservedMemory = 0;
+    // Nanite root pages of the meshes that carry Nanite data (NaniteFits): every page of a runtime mesh is a root page,
+    // and UE's root pool is bounded (NaniteStreamingManager.cpp, GetMaxPagePoolSizeInMB).
+    TMap<FString, uint32> NaniteRootPages;
+    int64 NaniteRootPagesUsed = 0;
+    bool NaniteFits(const FString& Id, const Nanite::FResources* Nanite);
     const FPreviewTexture* PreviewTexture(const FString& Key, FString& Error);
     struct FWet {
         FString Asset;

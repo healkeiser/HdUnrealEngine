@@ -614,7 +614,8 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     // Offline, the next frame of a sequence (a later time) keeps it whatever changed, as Movie Render Queue keeps it
     // through a shot (MoviePipelineRendering.cpp: a camera cut only at the shot's first sample) and Lumen follows
     // animated lights over its next frames.
-    const bool NextFrame = !IsInteractive() && !Aov && Previous.generation && Request->time_seconds != Previous.time_seconds;
+    const bool NextFrame =
+        !IsInteractive() && !Aov && Previous.generation && Request->time_seconds != Previous.time_seconds;
     const bool KeepHistory = (Session->HasRequest || NextFrame) && Previous.mode == HDUE_REALTIME &&
                              Request->mode == HDUE_REALTIME && Previous.aov == Request->aov;
     if (Aov) {
@@ -1681,6 +1682,15 @@ HdueResult HDUE_CALL ApplyScene(HdueSession Handle, const HdueSceneBatch* Batch)
     Runtime.Error.Empty();
     return HDUE_OK;
 }
+HdueResult HDUE_CALL UpdateMeshes(HdueSession Handle, HdueMeshUpdate* Meshes, uint32 Count) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || (Count && !Meshes)) return HDUE_INVALID_ARGUMENT;
+    for (uint32 Index = 0; Index < Count; ++Index)
+        if (!Meshes[Index].id) return HDUE_INVALID_ARGUMENT;
+    Runtime.Session->HasRequest = false;
+    Runtime.Session->Scene->UpdateMeshes(Meshes, Count);
+    return HDUE_OK;
+}
 HdueResult HDUE_CALL UpsertLights(HdueSession Handle, const HdueLightBatch* Batch) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Batch) return HDUE_INVALID_ARGUMENT;
@@ -1940,7 +1950,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .get_surface_status = SurfaceStatus,
             .configure_gpu_frames = ConfigureGpuFrames,
             .poll_gpu_frame = PollGpuFrame,
-            .acquire_gpu_frame = AcquireGpuFrame};
+            .acquire_gpu_frame = AcquireGpuFrame,
+            .update_meshes = UpdateMeshes};
     return HDUE_OK;
 }
 #endif

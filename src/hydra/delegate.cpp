@@ -440,9 +440,18 @@ struct ScenePacket {
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, removedIds;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
     std::map<std::string, std::vector<GfVec3f>> points;
-    // Takes the state's dirty sets (state lock held).
-    void take(HdUEState& state) {
-        dirtyMeshes.swap(state.dirtyMeshes);
+    // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
+    // least one), the other sets whole.
+    void take(HdUEState& state, uint64_t meshBudget) {
+        uint64_t bytes = 0;
+        for (auto it = state.dirtyMeshes.begin();
+             it != state.dirtyMeshes.end() && (dirtyMeshes.empty() || bytes < meshBudget);) {
+            if (const auto mesh = state.meshes.find(*it); mesh != state.meshes.end())
+                bytes += HdUEMeshBytes(mesh->second);
+            dirtyMeshes.insert(*it);
+            it = state.dirtyMeshes.erase(it);
+        }
+        this->bytes = bytes;
         movedMeshes.swap(state.movedMeshes);
         dirtyMaterials.swap(state.dirtyMaterials);
         dirtyLights.swap(state.dirtyLights);
@@ -468,9 +477,15 @@ struct ScenePacket {
     }
     uint64_t revision = 0;
     bool firstBatch = false;
+    bool stream = false;  // a streaming batch during Sync (HdUEStreamMeshes)
+    uint64_t bytes = 0;   // stored geometry of the meshes it takes
     // Descriptors.
     std::vector<HdueMeshDesc> meshes;
     std::vector<HdueMeshTransform> moves;  // movedMeshes, through set_transforms after apply_scene
+    // Released meshes whose material, visibility or sidedness changed, through update_meshes after apply_scene
+    // (their rprims in updateSources); reupload: those UE needs in full.
+    std::vector<HdueMeshUpdate> updates;
+    std::vector<std::string> updateSources, reupload;  // reupload: mesh ids
     std::vector<HdueMaterialDesc> materials;
     std::vector<HdueLight> extendedLights;
     std::vector<HdueAssetDesc> sceneAssets;
@@ -711,6 +726,26 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     }
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
+        if (data.released) {
+            // UE keeps its geometry: the changed fields go through update_meshes, and the mesh is re-pulled from
+            // Hydra only when UE needs it in full (sendScene, finishScene).
+            HdueMeshUpdate update{};
+            update.id = packet.own(data.id);
+            update.material_id = packet.own(data.material);
+            update.visible = data.visible && state.shown(data.renderTag);
+            update.flags = cullBackface && !data.doubleSided ? HDUE_MESH_SINGLE_SIDED : 0;
+            if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty())
+                update.flags |= HDUE_MESH_EDITABLE;  // UE then asks for the geometry (needs_upload)
+            update.prim_id = data.primId;
+            packet.updates.push_back(update);
+            packet.updateSources.push_back(data.sourceId);
+            if (!data.instanced && !HdUEShears(data.transform)) {  // a move Sync kept released (HdUEPlacedOnly)
+                std::vector<double> matrix(16);
+                rowMajor(inverse * data.transform * basis, matrix.data());
+                packet.moves.push_back({update.id, 1, packet.own(packet.doubles, std::move(matrix))});
+            }
+            continue;
+        }
         if (!data.sceneAsset.empty()) {
             HdueAssetDesc d{};
             d.struct_size = sizeof(d);
@@ -1067,12 +1102,13 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
     packet.surfaceUpdate = !packet.wet.empty() || state.surfaceStatus.binding_count;
 }
 // Under the state lock: takes the dirty sets and copies what UE needs.
-void prepareScene(HdUEState& state, ScenePacket& packet) {
-    packet.take(state);
+void prepareScene(HdUEState& state, ScenePacket& packet, uint64_t meshBudget) {
+    packet.take(state, meshBudget);
     packet.revision = state.revision;
     packet.firstBatch = state.firstBatch;
     packet.nativeLights = state.nativeAssets.lights;
-    prepareSurfaceEffects(state, packet);
+    // Surface effects bind to uploaded geometry: with the last batch.
+    if (!packet.stream && state.dirtyMeshes.empty()) prepareSurfaceEffects(state, packet);
     prepareMaterials(state, packet);
     prepareMeshes(state, packet);
     prepareLinks(state, packet);
@@ -1130,6 +1166,14 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         }
         backend.require(api.upsert_lights(session, &update), "upsert_lights");
     }
+    if (!packet.updates.empty()) {
+        backend.require(api.update_meshes(session, packet.updates.data(), uint32_t(packet.updates.size())),
+                        "update_meshes");
+        for (size_t i = 0; i < packet.updates.size(); ++i)
+            if (packet.updates[i].needs_upload) packet.reupload.push_back(packet.updates[i].id);
+        trace("hdUE scene submit: %zu released meshes updated, %zu need their geometry again\n", packet.updates.size(),
+              packet.reupload.size());
+    }
     if (!packet.moves.empty()) {
         backend.require(api.set_transforms(session, packet.moves.data(), uint32_t(packet.moves.size())),
                         "set_transforms");
@@ -1142,6 +1186,20 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
 }
+// Whether a generic mesh's geometry arrays can be freed once UE has it (finishScene): change detection compares its
+// geometryHash, update_meshes carries material, visibility and sidedness changes, and an upload that needs the arrays
+// again re-syncs the mesh from Hydra. Kept where something reads them after the upload: deformation blur (pointsAt),
+// wet masks and surfaces, displacement dicing, and hosts without a UE thread (usdview), whose ray picks read the
+// stored copy. husk, hython and Houdini's viewport (which picks from the ID AOVs UE renders) free them.
+bool releasable(const HdUEState& state, const HdUEMeshData& m) {
+    const auto& host = selfHost();
+    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() ||
+        (state.wetBindings && !HdUEWetSettings(*state.wetBindings, m).empty()))
+        return false;
+    const auto material = state.materials.find(m.material);
+    return material == state.materials.end() ||
+           (material->second.textures[HDUE_TEXTURE_DISPLACEMENT].file.empty() && material->second.displacement == 0);
+}
 // Under the state lock again: records what reached UE.
 void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceStatus& surface) {
     for (const auto& id : packet.removedIds) {
@@ -1153,7 +1211,24 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
         state.geometryRevisions.erase(id);
         state.erasedMeshes.erase(id);
     }
-    for (const auto& id : packet.genericMeshes) ++state.geometryRevisions[id];
+    uint64_t releasedBytes = 0;
+    int released = 0;
+    for (const auto& id : packet.genericMeshes) {
+        ++state.geometryRevisions[id];
+        if (auto mesh = state.meshes.find(id); mesh != state.meshes.end() && releasable(state, mesh->second)) {
+            releasedBytes += HdUEReleaseGeometry(mesh->second);
+            ++released;
+        }
+    }
+    for (const auto& id : packet.reupload)
+        if (auto mesh = state.meshes.find(id); mesh != state.meshes.end() && mesh->second.released) {
+            state.fullUploads.insert(id);
+            state.repull.insert(mesh->second.sourceId);  // its arrays come back with the next Sync
+            if (HdUETraceScene()) std::fprintf(stderr, "hdUE re-pulls %s from Hydra (geometry released)\n", id.c_str());
+        }
+    if (released && HdUETraceScene())
+        std::fprintf(stderr, "hdUE released the geometry of %d uploaded meshes (%.1f MB)\n", released,
+                     releasedBytes / 1048576.);
     state.submittedMeshes += packet.meshes.size();
     state.submittedMaterials += packet.materials.size();
     state.materialParameterUpdates += packet.materialUpdates.size();
@@ -1164,18 +1239,24 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
     state.linkedLights = packet.linkedLights;
     if (packet.sendLinks) state.linkedObjects = packet.linkedObjects;
     ++state.sceneSubmissions;
-    state.submittedRevision = packet.revision;
+    state.pendingBytes =
+        state.dirtyMeshes.empty() ? 0 : state.pendingBytes - std::min(state.pendingBytes, packet.bytes);
+    // A streaming batch leaves the revision unsubmitted: Execute's submit uploads the rest and requests the frame.
+    if (!packet.stream) state.submittedRevision = packet.revision;
     state.firstBatch = false;
 }
-// Uploads the scene changes since the last call. Runs on the UE thread; holds the state lock only to copy and record.
-void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points = {}) {
+// Uploads one batch of the scene changes since the last call (meshes up to meshBudget bytes); returns whether dirty
+// meshes remain. Runs on the UE thread; holds the state lock only to copy and record.
+bool submitBatch(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points, uint64_t meshBudget,
+                 bool stream = false) {
     const auto start = std::chrono::steady_clock::now();
     ScenePacket packet;
+    packet.stream = stream;
     packet.points = std::move(points);
     {
         std::lock_guard lock(state.mutex);
         try {
-            prepareScene(state, packet);
+            prepareScene(state, packet, meshBudget);
         } catch (...) {
             packet.giveBack(state);
             throw;
@@ -1200,10 +1281,83 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
         packet.giveBack(state);
         throw;
     }
-    state.setStage("Rendering");
     std::lock_guard lock(state.mutex);
     finishScene(state, packet, surface);
+    return !state.dirtyMeshes.empty();
 }
+// Uploads the scene changes since the last call, in batches: the upload descriptors copy each mesh's geometry again,
+// so one packet for a whole large scene doubled its memory (NVIDIA's Da Vinci Workshop: 26 GB stored, as much again
+// for the packet). Motion blur sub-frames send their deformed points in one packet.
+void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points = {}) {
+    // shortcut: a fixed 1 GB of stored geometry per batch; size it from available memory if batches prove too small.
+    const uint64_t budget = points.empty() ? uint64_t(1) << 30 : ~uint64_t(0);
+    while (submitBatch(state, std::move(points), budget)) points = {};
+    state.setStage("Rendering");
+}
+}  // namespace
+bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh) { return releasable(state, mesh); }
+uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
+    const uint64_t bytes = HdUEMeshBytes(m);
+    m.releasedTriangles = uint32_t(m.indices.size() / 3);
+    m.points = {};
+    m.normals = {};
+    m.uv = {};
+    m.uvSets = {};
+    m.colors = {};
+    m.indices = {};
+    m.sourceCorners = {};
+    m.pickMesh = nullptr;
+    m.released = true;
+    return bytes;
+}
+// Streaming: a scene too large to hold twice uploads while Hydra still syncs it. Mesh::Sync calls this after storing
+// a mesh; once 1 GB of stored geometry waits, hdUE's UE thread uploads it in batches (finishScene frees what it
+// sends), and Sync threads wait while more than 4 GB waits. Not in usdview, which drives UE from its own thread (post
+// would run inline on a Sync thread).
+// The session is created here if the first Execute has not come yet, at the render settings' resolution; Execute
+// resizes it, keeping the scene.
+void HdUEStreamMeshes(HdUEState& s) {
+    auto& host = selfHost();
+    if (!host.worker.joinable() || std::this_thread::get_id() == host.worker.get_id()) return;
+    // HDUE_STREAM_BYTES overrides the batch size (tests stream small scenes); the cap is four batches.
+    static const uint64_t Batch =
+        TfGetenvInt("HDUE_STREAM_BYTES", 0) > 0 ? uint64_t(TfGetenvInt("HDUE_STREAM_BYTES", 0)) : uint64_t(1) << 30;
+    const uint64_t Cap = 4 * Batch;
+    std::unique_lock lock(s.mutex);
+    if (s.pendingBytes < Batch) return;
+    if (!s.streamQueued) {
+        s.streamQueued = true;
+        host.post([&s] {
+            try {
+                if (!s.session) {
+                    const auto resolution = s.setting<GfVec2i>("resolution", GfVec2i(0));
+                    HdueSessionDesc desc{};
+                    desc.struct_size = sizeof(desc);
+                    desc.width = resolution[0] > 0 ? uint32_t(resolution[0]) : 640;
+                    desc.height = resolution[1] > 0 ? uint32_t(resolution[1]) : 360;
+                    s.backend->require(s.backend->api().create_session(&desc, &s.session), "create_session");
+                    s.locked([&] {
+                        s.width = desc.width;
+                        s.height = desc.height;
+                        s.firstBatch = true;
+                        s.geometryRevisions.clear();
+                        s.surfaceStatus = {sizeof(HdueSurfaceStatus)};
+                    });
+                }
+                while (s.locked([&] { return s.pendingBytes >= Batch; })) {
+                    submitBatch(s, {}, Batch, true);
+                    s.drained.notify_all();
+                }
+            } catch (const std::exception& e) {
+                s.setError(e.what());
+            }
+            s.locked([&] { s.streamQueued = false; });
+            s.drained.notify_all();
+        });
+    }
+    s.drained.wait(lock, [&] { return s.pendingBytes < Cap || !s.streamQueued; });
+}
+namespace {
 class Pass final : public HdRenderPass {
     std::shared_ptr<HdUEState> state_;
     GfMatrix4d view_{0.0}, projection_{0.0};
@@ -1610,7 +1764,7 @@ public:
             return converged_ && state_->error == error;
         if (!state_->setting<bool>("materialGraphValid", true)) return true;
         return converged_ && aovsDone_ && !denoisePending_ && settingsVersion_ == state_->requestSettingsRevision &&
-               state_->submittedRevision == state_->revision;
+               state_->submittedRevision == state_->revision && state_->locked([&] { return state_->repull.empty(); });
     }
     // What Execute reads from Hydra's render pass state, copied on the calling thread: Houdini reuses that object for
     // its other drawing once Execute returns, so a posted Execute must not read it later.
@@ -1691,6 +1845,24 @@ public:
         if (camera) snapshot.projection = framedProjection(*state, *camera, snapshot.sizes);
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
+        // Released meshes an upload needs again come back through Hydra: marked dirty here, on the thread that drives
+        // Sync (as SetRenderSetting marks prims), so the next Sync re-reads them.
+        state_->locked([&] {
+            auto* index = GetRenderIndex();
+            for (auto it = state_->repull.begin(); it != state_->repull.end();) {
+                const SdfPath path(*it);
+                if (!index->HasRprim(path)) {  // deleted meanwhile: nothing to wait for
+                    state_->repullMarked.erase(*it);
+                    it = state_->repull.erase(it);
+                    continue;
+                }
+                if (state_->repullMarked.insert(*it).second)
+                    index->GetChangeTracker().MarkRprimDirty(
+                        path, HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTopology |
+                                  HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals);
+                ++it;
+            }
+        });
         // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
         if (state_->locked([&] { return state_->submittedRevision != state_->revision; }))
             HdUERefreshWetMasks(*state_, GetRenderIndex());
@@ -3078,7 +3250,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     VtDictionary nativeAssetIds;
     int triangles = 0;
     for (const auto& [id, mesh] : state.meshes) {
-        triangles += int(mesh.indices.size() / 3);
+        triangles += int(mesh.released ? mesh.releasedTriangles : mesh.indices.size() / 3);
         if (!mesh.sceneAsset.empty()) nativeAssetIds[mesh.scenePath] = VtValue(id);
     }
     int translucentMaterials = 0;

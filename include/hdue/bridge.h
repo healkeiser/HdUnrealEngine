@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 12u
+#define HDUE_ABI_VERSION 13u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -265,6 +265,18 @@ typedef struct HdueMeshDesc {
     /* ABI 10: UV sets in uv, vertex_count * 2 floats each, one after another (0 counts as 1). The backend keeps 4. */
     uint32_t uv_set_count;
 } HdueMeshDesc;
+/* ABI 13: an uploaded mesh's material, visibility, sidedness and prim ID, without its geometry (update_meshes).
+ * Fields as in HdueMeshDesc. */
+typedef struct HdueMeshUpdate {
+    const char* id;
+    const char* material_id;
+    uint32_t visible;
+    uint32_t flags;
+    int32_t prim_id;
+    /* Out: 1 when the change needs the geometry again (an unknown or native mesh, a static/editable switch, a
+     * Nanite mesh given a translucent material or the reverse); apply_scene the mesh in full then. */
+    uint32_t needs_upload;
+} HdueMeshUpdate;
 typedef struct HdueLightDesc {
     const char* id;
     uint32_t type;
@@ -625,6 +637,10 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* poll_gpu_frame)(HdueSession session, HdueFrameInfo* frame);
     /* Any thread (see HdueGpuFrame). */
     HdueResult(HDUE_CALL* acquire_gpu_frame)(HdueSession session, HdueGpuFrame* frame);
+
+    /* ABI 13: changes meshes apply_scene uploaded without resending their geometry; sets each needs_upload. Call after
+     * the apply_scene that sent their materials. */
+    HdueResult(HDUE_CALL* update_meshes)(HdueSession session, HdueMeshUpdate* meshes, uint32_t count);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */

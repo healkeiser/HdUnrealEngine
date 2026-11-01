@@ -29,6 +29,13 @@ HDA = OTLS / "hdue_rendersettings.hda"
 # parameter is removed or renamed, and keep the previous definition, so saved scenes keep theirs. OPcustomize aliases
 # the names of the unversioned types these replace, so scenes saved with them load these.
 VERSION = "1.0"
+# The input stage's cameras as a menu, as Karma's render LOPs list them (their getCameras: loputils.globPrims).
+CAMERA_MENU = (
+    "import loputils\n"
+    "node = kwargs['node']\n"
+    "source = node.inputs()[0] if node.inputs() and node.inputs()[0] else node\n"
+    "return [p.GetPrimPath().pathString for p in loputils.globPrims(source, '%type:Camera') for _ in range(2)]"
+)
 NAME, LABEL, ICON = (
     f"hdue::hduerendersettings::{VERSION}",
     "hdUE Render Settings",
@@ -434,15 +441,9 @@ def build():
             template.setMinIsStrict(True)
             template.setMaxValue(16384)
             template.setMaxIsStrict(False)
-        # The stage's cameras as a menu, as Karma Render Settings' camera (its getCameras: loputils.globPrims).
         if name == "camera":
             template.setMenuType(hou.menuType.StringReplace)
-            template.setItemGeneratorScript(
-                "import loputils\n"
-                "node = kwargs['node']\n"
-                "source = node.inputs()[0] if node.inputs() and node.inputs()[0] else node\n"
-                "return [p.GetPrimPath().pathString for p in loputils.globPrims(source, '%type:Camera') for _ in range(2)]"
-            )
+            template.setItemGeneratorScript(CAMERA_MENU)
             template.setItemGeneratorScriptLanguage(hou.scriptLanguage.Python)
         group.append(template)
     # The Unreal settings above the tabs (render mode, samples, tonemapper, ...) in a group of their own, apart from
@@ -969,6 +970,12 @@ def build_render_products():
         f'`chs("../parentprimpath")`/`chs("../primname_" + {index})`'
     )
     product.parm("productName").set(f'`chs("../productName_" + {index})`')
+    # The Default Camera is authored only when set: products without one render through the settings' camera.
+    product.parm("camera").set('`chs("../camera")`')
+    product.parm("camera_control").setExpression(
+        '"set" if hou.pwd().parent().evalParm("camera") else "none"',
+        hou.exprLanguage.Python,
+    )
     product.parm("orderedVars").set(
         f'`ifs(ch("../doorderedVars_" + {index}), chs("../orderedVars_" + {index}), chs("../orderedVars"))`'
     )
@@ -984,6 +991,23 @@ def build_render_products():
 
     common = hou.FolderParmTemplate(
         "common", "Common Settings", folder_type=hou.folderType.Simple
+    )
+    common.addParmTemplate(
+        hou.StringParmTemplate(
+            "camera",
+            "Default Camera",
+            1,
+            menu_type=hou.menuType.StringReplace,
+            item_generator_script=CAMERA_MENU,
+            item_generator_script_language=hou.scriptLanguage.Python,
+            tags={
+                "sidefx::usdpathtype": "prim",
+                "script_action": "import loputils\nloputils.selectPrimsInParm(kwargs, False)",
+                "script_action_icon": "BUTTONS_reselect",
+            },
+            help="Camera the products render through, as Karma Render Products' Default Camera. Empty: the render "
+            "settings' camera.",
+        )
     )
     common.addParmTemplate(
         primlist(

@@ -3,6 +3,8 @@
 #include "picking.h"
 #include "placement.h"
 #include "pxr/pxr.h"
+#include <condition_variable>
+#include "pxr/base/arch/hash.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -112,12 +114,47 @@ struct HdUEMeshData {
         return out;
     }
     std::shared_ptr<const HdUEPickMesh> pickMesh;
+    // Hash of the geometry arrays (HdUEGeometryHash): what change detection compares, so the arrays can be freed.
+    uint64_t geometryHash = 0;
+    // The arrays were freed once UE had the mesh (finishScene); an upload that needs them re-syncs it from Hydra.
+    bool released = false;
+    uint32_t releasedTriangles = 0;
 };
 // Whether placing an uploaded mesh at transform needs no new geometry: a non-instanced mesh uploaded in local space,
 // moved without shear (HdUEShears). The motion extension then moves its UE actor.
+// Uploads dirty meshes while Hydra still syncs a large scene (husk, hython); delegate.cpp. Call without the state lock.
+struct HdUEState;
+void HdUEStreamMeshes(HdUEState& state);
+// Whether a mesh's arrays can be freed once UE has it, and freeing them (delegate.cpp). Under the state lock.
+bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh);
+uint64_t HdUEReleaseGeometry(HdUEMeshData& mesh);
 inline bool HdUEPlacedOnly(const HdUEMeshData& mesh, const GfMatrix4d& transform) {
     return mesh.transform != transform && !mesh.instanced && mesh.sceneAsset.empty() && !HdUEShears(mesh.transform) &&
            !HdUEShears(transform);
+}
+// Hash of a mesh's geometry arrays and their sizes (points, normals, UVs, colours, indices).
+inline uint64_t HdUEGeometryHash(const HdUEMeshData& m) {
+    uint64_t hash = 0;
+    const auto add = [&](const auto& v) {
+        const uint64_t size = v.size();
+        hash = ArchHash64(reinterpret_cast<const char*>(&size), sizeof(size), hash);
+        if (!v.empty()) hash = ArchHash64(reinterpret_cast<const char*>(v.data()), v.size() * sizeof(v[0]), hash);
+    };
+    add(m.points);
+    add(m.normals);
+    add(m.uv);
+    for (const auto& set : m.uvSets) add(set);
+    add(m.colors);
+    add(m.indices);
+    return hash;
+}
+// Bytes of a mesh's stored geometry arrays (the delegate's copy, and about what its upload descriptor copies again).
+inline uint64_t HdUEMeshBytes(const HdUEMeshData& m) {
+    const auto size = [](const auto& v) { return uint64_t(v.capacity()) * sizeof(v[0]); };
+    uint64_t bytes =
+        size(m.points) + size(m.normals) + size(m.uv) + size(m.colors) + size(m.indices) + size(m.sourceCorners);
+    for (const auto& set : m.uvSets) bytes += size(set);
+    return bytes;
 }
 // A dense density grid; local voxel (i, j, k) covers [i, i+1]^3 and localToWorld maps it to USD world.
 struct HdUEVolumeData {
@@ -210,6 +247,16 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
+    // Rprims (sourceId) of released meshes an upload needs again: the render pass marks them dirty in Hydra (marked),
+    // and their next Sync erases them. Frames do not converge meanwhile.
+    std::set<std::string> repull, repullMarked;
+    // Released meshes UE asked for in full (update_meshes' needs_upload): their next Sync keeps the arrays.
+    std::set<std::string> fullUploads;
+    // Streaming (HdUEStreamMeshes): stored geometry of dirty meshes not yet uploaded, whether an upload task is
+    // queued, and what waiting Sync threads wait on.
+    uint64_t pendingBytes = 0;
+    bool streamQueued = false;
+    std::condition_variable drained;
     // Meshes whose transform alone changed: placed through the motion extension, their geometry stays in UE.
     std::set<std::string> movedMeshes;
     TfTokenVector renderTags;  // sorted; the render pass's last tags (empty: everything)
