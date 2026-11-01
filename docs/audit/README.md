@@ -75,7 +75,8 @@ Open:
 
 - **Needs a decision:** UE-01/UE-03 (Developer modules, EULA: ask Epic), UE-09 (ship a Test build: rebuild and re-cook), UE-15 (Cryptomatte needs our own id AOV and manifest; husk writes it only for Karma), `doubleSided` default (USD culls, Karma does not), shear in instances, instance motion from time-sampled positions and `angularVelocities`.
 - **Not feasible as specified:** MAT-05 (`transparent` opacity renders dark in UE's Path Tracer; Karma renders it like `presence`), HYD-15 far clip (UE's Path Tracer ignores a finite far plane), `hdue:asset` on Xform/Scope and cooked MaterialX/Substrate preparation in husk (host-only Python), ALT-04, ALT-12.
-- **Remaining:** ALT-10/11 (wait for UE-01), re-record the PSO cache after VSM and the material changes.
+- **Remaining:** ALT-10/11 (wait for UE-01).
+- **PSO cache (item 6):** re-recorded after VSM and the material changes (106 PSOs); a Cornell husk render compiles none on the render thread in Lumen or the Path Tracer.
 - **Path Tracer direct light (was "floor black at `PathTracingMaxBounces=1`"):** no longer reproduces. Cornell at `PathTracingMaxBounces=1` against a 128-pixel Karma CPU card with `diffuselimit=0`: back wall 1.00x, short box top 0.80x, floor 0.85x, red wall 0.84x. Only surfaces seen at a grazing angle are darker, so the remaining gap is the BSDF's view-angle response (Substrate against Karma's UsdPreviewSurface), not light sampling.
 
 ## Then
