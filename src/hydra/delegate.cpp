@@ -386,6 +386,7 @@ HdSprim* HdUECreateCamera(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
 HdSprim* HdUECreateUnsupportedLight(const SdfPath&, const TfToken&);
 void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
+void HdUERepullMeshes(HdUEState&, HdRenderIndex*);
 
 HdUEState::~HdUEState() {
     if (session && backend) backend->api().destroy_session(session);
@@ -1195,11 +1196,11 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
 // Whether a generic mesh's geometry arrays can be freed once UE has it (finishScene): change detection compares its
 // geometryHash, update_meshes carries material, visibility and sidedness changes, and an upload that needs the arrays
 // again re-syncs the mesh from Hydra. Kept where something reads them after the upload: deformation blur (pointsAt),
-// wet masks and surfaces, displacement dicing, usdview's ray picks, and Houdini's viewport, where wet bindings arrive
-// after the first upload (its surfaces test failed with freed meshes). husk and hython free them.
+// wet masks and surfaces, displacement dicing and usdview's ray picks. A mesh that becomes wet later is re-pulled
+// (prepareSurfaceEffects).
 bool releasable(const HdUEState& state, const HdUEMeshData& m) {
     const auto& host = selfHost();
-    if (!host.worker.joinable() || host.continuous || !m.deformTimes.empty() || !m.masks.empty() ||
+    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() ||
         (state.wetBindings && !HdUEWetSettings(*state.wetBindings, m).empty()))
         return false;
     const auto material = state.materials.find(m.material);
@@ -1318,13 +1319,13 @@ uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
 }
 // Streaming: a scene too large to hold twice uploads while Hydra still syncs it. Mesh::Sync calls this after storing
 // a mesh; once 1 GB of stored geometry waits, hdUE's UE thread uploads it in batches (finishScene frees what it
-// sends), and Sync threads wait while more than 4 GB waits. husk and hython only, as releasing; usdview drives UE from
-// its own thread (post would run inline on a Sync thread).
+// sends), and Sync threads wait while more than 4 GB waits. Not in usdview, which drives UE from its own thread (post
+// would run inline on a Sync thread).
 // The session is created here if the first Execute has not come yet, at the render settings' resolution; Execute
 // resizes it, keeping the scene.
 void HdUEStreamMeshes(HdUEState& s) {
     auto& host = selfHost();
-    if (!host.worker.joinable() || host.continuous || std::this_thread::get_id() == host.worker.get_id()) return;
+    if (!host.worker.joinable() || std::this_thread::get_id() == host.worker.get_id()) return;
     // HDUE_STREAM_BYTES overrides the batch size (tests stream small scenes); the cap is four batches.
     static const uint64_t Batch =
         TfGetenvInt("HDUE_STREAM_BYTES", 0) > 0 ? uint64_t(TfGetenvInt("HDUE_STREAM_BYTES", 0)) : uint64_t(1) << 30;
@@ -1851,24 +1852,8 @@ public:
         if (camera) snapshot.projection = framedProjection(*state, *camera, snapshot.sizes);
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
-        // Released meshes an upload needs again come back through Hydra: marked dirty here, on the thread that drives
-        // Sync (as SetRenderSetting marks prims), so the next Sync re-reads them.
-        state_->locked([&] {
-            auto* index = GetRenderIndex();
-            for (auto it = state_->repull.begin(); it != state_->repull.end();) {
-                const SdfPath path(*it);
-                if (!index->HasRprim(path)) {  // deleted meanwhile: nothing to wait for
-                    state_->repullMarked.erase(*it);
-                    it = state_->repull.erase(it);
-                    continue;
-                }
-                if (state_->repullMarked.insert(*it).second)
-                    index->GetChangeTracker().MarkRprimDirty(
-                        path, HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTopology |
-                                  HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals);
-                ++it;
-            }
-        });
+        // Released meshes an upload needs again come back through Hydra, re-synced here on the thread that drives Sync.
+        HdUERepullMeshes(*state_, GetRenderIndex());
         // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
         if (state_->locked([&] { return state_->submittedRevision != state_->revision; }))
             HdUERefreshWetMasks(*state_, GetRenderIndex());

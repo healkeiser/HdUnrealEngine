@@ -247,9 +247,9 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
-    // Rprims (sourceId) of released meshes an upload needs again: the render pass marks them dirty in Hydra (marked),
-    // and their next Sync erases them. Frames do not converge meanwhile.
-    std::set<std::string> repull, repullMarked;
+    // Rprims (sourceId) of released meshes an upload needs again: the render pass re-syncs them (HdUERepullMeshes),
+    // and that Sync erases them. Frames do not converge meanwhile.
+    std::set<std::string> repull;
     // Released meshes UE asked for in full (update_meshes' needs_upload): their next Sync keeps the arrays.
     std::set<std::string> fullUploads;
     // Streaming (HdUEStreamMeshes): stored geometry of dirty meshes not yet uploaded, whether an upload task is

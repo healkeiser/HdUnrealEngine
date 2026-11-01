@@ -735,7 +735,6 @@ public:
             state->fullUploads.erase(id);
             state->removed.erase(id);
             state->repull.erase(state->meshes[id].sourceId);
-            state->repullMarked.erase(state->meshes[id].sourceId);
             state->erasedMeshes.erase(id);
             if (meshChanged || unreleased) {
                 if (state->dirtyMeshes.insert(id).second) state->pendingBytes += HdUEMeshBytes(state->meshes[id]);
@@ -853,7 +852,6 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
     state.fullUploads.erase(key);
     state.removed.erase(key);
     state.repull.erase(state.meshes[key].sourceId);
-    state.repullMarked.erase(state.meshes[key].sourceId);
     if (changed) {
         state.dirtyMeshes.insert(key);
         ++state.revision;
@@ -1517,6 +1515,25 @@ void HdUERefreshWetMasks(HdUEState& state, HdRenderIndex* index) {
     for (const auto& id : sources)
         if (const auto* mesh = dynamic_cast<const Mesh*>(index->GetRprim(id)))
             if (auto* delegate = index->GetSceneDelegateForRprim(id)) mesh->RefreshSelectedMasks(delegate, state);
+}
+// Re-reads released meshes from their scene delegate by calling their Sync with the geometry bits, as Hydra would for
+// prims marked dirty. Houdini's viewport never syncs an Rprim the render pass marks dirty (its Sync runs only for
+// stage edits), so the pass syncs them itself, on its own thread, which drives Hydra's Sync.
+void HdUERepullMeshes(HdUEState& state, HdRenderIndex* index) {
+    const auto ids = state.locked([&] { return state.repull; });
+    for (const auto& id : ids) {
+        const SdfPath path(id);
+        // GetRprim hands out const prims; Hydra's own Sync calls them non-const.
+        auto* rprim = const_cast<HdRprim*>(index->GetRprim(path));
+        auto* delegate = rprim ? index->GetSceneDelegateForRprim(path) : nullptr;
+        if (!delegate) {  // deleted meanwhile: nothing to wait for
+            state.locked([&] { state.repull.erase(id); });
+            continue;
+        }
+        HdDirtyBits bits = HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTopology |
+                           HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals;
+        rprim->Sync(delegate, &state, &bits, HdReprTokens->smoothHull);
+    }
 }
 HdSprim* HdUECreateLight(const SdfPath& id, uint32_t type) { return new Light(id, type); }
 // Mesh, plugin and portal lights render nothing in hdUE. Hydra drops Sprim types a delegate does not support, silently;
