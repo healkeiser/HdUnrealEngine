@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    doc = """UE's Ambient Cubemap post-process setting, given an image file: a white cubemap at intensity 4 (frame 2) adds
+light to the evenly lit wall, which keeps the stage's own light at intensity 0 (frame 1). UE 5.8.4's composite added
+nothing with Substrate's adaptive GBuffer until scripts/Apply-ResidencyPatch.ps1 patched AmbientCubemapComposite.usf.
+UE's Path Tracer does not apply the Ambient Cubemap, so the check runs in realtime only."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE post-process",
+ "feature": "Ambient Cubemap",
+ "frames": 2,
+ "modes": [
+  "realtime"
+ ],
+ "checks": [
+  {
+   "name": "cubemap adds light",
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      -2,
+      -2,
+      2,
+      2
+     ]
+    }
+   ],
+   "min": 1.5
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        asset unreal:postProcess:AmbientCubemap = @../textures/white.png@
+        float unreal:postProcess:AmbientCubemapIntensity.timeSamples = {
+            1: 0,
+            2: 4,
+        }
+    }
+}
+def Cube "Wall"
+{
+        double size = 1.0
+        double3 xformOp:scale = (12, 12, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+}

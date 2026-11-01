@@ -35,6 +35,8 @@ Measured on 2026-11-01 (UE 5.8 editor, RTX GPU, cubemap `/Engine/MapTemplates/Sk
 
 Cause: `Engine/Shaders/Private/AmbientCubemapComposite.usf` never defines `SUBSTRATE_LOAD_FROM_MATERIALCONTAINER`, so it reads as 0 and the pass reads the legacy GBuffer, which the adaptive format does not write. Every pixel's shading model reads as unlit and the pass adds nothing. The other Substrate composites set it from `SUBSTRATE_GBUFFER_FORMAT` (`ReflectionEnvironmentPixelShader.usf`, lines 25-32):
 
+hdUE's `scripts/Apply-ResidencyPatch.ps1` adds this to the source engine and the editor installation. With it, the SM6 adaptive capture above renders 0.225 (the blendable GBuffer's 0.236 differs by its own shading), and hdUE's Cornell box with a cubemap from `samples/cornell/ramp.png` at intensity 4 goes from 0.050 to 1.033:
+
 ```hlsl
 #if SUBSTRATE_GBUFFER_FORMAT==0
 #define SUBSTRATE_LOAD_FROM_MATERIALCONTAINER 0
