@@ -42,6 +42,12 @@ $Delegate = Join-Path $Build 'Release\hdUE_Houdini22.dll'
 foreach ($Path in $BackendDll, $Project, $Delegate, (Join-Path $Build 'resources\plugInfo.json')) {
     if (-not (Test-Path -LiteralPath $Path)) { throw "Missing $Path; build and stage first." }
 }
+# Packages ship the Test configuration (UE-09): the profile's DLL must be the current Test build, not Development.
+$TestBuild = Join-Path $TaskRoot 'unreal\HdUEBackend\Binaries\Win64\HdUEBackend-Win64-Test.dll'
+if (-not (Test-Path -LiteralPath $TestBuild) -or
+    (Get-FileHash -LiteralPath $TestBuild).Hash -ne (Get-FileHash -LiteralPath $BackendDll).Hash) {
+    throw "$BackendDll is not the Test build. Run Build-Backend.ps1 -Configuration Test and Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig <profile>, then package that profile."
+}
 $Version = (& git -C $TaskRoot describe --tags --always --dirty).Trim()
 # The delegate's version resource (resources/version.rc.in) names the commit and the Houdini build it was built from.
 $Stamp = (Get-Item -LiteralPath $Delegate).VersionInfo
@@ -110,8 +116,8 @@ if ($Zip) {
     $Symbols = Join-Path $Out "$Name-symbols"
     if (Test-Path -LiteralPath $Symbols) { Remove-Item -LiteralPath $Symbols -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $Symbols | Out-Null
-    # Update-HoudiniRuntime.ps1 copies only the hashed DLL; the staged runtime keeps the backend's symbols unhashed.
-    $BackendPdb = Join-Path (Split-Path -Parent $BackendDll) 'HdUEBackend.pdb'
+    # Update-HoudiniRuntime.ps1 copies only the hashed DLL, so the symbols come from the Test build it was copied from.
+    $BackendPdb = [IO.Path]::ChangeExtension($TestBuild, 'pdb')
     foreach ($Pdb in [IO.Path]::ChangeExtension($Delegate, 'pdb'), $BackendPdb) {
         if (-not (Test-Path -LiteralPath $Pdb)) { throw "Missing $Pdb." }
         Copy-Item -LiteralPath $Pdb -Destination $Symbols

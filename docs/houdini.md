@@ -5,8 +5,12 @@
 Like HtoA, Redshift or V-Ray, hdUE ships as one relocatable folder plus a Houdini package file. On the build machine:
 
 ```powershell
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly
+.\scripts\Build-Backend.ps1 -Configuration Test
+.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly
 ```
+
+Packages ship UE's Test configuration: Shipping's optimizations with the console commands and stats hdUE's `unreal:cvar:` settings rely on (Epic's Build Configurations); Development, which keeps `check()` asserts and debug tooling, stays for work and CI. `Package-Houdini.ps1` refuses a profile whose backend is not the current Test build.
 
 This writes `out\package\hdUE-<version>-houdini<build>-win64` (for example `hdUE-v0.2.0-houdini22.0.368-win64`; about 1.2 GB unpacked, 0.9 GB zipped) and the matching `.zip`, plus `...-symbols.zip` with the delegate and backend PDBs, which stay out of the package: keep it with the release to symbolise crash dumps. `<version>` is `git describe`; the script refuses a tree with uncommitted changes, or a delegate built from another commit, unless `-AllowDirty` is passed. The delegate's file properties (Details tab) show the same version and the Houdini build it was compiled against. The folder holds the delegate (`plugin\`), the Solaris integration, the Python helpers, the samples, the staged UE runtime (`runtime\`), a `runtime.json` with paths relative to itself, the hdUE version and the Houdini build, and the license terms: `LICENSE` (hdUE, MIT), `LICENSE-PACKAGE.txt` (end-user terms for the Unreal Engine runtime), `THIRD_PARTY_NOTICES.md` and `licenses\` (the engine's `Engine/Source/ThirdParty/Licenses`). The smoke test, import libraries, the Vulkan debug layers and the DirectX Agility SDK copy UE stages (`D3D12\`, which never loads under Houdini; `docs/architecture.md`) are left out.
 

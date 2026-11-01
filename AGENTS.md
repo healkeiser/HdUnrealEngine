@@ -28,7 +28,7 @@ hython scripts\run_conformance.py --runtime-config <absolute path>   # add --onl
 - `HDUE_TRACE_TIMING=1` prints the delegate's timeline (request to frame, readback, setting changes); `HDUE_TRACE_SCENE=1` the scene uploads. The backend log is `out/runtime/Windows/HdUEBackend/Saved/Logs/` (timestamps in UTC).
 - Render settings are generated: edit `scripts/generate_render_settings.py`, run it (writes `HdUnrealEngine_*.ds`), then `scripts/build_render_settings_hda.py` (rebuilds the HDAs). Never edit the `.ds` or the HDAs by hand.
 - Gallery: `hython scripts/render_gallery.py --set cornell|sponza --dev [--renderers lumen pathtraced] [--docs-only]`, then `uv run --with matplotlib python scripts/gallery_charts.py`. Re-render only the columns that changed; Karma's renders are reused.
-- Packages: `Package-Houdini.ps1 -Zip -UnrealLicenseesOnly` needs a clean tree and a delegate built from the current commit. The backend links UE Developer modules: packages go to Unreal Engine licensees only, never a public download.
+- Packages: `Package-Houdini.ps1 -Zip -UnrealLicenseesOnly` needs a clean tree, a delegate built from the current commit and a Test-configuration backend (`Build-Backend.ps1 -Configuration Test`, `Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig <profile>`). The backend links UE Developer modules: packages go to Unreal Engine licensees only, never a public download.
 
 ## Rules
 

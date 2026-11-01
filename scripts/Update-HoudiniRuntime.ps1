@@ -1,7 +1,8 @@
 param(
     [string]$RuntimeConfig = '',
     [string]$OutputConfig = '',
-    [switch]$SetDefault
+    [switch]$SetDefault,
+    [ValidateSet('Development', 'Test')][string]$Configuration = 'Development'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
@@ -13,7 +14,7 @@ if ($Config.version -ne 1) { throw 'Unsupported runtime configuration.' }
 foreach ($Key in @('backend_dll', 'runtime_project', 'asset_catalog', 'materialx_library')) {
     if ($Config.$Key -and -not [IO.Path]::IsPathRooted($Config.$Key)) { $Config.$Key = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ConfigPath) $Config.$Key)) }
 }
-$Source = Join-Path $TaskRoot 'unreal\HdUEBackend\Binaries\Win64\HdUEBackend.dll'
+$Source = Join-Path $TaskRoot ('unreal\HdUEBackend\Binaries\Win64\' + $(if ($Configuration -eq 'Test') { 'HdUEBackend-Win64-Test.dll' } else { 'HdUEBackend.dll' }))
 if (-not (Test-Path -LiteralPath $Source)) { throw 'Build-Backend.ps1 must finish first.' }
 foreach ($SourceShader in Get-ChildItem -LiteralPath (Join-Path $TaskRoot 'unreal\HdUEBackend\Shaders') -Filter '*.usf') {
     $RuntimeShader = Join-Path (Split-Path -Parent $Config.runtime_project) "Shaders\$($SourceShader.Name)"

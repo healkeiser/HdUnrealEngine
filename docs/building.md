@@ -103,7 +103,7 @@ GitHub runners cannot build Unreal Engine, so releases are built locally:
 1. Set `project(hdUE VERSION x.y.z)` in `CMakeLists.txt`, commit, and tag `vx.y.z` on that commit.
 2. `.\scripts\Verify.ps1 -WithUsdview` and `.\scripts\Test.ps1 -Suite all` on a clean tree.
 3. Render the gallery (`hython scripts/render_gallery.py --dev`). It fails when a scene's brightness against Karma CPU leaves its band (`scripts/check_gallery.py`, which CI also runs on the committed `docs/gallery.md`) or a Cornell hdUE render departs from its tile baseline (`tests/gallery_baselines.json`); after an intended change, check the images and store new baselines with `--bless`.
-4. `.\scripts\Build-Houdini.ps1`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes and a delegate built from another commit.
+4. `.\scripts\Build-Houdini.ps1`, `.\scripts\Build-Backend.ps1 -Configuration Test` and `.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes, a delegate built from another commit, and a backend that is not the current Test build (packages ship Test; see [houdini](houdini.md#installing-on-another-machine)).
 5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as `docs/houdini.md` describes.
 
 ## Standalone rendering and usdview

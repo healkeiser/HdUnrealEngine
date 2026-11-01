@@ -319,7 +319,9 @@ Building needs the Unreal Engine 5.8.4 source, Visual Studio 2022, OpenUSD 26.03
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
 .\scripts\Test.ps1 -Suite all          # unit, Hydra/usdview and Houdini suites
 hython scripts\run_conformance.py       # USD conformance set (docs/conformance.md)
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly
+.\scripts\Build-Backend.ps1 -Configuration Test   # packages ship UE's Test configuration
+.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly
 ```
 
 [CI](.github/workflows/ci.yml) builds the client library, runs the C ABI layout test, the unit suite (`Test.ps1 -Suite unit`: repository scope, Python tests, the gallery's brightness bands against Karma), the installer under Windows PowerShell 5.1, and the format and lint checks (Black, Ruff, clang-format, clang-tidy, PSScriptAnalyzer, actionlint). GitHub's runners have no UE, Houdini or ray-tracing GPU, so the rendering suites and the [conformance set](docs/conformance.md) run locally.
