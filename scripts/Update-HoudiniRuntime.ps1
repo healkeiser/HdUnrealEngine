@@ -27,14 +27,18 @@ $Destination = Join-Path (Split-Path -Parent $Config.backend_dll) ("HdUEBackend-
 if (-not (Test-Path -LiteralPath $Destination)) { Copy-Item -LiteralPath $Source -Destination $Destination }
 if ((Get-FileHash -LiteralPath $Source).Hash -ne (Get-FileHash -LiteralPath $Destination).Hash) { throw 'Runtime DLL copy verification failed.' }
 # The runtime's unhashed DLL (Stage-Runtime.ps1's copy, which .local/runtime.json, usdview and Test-Backend.ps1 load)
-# follows the build too, so every profile of this runtime passes the delegate's ABI check.
+# follows the build too, so every profile of this runtime passes the delegate's ABI check. Only when the default profile
+# (runtime-houdini.json) is updated: a side profile stages its build for its own tests and leaves the shared DLL alone.
+$DefaultProfile = Join-Path (Split-Path -Parent $ConfigPath) 'runtime-houdini.json'
+if (-not $OutputConfig) { $OutputConfig = $DefaultProfile }
+$IsDefault = $SetDefault -or [IO.Path]::GetFullPath($OutputConfig) -eq [IO.Path]::GetFullPath($DefaultProfile)
 $Unhashed = Join-Path (Split-Path -Parent $Destination) 'HdUEBackend.dll'
-if ((Test-Path -LiteralPath $Unhashed) -and (Get-FileHash -LiteralPath $Unhashed).Hash -ne (Get-FileHash -LiteralPath $Source).Hash) {
+if ($IsDefault -and (Test-Path -LiteralPath $Unhashed) -and
+    (Get-FileHash -LiteralPath $Unhashed).Hash -ne (Get-FileHash -LiteralPath $Source).Hash) {
     try { Copy-Item -LiteralPath $Source -Destination $Unhashed -Force }
     catch { Write-Warning "$Unhashed is in use and keeps the previous build: $($_.Exception.Message)" }
 }
 $Config.backend_dll = $Destination
-if (-not $OutputConfig) { $OutputConfig = Join-Path (Split-Path -Parent $ConfigPath) 'runtime-houdini.json' }
 $Config | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath ([IO.Path]::GetFullPath($OutputConfig)) -Encoding utf8
 Write-Output "Houdini runtime configuration: $([IO.Path]::GetFullPath($OutputConfig))"
 if ($SetDefault) {
