@@ -81,9 +81,9 @@ TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
 // Whether a mesh's Nanite data fits in UE's root page pool, reserving its pages if so. UE's pool is one buffer of at
 // most 2 GB on NVIDIA (4 GB on AMD, the GPU's largest buffer view), less the streaming pool, and UE ends the process
 // when a root page does not fit ("Cannot allocate more root pages", NaniteStreamingManager.cpp). Runtime meshes keep
-// every page resident (BuildNanite), so a scene past it (NVIDIA's Da Vinci Workshop: ~600M triangles) keeps its
-// remaining meshes as regular static meshes instead, with a warning. 10% stays free: released meshes return their pages
-// when UE's garbage collection frees them, after this count does.
+// one root page each and stream the rest (BuildNanite), so the pool holds tens of thousands of meshes; a scene past it
+// keeps its remaining meshes as regular static meshes instead, with a warning. 10% stays free: released meshes return
+// their pages when UE's garbage collection frees them, after this count does.
 bool FHdueScene::NaniteFits(const FString& Id, const Nanite::FResources* Nanite) {
     if (const uint32* Previous = NaniteRootPages.Find(Id)) {
         NaniteRootPagesUsed -= *Previous;
@@ -727,8 +727,9 @@ void HydraTangents(TArray<FStaticMeshBuildVertex>& Vertices, const TArray<uint32
     SMikkTSpaceContext Context = {&Interface, &Mesh, true};
     genTangSpaceDefault(&Context);
 }
-// Nanite data for one generated mesh (any thread). Every page is a root page: outside the editor, UE streams non-root
-// pages only from cooked files on disk, and these meshes exist only in memory.
+// Nanite data for one generated mesh (any thread). Its root pages (one per mesh, UE's default minimum residency) stay
+// on the GPU; the other pages stay in memory in StreamablePages and stream to the GPU when the view needs them, as the
+// editor streams them (UE's non-editor path reads only cooked files: Apply-ResidencyPatch.ps1 adds the memory path).
 TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     if (!Desc.vertex_count || Desc.index_count < 3) return nullptr;
     Nanite::IBuilderModule::FInputMeshData Input;
@@ -763,7 +764,7 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     Input.NumTexCoords = uint8(Sets);
     FMeshNaniteSettings Settings;
     Settings.bEnabled = true;
-    Settings.TargetMinimumResidencyInKB = MAX_uint32;
+    Settings.TargetMinimumResidencyInKB = 0;
     // The Nanite build is most of a scene's conversion (450 meshes, 4.4M triangles: 10.5 s of 11.2 s), so builds are
     // kept across runs as UE's derived data cache keeps a static mesh's (FStaticMeshRenderData::Cache, StaticMesh.cpp):
     // keyed by the builder's version and the mesh's content, the resources as Serialize writes them (bCooked false).
@@ -772,6 +773,7 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     FBlake3 Hasher;
     const FString Version = Nanite::IBuilderModule::Get().GetVersionString();
     Hasher.Update(*Version, Version.Len() * sizeof(TCHAR));
+    Hasher.Update("streaming", 9);  // entries from builds that kept every page a root page are not reused
     const auto Add = [&](const auto& Array) { Hasher.Update(Array.GetData(), Array.Num() * Array.GetTypeSize()); };
     Add(Input.Vertices.Position);
     Add(Input.Vertices.TangentX);
@@ -787,20 +789,35 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     if (FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) {
         FMemoryReader Reader(Bytes);  // not persistent: see the writer
         Resources->Serialize(Reader, nullptr, false);
-        if (!Reader.IsError()) {
+        // The streaming pages follow the resources (see the writer), restored as UE's DDC rebuild restores them.
+        int64 Streamable = 0;
+        Reader << Streamable;
+        if (!Reader.IsError() && Streamable >= 0 && Reader.Tell() + Streamable == Reader.TotalSize()) {
+            if (Streamable) {
+                Resources->StreamablePages.Lock(LOCK_READ_WRITE);
+                Reader.Serialize(Resources->StreamablePages.Realloc(Streamable), Streamable);
+                Resources->StreamablePages.Unlock();
+                Resources->StreamablePages.SetBulkDataFlags(BULKDATA_Force_NOT_InlinePayload);
+            }
             IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
             return Resources;
         }
         *Resources = Nanite::FResources();
     }
     if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
-    // Every page is a root page, so StreamablePages (bulk data) is empty. Runtime builds cannot save bulk data
-    // (USE_RUNTIME_BULKDATA, BulkData.cpp) but still read its header; a non-persistent archive skips it both ways.
+    // Runtime builds cannot save bulk data (USE_RUNTIME_BULKDATA, BulkData.cpp) but still read its header; a
+    // non-persistent archive skips it both ways, so the streaming pages are appended raw after the resources.
     // Identical meshes share a key: one written by another task is kept as it is.
-    if (Resources->StreamablePages.GetBulkDataSize() || IFileManager::Get().FileExists(*Path)) return Resources;
+    if (IFileManager::Get().FileExists(*Path)) return Resources;
     Bytes.Reset();
     FMemoryWriter Writer(Bytes);
     Resources->Serialize(Writer, nullptr, false);
+    int64 Streamable = Resources->StreamablePages.GetBulkDataSize();
+    Writer << Streamable;
+    if (Streamable) {
+        Writer.Serialize(const_cast<void*>(Resources->StreamablePages.LockReadOnly()), Streamable);
+        Resources->StreamablePages.Unlock();
+    }
     // Another task may build the same mesh: write a private file, then move it into place, once (UE's Move retries for
     // seconds while the other task's file is in the way).
     const FString Temporary = FPaths::CreateTempFilename(*FPaths::GetPath(Path), TEXT("nanite"));

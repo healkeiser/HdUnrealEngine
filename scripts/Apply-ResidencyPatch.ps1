@@ -46,3 +46,40 @@ foreach ($Root in @($EngineRoot, $EditorRoot) | Where-Object { $_ } | Select-Obj
         Write-Host "Applied hdUE Ambient Cubemap shader patch to $Root."
     }
 }
+# Runtime-built Nanite meshes (Scene.cpp BuildNanite) keep their streaming pages in memory: outside the editor, UE's
+# streaming manager reads non-root pages only through the IoDispatcher, with a chunk id only cooked packages have, so
+# every page had to be a root page in a pool of at most 2 GB. In non-editor builds, a page of loaded (in-memory) bulk
+# data is copied into the staging buffer instead, as the editor's EState::Memory path installs it; cooked bulk data is
+# never loaded, so cooked meshes stream from disk as before.
+$Header = Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Public\Rendering\NaniteStreamingManager.h'
+$Manager = Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Private\Rendering\NaniteStreamingManager.cpp'
+$HeaderSource = [IO.File]::ReadAllText($Header)
+$ManagerSource = [IO.File]::ReadAllText($Manager)
+if (-not $ManagerSource.Contains('bFromMemory')) {
+    $Newline = if ($ManagerSource.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $Edits = @(
+        @($Header, "`t`tFIoBuffer`t`t`t`tRequestBuffer;", "`t`tbool`t`t`t`t`tbFromMemory = false;`t// hdUE: copied from in-memory bulk data$Newline`t`tFIoBuffer`t`t`t`tRequestBuffer;"),
+        @($Header, "`t`t`tRequestBuffer = FIoBuffer();", "`t`t`tbFromMemory = false;$Newline`t`t`tRequestBuffer = FIoBuffer();"),
+        @($Manager, 'const bool bDiskRequest = true;', 'const bool bDiskRequest = !BulkData.IsBulkDataLoaded();	// hdUE: runtime-built pages are in memory'),
+        @($Manager, "Batch.Read(BulkData, PageStreamingState.BulkOffset, PageStreamingState.BulkSize, AIOP_Low, PendingPage.RequestBuffer, PendingPage.Request);$Newline`t`t`t`t`t`tbIssueIOBatch = true;",
+            (("#if !WITH_EDITOR", "`t`t`t`t`t`tif (!bDiskRequest)`t// hdUE: in-memory bulk data (runtime-built Nanite) has no IO chunk to read", "`t`t`t`t`t`t{",
+             "`t`t`t`t`t`t`tconst uint8* BulkDataPtr = (const uint8*)BulkData.LockReadOnly();",
+             "`t`t`t`t`t`t`tFMemory::Memcpy(Dst, BulkDataPtr + PageStreamingState.BulkOffset, PageStreamingState.BulkSize);",
+             "`t`t`t`t`t`t`tBulkData.Unlock();", "`t`t`t`t`t`t`tPendingPage.bFromMemory = true;", "`t`t`t`t`t`t}", "`t`t`t`t`t`telse", "#endif", "`t`t`t`t`t`t{",
+             "`t`t`t`t`t`t`tBatch.Read(BulkData, PageStreamingState.BulkOffset, PageStreamingState.BulkSize, AIOP_Low, PendingPage.RequestBuffer, PendingPage.Request);",
+             "`t`t`t`t`t`t`tbIssueIOBatch = true;", "`t`t`t`t`t`t}") -join $Newline)),
+        @($Manager, 'if (PendingPage.Request.IsCompleted())', 'if (PendingPage.bFromMemory || PendingPage.Request.IsCompleted())'),
+        @($Manager, 'if (!PendingPage.Request.IsOk())', 'if (!PendingPage.bFromMemory && !PendingPage.Request.IsOk())'),
+        @($Manager, 'check(Task.PendingPage->Request.IsCompleted());', 'check(Task.PendingPage->bFromMemory || Task.PendingPage->Request.IsCompleted());')
+    )
+    foreach ($Edit in $Edits) {
+        $Text = if ($Edit[0] -eq $Header) { $HeaderSource } else { $ManagerSource }
+        if (($Text.Split($Edit[1]).Length - 1) -ne 1) { throw "Unexpected $($Edit[0]); inspect the engine before applying the Nanite streaming patch." }
+    }
+    foreach ($Edit in $Edits) {
+        if ($Edit[0] -eq $Header) { $HeaderSource = $HeaderSource.Replace($Edit[1], $Edit[2]) } else { $ManagerSource = $ManagerSource.Replace($Edit[1], $Edit[2]) }
+    }
+    [IO.File]::WriteAllText($Header, $HeaderSource, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($Manager, $ManagerSource, [Text.UTF8Encoding]::new($false))
+    Write-Host 'Applied hdUE runtime Nanite streaming patch to UE 5.8.4.'
+}
