@@ -1,0 +1,96 @@
+#usda 1.0
+(
+    doc = """Time-sampled positions and orientations without velocities move instances linearly between samples, as
+UsdGeomPointInstancer::ComputeInstanceTransformsAtTime interpolates them. The shutter is open from -0.5 to 0.5 frames:
+the bottom cube moves 2 units per frame along +X and smears 1 unit each side, the bar at the top left turns 45 degrees
+per frame about Z and sweeps 22.5 degrees each side (its swept region, empty without motion, reads about 0.1 in both
+modes), and the top cube stays still and sharp."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "time-sampled positions and orientations motion blur",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "moving instance smears past its edge",
+   "value": {
+    "region": [
+     0.7,
+     -2.2,
+     1.3,
+     -1.8
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "turning bar sweeps",
+   "value": {
+    "region": [
+     -2.33,
+     2.11,
+     -2.13,
+     2.31
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.05
+  },
+  {
+   "name": "still instance stays sharp",
+   "value": {
+    "region": [
+     0.7,
+     1.8,
+     1.3,
+     2.2
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.02
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions.timeSamples = {
+        0: [(0, 2, 0), (-2, -2, 0), (-3, 2, 0)],
+        1: [(0, 2, 0), (0, -2, 0), (-3, 2, 0)],
+        2: [(0, 2, 0), (2, -2, 0), (-3, 2, 0)],
+    }
+    quath[] orientations.timeSamples = {
+        0: [(1, 0, 0, 0), (1, 0, 0, 0), (0.92388, 0, 0, -0.38268)],
+        1: [(1, 0, 0, 0), (1, 0, 0, 0), (1, 0, 0, 0)],
+        2: [(1, 0, 0, 0), (1, 0, 0, 0), (0.92388, 0, 0, 0.38268)],
+    }
+    int[] protoIndices = [0, 0, 1]
+    rel prototypes = [</Instancer/Prototypes/cube>, </Instancer/Prototypes/bar>]
+    def Scope "Prototypes"
+    {
+        def Cube "cube"
+        {
+            double size = 1.0
+        }
+        def Cube "bar"
+        {
+            double size = 1.0
+            float3 xformOp:scale = (2, 0.2, 0.1)
+            uniform token[] xformOpOrder = ["xformOp:scale"]
+        }
+    }
+}
+over "Camera"
+{
+    double shutter:open = -0.5
+    double shutter:close = 0.5
+}

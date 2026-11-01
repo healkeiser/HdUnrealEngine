@@ -42,7 +42,9 @@
 #include "pxr/imaging/hd/materialNodeSchema.h"
 #include "pxr/imaging/hd/materialNodeParameterSchema.h"
 #include "pxr/imaging/hd/instancer.h"
+#include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/rotation.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate,
@@ -328,6 +330,43 @@ public:
         mesh.velocities = perFrame(HdTokens->velocities, fps);
         mesh.accelerations = perFrame(HdTokens->accelerations, fps * fps);
         mesh.angularVelocities = perFrame(HdTokens->angularVelocities, fps);
+        if (mesh.velocities.empty() && mesh.angularVelocities.empty()) SampledMotion(prototype, count, mesh);
+    }
+    // Without velocities, time-sampled positions, orientations, scales or matrices move each instance: linearly between
+    // the samples around the frame, as UsdGeomPointInstancer::ComputeInstanceTransformsAtTime interpolates them, as a
+    // velocity and an angular velocity per frame about the instance's position.
+    void SampledMotion(const SdfPath& prototype, size_t count, HdUEMeshData& mesh) const {
+        std::map<TfToken, VtValue> open, close;
+        float t0 = 0, t1 = 0;
+        for (const auto& name : {HdInstancerTokens->instanceTranslations, HdInstancerTokens->instanceRotations,
+                                 HdInstancerTokens->instanceScales, HdInstancerTokens->instanceTransforms}) {
+            float times[HdUEMaxMotionSamples];
+            VtValue values[HdUEMaxMotionSamples];
+            const size_t n = GetDelegate()->SamplePrimvar(GetId(), name, -HdUEMotionWindow, HdUEMotionWindow,
+                                                          HdUEMaxMotionSamples, times, values);
+            if (n < 2 || values[0] == values[n - 1]) continue;
+            // shortcut: one linear segment from the first sample to the last; sample per sub-frame if a curved
+            // path between more than two samples inside the window matters.
+            open[name] = values[0];
+            close[name] = values[n - 1];
+            t0 = times[0];
+            t1 = times[n - 1];
+        }
+        if (open.empty() || t1 <= t0) return;
+        const auto from = ComputeInstanceTransforms(prototype, &open),
+                   to = ComputeInstanceTransforms(prototype, &close);
+        if (from.size() != count || to.size() != count) return;
+        const float span = t1 - t0;
+        mesh.velocities.resize(count);
+        mesh.angularVelocities.resize(count);
+        for (size_t i = 0; i < count; ++i) {
+            mesh.velocities[i] = GfVec3f((to[i].ExtractTranslation() - from[i].ExtractTranslation()) / span);
+            // The world-space turn between the two linear parts (row vectors: to = from * turn).
+            const auto turn = (from[i].ExtractRotationMatrix().GetInverse() * to[i].ExtractRotationMatrix())
+                                  .GetOrthonormalized()
+                                  .ExtractRotation();
+            mesh.angularVelocities[i] = GfVec3f(turn.GetAxis() * (turn.GetAngle() / span));  // degrees, as USD's
+        }
     }
     // An instance-rate colour primvar (displayColor, or the one a bound material reads) for each flattened instance,
     // from the nearest instancer that authors it, as Storm resolves nested instance primvars; empty when none does.
@@ -348,14 +387,19 @@ public:
                                                      : GfVec3f(1));
         return out;
     }
-    VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype) const {
+    // Instance placements; `sampled` replaces this instancer's instance primvars (values at another time).
+    VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype,
+                                              const std::map<TfToken, VtValue>* sampled = nullptr) const {
         if (!visible_) return {};
+        const auto at = [&](const TfToken& name) {
+            const auto found = sampled ? sampled->find(name) : std::map<TfToken, VtValue>::const_iterator();
+            return sampled && found != sampled->end() ? found->second : primvar(name);
+        };
         const auto instancer = GetDelegate()->GetInstancerTransform(GetId());
         const auto indices = GetDelegate()->GetInstanceIndices(GetId(), prototype);
-        const auto translations = primvar(HdInstancerTokens->instanceTranslations),
-                   rotations = primvar(HdInstancerTokens->instanceRotations);
-        const auto scales = primvar(HdInstancerTokens->instanceScales),
-                   matrices = primvar(HdInstancerTokens->instanceTransforms);
+        const auto translations = at(HdInstancerTokens->instanceTranslations),
+                   rotations = at(HdInstancerTokens->instanceRotations);
+        const auto scales = at(HdInstancerTokens->instanceScales), matrices = at(HdInstancerTokens->instanceTransforms);
         VtMatrix4dArray transforms(indices.size());
         for (size_t i = 0; i < indices.size(); ++i)
             transforms[i] =
