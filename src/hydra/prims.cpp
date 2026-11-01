@@ -727,6 +727,9 @@ public:
                 previous->second.instanceColors == part.instanceColors &&
                 (previous->second.transform == part.transform || moved) && HdUEReleasable(*state, part))
                 HdUEReleaseGeometry(part);
+            // A released mesh that keeps its arrays now (made wet, displaced, deforming) uploads: UE may hold it in a
+            // form that no longer fits (a static mesh where wet needs a dynamic one).
+            const bool unreleased = !revived && previous != missing && previous->second.released && !part.released;
             traceStored(part);
             state->meshes[id] = std::move(part);
             state->fullUploads.erase(id);
@@ -734,7 +737,7 @@ public:
             state->repull.erase(state->meshes[id].sourceId);
             state->repullMarked.erase(state->meshes[id].sourceId);
             state->erasedMeshes.erase(id);
-            if (meshChanged) {
+            if (meshChanged || unreleased) {
                 if (state->dirtyMeshes.insert(id).second) state->pendingBytes += HdUEMeshBytes(state->meshes[id]);
                 ++state->revision;
             } else if (moved || maskChanged) {
@@ -765,10 +768,16 @@ public:
         std::set<std::string> needed;
         for (const auto& id : emitted_) {
             const auto part = state.meshes.find(id);
-            // A released mesh has no arrays to map a mask onto; its wet binding re-syncs it (update_meshes).
-            if (part == state.meshes.end() || part->second.released) continue;
+            if (part == state.meshes.end()) continue;
             const auto name = HdUEWetValue<std::string>(HdUEWetSettings(bindings, part->second), "maskPrimvar", "");
-            if (!name.empty() && !part->second.masks.count(name) && !part->second.maskErrors.count(name))
+            if (name.empty() || part->second.masks.count(name) || part->second.maskErrors.count(name)) continue;
+            if (part->second.released) {
+                // No arrays to map the mask onto: the render pass re-pulls the mesh, whose next Sync reads its masks
+                // and uploads it in full.
+                state.fullUploads.insert(id);
+                state.repull.insert(part->second.sourceId);
+                ++state.revision;
+            } else
                 needed.insert(name);
         }
         if (needed.empty()) return;

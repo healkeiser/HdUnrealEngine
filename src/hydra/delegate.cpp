@@ -1069,6 +1069,12 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
     for (const auto& [id, data] : state.meshes) {
         const auto fields = HdUEWetSettings(effects, data);
         if (fields.empty()) continue;
+        // Wet needs the mesh editable in UE, with its arrays: a released one is re-pulled from Hydra (the render pass
+        // marks it dirty) and uploaded in full, and its binding follows that upload.
+        if (data.released || state.fullUploads.count(id)) {
+            if (data.released && state.fullUploads.insert(id).second) state.repull.insert(data.sourceId);
+            continue;
+        }
         const float amount = HdUEWetValue<float>(fields, "amount", float(HdUEWetValue<double>(fields, "amount", 1.)));
         if (amount == 0.f && !preview) continue;
         const auto maskName = HdUEWetValue<std::string>(fields, "maskPrimvar", "");
@@ -1189,11 +1195,11 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
 // Whether a generic mesh's geometry arrays can be freed once UE has it (finishScene): change detection compares its
 // geometryHash, update_meshes carries material, visibility and sidedness changes, and an upload that needs the arrays
 // again re-syncs the mesh from Hydra. Kept where something reads them after the upload: deformation blur (pointsAt),
-// wet masks and surfaces, displacement dicing, and hosts without a UE thread (usdview), whose ray picks read the
-// stored copy. husk, hython and Houdini's viewport (which picks from the ID AOVs UE renders) free them.
+// wet masks and surfaces, displacement dicing, usdview's ray picks, and Houdini's viewport, where wet bindings arrive
+// after the first upload (its surfaces test failed with freed meshes). husk and hython free them.
 bool releasable(const HdUEState& state, const HdUEMeshData& m) {
     const auto& host = selfHost();
-    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() ||
+    if (!host.worker.joinable() || host.continuous || !m.deformTimes.empty() || !m.masks.empty() ||
         (state.wetBindings && !HdUEWetSettings(*state.wetBindings, m).empty()))
         return false;
     const auto material = state.materials.find(m.material);
@@ -1312,13 +1318,13 @@ uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
 }
 // Streaming: a scene too large to hold twice uploads while Hydra still syncs it. Mesh::Sync calls this after storing
 // a mesh; once 1 GB of stored geometry waits, hdUE's UE thread uploads it in batches (finishScene frees what it
-// sends), and Sync threads wait while more than 4 GB waits. Not in usdview, which drives UE from its own thread (post
-// would run inline on a Sync thread).
+// sends), and Sync threads wait while more than 4 GB waits. husk and hython only, as releasing; usdview drives UE from
+// its own thread (post would run inline on a Sync thread).
 // The session is created here if the first Execute has not come yet, at the render settings' resolution; Execute
 // resizes it, keeping the scene.
 void HdUEStreamMeshes(HdUEState& s) {
     auto& host = selfHost();
-    if (!host.worker.joinable() || std::this_thread::get_id() == host.worker.get_id()) return;
+    if (!host.worker.joinable() || host.continuous || std::this_thread::get_id() == host.worker.get_id()) return;
     // HDUE_STREAM_BYTES overrides the batch size (tests stream small scenes); the cap is four batches.
     static const uint64_t Batch =
         TfGetenvInt("HDUE_STREAM_BYTES", 0) > 0 ? uint64_t(TfGetenvInt("HDUE_STREAM_BYTES", 0)) : uint64_t(1) << 30;
@@ -3137,8 +3143,15 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         ++state_->revision;
     }
     if (key == TfToken("renderingColorSpace")) HdUEWarnRenderingColorSpace(value);
-    if (key == TfToken("surfaceEffects"))
-        state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
+    if (key == TfToken("surfaceEffects")) {
+        auto bindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
+        // Wet meshes upload editable (HDUE_MESH_EDITABLE): one that becomes wet, or stops being wet, uploads again.
+        for (const auto& [id, mesh] : state_->meshes)
+            if ((state_->wetBindings && !HdUEWetSettings(*state_->wetBindings, mesh).empty()) !=
+                !HdUEWetSettings(*bindings, mesh).empty())
+                state_->dirtyMeshes.insert(id);
+        state_->wetBindings = std::move(bindings);
+    }
     if (key == TfToken("surfaceEffects") || key == TfToken("wetMaskPreview") || key == TfToken("wetValidationError")) {
         ++state_->revision;
         if (key == TfToken("surfaceEffects") && state_->renderIndex)
