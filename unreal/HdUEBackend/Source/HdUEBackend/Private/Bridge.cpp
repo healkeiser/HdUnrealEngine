@@ -377,6 +377,21 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     const int Code = UELibrary_InitW(reinterpret_cast<HINSTANCE>(Desc->instance_handle),
                                      reinterpret_cast<HWND>(Desc->window_handle), *Command);
     Runtime.EngineStarted = Code == 0;
+    // A host that exits with UE still running (husk, hython: ExitProcess ends UE's thread) detaches this DLL with UE
+    // live, and UE's static destructors then wait on threads that no longer exist (60 s per exit in Test builds) before
+    // the delegate's exit handler ends the process. A handler registered after UE's statics runs before their
+    // destructors, so this one ends the process first, with the exit code it already has. After hdue_shutdown_ue
+    // (Shutdown), UE tears down normally.
+    static bool ExitHandler = false;
+    if (Runtime.EngineStarted && !ExitHandler) {
+        ExitHandler = true;
+        std::atexit([] {
+            if (!Runtime.EngineStarted) return;
+            DWORD ExitCode = 0;
+            ::GetExitCodeProcess(::GetCurrentProcess(), &ExitCode);
+            ::TerminateProcess(::GetCurrentProcess(), ExitCode);
+        });
+    }
     // UELibrary's return value alone does not validate LaunchWindowsStartup.
     if (Code != 0 || !GEngine || !GDynamicRHI || GUsingNullRHI) {
         Runtime.State = HDUE_STATE_FAILED;
