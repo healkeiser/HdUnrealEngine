@@ -1187,8 +1187,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
             const FString ParentName =
                 Layered       ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
-                                                Thin ? TEXT("Thin") : TEXT(""))
-                : Masked      ? TEXT("M_PreviewSurfaceMasked")
+                                          Thin ? TEXT("Thin") : TEXT(""))
+                      : Masked ? TEXT("M_PreviewSurfaceMasked")
                 : Translucent ? TEXT("M_PreviewSurfaceTranslucent")
                               : TEXT("M_PreviewSurface");
             auto* Parent = LoadObject<UMaterialInterface>(
@@ -1364,7 +1364,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                          : (Native || Static) ? UStaticMeshComponent::StaticClass()
                                               : UDynamicMeshComponent::StaticClass();
         if (Actor && (!Actor->GetRootComponent() || Actor->GetRootComponent()->GetClass() != Wanted)) {
+            // The same mesh in another form (a static mesh made wet uploads dynamic): its geometry revision goes on, as
+            // the delegate's does, or wet bindings for this upload are rejected as obsolete.
+            const uint64 Revision = GeometryRevisions.FindRef(Id);
             Remove(Id);
+            if (Revision) GeometryRevisions.Add(Id, Revision);
             Actor = nullptr;
         }
         if (!Actor) {
