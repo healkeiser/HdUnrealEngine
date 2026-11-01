@@ -132,6 +132,7 @@ CHOICE_FOLDERS = {
 PATH_TRACED = ("Rendering|Path Tracing",)
 REALTIME = (
     "Rendering|Anti-Aliasing|r.AntiAliasingMethod",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.Enable",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveResolution",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveScreenPercentage",
     "Rendering|View Mode",
@@ -144,7 +145,55 @@ REALTIME = (
     "Rendering Features|Ray Tracing Ambient Occlusion",
     "Rendering Features|Motion Blur|MotionBlur",  # UE's velocity motion blur, not hdUE's sub-frames
     "Rendering Features|Translucency",
+    "Fog|Inscattering Texture",
+    "Fog|Directional Inscattering",
+    "Fog|Fog Screen Space Scattering - EXPERIMENTAL",
+    "Sky|Art Direction",
 )
+# Realtime-only properties in sections both modes use. The Path Tracer reads, for depth of field, the physical CoC
+# model's focus distance, lens radius and Petzval terms (PathTracing.cpp, DiaphragmDOFUtils.cpp); for fog, only
+# Volumetric Fog's density, falloff, albedo, phase, extinction and distance (PrepareFogParameters); for clouds, the
+# layer, tracing distances and material (PathTracing.cpp); for the sky, the physical atmosphere (its shaders read no
+# art direction, multi-scattering factor or sample count). Scalability groups and Nanite raster settings drive the
+# rasterizer only.
+REALTIME_ONLY = {
+    "DepthOfFieldMinFstop",
+    "DepthOfFieldBladeCount",
+    "DepthOfFieldDepthBlurAmount",
+    "DepthOfFieldDepthBlurRadius",
+    "DepthOfFieldUseHairDepth",
+    "DepthOfFieldBarrelRadius",
+    "DepthOfFieldBarrelLength",
+    "FogInscatteringLuminance",
+    "SkyAtmosphereAmbientContributionColorScale",
+    "FogMaxOpacity",
+    "StartDistance",
+    "EndDistance",
+    "FogCutoffDistance",
+    "VolumetricFogEmissive",
+    "VolumetricFogStartDistance",
+    "VolumetricFogNearFadeInDistance",
+    "VolumetricFogStaticLightingScatteringIntensity",
+    "bOverrideLightColorsWithFogInscatteringColors",
+    "bVisibleInReflectionCaptures",
+    "bVisibleInRealTimeSkyCaptures",
+    "MultiScatteringFactor",
+    "TraceSampleCountScale",
+    "TracingStartDistanceFromCamera",
+    "bUsePerSampleAtmosphericLightTransmittance",
+    "SkyLightCloudBottomOcclusion",
+    "ViewSampleCountScale",
+    "ReflectionViewSampleCountScaleValue",
+    "ShadowViewSampleCountScale",
+    "ShadowReflectionViewSampleCountScaleValue",
+    "ShadowTracingDistance",
+    "StopTracingTransmittanceThreshold",
+    "sg.AntiAliasingQuality",
+    "sg.ShadowQuality",
+    "sg.GlobalIlluminationQuality",
+    "sg.ReflectionQuality",
+    "r.Nanite.MaxPixelsPerEdge",
+}
 # Pairs shown on one row in hdUE Render Settings (minimum and maximum of one range).
 JOINS = (
     ("AutoExposureMinBrightness", "AutoExposureMaxBrightness"),
@@ -314,6 +363,20 @@ CVARS = [
         "Rendering|Anti-Aliasing",
         True,
         dict(menu=[(0, "None"), (1, "FXAA"), (2, "TAA"), (4, "TSR")]),
+    ),
+    (
+        "r.NGX.DLSS.Enable",
+        "NVIDIA DLSS",
+        "Rendering|Anti-Aliasing",
+        True,
+        dict(
+            kind="toggle",
+            type="int32",
+            default=0,
+            help="NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 "
+            "is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the "
+            "anti-aliasing method renders. Realtime mode only.",
+        ),
     ),
     (
         "r.ScreenPercentage",
@@ -1318,7 +1381,13 @@ def parse_properties(
             or ("mobile renderer only" if category in SKIP_CATEGORIES else None)
             or ("fixed-size array" if decl.group(3) else None)
         )
-        meta = dict(re.findall(r'(\w+)\s*=\s*"([^"]*)"', specifiers))
+        # Scene.h quotes its metadata (ClampMin = "0.0"); component headers do not (UIMin = 0.1f).
+        meta = {
+            key: quoted or bare
+            for key, quoted, bare in re.findall(
+                r'(\w+)\s*=\s*(?:"([^"]*)"|([^\s,()"]+))', specifiers
+            )
+        }
         enum_name = re.sub(
             r"TEnumAsByte<(?:enum\s+)?(\w+)(?:::Type)?>", r"\1", type_name
         )
@@ -1337,6 +1406,9 @@ def parse_properties(
             ), 1
         elif type_name in TYPES:
             kind, size = TYPES[type_name]
+            # UE edits color grading FVector4s with its color wheels (ColorGradingMode): an RGBA picker here.
+            if type_name == "FVector4" and "ColorGradingMode" in meta:
+                kind = "color"
         else:
             reason = reason or f"unsupported type {type_name}"
         if reason:
@@ -1419,7 +1491,10 @@ def ranges(meta, kind):
     """
 
     def number(key):
-        return float(meta[key]) if key in meta else None
+        try:
+            return float(meta[key].rstrip("f")) if key in meta else None
+        except ValueError:  # a named constant
+            return None
 
     ui_lo, ui_hi = number("UIMin"), number("UIMax")
     clamp_lo, clamp_hi = number("ClampMin"), number("ClampMax")
@@ -1429,7 +1504,7 @@ def ranges(meta, kind):
         ui_hi = None
     lo = clamp_lo if clamp_lo is not None else ui_lo
     hi = clamp_hi if clamp_hi is not None else ui_hi
-    if kind not in ("float", "int") or (lo is None and hi is None):
+    if kind not in ("float", "int", "color") or (lo is None and hi is None):
         return None
     # One open side: a slider of 10 from the bound that exists (or from the UI bound on the open side).
     lo = (
@@ -1644,7 +1719,7 @@ def ds_parm(setting, indent, viewport):
     kind = setting["kind"]
     parm_type = {
         "float": "float",
-        "color": "color",
+        "color": "color" if setting["size"] == 3 else "color4",
         "int": "int",
         "intmenu": "int",
         "toggle": "toggle",
@@ -1661,7 +1736,8 @@ def ds_parm(setting, indent, viewport):
         "image": "asset",
         "int": "int",
         "intmenu": "int",
-        "color": "color3f",
+        # RGBA pickers stay float4: UE's color grading values are FVector4s.
+        "color": "color3f" if setting["size"] == 3 else "float4",
     }.get(kind, "float" if setting["size"] == 1 else f"float{setting['size']}")
     defaults = " ".join(
         ds_string(v) if isinstance(v, str) else ds_number(v)
@@ -1800,7 +1876,9 @@ def layout(settings):
         key = f"{setting['place']}|{identity}"
         if key.startswith(PATH_TRACED):
             setting["mode"] = "pathtraced"
-        elif key.startswith(REALTIME):
+        elif (
+            key.startswith(REALTIME) or identity.split(":")[-1] in REALTIME_ONLY
+        ):
             setting["mode"] = "realtime"
         # hdUE's own first, then UE's properties in struct order, then console variables; Advanced last (UE's
         # "Advanced" expander closes each group).

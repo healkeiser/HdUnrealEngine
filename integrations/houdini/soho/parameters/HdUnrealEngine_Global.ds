@@ -174,6 +174,20 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealcvarrScreenPercentage_control_2xbeb == block } { xn__unrealcvarrScreenPercentage_control_2xbeb == none })"
             }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSEnable_control_6sbebde", "NVIDIA DLSS", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSEnable_5fbebde"
+                label   "NVIDIA DLSS"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the anti-aliasing method renders. Realtime mode only. Console variable r.NGX.DLSS.Enable (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSEnable_control_6sbebde == block } { xn__unrealcvarrNGXDLSSEnable_control_6sbebde == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
             HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe", "Lower Resolution While Moving", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarrHdUEInteractiveResolution_pzbebe"
@@ -1209,7 +1223,7 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldFstop_control_h9bl == block } { xn__unrealpostProcessDepthOfFieldFstop_control_h9bl == none })"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldMinFstop_control_dfcl", "Maximum Aperture (min F-stop)")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldMinFstop_control_dfcl", "Maximum Aperture (min F-stop)", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldMinFstop_c1bl"
                 label   "Maximum Aperture (min F-stop)"
@@ -1221,8 +1235,9 @@
                 parmtag { "spare_category" "Lens|Camera" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldMinFstop_control_dfcl == block } { xn__unrealpostProcessDepthOfFieldMinFstop_control_dfcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldBladeCount_control_micl", "Number of diaphragm blades")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldBladeCount_control_micl", "Number of diaphragm blades", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldBladeCount_l4bl"
                 label   "Number of diaphragm blades"
@@ -1234,6 +1249,7 @@
                 parmtag { "spare_category" "Lens|Camera" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldBladeCount_control_micl == block } { xn__unrealpostProcessDepthOfFieldBladeCount_control_micl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
 
@@ -1676,7 +1692,7 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldFocalDistance_control_incl == block } { xn__unrealpostProcessDepthOfFieldFocalDistance_control_incl == none })"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldDepthBlurAmount_control_rqcl", "Depth Blur km for 50%")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldDepthBlurAmount_control_rqcl", "Depth Blur km for 50%", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldDepthBlurAmount_qdcl"
                 label   "Depth Blur km for 50%"
@@ -1688,8 +1704,9 @@
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldDepthBlurAmount_control_rqcl == block } { xn__unrealpostProcessDepthOfFieldDepthBlurAmount_control_rqcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldDepthBlurRadius_control_rqcl", "Depth Blur Radius")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldDepthBlurRadius_control_rqcl", "Depth Blur Radius", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldDepthBlurRadius_qdcl"
                 label   "Depth Blur Radius"
@@ -1701,6 +1718,7 @@
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldDepthBlurRadius_control_rqcl == block } { xn__unrealpostProcessDepthOfFieldDepthBlurRadius_control_rqcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
             HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldPetzvalBokeh_control_vlcl", "Petzval Bokeh")
             parm {
@@ -1767,7 +1785,7 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldAspectRatioScalar_control_0tcl == block } { xn__unrealpostProcessDepthOfFieldAspectRatioScalar_control_0tcl == none })"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldBarrelRadius_control_vlcl", "Barrel Radius")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldBarrelRadius_control_vlcl", "Barrel Radius", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldBarrelRadius_u7bl"
                 label   "Barrel Radius"
@@ -1779,8 +1797,9 @@
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldBarrelRadius_control_vlcl == block } { xn__unrealpostProcessDepthOfFieldBarrelRadius_control_vlcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldBarrelLength_control_vlcl", "Barrel Length")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldBarrelLength_control_vlcl", "Barrel Length", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldBarrelLength_u7bl"
                 label   "Barrel Length"
@@ -1792,8 +1811,9 @@
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldBarrelLength_control_vlcl == block } { xn__unrealpostProcessDepthOfFieldBarrelLength_control_vlcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealpostProcessDepthOfFieldUseHairDepth_control_vlcl", "Use Hair Depth")
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessDepthOfFieldUseHairDepth_control_vlcl", "Use Hair Depth", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealpostProcessDepthOfFieldUseHairDepth_u7bl"
                 label   "Use Hair Depth"
@@ -1804,6 +1824,7 @@
                 parmtag { "spare_category" "Lens|Depth of Field" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealpostProcessDepthOfFieldUseHairDepth_control_vlcl == block } { xn__unrealpostProcessDepthOfFieldUseHairDepth_control_vlcl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -1872,7 +1893,7 @@
             parm {
                 name    "xn__unrealpostProcessColorSaturation_6sbl"
                 label   "Saturation"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1886,7 +1907,7 @@
             parm {
                 name    "xn__unrealpostProcessColorContrast_xpbl"
                 label   "Contrast"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1900,7 +1921,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGamma_1kbl"
                 label   "Gamma"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1914,7 +1935,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGain_fjbl"
                 label   "Gain"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1928,7 +1949,7 @@
             parm {
                 name    "xn__unrealpostProcessColorOffset_ombl"
                 label   "Offset"
-                type    float
+                type    color4
                 size    4
                 default { 0 0 0 0 }
                 range   { -1 1 }
@@ -1949,7 +1970,7 @@
             parm {
                 name    "xn__unrealpostProcessColorSaturationShadows_l4bl"
                 label   "Saturation"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1963,7 +1984,7 @@
             parm {
                 name    "xn__unrealpostProcessColorContrastShadows_c1bl"
                 label   "Contrast"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1977,7 +1998,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGammaShadows_gwbl"
                 label   "Gamma"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -1991,7 +2012,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGainShadows_tubl"
                 label   "Gain"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2005,7 +2026,7 @@
             parm {
                 name    "xn__unrealpostProcessColorOffsetShadows_2xbl"
                 label   "Offset"
-                type    float
+                type    color4
                 size    4
                 default { 0 0 0 0 }
                 range   { -1 1 }
@@ -2040,7 +2061,7 @@
             parm {
                 name    "xn__unrealpostProcessColorSaturationMidtones_75bl"
                 label   "Saturation"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2054,7 +2075,7 @@
             parm {
                 name    "xn__unrealpostProcessColorContrastMidtones_y2bl"
                 label   "Contrast"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2068,7 +2089,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGammaMidtones_2xbl"
                 label   "Gamma"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2082,7 +2103,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGainMidtones_gwbl"
                 label   "Gain"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2096,7 +2117,7 @@
             parm {
                 name    "xn__unrealpostProcessColorOffsetMidtones_pzbl"
                 label   "Offset"
-                type    float
+                type    color4
                 size    4
                 default { 0 0 0 0 }
                 range   { -1 1 }
@@ -2117,7 +2138,7 @@
             parm {
                 name    "xn__unrealpostProcessColorSaturationHighlights_h9bl"
                 label   "Saturation"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2131,7 +2152,7 @@
             parm {
                 name    "xn__unrealpostProcessColorContrastHighlights_75bl"
                 label   "Contrast"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2145,7 +2166,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGammaHighlights_c1bl"
                 label   "Gamma"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2159,7 +2180,7 @@
             parm {
                 name    "xn__unrealpostProcessColorGainHighlights_pzbl"
                 label   "Gain"
-                type    float
+                type    color4
                 size    4
                 default { 1 1 1 1 }
                 range   { 0 2 }
@@ -2173,7 +2194,7 @@
             parm {
                 name    "xn__unrealpostProcessColorOffsetHighlights_y2bl"
                 label   "Offset"
-                type    float
+                type    color4
                 size    4
                 default { 0 0 0 0 }
                 range   { -1 1 }
@@ -3267,7 +3288,7 @@
                 parmtag { "usdvaluetype" "float3" }
                 disablewhen R"({ xn__unrealheightFogSecondFogData_control_pzbj == block } { xn__unrealheightFogSecondFogData_control_pzbj == none } { xn__unrealheightFog_i0a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealheightFogFogInscatteringLuminance_control_micj", "Fog Inscattering Color")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFogInscatteringLuminance_control_micj", "Fog Inscattering Color", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFogInscatteringLuminance_l4bj"
                 label   "Fog Inscattering Color"
@@ -3278,8 +3299,9 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogFogInscatteringLuminance_control_micj == block } { xn__unrealheightFogFogInscatteringLuminance_control_micj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_control_xcdj", "Sky Atmosphere Ambient Contribution Color Scale")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_control_xcdj", "Sky Atmosphere Ambient Contribution Color Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_wycj"
                 label   "Sky Atmosphere Ambient Contribution Color Scale"
@@ -3290,8 +3312,9 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_control_xcdj == block } { xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_control_xcdj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogFogMaxOpacity_control_pzbj", "Fog Max Opacity")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFogMaxOpacity_control_pzbj", "Fog Max Opacity", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFogMaxOpacity_ombj"
                 label   "Fog Max Opacity"
@@ -3303,8 +3326,9 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFogMaxOpacity_control_pzbj == block } { xn__unrealheightFogFogMaxOpacity_control_pzbj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogStartDistance_control_pzbj", "Start Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogStartDistance_control_pzbj", "Start Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogStartDistance_ombj"
                 label   "Start Distance"
@@ -3316,8 +3340,9 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogStartDistance_control_pzbj == block } { xn__unrealheightFogStartDistance_control_pzbj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogEndDistance_control_gwbj", "End Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogEndDistance_control_gwbj", "End Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogEndDistance_fjbj"
                 label   "End Distance"
@@ -3329,8 +3354,9 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogEndDistance_control_gwbj == block } { xn__unrealheightFogEndDistance_control_gwbj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogFogCutoffDistance_control_75bj", "Fog Cutoff Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFogCutoffDistance_control_75bj", "Fog Cutoff Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFogCutoffDistance_6sbj"
                 label   "Fog Cutoff Distance"
@@ -3342,6 +3368,7 @@
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFogCutoffDistance_control_75bj == block } { xn__unrealheightFogFogCutoffDistance_control_75bj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
 
@@ -3349,7 +3376,8 @@
             name "hdUE_Fog_InscatteringTexture"
             label "Inscattering Texture"
             grouptag { "group_default" "0" }
-            HDUE_CONTROL("xn__unrealheightFogInscatteringColorCubemap_control_micj", "Inscattering Color Cubemap")
+            hidewhentab "{ xn__unrealrenderMode_41a != realtime }"
+            HDUE_CONTROL_HIDE("xn__unrealheightFogInscatteringColorCubemap_control_micj", "Inscattering Color Cubemap", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogInscatteringColorCubemap_l4bj"
                 label   "Inscattering Color Cubemap"
@@ -3360,8 +3388,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "string" }
                 disablewhen R"({ xn__unrealheightFogInscatteringColorCubemap_control_micj == block } { xn__unrealheightFogInscatteringColorCubemap_control_micj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_control_16cj", "Sky Light Capture In-Scattering Strength")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_control_16cj", "Sky Light Capture In-Scattering Strength", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_0tcj"
                 label   "Sky Light Capture In-Scattering Strength"
@@ -3373,8 +3402,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_control_16cj == block } { xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_control_16cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_control_o8cj", "Sky Light Capture In-Scattering Roughness")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_control_o8cj", "Sky Light Capture In-Scattering Roughness", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_nvcj"
                 label   "Sky Light Capture In-Scattering Roughness"
@@ -3386,8 +3416,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_control_o8cj == block } { xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_control_o8cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogInscatteringColorCubemapAngle_control_rqcj", "Inscattering Color Cubemap Angle")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogInscatteringColorCubemapAngle_control_rqcj", "Inscattering Color Cubemap Angle", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogInscatteringColorCubemapAngle_qdcj"
                 label   "Inscattering Color Cubemap Angle"
@@ -3399,8 +3430,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogInscatteringColorCubemapAngle_control_rqcj == block } { xn__unrealheightFogInscatteringColorCubemapAngle_control_rqcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogInscatteringTextureTint_control_zgcj", "Inscattering Texture Tint")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogInscatteringTextureTint_control_zgcj", "Inscattering Texture Tint", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogInscatteringTextureTint_y2bj"
                 label   "Inscattering Texture Tint"
@@ -3411,8 +3443,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogInscatteringTextureTint_control_zgcj == block } { xn__unrealheightFogInscatteringTextureTint_control_zgcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogFullyDirectionalInscatteringColorDistance_control_bbdj", "Fully Directional Inscattering Color Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFullyDirectionalInscatteringColorDistance_control_bbdj", "Fully Directional Inscattering Color Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFullyDirectionalInscatteringColorDistance_9wcj"
                 label   "Fully Directional Inscattering Color Distance"
@@ -3424,8 +3457,9 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFullyDirectionalInscatteringColorDistance_control_bbdj == block } { xn__unrealheightFogFullyDirectionalInscatteringColorDistance_control_bbdj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogNonDirectionalInscatteringColorDistance_control_16cj", "Non Directional Inscattering Color Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogNonDirectionalInscatteringColorDistance_control_16cj", "Non Directional Inscattering Color Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogNonDirectionalInscatteringColorDistance_0tcj"
                 label   "Non Directional Inscattering Color Distance"
@@ -3437,6 +3471,7 @@
                 parmtag { "spare_category" "InscatteringTexture" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogNonDirectionalInscatteringColorDistance_control_16cj == block } { xn__unrealheightFogNonDirectionalInscatteringColorDistance_control_16cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
 
@@ -3444,7 +3479,8 @@
             name "hdUE_Fog_DirectionalInscattering"
             label "Directional Inscattering"
             grouptag { "group_default" "0" }
-            HDUE_CONTROL("xn__unrealheightFogDirectionalInscatteringExponent_control_0tcj", "Directional Inscattering Exponent")
+            hidewhentab "{ xn__unrealrenderMode_41a != realtime }"
+            HDUE_CONTROL_HIDE("xn__unrealheightFogDirectionalInscatteringExponent_control_0tcj", "Directional Inscattering Exponent", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogDirectionalInscatteringExponent_zgcj"
                 label   "Directional Inscattering Exponent"
@@ -3456,8 +3492,9 @@
                 parmtag { "spare_category" "DirectionalInscattering" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogDirectionalInscatteringExponent_control_0tcj == block } { xn__unrealheightFogDirectionalInscatteringExponent_control_0tcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogDirectionalInscatteringStartDistance_control_51cj", "Directional Inscattering Start Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogDirectionalInscatteringStartDistance_control_51cj", "Directional Inscattering Start Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogDirectionalInscatteringStartDistance_4ocj"
                 label   "Directional Inscattering Start Distance"
@@ -3468,8 +3505,9 @@
                 parmtag { "spare_category" "DirectionalInscattering" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogDirectionalInscatteringStartDistance_control_51cj == block } { xn__unrealheightFogDirectionalInscatteringStartDistance_control_51cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogDirectionalInscatteringLuminance_control_nvcj", "Directional Inscattering Color")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogDirectionalInscatteringLuminance_control_nvcj", "Directional Inscattering Color", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogDirectionalInscatteringLuminance_micj"
                 label   "Directional Inscattering Color"
@@ -3480,6 +3518,7 @@
                 parmtag { "spare_category" "DirectionalInscattering" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogDirectionalInscatteringLuminance_control_nvcj == block } { xn__unrealheightFogDirectionalInscatteringLuminance_control_nvcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
 
@@ -3524,7 +3563,7 @@
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogAlbedo_control_h9bj == block } { xn__unrealheightFogVolumetricFogAlbedo_control_h9bj == none } { xn__unrealheightFog_i0a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealheightFogVolumetricFogEmissive_control_qdcj", "Emissive")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogVolumetricFogEmissive_control_qdcj", "Emissive", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogVolumetricFogEmissive_pzbj"
                 label   "Emissive"
@@ -3535,6 +3574,7 @@
                 parmtag { "spare_category" "VolumetricFog" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogEmissive_control_qdcj == block } { xn__unrealheightFogVolumetricFogEmissive_control_qdcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
             HDUE_CONTROL("xn__unrealheightFogVolumetricFogExtinctionScale_control_4ocj", "Extinction Scale")
             parm {
@@ -3562,7 +3602,7 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogDistance_control_qdcj == block } { xn__unrealheightFogVolumetricFogDistance_control_qdcj == none } { xn__unrealheightFog_i0a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealheightFogVolumetricFogStartDistance_control_vlcj", "Start Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogVolumetricFogStartDistance_control_vlcj", "Start Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogVolumetricFogStartDistance_u7bj"
                 label   "Start Distance"
@@ -3574,8 +3614,9 @@
                 parmtag { "spare_category" "VolumetricFog" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogStartDistance_control_vlcj == block } { xn__unrealheightFogVolumetricFogStartDistance_control_vlcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogVolumetricFogNearFadeInDistance_control_0tcj", "Near Fade In Distance")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogVolumetricFogNearFadeInDistance_control_0tcj", "Near Fade In Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogVolumetricFogNearFadeInDistance_zgcj"
                 label   "Near Fade In Distance"
@@ -3587,8 +3628,9 @@
                 parmtag { "spare_category" "VolumetricFog" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogNearFadeInDistance_control_0tcj == block } { xn__unrealheightFogVolumetricFogNearFadeInDistance_control_0tcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_control_gjdj", "Static Lighting Scattering Intensity")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_control_gjdj", "Static Lighting Scattering Intensity", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_f5cj"
                 label   "Static Lighting Scattering Intensity"
@@ -3599,8 +3641,9 @@
                 parmtag { "spare_category" "VolumetricFog" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_control_gjdj == block } { xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_control_gjdj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_control_thdj", "Override Light Colors With Fog Inscattering Colors")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_control_thdj", "Override Light Colors With Fog Inscattering Colors", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_s3cj"
                 label   "Override Light Colors With Fog Inscattering Colors"
@@ -3611,6 +3654,7 @@
                 parmtag { "spare_category" "VolumetricFog" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_control_thdj == block } { xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_control_thdj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -3619,8 +3663,9 @@
             name "hdUE_Fog_FogScreenSpaceScatteringEXPERIMENTAL"
             label "Fog Screen Space Scattering - EXPERIMENTAL"
             grouptag { "group_default" "0" }
+            hidewhentab "{ xn__unrealrenderMode_41a != realtime }"
             grouptag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
-            HDUE_CONTROL("xn__unrealheightFogbEnableFSSS_control_gwbj", "Enable Fog Screen Space Scattering")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogbEnableFSSS_control_gwbj", "Enable Fog Screen Space Scattering", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogbEnableFSSS_fjbj"
                 label   "Enable Fog Screen Space Scattering"
@@ -3631,9 +3676,10 @@
                 parmtag { "spare_category" "Fog Screen Space Scattering - EXPERIMENTAL" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealheightFogbEnableFSSS_control_gwbj == block } { xn__unrealheightFogbEnableFSSS_control_gwbj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogFSSSSceneColorScatteringAmountScale_control_j0cj", "Scene Color Scattering Amount Scale")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFSSSSceneColorScatteringAmountScale_control_j0cj", "Scene Color Scattering Amount Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFSSSSceneColorScatteringAmountScale_incj"
                 label   "Scene Color Scattering Amount Scale"
@@ -3645,9 +3691,10 @@
                 parmtag { "spare_category" "Fog Screen Space Scattering - EXPERIMENTAL" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFSSSSceneColorScatteringAmountScale_control_j0cj == block } { xn__unrealheightFogFSSSSceneColorScatteringAmountScale_control_j0cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogFSSSSceneColorScatteringAmountPower_control_j0cj", "Scene Color Scattering Amount Power")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFSSSSceneColorScatteringAmountPower_control_j0cj", "Scene Color Scattering Amount Power", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFSSSSceneColorScatteringAmountPower_incj"
                 label   "Scene Color Scattering Amount Power"
@@ -3659,9 +3706,10 @@
                 parmtag { "spare_category" "Fog Screen Space Scattering - EXPERIMENTAL" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFSSSSceneColorScatteringAmountPower_control_j0cj == block } { xn__unrealheightFogFSSSSceneColorScatteringAmountPower_control_j0cj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogFSSSSpreadScale_control_y2bj", "Spread Scale")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFSSSSpreadScale_control_y2bj", "Spread Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFSSSSpreadScale_xpbj"
                 label   "Spread Scale"
@@ -3673,9 +3721,10 @@
                 parmtag { "spare_category" "Fog Screen Space Scattering - EXPERIMENTAL" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFSSSSpreadScale_control_y2bj == block } { xn__unrealheightFogFSSSSpreadScale_control_y2bj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogFSSSBlurControl_control_y2bj", "Blur Control")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogFSSSBlurControl_control_y2bj", "Blur Control", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogFSSSBlurControl_xpbj"
                 label   "Blur Control"
@@ -3687,6 +3736,7 @@
                 parmtag { "spare_category" "Fog Screen Space Scattering - EXPERIMENTAL" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFSSSBlurControl_control_y2bj == block } { xn__unrealheightFogFSSSBlurControl_control_y2bj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -3722,7 +3772,7 @@
                 disablewhen R"({ xn__unrealheightFogbRenderInMainPass_control_75bj == block } { xn__unrealheightFogbRenderInMainPass_control_75bj == none } { xn__unrealheightFog_i0a == 0 })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogbVisibleInReflectionCaptures_control_4ocj", "Visible In Reflection Captures")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogbVisibleInReflectionCaptures_control_4ocj", "Visible In Reflection Captures", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogbVisibleInReflectionCaptures_3bcj"
                 label   "Visible In Reflection Captures"
@@ -3733,9 +3783,10 @@
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealheightFogbVisibleInReflectionCaptures_control_4ocj == block } { xn__unrealheightFogbVisibleInReflectionCaptures_control_4ocj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealheightFogbVisibleInRealTimeSkyCaptures_control_rqcj", "Visible In Real Time Sky Captures")
+            HDUE_CONTROL_HIDE("xn__unrealheightFogbVisibleInRealTimeSkyCaptures_control_rqcj", "Visible In Real Time Sky Captures", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealheightFogbVisibleInRealTimeSkyCaptures_qdcj"
                 label   "Visible In Real Time Sky Captures"
@@ -3746,6 +3797,7 @@
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealheightFogbVisibleInRealTimeSkyCaptures_control_rqcj == block } { xn__unrealheightFogbVisibleInRealTimeSkyCaptures_control_rqcj == none } { xn__unrealheightFog_i0a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -3805,6 +3857,7 @@
                 type    float
                 size    1
                 default { 6360 }
+                range   { 0.1! 10000! }
                 help    "The radius in kilometers from the center of the planet to the ground level."
                 parmtag { "spare_category" "Planet" }
                 parmtag { "usdvaluetype" "float" }
@@ -3829,6 +3882,7 @@
                 type    float
                 size    1
                 default { 0 }
+                range   { 0.1! 10000! }
                 help    "The planet radius used when there is not SkyAtmosphere component present in the scene."
                 parmtag { "spare_category" "Planet" }
                 parmtag { "usdvaluetype" "float" }
@@ -3859,24 +3913,27 @@
                 type    float
                 size    1
                 default { 60 }
+                range   { 0.1! 200 }
                 help    "The height of the atmosphere layer above the ground in kilometers."
                 parmtag { "spare_category" "Atmosphere" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereAtmosphereHeight_control_3bcn == block } { xn__unrealskyAtmosphereAtmosphereHeight_control_3bcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn", "MultiScattering")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn", "MultiScattering", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereMultiScatteringFactor_75bn"
                 label   "MultiScattering"
                 type    float
                 size    1
                 default { 1 }
+                range   { 0! 100! }
                 help    "Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0."
                 parmtag { "spare_category" "Atmosphere" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn == block } { xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn", "Trace Sample Count Scale")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn", "Trace Sample Count Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereTraceSampleCountScale_75bn"
                 label   "Trace Sample Count Scale"
@@ -3888,6 +3945,7 @@
                 parmtag { "spare_category" "Atmosphere" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn == block } { xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -3903,6 +3961,7 @@
                 type    float
                 size    1
                 default { 0.0331 }
+                range   { 0! 2 }
                 help    "Rayleigh scattering coefficient scale."
                 parmtag { "spare_category" "Atmosphere - Rayleigh" }
                 parmtag { "usdvaluetype" "float" }
@@ -3927,6 +3986,7 @@
                 type    float
                 size    1
                 default { 8 }
+                range   { 0.001! 20 }
                 help    "The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%."
                 parmtag { "spare_category" "Atmosphere - Rayleigh" }
                 parmtag { "usdvaluetype" "float" }
@@ -3945,6 +4005,7 @@
                 type    float
                 size    1
                 default { 0.003996 }
+                range   { 0! 5 }
                 help    "Mie scattering coefficient scale."
                 parmtag { "spare_category" "Atmosphere - Mie" }
                 parmtag { "usdvaluetype" "float" }
@@ -3969,6 +4030,7 @@
                 type    float
                 size    1
                 default { 0.000444 }
+                range   { 0! 5 }
                 help    "Mie absorption coefficient scale."
                 parmtag { "spare_category" "Atmosphere - Mie" }
                 parmtag { "usdvaluetype" "float" }
@@ -3993,6 +4055,7 @@
                 type    float
                 size    1
                 default { 0.8 }
+                range   { 0! 0.999! }
                 help    "A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources."
                 parmtag { "spare_category" "Atmosphere - Mie" }
                 parmtag { "usdvaluetype" "float" }
@@ -4005,6 +4068,7 @@
                 type    float
                 size    1
                 default { 1.2 }
+                range   { 0.001! 10 }
                 help    "The altitude in kilometer at which Mie effects are reduced to 40%."
                 parmtag { "spare_category" "Atmosphere - Mie" }
                 parmtag { "usdvaluetype" "float" }
@@ -4023,6 +4087,7 @@
                 type    float
                 size    1
                 default { 0.001881 }
+                range   { 0! 0.2 }
                 help    "Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere."
                 parmtag { "spare_category" "Atmosphere - Absorption" }
                 parmtag { "usdvaluetype" "float" }
@@ -4046,7 +4111,8 @@
             name "hdUE_Sky_ArtDirection"
             label "Art Direction"
             grouptag { "group_default" "0" }
-            HDUE_CONTROL("xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn", "Sky Luminance Factor")
+            hidewhentab "{ xn__unrealrenderMode_41a != realtime }"
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn", "Sky Luminance Factor", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereSkyLuminanceFactor_c1bn"
                 label   "Sky Luminance Factor"
@@ -4057,8 +4123,9 @@
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn == block } { xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn", "Sky And Aerial Perspective Luminance Factor")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn", "Sky And Aerial Perspective Luminance Factor", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_wycn"
                 label   "Sky And Aerial Perspective Luminance Factor"
@@ -4069,102 +4136,119 @@
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "color3f" }
                 disablewhen R"({ xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn == block } { xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn", "Aerial Perspective View Distance Scale")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn", "Aerial Perspective View Distance Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_rqcn"
                 label   "Aerial Perspective View Distance Scale"
                 type    float
                 size    1
                 default { 1 }
+                range   { 0! 3 }
                 help    "Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent)."
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn == block } { xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereHeightFogContribution_control_8jcn", "Height Fog Contribution")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereHeightFogContribution_control_8jcn", "Height Fog Contribution", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereHeightFogContribution_75bn"
                 label   "Height Fog Contribution"
                 type    float
                 size    1
                 default { 1 }
+                range   { 0! 1 }
                 help    "Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true."
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereHeightFogContribution_control_8jcn == block } { xn__unrealskyAtmosphereHeightFogContribution_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn", "Transmittance Min Light Elevation Angle")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn", "Transmittance Min Light Elevation Angle", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_0tcn"
                 label   "Transmittance Min Light Elevation Angle"
                 type    float
                 size    1
                 default { -90 }
+                range   { -90! 90! }
                 help    "The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective."
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn == block } { xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn", "Aerial Perspective Start Depth")
+            HDUE_CONTROL_HIDE("xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn", "Aerial Perspective Start Depth", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealskyAtmosphereAerialPerspectiveStartDepth_zgcn"
                 label   "Aerial Perspective Start Depth"
                 type    float
                 size    1
                 default { 0.1 }
+                range   { 0.001! 10 }
                 help    "The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test."
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn == block } { xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp", "Aerial Pespective Rayleigh Scattering Start Distance")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp", "Aerial Pespective Rayleigh Scattering Start Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_thdp"
                 label   "Aerial Pespective Rayleigh Scattering Start Distance"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 100 }
                 help    "Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)"
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp == block } { xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp", "Aerial Pespective Rayleigh Scattering Fade Distance")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp", "Aerial Pespective Rayleigh Scattering Fade Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_6fdp"
                 label   "Aerial Pespective Rayleigh Scattering Fade Distance"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 100 }
                 help    "Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp == block } { xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp", "Aerial Pespective Mie Scattering Start Distance")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp", "Aerial Pespective Mie Scattering Start Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_o8cp"
                 label   "Aerial Pespective Mie Scattering Start Distance"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 100 }
                 help    "Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)"
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp == block } { xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp", "Aerial Pespective Mie Scattering Fade Distance")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp", "Aerial Pespective Mie Scattering Fade Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_16cp"
                 label   "Aerial Pespective Mie Scattering Fade Distance"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 100 }
                 help    "Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"
                 parmtag { "spare_category" "Art Direction" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp == block } { xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
 
@@ -4225,7 +4309,7 @@
                 disablewhen R"({ xn__unrealvolumetricCloudbRenderInMainPass_control_zgcp == block } { xn__unrealvolumetricCloudbRenderInMainPass_control_zgcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp", "Visible In Real Time Sky Captures")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp", "Visible In Real Time Sky Captures", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_incp"
                 label   "Visible In Real Time Sky Captures"
@@ -4236,6 +4320,7 @@
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp == block } { xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }
@@ -4251,6 +4336,7 @@
                 type    float
                 size    1
                 default { 0 }
+                range   { 0 20 }
                 help    "The altitude at which the cloud layer starts. (kilometers above the ground)"
                 parmtag { "spare_category" "Layer" }
                 parmtag { "usdvaluetype" "float" }
@@ -4263,6 +4349,7 @@
                 type    float
                 size    1
                 default { 0 }
+                range   { 0.1! 20 }
                 help    "The height of the the cloud layer. (kilometers above the layer bottom altitude)"
                 parmtag { "spare_category" "Layer" }
                 parmtag { "usdvaluetype" "float" }
@@ -4275,22 +4362,25 @@
                 type    float
                 size    1
                 default { 0 }
+                range   { 1! 500 }
                 help    "The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)"
                 parmtag { "spare_category" "Layer" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudTracingStartMaxDistance_control_rqcp == block } { xn__unrealvolumetricCloudTracingStartMaxDistance_control_rqcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp", "Tracing Start Distance From Camera")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp", "Tracing Start Distance From Camera", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudTracingStartDistanceFromCamera_4ocp"
                 label   "Tracing Start Distance From Camera"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 100 }
                 help    "The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)"
                 parmtag { "spare_category" "Layer" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp == block } { xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
             HDUE_CONTROL("xn__unrealvolumetricCloudTracingMaxDistance_control_micp", "Tracing Max Distance")
             parm {
@@ -4299,6 +4389,7 @@
                 type    float
                 size    1
                 default { 0 }
+                range   { 0.1! 500 }
                 help    "The maximum distance that will be traced inside the cloud layer. (kilometers)"
                 parmtag { "spare_category" "Layer" }
                 parmtag { "usdvaluetype" "float" }
@@ -4328,7 +4419,8 @@
             name "hdUE_Sky_CloudTracing"
             label "Cloud Tracing"
             grouptag { "group_default" "0" }
-            HDUE_CONTROL("xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp", "Use Per Sample Atmospheric Light Transmittance")
+            hidewhentab "{ xn__unrealrenderMode_41a != realtime }"
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp", "Use Per Sample Atmospheric Light Transmittance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_o8cp"
                 label   "Use Per Sample Atmospheric Light Transmittance"
@@ -4339,20 +4431,23 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp == block } { xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp", "Sky Light Cloud Bottom Occlusion")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp", "Sky Light Cloud Bottom Occlusion", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_vlcp"
                 label   "Sky Light Cloud Bottom Occlusion"
                 type    float
                 size    1
                 default { 0 }
+                range   { 0! 1! }
                 help    "Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value."
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp == block } { xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp", "View Sample Count Scale")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp", "View Sample Count Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudViewSampleCountScale_u7bp"
                 label   "View Sample Count Scale"
@@ -4364,8 +4459,9 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp == block } { xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp", "Reflection View Sample Count Scale Value")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp", "Reflection View Sample Count Scale Value", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_9wcp"
                 label   "Reflection View Sample Count Scale Value"
@@ -4377,8 +4473,9 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp == block } { xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp", "Shadow View Sample Count Scale")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp", "Shadow View Sample Count Scale", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudShadowViewSampleCountScale_micp"
                 label   "Shadow View Sample Count Scale"
@@ -4390,8 +4487,9 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp == block } { xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp", "Shadow Reflection View Sample Count Scale Value")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp", "Shadow Reflection View Sample Count Scale Value", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_16cp"
                 label   "Shadow Reflection View Sample Count Scale Value"
@@ -4403,8 +4501,9 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp == block } { xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudShadowTracingDistance_control_incp", "Shadow Tracing Distance")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudShadowTracingDistance_control_incp", "Shadow Tracing Distance", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudShadowTracingDistance_h9bp"
                 label   "Shadow Tracing Distance"
@@ -4416,8 +4515,9 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudShadowTracingDistance_control_incp == block } { xn__unrealvolumetricCloudShadowTracingDistance_control_incp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp", "Stop Tracing Transmittance Threshold")
+            HDUE_CONTROL_HIDE("xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp", "Stop Tracing Transmittance Threshold", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_0tcp"
                 label   "Stop Tracing Transmittance Threshold"
@@ -4429,6 +4529,7 @@
                 parmtag { "spare_category" "Cloud Tracing" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp == block } { xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
         }
     }
@@ -5192,7 +5293,7 @@
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealcvarsgViewDistanceQuality_control_l4bec == block } { xn__unrealcvarsgViewDistanceQuality_control_l4bec == none })"
             }
-            HDUE_CONTROL("xn__unrealcvarsgAntiAliasingQuality_control_l4bec", "Anti-Aliasing")
+            HDUE_CONTROL_HIDE("xn__unrealcvarsgAntiAliasingQuality_control_l4bec", "Anti-Aliasing", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarsgAntiAliasingQuality_krbec"
                 label   "Anti-Aliasing"
@@ -5204,8 +5305,9 @@
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealcvarsgAntiAliasingQuality_control_l4bec == block } { xn__unrealcvarsgAntiAliasingQuality_control_l4bec == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealcvarsgShadowQuality_control_tubec", "Shadows")
+            HDUE_CONTROL_HIDE("xn__unrealcvarsgShadowQuality_control_tubec", "Shadows", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarsgShadowQuality_shbec"
                 label   "Shadows"
@@ -5217,8 +5319,9 @@
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealcvarsgShadowQuality_control_tubec == block } { xn__unrealcvarsgShadowQuality_control_tubec == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealcvarsgGlobalIlluminationQuality_control_dfcec", "Global Illumination")
+            HDUE_CONTROL_HIDE("xn__unrealcvarsgGlobalIlluminationQuality_control_dfcec", "Global Illumination", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarsgGlobalIlluminationQuality_c1bec"
                 label   "Global Illumination"
@@ -5230,8 +5333,9 @@
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealcvarsgGlobalIlluminationQuality_control_dfcec == block } { xn__unrealcvarsgGlobalIlluminationQuality_control_dfcec == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
-            HDUE_CONTROL("xn__unrealcvarsgReflectionQuality_control_c1bec", "Reflections")
+            HDUE_CONTROL_HIDE("xn__unrealcvarsgReflectionQuality_control_c1bec", "Reflections", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarsgReflectionQuality_bobec"
                 label   "Reflections"
@@ -5243,6 +5347,7 @@
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
                 disablewhen R"({ xn__unrealcvarsgReflectionQuality_control_c1bec == block } { xn__unrealcvarsgReflectionQuality_control_c1bec == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
             }
             HDUE_CONTROL("xn__unrealcvarsgPostProcessQuality_control_y2bec", "Post-Processing")
             parm {
@@ -5329,7 +5434,7 @@
                 disablewhen R"({ xn__unrealcvarrNanite_control_shbeb == block } { xn__unrealcvarrNanite_control_shbeb == none })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealcvarrNaniteMaxPixelsPerEdge_control_u7bebg", "Max Pixels per Edge")
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNaniteMaxPixelsPerEdge_control_u7bebg", "Max Pixels per Edge", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarrNaniteMaxPixelsPerEdge_tubebg"
                 label   "Max Pixels per Edge"
@@ -5341,6 +5446,7 @@
                 parmtag { "spare_category" "Nanite" }
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealcvarrNaniteMaxPixelsPerEdge_control_u7bebg == block } { xn__unrealcvarrNaniteMaxPixelsPerEdge_control_u7bebg == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }

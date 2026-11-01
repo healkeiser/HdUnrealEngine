@@ -37,6 +37,9 @@
 #include "Misc/ConfigCacheIni.h"
 #include "HAL/PlatformTLS.h"
 #include "LegacyScreenPercentageDriver.h"
+#if HDUE_WITH_DLSS
+#include "DLSS.h"
+#endif
 #include "Math/PerspectiveMatrix.h"
 #include "Math/Float16Color.h"
 #include "Misc/Paths.h"
@@ -443,6 +446,18 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         // the heterogeneous volume settings UE's docs recommend for cinematic renders in Movie Render Queue (shading
         // rate 1, 512 MB): at the defaults (4, 128 MB) the Path Tracer's voxel grids made volume edges blocky. Set
         // before any session, so authored unreal:cvar:* values override them.
+        // Each change is logged with UE's value before it, the default Test-RenderSettings.ps1 compares the generated
+        // defaults with (a session's own log line only sees the profile's value).
+        const auto Snapshot = [] {
+            TMap<FString, FString> Values;
+            IConsoleManager::Get().ForEachConsoleObjectThatStartsWith(
+                FConsoleObjectVisitor::CreateLambda([&Values](const TCHAR* Name, IConsoleObject* Object) {
+                    if (IConsoleVariable* Variable = Object->AsVariable()) Values.Add(Name, Variable->GetString());
+                }),
+                TEXT(""));
+            return Values;
+        };
+        const TMap<FString, FString> Before = Snapshot();
         Scalability::FQualityLevels Levels = Scalability::GetQualityLevels();
         const float Resolution = Levels.ResolutionQuality;
         Levels.SetFromSingleQualityLevelRelativeToMax(0);
@@ -462,6 +477,10 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
               {TEXT("r.HeterogeneousVolumes.FrustumGrid.MaxBottomLevelMemoryInMegabytes"), 512},
               {TEXT("r.HeterogeneousVolumes.OrthoGrid.MaxBottomLevelMemoryInMegabytes"), 512}})
             SetCVar(Name, Value);
+        for (const auto& [Name, Value] : Snapshot())
+            if (const FString* Old = Before.Find(Name); Old && *Old != Value)
+                UE_LOG(LogTemp, Log, TEXT("hdUE: offline profile console variable %s = %s (was %s)"), *Name, *Value,
+                       **Old);
     }
     Runtime.State = HDUE_STATE_READY;
     Runtime.Error.Empty();
@@ -1074,6 +1093,16 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         if (auto* Calibration = GEngine->GetEngineSubsystem<UCameraCalibrationSubsystem>();
             Calibration && Calibration->GetSceneViewExtension())
             Family.ViewExtensions.Add(Calibration->GetSceneViewExtension().ToSharedRef());
+#if HDUE_WITH_DLSS
+    // NVIDIA's DLSS replaces TSR when r.NGX.DLSS.Enable is set, as in UE. Its view extension only activates itself for
+    // game and editor viewports, so the family takes it explicitly, as the plugin's Movie Render Queue support does
+    // (MoviePipelineDLSSSetting.cpp); it then sets the family's temporal upscaler in BeginRenderViewFamily.
+    if (!PathTracing && CVarInt(TEXT("r.NGX.DLSS.Enable")) && CVarInt(TEXT("r.TemporalAA.Upscaler")))
+        if (const auto* Dlss = FModuleManager::GetModulePtr<IDLSSModuleInterface>(TEXT("DLSS"));
+            Dlss && Dlss->QueryDLSSSRSupport() == EDLSSSupport::Supported)
+            if (const auto Extension = Dlss->GetDLSSUpscalerViewExtension())
+                Family.ViewExtensions.Add(Extension.ToSharedRef());
+#endif
     if (Sharing) {
         const uint32 Width = Session->Width, Height = Session->Height;
         ENQUEUE_RENDER_COMMAND(HdueSharedSlot)([Job, Width, Height](FRHICommandListImmediate& Commands) {
@@ -1149,7 +1178,11 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
     Family.ViewMode = ViewMode;
     AddView(Family, *Session, PathTracing, Aov);
-    Family.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(Family, ScreenFraction, 1.0f));
+    // Moving frames keep full-resolution buffers (UE's dynamic resolution: the upper bound is the largest fraction);
+    // other frames bound at their own fraction, as UE's game viewport does with r.ScreenPercentage. DLSS picks its
+    // quality mode from this bound (DLAA at 1).
+    Family.SetScreenPercentageInterface(
+        new FLegacyScreenPercentageDriver(Family, ScreenFraction, Moving ? 1.0f : ScreenFraction));
     if (!IsInteractive() && (!PathTracing || !Session->Draws)) {
         // Movie Render Queue's flush before each frame: the textures this view uses at full resolution, and pending
         // virtual texture tiles (the Path Tracer prepares its own residency).

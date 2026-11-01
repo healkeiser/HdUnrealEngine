@@ -258,7 +258,7 @@ Texture properties (Ambient Cubemap, Exposure Metering Mask, convolution bloom K
 | Folder | Console variables |
 | --- | --- |
 | Scalability | `sg.*Quality` (Low to Cinematic): the levels of UE's scalability groups; Epic in the viewport, Cinematic in husk (see below) |
-| Resolution and Anti-Aliasing | `r.AntiAliasingMethod` (None, FXAA, TAA, TSR), `r.ScreenPercentage` (realtime beauty), `r.HdUE.InteractiveResolution` and `r.HdUE.InteractiveScreenPercentage` (Houdini's viewport renders at 50% while moving) |
+| Resolution and Anti-Aliasing | `r.AntiAliasingMethod` (None, FXAA, TAA, TSR), `r.ScreenPercentage` (realtime beauty), `r.HdUE.InteractiveResolution` and `r.HdUE.InteractiveScreenPercentage` (Houdini's viewport renders at 50% while moving), `r.NGX.DLSS.Enable` (NVIDIA DLSS, see below) |
 | Lumen | `r.Lumen.HardwareRayTracing`, `r.Lumen.Reflections.HardwareRayTracing`; quality and hit lighting are post-process properties (hdUE Render Settings: Hit Lighting, off by default as in UE, authors `LumenRayLightingMode`) |
 | Shadows | `r.Shadow.Virtual.Enable` (on in this project, as in new UE projects; 0 falls back to cascaded shadow maps), resolution biases and soft-shadow rays, `r.Shadow.FilterMethod`, `r.RayTracing.Shadows` |
 | Nanite, MegaLights, Ray Tracing | `r.Nanite`, `r.Nanite.MaxPixelsPerEdge`, `r.MegaLights.NumSamplesPerPixel`, `r.MegaLights.DefaultShadowMethod`, `r.RayTracing.Enable` |
@@ -267,6 +267,8 @@ Texture properties (Ambient Cubemap, Exposure Metering Mask, convolution bloom K
 Batch renders (husk, the USD Render ROP) apply an offline profile like Movie Render Queue's Game Overrides: Cinematic scalability (the screen percentage stays), all used textures fully streamed in before frames count (`r.Streaming.FullyLoadUsedTextures`, pending virtual-texture tiles loaded), `r.D3D12.GPUTimeout 0` so long Path Tracer dispatches are not reset by Windows, Lumen final gather, scene lighting and scene detail quality of at least 2 (ray lighting stays the project's surface cache, as neither Cinematic scalability nor Movie Render Queue changes it). Authored `unreal:cvar:*` and `unreal:postProcess:*` values win. The Houdini viewport keeps UE's interactive defaults.
 
 Other console variables work as attributes too. `scripts/Test-RenderSettings.ps1 -RuntimeConfig <config>` renders with every generated setting at its default and fails if UE skipped one or if a console variable's generated default differs from UE's value.
+
+**NVIDIA DLSS** Super Resolution replaces TAA or TSR in realtime mode when the backend is built with NVIDIA's DLSS plugin (see [building](building.md#nvidia-dlss)) and `r.NGX.DLSS.Enable` is 1 (the render settings' **NVIDIA DLSS**, off by default as in the plugin). It is the plugin's own upscaler, as in a UE game: the screen percentage picks the DLSS mode (50% Performance, about 67% Quality, 100% DLAA), and the viewport's 50% while moving is upscaled by DLSS. The plugin enables itself only for game and editor viewports, so hdUE adds its view extension to each realtime frame, as the plugin's Movie Render Queue support does. The Path Tracer and the GBuffer AOVs do not use it. Without the plugin, or on a GPU without DLSS, the setting is skipped and the anti-aliasing method renders.
 
 ![UE post-processing](images/gallery/post_processing.png)
 

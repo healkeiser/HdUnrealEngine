@@ -32,3 +32,7 @@ uv.lock
 /samples/hdris/
 # NVIDIA Da Vinci Workshop (NVIDIA One-Way Noncommercial License): a local download outside the repo; local layers over it
 /samples/davinci/
+# NVIDIA DLSS plugin (NVIDIA RTX SDKs license, not redistributable as source): downloaded locally, never committed
+# (docs/building.md)
+/unreal/HdUEBackend/Plugins/DLSS/
+/unreal/HdUEBackend/Plugins/StreamlineNGXCommon/

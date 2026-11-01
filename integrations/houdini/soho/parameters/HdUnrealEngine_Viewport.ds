@@ -187,6 +187,16 @@
             parmtag { "uiscope" "viewport" }
         }
         parm {
+            name    "xn__unrealcvarrNGXDLSSEnable_5fbebde"
+            label   "NVIDIA DLSS"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the anti-aliasing method renders. Realtime mode only. Console variable r.NGX.DLSS.Enable (process-wide)."
+            parmtag { "spare_category" "Anti-Aliasing" }
+            parmtag { "uiscope" "viewport" }
+        }
+        parm {
             name    "xn__unrealcvarrScreenPercentage_1kbeb"
             label   "Screen Percentage"
             type    float

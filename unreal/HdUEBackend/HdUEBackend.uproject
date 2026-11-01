@@ -23,6 +23,8 @@
     { "Name": "DatasmithContent", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "CameraCalibrationCore", "Enabled": true },
     { "Name": "HairStrands", "Enabled": true },
+    { "Name": "DLSS", "Enabled": true, "Optional": true },
+    { "Name": "StreamlineNGXCommon", "Enabled": true, "Optional": true },
     { "Name": "USDImporter", "Enabled": false },
     { "Name": "USDCore", "Enabled": false },
     { "Name": "PythonScriptPlugin", "Enabled": false }
