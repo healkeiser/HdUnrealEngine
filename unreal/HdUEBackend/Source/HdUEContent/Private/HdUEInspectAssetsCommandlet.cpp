@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Engine/Blueprint.h"
 #include "Materials/MaterialInterface.h"
+#include "SparseVolumeTexture/SparseVolumeTexture.h"
 #include "EngineUtils.h"
 #include "FileHelpers.h"
 #include "Dom/JsonObject.h"
@@ -59,11 +60,20 @@ int32 UHdUEInspectAssetsCommandlet::Main(const FString& Params) {
         auto O = MakeShared<FJsonObject>();
         O->SetStringField(TEXT("class"), A.AssetClassPath.ToString());
         const FString C = A.AssetClassPath.GetAssetName().ToString();
+        const bool Volume = C == TEXT("StaticSparseVolumeTexture") || C == TEXT("AnimatedSparseVolumeTexture");
         O->SetStringField(TEXT("kind"), C == TEXT("World")          ? TEXT("level")
                                         : C == TEXT("StaticMesh")   ? TEXT("static_mesh")
                                         : C == TEXT("SkeletalMesh") ? TEXT("skeletal_mesh")
                                         : C == TEXT("Blueprint")    ? TEXT("blueprint")
+                                        : Volume                    ? TEXT("sparse_volume")
                                                                     : TEXT("resource"));
+        // A Heterogeneous Volume spans its voxels from its pivot, placed by the first frame's transform (the VDB's own,
+        // its units read as cm: UHeterogeneousVolumeComponent::CalcBounds); the hosts' bounds proxies read it.
+        if (Volume)
+            if (auto* Texture = Cast<USparseVolumeTexture>(A.GetAsset()))
+                O->SetObjectField(TEXT("bounds_cm"),
+                                  BoundsJson(FBox(FVector::ZeroVector, FVector(Texture->GetVolumeResolution()))
+                                                 .TransformBy(Texture->GetFrameTransform())));
         Entries->SetObjectField(A.GetSoftObjectPath().ToString(), O);
     }
     const FString Package = FSoftObjectPath(Map).GetLongPackageName();

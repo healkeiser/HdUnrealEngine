@@ -18,7 +18,7 @@ UE 5.8's Ambient Cubemap adds no light with Substrate's adaptive GBuffer, which 
 2. Run [capture.py](capture.py) twice (the first run may capture before the materials have compiled):
 
    ```powershell
-   & "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" AC.uproject -run=pythonscript -script=<repo>\samples\repro\ambient_cubemap\capture.py -AllowCommandletRendering -unattended -nosplash -nop4 -stdout ACINT=10
+   & "<UE 5.8>\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" AC.uproject -run=pythonscript -script=<repo>\samples\repro\ambient_cubemap\capture.py -AllowCommandletRendering -unattended -nosplash -nop4 -stdout ACINT=10
    ```
 
 3. Read the mean of `Saved/ac.hdr`.

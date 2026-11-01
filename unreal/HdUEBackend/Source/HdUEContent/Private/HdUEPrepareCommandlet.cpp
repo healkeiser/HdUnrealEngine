@@ -41,6 +41,10 @@
 #include "Materials/MaterialExpressionStaticBool.h"
 #include "Materials/MaterialFunction.h"
 #include "Engine/VolumeTexture.h"
+#include "AssetImportTask.h"
+#include "AssetToolsModule.h"
+#include "Materials/MaterialInstanceConstant.h"
+#include "SparseVolumeTexture/SparseVolumeTexture.h"
 #include "Engine/Texture2D.h"
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
@@ -697,6 +701,37 @@ UMaterial* CreateLightFunctionMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// The parent of cooked Sparse Volume Textures placed through unreal:asset: an instance of UE's default SVT material, as
+// the editor's SVT material instance factory makes it (USparseVolumeTextureMaterialInstanceFactoryNew); the runtime
+// sets its SparseVolumeTexture parameter per asset. Also imports samples/cornell/fog.vdb as the test SVT, with the
+// OpenVDB importer's default grid assignment (an automated UAssetImportTask, as UE's scripted imports).
+bool CreateSparseVolumeAssets() {
+    auto* Parent = LoadObject<UMaterialInterface>(
+        nullptr, TEXT("/Engine/EngineMaterials/SparseVolumeMaterial.SparseVolumeMaterial"));
+    if (!Parent) return false;
+    auto* Instance = LoadObject<UMaterialInstanceConstant>(
+        nullptr, TEXT("/Game/HdUE/MI_HdUESparseVolume.MI_HdUESparseVolume"), nullptr, LOAD_NoWarn);
+    if (!Instance || Instance->Parent != Parent) {
+        if (!Instance)
+            Instance = NewObject<UMaterialInstanceConstant>(CreatePackage(TEXT("/Game/HdUE/MI_HdUESparseVolume")),
+                                                            TEXT("MI_HdUESparseVolume"), RF_Public | RF_Standalone);
+        Instance->SetParentEditorOnly(Parent);
+        Instance->PostEditChange();
+        if (!SaveAsset(Instance)) return false;
+    }
+    if (LoadObject<USparseVolumeTexture>(nullptr, TEXT("/Game/HdUE/SVT_HdUEFog.SVT_HdUEFog"), nullptr, LOAD_NoWarn))
+        return true;
+    FModuleManager::Get().LoadModule(TEXT("SparseVolumeTexture"));  // the OpenVDB import factory
+    auto* Task = NewObject<UAssetImportTask>();
+    Task->Filename = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("../../samples/cornell/fog.vdb"));
+    Task->DestinationPath = TEXT("/Game/HdUE");
+    Task->DestinationName = TEXT("SVT_HdUEFog");
+    Task->bAutomated = true;
+    Task->bReplaceExisting = true;
+    Task->bSave = true;
+    FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get().ImportAssetTasks({Task});
+    return Task->GetObjects().Num() > 0 && Cast<USparseVolumeTexture>(Task->GetObjects()[0]);
+}
 UMaterial* CreateGlass() {
     const FString Path = TEXT("/Game/HdUE/M_Glass");
     UPackage* Package = CreatePackage(*Path);
@@ -818,7 +853,7 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
                         Blend, LinearWhite, true, Thin, TwoSided))
                     return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial() ||
-        !CreateLightFunctionMaterial())
+        !CreateLightFunctionMaterial() || !CreateSparseVolumeAssets())
         return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);

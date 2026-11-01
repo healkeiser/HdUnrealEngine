@@ -6,6 +6,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/LightComponentBase.h"
+#include "Components/HeterogeneousVolumeComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "SparseVolumeTexture/SparseVolumeTexture.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/Level.h"
@@ -107,6 +110,8 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
         E->Kind = HDUE_ASSET_SKELETAL_MESH;
     else if (Class == TEXT("Blueprint") || Class == TEXT("BlueprintGeneratedClass"))
         E->Kind = HDUE_ASSET_ACTOR;
+    else if (Class == TEXT("StaticSparseVolumeTexture") || Class == TEXT("AnimatedSparseVolumeTexture"))
+        E->Kind = HDUE_ASSET_SPARSE_VOLUME;
     else {
         E->State = HDUE_ASSET_FAILED;
         E->Kind = Data.IsValid() ? HDUE_ASSET_RESOURCE : HDUE_ASSET_UNKNOWN;
@@ -191,10 +196,37 @@ void FHdueNativeAssets::Tick() {
             A->AddInstanceComponent(C);
             C->RegisterComponent();
             A->SetActorTransform(E.Transform);
+        } else if (auto* Texture = Cast<USparseVolumeTexture>(Asset); E.Kind == HDUE_ASSET_SPARSE_VOLUME && Texture) {
+            // A Heterogeneous Volume with UE's default SVT material, as the editor's SVT material instance factory
+            // makes it (USparseVolumeTextureMaterialInstanceFactoryNew: SparseVolumeMaterial's SparseVolumeTexture
+            // parameter); the prepared MI_HdUESparseVolume is that instance. The SVT keeps its VDB's transform, whose
+            // units UE reads as centimetres.
+            auto* Parent = LoadObject<UMaterialInterface>(
+                nullptr, TEXT("/Game/HdUE/MI_HdUESparseVolume.MI_HdUESparseVolume"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+            if (Parent) {
+                A = World->SpawnActor<AActor>();
+                auto* C = NewObject<UHeterogeneousVolumeComponent>(A);
+                auto* Material = UMaterialInstanceDynamic::Create(Parent, C);
+                Material->SetSparseVolumeTextureParameterValue(TEXT("SparseVolumeTexture"), Texture);
+                C->SetMaterial(0, Material);
+                C->SetVolumeResolution(Texture->GetVolumeResolution());
+                // shortcut: an animated SVT shows its first frame; map the stage time to SetFrame when a scene
+                // needs a sequence.
+                C->SetEndFrame(FMath::Max(Texture->GetNumFrames() - 1, 0));
+                // Renders wait for the streamed frame, as an offline render must (the component's own option).
+                C->bIssueBlockingRequests = true;
+                C->SetMobility(EComponentMobility::Movable);
+                A->SetRootComponent(C);
+                A->AddInstanceComponent(C);
+                C->RegisterComponent();
+                A->SetActorTransform(E.Transform);
+            }
         }
         if (!A) {
             E.State = HDUE_ASSET_FAILED;
-            E.Error = TEXT("Asset could not be instantiated (Blueprint must derive from a concrete Actor).");
+            E.Error = E.Kind == HDUE_ASSET_SPARSE_VOLUME
+                          ? TEXT("This runtime has no /Game/HdUE/MI_HdUESparseVolume; prepare and cook its content.")
+                          : TEXT("Asset could not be instantiated (Blueprint must derive from a concrete Actor).");
         } else {
             // A placed BP may author static components. Hydra edits its placement
             // after construction, so those owned components must be movable.
@@ -225,7 +257,7 @@ void FHdueNativeAssets::Stats(const FEntry& E, HdueAssetStatus& S) {
         A->GetComponents(Meshes);
         S.meshes += Meshes.Num();
         if (E.Visible && !A->IsHidden()) {
-            for (auto* C : Meshes)
+            for (auto* C : Meshes)  // a Heterogeneous Volume is a mesh component too
                 if (C->IsVisible()) Box += C->Bounds.GetBox();
             TArray<ULightComponentBase*> Lights;
             A->GetComponents(Lights);

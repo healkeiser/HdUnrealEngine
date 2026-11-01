@@ -393,7 +393,8 @@ enum {
     HDUE_ASSET_SKELETAL_MESH = 2,
     HDUE_ASSET_ACTOR = 3,
     HDUE_ASSET_LEVEL = 4,
-    HDUE_ASSET_RESOURCE = 5
+    HDUE_ASSET_RESOURCE = 5,
+    HDUE_ASSET_SPARSE_VOLUME = 6 /* A cooked Sparse Volume Texture, rendered as a Heterogeneous Volume. */
 };
 enum { HDUE_ASSET_LOADING = 0, HDUE_ASSET_READY = 1, HDUE_ASSET_FAILED = 2 };
 typedef struct HdueAssetDesc {

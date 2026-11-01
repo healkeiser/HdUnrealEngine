@@ -46,7 +46,7 @@ The Path Tracer waits for all required streaming virtual-texture pages and mappi
 
 ## Cooked native assets
 
-Xform, Scope, or Mesh prims can specify a cooked object path through `unreal:asset`. The registry determines whether it is a StaticMesh, SkeletalMesh, Actor Blueprint, or Level:
+Xform, Scope, or Mesh prims can specify a cooked object path through `unreal:asset`. The registry determines whether it is a StaticMesh, SkeletalMesh, Actor Blueprint, Level, or Sparse Volume Texture:
 
 ```usda
 def Xform "NativeMesh"
@@ -56,6 +56,8 @@ def Xform "NativeMesh"
 ```
 
 The bridge generates bounds proxies in its own layer. Native assets retain their pivot, material slots, and centimeter dimensions. Authored and parent transforms follow stage units without double unit conversion.
+
+A Sparse Volume Texture (a VDB imported in the UE editor) renders as UE's Heterogeneous Volume, with a dynamic instance of UE's `SparseVolumeMaterial` (`/Game/HdUE/MI_HdUESparseVolume`) bound to it, in both render modes. It keeps its VDB's transform, whose units UE reads as centimetres: a VDB written in metres needs a 100x scale on the prim. Animated SVTs show their first frame. `samples/conformance/volume/sparse_volume_texture.usda` places the Cornell fog this way.
 
 Transform, visibility, deletion, and re-creation are supported. Level transforms reload the instance. Virtual-texture waiting also covers native materials. Skeletal meshes use reference poses; Blueprint game progression, time synchronization, and World Partition coverage remain limited.
 
