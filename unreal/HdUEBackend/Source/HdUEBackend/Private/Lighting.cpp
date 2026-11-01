@@ -16,7 +16,54 @@
 #include "ImageUtils.h"
 #include "Math/Float16Color.h"
 #include "TextureResource.h"
+#include "UObject/UnrealType.h"
 
+// Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
+// numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Shared with
+// set_post_process (Bridge.cpp), compiled in the editor target too.
+bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container) {
+    void* Value = Property->ContainerPtrToValuePtr<void>(Container);
+    if (const auto* Object = CastField<FObjectPropertyBase>(Property)) {
+        const bool None = Text.IsEmpty() || Text == TEXT("None");
+        UObject* Loaded = None ? nullptr : LoadObject<UObject>(nullptr, *Text);
+        if (!None && (!Loaded || !Loaded->IsA(Object->PropertyClass))) return false;
+        Object->SetObjectPropertyValue(Value, Loaded);
+        return true;
+    }
+    const auto* Struct = CastField<FStructProperty>(Property);
+    if (Struct && !Text.Contains(TEXT("="))) {
+        TArray<FString> Numbers;
+        Text.Replace(TEXT("("), TEXT(" "))
+            .Replace(TEXT(")"), TEXT(" "))
+            .Replace(TEXT(","), TEXT(" "))
+            .ParseIntoArrayWS(Numbers);
+        if (Struct->Struct == TBaseStructure<FColor>::Get()) {
+            // Bare numbers are a linear colour (a USD color3f), stored as sRGB bytes as UE's colour picker does; the
+            // fields themselves are in memory order (B, G, R, A).
+            if (Numbers.Num() < 3 || Numbers.Num() > 4 ||
+                Numbers.ContainsByPredicate([](const FString& N) { return !N.IsNumeric(); }))
+                return false;
+            const FLinearColor Linear(FCString::Atof(*Numbers[0]), FCString::Atof(*Numbers[1]),
+                                      FCString::Atof(*Numbers[2]),
+                                      Numbers.Num() == 4 ? FCString::Atof(*Numbers[3]) : 1.f);
+            *static_cast<FColor*>(Value) = Linear.ToFColor(true);
+            return true;
+        }
+        int32 Index = 0;
+        for (TFieldIterator<FNumericProperty> Field(Struct->Struct); Field && Index < Numbers.Num(); ++Field, ++Index) {
+            if (!Numbers[Index].IsNumeric()) return false;
+            if (Field->IsFloatingPoint())
+                Field->SetFloatingPointPropertyValue(Field->ContainerPtrToValuePtr<void>(Value),
+                                                     FCString::Atod(*Numbers[Index]));
+            else
+                Field->SetIntPropertyValue(Field->ContainerPtrToValuePtr<void>(Value),
+                                           FCString::Atoi64(*Numbers[Index]));
+        }
+        return Index > 0 && Index == Numbers.Num();
+    }
+    const TCHAR* End = Property->ImportText_Direct(*Text, Value, nullptr, PPF_None);
+    return End && !*End;
+}
 namespace {
 FVector Axis(const HdueLight& Light, int32 Index) {
     return FVector(Light.axes[Index * 3], Light.axes[Index * 3 + 1], Light.axes[Index * 3 + 2]);
