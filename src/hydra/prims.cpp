@@ -1622,6 +1622,13 @@ HdSprim* HdUECreateLocalFog(const SdfPath& id) {
                     data.values.emplace_back(name, value.IsHolding<bool>()
                                                        ? (value.UncheckedGet<bool>() ? "True" : "False")
                                                        : TfStringify(value));
+            if (HdUETraceScene()) {
+                std::string text;
+                for (const auto& [name, value] : data.values) text += " " + name + "=" + value;
+                std::fprintf(stderr, "hdUE local fog volume %s synced, visible=%d:%s\n", data.id.c_str(), data.visible,
+                             text.c_str());
+                std::fflush(stderr);
+            }
             auto* state = static_cast<HdUEState*>(param);
             std::lock_guard lock(state->mutex);
             const auto old = state->localFogs.find(data.id);

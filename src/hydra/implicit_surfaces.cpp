@@ -417,6 +417,15 @@ public:
         auto result = BaseAdapter::InvalidateImagingSubprim(prim, subprim, names, type);
         if (subprim.IsEmpty() && std::any_of(names.begin(), names.end(), properties))
             result.insert(HdPrimvarsSchema::GetDefaultLocator().Append(HdUELocalFogTokens->values));
+        if (static const bool trace = TfGetenvBool("HDUE_TRACE_SCENE", false); trace) {
+            std::string list;
+            for (const auto& name : names) list += " " + (name.IsEmpty() ? std::string("<prim>") : name.GetString());
+            std::fprintf(stderr, "hdUE local fog volume %s invalidated (%s):%s -> %zu locators\n",
+                         prim.GetPath().GetText(),
+                         type == UsdImagingPropertyInvalidationType::Resync ? "resync" : "update", list.c_str(),
+                         result.end() - result.begin());
+            std::fflush(stderr);
+        }
         return result;
     }
     // The legacy UsdImagingDelegate (pre-scene-index hosts) is not supported.

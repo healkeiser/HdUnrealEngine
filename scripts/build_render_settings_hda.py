@@ -1118,12 +1118,11 @@ radius = asset.evalParm("radius")
 xform.AddTranslateOp().Set(Gf.Vec3d(*asset.evalParmTuple("t")))
 xform.AddRotateXYZOp().Set(Gf.Vec3f(*asset.evalParmTuple("r")))
 xform.AddScaleOp().Set(Gf.Vec3f(radius, radius, radius))
-# Only the properties changed from UE's defaults (the schema's fallbacks), as hdUE Render Settings authors its settings.
+# Every property, also at UE's default (the schema's fallback): Houdini's viewport is not told about an attribute that
+# appears on an existing prim (only about value changes and removals), so a property authored only once changed from
+# its default would not update the viewport.
 for name, kind in PROPERTIES:
-    parm = asset.parmTuple(name)
-    if parm.isAtDefault():
-        continue
-    value = parm.eval()
+    value = asset.parmTuple(name).eval()
     attribute = prim.CreateAttribute("unreal:localFogVolume:" + name, Sdf.ValueTypeNames.Find(USD_TYPES[kind]))
     attribute.Set(Gf.Vec3f(*value) if kind == "color" else bool(value[0]) if kind == "toggle" else value[0])
 # The volume's extent in the viewport: the unit sphere UE's base volume fills.
@@ -1257,8 +1256,8 @@ def build_local_fog_volume():
             icon,
             "Creates a UE Local Fog Volume: a sphere of fog that fades out radially, rendered by hdUE.",
             "Like Karma Fog Box for Karma, it creates a fog prim hdUE renders: an UnrealLocalFogVolume, UE's Local Fog "
-            "Volume (realtime only; UE's Path Tracer does not render local fog volumes). It authors the properties "
-            "changed from UE's defaults. UE draws no local fog nearer than 10 m to the camera unless "
+            "Volume (realtime only; UE's Path Tracer does not render local fog volumes). It authors every property, "
+            "at UE's defaults too. UE draws no local fog nearer than 10 m to the camera unless "
             "r.LocalFogVolume.GlobalStartDistance is lowered (Engine Quality console variables). Height Fog Density 0 "
             "hides the whole volume: UE multiplies its radial and height coverage.",
         ),

@@ -101,10 +101,11 @@ class Runtime:
         """start=False attaches to UE that hdUE's delegate runs on its own thread (Houdini's UI): status and errors
         only; ticking and shutdown belong to that thread.
         """
+        # The table: its header and one pointer per function (tests/abi_layout.c checks the C side).
         if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (
             48,
             552,
-            328,
+            8 + 8 * (len(Api._fields_) - 2),
         ):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()
