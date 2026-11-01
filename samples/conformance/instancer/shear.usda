@@ -1,0 +1,80 @@
+#usda 1.0
+(
+    doc = """An instance whose transform shears: a flat unit square, rotated 45 degrees about Z by its prototype
+transform, under the instance scale (4, 1, 1) becomes a wide diamond with tips at x = +-2.83 and corners at y = +-0.71.
+UE instances cannot hold shear, so hdUE bakes such instances into a companion mesh; dropping the shear would draw a
+larger rotated square reaching past y = 1.2 and short of the tips. The instance at y = -3 (scale 1) has no shear and
+stays a UE instance."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "sheared instance transform",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "diamond tip",
+   "value": {
+    "region": [
+     2.3,
+     -0.03,
+     2.5,
+     0.03
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "nothing above the diamond",
+   "value": {
+    "region": [
+     -0.1,
+     1.2,
+     0.1,
+     1.4
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "unsheared instance",
+   "value": {
+    "region": [
+     -0.2,
+     -3.2,
+     0.2,
+     -2.8
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions = [(0, 0, 0), (0, -3, 0)]
+    int[] protoIndices = [0, 0]
+    rel prototypes = [</Instancer/Prototypes/square>]
+    float3[] scales = [(4, 1, 1), (1, 1, 1)]
+    def Scope "Prototypes"
+    {
+        def Cube "square"
+        {
+            double size = 1.0
+            float3 xformOp:rotateXYZ = (0, 0, 45)
+            float3 xformOp:scale = (1, 1, 0.1)
+            uniform token[] xformOpOrder = ["xformOp:rotateXYZ", "xformOp:scale"]
+        }
+    }
+}

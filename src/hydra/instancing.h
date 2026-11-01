@@ -11,6 +11,7 @@
 #include "pxr/base/vt/array.h"
 #include "pxr/base/vt/value.h"
 #include <cmath>
+#include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Element i of a vec3 array primvar (float, double or half), false when missing.
@@ -69,4 +70,6 @@ inline bool HdUEHasShear(const GfMatrix4d& m) {
         }
     return false;
 }
+// The mesh that holds a generic instanced mesh's sheared instances, baked into its vertices.
+inline std::string HdUEShearedId(const std::string& id) { return id + ":sheared"; }
 PXR_NAMESPACE_CLOSE_SCOPE
