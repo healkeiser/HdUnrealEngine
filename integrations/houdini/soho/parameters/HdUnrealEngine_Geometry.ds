@@ -33,10 +33,23 @@
         type    string
         size    1
         default { "" }
-        help    "Cooked UE object this prim stands for: a StaticMesh, SkeletalMesh, Actor Blueprint or Level, as an object path (/Game/HdUE/SM_Nanite.SM_Nanite). It renders in place of the prim's own geometry."
+        help    "Cooked UE object this prim stands for: a StaticMesh, SkeletalMesh, Actor Blueprint, Level or Sparse Volume Texture, as an object path (/Game/HdUE/SM_Nanite.SM_Nanite). It renders in place of the prim's own geometry."
         parmtag { "spare_category" "Native Asset" }
         parmtag { "usdvaluetype" "string" }
         disablewhen R"({ xn__unrealasset_control_06a == block } { xn__unrealasset_control_06a == none })"
+    }
+    HDUE_CONTROL("xn__primvarsunrealvolumeframe_control_vubgg", "Volume Frame")
+    parm {
+        name    "xn__primvarsunrealvolumeframe_uhbgg"
+        label   "Volume Frame"
+        type    float
+        size    1
+        default { "0" }
+        range   { 0 100 }
+        help    "The frame of an animated Sparse Volume Texture (UE's Heterogeneous Volume Frame), from 0 for the first VDB of the sequence; fractional frames are UE's. Animate it as Sequencer keys Frame, for example $F - 1 for a sequence starting at frame 1."
+        parmtag { "spare_category" "Native Asset" }
+        parmtag { "usdvaluetype" "float" }
+        disablewhen R"({ xn__primvarsunrealvolumeframe_control_vubgg == block } { xn__primvarsunrealvolumeframe_control_vubgg == none })"
     }
     HDUE_CONTROL("xn__unrealsurfacewetenabled_control_krbhd", "Wet Surface")
     parm {

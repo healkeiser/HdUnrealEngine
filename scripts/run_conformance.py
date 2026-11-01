@@ -89,9 +89,9 @@ def render(path, mode, frames, out, env, timeout, extra=()):
         "--error-summary",
         "force",
         # Each frame is its own shot: a sequence keeps UE's temporal history as Movie Render Queue does, so a light
-        # switched between frames would lag a few frames, where the scenes test the switched state.
-        "--restart-delegate",
-        "1",
+        # switched between frames would lag a few frames, where the scenes test the switched state. A scene testing
+        # live edits passes its own (husk takes the option once).
+        *(() if "--restart-delegate" in extra else ("--restart-delegate", "1")),
         *extra,
         str(root),
     ]

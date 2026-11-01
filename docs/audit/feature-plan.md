@@ -109,7 +109,8 @@ engine change. So:
   `MI_HdUESparseVolume` (HdUEPrepare's instance of UE's `/Engine/EngineMaterials/SparseVolumeMaterial`, as
   `USparseVolumeTextureMaterialInstanceFactoryNew` makes it) with the asset as its `SparseVolumeTexture` parameter.
   The SVT keeps its VDB's transform, whose units UE reads as centimetres, so a VDB written in metres needs a 100x
-  scale. Animated SVTs show their first frame. Tested by `volume/sparse_volume_texture` (the Cornell fog, imported as
+  scale. Animated SVTs show the frame keyed in `primvars:unreal:volume:frame` (UE's `Frame`, ABI 17), tested by
+  `volume/sparse_volume_sequence`. Tested by `volume/sparse_volume_texture` (the Cornell fog, imported as
   `/Game/HdUE/SVT_HdUEFog` by an automated `UAssetImportTask`).
 - Verify: `volumes/*` conformance, `samples/cornell/fog.vdb` shadow on the floor in realtime, an emissive fire VDB in
   both modes.

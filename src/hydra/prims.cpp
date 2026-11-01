@@ -544,6 +544,12 @@ public:
         mesh.sceneAsset = value(delegate->Get(GetId(), TfToken("unreal:asset")), std::string());
         if (!mesh.sceneAsset.empty() && SdfPath(mesh.scenePath).GetName() == "__HdUEAssetProxy")
             mesh.scenePath = SdfPath(mesh.scenePath).GetParentPath().GetString();
+        // A constant primvar, so the asset prim's value reaches a host's bounds proxy under it (USD primvar
+        // inheritance).
+        if (!mesh.sceneAsset.empty()) {
+            const VtValue frame = delegate->Get(GetId(), TfToken("unreal:volume:frame"));
+            mesh.assetFrame = frame.CanCast<float>() ? VtValue::Cast<float>(frame).UncheckedGet<float>() : 0.f;
+        }
         const auto computed = computedPrimvars(delegate, GetId());
         auto shape = triangulate(delegate, *state, !mesh.sceneAsset.empty(),
                                  value(primvar(delegate, GetId(), HdTokens->points, computed), VtVec3fArray()));
@@ -743,7 +749,8 @@ public:
             // here, under the state mutex, serialized scene loads (tens of seconds on Sponza).
             const bool onlyNativeBounds =
                 previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
-                previous->second.transform == part.transform && previous->second.visible == part.visible;
+                previous->second.transform == part.transform && previous->second.visible == part.visible &&
+                previous->second.assetFrame == part.assetFrame;
             const bool moved = previous != missing && HdUEPlacedOnly(previous->second, part.transform);
             // A mesh UE asked for in full (fullUploads) uploads even when nothing changed since it was released.
             const bool meshChanged =
@@ -752,8 +759,8 @@ public:
                  previous->second.geometryHash != part.geometryHash ||
                  (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
-                 previous->second.sceneAsset != part.sceneAsset || previous->second.instanced != part.instanced ||
-                 previous->second.instances != part.instances ||
+                 previous->second.sceneAsset != part.sceneAsset || previous->second.assetFrame != part.assetFrame ||
+                 previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
                  previous->second.instanceColors != part.instanceColors ||
                  previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;

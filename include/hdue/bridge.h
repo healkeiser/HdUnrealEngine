@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 16u
+#define HDUE_ABI_VERSION 17u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -402,6 +402,9 @@ typedef struct HdueAssetDesc {
     const char* id;
     const char* asset_path; /* Cooked UE object path; input copied during the call. */
     double transform[16];   /* Native asset cm -> UE world cm, row-major. */
+    /* A Sparse Volume Texture's frame (UHeterogeneousVolumeComponent::Frame), fractional frames blend as UE's. */
+    float frame;
+    uint32_t reserved;
 } HdueAssetDesc;
 typedef struct HdueAssetStatus {
     uint32_t struct_size, kind, state, actors, meshes, lights;

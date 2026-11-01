@@ -703,8 +703,9 @@ UMaterial* CreateLightFunctionMaterial() {
 }
 // The parent of cooked Sparse Volume Textures placed through unreal:asset: an instance of UE's default SVT material, as
 // the editor's SVT material instance factory makes it (USparseVolumeTextureMaterialInstanceFactoryNew); the runtime
-// sets its SparseVolumeTexture parameter per asset. Also imports samples/cornell/fog.vdb as the test SVT, with the
-// OpenVDB importer's default grid assignment (an automated UAssetImportTask, as UE's scripted imports).
+// sets its SparseVolumeTexture parameter per asset. Also imports the test SVTs (samples/cornell/fog.vdb, and a
+// two-frame sequence for animated SVTs), with the OpenVDB importer's default grid assignment (an automated
+// UAssetImportTask, as UE's scripted imports).
 bool CreateSparseVolumeAssets() {
     auto* Parent = LoadObject<UMaterialInterface>(
         nullptr, TEXT("/Engine/EngineMaterials/SparseVolumeMaterial.SparseVolumeMaterial"));
@@ -719,18 +720,24 @@ bool CreateSparseVolumeAssets() {
         Instance->PostEditChange();
         if (!SaveAsset(Instance)) return false;
     }
-    if (LoadObject<USparseVolumeTexture>(nullptr, TEXT("/Game/HdUE/SVT_HdUEFog.SVT_HdUEFog"), nullptr, LOAD_NoWarn))
-        return true;
     FModuleManager::Get().LoadModule(TEXT("SparseVolumeTexture"));  // the OpenVDB import factory
-    auto* Task = NewObject<UAssetImportTask>();
-    Task->Filename = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("../../samples/cornell/fog.vdb"));
-    Task->DestinationPath = TEXT("/Game/HdUE");
-    Task->DestinationName = TEXT("SVT_HdUEFog");
-    Task->bAutomated = true;
-    Task->bReplaceExisting = true;
-    Task->bSave = true;
-    FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get().ImportAssetTasks({Task});
-    return Task->GetObjects().Num() > 0 && Cast<USparseVolumeTexture>(Task->GetObjects()[0]);
+    const auto Import = [](const TCHAR* Name, const TCHAR* File) {
+        if (LoadObject<USparseVolumeTexture>(nullptr, *FString::Printf(TEXT("/Game/HdUE/%s.%s"), Name, Name), nullptr,
+                                             LOAD_NoWarn))
+            return true;
+        auto* Task = NewObject<UAssetImportTask>();
+        Task->Filename = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("../../samples") / File);
+        Task->DestinationPath = TEXT("/Game/HdUE");
+        Task->DestinationName = Name;
+        Task->bAutomated = true;
+        Task->bReplaceExisting = true;
+        Task->bSave = true;
+        FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get().ImportAssetTasks({Task});
+        return Task->GetObjects().Num() > 0 && Cast<USparseVolumeTexture>(Task->GetObjects()[0]);
+    };
+    // The importer reads numbered files next to the first as one animated SVT (bIsSequence), named after their stem.
+    return Import(TEXT("SVT_HdUEFog"), TEXT("cornell/fog.vdb")) &&
+           Import(TEXT("SVT_HdUEPuff"), TEXT("conformance/volume/vdb_sequence/SVT_HdUEPuff.0001.vdb"));
 }
 UMaterial* CreateGlass() {
     const FString Path = TEXT("/Game/HdUE/M_Glass");

@@ -12,6 +12,8 @@ class AssetDesc(C.Structure):
         ("id", C.c_char_p),
         ("asset_path", C.c_char_p),
         ("transform", C.c_double * 16),
+        ("frame", C.c_float),
+        ("reserved", U32),
     ]
 
 
@@ -46,7 +48,7 @@ class Assets:
     def __init__(self, runtime):
         if tuple(
             C.sizeof(t) for t in (AssetDesc, AssetStatus, AssetSceneStatus)
-        ) != (152, 584, 544):
+        ) != (160, 584, 544):
             raise RuntimeError("Wrong native asset C ABI layout")
         self.runtime = runtime
         api = runtime.api

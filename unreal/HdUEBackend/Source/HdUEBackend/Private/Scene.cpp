@@ -374,6 +374,9 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
         TArray<UMeshComponent*> Meshes;
         Actor->GetComponents(Meshes);
         for (auto* Mesh : Meshes) {
+            // A Heterogeneous Volume draws no ID (no GBuffer), and its SetMaterial rebuilds its SVT binding: the ID
+            // material left it empty for every later frame.
+            if (Mesh->IsA<UHeterogeneousVolumeComponent>()) continue;
             if (On) {
                 // Exact in the float16 readback: both halves stay below 2048.
                 // Instance mode: instanced components emit their per-instance id (custom data 3), the rest -1.
@@ -383,8 +386,9 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
                                                             : FVector4f(0, 0, 0, 0));
                 Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
                 for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
-            } else if (auto* Static = Cast<UStaticMeshComponent>(Mesh))
-                Static->EmptyOverrideMaterials();
+            } else {
+                Mesh->EmptyOverrideMaterials();  // native skeletal meshes kept the ID material before
+            }
         }
     };
     for (const auto& Entry : Actors)

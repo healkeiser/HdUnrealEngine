@@ -66,6 +66,7 @@ struct HdUEMotionSamples {
 };
 struct HdUEMeshData {
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
+    float assetFrame = 0;  // primvars:unreal:volume:frame: an animated Sparse Volume Texture's frame (UE's Frame)
     // Indexed triangles: three indices per triangle into the per-vertex arrays (points, normals, uv, colors, masks).
     std::vector<GfVec3f> points, normals;
     std::vector<GfVec2f> uv;

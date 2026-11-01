@@ -779,6 +779,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             d.id = packet.own(data.id);
             d.asset_path = packet.own(data.sceneAsset);
             d.visible = data.visible && state.shown(data.renderTag);
+            d.frame = data.assetFrame;
             rowMajor(inverse * data.transform * basis, d.transform);
             packet.sceneAssets.push_back(d);
             packet.removed.push_back(d.id);

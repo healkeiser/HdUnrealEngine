@@ -71,6 +71,7 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
         Error = TEXT("Use a cooked UE object path such as /Game/HdUE/SM_Nanite.SM_Nanite.");
         return HDUE_INVALID_ARGUMENT;
     }
+    if (!FMath::IsFinite(D.frame)) return HDUE_INVALID_ARGUMENT;
     const FTransform Transform(Matrix);
     if (auto* Existing = Entries.Find(Id)) {
         auto& E = **Existing;
@@ -81,6 +82,20 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
             if (E.Actor.IsValid()) {
                 E.Actor->SetActorTransform(Transform);
                 E.Actor->SetActorHiddenInGame(!E.Visible);
+            }
+            // Another frame of an animated SVT: the component streams it on its next tick (blocking requests), so the
+            // asset reads as loading until it settles, as a Level made visible does.
+            if (E.Frame != D.frame) {
+                E.Frame = D.frame;
+                if (auto* Volume =
+                        E.Actor.IsValid() ? E.Actor->FindComponentByClass<UHeterogeneousVolumeComponent>() : nullptr) {
+                    Volume->SetFrame(E.Frame);
+                    if (E.State == HDUE_ASSET_READY) {
+                        E.State = HDUE_ASSET_LOADING;
+                        E.Started = FPlatformTime::Seconds();
+                        E.ReadyFrame = 0;
+                    }
+                }
             }
             if (E.Level.IsValid() && VisibilityChanged) {
                 E.Level->SetShouldBeVisible(E.Visible);
@@ -98,6 +113,7 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
     E->Path = Path;
     E->Transform = Transform;
     E->Visible = D.visible != 0;
+    E->Frame = D.frame;
     E->Started = FPlatformTime::Seconds();
     auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
     const FAssetData Data = Registry.GetAssetByObjectPath(ObjectPath);
@@ -210,9 +226,9 @@ void FHdueNativeAssets::Tick() {
                 Material->SetSparseVolumeTextureParameterValue(TEXT("SparseVolumeTexture"), Texture);
                 C->SetMaterial(0, Material);
                 C->SetVolumeResolution(Texture->GetVolumeResolution());
-                // shortcut: an animated SVT shows its first frame; map the stage time to SetFrame when a scene
-                // needs a sequence.
+                // The frame comes from primvars:unreal:volume:frame, as Sequencer keys UE's Frame; no playback.
                 C->SetEndFrame(FMath::Max(Texture->GetNumFrames() - 1, 0));
+                C->SetFrame(E.Frame);
                 // Renders wait for the streamed frame, as an offline render must (the component's own option).
                 C->bIssueBlockingRequests = true;
                 C->SetMobility(EComponentMobility::Movable);

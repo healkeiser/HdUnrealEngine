@@ -24,6 +24,7 @@ private:
         uint32 Kind = HDUE_ASSET_UNKNOWN, State = HDUE_ASSET_LOADING;
         FTransform Transform;
         bool Visible = true;
+        float Frame = 0;  // a Sparse Volume Texture's frame
         double Started = 0;
         uint64 ReadyFrame = 0;
         TSharedPtr<FStreamableHandle> Load;

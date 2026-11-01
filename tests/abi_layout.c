@@ -25,7 +25,7 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 208, "RenderRequest C ABI layout");
-_Static_assert(HDUE_ABI_VERSION == 16u, "ABI 16: one function table, no extension tables");
+_Static_assert(HDUE_ABI_VERSION == 17u, "ABI 17: one function table, no extension tables");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 56, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");
@@ -40,7 +40,7 @@ _Static_assert(sizeof(HdueMaterialUpdate) == 24, "Material update C ABI layout")
 _Static_assert(sizeof(HdueMaterialStats) == 32, "Material stats C ABI layout");
 _Static_assert(sizeof(HdueResidencyOptions) == 16, "Residency options C ABI layout");
 _Static_assert(sizeof(HdueResidencyStatus) == 584, "Residency status C ABI layout");
-_Static_assert(sizeof(HdueAssetDesc) == 152, "Asset descriptor C ABI layout");
+_Static_assert(sizeof(HdueAssetDesc) == 160, "Asset descriptor C ABI layout (frame, ABI 17)");
 _Static_assert(sizeof(HdueAssetStatus) == 584, "Asset status C ABI layout");
 _Static_assert(sizeof(HdueAssetSceneStatus) == 544, "Asset scene status C ABI layout");
 _Static_assert(sizeof(HdueViewportStatus) == 648, "Houdini viewport status C ABI layout");
