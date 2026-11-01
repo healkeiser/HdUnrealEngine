@@ -13,6 +13,10 @@ class UTextureCube;
 class UTexture2D;
 class UTextureLightProfile;
 class UPrimitiveComponent;
+class FProperty;
+
+// Sets one property of Container from text, as set_post_process reads its values (Bridge.cpp).
+bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container);
 
 class FHdueLighting {
 public:
@@ -25,6 +29,7 @@ public:
     void UpdateCamera(const FVector& Eye, const FVector& Target, const FVector& Up);
     bool Ready() const;
     bool BackgroundVisible() const;
+    bool HasDome() const { return DomeCount > 0; }
     FTextureRHIRef EnvironmentTexture() const;
     float EnvironmentScale() const { return RadianceScale; }
     void Status(HdueLightingStatus& Status) const;
@@ -36,6 +41,7 @@ private:
     struct FDefinition {
         HdueLight Data{};
         FString Id, File, Ies;
+        TArray<TPair<FString, FString>> Properties;  // unreal:light:<Property>, by name
     };
     struct FImageEntry {
         FDateTime Modified;

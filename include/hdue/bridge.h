@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 14u
+#define HDUE_ABI_VERSION 15u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -490,7 +490,14 @@ typedef struct HdueLight {
     float ies_angle_scale; /* UsdLux theta remap: > 0 theta / s, < 0 (theta - pi) / -s + pi, 0 none */
     uint32_t ies_normalize;
     /* UE lighting channels (bit per channel) of a linked light; 0 for every channel (unlinked). */
-    uint32_t lighting_channels, reserved;
+    uint32_t lighting_channels;
+    /* UE light component properties (unreal:light:<Property>) set by name before the light is registered, after the
+       UsdLux translation, so they can override it; values are text as for set_post_process (USD booleans True/False,
+       struct fields as bare numbers, objects as cooked paths). Unknown names and bad values are skipped with a warning
+       in the UE log. */
+    uint32_t property_count;
+    const char* const* property_names;
+    const char* const* property_values;
 } HdueLight;
 /* Light and shadow linking per object (mesh ID): lighting channels in bits 0-2, and NO_SHADOW when the object is
    outside every shadow-casting light's shadowLink. Objects not listed use every channel and cast shadows. */

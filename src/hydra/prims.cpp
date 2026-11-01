@@ -30,6 +30,7 @@
 #include "mesh_normals.h"
 #include "mesh_weld.h"
 #include "surface_settings.h"
+#include "light_properties.h"
 #include "color_management.h"
 #include "wet_mask.h"
 #include "pxr/base/tf/getenv.h"
@@ -1442,6 +1443,11 @@ public:
                 TF_WARN("hdUE: shadow:distance and shadow:falloff are not supported; shadows reach any distance (%s)",
                         GetId().GetText());
             });
+        // unreal:light:<UE light component property> (the Unreal Engine tab of Light LOPs), read by name from the
+        // generated list: Hydra's scene delegate reads light attributes by name only.
+        for (const char* name : HdUELightProperties)
+            if (const auto property = get(("unreal:light:" + std::string(name)).c_str()); !property.IsEmpty())
+                data.properties.emplace_back(name, HdUESettingText(property));
         auto texture = get("texture:file");
         if (applicationLight.IsHolding<GlfSimpleLight>() &&
             applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())

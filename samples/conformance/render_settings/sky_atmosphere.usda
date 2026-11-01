@@ -1,0 +1,85 @@
+#usda 1.0
+(
+    doc = """hdUE's Sky Atmosphere (unreal:skyAtmosphere, unreal:skyAtmosphere:<USkyAtmosphereComponent property>):
+UE's physical sky, lit by the scene's distant light (an Atmosphere Sun Light by UE's default). Off on frame 1 (no
+DomeLight: the background is black), on on frame 2: the sky above the horizon is bright and blue, as in UE with a Sky
+Atmosphere and a real-time capture Sky Light in the level."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE sky atmosphere",
+ "feature": "Sky Atmosphere with a distant sun",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "no sky while off",
+   "value": {
+    "frame": 1,
+    "region": [
+     -5.0,
+     2.0,
+     5.0,
+     5.0
+    ]
+   },
+   "max": 0.001
+  },
+  {
+   "name": "the sky is lit",
+   "value": {
+    "frame": 2,
+    "region": [
+     -5.0,
+     2.0,
+     5.0,
+     5.0
+    ]
+   },
+   "min": 0.01
+  },
+  {
+   "name": "the sky is blue",
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -5.0,
+      2.0,
+      5.0,
+      5.0
+     ],
+     "channel": 2
+    },
+    {
+     "frame": 2,
+     "region": [
+      -5.0,
+      2.0,
+      5.0,
+      5.0
+     ],
+     "channel": 0
+    }
+   ],
+   "min": 1.1
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        bool unreal:skyAtmosphere.timeSamples = {
+            1: 0,
+            2: 1,
+        }
+    }
+}

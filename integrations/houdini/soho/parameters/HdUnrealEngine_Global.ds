@@ -3752,6 +3752,688 @@
     }
 
     group {
+        name "hdUE_Sky_Tab"
+        label "Sky"
+        HDUE_CONTROL("xn__unrealskyAtmosphere_control_1kb", "Sky Atmosphere")
+        parm {
+            name    "xn__unrealskyAtmosphere_06a"
+            label   "Sky Atmosphere"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a physical sky lit by the distant lights that are Atmosphere Sun Lights (UE's default for a distant light; Light LOP, Unreal Engine tab). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE needs for Lumen and its Path Tracer; a DomeLight's environment takes its place."
+            parmtag { "spare_category" "Sky" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__unrealskyAtmosphere_control_1kb == block } { xn__unrealskyAtmosphere_control_1kb == none })"
+        }
+        HDUE_CONTROL("xn__unrealvolumetricCloud_control_bob", "Volumetric Cloud")
+        parm {
+            name    "xn__unrealvolumetricCloud_99a"
+            label   "Volumetric Cloud"
+            type    toggle
+            size    1
+            default { 0 }
+            help    "Place UE's Volumetric Cloud in the scene, with UE's default cloud material unless Material is set. Clouds need the Sky Atmosphere; the Path Tracer renders them with Reference Atmosphere on (Path Tracing)."
+            parmtag { "spare_category" "Sky" }
+            parmtag { "uiscope" "viewport" }
+            parmtag { "usdvaluetype" "bool" }
+            disablewhen R"({ xn__unrealvolumetricCloud_control_bob == block } { xn__unrealvolumetricCloud_control_bob == none })"
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_Planet"
+            label "Planet"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereTransformMode_control_75bn", "Transform Mode")
+            parm {
+                name    "xn__unrealskyAtmosphereTransformMode_6sbn"
+                label   "Transform Mode"
+                type    string
+                size    1
+                default { "ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin" }
+                menu { "ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin" "PlanetTopAtAbsoluteWorldOrigin" "ESkyAtmosphereTransformMode::PlanetTopAtComponentTransform" "PlanetTopAtComponentTransform" "ESkyAtmosphereTransformMode::PlanetCenterAtComponentTransform" "PlanetCenterAtComponentTransform" }
+                help    "The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0."
+                parmtag { "spare_category" "Planet" }
+                parmtag { "usdvaluetype" "token" }
+                disablewhen R"({ xn__unrealskyAtmosphereTransformMode_control_75bn == block } { xn__unrealskyAtmosphereTransformMode_control_75bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereBottomRadius_control_l4bn", "Ground Radius")
+            parm {
+                name    "xn__unrealskyAtmosphereBottomRadius_krbn"
+                label   "Ground Radius"
+                type    float
+                size    1
+                default { 6360 }
+                help    "The radius in kilometers from the center of the planet to the ground level."
+                parmtag { "spare_category" "Planet" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereBottomRadius_control_l4bn == block } { xn__unrealskyAtmosphereBottomRadius_control_l4bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereGroundAlbedo_control_l4bn", "Ground Albedo")
+            parm {
+                name    "xn__unrealskyAtmosphereGroundAlbedo_krbn"
+                label   "Ground Albedo"
+                type    color
+                size    3
+                default { 170 170 170 }
+                help    "The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0."
+                parmtag { "spare_category" "Planet" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereGroundAlbedo_control_l4bn == block } { xn__unrealskyAtmosphereGroundAlbedo_control_l4bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudPlanetRadius_control_u7bp", "Planet Radius")
+            parm {
+                name    "xn__unrealvolumetricCloudPlanetRadius_tubp"
+                label   "Planet Radius"
+                type    float
+                size    1
+                default { 0 }
+                help    "The planet radius used when there is not SkyAtmosphere component present in the scene."
+                parmtag { "spare_category" "Planet" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudPlanetRadius_control_u7bp == block } { xn__unrealvolumetricCloudPlanetRadius_control_u7bp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudGroundAlbedo_control_u7bp", "Ground Albedo")
+            parm {
+                name    "xn__unrealvolumetricCloudGroundAlbedo_tubp"
+                label   "Ground Albedo"
+                type    color
+                size    3
+                default { 0 0 0 }
+                help    "The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled."
+                parmtag { "spare_category" "Planet" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealvolumetricCloudGroundAlbedo_control_u7bp == block } { xn__unrealvolumetricCloudGroundAlbedo_control_u7bp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_Atmosphere"
+            label "Atmosphere"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereAtmosphereHeight_control_3bcn", "Atmosphere Height")
+            parm {
+                name    "xn__unrealskyAtmosphereAtmosphereHeight_2xbn"
+                label   "Atmosphere Height"
+                type    float
+                size    1
+                default { 60 }
+                help    "The height of the atmosphere layer above the ground in kilometers."
+                parmtag { "spare_category" "Atmosphere" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereAtmosphereHeight_control_3bcn == block } { xn__unrealskyAtmosphereAtmosphereHeight_control_3bcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn", "MultiScattering")
+            parm {
+                name    "xn__unrealskyAtmosphereMultiScatteringFactor_75bn"
+                label   "MultiScattering"
+                type    float
+                size    1
+                default { 1 }
+                help    "Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0."
+                parmtag { "spare_category" "Atmosphere" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn == block } { xn__unrealskyAtmosphereMultiScatteringFactor_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn", "Trace Sample Count Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereTraceSampleCountScale_75bn"
+                label   "Trace Sample Count Scale"
+                type    float
+                size    1
+                default { 1 }
+                range   { 0.25! 8 }
+                help    "Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'."
+                parmtag { "spare_category" "Atmosphere" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn == block } { xn__unrealskyAtmosphereTraceSampleCountScale_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_AtmosphereRayleigh"
+            label "Atmosphere - Rayleigh"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereRayleighScatteringScale_control_incn", "Rayleigh Scattering Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereRayleighScatteringScale_h9bn"
+                label   "Rayleigh Scattering Scale"
+                type    float
+                size    1
+                default { 0.0331 }
+                help    "Rayleigh scattering coefficient scale."
+                parmtag { "spare_category" "Atmosphere - Rayleigh" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereRayleighScatteringScale_control_incn == block } { xn__unrealskyAtmosphereRayleighScatteringScale_control_incn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereRayleighScattering_control_dfcn", "Rayleigh Scattering")
+            parm {
+                name    "xn__unrealskyAtmosphereRayleighScattering_c1bn"
+                label   "Rayleigh Scattering"
+                type    color
+                size    3
+                default { 0.1752870090634441 0.40960725075528703 1 }
+                help    "The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer."
+                parmtag { "spare_category" "Atmosphere - Rayleigh" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereRayleighScattering_control_dfcn == block } { xn__unrealskyAtmosphereRayleighScattering_control_dfcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereRayleighExponentialDistribution_control_j0cn", "Rayleigh Exponential Distribution")
+            parm {
+                name    "xn__unrealskyAtmosphereRayleighExponentialDistribution_incn"
+                label   "Rayleigh Exponential Distribution"
+                type    float
+                size    1
+                default { 8 }
+                help    "The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%."
+                parmtag { "spare_category" "Atmosphere - Rayleigh" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereRayleighExponentialDistribution_control_j0cn == block } { xn__unrealskyAtmosphereRayleighExponentialDistribution_control_j0cn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_AtmosphereMie"
+            label "Atmosphere - Mie"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieScatteringScale_control_dfcn", "Mie Scattering Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereMieScatteringScale_c1bn"
+                label   "Mie Scattering Scale"
+                type    float
+                size    1
+                default { 0.003996 }
+                help    "Mie scattering coefficient scale."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieScatteringScale_control_dfcn == block } { xn__unrealskyAtmosphereMieScatteringScale_control_dfcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieScattering_control_75bn", "Mie Scattering")
+            parm {
+                name    "xn__unrealskyAtmosphereMieScattering_6sbn"
+                label   "Mie Scattering"
+                type    color
+                size    3
+                default { 1 1 1 }
+                help    "The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieScattering_control_75bn == block } { xn__unrealskyAtmosphereMieScattering_control_75bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieAbsorptionScale_control_dfcn", "Mie Absorption Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereMieAbsorptionScale_c1bn"
+                label   "Mie Absorption Scale"
+                type    float
+                size    1
+                default { 0.000444 }
+                help    "Mie absorption coefficient scale."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieAbsorptionScale_control_dfcn == block } { xn__unrealskyAtmosphereMieAbsorptionScale_control_dfcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieAbsorption_control_75bn", "Mie Absorption")
+            parm {
+                name    "xn__unrealskyAtmosphereMieAbsorption_6sbn"
+                label   "Mie Absorption"
+                type    color
+                size    3
+                default { 1 1 1 }
+                help    "The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieAbsorption_control_75bn == block } { xn__unrealskyAtmosphereMieAbsorption_control_75bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieAnisotropy_control_75bn", "Mie Anisotropy")
+            parm {
+                name    "xn__unrealskyAtmosphereMieAnisotropy_6sbn"
+                label   "Mie Anisotropy"
+                type    float
+                size    1
+                default { 0.8 }
+                help    "A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieAnisotropy_control_75bn == block } { xn__unrealskyAtmosphereMieAnisotropy_control_75bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereMieExponentialDistribution_control_escn", "Mie Exponential Distribution")
+            parm {
+                name    "xn__unrealskyAtmosphereMieExponentialDistribution_dfcn"
+                label   "Mie Exponential Distribution"
+                type    float
+                size    1
+                default { 1.2 }
+                help    "The altitude in kilometer at which Mie effects are reduced to 40%."
+                parmtag { "spare_category" "Atmosphere - Mie" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereMieExponentialDistribution_control_escn == block } { xn__unrealskyAtmosphereMieExponentialDistribution_control_escn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_AtmosphereAbsorption"
+            label "Atmosphere - Absorption"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereOtherAbsorptionScale_control_micn", "Absorption Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereOtherAbsorptionScale_l4bn"
+                label   "Absorption Scale"
+                type    float
+                size    1
+                default { 0.001881 }
+                help    "Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere."
+                parmtag { "spare_category" "Atmosphere - Absorption" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereOtherAbsorptionScale_control_micn == block } { xn__unrealskyAtmosphereOtherAbsorptionScale_control_micn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereOtherAbsorption_control_h9bn", "Absorption")
+            parm {
+                name    "xn__unrealskyAtmosphereOtherAbsorption_gwbn"
+                label   "Absorption"
+                type    color
+                size    3
+                default { 0.34556087187666135 1 0.045188729399255716 }
+                help    "Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere."
+                parmtag { "spare_category" "Atmosphere - Absorption" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereOtherAbsorption_control_h9bn == block } { xn__unrealskyAtmosphereOtherAbsorption_control_h9bn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_ArtDirection"
+            label "Art Direction"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn", "Sky Luminance Factor")
+            parm {
+                name    "xn__unrealskyAtmosphereSkyLuminanceFactor_c1bn"
+                label   "Sky Luminance Factor"
+                type    color
+                size    3
+                default { 1 1 1 }
+                help    "Scales the luminance of pixels representing the sky. This will impact the captured sky light."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn == block } { xn__unrealskyAtmosphereSkyLuminanceFactor_control_dfcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn", "Sky And Aerial Perspective Luminance Factor")
+            parm {
+                name    "xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_wycn"
+                label   "Sky And Aerial Perspective Luminance Factor"
+                type    color
+                size    3
+                default { 1 1 1 }
+                help    "Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "color3f" }
+                disablewhen R"({ xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn == block } { xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_control_xcdn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn", "Aerial Perspective View Distance Scale")
+            parm {
+                name    "xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_rqcn"
+                label   "Aerial Perspective View Distance Scale"
+                type    float
+                size    1
+                default { 1 }
+                help    "Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent)."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn == block } { xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_control_s3cn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereHeightFogContribution_control_8jcn", "Height Fog Contribution")
+            parm {
+                name    "xn__unrealskyAtmosphereHeightFogContribution_75bn"
+                label   "Height Fog Contribution"
+                type    float
+                size    1
+                default { 1 }
+                help    "Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereHeightFogContribution_control_8jcn == block } { xn__unrealskyAtmosphereHeightFogContribution_control_8jcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn", "Transmittance Min Light Elevation Angle")
+            parm {
+                name    "xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_0tcn"
+                label   "Transmittance Min Light Elevation Angle"
+                type    float
+                size    1
+                default { -90 }
+                help    "The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn == block } { xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_control_16cn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn", "Aerial Perspective Start Depth")
+            parm {
+                name    "xn__unrealskyAtmosphereAerialPerspectiveStartDepth_zgcn"
+                label   "Aerial Perspective Start Depth"
+                type    float
+                size    1
+                default { 0.1 }
+                help    "The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test."
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn == block } { xn__unrealskyAtmosphereAerialPerspectiveStartDepth_control_0tcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp", "Aerial Pespective Rayleigh Scattering Start Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_thdp"
+                label   "Aerial Pespective Rayleigh Scattering Start Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)"
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp == block } { xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_control_uudp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp", "Aerial Pespective Rayleigh Scattering Fade Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_6fdp"
+                label   "Aerial Pespective Rayleigh Scattering Fade Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp == block } { xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_control_7sdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp", "Aerial Pespective Mie Scattering Start Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_o8cp"
+                label   "Aerial Pespective Mie Scattering Start Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)"
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp == block } { xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_control_pmdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp", "Aerial Pespective Mie Scattering Fade Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_16cp"
+                label   "Aerial Pespective Mie Scattering Fade Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"
+                parmtag { "spare_category" "Art Direction" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp == block } { xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_control_2kdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_Rendering"
+            label "Rendering"
+            grouptag { "group_default" "0" }
+            grouptag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            HDUE_CONTROL("xn__unrealskyAtmospherebHoldout_control_2xbn", "Holdout")
+            parm {
+                name    "xn__unrealskyAtmospherebHoldout_1kbn"
+                label   "Holdout"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) \"Alpha Output\", and \"Support Primitive Alpha Holdout\" if using the deferred renderer."
+                parmtag { "spare_category" "Rendering" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealskyAtmospherebHoldout_control_2xbn == block } { xn__unrealskyAtmospherebHoldout_control_2xbn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL("xn__unrealskyAtmospherebRenderInMainPass_control_qdcn", "Render In Main Pass")
+            parm {
+                name    "xn__unrealskyAtmospherebRenderInMainPass_pzbn"
+                label   "Render In Main Pass"
+                type    toggle
+                size    1
+                default { 1 }
+                help    "If true, this component will be rendered in the main pass (basepass, transparency)"
+                parmtag { "spare_category" "Rendering" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealskyAtmospherebRenderInMainPass_control_qdcn == block } { xn__unrealskyAtmospherebRenderInMainPass_control_qdcn == none } { xn__unrealskyAtmosphere_06a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudbHoldout_control_c1bp", "Holdout")
+            parm {
+                name    "xn__unrealvolumetricCloudbHoldout_bobp"
+                label   "Holdout"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) \"Alpha Output\", and \"Support Primitive Alpha Holdout\" if using the deferred renderer."
+                parmtag { "spare_category" "Rendering" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealvolumetricCloudbHoldout_control_c1bp == block } { xn__unrealvolumetricCloudbHoldout_control_c1bp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudbRenderInMainPass_control_zgcp", "Render In Main Pass")
+            parm {
+                name    "xn__unrealvolumetricCloudbRenderInMainPass_y2bp"
+                label   "Render In Main Pass"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "If true, this component will be rendered in the main pass (basepass, transparency)"
+                parmtag { "spare_category" "Rendering" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealvolumetricCloudbRenderInMainPass_control_zgcp == block } { xn__unrealvolumetricCloudbRenderInMainPass_control_zgcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp", "Visible In Real Time Sky Captures")
+            parm {
+                name    "xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_incp"
+                label   "Visible In Real Time Sky Captures"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "If true, this component will be visible in real-time sky light reflection captures."
+                parmtag { "spare_category" "Rendering" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp == block } { xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_control_j0cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_Layer"
+            label "Layer"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealvolumetricCloudLayerBottomAltitude_control_8jcp", "Layer Bottom Altitude")
+            parm {
+                name    "xn__unrealvolumetricCloudLayerBottomAltitude_75bp"
+                label   "Layer Bottom Altitude"
+                type    float
+                size    1
+                default { 0 }
+                help    "The altitude at which the cloud layer starts. (kilometers above the ground)"
+                parmtag { "spare_category" "Layer" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudLayerBottomAltitude_control_8jcp == block } { xn__unrealvolumetricCloudLayerBottomAltitude_control_8jcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudLayerHeight_control_75bp", "Layer Height")
+            parm {
+                name    "xn__unrealvolumetricCloudLayerHeight_6sbp"
+                label   "Layer Height"
+                type    float
+                size    1
+                default { 0 }
+                help    "The height of the the cloud layer. (kilometers above the layer bottom altitude)"
+                parmtag { "spare_category" "Layer" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudLayerHeight_control_75bp == block } { xn__unrealvolumetricCloudLayerHeight_control_75bp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudTracingStartMaxDistance_control_rqcp", "Tracing Start Max Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudTracingStartMaxDistance_qdcp"
+                label   "Tracing Start Max Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)"
+                parmtag { "spare_category" "Layer" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudTracingStartMaxDistance_control_rqcp == block } { xn__unrealvolumetricCloudTracingStartMaxDistance_control_rqcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp", "Tracing Start Distance From Camera")
+            parm {
+                name    "xn__unrealvolumetricCloudTracingStartDistanceFromCamera_4ocp"
+                label   "Tracing Start Distance From Camera"
+                type    float
+                size    1
+                default { 0 }
+                help    "The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)"
+                parmtag { "spare_category" "Layer" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp == block } { xn__unrealvolumetricCloudTracingStartDistanceFromCamera_control_51cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudTracingMaxDistance_control_micp", "Tracing Max Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudTracingMaxDistance_l4bp"
+                label   "Tracing Max Distance"
+                type    float
+                size    1
+                default { 0 }
+                help    "The maximum distance that will be traced inside the cloud layer. (kilometers)"
+                parmtag { "spare_category" "Layer" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudTracingMaxDistance_control_micp == block } { xn__unrealvolumetricCloudTracingMaxDistance_control_micp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_CloudMaterial"
+            label "Cloud Material"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealvolumetricCloudMaterial_control_c1bp", "Material")
+            parm {
+                name    "xn__unrealvolumetricCloudMaterial_bobp"
+                label   "Material"
+                type    string
+                size    1
+                default { "" }
+                help    "The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."
+                parmtag { "spare_category" "Cloud Material" }
+                parmtag { "usdvaluetype" "string" }
+                disablewhen R"({ xn__unrealvolumetricCloudMaterial_control_c1bp == block } { xn__unrealvolumetricCloudMaterial_control_c1bp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+        }
+
+        groupcollapsible {
+            name "hdUE_Sky_CloudTracing"
+            label "Cloud Tracing"
+            grouptag { "group_default" "0" }
+            HDUE_CONTROL("xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp", "Use Per Sample Atmospheric Light Transmittance")
+            parm {
+                name    "xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_o8cp"
+                label   "Use Per Sample Atmospheric Light Transmittance"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp == block } { xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_control_pmdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp", "Sky Light Cloud Bottom Occlusion")
+            parm {
+                name    "xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_vlcp"
+                label   "Sky Light Cloud Bottom Occlusion"
+                type    float
+                size    1
+                default { 0 }
+                help    "Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp == block } { xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_control_wycp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp", "View Sample Count Scale")
+            parm {
+                name    "xn__unrealvolumetricCloudViewSampleCountScale_u7bp"
+                label   "View Sample Count Scale"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0.05! 8 }
+                help    "Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp == block } { xn__unrealvolumetricCloudViewSampleCountScale_control_vlcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp", "Reflection View Sample Count Scale Value")
+            parm {
+                name    "xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_9wcp"
+                label   "Reflection View Sample Count Scale Value"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0.05! 8 }
+                help    "Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp == block } { xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_control_bbdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp", "Shadow View Sample Count Scale")
+            parm {
+                name    "xn__unrealvolumetricCloudShadowViewSampleCountScale_micp"
+                label   "Shadow View Sample Count Scale"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0.05! 8 }
+                help    "Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp == block } { xn__unrealvolumetricCloudShadowViewSampleCountScale_control_nvcp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp", "Shadow Reflection View Sample Count Scale Value")
+            parm {
+                name    "xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_16cp"
+                label   "Shadow Reflection View Sample Count Scale Value"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0.05! 8 }
+                help    "Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp == block } { xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_control_2kdp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudShadowTracingDistance_control_incp", "Shadow Tracing Distance")
+            parm {
+                name    "xn__unrealvolumetricCloudShadowTracingDistance_h9bp"
+                label   "Shadow Tracing Distance"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0.01! 50 }
+                help    "The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudShadowTracingDistance_control_incp == block } { xn__unrealvolumetricCloudShadowTracingDistance_control_incp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp", "Stop Tracing Transmittance Threshold")
+            parm {
+                name    "xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_0tcp"
+                label   "Stop Tracing Transmittance Threshold"
+                type    float
+                size    1
+                default { 0 }
+                range   { 0! 1! }
+                help    "When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance."
+                parmtag { "spare_category" "Cloud Tracing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp == block } { xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_control_16cp == none } { xn__unrealvolumetricCloud_99a == 0 })"
+            }
+        }
+    }
+
+    group {
         name "hdUE_RenderingFeatures_Tab"
         label "Rendering Features"
         HDUE_CONTROL("xn__unrealpostProcessUserFlags_control_gwbl", "User Flags")

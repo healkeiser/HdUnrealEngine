@@ -205,6 +205,9 @@ struct HdUEMaterialData {
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false;  // HDUE_MATERIAL_VERTEX_COLOR
 };
+// A setting's value as the backend reads UE properties from text: USD booleans as True/False, asset paths resolved,
+// everything else as USD prints it (vectors as "(x, y, z)", which fill a UE struct's fields in order).
+std::string HdUESettingText(const VtValue& value);
 struct HdUELightData {
     std::string id;
     std::string texture;
@@ -217,6 +220,7 @@ struct HdUELightData {
     float iesAngleScale = 0;
     bool iesNormalize = false;
     TfToken lightLink, shadowLink;  // collection ids; empty when the collection includes everything
+    std::vector<std::pair<std::string, std::string>> properties;  // unreal:light:<UE property>, as text
     uint32_t flags = HDUE_LIGHT_SHADOWS | HDUE_LIGHT_BACKGROUND | HDUE_LIGHT_MEGALIGHTS,
              textureFormat = HDUE_ENVIRONMENT_AUTOMATIC;
     bool visible = true, viewer = false;

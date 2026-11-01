@@ -37,13 +37,17 @@ rebuilds it only when those change. No ABI change.
 options (contact shadows, light shafts, `bCastVolumetricShadow`, volumetric scattering intensity) all need per-light
 values that UsdLux does not have.
 
-- ABI 14: add `const char* properties` to `HdueLight`: `name=value` pairs set on the light component by reflection, with
-  the parser the render settings already use for `unreal:postProcess:*` and `HeightFog:*` (same value syntax, unknown
-  names and bad values warned once in the UE log).
-- Delegate: every `unreal:light:<ULightComponent property>` attribute on a light goes into that string. The Houdini
-  Light LOP's Unreal Engine tab lists the properties of the light's UE class, generated as the render settings are.
+- ABI 14: `HdueLight` gets `property_count`, `property_names`, `property_values`, set on the light component by
+  reflection before it is registered, with the importer the render settings use for `unreal:postProcess:*` and
+  `HeightFog:*` (`ImportPropertyValue`; object properties load a cooked path and check its class).
+- Delegate: Hydra's scene delegate reads light attributes by name only, so `generate_render_settings.py` keeps a curated
+  list per UE class (`LIGHT_CLASSES`: what UsdLux has no attribute for and a runtime light can change) and writes both
+  the Light LOP's parameters (`HdUnrealEngine_Light.ds`, UE's labels, tooltips, ranges and constructor defaults) and
+  `src/hydra/light_properties.h`, the names the delegate reads as `unreal:light:<Property>`.
+- UE 5.8 has no `bUseContactShadows`: `ContactShadowLength` above 0 turns contact shadows on. Distant lights already
+  default to `bAtmosphereSunLight` on (`UDirectionalLightComponent`'s constructor).
 - Verify: conformance `lights/*`, a Cornell render (unchanged), one new conformance scene that sets
-  `unreal:light:bUseContactShadows`.
+  `unreal:light:ContactShadowLength`.
 
 ## 1. Sky Atmosphere, atmosphere sun, Volumetric Clouds
 
@@ -61,11 +65,14 @@ light with `bAtmosphereSunLight` (index 0 sun, 1 moon), and a SkyLight with `bRe
   directory to `DirectoriesToAlwaysCook` and load it explicitly; `unreal:volumetricCloud:Material` takes another cooked
   material path.
 - Height fog: with the atmosphere on, UE colours height fog from the atmosphere when its inscattering colours are
-  black ("Support Sky Atmosphere Affecting Height Fog"). Check the project setting and document the interaction.
-- Path Tracer: it ignores the atmosphere and clouds volumetrically unless `PathTracingEnableReferenceAtmosphere` is on
-  (`Scene.h:2517`; `r.PathTracing.EnableReferenceAtmosphere`, `r.PathTracing.EnableReferenceClouds`,
-  `PathTracing.cpp:428-501`). Turn the post-process flag on when the atmosphere is on, as MRQ users do for reference
-  renders, and add the reference cvars to the Engine Quality tab.
+  black. `r.SupportSkyAtmosphereAffectsHeightFog` is 1 by default and read-only (baked into shaders,
+  `SkyAtmosphereRendering.cpp:98-102`), so this project has it; document the interaction.
+- Path Tracer: UE's docs: Sky Atmosphere "requires a Sky Light in the scene which has Real Time Capture enabled", or
+  the post-process setting Reference Atmosphere, with which "any Sky Light present in the scene is automatically
+  ignored"; clouds are supported with the reference atmosphere since 5.6 ([Path Tracer](https://dev.epicgames.com/documentation/unreal-engine/path-tracer-in-unreal-engine)).
+  `PathTracingEnableReferenceAtmosphere` (`Scene.h:2517`, `r.PathTracing.EnableReferenceAtmosphere`,
+  `r.PathTracing.EnableReferenceClouds`, `PathTracing.cpp:428-501`) stays the user's choice; the real-time capture
+  SkyLight above already makes the Path Tracer see the sky.
 - Units: UE's atmosphere is in kilometres and its ground sits at the component's origin; the backend converts from
   `metersPerUnit` as it does for transforms.
 - Verify: new conformance scenes (atmosphere with sun at three elevations, clouds), both modes; Cornell unchanged;
@@ -82,12 +89,21 @@ engine change. So:
 - Keep the transient dense texture for Hydra volumes. Add a second field (`temperature`, or `emission`/`Cd` when
   authored) as a second channel, and extend `M_HdUEVolume` (and `HdueVolumeDesc`, ABI bump) with emission from it, as
   UE's heterogeneous volume materials read SVT attributes. Temperature-to-colour follows UE's own blackbody node.
-- Realtime shadows: `r.HeterogeneousVolumes.Shadows` defaults to 0 (`HeterogeneousVolumes.cpp:33`); shadows onto
-  geometry go through the adaptive volumetric shadow map, self-shadowing needs the proxy to cast dynamic shadows and
-  `r.HeterogeneousVolumes.LightingCache.UseAVSM`. This is the likely cause of the open "volumes cast no shadow" item.
-  Set the component's shadow casting, test the cvars on the conformance fog, and expose them in Engine Quality.
-- Path Tracer's blocky silhouettes: check `r.PathTracing.HeterogeneousVolumes.*` (`PathTracing.cpp:625-640`) for the
-  resampling resolution before anything else.
+- Realtime shadows onto the scene: the project's Heterogeneous Volumes "Shadow Casting" setting
+  (`r.HeterogeneousVolumes.Shadows`, 0 by default, `HeterogeneousVolumes.cpp:33`). The shadow is a volumetric shadow
+  map applied in the deferred light loop only (`LightRendering.cpp:1859,2364`): lights shaded by MegaLights skip it
+  (no MegaLights code sets `ADAPTIVE_VOLUMETRIC_SHADOW_MAP`), and so do lights with ray-traced shadows. hdUE shades
+  local lights with MegaLights by default, so a volume shadows the scene from distant lights and from local lights
+  with `unreal:megaLights = 0`. Self-shadowing needs only the light's `bCastVolumetricShadow`. This explains the open
+  "volumes cast no shadow" item.
+- Path Tracer's blocky silhouettes: its voxel grids use `r.HeterogeneousVolumes.{Frustum,Ortho}Grid.ShadingRate` 4 and
+  128 MB; UE's docs recommend shading rate 1 and 512 MB for cinematic renders in Movie Render Queue
+  ([Heterogeneous Volumes](https://dev.epicgames.com/documentation/unreal-engine/heterogeneous-volumes-in-unreal-engine)):
+  the offline profile sets them. `SetVolumeResolution` already gets the grid's size.
+- Emission: the Volume-domain material's Emissive output, rendered by both paths
+  (`HeterogeneousVolumesLiveShadingUtils.ush:36-72`, `PathTracingHeterogeneousVolumes.ush:124`); UE's BlackBody
+  expression is ordinary material code (`MaterialTemplate.ush:2113`). It needs `M_HdUEVolume` re-made by the
+  HdUEPrepare commandlet, an editor build and a re-cook.
 - Cooked SVTs: a Volume (or Xform) with `unreal:asset` pointing at a cooked `SparseVolumeTexture` renders it with UE's
   SVT material, through the native asset catalog, for scenes that pre-cook their VDBs in the editor.
 - Verify: `volumes/*` conformance, `samples/cornell/fog.vdb` shadow on the floor in realtime, an emissive fire VDB in
@@ -111,7 +127,8 @@ the Path Tracer supports them (`FLightFunctionParametersPathTracing`, `r.PathTra
 UE's strand renderer (HairStrands, Marschner shading, path-traced hair) is what Houdini hair needs; BasisCurves render as
 tube meshes today. There is no supported runtime path: the `UGroomAsset` build (`CacheDerivedDatas`,
 `CommitHairDescription`) is editor-only (`GroomAsset.h:890-961`). `FGroomBuilder` (`GroomBuilder.h:59-129`) compiles
-at runtime and `GetHairGroupsPlatformData()` is public, so a manual build may work.
+at runtime and `GetHairGroupsPlatformData()` is public, so a manual build may work. UE's docs describe no runtime,
+Blueprint, PCG or Niagara way to make a groom: grooms come from an Alembic or USD import in the editor.
 
 - Spike (1-2 days, throwaway): fill `FHairDescription` from one BasisCurves prim, run `FGroomBuilder::BuildData`,
   `BuildBulkData`, interpolation and cluster data, write `PlatformData`, `InitResources`, draw one
@@ -126,10 +143,17 @@ at runtime and `GetHairGroupsPlatformData()` is public, so a manual build may wo
 
 MaterialX `transmission` is see-through coverage today, with no refraction in realtime (the Path Tracer refracts).
 
-- Add translucent parent variants with UE's refraction (Substrate's refraction method driven by `specular_IOR` / `ior`),
-  as UE's Interchange MaterialX import does for transmissive Standard Surface; check its translation first and match it.
-- Check UE 5.8's Lumen translucency options (front-layer reflections are already on) and ray-traced translucency, and
-  expose the relevant cvars in Engine Quality rather than choosing one silently.
+- UE's Interchange MaterialX import (Substrate on) turns any connected `transmission` into
+  `Substrate-StandardSurface-Translucent` (OpenPBR: `MF_Substrate_OpenPBR_Translucent`) with blend mode
+  `BLEND_TranslucentColoredTransmittance`, and wires the material's Refraction pin from the function's
+  `Refraction (IOR)` output (`InterchangeMaterialXPipeline.cpp:31-35`, `MaterialXStandardSurfaceShader.cpp:42-68`,
+  `MaterialXSurfaceShaderAbstract.cpp:1527`). It leaves Refraction Method and Translucency Lighting Mode at the
+  engine defaults; `thin_walled` only sets two-sided. Add cooked parent variants that do the same.
+- UE's docs: the Path Tracer refracts only with Refraction Method Index Of Refraction ("otherwise ... transparency
+  instead of refraction"); check what the engine default gives the imported material.
+- Realtime options to expose in Engine Quality, not choose silently: `r.RayTracing.Translucency` (-1: the post-process
+  setting decides; `.Refraction` 1), Lumen front-layer reflections (already on), `r.Refraction.Blur` (Substrate rough
+  refraction, 0).
 - Verify: `materials/*` glass conformance, the glass profile scene, Cornell unchanged.
 
 ## 6. Lens distortion
@@ -138,8 +162,13 @@ UE: `CameraCalibrationCore` (runtime module): `ULensDistortionModelHandlerBase::
 `USphericalLensModel`, applied per view through `UCameraCalibrationSubsystem::SetLensDistortionSVEState`, which needs an
 `ACameraActor` per view. No LensFile asset is required.
 
-- Authoring: USD has no lens-distortion schema. Camera attributes `unreal:lensDistortion:k1..k3, p1, p2` (and
-  `overscan`), named after UE's spherical model's parameters; Karma's lens attributes are only a comparison.
+- UE's docs: "You can create a lens distortion handler object ... and drive its distortion state without the need to
+  specify a Lens File"; the spherical model is Brown-Conrady with K1, K2, P1, P2, K3, and the handler computes the
+  overscan ([Camera Lens Calibration](https://dev.epicgames.com/documentation/unreal-engine/camera-lens-calibration-overview)).
+- Authoring: USD has no lens-distortion schema, but Hydra's camera carries `HdLensDistortionSchema` (`type`, `k1`,
+  `k2`, `center`, `anaSq`, `asym`, `scale`, `ior`; [Hydra prim schemas](https://openusd.org/release/api/_page__hydra__prim__schemas.html)):
+  read it first and map `standard` distortion to UE's K1, K2 (and `center`). Camera attributes
+  `unreal:lensDistortion:k3, p1, p2` add what Hydra's model lacks. Karma's lens attributes are only a comparison.
 - Enable the plugin in the runtime project; overscan renders a larger data window and crops, so AOVs stay aligned.
 - Verify: a grid scene against a distortion computed from the same coefficients; viewport and husk match.
 
@@ -149,7 +178,13 @@ The `velocity` AOV comes from the raster pass, which renders one time, so it is 
 
 - Render the buffer pass after a previous frame at the shutter's open time (camera and object transforms, deformed
   points), so UE's velocity buffer holds this frame's motion, as MRQ's motion-vector output does after its warm-up.
-- Output convention: follow MRQ's motion-vector pass (its decoding and units); document it next to Karma's `motionvector`
-  for comparison.
+- Output convention: MRQ's `/MovieRenderPipeline/Materials/MovieRenderQueue_MotionVectors` reads `PPI_Velocity`, which
+  decodes to current minus previous position in NDC (+Y up, 2 = the full width, `MaterialTemplate.ush:3213-3232`),
+  and re-encodes it as `v * 0.2495 + 0.5` in R and G (UE's docs: "stored in the 0,1 coordinate space for X and Y,
+  where 0.5, 0.5 is no motion", normalized to the screen;
+  [Cinematic Render Passes](https://dev.epicgames.com/documentation/unreal-engine/cinematic-render-passes-in-unreal-engine)). Pixels with no velocity get the camera's motion. Document it next
+  to Karma's `motionvector` for comparison.
+- First frame: MRQ sets a camera cut at a shot's first sample, which zeroes motion unless warm-up frames run first
+  (`MoviePipelineRendering.cpp:407,451`); hdUE's sub-frame at shutter open plays that part.
 - Verify: a moving cube and a moving camera, both modes (the raster pass serves both), checked against the expected
   pixel displacement.

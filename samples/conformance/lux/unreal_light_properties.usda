@@ -1,0 +1,69 @@
+#usda 1.0
+(
+    doc = """unreal:light:<Property> sets a property of the UE light made from a UsdLux light: UE barn doors (angle 0, 3 m long) on a rect light narrow its beam, so the wall away from the light's axis stays dark. Without them hdUE's rect lights have none and the wall there gets about 0.45 of the centre's light."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE light properties",
+ "feature": "unreal:light:BarnDoorAngle, BarnDoorLength",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "barn doors darken the wall off the light's axis",
+   "ratio": [
+    {
+     "region": [
+      3.0,
+      -0.5,
+      4.0,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      -0.5,
+      -0.5,
+      0.5,
+      0.5
+     ]
+    }
+   ],
+   "max": 0.15
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def RectLight "L"
+{
+        float inputs:width = 1
+        float inputs:height = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 6
+        float unreal:light:BarnDoorAngle = 0
+        float unreal:light:BarnDoorLength = 300
+        double3 xformOp:translate = (0, 0, 3)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

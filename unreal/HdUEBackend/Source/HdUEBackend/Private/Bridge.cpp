@@ -21,6 +21,9 @@
 #include "Engine/World.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/LocalFogVolumeComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "GameFramework/Actor.h"
 #include "CanvasTypes.h"
 #include "ContentStreaming.h"
@@ -154,9 +157,13 @@ struct FSession {
         TStrongObjectPtr<UTexture> Texture;
     };
     TMap<FString, FPostProcessTexture> PostProcessTextures;
-    // set_post_process HeightFog: the Exponential Height Fog actor and the property values it was built with.
-    TWeakObjectPtr<AActor> HeightFog;
-    TArray<TPair<FString, FString>> HeightFogValues;
+    // Scene components set_post_process places (HeightFog, SkyAtmosphere, VolumetricCloud; SkyLight follows
+    // SkyAtmosphere): each one's actor and the property values it was built with.
+    struct FSceneComponent {
+        TWeakObjectPtr<AActor> Actor;
+        TArray<TPair<FString, FString>> Values;
+    };
+    TMap<FString, FSceneComponent> SceneComponents;
     // upsert_local_fog_volume: the Local Fog Volume actors, by id.
     TMap<FString, TWeakObjectPtr<AActor>> LocalFogVolumes;
     bool Tonemapper = false;
@@ -422,21 +429,28 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         // Offline hosts (husk) get Movie Render Queue's Game Overrides: Cinematic scalability (keeping the screen
         // percentage), fully loaded texture streaming (Draw waits for it) and no GPU timeout for long Path Tracer
         // dispatches. Lumen's surface cache updates every frame so bounce lighting converges within the warmup frames
-        // (as Movie Render Graph's layer warm-ups raise its update rates, DeferredLayerWarmUpHelpers.cpp). Set before
-        // any session, so authored unreal:cvar:* values override them.
+        // (as Movie Render Graph's layer warm-ups raise its update rates, DeferredLayerWarmUpHelpers.cpp). Volumes use
+        // the heterogeneous volume settings UE's docs recommend for cinematic renders in Movie Render Queue (shading
+        // rate 1, 512 MB): at the defaults (4, 128 MB) the Path Tracer's voxel grids made volume edges blocky. Set
+        // before any session, so authored unreal:cvar:* values override them.
         Scalability::FQualityLevels Levels = Scalability::GetQualityLevels();
         const float Resolution = Levels.ResolutionQuality;
         Levels.SetFromSingleQualityLevelRelativeToMax(0);
         Levels.ResolutionQuality = Resolution;
         Scalability::SetQualityLevels(Levels);
-        for (const auto& [Name, Value] : {TPair<const TCHAR*, int32>{TEXT("r.Streaming.FullyLoadUsedTextures"), 1},
-                                          {TEXT("r.Streaming.FramesForFullUpdate"), 0},
-                                          {TEXT("r.Streaming.SyncStatesWhenBlocking"), 1},
-                                          {TEXT("r.D3D12.GPUTimeout"), 0},
-                                          {TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2},
-                                          {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2},
-                                          {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000},
-                                          {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4}})
+        for (const auto& [Name, Value] :
+             {TPair<const TCHAR*, int32>{TEXT("r.Streaming.FullyLoadUsedTextures"), 1},
+              {TEXT("r.Streaming.FramesForFullUpdate"), 0},
+              {TEXT("r.Streaming.SyncStatesWhenBlocking"), 1},
+              {TEXT("r.D3D12.GPUTimeout"), 0},
+              {TEXT("r.LumenScene.Radiosity.UpdateFactor"), 2},
+              {TEXT("r.LumenScene.DirectLighting.UpdateFactor"), 2},
+              {TEXT("r.LumenScene.SurfaceCache.CardCapturesPerFrame"), 100000},
+              {TEXT("r.LumenScene.SurfaceCache.CardCaptureFactor"), 4},
+              {TEXT("r.HeterogeneousVolumes.FrustumGrid.ShadingRate"), 1},
+              {TEXT("r.HeterogeneousVolumes.OrthoGrid.ShadingRate"), 1},
+              {TEXT("r.HeterogeneousVolumes.FrustumGrid.MaxBottomLevelMemoryInMegabytes"), 512},
+              {TEXT("r.HeterogeneousVolumes.OrthoGrid.MaxBottomLevelMemoryInMegabytes"), 512}})
             SetCVar(Name, Value);
     }
     Runtime.State = HDUE_STATE_READY;
@@ -450,7 +464,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     const auto Session = Runtime.Session;
     ReleaseResidency(Session);
     HdueSharedFrames::Reset();
-    if (Session->HeightFog.IsValid()) Session->HeightFog->Destroy();
+    for (auto& [Prefix, Component] : Session->SceneComponents)
+        if (Component.Actor.IsValid()) Component.Actor->Destroy();
     for (const auto& Fog : Session->LocalFogVolumes)
         if (Fog.Value.IsValid()) Fog.Value->Destroy();
     Session->Scene.Reset();
@@ -530,6 +545,8 @@ bool SameView(const HdueRenderRequest& A, const HdueRenderRequest& B) {
            A.orthographic == B.orthographic && A.fstop == B.fstop && A.focus_distance_cm == B.focus_distance_cm &&
            A.focal_length_cm == B.focal_length_cm;
 }
+
+static void UpdateSkyCapture(FSession& Session);  // with set_post_process's scene components
 
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
@@ -623,6 +640,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (!Session->Scene->Lighting->GetError().IsEmpty())
         return Fail(HDUE_ENGINE_ERROR, *Session->Scene->Lighting->GetError());
     if (!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
+    UpdateSkyCapture(*Session);  // a DomeLight added or removed since set_post_process
     HdueAssetSceneStatus Assets{};
     Session->Scene->Assets.GetSceneStatus(Assets);
     if (Assets.loading) return Pending(TEXT("native assets"));
@@ -1315,10 +1333,20 @@ HdueResult HDUE_CALL SetTransforms(HdueSession Handle, const HdueMeshTransform* 
     return HDUE_OK;
 }
 
+}  // namespace
+
 // Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
-// numbers.
+// numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Global:
+// lights use it too (Lighting.h).
 bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container) {
     void* Value = Property->ContainerPtrToValuePtr<void>(Container);
+    if (const auto* Object = CastField<FObjectPropertyBase>(Property)) {
+        const bool None = Text.IsEmpty() || Text == TEXT("None");
+        UObject* Loaded = None ? nullptr : LoadObject<UObject>(nullptr, *Text);
+        if (!None && (!Loaded || !Loaded->IsA(Object->PropertyClass))) return false;
+        Object->SetObjectPropertyValue(Value, Loaded);
+        return true;
+    }
     const auto* Struct = CastField<FStructProperty>(Property);
     if (Struct && !Text.Contains(TEXT("="))) {
         TArray<FString> Numbers;
@@ -1353,6 +1381,7 @@ bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Contain
     const TCHAR* End = Property->ImportText_Direct(*Text, Value, nullptr, PPF_None);
     return End && !*End;
 }
+namespace {
 
 // Console variables hdUE set, with the value each had before (a variable no longer listed gets it back) and the
 // value last set (set again only when it changes: scalability groups re-apply their whole level when set).
@@ -1520,26 +1549,45 @@ static UTexture* PostProcessTexture(FSession& Session, const FString& Name, cons
     return Texture;
 }
 
-// HeightFog: one Exponential Height Fog in the session's world, as the actor a UE level places. Rebuilt only when its
-// values change, so volumetric fog keeps its temporal history from frame to frame.
-static void SetHeightFog(FSession& Session, bool Enabled, TArray<TPair<FString, FString>> Values) {
-    if (Enabled == Session.HeightFog.IsValid() && Values == Session.HeightFogValues) return;
-    if (Session.HeightFog.IsValid()) Session.HeightFog->Destroy();
-    Session.HeightFog = nullptr;
-    Session.HeightFogValues = MoveTemp(Values);
+// The scene components set_post_process places by name (Prefix True, Prefix:<Property> values), one each, as the
+// actors a UE level places.
+static UClass* SceneComponentClass(const FString& Prefix) {
+    if (Prefix == TEXT("HeightFog")) return UExponentialHeightFogComponent::StaticClass();
+    if (Prefix == TEXT("SkyAtmosphere")) return USkyAtmosphereComponent::StaticClass();
+    if (Prefix == TEXT("VolumetricCloud")) return UVolumetricCloudComponent::StaticClass();
+    return nullptr;
+}
+// Rebuilt only when its values change, so volumetric fog and clouds keep their temporal history from frame to frame.
+static void SetSceneComponent(FSession& Session, const FString& Prefix, UClass* Class, bool Enabled,
+                              TArray<TPair<FString, FString>> Values) {
+    auto& Component = Session.SceneComponents.FindOrAdd(Prefix);
+    if (Enabled == Component.Actor.IsValid() && Values == Component.Values) return;
+    if (Component.Actor.IsValid()) Component.Actor->Destroy();
+    Component.Actor = nullptr;
+    Component.Values = MoveTemp(Values);
     if (!Enabled) return;
     AActor* Actor = Runtime.World->SpawnActor<AActor>();
-    auto* Fog = NewObject<UExponentialHeightFogComponent>(Actor);
-    for (const auto& Value : Session.HeightFogValues) {
-        FProperty* Property = UExponentialHeightFogComponent::StaticClass()->FindPropertyByName(*Value.Key);
-        if (!Property || !ImportPropertyValue(Property, Value.Value, Fog))
-            UE_LOG(LogTemp, Warning, TEXT("hdUE: height fog setting %s = '%s' skipped (unknown property or value)"),
+    auto* Scene = NewObject<USceneComponent>(Actor, Class);
+    Scene->SetMobility(EComponentMobility::Movable);
+    for (const auto& Value : Component.Values) {
+        FProperty* Property = Class->FindPropertyByName(*Value.Key);
+        if (!Property || !ImportPropertyValue(Property, Value.Value, Scene))
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: %s setting %s = '%s' skipped (unknown property or value)"), *Prefix,
                    *Value.Key, *Value.Value);
     }
-    Actor->SetRootComponent(Fog);
-    Actor->AddInstanceComponent(Fog);
-    Fog->RegisterComponent();
-    Session.HeightFog = Actor;
+    Actor->SetRootComponent(Scene);
+    Actor->AddInstanceComponent(Scene);
+    Scene->RegisterComponent();
+    Component.Actor = Actor;
+}
+// UE's Sky Atmosphere lights the scene (Lumen) and reaches the Path Tracer through a Sky Light with real-time capture,
+// as UE's docs require and its default level has. A DomeLight's own sky light takes its place: a scene's environment
+// wins.
+static void UpdateSkyCapture(FSession& Session) {
+    const auto* Sky = Session.SceneComponents.Find(TEXT("SkyAtmosphere"));
+    const bool Capture = Sky && Sky->Actor.IsValid() && !Session.Scene->Lighting->HasDome();
+    SetSceneComponent(Session, TEXT("SkyLight"), USkyLightComponent::StaticClass(), Capture,
+                      {{TEXT("bRealTimeCapture"), TEXT("True")}});
 }
 
 // upsert_local_fog_volume: rebuilt on every upsert (the delegate sends a volume only when it changed), with its
@@ -1593,8 +1641,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     FString DebugView = TEXT("off");
     const auto Session = Runtime.Session;
     TSet<FString> Files;  // texture properties set to image files this call
-    bool HeightFog = false;
-    TArray<TPair<FString, FString>> HeightFogValues;
+    TMap<FString, TPair<bool, TArray<TPair<FString, FString>>>> Components;  // by prefix: enabled, values
     // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
     for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
         if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
@@ -1605,12 +1652,12 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
             DebugView = Text;
             continue;
         }
-        if (Name == TEXT("HeightFog")) {
-            HeightFog = Text == TEXT("True") || Text == TEXT("1");
+        if (SceneComponentClass(Name)) {
+            Components.FindOrAdd(Name).Key = Text == TEXT("True") || Text == TEXT("1");
             continue;
         }
-        if (Name.StartsWith(TEXT("HeightFog:"))) {
-            HeightFogValues.Emplace(Name.RightChop(10), Text);
+        if (FString Prefix, Property; Name.Split(TEXT(":"), &Prefix, &Property) && SceneComponentClass(Prefix)) {
+            Components.FindOrAdd(Prefix).Value.Emplace(Property, Text);
             continue;
         }
         if (Name.Contains(TEXT("."))) {
@@ -1655,7 +1702,12 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     for (auto It = Session->PostProcessTextures.CreateIterator(); It; ++It)
         if (!Files.Contains(It.Key())) It.RemoveCurrent();  // no longer set from a file
     SetDebugView(*Session, DebugView);
-    SetHeightFog(*Session, HeightFog, MoveTemp(HeightFogValues));
+    for (const TCHAR* Prefix : {TEXT("HeightFog"), TEXT("SkyAtmosphere"), TEXT("VolumetricCloud")}) {
+        auto* Component = Components.Find(Prefix);
+        SetSceneComponent(*Session, Prefix, SceneComponentClass(Prefix), Component && Component->Key,
+                          Component ? MoveTemp(Component->Value) : TArray<TPair<FString, FString>>());
+    }
+    UpdateSkyCapture(*Session);
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
     Session->Tonemapper = Desc->tonemapper != 0;

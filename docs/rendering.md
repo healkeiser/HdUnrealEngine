@@ -295,6 +295,8 @@ Per-light hdUE settings are `unreal:*` attributes on the light (the **Unreal Eng
 | `unreal:visibleBackground` | 1 | DomeLight: draw the environment as the background. Off, it still lights the scene, and camera rays that escape see black (Karma's default for domes, `karma:light:renderlightgeo`) |
 | `unreal:megaLights` | 1 | Realtime: shade this local light with MegaLights; off uses UE's regular deferred lighting |
 
+`unreal:light:<Property>` sets a property of the UE light component hdUE makes from the UsdLux light, by name, after the UsdLux translation (so it can override it) and before UE registers the light. Light LOPs list the supported ones on their Unreal Engine tab, in folders by the light types they apply to (Light, Distant Light, Rect Light), with UE's labels, tooltips, ranges and defaults: volumetric scattering and shadows, indirect lighting intensity, translucent lighting, transmission, ray-traced shadows, contact shadows (`ContactShadowLength` above 0; UE has no separate switch), shadow resolution and bias, light functions (`LightFunctionMaterial`, a cooked path), light shafts, the atmosphere sun and cloud shadows of distant lights, and rect light barn doors (hdUE shortens UE's 20 cm doors to 0.1 cm unless `BarnDoorLength` is set). The list is generated with the render settings (`LIGHT_CLASSES` in `scripts/generate_render_settings.py`, which also writes `src/hydra/light_properties.h`). Values are read as for `unreal:postProcess:*`; an unknown name or a bad value is skipped with a warning in the UE log. Dome lights take none.
+
 A visible dome shows through any gap in the geometry. In Intel's Sponza, cracks around the far door and in a window grille let camera rays escape (Karma's alpha drops to 0.5-0.9 there): with the dome visible hdUE drew the sky in them, while Karma, whose dome is not visible by default, drew black. hdUE always writes alpha 1, so background pixels cannot be separated by alpha yet.
 
 Optional camera-following review lights are used when there are no active supported scene lights. Authored lights, including DomeLight, take precedence.
@@ -316,7 +318,7 @@ Volumes (Houdini build) render the `density` field, or the first field, of a Vol
 
 From Houdini geometry, the VDB or Houdini volume primitive named after `fieldName` is used, else the `fieldIndex`-th one. Grids are densified over their active bounding box and point-sampled with a stride above 512 voxels per axis. Volume materials, other fields, temperature/emission, tapered Houdini volumes and frustum VDBs are not translated.
 
-Measured against Karma: in realtime, a fog's brightness is within about 15%, but volumes cast no shadow onto surfaces (enabling `r.HeterogeneousVolumes.Shadows` did not produce one in testing; the cause is not identified yet). The Path Tracer casts it (optical depth 1.4 against Karma's 1.9) and includes multiple scattering, but resamples volumes into a coarse grid, so their silhouettes are blocky.
+Measured against Karma: in realtime, a fog's brightness is within about 15%. Volumes shadow the scene in both modes. In realtime this is UE's heterogeneous volume Shadow Casting (`r.HeterogeneousVolumes.Shadows`, on in this project), with one shadow projection fitted around the volumes (`r.HeterogeneousVolumes.Shadows.Cascades` 0: with Virtual Shadow Maps, UE's default single cascade left the volume's shadow map empty). As in UE 5.8, the shadow reaches lights shaded by UE's deferred light loop: distant lights, and local lights with `unreal:megaLights` off (MegaLights does not support heterogeneous volumes); a light also needs Cast Volumetric Shadow (`unreal:light:bCastVolumetricShadow`, on by default for distant lights). The Path Tracer casts it (optical depth 1.4 against Karma's 1.9) and includes multiple scattering. It re-voxelizes volumes for each frame; batch renders use the shading rate 1 and 512 MB that UE's docs recommend for cinematic renders (`r.HeterogeneousVolumes.{Frustum,Ortho}Grid.ShadingRate`, `.MaxBottomLevelMemoryInMegabytes`; 4 and 128 MB by default, which made silhouettes blocky).
 
 ## Fog
 
@@ -334,6 +336,12 @@ As in UE:
 - UE draws none nearer than 10 m to the camera (`r.LocalFogVolume.GlobalStartDistance`, in Engine Quality's console variables or as `unreal:cvar:r:LocalFogVolume:GlobalStartDistance`); a volume's own Start Distance can only push it further.
 - Height Fog Density 0 hides the whole volume: UE combines the radial and height fog as the product of their coverages (`LocalFogVolumeCommon.ush`), so use a small value for radial fog alone.
 - With Volumetric Fog on the height fog, the volumes are also lit and shadowed through it (`r.LocalFogVolume.RenderIntoVolumetricFog`).
+
+## Sky and clouds
+
+The **Sky** tab places UE's Sky Atmosphere and Volumetric Cloud, as their actors do in a level. **Sky Atmosphere** (`unreal:skyAtmosphere`) turns on UE's physical sky; every `USkyAtmosphereComponent` property is `unreal:skyAtmosphere:<Property>`, generated like the fog's (UE's atmosphere is in kilometres, its planet top at the world origin by default). Distant lights light it as Atmosphere Sun Lights, UE's default for a directional light (`unreal:light:bAtmosphereSunLight`, index 0 the sun and 1 the moon). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE's default level has: Lumen needs it, and UE's Path Tracer renders the atmosphere only through it (or with Reference Atmosphere, Path Tracing tab). A DomeLight's environment takes its place.
+
+**Volumetric Cloud** (`unreal:volumetricCloud`, `unreal:volumetricCloud:<Property>`) needs the Sky Atmosphere. Its default material is UE's `/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst`, cooked with the runtime from this version on (a runtime staged before has no cloud material); `unreal:volumetricCloud:Material` takes another cooked material. UE's Path Tracer renders clouds with Reference Atmosphere on.
 
 ## Opacity and glass
 

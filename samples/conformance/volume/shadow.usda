@@ -1,0 +1,86 @@
+#usda 1.0
+(
+    doc = """A volume casts a shadow onto the scene: a distant light at 45 degrees throws the Cornell sample's fog sphere's shadow onto the wall beside the fog, darker than the lit wall next to it. In realtime this is UE's heterogeneous volume shadow casting, which reaches lights UE's deferred light loop shades (distant lights in hdUE; not MegaLights). The project config sets the two console variables below; the scene sets them too, so it also passes on a runtime staged before."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdVolVolume",
+ "feature": "Volume shadow on a surface",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "the fog shadows the wall",
+   "ratio": [
+    {
+     "region": [
+      1.5,
+      -0.5,
+      2.5,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      1.5,
+      3.5,
+      2.5,
+      4.5
+     ]
+    }
+   ],
+   "max": 0.8
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def Volume "Fog"
+{
+        rel field:density = </Fog/density>
+        double3 xformOp:translate = (0.9, 0, 1.5)
+        double3 xformOp:scale = (1.5, 1.5, 1.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        def OpenVDBAsset "density"
+        {
+                asset filePath = @../../cornell/fog.vdb@
+                token fieldName = "density"
+        }
+}
+def DistantLight "L"
+{
+        bool inputs:normalize = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 2
+        float3 xformOp:rotateXYZ = (0, -45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+}
+over "Render"
+{
+    over "Settings"
+    {
+        int unreal:cvar:r:HeterogeneousVolumes:Shadows = 1
+        int unreal:cvar:r:HeterogeneousVolumes:Shadows:Cascades = 0
+    }
+}

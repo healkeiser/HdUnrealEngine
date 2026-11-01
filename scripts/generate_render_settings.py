@@ -51,6 +51,7 @@ TABS = (
     "Color Grading",
     "Lighting",
     "Fog",
+    "Sky",
     "Rendering Features",
     "Engine Quality",
 )
@@ -197,6 +198,18 @@ FOG_DEFAULTS = {
         "Density, height falloff and height offset of the second fog (FExponentialHeightFogData); "
         "density 0 turns it off.",
     ),
+}
+# USkyAtmosphereComponent and UVolumetricCloudComponent defaults their constructors compute (Earth's atmosphere,
+# in kilometres; colours stored over one channel, with that channel as the scale: SkyAtmosphereComponent.cpp).
+SKY_DEFAULTS = {
+    "BottomRadius": (6360.0, None),
+    "AtmosphereHeight": (60.0, None),
+    "RayleighScattering": ([0.005802 / 0.0331, 0.013558 / 0.0331, 1.0], None),
+    "RayleighScatteringScale": (0.0331, None),
+    "RayleighExponentialDistribution": (8.0, None),
+    "MieExponentialDistribution": (1.2, None),
+    "OtherAbsorption": ([0.00065 / 0.001881, 1.0, 0.000085 / 0.001881], None),
+    "OtherAbsorptionScale": (0.001881, None),
 }
 SPEED_NOTE = (
     "Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport "
@@ -731,6 +744,30 @@ HDUE = [
         disable=[FOG_OFF],
     ),
     hdue(
+        "skyAtmosphere",
+        "Sky Atmosphere",
+        "Sky",
+        "toggle",
+        False,
+        "Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a physical sky lit by the "
+        "distant lights that are Atmosphere Sun Lights (UE's default for a distant light; Light LOP, Unreal Engine "
+        "tab). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE "
+        "needs for Lumen and its Path Tracer; a DomeLight's environment takes its place.",
+        category="Sky",
+        uiscope=True,
+    ),
+    hdue(
+        "volumetricCloud",
+        "Volumetric Cloud",
+        "Sky",
+        "toggle",
+        False,
+        "Place UE's Volumetric Cloud in the scene, with UE's default cloud material unless Material is set. Clouds "
+        "need the Sky Atmosphere; the Path Tracer renders them with Reference Atmosphere on (Path Tracing).",
+        category="Sky",
+        uiscope=True,
+    ),
+    hdue(
         "postProcessMaterials",
         "Post-Process Materials",
         "Rendering Features",
@@ -890,7 +927,11 @@ def default_value(expression, kind, size, enum):
         return [""]
     if expression in ("FLinearColor::Black", "FVector2f::ZeroVector"):
         numbers = [0.0, 0.0, 0.0]
-    elif expression in ("FLinearColor::White", "FColor::White"):
+    elif expression in (
+        "FLinearColor::White",
+        "FColor::White",
+        "FLinearColor(FLinearColor::White)",
+    ):
         numbers = [1.0, 1.0, 1.0]
     else:
         numbers = [
@@ -927,6 +968,7 @@ TYPES = {
     "double": ("float", 1),
     "int32": ("int", 1),
     "FVector4": ("float", 4),
+    "FVector": ("float", 3),
     "FLinearColor": ("color", 3),
     "FVector2D": ("float", 2),
     "FVector2f": ("float", 2),
@@ -948,25 +990,173 @@ def parse_post_process(header, defaults, enums, skipped):
     )
 
 
-def parse_height_fog(header, defaults, skipped):
-    """UExponentialHeightFogComponent's properties, on the Fog tab in UE's categories, off while unreal:heightFog is."""
-    start = header.index("class UExponentialHeightFogComponent")
-    body = header[start : header.index("\npublic:", start)]
+def parse_component(
+    source, name, setting, tab, overrides, skipped, enums=None, end="\npublic:"
+):
+    """U<name>'s properties as unreal:<setting>:<Property> on the tab in UE's categories, off while unreal:<setting>
+    is: a scene component the backend places by reflection (Components/<name>.h, its constructor's defaults).
+    """
+    header = (source / f"Runtime/Engine/Classes/Components/{name}.h").read_text(
+        encoding="utf-8"
+    )
+    start = header.index(f"class U{name}")
+    defaults = parse_defaults(
+        (source / f"Runtime/Engine/Private/Components/{name}.cpp").read_text(
+            encoding="utf-8"
+        ),
+        f"U{name}::U{name}(",
+    )
     settings = parse_properties(
-        body,
+        header[start : header.index(end, start)],
         defaults,
-        {},
+        enums or {},
         skipped,
-        "unreal:heightFog:",
-        FOG_DEFAULTS,
+        f"unreal:{setting}:",
+        overrides,
         images=False,
     )
-    for setting in settings:
-        category = setting["category"]
-        setting["place"] = "Fog|" + (
+    for entry in settings:
+        category = entry["category"]
+        entry["place"] = f"{tab}|" + (
             category if " " in category else label_from_name(category)
         )
-        setting["disable"] = [FOG_OFF]
+        entry["disable"] = [f"{houdini_name(f'unreal:{setting}')} == 0"]
+    return settings
+
+
+# UE light component properties Light LOPs offer as unreal:light:<Property>, by the class that declares them (its
+# header in Engine/Classes/Components, its constructor in Engine/Private/Components): what UsdLux has no attribute
+# for and a runtime light can change. The backend sets them by name on the light it made from UsdLux, after that
+# translation, so they also override it (BarnDoorLength).
+LIGHT_CLASSES = (
+    (
+        "LightComponentBase",
+        "LightComponent",
+        "Light",
+        (
+            "IndirectLightingIntensity",
+            "VolumetricScatteringIntensity",
+            "bCastVolumetricShadow",
+            "bAffectTranslucentLighting",
+            "bTransmission",
+            "CastRaytracedShadow",
+        ),
+    ),
+    (
+        "LightComponent",
+        "LightComponent",
+        "Light",
+        (
+            "ContactShadowLength",
+            "ContactShadowLengthInWS",
+            "ShadowResolutionScale",
+            "ShadowBias",
+            "ShadowSlopeBias",
+            "LightFunctionMaterial",
+            "LightFunctionScale",
+            "LightFunctionFadeDistance",
+            "DisabledBrightness",
+            "bEnableLightShaftBloom",
+            "BloomScale",
+            "BloomThreshold",
+            "BloomTint",
+        ),
+    ),
+    (
+        "DirectionalLightComponent",
+        "DirectionalLightComponent",
+        "Distant Light",
+        (
+            "bAtmosphereSunLight",
+            "AtmosphereSunLightIndex",
+            "AtmosphereSunDiskColorScale",
+            "bCastShadowsOnClouds",
+            "bCastShadowsOnAtmosphere",
+            "bCastCloudShadows",
+            "CloudShadowStrength",
+            "CloudShadowOnAtmosphereStrength",
+            "CloudShadowOnSurfaceStrength",
+            "CloudScatteredLuminanceScale",
+            "bEnableLightShaftOcclusion",
+            "OcclusionMaskDarkness",
+            "OcclusionDepthRange",
+            "DynamicShadowDistanceMovableLight",
+            "DynamicShadowCascades",
+        ),
+    ),
+    (
+        "RectLightComponent",
+        "RectLightComponent",
+        "Rect Light",
+        ("BarnDoorAngle", "BarnDoorLength"),
+    ),
+)
+LIGHT_DEFAULTS = {
+    "BarnDoorAngle": (
+        88.0,
+        None,
+    ),  # GetRectLightBarnDoorMaxAngle() (RectLightComponent.cpp)
+    "bCastVolumetricShadow": (
+        None,
+        "Distant lights default to on (UDirectionalLightComponent). It also lets heterogeneous volumes shadow the "
+        "scene in realtime.",
+    ),
+    "BarnDoorLength": (
+        0.1,
+        "hdUE shortens UE's 20 cm barn doors to 0.1 cm by default (UsdLux rect lights have none).",
+    ),
+}
+LIGHT_HEADER = ROOT / "src/hydra/light_properties.h"
+
+
+def parse_lights(source, enums, skipped):
+    """The LIGHT_CLASSES properties, each in a folder of the light types it applies to."""
+    settings = []
+    # ULightComponent's constructor sets properties ULightComponentBase declares: defaults accumulate down the chain.
+    chain = {}
+    for name, constructor_file, _, _ in LIGHT_CLASSES[:2]:
+        chain.update(
+            parse_defaults(
+                (
+                    source
+                    / f"Runtime/Engine/Private/Components/{constructor_file}.cpp"
+                ).read_text(encoding="utf-8"),
+                f"U{name}::U{name}(",
+            )
+        )
+    for name, constructor_file, folder, properties in LIGHT_CLASSES:
+        header = (
+            source / f"Runtime/Engine/Classes/Components/{name}.h"
+        ).read_text(encoding="utf-8")
+        start = header.index(f"class U{name}")
+        defaults = {
+            **chain,
+            **parse_defaults(
+                (
+                    source
+                    / f"Runtime/Engine/Private/Components/{constructor_file}.cpp"
+                ).read_text(encoding="utf-8"),
+                f"U{name}::U{name}(",
+            ),
+        }
+        found = {
+            s["attribute"].rpartition(":")[2]: s
+            for s in parse_properties(
+                header[start : header.index("\n};", start)],
+                defaults,
+                enums,
+                skipped,
+                "unreal:light:",
+                LIGHT_DEFAULTS,
+                images=False,
+            )
+        }
+        missing = [p for p in properties if p not in found]
+        if missing:
+            raise SystemExit(f"U{name} has no (supported) properties {missing}")
+        for p in properties:
+            found[p].update(folder=folder, advanced=False)
+            settings.append(found[p])
     return settings
 
 
@@ -1055,6 +1245,33 @@ def write_schema(settings):
     SCHEMA.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
 
 
+def ds_lights(settings, indent):
+    lines = []
+    for folder in dict.fromkeys(s["folder"] for s in settings):
+        lines += ds_folder(
+            "collapsible", group_id("hdUE_light", folder), folder, indent
+        )
+        for setting in settings:
+            if setting["folder"] == folder:
+                lines += ds_parm(setting, indent + "    ", False)
+        lines.append(f"{indent}}}")
+    return lines
+
+
+def write_light_header(settings):
+    names = "".join(
+        f'    "{s["attribute"].rpartition(":")[2]}",\n' for s in settings
+    )
+    LIGHT_HEADER.write_text(
+        "// Generated by scripts/generate_render_settings.py: the unreal:light:<Property> attributes the delegate reads\n"
+        "// from lights (HdUnrealEngine_Light.ds offers them on Light LOPs). Do not edit.\n"
+        "#pragma once\n\n"
+        f"inline constexpr const char* HdUELightProperties[] = {{\n{names}}};\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
 def parse_properties(
     body, defaults, enums, skipped, prefix, overrides=HDUE_DEFAULTS, images=True
 ):
@@ -1109,7 +1326,11 @@ def parse_properties(
             kind, size = "toggle", 1
         elif enum_name in enums:
             kind, size = "menu", 1
-        elif "TObjectPtr" in type_name or type_name.endswith("*"):
+        elif (
+            "TObjectPtr" in type_name
+            or "TSoftObjectPtr" in type_name
+            or type_name.endswith("*")
+        ):
             # Textures also take image files (imported at render time); curves only cooked assets.
             kind, size = (
                 "image" if images and "UTexture" in type_name else "string"
@@ -1816,21 +2037,54 @@ def main():
     post = parse_post_process(header, defaults, enums, skipped)
     for setting in post:
         setting["tonemapper"] = needs_tonemapper(setting["category"])
-    fog = parse_height_fog(
-        (
-            source
-            / "Runtime/Engine/Classes/Components/ExponentialHeightFogComponent.h"
-        ).read_text(encoding="utf-8"),
-        parse_defaults(
+    fog = parse_component(
+        source,
+        "ExponentialHeightFogComponent",
+        "heightFog",
+        "Fog",
+        FOG_DEFAULTS,
+        skipped,
+    )
+    sky = parse_component(
+        source,
+        "SkyAtmosphereComponent",
+        "skyAtmosphere",
+        "Sky",
+        SKY_DEFAULTS,
+        skipped,
+        parse_enums(
             (
                 source
-                / "Runtime/Engine/Private/Components/ExponentialHeightFogComponent.cpp"
-            ).read_text(encoding="utf-8"),
-            "UExponentialHeightFogComponent::UExponentialHeightFogComponent(",
+                / "Runtime/Engine/Classes/Components/SkyAtmosphereComponent.h"
+            ).read_text(encoding="utf-8")
+        ),
+        end="\n};",
+    ) + parse_component(
+        source,
+        "VolumetricCloudComponent",
+        "volumetricCloud",
+        "Sky",
+        SKY_DEFAULTS,
+        skipped,
+        end="\n};",
+    )
+    console = console_settings(args.engine_root)
+    lights = parse_lights(
+        source,
+        parse_enums(
+            *(
+                (source / f"Runtime/Engine/Classes/{path}").read_text(
+                    encoding="utf-8"
+                )
+                for path in (
+                    "Components/LightComponentBase.h",
+                    "Components/LightComponent.h",
+                    "Engine/EngineTypes.h",
+                )
+            )
         ),
         skipped,
     )
-    console = console_settings(args.engine_root)
 
     if args.defaults_json:
 
@@ -1842,7 +2096,9 @@ def main():
                 else " ".join(map(str, v)) if len(v) == 2 else v
             )
 
-        settings = {s["attribute"]: value(s) for s in post + fog + console}
+        settings = {
+            s["attribute"]: value(s) for s in post + fog + sky + console
+        }
         cvars = {
             s["cvar"]: s["declared_default"]
             for s in console
@@ -1861,7 +2117,7 @@ def main():
 
     local_fog = local_fog_volume_settings(args.engine_root, skipped)
     write_schema(local_fog)
-    tree = layout(post + fog + console + HDUE)
+    tree = layout(post + fog + sky + console + HDUE)
     replace_generated(
         PARAMETERS / "HdUnrealEngine_Global.ds",
         {"Unreal Engine": lambda indent: ds_layout(tree, indent)},
@@ -1874,6 +2130,12 @@ def main():
             )
         },
     )
+    replace_generated(
+        PARAMETERS / "HdUnrealEngine_Light.ds",
+        {"Light Properties": lambda indent: ds_lights(lights, indent)},
+    )
+    write_light_header(lights)
+    print(f"{len(lights)} light properties")
     for tab, sections in tree.items():
         for section, subs in sections.items():
             entries = [s for e in subs.values() for s in e]
@@ -1882,8 +2144,9 @@ def main():
                 f"{essential:4} / {len(entries):4} {tab or '(top)'}|{section}"
             )
     print(
-        f"{len(post)} post-process settings, {len(fog)} height fog settings, {len(console)} console variables, "
-        f"{len(HDUE)} hdUE settings ({sum(not s.get('advanced') for s in post + fog + console + HDUE)} Essential), "
+        f"{len(post)} post-process settings, {len(fog)} height fog settings, {len(sky)} sky settings, "
+        f"{len(console)} console variables, {len(HDUE)} hdUE settings "
+        f"({sum(not s.get('advanced') for s in post + fog + sky + console + HDUE)} Essential), "
         f"{len(local_fog)} local fog volume properties ({SCHEMA.name})"
     )
     for name, reason in skipped:

@@ -424,6 +424,15 @@ std::string asset(const VtDictionary& mapping, const std::string& id) {
     const auto it = mapping.find(id);
     return it != mapping.end() && it->second.IsHolding<std::string>() ? it->second.UncheckedGet<std::string>() : "";
 }
+}  // namespace
+std::string HdUESettingText(const VtValue& value) {
+    if (value.IsHolding<SdfAssetPath>()) {
+        const auto& asset = value.UncheckedGet<SdfAssetPath>();
+        return asset.GetResolvedPath().empty() ? asset.GetAssetPath() : asset.GetResolvedPath();
+    }
+    return value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False") : TfStringify(value);
+}
+namespace {
 // One scene upload, with copies of everything its descriptors point to. prepareScene fills it under the state lock;
 // sendScene hands it to UE without the lock, so Hydra Sync and Houdini's UI never wait for UE's apply (seconds on
 // large scenes); finishScene records the result under the lock again.
@@ -1049,6 +1058,16 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         light.ies_angle_scale = source ? source->iesAngleScale : 0;
         light.ies_normalize = source && source->iesNormalize;
         if (source) light.lighting_channels = packet.linkedLights[source->id];
+        if (source && !source->properties.empty()) {
+            std::vector<const char*> names, values;
+            for (const auto& [name, text] : source->properties) {
+                names.push_back(packet.own(name));
+                values.push_back(packet.own(text));
+            }
+            light.property_count = uint32_t(names.size());
+            light.property_names = packet.own(packet.strings, std::move(names));
+            light.property_values = packet.own(packet.strings, std::move(values));
+        }
         for (int c = 0; c < 3; ++c) {
             light.position_cm[c] = legacy.position[c];
             light.color[c] = legacy.color[c];
@@ -2612,25 +2631,39 @@ public:
                         names.insert(names.end(), {"HeightFog", "HeightFog:RelativeLocation"});
                         values.insert(values.end(), {"True", "0 0 " + TfStringify(heightCm)});
                     }
+                    // unreal:skyAtmosphere and unreal:volumetricCloud place UE's Sky Atmosphere and Volumetric Cloud
+                    // the same way, with unreal:skyAtmosphere:<property> and unreal:volumetricCloud:<property>.
+                    static constexpr std::pair<const char*, const char*> components[] = {
+                        {"heightFog", "HeightFog"},
+                        {"skyAtmosphere", "SkyAtmosphere"},
+                        {"volumetricCloud", "VolumetricCloud"}};
+                    std::map<std::string, std::string> enabled;  // setting prefix "<name>:" -> UE name
+                    for (const auto& [setting, ue] : components)
+                        if (s.setting<bool>(setting, false)) {
+                            enabled[std::string(setting) + ":"] = ue;
+                            if (std::string(ue) != "HeightFog") {  // HeightFog is above, with its height
+                                names.push_back(ue);
+                                values.push_back("True");
+                            }
+                        }
+                    const auto component = [&](const std::string& key) {
+                        for (const auto& [prefix, ue] : enabled)
+                            if (TfStringStartsWith(key, prefix)) return ue + ":" + key.substr(prefix.size());
+                        return std::string();
+                    };
                     const auto settings = s.settingsSnapshot();
                     for (const auto& [key, value] : settings) {
                         if (TfStringStartsWith(key.GetString(), "postProcess:"))
                             names.push_back(key.GetString().substr(12));
-                        else if (heightFog && TfStringStartsWith(key.GetString(), "heightFog:"))
-                            names.push_back("HeightFog:" + key.GetString().substr(10));
+                        else if (const auto name = component(key.GetString()); !name.empty())
+                            names.push_back(name);
                         else if (TfStringStartsWith(key.GetString(), "cvar:"))
                             names.push_back(TfStringReplace(key.GetString().substr(5), ":", "."));
                         else if (key == TfToken("debugView"))
                             names.push_back("DebugView");
                         else
                             continue;
-                        if (value.IsHolding<SdfAssetPath>()) {  // texture settings: an image file or a cooked path
-                            const auto& asset = value.UncheckedGet<SdfAssetPath>();
-                            values.push_back(asset.GetResolvedPath().empty() ? asset.GetAssetPath()
-                                                                             : asset.GetResolvedPath());
-                        } else
-                            values.push_back(value.IsHolding<bool>() ? (value.UncheckedGet<bool>() ? "True" : "False")
-                                                                     : TfStringify(value));
+                        values.push_back(HdUESettingText(value));  // texture settings: an image file or a cooked path
                     }
                     if (tonemapper) {
                         // UE's own physical camera exposure (ISO, shutter, aperture) stays off unless the scene asks
@@ -3158,7 +3191,8 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
     return purposes.empty() ? HdTokens->full : purposes[0];
 }
 // Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
-// Prefixed families (postProcess:*, heightFog:*, cvar:*) and dictionaries set by the Houdini host are not listed.
+// Prefixed families (postProcess:*, heightFog:*, skyAtmosphere:*, volumetricCloud:*, cvar:*) and dictionaries set by
+// the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
     return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
             {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
@@ -3177,7 +3211,9 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
             {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
             {"Exponential height fog", TfToken("heightFog"), VtValue(false)},
-            {"Height fog height", TfToken("heightFogHeight"), VtValue(0.0)}};
+            {"Height fog height", TfToken("heightFogHeight"), VtValue(0.0)},
+            {"Sky atmosphere", TfToken("skyAtmosphere"), VtValue(false)},
+            {"Volumetric cloud", TfToken("volumetricCloud"), VtValue(false)}};
 }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
@@ -3300,7 +3336,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
         key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("denoiser") ||
         key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
-        TfStringStartsWith(key.GetString(), "heightFog") || TfStringStartsWith(key.GetString(), "postProcess:") ||
+        TfStringStartsWith(key.GetString(), "heightFog") || TfStringStartsWith(key.GetString(), "skyAtmosphere") ||
+        TfStringStartsWith(key.GetString(), "volumetricCloud") || TfStringStartsWith(key.GetString(), "postProcess:") ||
         TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {

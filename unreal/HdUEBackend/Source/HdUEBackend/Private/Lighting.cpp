@@ -108,9 +108,18 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
         const auto& D = Batch.lights[I];
         if (D.struct_size != sizeof(D) || D.type > HDUE_CYLINDER_LIGHT || D.visible > 1 || (D.flags & ~31u) ||
             (D.lighting_channels & ~uint32(HDUE_LINK_CHANNELS)) || !Text(D.id) || D.cube_resolution < 32 ||
-            D.cube_resolution > 2048 || !FMath::IsPowerOfTwo(D.cube_resolution)) {
+            D.cube_resolution > 2048 || !FMath::IsPowerOfTwo(D.cube_resolution) || D.property_count > 1024 ||
+            (D.property_count && (!D.property_names || !D.property_values))) {
             Error = TEXT("Unsupported light descriptor or environment resolution.");
             return false;
+        }
+        TArray<TPair<FString, FString>> Properties;
+        for (uint32 P = 0; P < D.property_count; ++P) {
+            if (!Text(D.property_names[P]) || !D.property_values[P]) {
+                Error = TEXT("Invalid light property.");
+                return false;
+            }
+            Properties.Emplace(UTF8_TO_TCHAR(D.property_names[P]), UTF8_TO_TCHAR(D.property_values[P]));
         }
         if (D.texture_format > HDUE_ENVIRONMENT_LATLONG) {
             // angular, mirroredBall and cubeMapVerticalCross: this light only stays dark.
@@ -153,6 +162,9 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
         Definition.Data.texture_file = nullptr;
         Definition.Ies = D.ies_file ? UTF8_TO_TCHAR(D.ies_file) : TEXT("");
         Definition.Data.ies_file = nullptr;
+        Definition.Properties = MoveTemp(Properties);
+        Definition.Data.property_names = Definition.Data.property_values = nullptr;
+        Definition.Data.property_count = 0;
         if (Ids.Contains(Definition.Id)) {
             Error = TEXT("Duplicate light ID.");
             return false;
@@ -392,6 +404,14 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
         Intensity *= D.ies_normalize ? (Mean > 0 ? 1 / Mean : 1.f) : Texture->Brightness;
     }
     Light->SetIntensity(Intensity);
+    // unreal:light:<Property> last, so UE's own properties can override the UsdLux translation (barn doors, ...). The
+    // component is not registered yet, so its scene proxy is created with them.
+    for (const auto& [Name, Text] : Definition.Properties) {
+        FProperty* Property = Light->GetClass()->FindPropertyByName(*Name);
+        if (!Property || !Property->HasAnyPropertyFlags(CPF_Edit) || !ImportPropertyValue(Property, Text, Light))
+            UE_LOG(LogTemp, Warning, TEXT("hdUE light %s: %s = '%s' skipped (no such %s property, or a bad value)"),
+                   *Definition.Id, *Name, *Text, *Light->GetClass()->GetName());
+    }
     Light->RegisterComponent();
     Actor->SetActorHiddenInGame(!D.visible);
     return true;

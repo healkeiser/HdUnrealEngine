@@ -112,7 +112,11 @@ def render(path, mode, frames, out, env, timeout, extra=()):
             else None
         )
     except subprocess.TimeoutExpired as expired:  # run() kills husk
-        log = (expired.stdout or b"").decode(errors="replace")
+        log = (
+            expired.stdout or ""
+        )  # text despite TimeoutExpired's bytes default: run() decodes
+        if isinstance(log, bytes):
+            log = log.decode(errors="replace")
         error = f"timed out after {timeout} s"
     (out / "husk.log").write_text(log, encoding="utf-8")
     return time.perf_counter() - start, log, error
