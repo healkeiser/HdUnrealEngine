@@ -383,6 +383,7 @@ HdBprim* HdUECreateField(const SdfPath&);
 HdInstancer* HdUECreateInstancer(HdSceneDelegate*, const SdfPath&);
 HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateCamera(const SdfPath&);
+std::array<float, 7> HdUECameraLensDistortion(const HdCamera*);  // K1, K2, K3, P1, P2, principal point
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
 HdSprim* HdUECreateUnsupportedLight(const SdfPath&, const TfToken&);
 HdSprim* HdUECreateLocalFog(const SdfPath&);
@@ -1941,10 +1942,13 @@ public:
         double shutterOpen = 0, shutterClose = 0;
         float nearClip = .1f, farClip = 0;
         GfVec4f lens{0.f};
+        // UE's spherical lens distortion from unreal:lensDistortion:* on the camera (K1, K2, K3, P1, P2, principal
+        // point).
+        std::array<float, 7> distortion{0, 0, 0, 0, 0, .5f, .5f};
         std::vector<GfVec2i> sizes;
         bool same(const PassSnapshot& o) const {
             return aovs == o.aovs && view == o.view && projection == o.projection && cameraId == o.cameraId &&
-                   lens == o.lens && sizes == o.sizes;
+                   lens == o.lens && distortion == o.distortion && sizes == o.sizes;
         }
     };
     // Framing (crops, tiles, overscan, non-square pixels): UE fills the whole render buffer, so the projection maps the
@@ -1995,6 +1999,7 @@ public:
             snapshot.farClip = camera->GetClippingRange().GetMax();
             snapshot.lens = GfVec4f(camera->GetFStop(), camera->GetFocusDistance(), camera->GetFocalLength(),
                                     camera->GetLinearExposureScale());
+            snapshot.distortion = HdUECameraLensDistortion(camera);
         }
         for (const auto& aov : snapshot.aovs) {
             auto* b = aov.renderBuffer ? aov.renderBuffer
@@ -2440,6 +2445,9 @@ public:
                     request.projection_offset[0] = -projection[2][0];
                     request.projection_offset[1] = -projection[2][1];
                 }
+                for (int i = 0; i < 5; ++i) request.lens_distortion[i] = pass->distortion[i];
+                request.lens_principal_point[0] = pass->distortion[5];
+                request.lens_principal_point[1] = pass->distortion[6];
                 // UsdRenderSettings disableDepthOfField renders every camera in focus.
                 if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
                     request.fstop = lens[0];

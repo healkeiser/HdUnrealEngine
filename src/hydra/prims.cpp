@@ -1516,12 +1516,25 @@ public:
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
 }  // namespace
-// HdCamera that also records its transform samples for camera motion blur.
+// HdCamera that also records its transform samples for camera motion blur and UE's lens distortion.
 class Camera final : public HdCamera {
 public:
     explicit Camera(const SdfPath& id) : HdCamera(id) {}
+    // unreal:lensDistortion:K1, K2, K3, P1, P2 and PrincipalPoint (float2): UE's spherical model
+    // (CameraCalibrationCore).
+    std::array<float, 7> distortion{0, 0, 0, 0, 0, .5f, .5f};
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
         const bool transformDirty = *bits & DirtyTransform;
+        if (*bits & DirtyParams) {
+            const auto get = [&](const char* name) {
+                return delegate->GetCameraParamValue(GetId(), TfToken(std::string("unreal:lensDistortion:") + name));
+            };
+            const char* names[] = {"K1", "K2", "K3", "P1", "P2"};
+            for (int i = 0; i < 5; ++i) distortion[i] = value(get(names[i]), 0.f);
+            const auto center = value(get("PrincipalPoint"), GfVec2f(.5f));
+            distortion[5] = center[0];
+            distortion[6] = center[1];
+        }
         HdCamera::Sync(delegate, param, bits);
         if (!transformDirty || GetId().IsEmpty()) return;
         float times[HdUEMaxMotionSamples];
@@ -1542,6 +1555,10 @@ public:
     }
 };
 HdSprim* HdUECreateCamera(const SdfPath& id) { return new Camera(id); }
+std::array<float, 7> HdUECameraLensDistortion(const HdCamera* camera) {
+    const auto* own = dynamic_cast<const Camera*>(camera);
+    return own ? own->distortion : std::array<float, 7>{0, 0, 0, 0, 0, .5f, .5f};
+}
 HdRprim* HdUECreateMesh(const SdfPath& id) { return new Mesh(id); }
 HdRprim* HdUECreatePoints(const SdfPath& id) { return new Points(id); }
 HdRprim* HdUECreateCurves(const SdfPath& id) { return new Curves(id); }

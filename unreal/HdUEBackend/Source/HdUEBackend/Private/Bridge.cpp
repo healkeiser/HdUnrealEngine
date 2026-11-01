@@ -21,6 +21,11 @@
 #include "Engine/World.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/LocalFogVolumeComponent.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "CameraCalibrationSubsystem.h"
+#include "LensFileRendering.h"
+#include "SphericalLensDistortionModelHandler.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/VolumetricCloudComponent.h"
@@ -164,6 +169,11 @@ struct FSession {
         TArray<TPair<FString, FString>> Values;
     };
     TMap<FString, FSceneComponent> SceneComponents;
+    // UE's lens distortion (request lens_distortion): CameraCalibrationCore's spherical-model handler and the camera
+    // actor its scene view extension keys the distortion on; LensOverscan is 0 without distortion.
+    TStrongObjectPtr<USphericalLensDistortionModelHandler> LensHandler;
+    TStrongObjectPtr<ACameraActor> LensCamera;
+    float LensOverscan = 0;
     // upsert_local_fog_volume: the Local Fog Volume actors, by id.
     TMap<FString, TWeakObjectPtr<AActor>> LocalFogVolumes;
     bool Tonemapper = false;
@@ -548,6 +558,44 @@ bool SameView(const HdueRenderRequest& A, const HdueRenderRequest& B) {
 
 static void UpdateSkyCapture(FSession& Session);  // with set_post_process's scene components
 
+// UE's lens distortion as a CineCamera with a Lens Distortion component applies it (CameraCalibrationCore): the
+// spherical model's state, a camera actor with its overscan, and the distortion scene view extension's state for that
+// actor. The view renders the overscanned frame and UE's upscale pass distorts it (LensDistortion.cpp).
+static void UpdateLensDistortion(FSession& Session) {
+    const auto& R = Session.Request;
+    bool On = !R.orthographic;
+    if (On) {
+        On = false;
+        for (float K : R.lens_distortion) On |= K != 0;
+    }
+    auto* Subsystem = GEngine ? GEngine->GetEngineSubsystem<UCameraCalibrationSubsystem>() : nullptr;
+    if (!On || !Subsystem) {
+        if (Subsystem && Session.LensCamera && Session.LensOverscan > 0)
+            Subsystem->ClearLensDistortionSVEState(Session.LensCamera.Get());
+        Session.LensOverscan = 0;
+        return;
+    }
+    if (!Session.LensHandler)
+        Session.LensHandler.Reset(NewObject<USphericalLensDistortionModelHandler>(GetTransientPackage()));
+    if (!Session.LensCamera) Session.LensCamera.Reset(NewObject<ACameraActor>(GetTransientPackage()));
+    FLensDistortionState State;
+    State.DistortionInfo.Parameters = {R.lens_distortion[0], R.lens_distortion[1], R.lens_distortion[2],
+                                       R.lens_distortion[3], R.lens_distortion[4]};
+    // UE's normalized focal length is the focal length over the filmback: the projection's cot(half angle) / 2.
+    const double Cot = 1 / FMath::Tan(FMath::DegreesToRadians(double(R.horizontal_fov_degrees)) * .5);
+    State.FocalLengthInfo.FxFy =
+        FVector2D(R.projection_scale[0] > 0 ? R.projection_scale[0] * .5 : Cot * .5,
+                  R.projection_scale[1] > 0 ? R.projection_scale[1] * .5 : Cot * .5 * Session.Width / Session.Height);
+    State.ImageCenter.PrincipalPoint = FVector2D(R.lens_principal_point[0], R.lens_principal_point[1]);
+    Session.LensHandler->SetDistortionState(State);
+    Session.LensOverscan = FMath::Max(1.f, Session.LensHandler->ComputeOverscanFactor());
+    Session.LensCamera->GetCameraComponent()->Overscan = Session.LensOverscan - 1;
+    FDisplacementMapBlendingParams Params;
+    Params.States[0] = State;
+    Subsystem->SetLensDistortionSVEState(Session.LensCamera.Get(), Params, Session.LensHandler.Get(),
+                                         EDistortionRenderingMode::TemporalSuperResolution);
+}
+
 HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* Request) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Request)) return HDUE_INVALID_ARGUMENT;
@@ -686,6 +734,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     Session->Request = *Request;
     if (NextFrame && KeepHistory) Session->Request.warmup_frames = 1;
     if (!Aov) Session->BeautyRequest = *Request;
+    UpdateLensDistortion(*Session);
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
     Session->Draws = 0;
     Session->FullResDraws = 0;
@@ -886,6 +935,15 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
         }
         Options.ProjectionMatrix.M[2][0] = Request.projection_offset[0];
         Options.ProjectionMatrix.M[2][1] = Request.projection_offset[1];
+        if (Session.LensOverscan > 0) {
+            // The distorted frame samples beyond the undistorted one: render the handler's overscan, as UE's camera
+            // component widens its field of view for a Lens Distortion component; UE's upscale pass crops it back.
+            for (int32 Axis = 0; Axis < 2; ++Axis) {
+                Options.ProjectionMatrix.M[Axis][Axis] /= Session.LensOverscan;
+                Options.ProjectionMatrix.M[2][Axis] /= Session.LensOverscan;
+            }
+            Options.ViewActor = Session.LensCamera.Get();
+        }
     }
     Options.BackgroundColor = FLinearColor::Black;
     FSceneView* View = new FSceneView(Options);
@@ -1012,6 +1070,10 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         Settings.bBufferVisualizationDumpRequired = true;
     }
     Family.ViewExtensions.Add(FSceneViewExtensions::NewExtension<FHdueDepthCapture>(Session, Job));
+    if (Session->LensOverscan > 0)  // CameraCalibrationCore's extension sets the view's distortion LUT
+        if (auto* Calibration = GEngine->GetEngineSubsystem<UCameraCalibrationSubsystem>();
+            Calibration && Calibration->GetSceneViewExtension())
+            Family.ViewExtensions.Add(Calibration->GetSceneViewExtension().ToSharedRef());
     if (Sharing) {
         const uint32 Width = Session->Width, Height = Session->Height;
         ENQUEUE_RENDER_COMMAND(HdueSharedSlot)([Job, Width, Height](FRHICommandListImmediate& Commands) {

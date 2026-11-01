@@ -21,6 +21,7 @@
     { "Name": "AnimationWarping", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "ACLPlugin", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "DatasmithContent", "Enabled": true, "TargetAllowList": ["Editor"] },
+    { "Name": "CameraCalibrationCore", "Enabled": true },
     { "Name": "USDImporter", "Enabled": false },
     { "Name": "USDCore", "Enabled": false },
     { "Name": "PythonScriptPlugin", "Enabled": false }

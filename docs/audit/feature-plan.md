@@ -165,10 +165,16 @@ UE: `CameraCalibrationCore` (runtime module): `ULensDistortionModelHandlerBase::
 - UE's docs: "You can create a lens distortion handler object ... and drive its distortion state without the need to
   specify a Lens File"; the spherical model is Brown-Conrady with K1, K2, P1, P2, K3, and the handler computes the
   overscan ([Camera Lens Calibration](https://dev.epicgames.com/documentation/unreal-engine/camera-lens-calibration-overview)).
-- Authoring: USD has no lens-distortion schema, but Hydra's camera carries `HdLensDistortionSchema` (`type`, `k1`,
+- Done (authoring decided after the research below): `unreal:lensDistortion:K1..P2` and `PrincipalPoint` on the
+  camera, UE's own model; Hydra's `lensDistortion:*` is not read, as OpenUSD does not define its `standard` model's
+  mathematics (docs/rendering.md, Cameras).
+- Authoring research: USD has no lens-distortion schema, but Hydra's camera carries `HdLensDistortionSchema` (`type`, `k1`,
   `k2`, `center`, `anaSq`, `asym`, `scale`, `ior`; [Hydra prim schemas](https://openusd.org/release/api/_page__hydra__prim__schemas.html)):
   read it first and map `standard` distortion to UE's K1, K2 (and `center`). Camera attributes
-  `unreal:lensDistortion:k3, p1, p2` add what Hydra's model lacks. Karma's lens attributes are only a comparison.
+  `unreal:lensDistortion:k3, p1, p2` add what Hydra's model lacks. Houdini 22's Camera LOP authors no distortion;
+  Karma distorts in a lens shader (Lens OpenCV Distort VOP: OpenCV's k1, k2, k3, p1, p2, the same Brown-Conrady set
+  as UE's spherical model; https://www.sidefx.com/docs/houdini22.0/nodes/vop/lens_opencv_distort.html), which is
+  only a comparison.
 - Enable the plugin in the runtime project; overscan renders a larger data window and crops, so AOVs stay aligned.
 - Verify: a grid scene against a distortion computed from the same coefficients; viewport and husk match.
 

@@ -1,0 +1,70 @@
+#usda 1.0
+(
+    doc = """UE's lens distortion (CameraCalibrationCore's spherical model) from unreal:lensDistortion:K1..P2 on the
+camera: a bright square near the top-right corner of a dark wall. Frame 1 has no distortion; frame 2 a strong
+barrel K1, which pulls the square toward the centre, so the square's undistorted place gets darker and the region
+inside it, toward the centre, brighter."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE lens distortion",
+ "feature": "unreal:lensDistortion:K1 on a camera",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "the square leaves its undistorted place",
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      3.7,
+      3.7,
+      4.1,
+      4.1
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      3.7,
+      3.7,
+      4.1,
+      4.1
+     ]
+    }
+   ],
+   "max": 0.8
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Camera"
+{
+    float unreal:lensDistortion:K1.timeSamples = {
+        1: 0,
+        2: -0.4,
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-6, -6, -1), (6, -6, -1), (6, 6, -1), (-6, 6, -1)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+}
+def Mesh "Square"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(3.5, 3.5, 0), (4.3, 3.5, 0), (4.3, 4.3, 0), (3.5, 4.3, 0)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(1, 1, 1)]
+}

@@ -120,6 +120,11 @@ typedef struct HdueRenderRequest {
     float fstop;       /* depth of field when fstop and focus_distance_cm are > 0 */
     float focus_distance_cm;
     float focal_length_cm;
+    /* ABI 15: UE's spherical lens distortion (CameraCalibrationCore's Brown-Conrady model, unitless): K1, K2, K3, P1,
+       P2, and the principal point in normalized image coordinates (0.5, 0.5 is the centre). All zero: no distortion. */
+    float lens_distortion[5];
+    float lens_principal_point[2];
+    uint32_t reserved;
 } HdueRenderRequest;
 /* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
 enum {
