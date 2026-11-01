@@ -21,4 +21,16 @@ MODULES = {
 
 def start(host):
     test = os.environ["HDUE_HOUDINI_TEST"]
-    importlib.import_module(MODULES.get(test, "hdue_houdini_test")).start(host)
+    # Houdini's Solaris desktop, so a person watching sees the stage, scene graph and LOP network the test drives;
+    # the tests find their scene viewer after this.
+    import hou
+
+    module = importlib.import_module(MODULES.get(test, "hdue_houdini_test"))
+    if os.environ.get("HDUE_TEST_DESKTOP") != "0" and hou.isUIAvailable() and hou.ui.desktop("Solaris"):
+        import hdefereval
+
+        hou.ui.desktop("Solaris").setAsCurrent()
+        # Start once the desktop has switched, so the test finds the Solaris desktop's scene viewer.
+        hdefereval.executeDeferred(lambda: module.start(host))
+    else:
+        module.start(host)
