@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 15u
+#define HDUE_ABI_VERSION 16u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -231,6 +231,9 @@ typedef struct HdueMaterialDesc {
     float subsurface, subsurface_color[3], subsurface_radius[3];
     float sheen, sheen_color[3], sheen_roughness;
     float coat_color[3];
+    /* ABI 16: transmission > 0 refracts, as UE's Interchange imports a transmissive standard_surface / OpenPBR (the
+       translucent Standard Surface parent); transmission_depth in cm, 0 for UE's default. */
+    float transmission, transmission_color[3], transmission_depth;
 } HdueMaterialDesc;
 /* useSpecularWorkflow: diffuse and F0 come from diffuseColor and specularColor instead of metallic and ior. */
 #define HDUE_MATERIAL_SPECULAR_WORKFLOW 2u
@@ -455,6 +458,11 @@ typedef struct HdueVolumeDesc {
     double transform[16];
     float albedo[3];
     float extinction_scale;
+    /* ABI 16: emission from another field on the same voxels (null: none), shown as UE's BlackBody of
+       value * temperature_scale (kelvin) times emission_intensity. */
+    const float* emission;
+    float emission_intensity;
+    float temperature_scale;
 } HdueVolumeDesc;
 /* upsert_local_fog_volume (ABI 14): one UE Local Fog Volume, as the actor a level places. transform (row-major, row
  * vectors, UE world centimeters) places UE's base volume, a sphere of radius 500 cm. names and values set
@@ -469,6 +477,19 @@ typedef struct HdueLocalFogVolumeDesc {
     const char* const* values;
     uint32_t count;
 } HdueLocalFogVolumeDesc;
+/* upsert_groom (ABI 16): curves as UE hair strands, a UGroomAsset built at runtime and drawn by a groom component (UE's
+ * default hair material). points: point_count xyz in UE world centimeters; widths_cm per point; curve_point_counts per
+ * curve, summing to point_count. Guides are generated from every strand (no simulation). apply_scene's removed_ids
+ * removes it. */
+typedef struct HdueGroomDesc {
+    uint32_t struct_size;
+    uint32_t visible;
+    const char* id;
+    uint32_t point_count, curve_count;
+    const float* points;
+    const float* widths_cm;
+    const uint32_t* curve_point_counts;
+} HdueGroomDesc;
 enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
 enum {
     HDUE_LIGHT_SHADOWS = 1,
@@ -503,6 +524,9 @@ typedef struct HdueLight {
     uint32_t property_count;
     const char* const* property_names;
     const char* const* property_values;
+    /* ABI 16: an image (unreal:lightFunction:texture) shown as UE's light function on a local or distant light;
+       empty for none. */
+    const char* light_function_file;
 } HdueLight;
 /* Light and shadow linking per object (mesh ID): lighting channels in bits 0-2, and NO_SHADOW when the object is
    outside every shadow-casting light's shadowLink. Objects not listed use every channel and cast shadows. */
@@ -672,6 +696,8 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* update_meshes)(HdueSession session, HdueMeshUpdate* meshes, uint32_t count);
 
     HdueResult(HDUE_CALL* upsert_local_fog_volume)(HdueSession session, const HdueLocalFogVolumeDesc* volume);
+
+    HdueResult(HDUE_CALL* upsert_groom)(HdueSession session, const HdueGroomDesc* groom);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */

@@ -1,0 +1,78 @@
+#usda 1.0
+(
+    doc = """unreal:lightFunction:texture filters a light with an image, as UE's light function (a gobo): a spot light on
+a white wall through the Cornell sample's checker image on frame 2 only. The checker's dark squares darken the lit
+wall to well under its unfiltered brightness."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE light function",
+ "feature": "unreal:lightFunction:texture",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "the light function darkens the wall",
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -1.5,
+      -1.5,
+      1.5,
+      1.5
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      -1.5,
+      -1.5,
+      1.5,
+      1.5
+     ]
+    }
+   ],
+   "max": 0.85
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.8)]
+}
+def SphereLight "Spot" (
+    prepend apiSchemas = ["ShapingAPI"]
+)
+{
+        float inputs:radius = 0.05
+        float inputs:intensity = 1
+        float inputs:exposure = 10
+        float inputs:shaping:cone:angle = 45
+        asset unreal:lightFunction:texture.timeSamples = {
+            1: @@,
+            2: @../../cornell/checker.png@,
+        }
+        float3 unreal:light:LightFunctionScale = (100, 100, 100)
+        double3 xformOp:translate = (0, 0, 4)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}

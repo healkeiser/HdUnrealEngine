@@ -40,7 +40,7 @@ public:
 private:
     struct FDefinition {
         HdueLight Data{};
-        FString Id, File, Ies;
+        FString Id, File, Ies, LightFunction;
         TArray<TPair<FString, FString>> Properties;  // unreal:light:<Property>, by name
     };
     struct FImageEntry {
@@ -53,6 +53,9 @@ private:
     TMap<FString, AActor*> Actors;
     TMap<FString, FImageEntry> Images;
     TMap<FString, TStrongObjectPtr<UTexture2D>> LightTextures;
+    TMap<FString, TStrongObjectPtr<class UMaterialInstanceDynamic>> LightFunctions;  // by light ID
+    FString LoadImageFile(const FString& File);     // into Images; the error, empty on success
+    UTexture2D* ImageTexture(const FString& File);  // a loaded image as a texture, kept in LightTextures
     struct FProfileEntry {
         FDateTime Modified;
         int64 Size = 0;

@@ -369,6 +369,8 @@ struct MaterialXSurface {
     Input<GfVec3f> emissionColor;
     Input<float> opacity;
     Input<bool> thinWalled;
+    Input<GfVec3f> transmissionColor;
+    Input<float> transmissionDepth;
     const char* normal;
 };
 const MaterialXSurface standardSurface{{"base", .8f},
@@ -393,6 +395,8 @@ const MaterialXSurface standardSurface{{"base", .8f},
                                        {"emission_color", GfVec3f(1)},
                                        {"opacity", 1},
                                        {"thin_walled", false},
+                                       {"transmission_color", GfVec3f(1)},
+                                       {"transmission_depth", 0},
                                        "normal"};
 // OpenPBR's subsurface_radius is the scalar distance and subsurface_radius_scale the per-channel colour.
 const MaterialXSurface openPbr{{"base_weight", 1},
@@ -417,6 +421,8 @@ const MaterialXSurface openPbr{{"base_weight", 1},
                                {"emission_color", GfVec3f(1)},
                                {"geometry_opacity", 1},
                                {"geometry_thin_walled", false},
+                               {"transmission_color", GfVec3f(1)},
+                               {"transmission_depth", 0},
                                "geometry_normal"};
 
 // Multiplies a slot's constant and texture by a weight (base, specular and emission only scale their colours).
@@ -481,14 +487,18 @@ void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurf
     // (Material.cpp:1170), which Interchange leaves unset. A standard_surface with transmission is translucent instead,
     // its opacity unused for the blend (MaterialXStandardSurfaceShader.cpp:65-69); OpenPBR's geometry_opacity wins over
     // transmission (masked). Karma renders opacity as fractional coverage: scenes moving between them adjust materials.
-    // Transmission is approximated as see-through coverage (opacity 1 - transmission) on the translucent parent.
+    // Transmission refracts as UE's import makes it: the translucent Standard Surface parent (UE's
+    // Substrate-StandardSurface-Translucent function, coloured transmittance, Refraction from its IOR output).
     const bool textured = read(s.opacity, data.opacity, HDUE_TEXTURE_OPACITY);
     read(s.transmission, transmission);
     transmission = std::clamp(transmission, 0.f, 1.f);
     if ((textured || data.opacity != 1) && (&s == &openPbr || transmission == 0))
         data.opacityThreshold = .3333f;
-    else
-        data.opacity *= 1 - transmission;
+    else if (transmission > 0) {
+        data.transmission = transmission;
+        color(s.transmissionColor, data.transmissionColor);
+        read(s.transmissionDepth, data.transmissionDepth);
+    }
     read(s.thinWalled, data.thinWalled);
     GfVec3f normal(0, 0, 1);
     r.read(s.normal, normal, HDUE_TEXTURE_NORMAL);

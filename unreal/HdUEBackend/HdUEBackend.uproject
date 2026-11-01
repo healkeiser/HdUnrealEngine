@@ -22,6 +22,7 @@
     { "Name": "ACLPlugin", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "DatasmithContent", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "CameraCalibrationCore", "Enabled": true },
+    { "Name": "HairStrands", "Enabled": true },
     { "Name": "USDImporter", "Enabled": false },
     { "Name": "USDCore", "Enabled": false },
     { "Name": "PythonScriptPlugin", "Enabled": false }

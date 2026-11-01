@@ -405,6 +405,8 @@ void HdUEState::erase(const std::string& id) {
     dirtyVolumes.erase(id);
     localFogs.erase(id);
     dirtyLocalFogs.erase(id);
+    grooms.erase(id);
+    dirtyGrooms.erase(id);
     // geometryRevisions[id] stays until the removal reaches UE (submit), so a revived mesh keeps its revision.
     dirtyMeshes.erase(id);
     movedMeshes.erase(id);
@@ -453,7 +455,7 @@ struct ScenePacket {
     }
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyLocalFogs,
-        removedIds;
+        dirtyGrooms, removedIds;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
     std::map<std::string, std::vector<GfVec3f>> points;
     // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
@@ -473,6 +475,7 @@ struct ScenePacket {
         dirtyLights.swap(state.dirtyLights);
         dirtyVolumes.swap(state.dirtyVolumes);
         dirtyLocalFogs.swap(state.dirtyLocalFogs);
+        dirtyGrooms.swap(state.dirtyGrooms);
         removedIds.swap(state.removed);
     }
     // Gives them back after a failed upload (state lock held). Sync may have erased or revived prims meanwhile:
@@ -488,9 +491,10 @@ struct ScenePacket {
         restore(dirtyLights, state.dirtyLights, state.lights);
         restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
         restore(dirtyLocalFogs, state.dirtyLocalFogs, state.localFogs);
+        restore(dirtyGrooms, state.dirtyGrooms, state.grooms);
         for (const auto& id : removedIds)
             if (!state.meshes.count(id) && !state.materials.count(id) && !state.lights.count(id) &&
-                !state.volumes.count(id) && !state.localFogs.count(id))
+                !state.volumes.count(id) && !state.localFogs.count(id) && !state.grooms.count(id))
                 state.removed.insert(id);
     }
     uint64_t revision = 0;
@@ -509,6 +513,7 @@ struct ScenePacket {
     std::vector<HdueAssetDesc> sceneAssets;
     std::vector<HdueVolumeDesc> volumes;
     std::vector<HdueLocalFogVolumeDesc> localFogs;
+    std::vector<HdueGroomDesc> grooms;
     std::vector<HdueMaterialUpdate> materialUpdates;
     std::vector<HdueWetBinding> wet;
     std::vector<const char*> removed, removedAssets;
@@ -662,7 +667,10 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
             desc.subsurface_radius[i] = data.subsurfaceRadius[i] * units;
             desc.sheen_color[i] = data.sheenColor[i];
             desc.coat_color[i] = data.coatColor[i];
+            desc.transmission_color[i] = data.transmissionColor[i];
         }
+        desc.transmission = data.transmission;
+        desc.transmission_depth = float(data.transmissionDepth * units);
         if (data.thinWalled) desc.flags |= HDUE_MATERIAL_THIN_WALLED;
         if (data.subsurfaceBaseTexture) desc.flags |= HDUE_MATERIAL_SUBSURFACE_BASE_TEXTURE;
         if (data.sheenBaseTexture) desc.flags |= HDUE_MATERIAL_SHEEN_BASE_TEXTURE;
@@ -1056,6 +1064,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         light.texture_file =
             packet.own(source ? textureFile(state, source->texture, true) : "");  // scene_linear, as material colours
         light.ies_file = packet.own(source ? source->ies : "");
+        light.light_function_file = packet.own(source ? source->lightFunction : "");
         light.ies_angle_scale = source ? source->iesAngleScale : 0;
         light.ies_normalize = source && source->iesNormalize;
         if (source) light.lighting_channels = packet.linkedLights[source->id];
@@ -1169,6 +1178,12 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         // the resolution halves optical depth), so scale by the voxel's edge length in cm.
         const double voxelCm = std::cbrt(std::abs(m.ExtractRotationMatrix().GetDeterminant()));
         desc.extinction_scale = float(perCentimeter * voxelCm);
+        if (volume.emission.size() == volume.density.size() && !volume.emission.empty()) {
+            desc.emission =
+                packet.own(packet.floats, std::vector<float>(volume.emission.begin(), volume.emission.end()));
+            desc.emission_intensity = volume.emissionIntensity;
+            desc.temperature_scale = volume.temperatureScale;
+        }
         packet.volumes.push_back(desc);
     }
 }
@@ -1201,6 +1216,34 @@ void prepareLocalFogs(HdUEState& state, ScenePacket& packet) {
         if (HdUETraceScene())
             TF_STATUS("hdUE local fog volume %s visible=%u properties=%u", desc.id, desc.visible, desc.count);
         packet.localFogs.push_back(desc);
+    }
+}
+// Grooms reach UE in world space (cm, UE axes): their points through the curves' transform, widths scaled with it.
+void prepareGrooms(HdUEState& state, ScenePacket& packet) {
+    if (packet.dirtyGrooms.empty()) return;
+    const double cmPerUnit = state.setting<double>("metersPerUnit", .01) * 100;
+    for (const auto& id : packet.dirtyGrooms) {
+        const auto it = state.grooms.find(id);
+        if (it == state.grooms.end()) continue;
+        const auto& groom = it->second;
+        std::vector<float> points, widths;
+        points.reserve(groom.points.size() * 3);
+        for (const auto& p : groom.points) {
+            const auto ue = state.convert(groom.localToWorld.Transform(GfVec3d(p)));
+            points.insert(points.end(), {float(ue[0]), float(ue[1]), float(ue[2])});
+        }
+        const double scale = std::cbrt(std::abs(groom.localToWorld.ExtractRotationMatrix().GetDeterminant()));
+        for (const float w : groom.widths) widths.push_back(float(w * scale * cmPerUnit));
+        HdueGroomDesc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.id = packet.own(groom.id);
+        desc.visible = groom.visible;
+        desc.point_count = uint32_t(groom.points.size());
+        desc.curve_count = uint32_t(groom.counts.size());
+        desc.points = packet.own(packet.floats, std::move(points));
+        desc.widths_cm = packet.own(packet.floats, std::move(widths));
+        desc.curve_point_counts = packet.own(packet.indices, std::vector<uint32_t>(groom.counts));
+        packet.grooms.push_back(desc);
     }
 }
 void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
@@ -1262,6 +1305,7 @@ void prepareScene(HdUEState& state, ScenePacket& packet, uint64_t meshBudget) {
     prepareLights(state, packet);
     prepareVolumes(state, packet);
     prepareLocalFogs(state, packet);
+    prepareGrooms(state, packet);
     for (const auto& id : packet.removedIds) {
         packet.removed.push_back(packet.own(id));
         packet.removed.push_back(packet.own(HdUEShearedId(id)));  // a no-op in UE when it had none
@@ -1336,6 +1380,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     for (const auto& desc : packet.volumes) backend.require(api.upsert_volume(session, &desc), "upsert_volume");
     for (const auto& desc : packet.localFogs)
         backend.require(api.upsert_local_fog_volume(session, &desc), "upsert_local_fog_volume");
+    for (const auto& desc : packet.grooms) backend.require(api.upsert_groom(session, &desc), "upsert_groom");
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
 }

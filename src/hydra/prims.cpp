@@ -1136,6 +1136,9 @@ public:
             topology.GetCurveWrap() == HdTokens->pinned && type == HdTokens->cubic && basis != HdTokens->bezier;
         const int Sides = ribbon ? 2 : 6;
         size_t offset = 0, varying = 0;
+        // unreal:groom: UE hair strands (UGroomAsset, HairStrands) from the evaluated samples, instead of tubes.
+        const bool groom = value(delegate->Get(GetId(), TfToken("unreal:groom")), false);
+        HdUEGroomData hair;
         // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
         for (size_t curveIndex = 0; curveIndex < counts.size(); ++curveIndex) {
             const size_t count = size_t(std::max(0, counts[curveIndex]));
@@ -1160,6 +1163,14 @@ public:
             varying += varyingCount;
             const auto curve = samples(primvar(points, HdInterpolationVertex, GfVec3d(0)).cvs, type, basis, periodic);
             if (curve.size() < 2) continue;
+            if (groom) {
+                for (const auto& sample : curve) {
+                    hair.points.emplace_back(sample.point);
+                    hair.widths.push_back(float(at(width, sample)));
+                }
+                hair.counts.push_back(uint32_t(curve.size()));
+                continue;
+            }
             // Parallel-transported frame along the curve; ribbons span the authored normal's binormal instead.
             GfVec3d tangent = (curve[1].point - curve[0].point).GetNormalized();
             GfVec3d frame =
@@ -1229,6 +1240,21 @@ public:
                     mesh.indices.insert(mesh.indices.end(), {center, end ? a : b, end ? b : a});
                 }
             }
+        }
+        if (groom) {
+            auto* state = static_cast<HdUEState*>(param);
+            hair.id = mesh.id;
+            hair.visible = mesh.visible;
+            hair.localToWorld = mesh.transform;
+            if (state->locked([&] { return state->meshes.count(hair.id) > 0; }))
+                state->erase(hair.id);  // its tubes, when unreal:groom was just turned on
+            std::lock_guard lock(state->mutex);
+            if (const auto old = state->grooms.find(hair.id); old != state->grooms.end() && old->second == hair) return;
+            state->removed.erase(hair.id);
+            state->grooms[hair.id] = std::move(hair);
+            state->dirtyGrooms.insert(mesh.id);
+            ++state->revision;
+            return;
         }
         mesh.colors = HdUEVaryingColors(std::move(colors), mesh.points.size());
         mesh.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
@@ -1327,38 +1353,68 @@ public:
         for (const auto& field : fields)
             if (field.fieldName == TfToken("density")) chosen = &field;
         if (!chosen && !fields.empty()) chosen = &fields.front();
+        // A field densified over its active bounding box into out (density, dimensions, localToWorld).
+        const auto load = [&](const HdVolumeFieldDescriptor& field, HdUEVolumeData& out) {
+            const bool vdb = field.fieldPrimType == TfToken("openvdbAsset");
+            if (!vdb && field.fieldPrimType != TfToken("houdiniFieldAsset"))
+                throw std::runtime_error("only openvdbAsset and houdiniFieldAsset fields are supported, not " +
+                                         field.fieldPrimType.GetString());
+            const auto file = value(delegate->Get(field.fieldId, TfToken("filePath")), SdfAssetPath());
+            const auto path = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
+            auto gridName = value(delegate->Get(field.fieldId, TfToken("fieldName")), TfToken()).GetString();
+            if (gridName.empty()) gridName = field.fieldName.GetString();
+            const auto index = delegate->Get(field.fieldId, TfToken("fieldIndex"));
+            static std::once_flag initialized;
+            std::call_once(initialized, [] { openvdb::initialize(); });
+            const bool vdbFile = vdb && path.rfind("op:", 0) != 0 && TfStringEndsWith(TfStringToLower(path), ".vdb");
+            if (vdbFile) {
+                openvdb::io::File in(path);
+                in.open(false);
+                const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(in.readGrid(gridName));
+                in.close();
+                if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
+                HdUEDensifyGrid(*grid, MaxResolution, out);
+            } else  // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
+                HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb,
+                                     MaxResolution, out);
+        };
         try {
             if (chosen) {
-                const bool vdb = chosen->fieldPrimType == TfToken("openvdbAsset");
-                if (!vdb && chosen->fieldPrimType != TfToken("houdiniFieldAsset"))
-                    throw std::runtime_error("only openvdbAsset and houdiniFieldAsset fields are supported, not " +
-                                             chosen->fieldPrimType.GetString());
-                const auto file = value(delegate->Get(chosen->fieldId, TfToken("filePath")), SdfAssetPath());
-                const auto path = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
-                auto gridName = value(delegate->Get(chosen->fieldId, TfToken("fieldName")), TfToken()).GetString();
-                if (gridName.empty()) gridName = chosen->fieldName.GetString();
-                const auto index = delegate->Get(chosen->fieldId, TfToken("fieldIndex"));
-                static std::once_flag initialized;
-                std::call_once(initialized, [] { openvdb::initialize(); });
-                const bool vdbFile =
-                    vdb && path.rfind("op:", 0) != 0 && TfStringEndsWith(TfStringToLower(path), ".vdb");
-                if (vdbFile) {
-                    openvdb::io::File file(path);
-                    file.open(false);
-                    const auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
-                    file.close();
-                    if (!grid) throw std::runtime_error("grid " + gridName + " in " + path + " is not a float grid");
-                    HdUEDensifyGrid(*grid, MaxResolution, volume);
-                } else  // SOP volumes behind op: paths, and .bgeo files: VDB or native Houdini volumes
-                    HdUELoadHoudiniField(path, gridName, index.IsHolding<int>() ? index.UncheckedGet<int>() : 0, vdb,
-                                         MaxResolution, volume);
+                load(*chosen, volume);
                 gridToLocal_ = volume.localToWorld;
+                // unreal:emissionField: another field (temperature, flame, ...) shown as emission, as UE's
+                // heterogeneous volume materials read an imported grid; sampled at the density's voxel centres.
+                const auto emissionField = value(delegate->Get(GetId(), TfToken("unreal:emissionField")), TfToken());
+                volume.emissionIntensity = value(delegate->Get(GetId(), TfToken("unreal:emissionIntensity")), 1.f);
+                volume.temperatureScale = value(delegate->Get(GetId(), TfToken("unreal:temperatureScale")), 1.f);
+                const auto source = std::find_if(fields.begin(), fields.end(), [&](const auto& field) {
+                    return !emissionField.IsEmpty() && field.fieldName == emissionField;
+                });
+                if (source != fields.end() && volume.width) {
+                    HdUEVolumeData grid;
+                    load(*source, grid);
+                    const auto toGrid = volume.localToWorld * grid.localToWorld.GetInverse();
+                    volume.emission.assign(volume.density.size(), 0.f);
+                    for (uint32_t k = 0; k < volume.depth; ++k)
+                        for (uint32_t j = 0; j < volume.height; ++j)
+                            for (uint32_t i = 0; i < volume.width; ++i) {
+                                const auto p = toGrid.Transform(GfVec3d(i + .5, j + .5, k + .5));
+                                const int64_t x = int64_t(std::floor(p[0])), y = int64_t(std::floor(p[1])),
+                                              z = int64_t(std::floor(p[2]));
+                                if (x >= 0 && y >= 0 && z >= 0 && x < grid.width && y < grid.height && z < grid.depth)
+                                    volume.emission[(size_t(k) * volume.height + j) * volume.width + i] =
+                                        grid.density[(size_t(z) * grid.height + size_t(y)) * grid.width + size_t(x)];
+                            }
+                } else if (!emissionField.IsEmpty())
+                    TF_WARN("hdUE volume %s: no field %s for unreal:emissionField", GetId().GetText(),
+                            emissionField.GetText());
             }
         } catch (const std::exception& error) {
             TF_RUNTIME_ERROR("hdUE volume %s: %s", GetId().GetText(), error.what());
             gridToLocal_.reset();
             volume.width = volume.height = volume.depth = 0;
             volume.density.clear();
+            volume.emission.clear();
         }
         if (HdUETracePass()) {
             const auto m = volume.localToWorld * transform;
@@ -1448,6 +1504,8 @@ public:
         for (const char* name : HdUELightProperties)
             if (const auto property = get(("unreal:light:" + std::string(name)).c_str()); !property.IsEmpty())
                 data.properties.emplace_back(name, HdUESettingText(property));
+        if (const auto function = get("unreal:lightFunction:texture"); function.IsHolding<SdfAssetPath>())
+            data.lightFunction = HdUESettingText(function);
         auto texture = get("texture:file");
         if (applicationLight.IsHolding<GlfSimpleLight>() &&
             applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight())

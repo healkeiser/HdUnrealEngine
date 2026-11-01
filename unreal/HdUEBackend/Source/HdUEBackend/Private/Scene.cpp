@@ -22,6 +22,12 @@
 #include "Algo/AllOf.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HeterogeneousVolumeComponent.h"
+#include "GroomAsset.h"
+#include "GroomBuilder.h"
+#include "GroomComponent.h"
+#include "HairAttributes.h"
+#include "HairDescription.h"
+#include "HairStrandsDatas.h"
 #include "Engine/VolumeTexture.h"
 #include "TextureResource.h"
 #include "ImageCore.h"
@@ -114,6 +120,10 @@ void FHdueScene::Remove(const FString& Id) {
     NaniteFits(Id, nullptr);  // returns its root pages
     Lighting->Remove(Id);
     RemoveVolume(Id);
+    if (FGroom* Groom = Grooms.Find(Id)) {
+        if (IsValid(Groom->Actor)) World->DestroyActor(Groom->Actor);
+        Grooms.Remove(Id);
+    }
     CameraLightDirections.Remove(Id);
     if (AActor** Actor = Actors.Find(Id)) {
         if (IsValid(*Actor)) World->DestroyActor(*Actor);
@@ -146,6 +156,68 @@ T* AddRootComponent(AActor* Actor, TFunctionRef<void(T&)> Configure, UClass* Cla
 }
 }  // namespace
 
+// Curves as UE hair strands: the groom asset UE's importer would build, made from memory with UE's own builder
+// (GroomAsset.cpp BuildHairGroup_Strands): one group, guides generated from every strand (no simulation), so no
+// interpolation data; positions uncompressed, as a cooked runtime uploads its in-memory bulk data as is. Drawn by a
+// groom component with UE's default hair material.
+bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
+    const FString Id = UTF8_TO_TCHAR(Desc.id);
+    FHairDescription Description;
+    Description.InitializeVertices(int32(Desc.point_count));
+    Description.InitializeStrands(int32(Desc.curve_count));
+    for (uint32 I = 0; I < Desc.point_count; ++I) {
+        SetHairVertexAttribute(Description, FVertexID(int32(I)), HairAttribute::Vertex::Position,
+                               FVector3f(Desc.points[I * 3], Desc.points[I * 3 + 1], Desc.points[I * 3 + 2]));
+        SetHairVertexAttribute(Description, FVertexID(int32(I)), HairAttribute::Vertex::Width,
+                               FMath::Max(0.f, Desc.widths_cm[I]));
+    }
+    for (uint32 I = 0; I < Desc.curve_count; ++I)
+        SetHairStrandAttribute(Description, FStrandID(int32(I)), HairAttribute::Strand::VertexCount,
+                               int32(Desc.curve_point_counts[I]));
+    TStrongObjectPtr<UGroomAsset> Asset(NewObject<UGroomAsset>(GetTransientPackage()));
+    Asset->SetNumGroup(1);
+    auto& Interpolation = Asset->GetHairGroupsInterpolation()[0];
+    Interpolation.InterpolationSettings.GuideType = EGroomGuideType::Generated;
+    Interpolation.InterpolationSettings.HairToGuideDensity = 1.f;
+    FHairDescriptionGroups Groups;
+    // (FHairDescriptionGroups::IsValid is not exported for modular builds: the group count stands in.)
+    if (!FGroomBuilder::BuildHairDescriptionGroups(Description, Groups) || Groups.HairGroups.Num() != 1) {
+        Error = TEXT("Cannot build hair strands from the curves of ") + Id;
+        return false;
+    }
+    FHairStrandsDatas Strands, Guides;
+    auto& Info = Asset->GetHairGroupsInfo()[0];
+    FGroomBuilder::BuildData(Groups.HairGroups[0], Interpolation, Info, Strands, Guides);
+    auto& Platform = Asset->GetHairGroupsPlatformData()[0];
+    FGroomBuilder::BuildBulkData(Groups.HairGroups[0].Info, Guides, Platform.Guides.BulkData, false);
+    FGroomBuilder::BuildBulkData(Groups.HairGroups[0].Info, Strands, Platform.Strands.BulkData, false);
+    Platform.Strands.InterpolationBulkData.Reset();
+    FGroomBuilder::BuildClusterBulkData(Strands, Groups.Bounds.SphereRadius, Asset->GetHairGroupsLOD()[0],
+                                        Platform.Strands.ClusterBulkData);
+    Asset->GetHairGroupsRendering()[0].ShadowSettings.bUseHairRaytracingGeometry = true;  // the Path Tracer's strands
+    // No cards or meshes, but UGroomAsset::InitCardsResources/InitMeshesResources check their LOD arrays match the
+    // group's LOD count (the editor's cache build sizes them the same way).
+    const int32 LODCount = Asset->GetHairGroupsLOD()[0].LODs.Num();
+    Platform.Cards.LODs.SetNum(LODCount);
+    Platform.Meshes.LODs.SetNum(LODCount);
+    Asset->UpdateHairGroupsInfo();
+    Asset->InitResources();
+    if (!Asset->AreGroupsValid()) {
+        Error = TEXT("UE rejected the hair strands of ") + Id;
+        return false;
+    }
+    FGroom& Groom = Grooms.FindOrAdd(Id);
+    if (IsValid(Groom.Actor)) World->DestroyActor(Groom.Actor);
+    Groom.Actor = World->SpawnActor<AActor>();
+    AddRootComponent<UGroomComponent>(Groom.Actor, [&](UGroomComponent& Component) {
+        Component.SetGroomAsset(Asset.Get());
+        // UGroomComponent::PostLoad's call: a spawned component is never loaded.
+        Component.PrecachePSOs();
+    });
+    Groom.Asset = MoveTemp(Asset);
+    Groom.Actor->SetActorHiddenInGame(!Desc.visible);
+    return true;
+}
 bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     const FString Id = UTF8_TO_TCHAR(Desc.id);
     const uint64 Count = uint64(Desc.width) * Desc.height * Desc.depth;
@@ -162,27 +234,46 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
         Volume.Material.Reset(UMaterialInstanceDynamic::Create(Parent, World));
     }
     auto* Component = Volume.Actor->FindComponentByClass<UHeterogeneousVolumeComponent>();
-    if (Count) {
-        // ponytail: half-float dense 3D texture; sparse grids beyond a few hundred voxels per side cost memory.
-        UVolumeTexture* Texture = Volume.Texture.Get();
+    // ponytail: half-float dense 3D textures; sparse grids beyond a few hundred voxels per side cost memory.
+    const auto Fill = [&](TStrongObjectPtr<UVolumeTexture>& Slot, const float* Values) -> UVolumeTexture* {
+        UVolumeTexture* Texture = Slot.Get();
         if (!Texture || Texture->GetSizeX() != int32(Desc.width) || Texture->GetSizeY() != int32(Desc.height) ||
             Texture->GetSizeZ() != int32(Desc.depth)) {
             Texture = UVolumeTexture::CreateTransient(Desc.width, Desc.height, Desc.depth, PF_R16F);
-            if (!Texture) {
-                Error = TEXT("Cannot create the volume texture.");
-                return false;
-            }
+            if (!Texture) return nullptr;
             Texture->SRGB = false;
             Texture->Filter = TF_Trilinear;
             Texture->NeverStream = true;
-            Volume.Texture.Reset(Texture);
+            Slot.Reset(Texture);
         }
         auto& Mip = Texture->GetPlatformData()->Mips[0];
         auto* Voxels = static_cast<FFloat16*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
-        for (uint64 I = 0; I < Count; ++I) Voxels[I] = FFloat16(FMath::Max(0.f, Desc.density[I]));
+        for (uint64 I = 0; I < Count; ++I) Voxels[I] = FFloat16(FMath::Max(0.f, Values[I]));
         Mip.BulkData.Unlock();
         Texture->UpdateResource();
+        return Texture;
+    };
+    if (Count) {
+        UVolumeTexture* Texture = Fill(Volume.Texture, Desc.density);
+        if (!Texture) {
+            Error = TEXT("Cannot create the volume texture.");
+            return false;
+        }
         Volume.Material->SetTextureParameterValue(TEXT("Density"), Texture);
+    }
+    // Emission: UE's BlackBody of the field times its intensity (M_HdUEVolume); intensity 0 without a field.
+    if (Count && Desc.emission) {
+        UVolumeTexture* Texture = Fill(Volume.Emission, Desc.emission);
+        if (!Texture) {
+            Error = TEXT("Cannot create the volume emission texture.");
+            return false;
+        }
+        Volume.Material->SetTextureParameterValue(TEXT("Emission"), Texture);
+        Volume.Material->SetScalarParameterValue(TEXT("EmissionIntensity"), Desc.emission_intensity);
+        Volume.Material->SetScalarParameterValue(TEXT("TemperatureScale"), Desc.temperature_scale);
+    } else {
+        Volume.Emission.Reset();
+        Volume.Material->SetScalarParameterValue(TEXT("EmissionIntensity"), 0.f);
     }
     Volume.Material->SetVectorParameterValue(TEXT("Albedo"),
                                              FLinearColor(Desc.albedo[0], Desc.albedo[1], Desc.albedo[2], 1));
@@ -1194,19 +1285,23 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const auto HasTexture = [&](int32 Slot) { return Desc.textures[Slot].file && *Desc.textures[Slot].file; };
             // UsdPreviewSurface: opacityThreshold > 0 is cutout; otherwise partial opacity is see-through.
             const bool Masked = Desc.opacity_threshold > 0.f;
-            const bool Translucent = !Masked && (Opacity < 1.f || HasTexture(HDUE_TEXTURE_OPACITY));
+            // MaterialX transmission refracts on the translucent Standard Surface parent, as UE's Interchange imports
+            // it (Substrate-StandardSurface-Translucent, coloured transmittance, Refraction from its IOR output).
+            const bool Transmissive = !Masked && Desc.transmission > 0.f;
+            const bool Translucent = Transmissive || (!Masked && (Opacity < 1.f || HasTexture(HDUE_TEXTURE_OPACITY)));
             // MaterialX subsurface and sheen, and clear coats, need the layered Standard Surface parents (UE's
             // Substrate standard_surface: a coat slab vertically layered over the base, several slabs per pixel);
             // everything else stays on the single-slab Preview Surface parents. The specular workflow and see-through
             // materials keep the base slab's second specular lobe (haziness) as their coat.
             const bool Coat = (Desc.clearcoat > 0.f || HasTexture(HDUE_TEXTURE_CLEARCOAT)) &&
                               !(Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW);
-            const bool Layered = !Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f || Coat);
+            const bool Layered = Transmissive || (!Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f || Coat));
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
             const FString ParentName =
-                Layered       ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
-                                          Thin ? TEXT("Thin") : TEXT(""))
-                      : Masked ? TEXT("M_PreviewSurfaceMasked")
+                Transmissive  ? FString::Printf(TEXT("M_StandardSurfaceTranslucent%s"), Thin ? TEXT("Thin") : TEXT(""))
+                 : Layered ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
+                                            Thin ? TEXT("Thin") : TEXT(""))
+                 : Masked ? TEXT("M_PreviewSurfaceMasked")
                 : Translucent ? TEXT("M_PreviewSurfaceTranslucent")
                               : TEXT("M_PreviewSurface");
             auto* Parent = LoadObject<UMaterialInterface>(
@@ -1289,6 +1384,11 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const auto Color = [](const float* C) { return FLinearColor(C[0], C[1], C[2], 1); };
                     Instance->SetScalarParameterValue(TEXT("SpecularIOR"), Ior);
                     Instance->SetVectorParameterValue(TEXT("CoatColor"), Color(Desc.coat_color));
+                    if (Transmissive) {
+                        Instance->SetScalarParameterValue(TEXT("Transmission"), Desc.transmission);
+                        Instance->SetVectorParameterValue(TEXT("TransmissionColor"), Color(Desc.transmission_color));
+                        Instance->SetScalarParameterValue(TEXT("TransmissionDepth"), Desc.transmission_depth);
+                    }
                     Instance->SetScalarParameterValue(TEXT("Subsurface"), Desc.subsurface);
                     Instance->SetVectorParameterValue(TEXT("SubsurfaceColor"), Color(Desc.subsurface_color));
                     Instance->SetVectorParameterValue(TEXT("SubsurfaceRadius"), Color(Desc.subsurface_radius));

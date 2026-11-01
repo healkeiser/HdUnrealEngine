@@ -1,0 +1,77 @@
+#usda 1.0
+(
+    doc = """primvars:unreal:emissionField (constant) shows another field of a volume as emission, UE's BlackBody of the field's value times
+primvars:unreal:temperatureScale (kelvin) times primvars:unreal:emissionIntensity, as a UE heterogeneous volume material reads an
+imported grid. The Cornell sample's fog sphere, in the dark, emitting from its own density field (no other field in
+the file) on frame 2 only: the fog glows, warm, where it was black."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE volume emission",
+ "feature": "unreal:emissionField, temperatureScale, emissionIntensity",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "no light without emission",
+   "value": {
+    "frame": 1
+   },
+   "max": 0.002
+  },
+  {
+   "name": "the fog glows",
+   "value": {
+    "frame": 2
+   },
+   "min": 0.01
+  },
+  {
+   "name": "the glow is warm (blackbody)",
+   "ratio": [
+    {
+     "frame": 2,
+     "channel": 0
+    },
+    {
+     "frame": 2,
+     "channel": 2
+    }
+   ],
+   "min": 1.2
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Volume "Fog"
+{
+        rel field:density = </Fog/density>
+        token primvars:unreal:emissionField = "density"
+        float primvars:unreal:temperatureScale = 2500
+        float primvars:unreal:emissionIntensity.timeSamples = {
+            1: 0,
+            2: 1,
+        }
+        double3 xformOp:translate = (2.4, 0, 0)
+        double3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        def OpenVDBAsset "density"
+        {
+                asset filePath = @../../cornell/fog.vdb@
+                token fieldName = "density"
+        }
+}

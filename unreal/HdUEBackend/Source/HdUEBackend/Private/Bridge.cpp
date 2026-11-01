@@ -1380,6 +1380,23 @@ HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc
     return HDUE_OK;
 }
 
+HdueResult HDUE_CALL UpsertGroom(HdueSession Handle, const HdueGroomDesc* Desc) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id || !Desc->point_count || !Desc->curve_count ||
+        Desc->point_count > (1u << 26) || !Desc->points || !Desc->widths_cm || !Desc->curve_point_counts)
+        return HDUE_INVALID_ARGUMENT;
+    uint64 Sum = 0;
+    for (uint32 I = 0; I < Desc->curve_count; ++I) Sum += Desc->curve_point_counts[I];
+    if (Sum != Desc->point_count) return HDUE_INVALID_ARGUMENT;
+    for (uint64 I = 0; I < uint64(Desc->point_count) * 3; ++I)
+        if (!FMath::IsFinite(Desc->points[I])) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    FString Error;
+    if (!Session->Scene->UpsertGroom(*Desc, Error)) return Fail(HDUE_ENGINE_ERROR, *Error);
+    Session->HasRequest = false;  // restart accumulation, as scene batches do
+    return HDUE_OK;
+}
+
 HdueResult HDUE_CALL RemoveVolume(HdueSession Handle, const char* Id) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
@@ -2136,7 +2153,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .poll_gpu_frame = PollGpuFrame,
             .acquire_gpu_frame = AcquireGpuFrame,
             .update_meshes = UpdateMeshes,
-            .upsert_local_fog_volume = UpsertLocalFogVolume};
+            .upsert_local_fog_volume = UpsertLocalFogVolume,
+            .upsert_groom = UpsertGroom};
     return HDUE_OK;
 }
 #endif

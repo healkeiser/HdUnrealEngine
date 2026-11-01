@@ -16,6 +16,7 @@
 #include "ImageUtils.h"
 #include "Math/Float16Color.h"
 #include "TextureResource.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/UnrealType.h"
 
 // Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
@@ -111,6 +112,7 @@ void FHdueLighting::Clear() {
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
     Actors.Empty();
     Definitions.Empty();
+    LightFunctions.Empty();
     Images.Empty();
     LightTextures.Empty();
     Objects.Empty();
@@ -127,6 +129,7 @@ void FHdueLighting::Clear() {
     CaptureFence.BeginFence();
 }
 void FHdueLighting::Remove(const FString& Id) {
+    LightFunctions.Remove(Id);
     if (auto* Actor = Actors.Find(Id)) {
         if (IsValid(*Actor)) World->DestroyActor(*Actor);
         Actors.Remove(Id);
@@ -240,34 +243,20 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
             Ignore(TEXT("an image on a light other than DomeLight and RectLight"));
             Definition.File.Empty();
         }
+        Definition.LightFunction = D.light_function_file ? UTF8_TO_TCHAR(D.light_function_file) : TEXT("");
+        Definition.Data.light_function_file = nullptr;
+        if (!Definition.LightFunction.IsEmpty() && D.type == HDUE_DOME_LIGHT) {
+            Ignore(TEXT("a light function on a DomeLight (UE's sky light has none)"));
+            Definition.LightFunction.Empty();
+        }
+        if (FString ImageError =
+                Definition.LightFunction.IsEmpty() ? FString() : LoadImageFile(Definition.LightFunction);
+            !ImageError.IsEmpty()) {
+            Ignore(*(TEXT("light function: ") + ImageError));
+            Definition.LightFunction.Empty();
+        }
         if (!Definition.File.IsEmpty()) {
-            const auto Stat = IFileManager::Get().GetStatData(*Definition.File);
-            auto* Cached = Images.Find(Definition.File);
-            FString ImageError;
-            if (!Stat.bIsValid || Stat.bIsDirectory)
-                ImageError = TEXT("its image is not a readable file: ") + Definition.File;
-            else if (!Cached || Cached->Modified != Stat.ModificationTime || Cached->Size != Stat.FileSize) {
-                FImage Image;
-                FImageEntry Entry;
-                Entry.Modified = Stat.ModificationTime;
-                Entry.Size = Stat.FileSize;
-                Entry.Image = MakeShared<FImage>();
-                if (!FImageUtils::LoadImage(*Definition.File, Image) || Image.NumSlices != 1 || Image.SizeX > 32768 ||
-                    Image.SizeY > 16384)
-                    ImageError = TEXT("cannot decode its image: ") + Definition.File;
-                else {
-                    Image.CopyTo(*Entry.Image, ERawImageFormat::RGBA32F, EGammaSpace::Linear);
-                    for (const auto& Pixel : Entry.Image->AsRGBA32F())
-                        if (!FMath::IsFinite(Pixel.R) || !FMath::IsFinite(Pixel.G) || !FMath::IsFinite(Pixel.B)) {
-                            ImageError = TEXT("its HDR image has nonfinite pixels: ") + Definition.File;
-                            break;
-                        }
-                }
-                if (ImageError.IsEmpty()) {
-                    Images.Add(Definition.File, MoveTemp(Entry));
-                    LightTextures.Remove(Definition.File);
-                }
-            }
+            const FString ImageError = LoadImageFile(Definition.File);
             if (!ImageError.IsEmpty()) {
                 Ignore(*ImageError);
                 Definition.File.Empty();
@@ -420,22 +409,24 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
                 DiskTexture->UpdateResource();
             }
             Rect->SetSourceTexture(DiskTexture.Get());
-        } else if (!Definition.File.IsEmpty()) {
-            if (!LightTextures.Contains(Definition.File)) {
-                const auto& Image = *Images[Definition.File].Image;
-                TStrongObjectPtr<UTexture2D> Texture(
-                    UTexture2D::CreateTransient(Image.SizeX, Image.SizeY, PF_FloatRGBA));
-                Texture->SRGB = false;
-                Texture->NeverStream = true;
-                auto& Mip = Texture->GetPlatformData()->Mips[0];
-                auto* Pixels = static_cast<FFloat16Color*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
-                const auto Source = Image.AsRGBA32F();
-                for (int64 I = 0; I < Source.Num(); ++I) Pixels[I] = FFloat16Color(Source[I]);
-                Mip.BulkData.Unlock();
-                Texture->UpdateResource();
-                LightTextures.Add(Definition.File, MoveTemp(Texture));
-            }
-            Rect->SetSourceTexture(LightTextures[Definition.File].Get());
+        } else if (!Definition.File.IsEmpty())
+            Rect->SetSourceTexture(ImageTexture(Definition.File));
+    }
+    // unreal:lightFunction:texture: UE's light function from an image, an instance of the cooked M_HdUELightFunction.
+    LightFunctions.Remove(Definition.Id);
+    if (!Definition.LightFunction.IsEmpty()) {
+        auto* Parent =
+            LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUELightFunction.M_HdUELightFunction"));
+        if (!Parent) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE light %s: /Game/HdUE/M_HdUELightFunction is missing; stage a runtime "
+                        "prepared with Prepare-Content.ps1."),
+                   *Definition.Id);
+        } else {
+            TStrongObjectPtr<UMaterialInstanceDynamic> Function(UMaterialInstanceDynamic::Create(Parent, nullptr));
+            Function->SetTextureParameterValue(TEXT("Texture"), ImageTexture(Definition.LightFunction));
+            Light->SetLightFunctionMaterial(Function.Get());
+            LightFunctions.Add(Definition.Id, MoveTemp(Function));
         }
     }
     if (auto* Local = Cast<ULocalLightComponent>(Light); Local && !Definition.Ies.IsEmpty()) {
@@ -462,6 +453,41 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
     Light->RegisterComponent();
     Actor->SetActorHiddenInGame(!D.visible);
     return true;
+}
+FString FHdueLighting::LoadImageFile(const FString& File) {
+    const auto Stat = IFileManager::Get().GetStatData(*File);
+    if (!Stat.bIsValid || Stat.bIsDirectory) return TEXT("its image is not a readable file: ") + File;
+    if (const auto* Cached = Images.Find(File);
+        Cached && Cached->Modified == Stat.ModificationTime && Cached->Size == Stat.FileSize)
+        return {};
+    FImage Image;
+    FImageEntry Entry;
+    Entry.Modified = Stat.ModificationTime;
+    Entry.Size = Stat.FileSize;
+    Entry.Image = MakeShared<FImage>();
+    if (!FImageUtils::LoadImage(*File, Image) || Image.NumSlices != 1 || Image.SizeX > 32768 || Image.SizeY > 16384)
+        return TEXT("cannot decode its image: ") + File;
+    Image.CopyTo(*Entry.Image, ERawImageFormat::RGBA32F, EGammaSpace::Linear);
+    for (const auto& Pixel : Entry.Image->AsRGBA32F())
+        if (!FMath::IsFinite(Pixel.R) || !FMath::IsFinite(Pixel.G) || !FMath::IsFinite(Pixel.B))
+            return TEXT("its HDR image has nonfinite pixels: ") + File;
+    Images.Add(File, MoveTemp(Entry));
+    LightTextures.Remove(File);
+    return {};
+}
+UTexture2D* FHdueLighting::ImageTexture(const FString& File) {
+    if (const auto* Existing = LightTextures.Find(File)) return Existing->Get();
+    const auto& Image = *Images[File].Image;
+    TStrongObjectPtr<UTexture2D> Texture(UTexture2D::CreateTransient(Image.SizeX, Image.SizeY, PF_FloatRGBA));
+    Texture->SRGB = false;
+    Texture->NeverStream = true;
+    auto& Mip = Texture->GetPlatformData()->Mips[0];
+    auto* Pixels = static_cast<FFloat16Color*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
+    const auto Source = Image.AsRGBA32F();
+    for (int64 I = 0; I < Source.Num(); ++I) Pixels[I] = FFloat16Color(Source[I]);
+    Mip.BulkData.Unlock();
+    Texture->UpdateResource();
+    return LightTextures.Add(File, MoveTemp(Texture)).Get();
 }
 const FHdueLighting::FProfileEntry* FHdueLighting::Profile(const FString& File, float AngleScale, FString& Error) {
     const auto Stat = IFileManager::Get().GetStatData(*File);

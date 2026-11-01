@@ -26,6 +26,7 @@
 #include "Materials/MaterialExpressionNormalize.h"
 #include "Materials/MaterialExpressionSceneTexture.h"
 #include "Materials/MaterialExpressionTextureSampleParameterVolume.h"
+#include "Materials/MaterialExpressionBlackBody.h"
 #include "Materials/MaterialExpressionTransformPosition.h"
 #include "Materials/MaterialExpressionWorldPosition.h"
 #include "Materials/MaterialExpressionVertexColor.h"
@@ -147,7 +148,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
         Material->TwoSided == TwoSided &&
-        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion3") : TEXT("PreviewSurfaceVersion5")) &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion4") : TEXT("PreviewSurfaceVersion5")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
@@ -300,17 +301,30 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         return Expression;
     };
     UMaterialExpression* Front = nullptr;
+    int32 FrontOutput = 0;
     auto* Data = Material->GetEditorOnlyData();
     Data->BaseColor.Expression = nullptr;
     Data->Metallic.Expression = nullptr;
     Data->Roughness.Expression = nullptr;
+    // Transmission: UE's translucent standard_surface, as its Interchange imports a transmissive MaterialX surface
+    // (InterchangeMaterialXPipeline.cpp, MaterialXStandardSurfaceShader.cpp: coloured transmittance, Refraction from
+    // the function's "Refraction (IOR)").
+    const bool Transmissive = Layered && Blend == BLEND_TranslucentColoredTransmittance;
     if (Layered) {
-        Scalar(TEXT("StandardSurfaceVersion3"),
+        Scalar(TEXT("StandardSurfaceVersion4"),
                1.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
         Call->SetMaterialFunction(LoadObject<UMaterialFunction>(
-            nullptr,
-            TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Opaque.Substrate-StandardSurface-Opaque")));
+            nullptr, Transmissive ? TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Translucent."
+                                         "Substrate-StandardSurface-Translucent")
+                                  : TEXT("/Engine/Functions/Substrate/Substrate-StandardSurface-Opaque."
+                                         "Substrate-StandardSurface-Opaque")));
+        const auto Output = [&](std::initializer_list<const TCHAR*> Names) -> int32 {
+            for (const TCHAR* Name : Names)
+                for (int32 Index = 0; Index < Call->FunctionOutputs.Num(); ++Index)
+                    if (Call->FunctionOutputs[Index].Output.OutputName == Name) return Index;
+            return INDEX_NONE;
+        };
         const auto Input = [&](const TCHAR* Input, UMaterialExpression* Expression) {
             for (auto& Function : Call->FunctionInputs)
                 if (Function.ExpressionInput && Function.ExpressionInput->InputName == Input) {
@@ -360,6 +374,19 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         ThinWalled->Value = Thin;
         Input(TEXT("thin_walled"), ThinWalled);
         Front = Call;
+        if (Transmissive) {
+            Input(TEXT("transmission"), Scalar(TEXT("Transmission"), 1.f));
+            Input(TEXT("transmission_color"), Vector(TEXT("TransmissionColor"), FLinearColor::White));
+            Input(TEXT("transmission_depth"), Scalar(TEXT("TransmissionDepth"), 0.f));
+            Input(TEXT("opacity"), Opacity);
+            // UE's own code names the front output either way (InterchangeMaterialXPipeline.cpp: "renamed somehow").
+            FrontOutput = FMath::Max(
+                0, Output({TEXT("Substrate StandardSurface Translucent"), TEXT("Substrate StandardSurface Opaque")}));
+            if (const int32 Refraction = Output({TEXT("Refraction (IOR)")}); Refraction != INDEX_NONE)
+                Data->Refraction.Connect(Refraction, Call);
+            else
+                UE_LOG(LogTemp, Error, TEXT("Substrate translucent standard_surface has no Refraction (IOR) output"));
+        }
     } else {
         // Metalness workflow, with ior as the dielectric specular level (the backend converts ior to it).
         auto* Conversion = Add(NewObject<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>(Material));
@@ -391,9 +418,13 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
         Front = Slab;
     }
-    Data->FrontMaterial.Connect(0, Front);
+    Data->FrontMaterial.Connect(FrontOutput, Front);
     Data->AmbientOcclusion.Connect(0, Occlusion);
     Material->BlendMode = Blend;
+    if (Transmissive) {  // as M_Glass: per-pixel lit, refracting by IOR (the Path Tracer refracts only then)
+        Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
+        Material->RefractionMethod = RM_IndexOfRefraction;
+    }
     if (Blend == BLEND_Masked) {
         // Cutout at opacityThreshold, independent of UE's per-asset clip value.
         auto* Threshold = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
@@ -557,8 +588,8 @@ UMaterial* CreateVolumeMaterial() {
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"), nullptr, LOAD_NoWarn);
     if (Material && Material->MaterialDomain == MD_Volume && Material->bUsedWithHeterogeneousVolumes) {
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
-            if (const auto* Row = Cast<UMaterialExpressionVectorParameter>(Expression);
-                Row && Row->ParameterName == TEXT("WorldToUVW0"))
+            if (const auto* Intensity = Cast<UMaterialExpressionScalarParameter>(Expression);
+                Intensity && Intensity->ParameterName == TEXT("EmissionIntensity"))
                 return Material;
     }
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEVolume"), RF_Public | RF_Standalone);
@@ -604,14 +635,65 @@ UMaterial* CreateVolumeMaterial() {
     auto* Albedo = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
     Albedo->ParameterName = TEXT("Albedo");
     Albedo->DefaultValue = FLinearColor(.8f, .8f, .8f, 1);
+    // Emission: another field on the same voxels as UE's BlackBody of its value * TemperatureScale (kelvin), times
+    // EmissionIntensity (0 without a field).
+    auto* Emission = Add(NewObject<UMaterialExpressionTextureSampleParameterVolume>(Material));
+    Emission->ParameterName = TEXT("Emission");
+    Emission->Texture = Empty;
+    Emission->SamplerType = SAMPLERTYPE_LinearColor;
+    Emission->Coordinates.Connect(0, UVW);
+    auto* TemperatureScale = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    TemperatureScale->ParameterName = TEXT("TemperatureScale");
+    TemperatureScale->DefaultValue = 1.f;
+    auto* Kelvin = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Kelvin->A.Connect(1, Emission);
+    Kelvin->B.Connect(0, TemperatureScale);
+    auto* Body = Add(NewObject<UMaterialExpressionBlackBody>(Material));
+    Body->Temp.Connect(0, Kelvin);
+    auto* Intensity = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    Intensity->ParameterName = TEXT("EmissionIntensity");
+    Intensity->DefaultValue = 0.f;
+    auto* Emissive = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Emissive->A.Connect(0, Body);
+    Emissive->B.Connect(0, Intensity);
     auto* Data = Material->GetEditorOnlyData();
-    // Legacy volume inputs, as UE's SparseVolumeTextureMaterialFactory uses: albedo, extinction.
+    // Legacy volume inputs, as UE's SparseVolumeTextureMaterialFactory uses: albedo, extinction, emission.
     Data->BaseColor.Connect(0, Albedo);
     Data->SubsurfaceColor.Connect(0, Extinction);
+    Data->EmissiveColor.Connect(0, Emissive);
     Material->MaterialDomain = MD_Volume;
     Material->BlendMode = BLEND_Additive;
     Material->bUsedWithHeterogeneousVolumes = true;
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
+// Light function parent for unreal:lightFunction:texture: the texture over UE's light-function coordinates filters the
+// light, as a light function material made in the editor does; compatible with the Light Function Atlas, through which
+// MegaLights reads light functions.
+UMaterial* CreateLightFunctionMaterial() {
+    const FString Path = TEXT("/Game/HdUE/M_HdUELightFunction");
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUELightFunction.M_HdUELightFunction"), nullptr,
+                                           LOAD_NoWarn);
+    if (Material && Material->MaterialDomain == MD_LightFunction && Material->bForceCompatibleWithLightFunctionAtlas)
+        return Material;
+    if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUELightFunction"), RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    auto* Coordinates = NewObject<UMaterialExpressionTextureCoordinate>(Material);
+    auto* Texture = NewObject<UMaterialExpressionTextureSampleParameter2D>(Material);
+    Texture->ParameterName = TEXT("Texture");
+    Texture->Texture =
+        LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
+    Texture->SamplerType = SAMPLERTYPE_Color;
+    Texture->Coordinates.Connect(0, Coordinates);
+    Material->GetEditorOnlyData()->EmissiveColor.Connect(0, Texture);
+    for (UMaterialExpression* Expression :
+         {static_cast<UMaterialExpression*>(Coordinates), static_cast<UMaterialExpression*>(Texture)})
+        Material->GetExpressionCollection().AddExpression(Expression);
+    Material->MaterialDomain = MD_LightFunction;
+    Material->bForceCompatibleWithLightFunctionAtlas = true;
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
@@ -722,18 +804,22 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
                 Blend, LinearWhite, false, false, false))
             return 3;
     // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's
-    // function).
+    // function); Translucent for MaterialX transmission.
     for (const bool Thin : {false, true})
-        for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked})
+        for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentColoredTransmittance})
             for (const bool TwoSided : {true, false})
                 if ((TwoSided || !Thin) &&
                     !CreateSurface(
                         *FString::Printf(TEXT("M_StandardSurface%s%s%s"),
-                                         Blend == BLEND_Masked ? TEXT("Masked") : TEXT(""),
+                                         Blend == BLEND_Masked                            ? TEXT("Masked")
+                                         : Blend == BLEND_TranslucentColoredTransmittance ? TEXT("Translucent")
+                                                                                          : TEXT(""),
                                          Thin ? TEXT("Thin") : TEXT(""), TwoSided ? TEXT("") : TEXT("OneSided")),
                         Blend, LinearWhite, true, Thin, TwoSided))
                     return 3;
-    if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial()) return 3;
+    if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial() ||
+        !CreateLightFunctionMaterial())
+        return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);
     UMaterial* Red = CreatePBR(TEXT("M_ReferenceRed"), FLinearColor(0.7f, 0.05f, 0.02f), 0.05f, 0.4f);

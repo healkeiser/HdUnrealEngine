@@ -165,6 +165,10 @@ struct HdUEVolumeData {
     VtFloatArray density;  // shared by the volumes of one prim's instances
     GfMatrix4d localToWorld{1};
     GfVec3f albedo{.8f};
+    // unreal:emissionField resampled onto the density's voxels (empty: no emission), shown as UE's BlackBody of
+    // value * temperatureScale (kelvin) times emissionIntensity.
+    VtFloatArray emission;
+    float emissionIntensity = 1, temperatureScale = 1;
 };
 // An UnrealLocalFogVolume prim: a unit sphere in its local space, and its unreal:localFogVolume:<property> values as
 // text, by ULocalFogVolumeComponent property name.
@@ -174,6 +178,17 @@ struct HdUELocalFogData {
     GfMatrix4d localToWorld{1};
     std::vector<std::pair<std::string, std::string>> values;
     bool operator==(const HdUELocalFogData&) const = default;
+};
+// BasisCurves with unreal:groom: UE hair strands (a UGroomAsset built at runtime) instead of tube meshes. Points are
+// the curves' evaluated samples in their own space, widths per point in scene units, counts the points per curve.
+struct HdUEGroomData {
+    std::string id;
+    bool visible = true;
+    GfMatrix4d localToWorld{1};
+    std::vector<GfVec3f> points;
+    std::vector<float> widths;
+    std::vector<uint32_t> counts;
+    bool operator==(const HdUEGroomData&) const = default;
 };
 struct HdUETextureData {
     std::string file;
@@ -200,6 +215,9 @@ struct HdUEMaterialData {
     // MaterialX standard_surface / OpenPBR; subsurfaceRadius is the mean free path in scene units.
     float subsurface = 0, sheen = 0, sheenRoughness = .3f;
     GfVec3f subsurfaceColor{1}, subsurfaceRadius{1}, sheenColor{1}, coatColor{1};
+    // transmission > 0 refracts (translucent Standard Surface parent); transmissionDepth in scene units.
+    float transmission = 0, transmissionDepth = 0;
+    GfVec3f transmissionColor{1};
     bool thinWalled = false, subsurfaceBaseTexture = false, sheenBaseTexture = false;  // HDUE_MATERIAL_*
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
@@ -221,6 +239,7 @@ struct HdUELightData {
     bool iesNormalize = false;
     TfToken lightLink, shadowLink;  // collection ids; empty when the collection includes everything
     std::vector<std::pair<std::string, std::string>> properties;  // unreal:light:<UE property>, as text
+    std::string lightFunction;                                    // unreal:lightFunction:texture, an image file
     uint32_t flags = HDUE_LIGHT_SHADOWS | HDUE_LIGHT_BACKGROUND | HDUE_LIGHT_MEGALIGHTS,
              textureFormat = HDUE_ENVIRONMENT_AUTOMATIC;
     bool visible = true, viewer = false;
@@ -242,6 +261,7 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
     std::map<std::string, HdUELocalFogData> localFogs;
+    std::map<std::string, HdUEGroomData> grooms;
     std::map<std::string, HdUEMotionSamples> cameraMotion;  // absolute camera transforms by camera id
     std::atomic<bool> paused{false};  // Pause()/houdini:render_pause: no frames are requested or drawn
     // What the renderer is doing, for Houdini's viewport (rendererStage). Its own lock: the UI reads it while the UE
@@ -257,7 +277,7 @@ struct HdUEState : HdRenderParam {
     mutable std::mutex stageMutex;
     std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex;  // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
-    std::set<std::string> dirtyVolumes, dirtyLocalFogs;
+    std::set<std::string> dirtyVolumes, dirtyLocalFogs, dirtyGrooms;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;

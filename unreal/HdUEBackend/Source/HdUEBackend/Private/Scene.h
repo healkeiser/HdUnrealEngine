@@ -81,6 +81,7 @@ public:
     // Dense density grids as heterogeneous volumes (upsert_volume).
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
     void RemoveVolume(const FString& Id);
+    bool UpsertGroom(const HdueGroomDesc& Desc, FString& Error);
     void SetTransforms(const FString& Id, uint32 Count, const double* Matrices);  // set_transforms
     void UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count);                      // update_meshes
     void ApplyLinks();  // Lighting's object table to every mesh (after a light batch replaced it)
@@ -106,10 +107,15 @@ private:
     TMap<FString, int32> PrimIds;
     struct FVolume {
         AActor* Actor = nullptr;
-        TStrongObjectPtr<class UVolumeTexture> Texture;
+        TStrongObjectPtr<class UVolumeTexture> Texture, Emission;
         TStrongObjectPtr<UMaterialInstanceDynamic> Material;
     };
     TMap<FString, FVolume> Volumes;
+    struct FGroom {
+        AActor* Actor = nullptr;
+        TStrongObjectPtr<class UGroomAsset> Asset;
+    };
+    TMap<FString, FGroom> Grooms;  // upsert_groom, by id
     int32 IdMode = 0;
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits
     // matter.
