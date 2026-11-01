@@ -676,7 +676,11 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         Session->ViewState->Destroy();
         Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     }
-    Session->CameraCut = Aov || !KeepHistory;
+    // The same AOV pass at a later time continues from it: the delegate renders the frame before for motion vectors,
+    // so UE's velocity buffer holds the motion since then, as Movie Render Queue's does after its warm-up frames.
+    const bool AovNextFrame = Aov && Session->HasRequest && Session->Request.aov == Request->aov &&
+                              Request->time_seconds > Session->Request.time_seconds;
+    Session->CameraCut = Aov ? !AovNextFrame : !KeepHistory;
     // That next frame continues the history as Movie Render Queue does after its warm-up: one draw (its default
     // temporal sample count). The warm-up frames run on a sequence's first frame.
     Session->Request = *Request;

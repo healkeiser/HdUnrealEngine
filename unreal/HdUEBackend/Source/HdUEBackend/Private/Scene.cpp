@@ -229,7 +229,8 @@ void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Ma
         TArray<FTransform> Transforms;
         Transforms.Reserve(Count);
         for (uint32 I = 0; I < Count; ++I) Transforms.Add(ToTransform(I));
-        Instances->BatchUpdateInstancesTransforms(0, Transforms, true, true, true);
+        // Not a teleport: UE keeps each instance's previous transform for the velocity buffer (motion vectors).
+        Instances->BatchUpdateInstancesTransforms(0, Transforms, true, true, false);
     } else if (Count == 1)
         Actor->SetActorTransform(ToTransform(0), false, nullptr, ETeleportType::TeleportPhysics);
 }

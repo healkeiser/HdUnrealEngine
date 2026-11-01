@@ -49,7 +49,7 @@ A render var selects an AOV by its `sourceName` (`raw`), or by its light path ex
 | `tangent` | | normal3f | `WorldTangent` buffer, USD axes | yes | yes |
 | `shadingModel` | | color3f | `ShadingModel` buffer (the colour code of UE's Shading Model view) | yes | yes |
 | `customDepth`, `customStencil` | | float | `CustomDepthWorldUnits`, `CustomStencil` buffers; hdUE meshes do not render custom depth, so far and 0 | yes | yes |
-| `velocity` | | color3f | `Velocity` buffer (encoded, 0.5 still); the raster pass renders one time, so 0.5 | yes | yes |
+| `velocity` | | color3f | Motion vectors as Movie Render Queue writes them: UE's `Velocity` buffer, the motion since the frame before in R (x) and G (y), 0.5 for none, v × 0.2495 + 0.5 for a motion of v in NDC (2 is the whole width). The buffers pass first renders the frame before (camera and meshes one frame back, not published); deforming meshes and volumes show no motion of their own | yes | yes |
 | `combineddiffuse` (`diffuse`) | `C<RD>.*L` | color3f | Diffuse + Indirect Diffuse components | yes | yes |
 | `directdiffuse` | `C<RD>L` | color3f | Diffuse component | yes | yes |
 | `indirectdiffuse` | `C<RD>.+L` | color3f | Indirect Diffuse component (realtime: Lumen GI) | yes | yes |

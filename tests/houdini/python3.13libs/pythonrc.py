@@ -6,7 +6,6 @@ import os
 
 if os.environ.get("HDUE_HOUDINI_TEST"):
     import hdefereval
-    import hdue_houdini
     import hdue_tests
 
-    hdefereval.execute_deferred(lambda: hdue_tests.start(hdue_houdini.start()))
+    hdefereval.execute_deferred(hdue_tests.run)

@@ -1722,6 +1722,9 @@ class Pass final : public HdRenderPass {
     }
     size_t aovSlot_ = 0;
     bool aovInFlight_ = false;
+    // Motion vectors: the buffers pass first renders the frame before (unpublished), so UE's velocity buffer holds the
+    // motion since then.
+    bool velocityPriming_ = false, velocityPrimed_ = false;
     std::atomic<bool> aovsDone_{true};  // also true while no AOV is bound
     void publishAov(HdUERenderBuffer& target, HdUEAovFormat format, const HdueFrameInfo& frame,
                     std::vector<float> rgba) const {
@@ -2261,6 +2264,8 @@ public:
                 aovs_ = aovs;
                 aovSlot_ = 0;
                 aovInFlight_ = false;
+                if (velocityPriming_) applyMotion(s, 0);  // back from the frame before
+                velocityPriming_ = velocityPrimed_ = false;
                 aovsDone_ = aovs_.empty();
             }
             if (!buffer && !aovs_.empty() && aovs_.front().first->GetWidth()) {
@@ -2378,9 +2383,71 @@ public:
             const auto subframeTime = [&](int k) {
                 return float(pass->shutterOpen + (k + .5) / subframes_ * (pass->shutterClose - pass->shutterOpen));
             };
-            const auto viewAt = [&](float t) {
-                if (subframes_ < 2 || !cameraMotion) return view;
-                return view * cameraMotion->at(0) * cameraMotion->at(t).GetInverse();
+            const auto cameraAt = [&](float t) {
+                return cameraMotion ? view * cameraMotion->at(0) * cameraMotion->at(t).GetInverse() : view;
+            };
+            const auto viewAt = [&](float t) { return subframes_ < 2 ? view : cameraAt(t); };
+            // A request for the camera at view: the beauty's, its motion-blur sub-frames' and the AOVs'.
+            const auto build = [&](const GfMatrix4d& view) {
+                HdueRenderRequest request{};
+                request.struct_size = sizeof(request);
+                request.generation = std::max(s.generation, s.aovGeneration) + 1;
+                request.mode =
+                    s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED : HDUE_REALTIME;
+                request.samples_per_pixel = uint32_t(s.samplesPerPixel());
+                request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 32)));
+                request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
+                request.time_seconds = s.setting<double>("timeSeconds", 0);
+                const auto camera = view.GetInverse();
+                const auto eye = s.convert(camera.ExtractTranslation());
+                // Directions only, normalized: a camera under a scaled (e.g. 0.01) or sheared transform gave a
+                // target and up so short or skewed that the backend rejected the camera as degenerate.
+                const auto forward = s.convert(camera.TransformDir(GfVec3d(0, 0, -1)), true).GetNormalized();
+                auto up = s.convert(camera.TransformDir(GfVec3d(0, 1, 0)), true);
+                up = (up - forward * GfDot(up, forward)).GetNormalized();
+                const auto target = eye + forward * 100;  // 1 m ahead
+                for (int c = 0; c < 3; ++c) {
+                    request.eye[c] = eye[c];
+                    request.target[c] = target[c];
+                    request.up[c] = up[c];
+                }
+                // The backend takes the projection from projection_scale; the field of view only feeds its range
+                // check and texture streaming, so a narrow crop or tile is not rejected as under 1 degree.
+                request.horizontal_fov_degrees =
+                    std::clamp(float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846), 1.f, 170.f);
+                if (HdUETraceScene())
+                    TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
+                              pass->camera ? pass->cameraId.GetText() : "none", eye[0], eye[1], eye[2], target[0],
+                              target[1], target[2], request.horizontal_fov_degrees, s.width, s.height,
+                              s.setting<double>("metersPerUnit", .01), s.setting<std::string>("upAxis", "Y").c_str());
+                const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
+                request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
+                if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip)
+                    request.far_clip_cm = float(pass->farClip * cmPerUnit);
+                // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
+                if (projection[3][3] == 1) {
+                    request.orthographic = 1;
+                    request.projection_scale[0] = projection[0][0] / cmPerUnit;
+                    request.projection_scale[1] = projection[1][1] / cmPerUnit;
+                    request.projection_offset[0] = projection[3][0];
+                    request.projection_offset[1] = projection[3][1];
+                    request.near_clip_cm = float((projection[3][2] + 1) / projection[2][2] * cmPerUnit);
+                    request.far_clip_cm = float((projection[3][2] - 1) / projection[2][2] * cmPerUnit);
+                    request.horizontal_fov_degrees = 90;
+                } else {
+                    request.projection_scale[0] = projection[0][0];
+                    request.projection_scale[1] = projection[1][1];
+                    request.projection_offset[0] = -projection[2][0];
+                    request.projection_offset[1] = -projection[2][1];
+                }
+                // UsdRenderSettings disableDepthOfField renders every camera in focus.
+                if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
+                    request.fstop = lens[0];
+                    request.focus_distance_cm = float(lens[1] * cmPerUnit);
+                    request.focal_length_cm =
+                        float(lens[2] * cmPerUnit);  // world units, as Hydra and Karma read USD lens attributes
+                }
+                return request;
             };
             const uint64_t settingsVersion = s.requestSettingsRevision;
             // Consume a completed image before changing its generation. Otherwise
@@ -2495,7 +2562,13 @@ public:
                     aovMs = ms(aovStart, Clock::now());
                     if (copied == HDUE_STALE_FRAME)
                         ++s.staleFrameRetries;
-                    else {
+                    else if (velocityPriming_) {  // the frame before the motion vectors: back to this frame's pose
+                        s.backend->require(copied, "copy_frame");
+                        applyMotion(s, 0);
+                        velocityPriming_ = false;
+                        velocityPrimed_ = true;
+                        aovInFlight_ = false;
+                    } else {
                         s.backend->require(copied, "copy_frame");
                         const uint32_t id = aovs_[aovSlot_].second;
                         if (aovs_[aovSlot_].first == cryptoIds_.get())
@@ -2542,68 +2615,6 @@ public:
             } else if (needsRequest || subframeDue_) {
                 requested = true;
                 lastRequestAt_ = Clock::now();
-                const auto build = [&](const GfMatrix4d& view) {
-                    HdueRenderRequest request{};
-                    request.struct_size = sizeof(request);
-                    request.generation = std::max(s.generation, s.aovGeneration) + 1;
-                    request.mode = s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED
-                                                                                                    : HDUE_REALTIME;
-                    request.samples_per_pixel = uint32_t(s.samplesPerPixel());
-                    request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 32)));
-                    request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
-                    request.time_seconds = s.setting<double>("timeSeconds", 0);
-                    const auto camera = view.GetInverse();
-                    const auto eye = s.convert(camera.ExtractTranslation());
-                    // Directions only, normalized: a camera under a scaled (e.g. 0.01) or sheared transform gave a
-                    // target and up so short or skewed that the backend rejected the camera as degenerate.
-                    const auto forward = s.convert(camera.TransformDir(GfVec3d(0, 0, -1)), true).GetNormalized();
-                    auto up = s.convert(camera.TransformDir(GfVec3d(0, 1, 0)), true);
-                    up = (up - forward * GfDot(up, forward)).GetNormalized();
-                    const auto target = eye + forward * 100;  // 1 m ahead
-                    for (int c = 0; c < 3; ++c) {
-                        request.eye[c] = eye[c];
-                        request.target[c] = target[c];
-                        request.up[c] = up[c];
-                    }
-                    // The backend takes the projection from projection_scale; the field of view only feeds its range
-                    // check and texture streaming, so a narrow crop or tile is not rejected as under 1 degree.
-                    request.horizontal_fov_degrees = std::clamp(
-                        float(2 * std::atan(1.0 / projection[0][0]) * 180 / 3.14159265358979323846), 1.f, 170.f);
-                    if (HdUETraceScene())
-                        TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
-                                  pass->camera ? pass->cameraId.GetText() : "none", eye[0], eye[1], eye[2], target[0],
-                                  target[1], target[2], request.horizontal_fov_degrees, s.width, s.height,
-                                  s.setting<double>("metersPerUnit", .01),
-                                  s.setting<std::string>("upAxis", "Y").c_str());
-                    const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
-                    request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
-                    if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip)
-                        request.far_clip_cm = float(pass->farClip * cmPerUnit);
-                    // Hydra's projection already holds the conformed window and aperture offsets (GfFrustum layout).
-                    if (projection[3][3] == 1) {
-                        request.orthographic = 1;
-                        request.projection_scale[0] = projection[0][0] / cmPerUnit;
-                        request.projection_scale[1] = projection[1][1] / cmPerUnit;
-                        request.projection_offset[0] = projection[3][0];
-                        request.projection_offset[1] = projection[3][1];
-                        request.near_clip_cm = float((projection[3][2] + 1) / projection[2][2] * cmPerUnit);
-                        request.far_clip_cm = float((projection[3][2] - 1) / projection[2][2] * cmPerUnit);
-                        request.horizontal_fov_degrees = 90;
-                    } else {
-                        request.projection_scale[0] = projection[0][0];
-                        request.projection_scale[1] = projection[1][1];
-                        request.projection_offset[0] = -projection[2][0];
-                        request.projection_offset[1] = -projection[2][1];
-                    }
-                    // UsdRenderSettings disableDepthOfField renders every camera in focus.
-                    if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
-                        request.fstop = lens[0];
-                        request.focus_distance_cm = float(lens[1] * cmPerUnit);
-                        request.focal_length_cm =
-                            float(lens[2] * cmPerUnit);  // world units, as Hydra and Karma read USD lens attributes
-                    }
-                    return request;
-                };
                 if (needsRequest) {
                     // unreal:postProcess:<FPostProcessSettings property>, unreal:postProcessMaterials,
                     // unreal:tonemapper, and unreal:cvar:<console variable, ':' for '.'> (USD attribute names cannot
@@ -2777,6 +2788,7 @@ public:
                     beautyRequest_ = build(view);  // AOVs render the unblurred pose at the current time
                     aovSlot_ = 0;
                     aovInFlight_ = false;
+                    velocityPriming_ = velocityPrimed_ = false;
                     aovsDone_ = aovs_.empty();
                     denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
@@ -2816,6 +2828,26 @@ public:
                         s.backend->require(
                             s.backend->api().set_aov_buffers(s.session, names.data(), uint32_t(names.size())),
                             "set_buffers");
+                        // Motion vectors as Movie Render Queue renders them: UE's velocity buffer holds the motion
+                        // since the frame before, so that frame renders first (a camera cut, not published), then
+                        // this one continues from it with one draw.
+                        if (std::find_if(bufferVars_.begin(), bufferVars_.end(), [](const auto& var) {
+                                return std::string_view(var.row->buffer) == "Velocity";
+                            }) != bufferVars_.end()) {
+                            request.warmup_frames = 1;
+                            if (!velocityPrimed_) {
+                                auto prime = build(cameraAt(-1.f));
+                                prime.generation = request.generation;
+                                prime.aov = request.aov;
+                                prime.mode = request.mode;
+                                prime.lumen_enabled = request.lumen_enabled;
+                                prime.warmup_frames = 1;
+                                prime.time_seconds -= 1. / s.setting<double>("houdini:fps", 24.);
+                                request = prime;
+                                applyMotion(s, -1.f);
+                                velocityPriming_ = true;
+                            }
+                        }
                     }
                     if (aovs_[aovSlot_].first == cryptoIds_.get()) {
                         // The sample's cell centre in a 4 x 4 grid over the pixel; NDC spans 2 per image size.

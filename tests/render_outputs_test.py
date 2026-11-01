@@ -251,6 +251,8 @@ assert tabs == [
     "Lens",
     "Color Grading",
     "Lighting",
+    "Fog",
+    "Sky",
     "Rendering Features",
     "Image Output",
     "Engine Quality",

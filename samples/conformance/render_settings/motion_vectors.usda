@@ -1,0 +1,109 @@
+#usda 1.0
+(
+    doc = """The velocity render var holds motion vectors as Movie Render Queue writes them: the motion since the frame
+before, in UE's encoding (x and y in R and G, 0.5 for no motion, v * 0.2495 + 0.5 for a motion of v in NDC, 2 the
+whole width). A cube moving +2.4 units per frame across a still wall, at frame 1: 0.48 of NDC, so about 0.62 in R on
+the cube and 0.5 on the wall."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderVar",
+ "feature": "velocity render var (motion vectors)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "the moving cube moves right",
+   "value": {
+    "region": [
+     -0.2,
+     -0.2,
+     0.2,
+     0.2
+    ],
+    "aov": "velocity",
+    "channel": 0
+   },
+   "min": 0.56,
+   "max": 0.68
+  },
+  {
+   "name": "the cube does not move vertically",
+   "value": {
+    "region": [
+     -0.2,
+     -0.2,
+     0.2,
+     0.2
+    ],
+    "aov": "velocity",
+    "channel": 1
+   },
+   "min": 0.48,
+   "max": 0.52
+  },
+  {
+   "name": "the wall is still",
+   "value": {
+    "region": [
+     2.5,
+     2.5,
+     4.0,
+     4.0
+    ],
+    "aov": "velocity",
+    "channel": 0
+   },
+   "min": 0.49,
+   "max": 0.51
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        rel products = [</Render/Beauty>, </Render/Buffers>]
+    }
+    def RenderProduct "Buffers"
+    {
+        token productName = "buffers.$F4.exr"
+        rel orderedVars = [</Render/Vars/velocity>]
+    }
+    over "Vars"
+    {
+        def RenderVar "velocity"
+        {
+            uniform token dataType = "color3f"
+            uniform string sourceName = "velocity"
+            uniform token sourceType = "raw"
+            string driver:parameters:aov:name = "velocity"
+            token driver:parameters:aov:format = "color3f"
+        }
+    }
+}
+def Mesh "Wall"
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, -5, -2), (5, -5, -2), (5, 5, -2), (-5, 5, -2)]
+        uniform token subdivisionScheme = "none"
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+}
+def Cube "Box"
+{
+        double size = 1
+        double3 xformOp:translate.timeSamples = {
+            0: (-2.4, 0, 0),
+            1: (0, 0, 0),
+            2: (2.4, 0, 0),
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+}
