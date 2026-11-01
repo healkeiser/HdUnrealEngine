@@ -40,7 +40,8 @@ class Test(MaterialTest):
         yield from self.image("02-pathtraced", 1, generation)
         yield from self.capture("02-pathtraced-solaris.png")
         controls = integration.current_settings_node()
-        override = hdue_surface.create(["/World/Wet"], input_node=controls)
+        # After the displayed node (the Render Settings LOP): wiring it from the controls would drop the mode.
+        override = hdue_surface.create(["/World/Wet"])
         override.parm("hdue_wet_amount").set(0.35)
         yield from self.image(
             "03-amount-edit", 1, self.frames[-1]["generation"]

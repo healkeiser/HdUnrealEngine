@@ -11,10 +11,16 @@ $TaskRoot = Split-Path -Parent $PSScriptRoot
 $RunOutput = New-HdUERun -Name houdini -Path $OutputDirectory
 # LOP cook, native asset proxies, stage space, render outputs, the material re-preparation change filter and the
 # Substrate Material Builder.
-foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test') {
-    & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot "tests\$Test.py")
-    if ($LASTEXITCODE) { throw "$Test failed." }
+# The repo's HDAs and Python come first, as in Launch-Houdini.ps1: an installed hdUE package would otherwise win.
+$PreviousHoudiniPath = $env:HOUDINI_PATH
+$env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($PreviousHoudiniPath) { $PreviousHoudiniPath } else { '&' })
+try {
+    foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test') {
+        & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot "tests\$Test.py")
+        if ($LASTEXITCODE) { throw "$Test failed." }
+    }
 }
+finally { $env:HOUDINI_PATH = $PreviousHoudiniPath }
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory $RunOutput -TestKind integration -TimeoutSeconds $TimeoutSeconds
 $Result = Get-Content -LiteralPath (Join-Path $RunOutput 'verified.json') -Raw | ConvertFrom-Json
 $Runtime = Get-Content -LiteralPath (Join-Path $RunOutput 'runtime-state.json') -Raw | ConvertFrom-Json
