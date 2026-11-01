@@ -1191,9 +1191,12 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     AddView(Family, *Session, PathTracing, Aov);
     // Moving frames keep full-resolution buffers (UE's dynamic resolution: the upper bound is the largest fraction);
     // other frames bound at their own fraction, as UE's game viewport does with r.ScreenPercentage. DLSS picks its
-    // quality mode from this bound (DLAA at 1).
+    // quality mode from this bound (DLAA at 1) and accepts only that mode's fractions (DLAA: 0.99 to 1; NGX fails the
+    // frame otherwise), so with DLSS on moving frames bound at their own fraction too, as UE's dynamic resolution
+    // clamps to the upscaler's range.
+    const bool FullBuffers = Moving && !CVarInt(TEXT("r.NGX.DLSS.Enable"));
     Family.SetScreenPercentageInterface(
-        new FLegacyScreenPercentageDriver(Family, ScreenFraction, Moving ? 1.0f : ScreenFraction));
+        new FLegacyScreenPercentageDriver(Family, ScreenFraction, FullBuffers ? 1.0f : ScreenFraction));
     if (!IsInteractive() && (!PathTracing || !Session->Draws)) {
         // Movie Render Queue's flush before each frame: the textures this view uses at full resolution, and pending
         // virtual texture tiles (the Path Tracer prepares its own residency).
