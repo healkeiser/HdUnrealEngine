@@ -106,8 +106,9 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 }
 // The material of a prim without a bound one (mesh, points, curves): its displayColor, or white times its vertex
 // colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
-// DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color). The
-// material's id is the prim's with ".displayColor".
+// DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color); without
+// one it is white, the vertex colour UE's importer gives a mesh without displayColor (USDGeomMeshConversion.cpp).
+// The material's id is the prim's with ".displayColor".
 // UsdLux MeshLightAPI: UsdImaging puts the light (isLight) and its MeshLight node (intensity, exposure, colour,
 // colour temperature) on the mesh prim itself. UE's USD importer ignores MeshLightAPI; UE lights a scene from emissive
 // surfaces (Lumen, Path Tracer), so the mesh emits that radiance from its display-colour material. Zero when the
@@ -144,10 +145,7 @@ HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& 
     material.id = mesh.id + ".displayColor";
     const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
     material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
-    if (material.vertexColor)
-        material.color = GfVec3f(1);
-    else if (!color.empty())
-        material.color = HdUEFromSceneLinear(color[0]);
+    material.color = material.vertexColor || color.empty() ? GfVec3f(1) : HdUEFromSceneLinear(color[0]);
     const auto opacity = value(delegate->Get(id, HdTokens->displayOpacity), VtFloatArray());
     if (!opacity.empty()) {
         // The generic ABI carries one opacity per material. Constant primvars (and identical values in other domains)
