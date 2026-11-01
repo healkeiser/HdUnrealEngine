@@ -133,6 +133,7 @@ PATH_TRACED = ("Rendering|Path Tracing",)
 REALTIME = (
     "Rendering|Anti-Aliasing|r.AntiAliasingMethod",
     "Rendering|Anti-Aliasing|r.NGX.DLSS.Enable",
+    "Rendering|Anti-Aliasing|r.HdUE.DLSS.RayReconstruction",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveResolution",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveScreenPercentage",
     "Rendering|View Mode",
@@ -247,6 +248,13 @@ FOG_DEFAULTS = {
         "Density, height falloff and height offset of the second fog (FExponentialHeightFogData); "
         "density 0 turns it off.",
     ),
+}
+# FExponentialHeightFogData's fields as UE's Details panel expands SecondFogData: the constructor turns the second fog
+# off (ExponentialHeightFogComponent.cpp), the other fields keep the struct's initializers (ExponentialHeightFogData.h).
+SECOND_FOG_DEFAULTS = {
+    "FogDensity": (0.0, "Density 0 turns the second fog off."),
+    "FogHeightFalloff": (0.2, None),
+    "FogHeightOffset": (0.0, None),
 }
 # USkyAtmosphereComponent and UVolumetricCloudComponent defaults their constructors compute (Earth's atmosphere,
 # in kilometres; colours stored over one channel, with that channel as the scale: SkyAtmosphereComponent.cpp).
@@ -376,6 +384,20 @@ CVARS = [
             help="NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 "
             "is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the "
             "anti-aliasing method renders. Realtime mode only.",
+        ),
+    ),
+    (
+        "r.HdUE.DLSS.RayReconstruction",
+        "DLSS Ray Reconstruction",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            kind="toggle",
+            type="int32",
+            default=0,
+            help="NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen "
+            "reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and "
+            "restores them. Needs NVIDIA DLSS on. Realtime mode only.",
         ),
     ),
     (
@@ -1335,6 +1357,35 @@ def write_light_header(settings):
     )
 
 
+def expand_struct(settings, header, name, struct, label, overrides, skipped):
+    """A struct property's fields in its place, as UE's Details panel expands it: <attribute>:<Field> (the backend
+    sets the field by reflection), each with the field's metadata, labelled "<label> <field label>".
+    """
+    index = next(
+        i for i, s in enumerate(settings) if s["attribute"].endswith(":" + name)
+    )
+    parent = settings[index]
+    text = header.read_text(encoding="utf-8")
+    start = text.index(f"struct {struct}")
+    fields = parse_properties(
+        text[start : text.index("};", start)],
+        {},
+        {},
+        skipped,
+        parent["attribute"] + ":",
+        overrides,
+        images=False,
+    )
+    for field in fields:
+        field.update(
+            category=parent["category"],
+            place=parent["place"],
+            disable=parent["disable"],
+            label=f"{label} {field['label']}",
+        )
+    return settings[:index] + fields + settings[index + 1 :]
+
+
 def parse_properties(
     body, defaults, enums, skipped, prefix, overrides=HDUE_DEFAULTS, images=True
 ):
@@ -2121,6 +2172,15 @@ def main():
         "heightFog",
         "Fog",
         FOG_DEFAULTS,
+        skipped,
+    )
+    fog = expand_struct(
+        fog,
+        source / "Runtime/Engine/Public/Rendering/ExponentialHeightFogData.h",
+        "SecondFogData",
+        "FExponentialHeightFogData",
+        "Second",
+        SECOND_FOG_DEFAULTS,
         skipped,
     )
     sky = parse_component(

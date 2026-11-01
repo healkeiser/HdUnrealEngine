@@ -39,6 +39,7 @@
 #include "LegacyScreenPercentageDriver.h"
 #if HDUE_WITH_DLSS
 #include "DLSS.h"
+#include "DLSSLibrary.h"
 #endif
 #include "Math/PerspectiveMatrix.h"
 #include "Math/Float16Color.h"
@@ -87,6 +88,10 @@ TAutoConsoleVariable<int32> CVarInteractiveResolution(
 TAutoConsoleVariable<float> CVarInteractiveScreenPercentage(
     TEXT("r.HdUE.InteractiveScreenPercentage"), 50.f,
     TEXT("Screen percentage of interactive realtime frames while moving (r.HdUE.InteractiveResolution)."));
+TAutoConsoleVariable<int32> CVarDlssRayReconstruction(
+    TEXT("r.HdUE.DLSS.RayReconstruction"), 0,
+    TEXT("NVIDIA DLSS Ray Reconstruction with r.NGX.DLSS.Enable: switched through the DLSS plugin's EnableDLSSRR, "
+         "which also turns off the denoisers it replaces and restores them."));
 struct FReadbackJob {
     TAtomic<bool> Complete{false};
     TAtomic<bool> Failed{false};
@@ -1097,6 +1102,12 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     // NVIDIA's DLSS replaces TSR when r.NGX.DLSS.Enable is set, as in UE. Its view extension only activates itself for
     // game and editor viewports, so the family takes it explicitly, as the plugin's Movie Render Queue support does
     // (MoviePipelineDLSSSetting.cpp); it then sets the family's temporal upscaler in BeginRenderViewFamily.
+    // Ray Reconstruction goes through the plugin's own switch (UDLSSLibrary::EnableDLSSRR, what its Blueprint and
+    // settings UIs call): it turns off the denoisers RR replaces and restores them. RR needs DLSS on, as there.
+    if (const bool RayReconstruction =
+            CVarDlssRayReconstruction.GetValueOnGameThread() && CVarInt(TEXT("r.NGX.DLSS.Enable"));
+        RayReconstruction != UDLSSLibrary::IsDLSSRREnabled())
+        UDLSSLibrary::EnableDLSSRR(RayReconstruction);
     if (!PathTracing && CVarInt(TEXT("r.NGX.DLSS.Enable")) && CVarInt(TEXT("r.TemporalAA.Upscaler")))
         if (const auto* Dlss = FModuleManager::GetModulePtr<IDLSSModuleInterface>(TEXT("DLSS"));
             Dlss && Dlss->QueryDLSSSRSupport() == EDLSSSupport::Supported)
@@ -1636,8 +1647,18 @@ static void SetSceneComponent(FSession& Session, const FString& Prefix, UClass* 
     auto* Scene = NewObject<USceneComponent>(Actor, Class);
     Scene->SetMobility(EComponentMobility::Movable);
     for (const auto& Value : Component.Values) {
-        FProperty* Property = Class->FindPropertyByName(*Value.Key);
-        if (!Property || !ImportPropertyValue(Property, Value.Value, Scene))
+        // <Struct>:<Field> sets one field of a struct property (SecondFogData:FogDensity), as UE's Details panel
+        // expands it.
+        FString Name = Value.Key, Field;
+        if (FString Struct; Value.Key.Split(TEXT(":"), &Struct, &Field)) Name = Struct;
+        FProperty* Property = Class->FindPropertyByName(*Name);
+        void* Container = Scene;
+        if (Property && !Field.IsEmpty()) {
+            const auto* Struct = CastField<FStructProperty>(Property);
+            Container = Struct ? Struct->ContainerPtrToValuePtr<void>(Scene) : nullptr;
+            Property = Struct ? Struct->Struct->FindPropertyByName(*Field) : nullptr;
+        }
+        if (!Property || !ImportPropertyValue(Property, Value.Value, Container))
             UE_LOG(LogTemp, Warning, TEXT("hdUE: %s setting %s = '%s' skipped (unknown property or value)"), *Prefix,
                    *Value.Key, *Value.Value);
     }

@@ -188,6 +188,20 @@
                 hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEDLSSRayReconstruction_control_qdcebee", "DLSS Ray Reconstruction", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrHdUEDLSSRayReconstruction_pzbebee"
+                label   "DLSS Ray Reconstruction"
+                type    toggle
+                size    1
+                default { 0 }
+                help    "NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and restores them. Needs NVIDIA DLSS on. Realtime mode only. Console variable r.HdUE.DLSS.RayReconstruction (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealcvarrHdUEDLSSRayReconstruction_control_qdcebee == block } { xn__unrealcvarrHdUEDLSSRayReconstruction_control_qdcebee == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
             HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe", "Lower Resolution While Moving", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarrHdUEInteractiveResolution_pzbebe"
@@ -3276,17 +3290,43 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealheightFogFogHeightFalloff_control_l4bj == block } { xn__unrealheightFogFogHeightFalloff_control_l4bj == none } { xn__unrealheightFog_i0a == 0 })"
             }
-            HDUE_CONTROL("xn__unrealheightFogSecondFogData_control_pzbj", "Second Fog Data")
+            HDUE_CONTROL("xn__unrealheightFogSecondFogDataFogDensity_control_zgcjn", "Second Fog Density")
             parm {
-                name    "xn__unrealheightFogSecondFogData_ombj"
-                label   "Second Fog Data"
+                name    "xn__unrealheightFogSecondFogDataFogDensity_y2bjn"
+                label   "Second Fog Density"
                 type    float
-                size    3
-                default { 0 0.2 0 }
-                help    "Settings for the second fog. Setting the density of this to 0 means it doesn't have any influence. Density, height falloff and height offset of the second fog (FExponentialHeightFogData); density 0 turns it off."
+                size    1
+                default { 0 }
+                range   { 0 0.05 }
+                help    "Global density factor for this fog. Density 0 turns the second fog off."
                 parmtag { "spare_category" "ExponentialHeightFogComponent" }
-                parmtag { "usdvaluetype" "float3" }
-                disablewhen R"({ xn__unrealheightFogSecondFogData_control_pzbj == block } { xn__unrealheightFogSecondFogData_control_pzbj == none } { xn__unrealheightFog_i0a == 0 })"
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealheightFogSecondFogDataFogDensity_control_zgcjn == block } { xn__unrealheightFogSecondFogDataFogDensity_control_zgcjn == none } { xn__unrealheightFog_i0a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealheightFogSecondFogDataFogHeightFalloff_control_rqcjn", "Second Fog Height Falloff")
+            parm {
+                name    "xn__unrealheightFogSecondFogDataFogHeightFalloff_qdcjn"
+                label   "Second Fog Height Falloff"
+                type    float
+                size    1
+                default { 0.2 }
+                range   { 0.001 2 }
+                help    "Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger."
+                parmtag { "spare_category" "ExponentialHeightFogComponent" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealheightFogSecondFogDataFogHeightFalloff_control_rqcjn == block } { xn__unrealheightFogSecondFogDataFogHeightFalloff_control_rqcjn == none } { xn__unrealheightFog_i0a == 0 })"
+            }
+            HDUE_CONTROL("xn__unrealheightFogSecondFogDataFogHeightOffset_control_4ocjn", "Second Fog Height Offset")
+            parm {
+                name    "xn__unrealheightFogSecondFogDataFogHeightOffset_3bcjn"
+                label   "Second Fog Height Offset"
+                type    float
+                size    1
+                default { 0 }
+                help    "Height offset, relative to the actor position Z."
+                parmtag { "spare_category" "ExponentialHeightFogComponent" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealheightFogSecondFogDataFogHeightOffset_control_4ocjn == block } { xn__unrealheightFogSecondFogDataFogHeightOffset_control_4ocjn == none } { xn__unrealheightFog_i0a == 0 })"
             }
             HDUE_CONTROL_HIDE("xn__unrealheightFogFogInscatteringLuminance_control_micj", "Fog Inscattering Color", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
