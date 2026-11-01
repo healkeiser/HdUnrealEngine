@@ -2470,10 +2470,22 @@ public:
                                 "hdUE: with the Unreal tonemapper on, the beauty is UE's display-referred image; "
                                 "view it with an un-tone-mapped view (not ACES or AgX, which tone-map it again)");
                         });
+                    // unreal:heightFog places UE's Exponential Height Fog (volumetric fog included),
+                    // unreal:heightFog:<UExponentialHeightFogComponent property> sets it, and unreal:heightFogHeight
+                    // (scene units along the up axis) is where its density is FogDensity.
+                    const bool heightFog = s.setting<bool>("heightFog", false);
+                    if (heightFog) {
+                        const double heightCm =
+                            s.setting<double>("heightFogHeight", 0) * s.setting<double>("metersPerUnit", .01) * 100;
+                        names.insert(names.end(), {"HeightFog", "HeightFog:RelativeLocation"});
+                        values.insert(values.end(), {"True", "0 0 " + TfStringify(heightCm)});
+                    }
                     const auto settings = s.settingsSnapshot();
                     for (const auto& [key, value] : settings) {
                         if (TfStringStartsWith(key.GetString(), "postProcess:"))
                             names.push_back(key.GetString().substr(12));
+                        else if (heightFog && TfStringStartsWith(key.GetString(), "heightFog:"))
+                            names.push_back("HeightFog:" + key.GetString().substr(10));
                         else if (TfStringStartsWith(key.GetString(), "cvar:"))
                             names.push_back(TfStringReplace(key.GetString().substr(5), ":", "."));
                         else if (key == TfToken("debugView"))
@@ -3013,7 +3025,7 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
     return purposes.empty() ? HdTokens->full : purposes[0];
 }
 // Every scalar setting hdUE reads, with the default its readers use (hosts such as usdview build their UI from these).
-// Prefixed families (postProcess:*, cvar:*) and dictionaries set by the Houdini host are not listed.
+// Prefixed families (postProcess:*, heightFog:*, cvar:*) and dictionaries set by the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
     return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
             {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
@@ -3030,7 +3042,9 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Denoiser", TfToken("denoiser"), VtValue(std::string("off"))},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
-            {"Cull Backface", TfToken("cullBackface"), VtValue(true)}};
+            {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
+            {"Exponential height fog", TfToken("heightFog"), VtValue(false)},
+            {"Height fog height", TfToken("heightFogHeight"), VtValue(0.0)}};
 }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
@@ -3146,13 +3160,15 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             TF_STATUS("hdUE wet settings: renderIndex=%p rprims=%zu", state_->renderIndex,
                       state_->renderIndex ? state_->renderIndex->GetRprimIds().size() : 0);
     }
+    // "heightFog" covers heightFog, heightFogHeight and heightFog:*.
     if (key == TfToken("renderMode") || key == TfToken("samplesPerPixel") || key == TfToken("warmupFrames") ||
         key == TfToken("lumenEnabled") || key == TfToken("timeSeconds") || key == TfToken("motionBlur") ||
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
         key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
         key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("denoiser") ||
         key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
-        TfStringStartsWith(key.GetString(), "postProcess:") || TfStringStartsWith(key.GetString(), "cvar:"))
+        TfStringStartsWith(key.GetString(), "heightFog") || TfStringStartsWith(key.GetString(), "postProcess:") ||
+        TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {
         const double frame = state_->setting<double>("houdini:frame", 1.);

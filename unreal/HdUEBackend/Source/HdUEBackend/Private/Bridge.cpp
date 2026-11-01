@@ -19,6 +19,8 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "GameFramework/Actor.h"
 #include "CanvasTypes.h"
 #include "ContentStreaming.h"
 #include "Scalability.h"
@@ -151,6 +153,9 @@ struct FSession {
         TStrongObjectPtr<UTexture> Texture;
     };
     TMap<FString, FPostProcessTexture> PostProcessTextures;
+    // set_post_process HeightFog: the Exponential Height Fog actor and the property values it was built with.
+    TWeakObjectPtr<AActor> HeightFog;
+    TArray<TPair<FString, FString>> HeightFogValues;
     bool Tonemapper = false;
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
@@ -427,6 +432,7 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     const auto Session = Runtime.Session;
     ReleaseResidency(Session);
     HdueSharedFrames::Reset();
+    if (Session->HeightFog.IsValid()) Session->HeightFog->Destroy();
     Session->Scene.Reset();
     // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
     // or the persistent view go.
@@ -1289,9 +1295,10 @@ HdueResult HDUE_CALL SetTransforms(HdueSession Handle, const HdueMeshTransform* 
     return HDUE_OK;
 }
 
-// Text for one FPostProcessSettings property; struct fields can also be given as bare numbers.
-bool ImportPostProcessValue(FProperty* Property, const FString& Text, FPostProcessSettings& Settings) {
-    void* Value = Property->ContainerPtrToValuePtr<void>(&Settings);
+// Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
+// numbers.
+bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container) {
+    void* Value = Property->ContainerPtrToValuePtr<void>(Container);
     const auto* Struct = CastField<FStructProperty>(Property);
     if (Struct && !Text.Contains(TEXT("="))) {
         TArray<FString> Numbers;
@@ -1299,6 +1306,18 @@ bool ImportPostProcessValue(FProperty* Property, const FString& Text, FPostProce
             .Replace(TEXT(")"), TEXT(" "))
             .Replace(TEXT(","), TEXT(" "))
             .ParseIntoArrayWS(Numbers);
+        if (Struct->Struct == TBaseStructure<FColor>::Get()) {
+            // Bare numbers are a linear colour (a USD color3f), stored as sRGB bytes as UE's colour picker does; the
+            // fields themselves are in memory order (B, G, R, A).
+            if (Numbers.Num() < 3 || Numbers.Num() > 4 ||
+                Numbers.ContainsByPredicate([](const FString& N) { return !N.IsNumeric(); }))
+                return false;
+            const FLinearColor Linear(FCString::Atof(*Numbers[0]), FCString::Atof(*Numbers[1]),
+                                      FCString::Atof(*Numbers[2]),
+                                      Numbers.Num() == 4 ? FCString::Atof(*Numbers[3]) : 1.f);
+            *static_cast<FColor*>(Value) = Linear.ToFColor(true);
+            return true;
+        }
         int32 Index = 0;
         for (TFieldIterator<FNumericProperty> Field(Struct->Struct); Field && Index < Numbers.Num(); ++Field, ++Index) {
             if (!Numbers[Index].IsNumeric()) return false;
@@ -1481,6 +1500,28 @@ static UTexture* PostProcessTexture(FSession& Session, const FString& Name, cons
     return Texture;
 }
 
+// HeightFog: one Exponential Height Fog in the session's world, as the actor a UE level places. Rebuilt only when its
+// values change, so volumetric fog keeps its temporal history from frame to frame.
+static void SetHeightFog(FSession& Session, bool Enabled, TArray<TPair<FString, FString>> Values) {
+    if (Enabled == Session.HeightFog.IsValid() && Values == Session.HeightFogValues) return;
+    if (Session.HeightFog.IsValid()) Session.HeightFog->Destroy();
+    Session.HeightFog = nullptr;
+    Session.HeightFogValues = MoveTemp(Values);
+    if (!Enabled) return;
+    AActor* Actor = Runtime.World->SpawnActor<AActor>();
+    auto* Fog = NewObject<UExponentialHeightFogComponent>(Actor);
+    for (const auto& Value : Session.HeightFogValues) {
+        FProperty* Property = UExponentialHeightFogComponent::StaticClass()->FindPropertyByName(*Value.Key);
+        if (!Property || !ImportPropertyValue(Property, Value.Value, Fog))
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: height fog setting %s = '%s' skipped (unknown property or value)"),
+                   *Value.Key, *Value.Value);
+    }
+    Actor->SetRootComponent(Fog);
+    Actor->AddInstanceComponent(Fog);
+    Fog->RegisterComponent();
+    Session.HeightFog = Actor;
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
@@ -1491,6 +1532,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     FString DebugView = TEXT("off");
     const auto Session = Runtime.Session;
     TSet<FString> Files;  // texture properties set to image files this call
+    bool HeightFog = false;
+    TArray<TPair<FString, FString>> HeightFogValues;
     // FPostProcessSettings starts with every bOverride_ set to false only after this reset.
     for (TFieldIterator<FBoolProperty> Flag(FPostProcessSettings::StaticStruct()); Flag; ++Flag)
         if (Flag->GetName().StartsWith(TEXT("bOverride_"))) Flag->SetPropertyValue_InContainer(&Settings, false);
@@ -1499,6 +1542,14 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
         if (Name == TEXT("DebugView")) {
             DebugView = Text;
+            continue;
+        }
+        if (Name == TEXT("HeightFog")) {
+            HeightFog = Text == TEXT("True") || Text == TEXT("1");
+            continue;
+        }
+        if (Name.StartsWith(TEXT("HeightFog:"))) {
+            HeightFogValues.Emplace(Name.RightChop(10), Text);
             continue;
         }
         if (Name.Contains(TEXT("."))) {
@@ -1520,7 +1571,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
             }
             continue;
         }
-        if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPostProcessValue(Property, Text, Settings)) {
+        if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPropertyValue(Property, Text, &Settings)) {
             UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"),
                    *Name, *Text);
             continue;
@@ -1543,6 +1594,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     for (auto It = Session->PostProcessTextures.CreateIterator(); It; ++It)
         if (!Files.Contains(It.Key())) It.RemoveCurrent();  // no longer set from a file
     SetDebugView(*Session, DebugView);
+    SetHeightFog(*Session, HeightFog, MoveTemp(HeightFogValues));
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
     Session->Tonemapper = Desc->tonemapper != 0;

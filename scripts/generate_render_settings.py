@@ -3,7 +3,8 @@
 Every user-facing FPostProcessSettings property (Engine/Classes/Engine/Scene.h) becomes an
 unreal:postProcess:<Property> parameter, in UE's own categories, with UE's display names, ranges,
 tooltips and constructor defaults (Engine/Private/Scene.cpp), sorted into the tabs of the hdUE
-settings. A curated list of console variables becomes unreal:cvar:<name with '.' as ':'> parameters
+settings. Every UExponentialHeightFogComponent property (Volumetric Fog included) becomes an
+unreal:heightFog:<Property> parameter on the Fog tab, the same way. A curated list of console variables becomes unreal:cvar:<name with '.' as ':'> parameters
 (Engine Quality), with their help and defaults read from their declarations. The parameters are
 written into the named generated blocks of the Houdini dialog scripts; run this after an engine
 update, then scripts/build_render_settings_hda.py, and commit the result:
@@ -49,6 +50,7 @@ TABS = (
     "Lens",
     "Color Grading",
     "Lighting",
+    "Fog",
     "Rendering Features",
     "Engine Quality",
 )
@@ -91,6 +93,8 @@ OPEN = {  # expanded by default; the other sections start collapsed
     "Lens|Exposure",
     "Color Grading|Global",
     "Lighting|Global Illumination",
+    "Fog|Exponential Height Fog Component",
+    "Fog|Volumetric Fog",
     "Engine Quality|Scalability",
 }
 # Sections whose toggle sits in the header (sidefx::header_toggle, as Karma's Motion Blur); True disables the
@@ -183,6 +187,15 @@ HDUE_DEFAULTS = {
     "PathTracingEnableReferenceDOF": (
         True,
         "hdUE turns it on when the USD camera has depth of field.",
+    ),
+}
+# UExponentialHeightFogComponent defaults its constructor does not spell out, with a note for the help.
+FOG_OFF = "xn__unrealheightFog_i0a == 0"  # unreal:heightFog
+FOG_DEFAULTS = {
+    "SecondFogData": (
+        [0.0, 0.2, 0.0],
+        "Density, height falloff and height offset of the second fog (FExponentialHeightFogData); "
+        "density 0 turns it off.",
     ),
 }
 SPEED_NOTE = (
@@ -693,6 +706,31 @@ HDUE = [
         advanced=True,
     ),
     hdue(
+        "heightFog",
+        "Exponential Height Fog",
+        "Fog",
+        "toggle",
+        False,
+        "Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor in a level. Turn on "
+        "Volumetric Fog for lit, shadowed fog (light shafts); the Path Tracer renders the fog only with Volumetric Fog "
+        "on. Lights scatter into it by their Volumetric Scattering Intensity.",
+        category="Fog",
+        uiscope=True,
+    ),
+    hdue(
+        "heightFogHeight",
+        "Fog Height",
+        "Fog",
+        "float",
+        0.0,
+        "Height of the fog actor, in scene units along the stage's up axis: the fog's density is Fog Density there "
+        "and grows below it.",
+        range=(-100, 100, False, False),
+        category="Fog",
+        uiscope=True,
+        disable=[FOG_OFF],
+    ),
+    hdue(
         "postProcessMaterials",
         "Post-Process Materials",
         "Rendering Features",
@@ -815,10 +853,10 @@ def parse_enums(*sources):
     return enums
 
 
-def parse_defaults(source):
-    body = source[
-        source.index("FPostProcessSettings::FPostProcessSettings()") :
-    ]
+def parse_defaults(
+    source, constructor="FPostProcessSettings::FPostProcessSettings("
+):
+    body = source[source.index(constructor) :]
     body = body[: body.index("\n}\n")]
     defaults = {}
     for name, expression in re.findall(r"^\s*(\w+)\s*=\s*(.+?);", body, re.M):
@@ -852,6 +890,8 @@ def default_value(expression, kind, size, enum):
         return [""]
     if expression in ("FLinearColor::Black", "FVector2f::ZeroVector"):
         numbers = [0.0, 0.0, 0.0]
+    elif expression in ("FLinearColor::White", "FColor::White"):
+        numbers = [1.0, 1.0, 1.0]
     else:
         numbers = [
             float(n.rstrip("f"))
@@ -891,6 +931,9 @@ TYPES = {
     "FVector2D": ("float", 2),
     "FVector2f": ("float", 2),
     "FVector3f": ("float", 3),
+    # Linear in Houdini; the backend stores sRGB bytes as UE's colour picker does.
+    "FColor": ("color", 3),
+    "FExponentialHeightFogData": ("float", 3),
 }
 
 
@@ -900,6 +943,39 @@ def parse_post_process(header, defaults, enums, skipped):
             "}; // struct FPostProcessSettings"
         )
     ]
+    return parse_properties(
+        body, defaults, enums, skipped, "unreal:postProcess:"
+    )
+
+
+def parse_height_fog(header, defaults, skipped):
+    """UExponentialHeightFogComponent's properties, on the Fog tab in UE's categories, off while unreal:heightFog is."""
+    start = header.index("class UExponentialHeightFogComponent")
+    body = header[start : header.index("\npublic:", start)]
+    settings = parse_properties(
+        body,
+        defaults,
+        {},
+        skipped,
+        "unreal:heightFog:",
+        FOG_DEFAULTS,
+        images=False,
+    )
+    for setting in settings:
+        category = setting["category"]
+        setting["place"] = "Fog|" + (
+            category if " " in category else label_from_name(category)
+        )
+        setting["disable"] = [FOG_OFF]
+    return settings
+
+
+def parse_properties(
+    body, defaults, enums, skipped, prefix, overrides=HDUE_DEFAULTS, images=True
+):
+    """One setting per UPROPERTY of a struct or class body: <prefix><Property>; images=False: textures as cooked
+    paths only.
+    """
     editor_only = [
         (m.start(), m.end())
         for m in re.finditer(r"#if WITH_EDITORONLY_DATA.*?#endif", body, re.S)
@@ -950,7 +1026,9 @@ def parse_post_process(header, defaults, enums, skipped):
             kind, size = "menu", 1
         elif "TObjectPtr" in type_name or type_name.endswith("*"):
             # Textures also take image files (imported at render time); curves only cooked assets.
-            kind, size = ("image" if "UTexture" in type_name else "string"), 1
+            kind, size = (
+                "image" if images and "UTexture" in type_name else "string"
+            ), 1
         elif type_name in TYPES:
             kind, size = TYPES[type_name]
         else:
@@ -959,9 +1037,9 @@ def parse_post_process(header, defaults, enums, skipped):
             skipped.append((name, reason))
             continue
         enum = enums.get(enum_name, [])
-        default, note = HDUE_DEFAULTS.get(name, (None, None))
+        default, note = overrides.get(name, (None, None))
         value = (
-            [default]
+            (default if isinstance(default, list) else [default])
             if default is not None
             else default_value(
                 defaults.get(name),
@@ -1002,7 +1080,7 @@ def parse_post_process(header, defaults, enums, skipped):
         translucency = meta.get("TranslucencyType")
         settings.append(
             dict(
-                attribute=f"unreal:postProcess:{name}",
+                attribute=prefix + name,
                 # UE has stray spaces in some (AutoExposureBias: "Exposure Compensation ").
                 label=(meta.get("DisplayName") or "").strip()
                 or label_from_name(name),
@@ -1653,6 +1731,20 @@ def main():
     post = parse_post_process(header, defaults, enums, skipped)
     for setting in post:
         setting["tonemapper"] = needs_tonemapper(setting["category"])
+    fog = parse_height_fog(
+        (
+            source
+            / "Runtime/Engine/Classes/Components/ExponentialHeightFogComponent.h"
+        ).read_text(encoding="utf-8"),
+        parse_defaults(
+            (
+                source
+                / "Runtime/Engine/Private/Components/ExponentialHeightFogComponent.cpp"
+            ).read_text(encoding="utf-8"),
+            "UExponentialHeightFogComponent::UExponentialHeightFogComponent(",
+        ),
+        skipped,
+    )
     console = console_settings(args.engine_root)
 
     if args.defaults_json:
@@ -1665,7 +1757,7 @@ def main():
                 else " ".join(map(str, v)) if len(v) == 2 else v
             )
 
-        settings = {s["attribute"]: value(s) for s in post + console}
+        settings = {s["attribute"]: value(s) for s in post + fog + console}
         cvars = {
             s["cvar"]: s["declared_default"]
             for s in console
@@ -1682,7 +1774,7 @@ def main():
         )
         return
 
-    tree = layout(post + console + HDUE)
+    tree = layout(post + fog + console + HDUE)
     replace_generated(
         PARAMETERS / "HdUnrealEngine_Global.ds",
         {"Unreal Engine": lambda indent: ds_layout(tree, indent)},
@@ -1703,8 +1795,8 @@ def main():
                 f"{essential:4} / {len(entries):4} {tab or '(top)'}|{section}"
             )
     print(
-        f"{len(post)} post-process settings, {len(console)} console variables, {len(HDUE)} hdUE settings "
-        f"({sum(not s.get('advanced') for s in post + console + HDUE)} Essential)"
+        f"{len(post)} post-process settings, {len(fog)} height fog settings, {len(console)} console variables, "
+        f"{len(HDUE)} hdUE settings ({sum(not s.get('advanced') for s in post + fog + console + HDUE)} Essential)"
     )
     for name, reason in skipped:
         print(f"skipped {name}: {reason}")

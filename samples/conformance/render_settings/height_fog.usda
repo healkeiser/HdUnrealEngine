@@ -1,0 +1,64 @@
+#usda 1.0
+(
+    doc = """hdUE's Exponential Height Fog (unreal:heightFog, unreal:heightFog:<UExponentialHeightFogComponent
+property>), with Volumetric Fog so UE's Path Tracer renders it too. Off on frame 1, on on frame 2: the 10 m of fog
+between the camera and the white wall dims the wall, as in UE with an Exponential Height Fog actor in the level."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE height fog",
+ "feature": "Exponential Height Fog with Volumetric Fog",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "fog changes the wall",
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -4.5,
+      -4.5,
+      4.5,
+      4.5
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      -4.5,
+      -4.5,
+      4.5,
+      4.5
+     ]
+    }
+   ],
+   "max": 0.9
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        bool unreal:heightFog.timeSamples = {
+            1: 0,
+            2: 1,
+        }
+        float unreal:heightFog:FogDensity = 1
+        bool unreal:heightFog:bEnableVolumetricFog = 1
+    }
+}
+def Cube "Wall"
+{
+        double size = 1.0
+        double3 xformOp:scale = (12, 12, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+}

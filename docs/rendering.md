@@ -318,6 +318,12 @@ From Houdini geometry, the VDB or Houdini volume primitive named after `fieldNam
 
 Measured against Karma: in realtime, a fog's brightness is within about 15%, but volumes cast no shadow onto surfaces (enabling `r.HeterogeneousVolumes.Shadows` did not produce one in testing; the cause is not identified yet). The Path Tracer casts it (optical depth 1.4 against Karma's 1.9) and includes multiple scattering, but resamples volumes into a coarse grid, so their silhouettes are blocky.
 
+## Fog
+
+The **Fog** tab of hdUE Render Settings places UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor does in a level. **Exponential Height Fog** (`unreal:heightFog`) turns it on; **Fog Height** (`unreal:heightFogHeight`, scene units along the stage's up axis) is the actor's height, where the density is Fog Density. Every other parameter is a `UExponentialHeightFogComponent` property (`unreal:heightFog:<Property>`), generated from the engine source with UE's categories, names, ranges and defaults; distances are in UE centimeters, as in UE's Details panel. UE's USD importer imports no fog, so there is no USD schema to follow.
+
+**Volumetric Fog** (`unreal:heightFog:bEnableVolumetricFog`) gives lit, shadowed fog and light shafts: lights scatter into it by their Volumetric Scattering Intensity. UE's Path Tracer renders the height fog only with Volumetric Fog on (`PathTracing.cpp`), and limits its density growth below the fog height with `r.PathTracing.FogDensityClamp`. The fog is part of the scene, so colour AOVs show it too. Changing a fog setting rebuilds the fog, which restarts volumetric fog's temporal history.
+
 ## Opacity and glass
 
 Generic `displayOpacity` maps to Substrate coverage. Constant values and identical values across another domain are supported; varying values are reduced with a warning. Opaque and translucent parents are selected accordingly.
