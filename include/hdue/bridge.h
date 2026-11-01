@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 13u
+#define HDUE_ABI_VERSION 14u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -451,6 +451,19 @@ typedef struct HdueVolumeDesc {
     float albedo[3];
     float extinction_scale;
 } HdueVolumeDesc;
+/* upsert_local_fog_volume (ABI 14): one UE Local Fog Volume, as the actor a level places. transform (row-major, row
+ * vectors, UE world centimeters) places UE's base volume, a sphere of radius 500 cm. names and values set
+ * ULocalFogVolumeComponent properties as set_post_process sets FPostProcessSettings ones; unknown ones are skipped
+ * with a warning. remove_asset removes it. Realtime only: UE's Path Tracer does not render local fog volumes. */
+typedef struct HdueLocalFogVolumeDesc {
+    uint32_t struct_size;
+    uint32_t visible;
+    const char* id;
+    double transform[16];
+    const char* const* names;
+    const char* const* values;
+    uint32_t count;
+} HdueLocalFogVolumeDesc;
 enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
 enum {
     HDUE_LIGHT_SHADOWS = 1,
@@ -645,6 +658,8 @@ typedef struct HdueApi {
     /* ABI 13: changes meshes apply_scene uploaded without resending their geometry; sets each needs_upload. Call after
      * the apply_scene that sent their materials. */
     HdueResult(HDUE_CALL* update_meshes)(HdueSession session, HdueMeshUpdate* meshes, uint32_t count);
+
+    HdueResult(HDUE_CALL* upsert_local_fog_volume)(HdueSession session, const HdueLocalFogVolumeDesc* volume);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */

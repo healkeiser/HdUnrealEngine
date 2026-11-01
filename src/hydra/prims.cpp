@@ -1559,6 +1559,37 @@ HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
     };
     return new Unsupported(id, type);
 }
+// UnrealLocalFogVolume (HdUE_LocalFogVolumeAdapter): its transform, visibility and the unreal:localFogVolume dictionary
+// of property values, uploaded when one of them changes.
+HdSprim* HdUECreateLocalFog(const SdfPath& id) {
+    struct LocalFog final : HdSprim {
+        explicit LocalFog(const SdfPath& id) : HdSprim(id) {}
+        HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
+        void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
+            *bits = HdChangeTracker::Clean;
+            if (GetId().IsEmpty()) return;
+            HdUELocalFogData data;
+            data.id = GetId().GetString();
+            data.localToWorld = delegate->GetTransform(GetId());
+            data.visible = delegate->GetVisible(GetId());
+            const auto values = delegate->Get(GetId(), TfToken("unreal:localFogVolume"));
+            if (values.IsHolding<VtDictionary>())
+                for (const auto& [name, value] : values.UncheckedGet<VtDictionary>())  // sorted by name
+                    data.values.emplace_back(name, value.IsHolding<bool>()
+                                                       ? (value.UncheckedGet<bool>() ? "True" : "False")
+                                                       : TfStringify(value));
+            auto* state = static_cast<HdUEState*>(param);
+            std::lock_guard lock(state->mutex);
+            const auto old = state->localFogs.find(data.id);
+            if (old != state->localFogs.end() && old->second == data) return;
+            state->localFogs[data.id] = std::move(data);
+            state->dirtyLocalFogs.insert(GetId().GetString());
+            ++state->revision;
+        }
+        void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+    };
+    return new LocalFog(id);
+}
 // Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
 void HdUETakeMeshSyncStats(double& milliseconds, int& count) {
     milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0;

@@ -37,6 +37,13 @@
       "HdUE_HermiteCurvesAdapter": {
         "bases": ["UsdImagingHermiteCurvesAdapter"], "primTypeName": "HermiteCurves"
       },
+      "HdUE_LocalFogVolumeAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealLocalFogVolume"
+      },
+      "HdUEUnrealLocalFogVolume": {
+        "alias": { "UsdSchemaBase": "UnrealLocalFogVolume" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealLocalFogVolume", "schemaKind": "concreteTyped"
+      },
       "HdUE_VisibilityAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },

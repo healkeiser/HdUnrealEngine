@@ -385,6 +385,7 @@ HdSprim* HdUECreateMaterial(const SdfPath&);
 HdSprim* HdUECreateCamera(const SdfPath&);
 HdSprim* HdUECreateLight(const SdfPath&, uint32_t);
 HdSprim* HdUECreateUnsupportedLight(const SdfPath&, const TfToken&);
+HdSprim* HdUECreateLocalFog(const SdfPath&);
 void HdUERefreshWetMasks(HdUEState&, HdRenderIndex*);
 void HdUERepullMeshes(HdUEState&, HdRenderIndex*);
 
@@ -401,6 +402,8 @@ void HdUEState::erase(const std::string& id) {
     lights.erase(id);
     volumes.erase(id);
     dirtyVolumes.erase(id);
+    localFogs.erase(id);
+    dirtyLocalFogs.erase(id);
     // geometryRevisions[id] stays until the removal reaches UE (submit), so a revived mesh keeps its revision.
     dirtyMeshes.erase(id);
     movedMeshes.erase(id);
@@ -432,13 +435,15 @@ struct ScenePacket {
     std::deque<std::vector<uint32_t>> indices;
     std::deque<std::vector<int32_t>> ids;
     std::deque<std::vector<HdueMaterialParameter>> parameters;
+    std::deque<std::vector<const char*>> strings;
     const char* own(std::string value) { return text.emplace_back(std::move(value)).c_str(); }
     template <class T, class Store>
     const T* own(Store& store, std::vector<T> values) {
         return values.empty() ? nullptr : store.emplace_back(std::move(values)).data();
     }
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
-    std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, removedIds;
+    std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyLocalFogs,
+        removedIds;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
     std::map<std::string, std::vector<GfVec3f>> points;
     // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
@@ -457,6 +462,7 @@ struct ScenePacket {
         dirtyMaterials.swap(state.dirtyMaterials);
         dirtyLights.swap(state.dirtyLights);
         dirtyVolumes.swap(state.dirtyVolumes);
+        dirtyLocalFogs.swap(state.dirtyLocalFogs);
         removedIds.swap(state.removed);
     }
     // Gives them back after a failed upload (state lock held). Sync may have erased or revived prims meanwhile:
@@ -471,9 +477,10 @@ struct ScenePacket {
         restore(dirtyMaterials, state.dirtyMaterials, state.materials);
         restore(dirtyLights, state.dirtyLights, state.lights);
         restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
+        restore(dirtyLocalFogs, state.dirtyLocalFogs, state.localFogs);
         for (const auto& id : removedIds)
             if (!state.meshes.count(id) && !state.materials.count(id) && !state.lights.count(id) &&
-                !state.volumes.count(id))
+                !state.volumes.count(id) && !state.localFogs.count(id))
                 state.removed.insert(id);
     }
     uint64_t revision = 0;
@@ -491,6 +498,7 @@ struct ScenePacket {
     std::vector<HdueLight> extendedLights;
     std::vector<HdueAssetDesc> sceneAssets;
     std::vector<HdueVolumeDesc> volumes;
+    std::vector<HdueLocalFogVolumeDesc> localFogs;
     std::vector<HdueMaterialUpdate> materialUpdates;
     std::vector<HdueWetBinding> wet;
     std::vector<const char*> removed, removedAssets;
@@ -1063,6 +1071,37 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         packet.volumes.push_back(desc);
     }
 }
+// UE's base Local Fog Volume is a sphere of radius 500 cm (ULocalFogVolumeComponent::GetBaseVolumeSize); the prim's is
+// the unit sphere of its local space. Its local axes are converted too (UE's local Z, where its height fog falls off,
+// is the prim's up axis), so the transform keeps a positive determinant: UE's shader rebuilds the volume's Z axis as
+// the cross product of the others, which a reflection (USD to UE's handedness) would mirror.
+void prepareLocalFogs(HdUEState& state, ScenePacket& packet) {
+    if (packet.dirtyLocalFogs.empty()) return;
+    const auto basis = sceneBasis(state);
+    const double cmPerUnit = state.setting<double>("metersPerUnit", .01) * 100;
+    const auto toUnit = GfMatrix4d().SetScale(1. / 500) * basis.GetInverse() * GfMatrix4d().SetScale(cmPerUnit);
+    for (const auto& id : packet.dirtyLocalFogs) {
+        const auto it = state.localFogs.find(id);
+        if (it == state.localFogs.end()) continue;
+        const auto& fog = it->second;
+        HdueLocalFogVolumeDesc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.id = packet.own(fog.id);
+        desc.visible = fog.visible;
+        rowMajor(toUnit * fog.localToWorld * basis, desc.transform);
+        std::vector<const char*> names, values;
+        for (const auto& [name, value] : fog.values) {
+            names.push_back(packet.own(name));
+            values.push_back(packet.own(value));
+        }
+        desc.count = uint32_t(names.size());
+        desc.names = packet.own(packet.strings, std::move(names));
+        desc.values = packet.own(packet.strings, std::move(values));
+        if (HdUETraceScene())
+            TF_STATUS("hdUE local fog volume %s visible=%u properties=%u", desc.id, desc.visible, desc.count);
+        packet.localFogs.push_back(desc);
+    }
+}
 void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
     const auto effects = state.setting<VtDictionary>("surfaceEffects", {});
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
@@ -1121,6 +1160,7 @@ void prepareScene(HdUEState& state, ScenePacket& packet, uint64_t meshBudget) {
     prepareLinks(state, packet);
     prepareLights(state, packet);
     prepareVolumes(state, packet);
+    prepareLocalFogs(state, packet);
     for (const auto& id : packet.removedIds) packet.removed.push_back(packet.own(id));
 }
 // Without the state lock: only the backend and the packet (the UE thread owns the session).
@@ -1190,6 +1230,8 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     for (const auto* id : packet.removedAssets) backend.require(api.remove_asset(session, id), "remove_asset");
     for (const auto& desc : packet.sceneAssets) backend.require(api.upsert_asset(session, &desc), "upsert_asset");
     for (const auto& desc : packet.volumes) backend.require(api.upsert_volume(session, &desc), "upsert_volume");
+    for (const auto& desc : packet.localFogs)
+        backend.require(api.upsert_local_fog_volume(session, &desc), "upsert_local_fog_volume");
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
 }
@@ -2890,11 +2932,11 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const {
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
     static TfTokenVector t{
-        HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,    HdPrimTypeTokens->extComputation,
-        HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->rectLight,
-        HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,   HdPrimTypeTokens->cylinderLight,
-        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight, TfToken("portalLight"),
-        HdPrimTypeTokens->light};
+        HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,     HdPrimTypeTokens->extComputation,
+        HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight,  HdPrimTypeTokens->rectLight,
+        HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,    HdPrimTypeTokens->cylinderLight,
+        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight,  TfToken("portalLight"),
+        HdPrimTypeTokens->light,        TfToken("unrealLocalFogVolume")};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -2937,6 +2979,7 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
         return HdUECreateUnsupportedLight(id, type);
     if (type == HdPrimTypeTokens->light)  // what UsdImaging makes of a GeometryLight or PortalLight
         return HdUECreateUnsupportedLight(id, type);
+    if (type == TfToken("unrealLocalFogVolume")) return HdUECreateLocalFog(id);
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {

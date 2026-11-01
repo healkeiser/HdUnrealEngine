@@ -166,6 +166,15 @@ struct HdUEVolumeData {
     GfMatrix4d localToWorld{1};
     GfVec3f albedo{.8f};
 };
+// An UnrealLocalFogVolume prim: a unit sphere in its local space, and its unreal:localFogVolume:<property> values as
+// text, by ULocalFogVolumeComponent property name.
+struct HdUELocalFogData {
+    std::string id;
+    bool visible = true;
+    GfMatrix4d localToWorld{1};
+    std::vector<std::pair<std::string, std::string>> values;
+    bool operator==(const HdUELocalFogData&) const = default;
+};
 struct HdUETextureData {
     std::string file;
     GfVec4f scale{1}, bias{0}, mask{1, 0, 0, 0};
@@ -228,6 +237,7 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
+    std::map<std::string, HdUELocalFogData> localFogs;
     std::map<std::string, HdUEMotionSamples> cameraMotion;  // absolute camera transforms by camera id
     std::atomic<bool> paused{false};  // Pause()/houdini:render_pause: no frames are requested or drawn
     // What the renderer is doing, for Houdini's viewport (rendererStage). Its own lock: the UI reads it while the UE
@@ -243,7 +253,7 @@ struct HdUEState : HdRenderParam {
     mutable std::mutex stageMutex;
     std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex;  // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
-    std::set<std::string> dirtyVolumes;
+    std::set<std::string> dirtyVolumes, dirtyLocalFogs;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;

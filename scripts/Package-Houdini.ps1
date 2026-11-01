@@ -77,7 +77,8 @@ foreach ($File in $Samples) {
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $Package 'plugin\Release'), (Join-Path $Package 'plugin\resources') | Out-Null
 Copy-Item -LiteralPath $Delegate -Destination (Join-Path $Package 'plugin\Release')
-Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json') -Destination (Join-Path $Package 'plugin\resources')
+Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json'), (Join-Path $Build 'resources\generatedSchema.usda') `
+    -Destination (Join-Path $Package 'plugin\resources')
 # Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out. So do the smoke
 # test, import libraries and the Vulkan debug layers: debugging aids, not part of the product. The Agility SDK copy
 # (D3D12) never loads: D3D12 reads D3D12SDKPath from the executable only, and husk/Houdini don't export it.

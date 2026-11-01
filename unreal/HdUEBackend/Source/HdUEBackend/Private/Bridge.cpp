@@ -20,6 +20,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/LocalFogVolumeComponent.h"
 #include "GameFramework/Actor.h"
 #include "CanvasTypes.h"
 #include "ContentStreaming.h"
@@ -156,6 +157,8 @@ struct FSession {
     // set_post_process HeightFog: the Exponential Height Fog actor and the property values it was built with.
     TWeakObjectPtr<AActor> HeightFog;
     TArray<TPair<FString, FString>> HeightFogValues;
+    // upsert_local_fog_volume: the Local Fog Volume actors, by id.
+    TMap<FString, TWeakObjectPtr<AActor>> LocalFogVolumes;
     bool Tonemapper = false;
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
@@ -433,6 +436,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     ReleaseResidency(Session);
     HdueSharedFrames::Reset();
     if (Session->HeightFog.IsValid()) Session->HeightFog->Destroy();
+    for (const auto& Fog : Session->LocalFogVolumes)
+        if (Fog.Value.IsValid()) Fog.Value->Destroy();
     Session->Scene.Reset();
     // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
     // or the persistent view go.
@@ -1522,6 +1527,47 @@ static void SetHeightFog(FSession& Session, bool Enabled, TArray<TPair<FString, 
     Session.HeightFog = Actor;
 }
 
+// upsert_local_fog_volume: rebuilt on every upsert (the delegate sends a volume only when it changed), with its
+// properties set before it registers.
+HdueResult HDUE_CALL UpsertLocalFogVolume(HdueSession Handle, const HdueLocalFogVolumeDesc* Desc) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id || (Desc->count && (!Desc->names || !Desc->values)))
+        return HDUE_INVALID_ARGUMENT;
+    for (double Value : Desc->transform)
+        if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
+    for (uint32 Index = 0; Index < Desc->count; ++Index)
+        if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    const FString Id = UTF8_TO_TCHAR(Desc->id);
+    if (const auto* Old = Session->LocalFogVolumes.Find(Id); Old && Old->IsValid()) (*Old)->Destroy();
+    Session->LocalFogVolumes.Remove(Id);
+    Session->HasRequest = false;  // restart accumulation, as scene batches do
+    if (!Desc->visible) return HDUE_OK;
+    AActor* Actor = Runtime.World->SpawnActor<AActor>();
+    auto* Fog = NewObject<ULocalFogVolumeComponent>(Actor);
+    for (uint32 Index = 0; Index < Desc->count; ++Index) {
+        const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        FProperty* Property = ULocalFogVolumeComponent::StaticClass()->FindPropertyByName(*Name);
+        if (!Property || !ImportPropertyValue(Property, Text, Fog))
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: local fog volume setting %s = '%s' skipped (unknown property or value)"), *Name, *Text);
+    }
+    FMatrix Matrix;
+    for (int R = 0; R < 4; ++R)
+        for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc->transform[R * 4 + C];
+    Actor->SetRootComponent(Fog);
+    Actor->AddInstanceComponent(Fog);
+    Fog->SetWorldTransform(FTransform(Matrix));
+    Fog->RegisterComponent();
+    FString Properties;
+    for (uint32 Index = 0; Index < Desc->count; ++Index)
+        Properties += FString::Printf(TEXT(" %hs=%hs"), Desc->names[Index], Desc->values[Index]);
+    UE_LOG(LogTemp, Log, TEXT("hdUE: local fog volume %s at %s:%s"), *Id, *Fog->GetComponentTransform().ToString(),
+           *Properties);
+    Session->LocalFogVolumes.Add(Id, Actor);
+    return HDUE_OK;
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
@@ -1898,6 +1944,9 @@ HdueResult HDUE_CALL RemoveAsset(HdueSession Handle, const char* Id) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.Remove(UTF8_TO_TCHAR(Id));
+    if (TWeakObjectPtr<AActor> Fog;
+        Runtime.Session->LocalFogVolumes.RemoveAndCopyValue(UTF8_TO_TCHAR(Id), Fog) && Fog.IsValid())
+        Fog->Destroy();
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
     Runtime.World->SetShouldTick(true);
@@ -2003,7 +2052,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .configure_gpu_frames = ConfigureGpuFrames,
             .poll_gpu_frame = PollGpuFrame,
             .acquire_gpu_frame = AcquireGpuFrame,
-            .update_meshes = UpdateMeshes};
+            .update_meshes = UpdateMeshes,
+            .upsert_local_fog_volume = UpsertLocalFogVolume};
     return HDUE_OK;
 }
 #endif

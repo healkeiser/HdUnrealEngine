@@ -1,0 +1,106 @@
+#usda 1.0
+(
+    doc = """hdUE's UnrealLocalFogVolume prim (resources/generatedSchema.usda): UE's Local Fog Volume filling the unit
+sphere of the prim's local space, here a 4 m sphere between the camera and the white wall. Invisible on frame 1,
+visible on frame 2 (r.LocalFogVolume.GlobalStartDistance 0: the volume is nearer than UE's default 10 m): in realtime it
+dims the wall; UE's Path Tracer does not render local fog volumes, so the path traced
+wall stays as it was."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE UnrealLocalFogVolume",
+ "feature": "Local Fog Volume",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "fog dims the wall",
+   "modes": [
+    "realtime"
+   ],
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -1,
+      -1,
+      1,
+      1
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      -1,
+      -1,
+      1,
+      1
+     ]
+    }
+   ],
+   "max": 0.9
+  },
+  {
+   "name": "Path Tracer ignores it, as UE's",
+   "modes": [
+    "pathtraced"
+   ],
+   "ratio": [
+    {
+     "frame": 2,
+     "region": [
+      -1,
+      -1,
+      1,
+      1
+     ]
+    },
+    {
+     "frame": 1,
+     "region": [
+      -1,
+      -1,
+      1,
+      1
+     ]
+    }
+   ],
+   "min": 0.95,
+   "max": 1.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 2
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        # UE draws no local fog volume closer than 10 m to the camera by default; the camera is 10 m from the wall.
+        float unreal:cvar:r:LocalFogVolume:GlobalStartDistance = 0
+    }
+}
+def UnrealLocalFogVolume "Fog"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        2: "inherited",
+    }
+    float unreal:localFogVolume:RadialFogExtinction = 2
+    # Absorbing: lit white fog in front of the lit white wall would add about as much light as it takes.
+    color3f unreal:localFogVolume:FogAlbedo = (0, 0, 0)
+    double3 xformOp:translate = (0, 0, 4)
+    double3 xformOp:scale = (4, 4, 4)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+}
+def Cube "Wall"
+{
+        double size = 1.0
+        double3 xformOp:scale = (12, 12, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+}
