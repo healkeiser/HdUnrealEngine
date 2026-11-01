@@ -1,0 +1,104 @@
+#usda 1.0
+(
+    doc = """Time-sampled scales and a three-sample path move instances as
+UsdGeomPointInstancer::ComputeInstanceTransformsAtTime interpolates them, per sub-frame. The shutter is open from -0.5
+to 0.5 frames. The top cube's scale grows from 1 to 3 over two frames: within the shutter its half-size runs from 0.75
+to 1.25, so the region just past its frame-1 edge (x = 1) is covered part of the time. The bottom cube turns a corner at
+the frame: from (-2, -3) to (0, -3) and then up to (0, -1), so it sweeps left along y = -3 before the frame and up
+after it; one straight segment from the first sample to the last would drag it diagonally through (-0.5, -3.5)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "time-sampled scales and curved paths motion blur",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "growing instance blurs past its edge",
+   "value": {
+    "region": [
+     1.05,
+     2.9,
+     1.15,
+     3.1
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "growing instance stays solid inside",
+   "value": {
+    "region": [
+     0.5,
+     2.9,
+     0.6,
+     3.1
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.95
+  },
+  {
+   "name": "turning instance sweeps its left arm",
+   "value": {
+    "region": [
+     -0.8,
+     -3.05,
+     -0.6,
+     -2.95
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "no straight segment across the corner",
+   "value": {
+    "region": [
+     -0.5,
+     -3.55,
+     -0.4,
+     -3.45
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.02
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions.timeSamples = {
+        0: [(0, 3, 0), (-2, -3, 0)],
+        1: [(0, 3, 0), (0, -3, 0)],
+        2: [(0, 3, 0), (0, -1, 0)],
+    }
+    float3[] scales.timeSamples = {
+        0: [(1, 1, 1), (0.4, 0.4, 0.4)],
+        1: [(2, 2, 1), (0.4, 0.4, 0.4)],
+        2: [(3, 3, 1), (0.4, 0.4, 0.4)],
+    }
+    int[] protoIndices = [0, 0]
+    rel prototypes = [</Instancer/Prototypes/cube>]
+    def Scope "Prototypes"
+    {
+        def Cube "cube"
+        {
+            double size = 1.0
+        }
+    }
+}
+over "Camera"
+{
+    double shutter:open = -0.5
+    double shutter:close = 0.5
+}

@@ -52,7 +52,21 @@ int main() {
               "scale then rotation reported as shear");
         check(!HdUEHasShear(GfMatrix4d(1).SetScale(GfVec3d(-1, 2, 3))), "negative scale reported as shear");
         check(HdUEHasShear(rotate * stretch), "rotated prototype under a non-uniform scale is sheared");
-        std::cout << "PASS: instance composition, quath/quatf/vec4f orientations, normalization, shear detection\n";
+        // Sub-frame instances interpolate as UsdGeomPointInstancer does its primvars: scale and position linearly,
+        // orientation by slerp, under a rotated prototype; a mirrored instance keeps its mirror.
+        const auto instance = [&](double s, double degrees, double x) {
+            return rotate * GfMatrix4d(1).SetScale(GfVec3d(s, 1, 1)) *
+                   GfMatrix4d(1).SetRotate(GfRotation(GfVec3d(0, 0, 1), degrees)) *
+                   GfMatrix4d(1).SetTranslate(GfVec3d(x, 0, 0));
+        };
+        check(GfIsClose(HdUEInterpolateInstance(instance(1, 0, 0), instance(3, 90, 4), .5), instance(2, 45, 2), 1e-9),
+              "instance interpolation is not scale-linear, slerp, position-linear");
+        const GfMatrix4d mirror = GfMatrix4d(1).SetScale(GfVec3d(-1, 1, 1));
+        check(GfIsClose(HdUEInterpolateInstance(mirror * instance(1, 0, 0), mirror * instance(1, 90, 0), .5),
+                        mirror * instance(1, 45, 0), 1e-9),
+              "mirrored instance interpolation");
+        std::cout << "PASS: instance composition, quath/quatf/vec4f orientations, normalization, shear detection, "
+                     "sub-frame interpolation\n";
         return 0;
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

@@ -1,5 +1,6 @@
 #pragma once
 #include "hdue/backend.hpp"
+#include "instancing.h"
 #include "picking.h"
 #include "placement.h"
 #include "pxr/pxr.h"
@@ -96,13 +97,27 @@ struct HdUEMeshData {
     // Per instance: world rotation axis scaled by degrees per frame, about the instance's position
     // (PointInstancer angularVelocities).
     std::vector<GfVec3f> angularVelocities;
+    // Sampled instance motion (time-sampled instance primvars without velocities): every instance's matrix at each of
+    // the frame-relative instanceTimes (0 included); instanceAt interpolates between them.
+    std::vector<float> instanceTimes;
+    std::vector<std::vector<GfMatrix4d>> instanceSamples;
+    GfMatrix4d instanceAt(size_t i, float t) const {
+        if (instanceTimes.empty() || !t) return instances[i];
+        if (t <= instanceTimes.front()) return instanceSamples.front()[i];
+        for (size_t k = 1; k < instanceTimes.size(); ++k)
+            if (t <= instanceTimes[k])
+                return HdUEInterpolateInstance(
+                    instanceSamples[k - 1][i], instanceSamples[k][i],
+                    (t - instanceTimes[k - 1]) / std::max(1e-6f, instanceTimes[k] - instanceTimes[k - 1]));
+        return instanceSamples.back()[i];
+    }
     float blurScale = 1;  // UsdGeomMotionAPI motion:blurScale: motion is evaluated at t * blurScale
     // Deformation blur: per-vertex point offsets at frame-relative times (piecewise linear); empty unless points move.
     std::vector<float> deformTimes;
     std::vector<std::vector<GfVec3f>> deformOffsets;
     bool moving() const {
         return motionLeft.moving() || motionRight.moving() || !velocities.empty() || !accelerations.empty() ||
-               !angularVelocities.empty() || !deformTimes.empty();
+               !angularVelocities.empty() || !instanceTimes.empty() || !deformTimes.empty();
     }
     std::vector<GfVec3f> pointsAt(float t) const {
         auto out = points;

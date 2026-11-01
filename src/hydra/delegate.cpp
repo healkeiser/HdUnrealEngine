@@ -456,8 +456,10 @@ struct ScenePacket {
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyLocalFogs,
         dirtyGrooms, removedIds;
-    // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points.
+    // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points, and
+    // instanced meshes whose sheared instances (baked into their companion) are baked at the sub-frame's matrices.
     std::map<std::string, std::vector<GfVec3f>> points;
+    std::map<std::string, std::vector<GfMatrix4d>> instances;
     // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
     // least one), the other sets whole.
     void take(HdUEState& state, uint64_t meshBudget) {
@@ -888,6 +890,8 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
                                [&] { TF_WARN("Sheared instances of %s render without shear", data.id.c_str()); });
             }
             const auto companion = HdUEShearedId(data.id);
+            const auto subFrame = packet.instances.find(id);
+            const auto& placed = subFrame != packet.instances.end() ? subFrame->second : data.instances;
             if (sheared.empty())
                 packet.removed.push_back(packet.own(companion));
             else {
@@ -901,7 +905,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
                 bi.reserve(data.indices.size() * n);
                 WorkParallelForN(n, [&](size_t begin, size_t end) {
                     for (size_t k = begin; k < end; ++k) {
-                        const auto& m = data.instances[sheared[k]];
+                        const auto& m = placed[sheared[k]];
                         const auto mn = m.GetInverse().GetTranspose();
                         for (size_t v = 0; v < count; ++v) {
                             const size_t o = k * count + v;
@@ -924,7 +928,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
                     }
                 });
                 for (size_t k = 0; k < n; ++k) {
-                    const bool flip = data.instances[sheared[k]].GetDeterminant() < 0;
+                    const bool flip = placed[sheared[k]].GetDeterminant() < 0;
                     for (size_t t = 0; t + 2 < desc.index_count; t += 3) {
                         const uint32_t base = uint32_t(k * count);
                         bi.push_back(base + desc.indices[t]);
@@ -1448,12 +1452,14 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
 }
 // Uploads one batch of the scene changes since the last call (meshes up to meshBudget bytes); returns whether dirty
 // meshes remain. Runs on the UE thread; holds the state lock only to copy and record.
-bool submitBatch(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points, uint64_t meshBudget,
-                 bool stream = false) {
+bool submitBatch(HdUEState& state, uint64_t meshBudget, bool stream = false,
+                 std::map<std::string, std::vector<GfVec3f>> points = {},
+                 std::map<std::string, std::vector<GfMatrix4d>> instances = {}) {
     const auto start = std::chrono::steady_clock::now();
     ScenePacket packet;
     packet.stream = stream;
     packet.points = std::move(points);
+    packet.instances = std::move(instances);
     {
         std::lock_guard lock(state.mutex);
         try {
@@ -1488,11 +1494,13 @@ bool submitBatch(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> p
 }
 // Uploads the scene changes since the last call, in batches: the upload descriptors copy each mesh's geometry again,
 // so one packet for a whole large scene doubled its memory (NVIDIA's Da Vinci Workshop: 26 GB stored, as much again
-// for the packet). Motion blur sub-frames send their deformed points in one packet.
-void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points = {}) {
+// for the packet). Motion blur sub-frames send their deformed points and sheared instances in one packet.
+void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points = {},
+            std::map<std::string, std::vector<GfMatrix4d>> instances = {}) {
     // shortcut: a fixed 1 GB of stored geometry per batch; size it from available memory if batches prove too small.
-    const uint64_t budget = points.empty() ? uint64_t(1) << 30 : ~uint64_t(0);
-    while (submitBatch(state, std::move(points), budget)) points = {};
+    const uint64_t budget = points.empty() && instances.empty() ? uint64_t(1) << 30 : ~uint64_t(0);
+    for (bool more = true; more; points = {}, instances = {})
+        more = submitBatch(state, budget, false, std::move(points), std::move(instances));
     state.setStage("Rendering");
 }
 }  // namespace
@@ -1546,7 +1554,7 @@ void HdUEStreamMeshes(HdUEState& s) {
                     });
                 }
                 while (s.locked([&] { return s.pendingBytes >= Batch; })) {
-                    submitBatch(s, {}, Batch, true);
+                    submitBatch(s, Batch, true);
                     s.drained.notify_all();
                 }
             } catch (const std::exception& e) {
@@ -1576,6 +1584,7 @@ class Pass final : public HdRenderPass {
         std::unique_lock lock(s.mutex);
         std::vector<std::vector<double>> storage;
         std::vector<const std::string*> ids;
+        std::map<std::string, std::vector<GfMatrix4d>> instances;
         const auto nativeMeshes = s.setting<VtDictionary>("nativeMeshAssets", {});
         for (const auto& [id, mesh] : s.meshes) {
             if (!mesh.moving()) continue;
@@ -1603,11 +1612,22 @@ class Pass final : public HdRenderPass {
                     for (int c = 0; c < 4; ++c) out.push_back(m[r][c]);
             };
             if (mesh.instanced) {
-                // shortcut: a generic mesh's sheared instances are baked into one static companion mesh and do not
-                // blur; give the companion its own sub-frame upload if moving sheared instances matter.
+                // A generic mesh's sheared instances live in its baked companion (HdUEShearedId), which is resubmitted
+                // with them at t, as deforming meshes are.
                 const bool generic = asset(nativeMeshes, id).empty();
-                for (size_t i = 0; i < mesh.instances.size(); ++i)
-                    if (!generic || !HdUEHasShear(mesh.instances[i])) push(place(mesh.instances[i], i));
+                std::vector<GfMatrix4d> placed(mesh.instances.size());
+                bool sheared = false;
+                for (size_t i = 0; i < mesh.instances.size(); ++i) {
+                    placed[i] = place(mesh.instanceAt(i, tm), i);
+                    if (generic && HdUEHasShear(mesh.instances[i]))
+                        sheared = true;
+                    else
+                        push(placed[i]);
+                }
+                if (sheared) {
+                    instances[id] = std::move(placed);
+                    s.dirtyMeshes.insert(id);
+                }
             } else if (!asset(nativeMeshes, id).empty() || !HdUEShears(mesh.transform))
                 push(place(mesh.transform, SIZE_MAX));
             else
@@ -1625,7 +1645,7 @@ class Pass final : public HdRenderPass {
         names.reserve(ids.size());
         for (const auto* id : ids) names.push_back(*id);
         lock.unlock();
-        if (!deformed.empty()) submit(s, std::move(deformed));
+        if (!deformed.empty() || !instances.empty()) submit(s, std::move(deformed), std::move(instances));
         std::vector<HdueMeshTransform> moves;
         for (size_t i = 0; i < names.size(); ++i)
             moves.push_back({names[i].c_str(), uint32_t(storage[i].size() / 16), storage[i].data()});

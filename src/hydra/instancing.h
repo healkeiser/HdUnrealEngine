@@ -1,6 +1,8 @@
 #pragma once
 #include "pxr/pxr.h"
+#include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/quatd.h"
 #include "pxr/base/gf/quatf.h"
 #include "pxr/base/gf/quath.h"
@@ -69,6 +71,34 @@ inline bool HdUEHasShear(const GfMatrix4d& m) {
             if (std::abs(GfDot(x, y)) > 1e-6 * x.GetLength() * y.GetLength()) return true;
         }
     return false;
+}
+// The instance matrix a fraction u of the way from a to b, as UsdGeomPointInstancer::ComputeInstanceTransformsAtTime
+// interpolates its primvars: positions and scales linearly, orientations by slerp. The linear part of a row-vector
+// matrix splits into a symmetric stretch times a rotation (the polar decomposition, by Higham's iteration; Gf's
+// Orthonormalize is not it for sheared matrices); for scale * orientation * translate under a rotating prototype or
+// instancer transform these are exactly the scale and the orientation, so the result matches interpolating the
+// primvars.
+inline GfMatrix4d HdUEInterpolateInstance(const GfMatrix4d& a, const GfMatrix4d& b, double u) {
+    const auto polar = [](const GfMatrix4d& m, GfMatrix3d& stretch, GfQuatd& rotation) {
+        GfMatrix3d linear = m.ExtractRotationMatrix();
+        const double sign = linear.GetDeterminant() < 0 ? -1 : 1;  // a mirror: -linear has a proper rotation
+        linear *= sign;
+        GfMatrix3d turn = linear;
+        for (int i = 0; i < 32; ++i) {
+            const auto next = (turn + turn.GetInverse().GetTranspose()) * .5;
+            const bool done = GfIsClose(next, turn, 1e-12);
+            turn = next;
+            if (done) break;
+        }
+        rotation = turn.ExtractRotation().GetQuat();
+        stretch = linear * turn.GetTranspose() * sign;
+    };
+    GfMatrix3d sa, sb;
+    GfQuatd qa, qb;
+    polar(a, sa, qa);
+    polar(b, sb, qb);
+    return GfMatrix4d((sa * (1 - u) + sb * u) * GfMatrix3d().SetRotate(GfSlerp(u, qa, qb)),
+                      a.ExtractTranslation() * (1 - u) + b.ExtractTranslation() * u);
 }
 // The mesh that holds a generic instanced mesh's sheared instances, baked into its vertices.
 inline std::string HdUEShearedId(const std::string& id) { return id + ":sheared"; }

@@ -18,6 +18,7 @@
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/light.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
+#include "pxr/imaging/hd/timeSampleArray.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/glf/simpleLight.h"
 #include "pxr/usd/sdf/assetPath.h"
@@ -333,41 +334,42 @@ public:
         mesh.angularVelocities = perFrame(HdTokens->angularVelocities, fps);
         if (mesh.velocities.empty() && mesh.angularVelocities.empty()) SampledMotion(prototype, count, mesh);
     }
-    // Without velocities, time-sampled positions, orientations, scales or matrices move each instance: linearly between
-    // the samples around the frame, as UsdGeomPointInstancer::ComputeInstanceTransformsAtTime interpolates them, as a
-    // velocity and an angular velocity per frame about the instance's position.
+    // Without velocities, time-sampled positions, orientations, scales or matrices move each instance: the instance
+    // matrices (mesh.transform first) at every sample time inside the motion window and at the frame, which the render
+    // pass interpolates per sub-frame (HdUEMeshData::instanceAt) as
+    // UsdGeomPointInstancer::ComputeInstanceTransformsAtTime interpolates the primvars. A primvar without a sample at
+    // another one's time is resampled there as Hydra resamples (HdResampleRawTimeSamples); PointInstancer primvars
+    // usually share their times, which it returns exactly.
     void SampledMotion(const SdfPath& prototype, size_t count, HdUEMeshData& mesh) const {
-        std::map<TfToken, VtValue> open, close;
-        float t0 = 0, t1 = 0;
-        for (const auto& name : {HdInstancerTokens->instanceTranslations, HdInstancerTokens->instanceRotations,
-                                 HdInstancerTokens->instanceScales, HdInstancerTokens->instanceTransforms}) {
+        struct Samples {
+            size_t n = 0;
             float times[HdUEMaxMotionSamples];
             VtValue values[HdUEMaxMotionSamples];
-            const size_t n = GetDelegate()->SamplePrimvar(GetId(), name, -HdUEMotionWindow, HdUEMotionWindow,
-                                                          HdUEMaxMotionSamples, times, values);
-            if (n < 2 || values[0] == values[n - 1]) continue;
-            // shortcut: one linear segment from the first sample to the last; sample per sub-frame if a curved
-            // path between more than two samples inside the window matters.
-            open[name] = values[0];
-            close[name] = values[n - 1];
-            t0 = times[0];
-            t1 = times[n - 1];
+        };
+        std::map<TfToken, Samples> sampled;
+        std::set<float> times{0.f};
+        for (const auto& name : {HdInstancerTokens->instanceTranslations, HdInstancerTokens->instanceRotations,
+                                 HdInstancerTokens->instanceScales, HdInstancerTokens->instanceTransforms}) {
+            Samples s;
+            s.n = GetDelegate()->SamplePrimvar(GetId(), name, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples,
+                                               s.times, s.values);
+            if (std::all_of(s.values, s.values + s.n, [&](const VtValue& v) { return v == s.values[0]; })) continue;
+            times.insert(s.times, s.times + s.n);
+            sampled[name] = std::move(s);
         }
-        if (open.empty() || t1 <= t0) return;
-        const auto from = ComputeInstanceTransforms(prototype, &open),
-                   to = ComputeInstanceTransforms(prototype, &close);
-        if (from.size() != count || to.size() != count) return;
-        const float span = t1 - t0;
-        mesh.velocities.resize(count);
-        mesh.angularVelocities.resize(count);
-        for (size_t i = 0; i < count; ++i) {
-            mesh.velocities[i] = GfVec3f((to[i].ExtractTranslation() - from[i].ExtractTranslation()) / span);
-            // The world-space turn between the two linear parts (row vectors: to = from * turn).
-            const auto turn = (from[i].ExtractRotationMatrix().GetInverse() * to[i].ExtractRotationMatrix())
-                                  .GetOrthonormalized()
-                                  .ExtractRotation();
-            mesh.angularVelocities[i] = GfVec3f(turn.GetAxis() * (turn.GetAngle() / span));  // degrees, as USD's
+        if (sampled.empty()) return;
+        std::vector<std::vector<GfMatrix4d>> samples;
+        for (const float t : times) {
+            std::map<TfToken, VtValue> at;
+            for (const auto& [name, s] : sampled) at[name] = HdResampleRawTimeSamples(t, s.n, s.times, s.values);
+            const auto instances = ComputeInstanceTransforms(prototype, &at);
+            if (instances.size() != count) return;
+            auto& out = samples.emplace_back();
+            out.reserve(count);
+            for (const auto& m : instances) out.push_back(mesh.transform * m);
         }
+        mesh.instanceTimes.assign(times.begin(), times.end());
+        mesh.instanceSamples = std::move(samples);
     }
     // An instance-rate colour primvar (displayColor, or the one a bound material reads) for each flattened instance,
     // from the nearest instancer that authors it, as Storm resolves nested instance primvars; empty when none does.
@@ -967,6 +969,7 @@ public:
         const float fps = float(HdUEFramesPerSecond(*static_cast<HdUEState*>(param)));
         // Points move with their prim (or instancer) transform, their velocities and their instances'.
         HdUEMeshData placed;
+        placed.transform = mesh.transform;  // sampled instance motion composes it as placements do
         if (instancer)
             instancer->ComputeInstanceMotion(GetId(), fps, placements.size(), placed);
         else
@@ -992,14 +995,18 @@ public:
                 if (!placed.accelerations.empty()) mesh.accelerations.push_back(placed.accelerations[p]);
                 if (!placed.angularVelocities.empty()) mesh.angularVelocities.push_back(placed.angularVelocities[p]);
                 const double radius = .5 * HdUEWidth(widths, i, .1f);
-                mesh.instances.push_back(GfMatrix4d(1).SetScale(radius) *
-                                         GfMatrix4d(1).SetTranslate(GfVec3d(points[i])) * placements[p]);
+                const auto sphere = GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i]));
+                mesh.instances.push_back(sphere * placements[p]);
+                mesh.instanceSamples.resize(placed.instanceTimes.size());
+                for (size_t k = 0; k < placed.instanceTimes.size(); ++k)
+                    mesh.instanceSamples[k].push_back(sphere * placed.instanceSamples[k][p]);
                 if (!placed.instanceColors.empty())
                     mesh.instanceColors.push_back(placed.instanceColors[p]);
                 else if (!colors.empty())
                     mesh.instanceColors.push_back(colors[i]);
                 mesh.instanceIds.push_back(instancer ? int32_t(p) : -1);
             }
+        mesh.instanceTimes = placed.instanceTimes;
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
     }

@@ -1,0 +1,73 @@
+#usda 1.0
+(
+    doc = """A sheared instance moves: the wide diamond of shear.usda (a square rotated 45 degrees about Z by its prototype
+transform, under the instance scale (4, 1, 1), corners at y = +-0.71) moves at 48 units/s along +Y, 2 units per frame
+at 24 fps, and the shutter is open from -0.5 to 0.5 frames, so it smears 1 unit each side. hdUE bakes sheared instances
+into a companion mesh, which is rebaked per sub-frame; a still companion would leave nothing above y = 0.71. The
+unsheared instance at y = -3 is still and stays sharp."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomPointInstancer",
+ "feature": "sheared instance motion blur",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "sheared instance smears above its corner",
+   "value": {
+    "region": [
+     -0.1,
+     1.2,
+     0.1,
+     1.4
+    ],
+    "stat": "alpha"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "still unsheared instance stays sharp",
+   "value": {
+    "region": [
+     -0.1,
+     -2.2,
+     0.1,
+     -2.0
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.02
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def PointInstancer "Instancer"
+{
+    point3f[] positions = [(0, 0, 0), (0, -3, 0)]
+    int[] protoIndices = [0, 0]
+    rel prototypes = [</Instancer/Prototypes/square>]
+    float3[] scales = [(4, 1, 1), (1, 1, 1)]
+    vector3f[] velocities = [(0, 48, 0), (0, 0, 0)]
+    def Scope "Prototypes"
+    {
+        def Cube "square"
+        {
+            double size = 1.0
+            float3 xformOp:rotateXYZ = (0, 0, 45)
+            float3 xformOp:scale = (1, 1, 0.1)
+            uniform token[] xformOpOrder = ["xformOp:rotateXYZ", "xformOp:scale"]
+        }
+    }
+}
+over "Camera"
+{
+    double shutter:open = -0.5
+    double shutter:close = 0.5
+}
