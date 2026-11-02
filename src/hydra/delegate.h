@@ -85,6 +85,7 @@ struct HdUEMeshData {
     VtArray<TfToken> categories;          // light/shadow link collections that include the prim (GetCategories)
     bool doubleSided = true;              // UsdGeomGprim doubleSided; unreal:cullBackface culls single-sided backs
     bool instanced = false;               // prototype of a Hydra instancer: drawn once per entry of instances
+    bool bakedInstances = false;          // a sheared-instance companion (HdUEStoreShearCompanion): instances baked in
     std::vector<GfMatrix4d> instances;    // USD world matrices (prototype transform included)
     std::vector<GfVec3f> instanceColors;  // per instance: an instance-rate displayColor (or material colour primvar)
     std::vector<int32_t> instanceIds;     // Hydra instanceId per instance; empty means the instance index
@@ -138,8 +139,8 @@ struct HdUEMeshData {
 };
 // Whether an instanced mesh's sheared instances are baked into its companion mesh (HdUEShearedId): only for a generic
 // mesh (a cooked asset has no vertices here), and not when the companion's arrays would pass UE's int32 element counts
-// (Scene.cpp: positions, UV sets, indices); those instances then render without shear. Sheared meshes keep their
-// arrays (releasable), so the counts are there.
+// (Scene.cpp: positions, UV sets, indices); those instances then render without shear. Evaluated at Sync, where the
+// arrays are there.
 inline bool HdUEBakesShear(const HdUEMeshData& mesh, bool generic) {
     if (!generic) return false;
     const auto sheared = size_t(std::count_if(mesh.instances.begin(), mesh.instances.end(), HdUEHasShear));
@@ -147,8 +148,13 @@ inline bool HdUEBakesShear(const HdUEMeshData& mesh, bool generic) {
     return sheared && mesh.points.size() * sheared * perVertex <= size_t(INT32_MAX) &&
            mesh.indices.size() * sheared <= size_t(INT32_MAX);
 }
-// Uploads dirty meshes while Hydra still syncs a large scene (husk, hython); delegate.cpp. Call without the state lock.
 struct HdUEState;
+// Moves an instanced mesh's sheared instances (HdUEBakesShear) into its companion mesh (HdUEShearedId) in the state,
+// or removes the companion when there are none; Drop removes it with its prototype. delegate.cpp; under the state
+// lock, before the prototype is compared and stored.
+void HdUEStoreShearCompanion(HdUEState& state, HdUEMeshData& prototype);
+void HdUEDropShearCompanion(HdUEState& state, const std::string& prototype);
+// Uploads dirty meshes while Hydra still syncs a large scene (husk, hython); delegate.cpp. Call without the state lock.
 void HdUEStreamMeshes(HdUEState& state);
 // Whether a mesh's arrays can be freed once UE has it, and freeing them (delegate.cpp). Under the state lock.
 bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh);

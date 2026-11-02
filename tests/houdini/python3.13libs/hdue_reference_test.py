@@ -80,7 +80,8 @@ class Test(ViewportTest):
         self.depth_changed("01-reference-lumen", "02-reference-translated")
         if self.frames[-1]["scene_submissions"] <= submissions:
             raise AssertionError("Reference transform did not submit geometry")
-        if float(np.abs(first - moved).mean()) < 0.001:
+        # Changed pixels, not the mean, so the check holds for any viewport size (hdue_houdini_test.py).
+        if (np.abs(first - moved).max(-1) > 0.05).sum() < 100:
             raise AssertionError("Reference transform did not change the image")
         generation = self.frames[-1]["generation"]
         integration.set_mode("pathtraced")
@@ -93,7 +94,7 @@ class Test(ViewportTest):
         self.depth_changed(
             "03-reference-pathtraced", "04-reference-pathtraced-edited"
         )
-        if float(np.abs(traced - traced_moved).mean()) < 0.001:
+        if (np.abs(traced - traced_moved).max(-1) > 0.05).sum() < 100:
             raise AssertionError(
                 "Reference transform did not change the Path Tracer image"
             )

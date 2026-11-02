@@ -70,7 +70,7 @@ The tables below give the numbers behind both charts; regenerate the charts with
 <!-- gallery:start -->
 Every scene is the [CC0 Cornell box](samples/cornell/) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
 
-- **hdUE Lumen**: realtime mode, 32 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
+- **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 512 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.
@@ -134,7 +134,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 <!-- sponza:start -->
 [Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
-- **hdUE Lumen**: realtime mode, 32 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
+- **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 256 samples per pixel, up to 32 bounces.
 - **Karma XPU** (GPU and CPU) and **Karma CPU**: path traced, 256 samples per pixel, 8 diffuse bounces.
 - Machine: NVIDIA GeForce RTX 4090 and AMD Ryzen 9 5950X 16-Core Processor.

@@ -33,6 +33,7 @@
 #include "Materials/MaterialExpressionPerInstanceCustomData.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Materials/MaterialExpressionFloor.h"
+#include "Materials/MaterialExpressionMax.h"
 #include "Materials/MaterialExpressionAbs.h"
 #include "Materials/MaterialExpressionSaturate.h"
 #include "Materials/MaterialExpressionOneMinus.h"
@@ -134,6 +135,49 @@ UTexture2D* CreateLinearWhite() {
     Texture->PostEditChange();
     return SaveAsset(Texture) ? Texture : nullptr;
 }
+// The ID passes' emission (HDUE_AOV_PRIM_ID): custom primitive data 0..2, set per component to the encoded Hydra
+// prim ID; with custom primitive data 4 set (instance pass), the instance's Hydra instanceId from per-instance custom
+// data 3 in the same encoding (exact in the float16 readback: both halves stay below 2048).
+template <class FAdd>
+UMaterialExpression* IdEmission(UMaterial* Material, const FAdd& Add) {
+    auto* Id = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+    Id->ParameterName = TEXT("HdUEId");
+    Id->DefaultValue = FLinearColor(0, 0, 0, 0);
+    Id->bUseCustomPrimitiveData = true;
+    Id->PrimitiveDataIndex = 0;
+    auto* InstanceMode = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+    InstanceMode->ParameterName = TEXT("HdUEInstanceMode");
+    InstanceMode->DefaultValue = 0.f;
+    InstanceMode->bUseCustomPrimitiveData = true;
+    InstanceMode->PrimitiveDataIndex = 4;
+    auto* Instance = Add(NewObject<UMaterialExpressionPerInstanceCustomData>(Material));
+    Instance->DataIndex = 3;
+    Instance->ConstDefaultValue = -1.f;
+    auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
+    Scaled->A.Connect(0, Instance);
+    Scaled->ConstB = 2048.f;
+    auto* High = Add(NewObject<UMaterialExpressionFloor>(Material));
+    High->Input.Connect(0, Scaled);
+    auto* HighScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    HighScaled->A.Connect(0, High);
+    HighScaled->ConstB = 2048.f;
+    auto* Low = Add(NewObject<UMaterialExpressionSubtract>(Material));
+    Low->A.Connect(0, Instance);
+    Low->B.Connect(0, HighScaled);
+    auto* HighLow = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    HighLow->A.Connect(0, High);
+    HighLow->B.Connect(0, Low);
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+    One->R = 1.f;
+    auto* Encoded = Add(NewObject<UMaterialExpressionAppendVector>(Material));
+    Encoded->A.Connect(0, HighLow);
+    Encoded->B.Connect(0, One);
+    auto* Select = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    Select->A.Connect(0, Id);
+    Select->B.Connect(0, Encoded);
+    Select->Alpha.Connect(0, InstanceMode);
+    return Select;
+}
 // Surface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar inputs then dot
 // <Slot>Mask), so an untextured input is Scale 0, Bias constant. Preview Surface masters shade
 // one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
@@ -152,7 +196,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
         Material->TwoSided == TwoSided &&
-        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion4") : TEXT("PreviewSurfaceVersion5")) &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion4") : TEXT("PreviewSurfaceVersion6")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
@@ -399,8 +443,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Conversion->Specular.Connect(0, Scalar(TEXT("SpecularLevel"), .5f));
         // Specular workflow (useSpecularWorkflow): diffuseColor and specularColor are the albedo and F0 directly.
         auto* UseSpecular = Scalar(TEXT("UseSpecularWorkflow"), 0.f);
-        Scalar(TEXT("PreviewSurfaceVersion5"),
-               5.f);  // unconnected marker: bump the name when this graph changes, to regenerate
+        Scalar(TEXT("PreviewSurfaceVersion6"),
+               6.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Albedo = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
         Albedo->A.Connect(0, Conversion);
         Albedo->B.Connect(0, BaseColor);
@@ -421,6 +465,31 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         Slab->SecondRoughness.Connect(0, ClearcoatRoughness);
         Slab->SecondRoughnessWeight.Connect(0, Clearcoat);
         Front = Slab;
+    }
+    UMaterialExpression* IdPass = nullptr;
+    if (!Layered) {
+        // ID passes without a material swap: custom primitive data 5 (HdUEIdPass) selects an emission-only slab
+        // carrying IdEmission, so the backend switches a mesh to its ID by custom primitive data (a GPU Scene update)
+        // instead of SetMaterial (a render state rebuild of every mesh, twice per ID pass). UE's own Object ID pass
+        // draws hit proxies (MoviePipelineObjectIdPass.cpp), which the renderer compiles in editor builds only
+        // (SceneHitProxyRendering.cpp). The Select's parameter blending keeps the beauty's single slab exactly.
+        auto* Switch = Scalar(TEXT("HdUEIdPass"), 0.f);
+        Switch->bUseCustomPrimitiveData = true;
+        Switch->PrimitiveDataIndex = 5;
+        IdPass = Switch;
+        auto* Zero = Add(NewObject<UMaterialExpressionConstant>(Material));
+        auto* IdSlab = Add(NewObject<UMaterialExpressionSubstrateSlabBSDF>(Material));
+        IdSlab->DiffuseAlbedo.Connect(0, Zero);
+        IdSlab->F0.Connect(0, Zero);
+        IdSlab->F90.Connect(0, Zero);
+        IdSlab->Normal.Connect(0, UnitNormal);  // the Select needs both local bases; the beauty's keeps it unchanged
+        IdSlab->EmissiveColor.Connect(0, IdEmission(Material, Add));
+        auto* Select = Add(NewObject<UMaterialExpressionSubstrateSelect>(Material));
+        Select->A.Connect(FrontOutput, Front);
+        Select->B.Connect(0, IdSlab);
+        Select->SelectValue.Connect(0, IdPass);
+        Front = Select;
+        FrontOutput = 0;
     }
     Data->FrontMaterial.Connect(FrontOutput, Front);
     Data->AmbientOcclusion.Connect(0, Occlusion);
@@ -445,7 +514,13 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     } else if (Blend == BLEND_TranslucentGreyTransmittance) {
         auto* Weight = Add(NewObject<UMaterialExpressionSubstrateWeight>(Material));
         Weight->A.Connect(0, Front);
-        Weight->Weight.Connect(0, Opacity);
+        if (IdPass) {  // the ID covers what is behind it, as M_HdUEId does
+            auto* Covered = Add(NewObject<UMaterialExpressionMax>(Material));
+            Covered->A.Connect(0, Opacity);
+            Covered->B.Connect(0, IdPass);
+            Weight->Weight.Connect(0, Covered);
+        } else
+            Weight->Weight.Connect(0, Opacity);
         Data->FrontMaterial.Connect(0, Weight);
         Material->TranslucencyLightingMode = TLM_SurfacePerPixelLighting;
     }
@@ -509,9 +584,8 @@ UMaterial* CreateAovMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
-// ID pass material: unlit emission of custom primitive data 0..2, set per component to the
-// encoded Hydra prim ID (see HDUE_AOV_PRIM_ID). With custom primitive data 4 set (instance pass),
-// it emits the instance's Hydra instanceId from per-instance custom data 3 in the same encoding.
+// ID pass material: unlit IdEmission. The backend swaps it onto meshes whose materials have no HdUEIdPass switch
+// (native assets, Standard Surface and MaterialX materials).
 UMaterial* CreateIdMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEId");
     UPackage* Package = CreatePackage(*Path);
@@ -526,44 +600,8 @@ UMaterial* CreateIdMaterial() {
         Material->GetExpressionCollection().AddExpression(Expression);
         return Expression;
     };
-    auto* Id = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-    Id->ParameterName = TEXT("HdUEId");
-    Id->DefaultValue = FLinearColor(0, 0, 0, 0);
-    Id->bUseCustomPrimitiveData = true;
-    Id->PrimitiveDataIndex = 0;
-    auto* InstanceMode = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-    InstanceMode->ParameterName = TEXT("HdUEInstanceMode");
-    InstanceMode->DefaultValue = 0.f;
-    InstanceMode->bUseCustomPrimitiveData = true;
-    InstanceMode->PrimitiveDataIndex = 4;
-    auto* Instance = Add(NewObject<UMaterialExpressionPerInstanceCustomData>(Material));
-    Instance->DataIndex = 3;
-    Instance->ConstDefaultValue = -1.f;
-    auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
-    Scaled->A.Connect(0, Instance);
-    Scaled->ConstB = 2048.f;
-    auto* High = Add(NewObject<UMaterialExpressionFloor>(Material));
-    High->Input.Connect(0, Scaled);
-    auto* HighScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    HighScaled->A.Connect(0, High);
-    HighScaled->ConstB = 2048.f;
-    auto* Low = Add(NewObject<UMaterialExpressionSubtract>(Material));
-    Low->A.Connect(0, Instance);
-    Low->B.Connect(0, HighScaled);
-    auto* HighLow = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    HighLow->A.Connect(0, High);
-    HighLow->B.Connect(0, Low);
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
-    One->R = 1.f;
-    auto* Encoded = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Encoded->A.Connect(0, HighLow);
-    Encoded->B.Connect(0, One);
-    auto* Select = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    Select->A.Connect(0, Id);
-    Select->B.Connect(0, Encoded);
-    Select->Alpha.Connect(0, InstanceMode);
     auto* Unlit = Add(NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material));
-    Unlit->EmissiveColor.Connect(0, Select);
+    Unlit->EmissiveColor.Connect(0, IdEmission(Material, Add));
     Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
     Material->bUsedWithNanite = true;
     Material->bUsedWithInstancedStaticMeshes = true;

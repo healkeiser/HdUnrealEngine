@@ -244,7 +244,9 @@ class Test:
         transformed = yield from self.image(
             "04-transform-edit", 1, self.frames[-1]["generation"]
         )
-        if np.abs(traced - transformed).mean() < 0.001:
+        # Count changed pixels, not the mean: the cube covers ~300 px of a narrow viewport (another screen or
+        # window size), where its 60 cm move averages below any fixed mean over the whole image.
+        if (np.abs(traced - transformed).max(-1) > 0.05).sum() < 100:
             raise AssertionError("Transform did not change the image")
         native = edit.parent().createNode("pythonscript", "hdUE_native_test")
         native.setInput(0, edit)

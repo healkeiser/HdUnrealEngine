@@ -76,7 +76,7 @@ public:
     bool SurfaceReady() const;
     TArray<TStrongObjectPtr<UTexture2D>> GatherVirtualTextures() const;
     HdueResult PickNative(const HdueNativeRay& Ray, HdueNativeHit& Hit, FString& ObjectId, FString& Error);
-    // Swaps every mesh to M_HdUEId (its prim ID in custom primitive data) for the ID pass, or back.
+    // Switches every mesh to its ID (custom primitive data; M_HdUEId where its material has no switch) or back.
     bool SetIdMode(int32 Mode, FString& Error);  // 0 off, 1 prim IDs, 2 instance IDs
     // Dense density grids as heterogeneous volumes (upsert_volume).
     bool UpsertVolume(const HdueVolumeDesc& Desc, FString& Error);
@@ -94,7 +94,6 @@ private:
     // TickConversions swaps in versions built in the background. Offline hosts (husk) build both before the frame.
     bool Interactive;
     TMap<FString, AActor*> Actors;
-    TMap<FString, FVector> CameraLightDirections;
     TMap<FString, FString> MeshMaterials;
     TSet<FString> SingleSided;  // meshes sent with HDUE_MESH_SINGLE_SIDED
     // By material id: Base's twin on the one-sided parent (null when Base has none).
@@ -137,14 +136,15 @@ private:
         TSharedPtr<FNaniteSource> Source;                // the mesh's arrays, released once its build starts
         int64 Memory = 0;                                // reserved from launch until the mesh is swapped in
         UE::Tasks::TTask<TSharedPtr<FConversion>> Task;  // invalid while queued
-        FString Key;                                     // the mesh's sharing key (SharedMeshes)
         bool Translucent = false;                        // its material keeps it off Nanite
+        TSet<FString> Ids;                               // the meshes of the key that receive the build
     };
     // Generated static meshes by content key (MeshKey): identical meshes draw one static mesh, as UE's USD importer
     // shares assets between identical prims. Weak: components keep a shared mesh alive.
     TMap<FString, TWeakObjectPtr<UStaticMesh>> SharedMeshes;
-    TMap<FString, FPendingStatic> PendingStatic;
-    TArray<FPendingStatic> RetiredBuilds;  // launched builds of removed or rebuilt meshes, finishing unused
+    TMap<FString, FPendingStatic> PendingStatic;  // by sharing key: one build per key, however many copies
+    TMap<FString, FString> PendingKeys;           // mesh id -> its PendingStatic key
+    TArray<FPendingStatic> RetiredBuilds;         // launched builds of removed or rebuilt meshes, finishing unused
     int64 ReservedMemory = 0;
     void ForgetPending(const FString& Id);
     // Nanite root pages of the meshes that carry Nanite data (NaniteFits): every page of a runtime mesh is a root page,

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 17u
+#define HDUE_ABI_VERSION 18u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -285,19 +285,6 @@ typedef struct HdueMeshUpdate {
      * Nanite mesh given a translucent material or the reverse); apply_scene the mesh in full then. */
     uint32_t needs_upload;
 } HdueMeshUpdate;
-typedef struct HdueLightDesc {
-    const char* id;
-    uint32_t type;
-    uint32_t visible;
-    double position[3];
-    /* World direction, or (forward,right,up) relative to the render camera
-       for HDUE_CAMERA_DISTANT_LIGHT. The latter updates with request_render. */
-    double direction[3];
-    float color[3];
-    float intensity;
-    float width_cm;
-    float height_cm;
-} HdueLightDesc;
 typedef struct HdueSceneBatch {
     uint32_t struct_size;
     uint32_t reset_scene;
@@ -305,8 +292,6 @@ typedef struct HdueSceneBatch {
     uint32_t material_count;
     uint32_t mesh_count;
     const HdueMeshDesc* meshes;
-    const HdueLightDesc* lights;
-    uint32_t light_count;
     uint32_t removed_count;
     const char* const* removed_ids;
 } HdueSceneBatch;

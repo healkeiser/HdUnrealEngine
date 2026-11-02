@@ -267,16 +267,8 @@ int run(int argc, wchar_t** argv) {
                 mesh.indices = indices;
                 mesh.visible = 1;
                 mesh.uv = uv;
+                mesh.flags = HDUE_MESH_EDITABLE;  // wet layers edit the uploaded geometry
                 for (int c = 0; c < 4; ++c) mesh.transform[c * 4 + c] = 1;
-                HdueLightDesc light{};
-                light.id = "key";
-                light.type = HDUE_DISTANT_LIGHT;
-                light.visible = 1;
-                light.intensity = 4;
-                light.direction[0] = .4f;
-                light.direction[1] = .3f;
-                light.direction[2] = -1;
-                light.color[0] = light.color[1] = light.color[2] = 1;
                 HdueSceneBatch batch{};
                 batch.struct_size = sizeof(batch);
                 batch.reset_scene = 1;
@@ -284,9 +276,26 @@ int run(int argc, wchar_t** argv) {
                 batch.materials = materialVariants;
                 batch.mesh_count = 1;
                 batch.meshes = &mesh;
-                batch.light_count = 1;
-                batch.lights = &light;
                 backend.require(backend.api().apply_scene(session, &batch), "wet fixture");
+                // A 4 lux sun shining along (.4,.3,-1): UsdLux lights face their local -Z; normalize makes the
+                // intensity the illuminance.
+                HdueLight light{};
+                light.struct_size = sizeof(light);
+                light.id = "key";
+                light.type = HDUE_DISTANT_LIGHT;
+                light.visible = 1;
+                light.flags = HDUE_LIGHT_SHADOWS | HDUE_LIGHT_NORMALIZE;
+                light.intensity = 4;
+                light.angle_degrees = .53f;
+                light.diffuse = light.specular = 1;
+                light.cone_angle = 180;
+                light.cube_resolution = 512;
+                light.color[0] = light.color[1] = light.color[2] = 1;
+                const double length = std::sqrt(.4 * .4 + .3 * .3 + 1.);
+                const double axes[9] = {.6, -.8, 0, 0, 0, 1, -.4 / length, -.3 / length, 1 / length};
+                std::copy(axes, axes + 9, light.axes);
+                HdueLightBatch lights{sizeof(lights), 1, &light};
+                backend.require(backend.api().upsert_lights(session, &lights), "wet fixture light");
                 HdueMaterialStats baseStats{sizeof(HdueMaterialStats)}, wetStats{sizeof(HdueMaterialStats)};
                 backend.require(backend.api().get_material_stats(session, "base", &baseStats), "dry shader cost");
                 backend.require(backend.api().get_material_stats(session, "variant", &wetStats), "wet shader cost");

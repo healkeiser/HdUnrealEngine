@@ -738,6 +738,7 @@ public:
         }
         std::set<std::string> current;
         for (auto& part : parts) {
+            HdUEStoreShearCompanion(*state, part);  // first: the part keeps only its unsheared instances
             // A prim deleted and re-created with the same data (Houdini rebuilds the Hydra scene when its LOP chain
             // changes) is compared with its last data, so an unchanged mesh is neither removed nor re-uploaded.
             auto previous = state->meshes.find(part.id);
@@ -800,6 +801,7 @@ public:
         }
         for (const auto& id : emitted_)
             if (!current.count(id)) {
+                HdUEDropShearCompanion(*state, id);
                 state->meshes.erase(id);
                 state->dirtyMeshes.erase(id);
                 state->movedMeshes.erase(id);
@@ -890,6 +892,7 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
             state.dirtyMaterials.insert(material.id);
         }
     }
+    HdUEStoreShearCompanion(state, mesh);
     const auto previous = state.meshes.find(mesh.id);
     mesh.geometryHash = HdUEGeometryHash(mesh);
     const bool sameGeometry = previous != state.meshes.end() && previous->second.geometryHash == mesh.geometryHash;

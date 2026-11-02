@@ -807,6 +807,13 @@ FEngineShowFlags ShowFlags(const FSession& Session, bool PathTracing, bool Aov, 
         Flags.SetLensFlares(false);
         // Volumes composite into scene color and would overwrite surface channels and IDs.
         Flags.SetHeterogeneousVolumes(false);
+        // ID frames switch materials to their ID emission (Scene.cpp SetIdMode), which Lumen's surface cache would
+        // capture and the next beauty reuse; with neither Lumen feature, UE skips the Lumen scene update
+        // (LumenSceneRendering.cpp BeginUpdateLumenSceneTasks).
+        if (Session.Request.aov == HDUE_AOV_PRIM_ID || Session.Request.aov == HDUE_AOV_INSTANCE_ID) {
+            Flags.SetLumenGlobalIllumination(false);
+            Flags.SetLumenReflections(false);
+        }
     }
     return Flags;
 }

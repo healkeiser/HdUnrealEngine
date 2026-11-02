@@ -126,7 +126,6 @@ void FHdueScene::Remove(const FString& Id) {
         if (IsValid(Groom->Actor)) World->DestroyActor(Groom->Actor);
         Grooms.Remove(Id);
     }
-    CameraLightDirections.Remove(Id);
     if (AActor** Actor = Actors.Find(Id)) {
         if (IsValid(*Actor)) World->DestroyActor(*Actor);
         Actors.Remove(Id);
@@ -141,11 +140,17 @@ void FHdueScene::Remove(const FString& Id) {
     ForgetPending(Id);
 }
 // Drops a mesh's background build: a queued one at once, a launched one once it finishes (TickConversions), holding its
-// reserved memory until then. Removed meshes kept their geometry copy and still had cards and Nanite built.
+// reserved memory until then. Removed meshes kept their geometry copy and still had cards and Nanite built. A build
+// shared by other meshes of its key goes on for them.
 void FHdueScene::ForgetPending(const FString& Id) {
+    FString Key;
+    if (!PendingKeys.RemoveAndCopyValue(Id, Key)) return;
+    FPendingStatic& Shared = PendingStatic.FindChecked(Key);
+    Shared.Ids.Remove(Id);
+    if (Shared.Ids.Num()) return;
     FPendingStatic Pending;
-    if (!PendingStatic.RemoveAndCopyValue(Id, Pending) || !Pending.Task.IsValid()) return;
-    RetiredBuilds.Add(MoveTemp(Pending));
+    PendingStatic.RemoveAndCopyValue(Key, Pending);
+    if (Pending.Task.IsValid()) RetiredBuilds.Add(MoveTemp(Pending));
 }
 namespace {
 // The root component of an hdUE actor: movable and render-only. Collision stays off, so UE neither cooks physics
@@ -375,12 +380,24 @@ void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
 bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
     if (Mode == IdMode) return true;
     const bool On = Mode != 0;
-    UMaterialInterface* IdMaterial = nullptr;
-    if (On && !(IdMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId")))) {
+    auto* IdMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId"));
+    if (On && !IdMaterial) {
         Error = TEXT("ID material /Game/HdUE/M_HdUEId is missing; run Prepare-Content.ps1 and stage the runtime.");
         return false;
     }
-    const auto Swap = [&](AActor* Actor, int32 Id) {
+    // Materials with the HdUEIdPass switch (the Preview Surface masters) draw the ID themselves when custom primitive
+    // data 5 is set: a GPU Scene update, where SetMaterial rebuilds the mesh's render state. Other meshes (native
+    // assets, Standard Surface and MaterialX materials) swap to M_HdUEId.
+    const FHashedMaterialParameterInfo Switch(TEXT("HdUEIdPass"));
+    const auto Switches = [&](const UMeshComponent* Mesh) {
+        float Unused;
+        for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+            if (const auto* Material = Mesh->GetMaterial(Slot);
+                !Material || !Material->GetScalarParameterDefaultValue(Switch, Unused))
+                return false;
+        return Mesh->GetNumMaterials() > 0;
+    };
+    const auto Apply = [&](AActor* Actor, int32 Id) {
         TArray<UMeshComponent*> Meshes;
         Actor->GetComponents(Meshes);
         for (auto* Mesh : Meshes) {
@@ -395,20 +412,30 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
                                                             ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0)
                                                             : FVector4f(0, 0, 0, 0));
                 Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
-                for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
+                // Already swapped (prim to instance IDs): no switch, and SetMaterial does nothing.
+                if (Switches(Mesh))
+                    Mesh->SetCustomPrimitiveDataFloat(5, 1.f);
+                else
+                    for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
+            } else if (Switches(Mesh)) {
+                Mesh->SetCustomPrimitiveDataFloat(5, 0.f);
             } else {
-                Mesh->EmptyOverrideMaterials();  // native skeletal meshes kept the ID material before
+                for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+                    if (IdMaterial && Mesh->GetMaterial(Slot) == IdMaterial) {
+                        Mesh->EmptyOverrideMaterials();  // native skeletal meshes kept the ID material before
+                        break;
+                    }
             }
         }
     };
     for (const auto& Entry : Actors)
         if (IsValid(Entry.Value)) {
             const int32* Id = PrimIds.Find(Entry.Key);
-            Swap(Entry.Value, Id ? *Id : -1);
+            Apply(Entry.Value, Id ? *Id : -1);
         }
     // ponytail: native catalog assets carry no Hydra prim ID; they read as background in the ID pass.
     for (auto* Actor : Assets.GetActors())
-        if (IsValid(Actor)) Swap(Actor, -1);
+        if (IsValid(Actor)) Apply(Actor, -1);
     IdMode = Mode;
     if (!On) BindMaterials();
     return true;
@@ -1152,7 +1179,7 @@ void FHdueScene::TickConversions() {
         Available -= ReservedMemory;
         if (const int64 Limit = int64(CVarMeshBuildMaxMemoryUsage.GetValueOnGameThread()) << 30)
             Available = FMath::Min(Available, Limit - ReservedMemory);
-        for (auto& [Id, Pending] : PendingStatic) {
+        for (auto& [Key, Pending] : PendingStatic) {
             if (Pending.Task.IsValid()) continue;
             if (ReservedMemory && Pending.Memory > Available) break;  // one build always runs
             Available -= Pending.Memory;
@@ -1170,14 +1197,20 @@ void FHdueScene::TickConversions() {
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
         if (!It.Value().Task.IsValid() || !It.Value().Task.IsCompleted()) continue;  // queued or not built yet
         ReservedMemory -= It.Value().Memory;
-        AActor* Actor = Actors.FindRef(It.Key());
-        auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr;
+        // Every mesh of the key draws the one converted mesh, as offline hosts share it (Apply).
+        TArray<UStaticMeshComponent*> Components;
+        for (const FString& Id : It.Value().Ids) {
+            PendingKeys.Remove(Id);
+            AActor* Actor = Actors.FindRef(Id);
+            if (auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr)
+                Components.Add(Component);
+        }
         const TSharedPtr<FConversion> Conversion = It.Value().Task.GetResult();
-        if (!Component) {
+        if (!Components.Num()) {
             It.RemoveCurrent();
             continue;
         }
-        const FString& Key = It.Value().Key;
+        const FString& Key = It.Key();
         // Nanite draws opaque and masked materials only.
         const bool Nanite =
             NaniteFits(Key, Conversion->Nanite && !It.Value().Translucent ? Conversion->Nanite.Get() : nullptr);
@@ -1191,7 +1224,7 @@ void FHdueScene::TickConversions() {
         if (Tried % 50 == 1 || PendingStatic.Num() == 1)
             UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes,
                    Tried);
-        Component->SetStaticMesh(Built);
+        for (UStaticMeshComponent* Component : Components) Component->SetStaticMesh(Built);
         It.RemoveCurrent();
         return;  // one per tick keeps frames smooth
     }
@@ -1255,7 +1288,7 @@ UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
 }  // namespace
 bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     if ((Batch.material_count && !Batch.materials) || (Batch.mesh_count && !Batch.meshes) ||
-        (Batch.light_count && !Batch.lights) || (Batch.removed_count && !Batch.removed_ids)) {
+        (Batch.removed_count && !Batch.removed_ids)) {
         Error = TEXT("Missing scene batch data.");
         return false;
     }
@@ -1299,7 +1332,6 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Fixtures.Add(*It);
         for (auto* A : Fixtures) World->DestroyActor(A);
         Actors.Empty();
-        CameraLightDirections.Empty();
         MeshMaterials.Empty();
         SingleSided.Empty();
         OneSided.Empty();
@@ -1559,8 +1591,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // (UUsdAssetCache3, keyed by a hash of the mesh: USDGeomMeshTranslator.cpp): NVIDIA's Da Vinci Workshop references
     // the same assets thousands of times without USD instancing, and each copy held its own render data, Nanite pages
     // and ray-tracing geometry. Keys are hashed on all cores; the first mesh of a key in the batch builds it, the
-    // others (and later batches, while it lives) reuse it. Interactive hosts share only finished conversions
-    // (TickConversions).
+    // others (and later batches, while it lives) reuse it. Interactive hosts share a batch's quick mesh and run
+    // one background conversion per key (PendingStatic), which TickConversions swaps into every mesh of the key.
     for (auto It = SharedMeshes.CreateIterator(); It; ++It)
         if (!It.Value().IsValid()) {
             NaniteFits(It.Key(), nullptr);  // its root pages are back once UE has destroyed it
@@ -1673,7 +1705,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                    Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
-            ForgetPending(Id);  // a background build for the previous geometry finishes unused
+            // A background build for the previous geometry finishes unused; one for the same key goes on.
+            if (!Static || PendingKeys.FindRef(Id) != Keys[Index]) ForgetPending(Id);
             if (Static) {
                 const FString& Key = Keys[Index];
                 UStaticMesh* Built = BatchBuilt.FindRef(Key);
@@ -1696,7 +1729,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     InstanceMesh = Built;
                 else
                     Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-                if (Interactive && !Converted) {
+                if (Interactive && !Converted && PendingStatic.Contains(Key)) {
+                    PendingStatic[Key].Ids.Add(Id);  // the key's build is queued or running: it swaps in here too
+                    PendingKeys.Add(Id, Key);
+                } else if (Interactive && !Converted) {
                     // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s). TickConversions starts them.
@@ -1705,7 +1741,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const int64 Source = Copy->Positions.GetAllocatedSize() + Copy->Normals.GetAllocatedSize() +
                                          Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
                                          Copy->Indices.GetAllocatedSize();
-                    PendingStatic.Add(Id, {Copy, 7 * Source, {}, Key, Translucent[Index]});
+                    PendingStatic.Add(Key, {Copy, 7 * Source, {}, Translucent[Index], {Id}});
+                    PendingKeys.Add(Id, Key);
                 }
             } else
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));
@@ -1742,42 +1779,6 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         PrimIds.Add(Id, Desc.prim_id);
         Lighting->Link(Id, Cast<UPrimitiveComponent>(Actor->GetRootComponent()));
     }
-    for (uint32 Index = 0; Index < Batch.light_count; ++Index) {
-        const auto& Desc = Batch.lights[Index];
-        if (!Desc.id || Desc.type > HDUE_CAMERA_DISTANT_LIGHT) {
-            Error = TEXT("Unsupported light.");
-            return false;
-        }
-        const FString Id = UTF8_TO_TCHAR(Desc.id);
-        Remove(Id);
-        auto* Actor = World->SpawnActor<AActor>();
-        Actors.Add(Id, Actor);
-        ULightComponent* Light = (Desc.type == HDUE_DISTANT_LIGHT || Desc.type == HDUE_CAMERA_DISTANT_LIGHT)
-                                     ? static_cast<ULightComponent*>(NewObject<UDirectionalLightComponent>(Actor))
-                                 : Desc.type == HDUE_SPHERE_LIGHT
-                                     ? static_cast<ULightComponent*>(NewObject<UPointLightComponent>(Actor))
-                                     : static_cast<ULightComponent*>(NewObject<URectLightComponent>(Actor));
-        Light->SetMobility(EComponentMobility::Movable);
-        Actor->SetRootComponent(Light);
-        Actor->AddInstanceComponent(Light);
-        Light->RegisterComponent();
-        Light->SetLightColor(FLinearColor(Desc.color[0], Desc.color[1], Desc.color[2]));
-        Light->SetIntensity(FMath::Max(0.f, Desc.intensity));
-        Actor->SetActorLocation(FVector(Desc.position[0], Desc.position[1], Desc.position[2]));
-        Actor->SetActorRotation(FVector(Desc.direction[0], Desc.direction[1], Desc.direction[2]).Rotation());
-        Actor->SetActorHiddenInGame(!Desc.visible);
-        if (Desc.type == HDUE_CAMERA_DISTANT_LIGHT)
-            CameraLightDirections.Add(Id, FVector(Desc.direction[0], Desc.direction[1], Desc.direction[2]));
-        if (auto* Point = Cast<UPointLightComponent>(Light)) {
-            Point->SetAttenuationRadius(100000);
-            Point->SetSourceRadius(FMath::Max(0.1f, Desc.width_cm));
-        }
-        if (auto* Rect = Cast<URectLightComponent>(Light)) {
-            Rect->SetSourceWidth(Desc.width_cm);
-            Rect->SetSourceHeight(Desc.height_cm);
-            Rect->SetAttenuationRadius(100000);
-        }
-    }
     const double MeshesDone = FPlatformTime::Seconds();
     BindMaterials();
     if (Batch.material_count || Batch.mesh_count)
@@ -1791,14 +1792,4 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
 }
 void FHdueScene::UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up) {
     Lighting->UpdateCamera(Eye, Target, Up);
-    const FVector Forward = (Target - Eye).GetSafeNormal();
-    const FVector Right = FVector::CrossProduct(Up, Forward).GetSafeNormal();
-    const FVector CameraUp = FVector::CrossProduct(Forward, Right).GetSafeNormal();
-    for (const auto& Entry : CameraLightDirections) {
-        AActor* Actor = Actors.FindRef(Entry.Key);
-        if (!IsValid(Actor)) continue;
-        const FVector Direction =
-            (Forward * Entry.Value.X + Right * Entry.Value.Y + CameraUp * Entry.Value.Z).GetSafeNormal();
-        Actor->SetActorLocationAndRotation(Eye, Direction.Rotation());
-    }
 }

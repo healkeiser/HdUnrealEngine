@@ -403,6 +403,7 @@ void HdUEState::erase(const std::string& id) {
         erasedMeshes[id] = std::move(mesh->second);
         meshes.erase(mesh);
     }
+    HdUEDropShearCompanion(*this, id);  // a revived prototype's Sync stores it again
     materials.erase(id);
     lights.erase(id);
     volumes.erase(id);
@@ -461,7 +462,7 @@ struct ScenePacket {
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyLocalFogs,
         dirtyGrooms, removedIds;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points, and
-    // instanced meshes whose sheared instances (baked into their companion) are baked at the sub-frame's matrices.
+    // sheared-instance companions (bakedInstances) baked at the sub-frame's instance matrices.
     std::map<std::string, std::vector<GfVec3f>> points;
     std::map<std::string, std::vector<GfMatrix4d>> instances;
     // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
@@ -863,24 +864,68 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         desc.uv = packet.own(packet.floats, std::move(uv));
         desc.uv_set_count = uint32_t(sets.size());
         desc.indices = packet.own(packet.indices, std::move(index));
-        std::optional<HdueMeshDesc> shearedCompanion;
-        if (data.instanced) {
+        if (data.bakedInstances) {
+            // A sheared-instance companion (HdUEStoreShearCompanion): a copy of the vertices per instance, placed by
+            // its matrix (at the sub-frame's matrices during motion blur), as a sheared non-instanced mesh is baked.
+            const auto subFrame = packet.instances.find(id);
+            const auto& placed = subFrame != packet.instances.end() ? subFrame->second : data.instances;
+            const size_t n = placed.size();
+            const bool perInstanceColors = data.instanceColors.size() == n;
+            std::vector<float> bp(count * 3 * n), bn(normals ? count * 3 * n : 0), buv(count * 2 * sets.size() * n), bc;
+            const auto* sourceColors = desc.colors;
+            if (sourceColors || perInstanceColors) bc.resize(count * 3 * n);
+            std::vector<uint32_t> bi;
+            bi.reserve(size_t(desc.index_count) * n);
+            WorkParallelForN(n, [&](size_t begin, size_t end) {
+                for (size_t k = begin; k < end; ++k) {
+                    const auto& m = placed[k];
+                    const auto mn = m.GetInverse().GetTranspose();
+                    for (size_t v = 0; v < count; ++v) {
+                        const size_t o = k * count + v;
+                        const auto point = convert(m.Transform(GfVec3d(vertices[v])));
+                        for (int c = 0; c < 3; ++c) bp[o * 3 + c] = float(point[c]);
+                        if (normals) {
+                            const auto normal =
+                                convert(mn.TransformDir(GfVec3d(vertexNormals[v])), true).GetNormalized();
+                            for (int c = 0; c < 3; ++c) bn[o * 3 + c] = float(normal[c]);
+                        }
+                        for (size_t s = 0; s < sets.size(); ++s) {
+                            buv[(s * count * n + o) * 2] = (*sets[s])[v][0];
+                            buv[(s * count * n + o) * 2 + 1] = 1 - (*sets[s])[v][1];
+                        }
+                        if (!bc.empty())
+                            for (int c = 0; c < 3; ++c)
+                                bc[o * 3 + c] = (sourceColors ? sourceColors[v * 3 + c] : 1.f) *
+                                                (perInstanceColors ? data.instanceColors[k][c] : 1.f);
+                    }
+                }
+            });
+            for (size_t k = 0; k < n; ++k) {
+                const bool flip = placed[k].GetDeterminant() < 0;
+                for (size_t t = 0; t + 2 < desc.index_count; t += 3) {
+                    const uint32_t base = uint32_t(k * count);
+                    bi.push_back(base + desc.indices[t]);
+                    bi.push_back(base + desc.indices[t + (flip ? 2 : 1)]);
+                    bi.push_back(base + desc.indices[t + (flip ? 1 : 2)]);
+                }
+            }
+            desc.vertex_count = uint32_t(count * n);
+            desc.index_count = uint32_t(bi.size());
+            desc.positions = packet.own(packet.floats, std::move(bp));
+            desc.normals = packet.own(packet.floats, std::move(bn));
+            desc.uv = packet.own(packet.floats, std::move(buv));
+            desc.colors = bc.empty() ? nullptr : packet.own(packet.floats, std::move(bc));
+            desc.indices = packet.own(packet.indices, std::move(bi));
+        } else if (data.instanced) {
             // USD row-vector matrices into UE: S^-1 * M * S, S = the USD -> UE basis and units. UE instances are
             // FTransforms, which cannot hold shear (a rotated prototype under a non-uniform instance scale): a generic
-            // mesh's sheared instances are baked into one companion mesh instead (HdUEShearedId), as a sheared
-            // non-instanced mesh is baked into its vertices.
+            // mesh's sheared instances are in its companion (HdUEStoreShearCompanion).
             std::vector<double> matrices;
-            std::vector<size_t> sheared;
             std::vector<float> instanceColors;
             std::vector<int32_t> instanceIds;
             const bool perInstanceColors = data.instanceColors.size() == data.instances.size();
             const bool perInstanceIds = data.instanceIds.size() == data.instances.size();
-            const bool bake = HdUEBakesShear(data, nativeAsset.empty());
             for (size_t i = 0; i < data.instances.size(); ++i) {
-                if (bake && HdUEHasShear(data.instances[i])) {
-                    sheared.push_back(i);
-                    continue;
-                }
                 matrices.resize(matrices.size() + 16);
                 rowMajor(inverse * data.instances[i] * basis, &matrices[matrices.size() - 16]);
                 if (perInstanceColors) {
@@ -888,75 +933,6 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
                     instanceColors.insert(instanceColors.end(), {c[0], c[1], c[2]});
                 }
                 if (perInstanceIds) instanceIds.push_back(data.instanceIds[i]);
-            }
-            if (!bake && std::any_of(data.instances.begin(), data.instances.end(), HdUEHasShear)) {
-                // A cooked asset has no vertices here to bake, and a companion past UE's vertex limit is not built.
-                static std::once_flag warned;
-                std::call_once(warned,
-                               [&] { TF_WARN("Sheared instances of %s render without shear", data.id.c_str()); });
-            }
-            const auto companion = HdUEShearedId(data.id);
-            const auto subFrame = packet.instances.find(id);
-            const auto& placed = subFrame != packet.instances.end() ? subFrame->second : data.instances;
-            if (sheared.empty())
-                packet.removed.push_back(packet.own(companion));
-            else {
-                HdueMeshDesc baked = desc;
-                const size_t n = sheared.size();
-                std::vector<float> bp(count * 3 * n), bn(normals ? count * 3 * n : 0), buv(count * 2 * sets.size() * n),
-                    bc;
-                const auto* sourceColors = desc.colors;
-                if (sourceColors || perInstanceColors) bc.resize(count * 3 * n);
-                std::vector<uint32_t> bi;
-                bi.reserve(data.indices.size() * n);
-                WorkParallelForN(n, [&](size_t begin, size_t end) {
-                    for (size_t k = begin; k < end; ++k) {
-                        const auto& m = placed[sheared[k]];
-                        const auto mn = m.GetInverse().GetTranspose();
-                        for (size_t v = 0; v < count; ++v) {
-                            const size_t o = k * count + v;
-                            const auto point = convert(m.Transform(GfVec3d(vertices[v])));
-                            for (int c = 0; c < 3; ++c) bp[o * 3 + c] = float(point[c]);
-                            if (normals) {
-                                const auto normal =
-                                    convert(mn.TransformDir(GfVec3d(vertexNormals[v])), true).GetNormalized();
-                                for (int c = 0; c < 3; ++c) bn[o * 3 + c] = float(normal[c]);
-                            }
-                            for (size_t s = 0; s < sets.size(); ++s) {
-                                buv[(s * count * n + o) * 2] = (*sets[s])[v][0];
-                                buv[(s * count * n + o) * 2 + 1] = 1 - (*sets[s])[v][1];
-                            }
-                            if (!bc.empty())
-                                for (int c = 0; c < 3; ++c)
-                                    bc[o * 3 + c] = (sourceColors ? sourceColors[v * 3 + c] : 1.f) *
-                                                    (perInstanceColors ? data.instanceColors[sheared[k]][c] : 1.f);
-                        }
-                    }
-                });
-                for (size_t k = 0; k < n; ++k) {
-                    const bool flip = placed[sheared[k]].GetDeterminant() < 0;
-                    for (size_t t = 0; t + 2 < desc.index_count; t += 3) {
-                        const uint32_t base = uint32_t(k * count);
-                        bi.push_back(base + desc.indices[t]);
-                        bi.push_back(base + desc.indices[t + (flip ? 2 : 1)]);
-                        bi.push_back(base + desc.indices[t + (flip ? 1 : 2)]);
-                    }
-                }
-                baked.id = packet.own(companion);
-                baked.vertex_count = uint32_t(count * n);
-                baked.index_count = uint32_t(bi.size());
-                baked.positions = packet.own(packet.floats, std::move(bp));
-                baked.normals = packet.own(packet.floats, std::move(bn));
-                baked.uv = packet.own(packet.floats, std::move(buv));
-                baked.colors = bc.empty() ? nullptr : packet.own(packet.floats, std::move(bc));
-                baked.indices = packet.own(packet.indices, std::move(bi));
-                baked.instance_count = 0;
-                baked.instance_transforms = nullptr;
-                baked.instance_colors = nullptr;
-                baked.instance_ids = nullptr;
-                for (int i = 0; i < 16; ++i) baked.transform[i] = i % 5 == 0;
-                shearedCompanion = baked;
-                packet.genericMeshes.push_back(companion);
             }
             desc.instance_count = uint32_t(matrices.size() / 16);
             if (instanceColors.size() == size_t(desc.instance_count) * 3 && desc.instance_count)
@@ -970,18 +946,15 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         // Surface effects edit vertex colours after upload, and deforming meshes upload again per motion blur
         // sub-frame, so their meshes stay editable (dynamic) in UE: a static mesh rebuilt its cards and Nanite data
         // every sub-frame.
-        if ((state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) || !data.deformTimes.empty())
+        // A moving sheared-instance companion uploads again per sub-frame (applyMotion) likewise.
+        if ((state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) || !data.deformTimes.empty() ||
+            (data.bakedInstances && data.moving()))
             desc.flags |= HDUE_MESH_EDITABLE;
         if (cullBackface && !data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!baked) rowMajor(inverse * data.transform * basis, desc.transform);
         if (nativeAsset.empty()) packet.genericMeshes.push_back(id);
         packet.meshes.push_back(desc);
-        if (shearedCompanion) {
-            // A moving mesh's companion uploads again per sub-frame (applyMotion): dynamic, as deforming meshes are.
-            shearedCompanion->flags = desc.flags | (data.moving() ? HDUE_MESH_EDITABLE : 0);
-            packet.meshes.push_back(*shearedCompanion);
-        }
         if (HdUETraceScene())
             TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
     }
@@ -1044,6 +1017,19 @@ void prepareLinks(HdUEState& state, ScenePacket& packet) {
     packet.sendLinks =
         packet.linkedObjects != (packet.firstBatch ? decltype(packet.linkedObjects){} : state.linkedObjects);
 }
+// A light's UE-space placement before prepareLights extends it to an HdueLight. Camera-distant lights keep
+// (forward,right,up) relative to the render camera in direction.
+struct LightDesc {
+    const char* id;
+    uint32_t type;
+    uint32_t visible;
+    double position[3];
+    double direction[3];
+    float color[3];
+    float intensity;
+    float width_cm;
+    float height_cm;
+};
 void prepareLights(HdUEState& state, ScenePacket& packet) {
     const double viewerIntensity =
         state.setting<double>("viewerLightIntensity", state.setting<float>("viewerLightIntensity", 4.f));
@@ -1061,7 +1047,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
                        !state.nativeAssets.lights;
     const double units = state.setting<double>("metersPerUnit", .01) * 100;
     const auto domeResolution = uint32_t(state.setting<int>("domeResolution", 512));
-    const auto extend = [&](const HdueLightDesc& legacy, const HdUELightData* source) {
+    const auto extend = [&](const LightDesc& legacy, const HdUELightData* source) {
         HdueLight light{};
         light.struct_size = sizeof(light);
         light.type = legacy.type;
@@ -1127,7 +1113,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     };
     for (const auto& id : packet.dirtyLights) {
         const auto& data = state.lights.at(id);
-        HdueLightDesc desc{};
+        LightDesc desc{};
         desc.id = packet.own(data.id);
         desc.type = data.type;
         desc.visible = data.visible && (data.viewer || state.setting<bool>("sceneLightsEnabled", true));
@@ -1153,7 +1139,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     }
     if (packet.autoLight) {
         for (int i = 0; i < 2; ++i) {
-            HdueLightDesc desc{};
+            LightDesc desc{};
             desc.id = i ? AutoFill : AutoKey;
             desc.type = HDUE_CAMERA_DISTANT_LIGHT;
             desc.visible = 1;
@@ -1321,10 +1307,7 @@ void prepareScene(HdUEState& state, ScenePacket& packet, uint64_t meshBudget) {
     prepareVolumes(state, packet);
     prepareLocalFogs(state, packet);
     prepareGrooms(state, packet);
-    for (const auto& id : packet.removedIds) {
-        packet.removed.push_back(packet.own(id));
-        packet.removed.push_back(packet.own(HdUEShearedId(id)));  // a no-op in UE when it had none
-    }
+    for (const auto& id : packet.removedIds) packet.removed.push_back(packet.own(id));
 }
 // Without the state lock: only the backend and the packet (the UE thread owns the session).
 void sendScene(const HdUEState& state, ScenePacket& packet) {
@@ -1340,7 +1323,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     batch.material_count = uint32_t(packet.materials.size());
     batch.removed_ids = packet.removed.data();
     batch.removed_count = uint32_t(packet.removed.size());
-    if (batch.reset_scene || batch.mesh_count || batch.material_count || batch.light_count || batch.removed_count) {
+    if (batch.reset_scene || batch.mesh_count || batch.material_count || batch.removed_count) {
         const auto applyStart = std::chrono::steady_clock::now();
         backend.require(api.apply_scene(session, &batch), "apply_scene");
         uint64_t vertices = 0, triangles = 0;
@@ -1348,11 +1331,9 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
             vertices += mesh.vertex_count;
             triangles += mesh.index_count / 3;
         }
-        trace(
-            "hdUE scene submit: UE apply %.1f ms (%u meshes: %llu vertices, %llu triangles; %u materials, %u lights)\n",
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(),
-            batch.mesh_count, (unsigned long long)vertices, (unsigned long long)triangles, batch.material_count,
-            batch.light_count);
+        trace("hdUE scene submit: UE apply %.1f ms (%u meshes: %llu vertices, %llu triangles; %u materials)\n",
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(),
+              batch.mesh_count, (unsigned long long)vertices, (unsigned long long)triangles, batch.material_count);
         double syncMs = 0;
         int syncs = 0;
         HdUETakeMeshSyncStats(syncMs, syncs);
@@ -1406,9 +1387,8 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
 // (prepareSurfaceEffects).
 bool releasable(const HdUEState& state, const HdUEMeshData& m) {
     const auto& host = selfHost();
-    // A mesh with sheared instances keeps its arrays: its baked companion is rebuilt from them on every upload.
-    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() ||
-        std::any_of(m.instances.begin(), m.instances.end(), HdUEHasShear) ||
+    // A moving sheared-instance companion keeps its arrays: motion blur bakes it again per sub-frame.
+    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() || (m.bakedInstances && m.moving()) ||
         (state.wetBindings && !HdUEWetSettings(*state.wetBindings, m).empty()))
         return false;
     const auto material = state.materials.find(m.material);
@@ -1515,6 +1495,101 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
 }
 }  // namespace
 bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh) { return releasable(state, mesh); }
+// UE instances are FTransforms, which cannot hold shear (a rotated prototype under a non-uniform instance scale): a
+// generic instanced mesh's sheared instances move into a mesh of their own, which prepareMeshes bakes into its
+// vertices as a sheared non-instanced mesh is baked. The prototype then uploads, moves and releases as any instanced
+// mesh, and motion blur bakes only the companion again (applyMotion).
+void HdUEStoreShearCompanion(HdUEState& state, HdUEMeshData& prototype) {
+    const auto id = HdUEShearedId(prototype.id);
+    if (!prototype.instanced || std::none_of(prototype.instances.begin(), prototype.instances.end(), HdUEHasShear)) {
+        HdUEDropShearCompanion(state, prototype.id);
+        return;
+    }
+    const bool generic = prototype.sceneAsset.empty() &&
+                         asset(state.setting<VtDictionary>("nativeMeshAssets", {}), prototype.id).empty();
+    if (!HdUEBakesShear(prototype, generic)) {
+        // A cooked asset has no vertices here to bake, and a companion past UE's vertex limit is not built.
+        static std::once_flag warned;
+        std::call_once(warned, [&] { TF_WARN("Sheared instances of %s render without shear", prototype.id.c_str()); });
+        HdUEDropShearCompanion(state, prototype.id);
+        return;
+    }
+    HdUEMeshData companion;
+    companion.id = id;
+    companion.sourceId = prototype.sourceId;  // re-pulled with its prototype
+    companion.scenePath = prototype.scenePath;
+    companion.bindingPath = id;  // no surface effects: they bind to the prototype's arrays only
+    companion.material = prototype.material;
+    companion.visible = prototype.visible;
+    companion.renderTag = prototype.renderTag;
+    companion.primId = prototype.primId;
+    companion.categories = prototype.categories;
+    companion.doubleSided = prototype.doubleSided;
+    companion.instanced = companion.bakedInstances = true;
+    companion.points = prototype.points;
+    companion.normals = prototype.normals;
+    companion.uv = prototype.uv;
+    companion.uvSets = prototype.uvSets;
+    companion.colors = prototype.colors;
+    companion.indices = prototype.indices;
+    companion.motionLeft = prototype.motionLeft;
+    companion.motionRight = prototype.motionRight;
+    companion.blurScale = prototype.blurScale;
+    companion.instanceTimes = prototype.instanceTimes;
+    companion.deformTimes = prototype.deformTimes;
+    companion.deformOffsets = prototype.deformOffsets;
+    // Per-instance arrays (those sized by the instances) split between the two.
+    std::vector<char> sheared(prototype.instances.size());
+    for (size_t i = 0; i < sheared.size(); ++i) sheared[i] = HdUEHasShear(prototype.instances[i]);
+    const auto split = [&](auto& from, auto& to) {
+        if (from.size() != sheared.size()) return;
+        std::decay_t<decltype(from)> keep;
+        for (size_t i = 0; i < from.size(); ++i) (sheared[i] ? to : keep).push_back(std::move(from[i]));
+        from.swap(keep);
+    };
+    split(prototype.instanceColors, companion.instanceColors);
+    split(prototype.instanceIds, companion.instanceIds);
+    split(prototype.velocities, companion.velocities);
+    split(prototype.accelerations, companion.accelerations);
+    split(prototype.angularVelocities, companion.angularVelocities);
+    companion.instanceSamples.resize(prototype.instanceSamples.size());
+    for (size_t k = 0; k < prototype.instanceSamples.size(); ++k)
+        split(prototype.instanceSamples[k], companion.instanceSamples[k]);
+    split(prototype.instances, companion.instances);
+    companion.geometryHash = HdUEGeometryHash(companion);
+    const auto previous = state.meshes.find(id);
+    bool changed = previous == state.meshes.end() || state.fullUploads.count(id) ||
+                   previous->second.geometryHash != companion.geometryHash ||
+                   previous->second.instances != companion.instances ||
+                   previous->second.instanceColors != companion.instanceColors ||
+                   previous->second.material != companion.material || previous->second.visible != companion.visible ||
+                   previous->second.doubleSided != companion.doubleSided;
+    if (!changed) {
+        companion.pickMesh = previous->second.pickMesh;
+        // UE keeps a released companion's geometry, unless it keeps its arrays now (moving): then it uploads.
+        if (previous->second.released && HdUEReleasable(state, companion))
+            HdUEReleaseGeometry(companion);
+        else
+            changed = previous->second.released;
+    }
+    state.meshes[id] = std::move(companion);
+    state.fullUploads.erase(id);
+    state.removed.erase(id);
+    state.erasedMeshes.erase(id);
+    if (changed) {
+        if (state.dirtyMeshes.insert(id).second) state.pendingBytes += HdUEMeshBytes(state.meshes[id]);
+        ++state.revision;
+    }
+}
+void HdUEDropShearCompanion(HdUEState& state, const std::string& prototype) {
+    const auto id = HdUEShearedId(prototype);
+    if (!state.meshes.erase(id)) return;
+    state.dirtyMeshes.erase(id);
+    state.movedMeshes.erase(id);
+    state.fullUploads.erase(id);
+    state.removed.insert(id);
+    ++state.revision;
+}
 uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
     const uint64_t bytes = HdUEMeshBytes(m);
     m.releasedTriangles = uint32_t(m.indices.size() / 3);
@@ -1619,27 +1694,22 @@ class Pass final : public HdRenderPass {
                 }
                 return m;
             };
+            if (mesh.bakedInstances) {
+                // A sheared-instance companion is resubmitted with its instances baked at t, as deforming meshes are.
+                auto& placed = instances[id];
+                for (size_t i = 0; i < mesh.instances.size(); ++i) placed.push_back(place(mesh.instanceAt(i, tm), i));
+                s.dirtyMeshes.insert(id);
+                continue;
+            }
             auto& out = storage.emplace_back();
             const auto push = [&](const GfMatrix4d& usd) {
                 const auto m = inverse * usd * basis;
                 for (int r = 0; r < 4; ++r)
                     for (int c = 0; c < 4; ++c) out.push_back(m[r][c]);
             };
-            if (mesh.instanced) {
-                // A generic mesh's sheared instances live in its baked companion (HdUEShearedId), which is resubmitted
-                // with them at t, as deforming meshes are.
-                const bool bake = HdUEBakesShear(mesh, asset(nativeMeshes, id).empty());
-                std::vector<GfMatrix4d> placed(bake ? mesh.instances.size() : 0);
-                for (size_t i = 0; i < mesh.instances.size(); ++i) {
-                    const auto m = place(mesh.instanceAt(i, tm), i);
-                    if (bake) placed[i] = m;
-                    if (!bake || !HdUEHasShear(mesh.instances[i])) push(m);
-                }
-                if (bake) {
-                    instances[id] = std::move(placed);
-                    s.dirtyMeshes.insert(id);
-                }
-            } else if (!asset(nativeMeshes, id).empty() || !HdUEShears(mesh.transform))
+            if (mesh.instanced)
+                for (size_t i = 0; i < mesh.instances.size(); ++i) push(place(mesh.instanceAt(i, tm), i));
+            else if (!asset(nativeMeshes, id).empty() || !HdUEShears(mesh.transform))
                 push(place(mesh.transform, SIZE_MAX));
             else
                 push(mesh.transform.GetInverse() * place(mesh.transform, SIZE_MAX));  // baked into world space
@@ -2482,7 +2552,7 @@ public:
                 request.mode =
                     s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED : HDUE_REALTIME;
                 request.samples_per_pixel = uint32_t(s.samplesPerPixel());
-                request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 32)));
+                request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 64)));
                 request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
                 request.time_seconds = s.setting<double>("timeSeconds", 0);
                 const auto camera = view.GetInverse();
@@ -3317,7 +3387,7 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
     return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
             {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
-            {"Warmup frames", TfToken("warmupFrames"), VtValue(32)},
+            {"Warmup frames", TfToken("warmupFrames"), VtValue(64)},
             {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
             {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
             {"Environment cube resolution", TfToken("domeResolution"), VtValue(512)},
@@ -3419,7 +3489,13 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         ++state_->revision;
     }
     if (key == TfToken("nativeMeshAssets")) {
-        dirtyChangedEntries(previousDictionary, currentDictionary, state_->meshes, state_->dirtyMeshes);
+        std::set<std::string> changed;
+        dirtyChangedEntries(previousDictionary, currentDictionary, state_->meshes, changed);
+        for (const auto& id : changed) {
+            state_->dirtyMeshes.insert(id);
+            // Whether its sheared instances bake (HdUEStoreShearCompanion) is decided at Sync.
+            if (state_->meshes.at(id).instanced) state_->repull.insert(state_->meshes.at(id).sourceId);
+        }
         ++state_->revision;
     }
     if (key == TfToken("opTextures")) {  // re-pack what reads a host image

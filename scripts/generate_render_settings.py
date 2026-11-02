@@ -639,7 +639,9 @@ HDUE = [
         "Warmup Frames",
         "",
         "int",
-        32,
+        # Movie Render Queue's default Basic configuration: UMoviePipelineBasicConfig::NumWarmUpFrames(64)
+        # (MoviePipelineBasicConfig.cpp); Movie Render Graph renders those frames and discards them.
+        64,
         "Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. In husk, "
         "only a sequence's first frame warms up: each later frame continues its history with one draw, as Movie Render "
         "Queue does.",

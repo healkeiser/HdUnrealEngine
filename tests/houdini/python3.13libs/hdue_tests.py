@@ -28,7 +28,21 @@ def run():
     import hdefereval
     import hdue_houdini
     import hou
+    from PySide6 import QtGui
 
+    # Image checks assume a landscape viewport: Houdini restores its window on whatever monitor it last used, a
+    # portrait one included, so maximize it on the widest landscape screen.
+    window = hou.qt.mainWindow()
+    screen = max(
+        QtGui.QGuiApplication.screens(),
+        key=lambda s: (
+            s.geometry().width() > s.geometry().height(),
+            s.geometry().width(),
+        ),
+    )
+    window.showNormal()
+    window.setGeometry(screen.availableGeometry())
+    window.showMaximized()
     if (
         os.environ.get("HDUE_TEST_DESKTOP") != "0"
         and hou.isUIAvailable()
