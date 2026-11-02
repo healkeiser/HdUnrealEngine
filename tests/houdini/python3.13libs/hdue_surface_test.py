@@ -42,7 +42,7 @@ class Test(MaterialTest):
         controls = integration.current_settings_node()
         # After the displayed node (the Render Settings LOP): wiring it from the controls would drop the mode.
         override = hdue_surface.create(["/World/Wet"])
-        override.parm("hdue_wet_amount").set(0.35)
+        hdue_surface.parm(override, "amount").set(0.35)
         yield from self.image(
             "03-amount-edit", 1, self.frames[-1]["generation"]
         )
@@ -103,7 +103,7 @@ class Test(MaterialTest):
         empty = Batch(C.sizeof(Batch), 0, None)
         if self.surface.apply(session + 1, C.byref(empty)) != -1:
             raise AssertionError("Backend accepted a stale session")
-        override.parm("hdue_wet_mask").set("missing_mask")
+        hdue_surface.parm(override, "maskPrimvar").set("missing_mask")
         while not self.host.material_error:
             yield
         for _ in range(10):
@@ -112,7 +112,7 @@ class Test(MaterialTest):
             raise AssertionError(
                 "Invalid wet settings reported a completed frame"
             )
-        override.parm("hdue_wet_enabled").set(0)
+        hdue_surface.parm(override, "enabled").set(0)
         override.cook(force=True)
         viewer.curViewport().draw()
         while self.host.material_error or self.api.status()["error"]:

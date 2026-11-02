@@ -22,6 +22,9 @@ previous build; Hydra sync or ABI changes also run the in-Houdini test they touc
 | 6 | Lens distortion | M | No USD schema; plugin and camera actor per view |
 | 7 | Motion vectors | S-M | Previous-frame state for the raster pass |
 
+Nodes (prim LOPs that create or edit UE's actors as prims, and the Substrate builder's volume and BSDF nodes) are
+planned in [node-plan.md](node-plan.md).
+
 Local Fog Volumes are not here: they are phase 2 of the fog work (a LOP HDA authoring
 `unreal:localFogVolume:<ULocalFogVolumeComponent property>` on a box or sphere prim; realtime only, as UE's Path Tracer
 ignores them). Volumetric fog is part of its height fog (`unreal:heightFog:bEnableVolumetricFog`).

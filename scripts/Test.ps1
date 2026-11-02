@@ -25,5 +25,9 @@ if ($Suite -in 'hydra', 'all') {
 if ($Suite -in 'houdini', 'all') {
     & (Join-Path $PSScriptRoot 'Test-Houdini.ps1') -RuntimeConfig $RuntimeConfig
     & (Join-Path $PSScriptRoot 'Test-HoudiniOpTextures.ps1') -RuntimeConfig $RuntimeConfig
+    # hdUE's create/edit prim LOPs (hython, no GPU).
+    if ($RuntimeConfig) { $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($RuntimeConfig) }
+    & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\houdini_prim_lops.py')
+    if ($LASTEXITCODE) { throw 'Prim LOP tests failed.' }
 }
 Write-Output "Suite $Suite passed."

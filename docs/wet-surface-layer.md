@@ -142,7 +142,7 @@ Path Tracer begins a new accumulation only after the effect instance, mask uploa
 
 ## UI and diagnostics
 
-Solaris exposes an authoring control for a prim selection: enable, amount, roughness, and mask primvar. This writes an override layer on the selected prim paths, rather than changing a shared USD material. Authoring and undo stay on the Houdini UI thread. usdview/standalone may consume the same authored attributes without a dedicated painting UI.
+Solaris exposes an authoring control for a prim selection: enable, amount, roughness, and mask primvar. `hdue_surface.create()` adds a Render Geometry Settings LOP (`hdUE_wet_surface`) whose Primitives are the selected paths and whose hdUE tab sets the four `unreal:surface:wet:*` attributes (Set or Create, coating on); any Render Geometry Settings LOP can author them the same way. This writes an override layer on the selected prim paths, rather than changing a shared USD material. Authoring and undo stay on the Houdini UI thread. usdview/standalone may consume the same authored attributes without a dedicated painting UI.
 
 A mask-preview color mode displays the final coverage in grayscale. It uses the ordinary color AOV and does not require a new public AOV. Returning to the shaded view restores the current effect/material binding.
 

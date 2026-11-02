@@ -10,3 +10,6 @@ opalias Lop hdue::hduerenderproducts::1.0 hdue::renderproducts::1.0
 // The Substrate builder is a plain VOP subnet now (hdUE Substrate Material Builder, as Karma's Material Builder);
 // otls/hdue_substrate_builder_legacy.hda keeps the earlier asset loading.
 opdeprecate -r "Use the hdUE Substrate Material Builder (TAB menu > hdUE); hdue_substrate.upgrade(node) converts this one" 22.0 Vop hdue::substrate_builder::1.3
+// hdUE Local Fog Volume 2.0 creates or edits its prim (Action menu, as Houdini's prim LOPs); 1.0, which only created it,
+// stays in otls/hdue_localfogvolume_legacy.hda so saved scenes load it, out of the TAB menu.
+ophide Lop hdue::hduelocalfogvolume::1.0
