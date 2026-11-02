@@ -31,6 +31,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 class HdUEGpuFrames;
+// Thrown by HdUERenderDelegate's constructor once UE has shut down in this process (Houdini quitting): it cannot
+// start again, and the delegate Houdini creates while it quits needs no error report.
+struct HdUEStopped : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 // Diagnostic switches, read once (they were read per prim and per Execute).
 inline bool HdUETraceScene() {
     static const bool on = TfGetenvBool("HDUE_TRACE_SCENE", false);

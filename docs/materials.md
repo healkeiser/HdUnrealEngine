@@ -30,6 +30,8 @@ usdview and Solaris both accept the cooked registry through `-MaterialXLibrary`.
 
 Use `samples/materialx/showcase_solaris.usda` with Solaris Asset Reference. Its single default prim contains geometry, materials, lights, and cameras, and uses Y-up/meters. All 21 meshes retain bindings when referenced below another prim.
 
+Each sample material references its material in the `.mtlx` document through USD's MaterialX file format (`references = @standard_surface.mtlx@</MaterialX/Materials/SS_Glass>`), so USD, Karma and hdUE's own translation all read the same graph; the cooked library maps the material by that document and material name. An older form, a Shader with `info:mtlx:sourceAsset` and a `subIdentifier` naming the material, still maps, but USD expects a nodedef name there and warns ("Invalid MaterialX NodeDef"). hdUE warns about a surface shader it cannot translate unless the library renders that material.
+
 The original `showcase.usda` is a complete-stage sample. Its materials are outside the default geometry prim, so open it as a stage or sublayer. Referencing only the geometry prim drops its material bindings.
 
 Regenerate the reference-safe scene through `uv run` with the configured Houdini Python executable and `scripts/generate_solaris_materialx_sample.py`.

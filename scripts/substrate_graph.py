@@ -166,7 +166,7 @@ USD_TYPES = {
     "vector2": Sdf.ValueTypeNames.Float2,
     "color4": Sdf.ValueTypeNames.Color4f,
 }
-COMPILER_VERSION = 2
+COMPILER_VERSION = 3  # 3: ID switch (IdSwitch.h)
 ERROR_ATTRIBUTE = "unreal:substrate:authoringError"
 
 

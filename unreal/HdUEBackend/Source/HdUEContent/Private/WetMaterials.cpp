@@ -1,4 +1,5 @@
 #include "WetMaterials.h"
+#include "IdSwitch.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialExpressionSubstrate.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
@@ -49,6 +50,7 @@ UMaterialExpression* Coverage(UMaterial* M) {
     return Product;
 }
 bool Save(UMaterial* M) {
+    HdUEAddIdSwitch(M);  // the base's switch, and the water layer hidden in ID passes
     M->PostEditChange();
     FAssetRegistryModule::AssetCreated(M);
     FSavePackageArgs Args;

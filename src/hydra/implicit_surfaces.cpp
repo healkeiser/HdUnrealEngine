@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdsi/tetMeshConversionSceneIndex.h"
 #include "pxr/imaging/hd/basisCurvesSchema.h"
 #include "pxr/imaging/hd/basisCurvesTopologySchema.h"
+#include "pxr/usd/usdGeom/hermiteCurves.h"
 #include "pxr/usd/usdGeom/primvarsAPI.h"
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/visibilityAPI.h"
@@ -40,8 +41,8 @@
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/usdImaging/usdImaging/drawModeSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/geomModelSchema.h"
+#include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
-#include "pxr/usdImaging/usdImaging/hermiteCurvesAdapter.h"
 #include "pxr/base/tf/getenv.h"
 #include <algorithm>
 #include <iostream>
@@ -348,17 +349,19 @@ public:
         return {};
     }
 };
-// HermiteCurves: UE's USD importer has none, so hdUE does not render them. UsdImaging's own adapter publishes no type
-// for them; this one keeps its data unchanged for every renderer and only adds a private hdUE: key, so hdUE can warn.
-class HdUE_HermiteCurvesAdapter final : public UsdImagingHermiteCurvesAdapter {
+// HermiteCurves: UE's USD importer has none, so hdUE does not render them, and UsdImaging's adapter publishes no type
+// for them. This keyless API schema adapter (it sees every prim) only adds a private unreal: key to them, so hdUE can
+// warn; replacing UsdImaging's HermiteCurves adapter instead made USD report a coding error in every session
+// ("Overriding prim adapters at runtime is not supported").
+class HdUE_HermiteCurvesAPIAdapter final : public UsdImagingAPISchemaAdapter {
 public:
     HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim,
-                                                      const UsdImagingDataSourceStageGlobals& globals) override {
-        const auto data = UsdImagingHermiteCurvesAdapter::GetImagingSubprimData(prim, subprim, globals);
-        if (!subprim.IsEmpty()) return data;
-        static const TfToken key("unreal:hermiteCurves");
-        return HdOverlayContainerDataSource::OverlayedContainerDataSources(
-            HdRetainedContainerDataSource::New(key, HdRetainedTypedSampledDataSource<bool>::New(true)), data);
+                                                      const TfToken& instance,
+                                                      const UsdImagingDataSourceStageGlobals&) override {
+        if (!subprim.IsEmpty() || !instance.IsEmpty() || !prim.IsA<UsdGeomHermiteCurves>()) return nullptr;
+        static const auto data = HdRetainedContainerDataSource::New(TfToken("unreal:hermiteCurves"),
+                                                                    HdRetainedTypedSampledDataSource<bool>::New(true));
+        return data;
     }
 };
 // UnrealLocalFogVolume (resources/generatedSchema.usda; UE's USD importer has no fog): an unrealLocalFogVolume Sprim
@@ -587,8 +590,8 @@ protected:
                 std::cerr << entry.primPath << " (" << entry.primType << ")" << std::endl;
                 HdDebugPrintDataSource(std::cerr, prim.dataSource, 1);
             }
-            // HermiteCurves (HdUE_HermiteCurvesAdapter): UE's USD importer has none; converting them in a UsdImaging
-            // adapter would change every renderer in the session, so hdUE only warns.
+            // HermiteCurves (HdUE_HermiteCurvesAPIAdapter): UE's USD importer has none; converting them in a
+            // UsdImaging adapter would change every renderer in the session, so hdUE only warns.
             if (prim.dataSource->Get(TfToken("unreal:hermiteCurves")))
                 warn(TfToken("HermiteCurves"), "HermiteCurves are not supported and render nothing (%s)",
                      entry.primPath.GetText());
@@ -628,8 +631,8 @@ TF_REGISTRY_FUNCTION(TfType) {
     HdSceneIndexPluginRegistry::Define<HdUE_UnsupportedSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_DrawModeSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_PurposeVisibilitySceneIndexPlugin>();
-    TfType::Define<HdUE_HermiteCurvesAdapter, TfType::Bases<UsdImagingHermiteCurvesAdapter>>()
-        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_HermiteCurvesAdapter>>();
+    TfType::Define<HdUE_HermiteCurvesAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
+        .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_HermiteCurvesAPIAdapter>>();
     TfType::Define<HdUE_LocalFogVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_LocalFogVolumeAdapter>>();
     TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()

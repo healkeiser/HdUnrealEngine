@@ -74,12 +74,49 @@
 #include "TextureResource.h"
 #include "UObject/Package.h"
 #include "Runtime/Launch/Resources/Version.h"
+#include "Misc/CommandLine.h"
+#include "Misc/CoreDelegates.h"
+#include "Misc/FeedbackContext.h"
+#include "Misc/OutputDeviceHelper.h"
+#include "Misc/OutputDeviceRedirector.h"
+#include "Misc/Parse.h"
+#include <cstdio>
 
 static_assert(ENGINE_MAJOR_VERSION == HDUE_ENGINE_MAJOR && ENGINE_MINOR_VERSION == HDUE_ENGINE_MINOR &&
                   ENGINE_PATCH_VERSION == HDUE_ENGINE_PATCH,
               "Use the pinned UE 5.8.4 source, not a different installed/source engine.");
 
 namespace {
+// UE's console echo for hosts that capture this process's stdout (husk's console, Houdini's Log Viewer), as UTF-8:
+// every Error and Warning, each warning once, and PSO precache misses (UE logs them at Display, but each is a PSO
+// compiled on the render thread). Other Display and Log lines are progress and stay in the log file, as a UE game
+// shows its user none of them.
+class FHdueConsoleEcho final : public FOutputDevice {
+public:
+    bool CanBeUsedOnAnyThread() const override { return true; }
+    void Serialize(const TCHAR* V, ELogVerbosity::Type Verbosity, const FName& Category) override {
+        Serialize(V, Verbosity, Category, -1.0);
+    }
+    void Serialize(const TCHAR* V, ELogVerbosity::Type Verbosity, const FName& Category, double Time) override {
+        const auto Level = ELogVerbosity::Type(Verbosity & ELogVerbosity::VerbosityMask);
+        if (Level == ELogVerbosity::NoLogging ||
+            (Level > ELogVerbosity::Warning && !FCString::Strstr(V, TEXT("(PSOPrecacheState: Missed)"))))
+            return;
+        TUtf8StringBuilder<512> Line;
+        FOutputDeviceHelper::AppendFormatLogLine(Line, Level, Category, V, GPrintLogTimes, Time);
+        Line.AppendChar('\n');
+        FScopeLock Lock(&Mutex);
+        bool Seen = false;
+        if (Level != ELogVerbosity::Error && Level != ELogVerbosity::Fatal) Warned.Add(V, &Seen);
+        if (Seen) return;
+        std::fwrite(Line.GetData(), 1, Line.Len(), stdout);
+        std::fflush(stdout);
+    }
+
+private:
+    FCriticalSection Mutex;
+    TSet<FString> Warned;
+};
 // hdUE's interactive resolution, set like any console variable (unreal:cvar:r:HdUE:...).
 TAutoConsoleVariable<int32> CVarInteractiveResolution(
     TEXT("r.HdUE.InteractiveResolution"), 1,
@@ -292,12 +329,21 @@ template <class T>
 bool Sized(const T* Value) {
     return Value && Value->struct_size == sizeof(T);
 }
+// Cached on the game thread: per-frame lookups made UE warn "Console object named ... shows many (500)
+// FindConsoleObject() calls (consider caching e.g. using static)" (ConsoleManager.cpp). Variables never unregister.
+IConsoleVariable* FindCVar(const TCHAR* Name) {
+    static TMap<FString, IConsoleVariable*> Found;
+    if (IConsoleVariable** CVar = Found.Find(Name)) return *CVar;
+    IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name);
+    if (CVar) Found.Add(Name, CVar);  // a plugin's variable may register later
+    return CVar;
+}
 int32 CVarInt(const TCHAR* Name) {
-    const IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name);
+    const IConsoleVariable* CVar = FindCVar(Name);
     return CVar ? CVar->GetInt() : 0;
 }
 void SetCVar(const TCHAR* Name, int32 Value) {
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name)) CVar->Set(Value, ECVF_SetByCode);
+    if (IConsoleVariable* CVar = FindCVar(Name)) CVar->Set(Value, ECVF_SetByCode);
 }
 bool IsInteractive() { return Runtime.Interactive; }
 // Finished frames are guarded by the session's FrameMutex, so any thread may read them: hosts that run UE on a thread
@@ -395,6 +441,21 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
                    Path.GetData());
         }
     }
+    // UE echoes every Display line to stdout (FFeedbackContextAnsi's wprintf, as UTF-16, or -stdout's
+    // FOutputDeviceStdOutput), which husk's console and Houdini's Log Viewer showed. Unless -stdout asks for that
+    // echo, GWarn becomes UE's base feedback context, which only forwards to GLog (as AutomationTest swaps GWarn for a
+    // filter), and FHdueConsoleEcho prints what the host's user should see; the log file keeps every line.
+    static bool EchoHooked = false;
+    if (!EchoHooked) {
+        EchoHooked = true;
+        FCoreDelegates::OnOutputDevicesInit.AddLambda([] {
+            if (FParse::Param(FCommandLine::Get(), TEXT("stdout"))) return;
+            static FFeedbackContext Quiet;
+            static FHdueConsoleEcho Echo;
+            GWarn = &Quiet;
+            GLog->AddOutputDevice(&Echo);
+        });
+    }
     FString Command = FString::Printf(TEXT("\"%s\" %s -game -windowed -d3d12 -unattended -nosplash -nosound "
                                            "-NoLoadingScreen -NoSplash -ResX=640 -ResY=360"),
                                       *Project, *Map);
@@ -440,9 +501,6 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     GAreScreenMessagesEnabled = false;
     GEngine->bSuppressMapWarnings = true;
     SetCVar(TEXT("t.IdleWhenNotForeground"), 0);
-    // Alpha output: keep coverage in scene colour through post-processing (toggleable at runtime in UE 5.8), so the
-    // beauty carries alpha 0 where no geometry is (background, sky hidden from camera rays).
-    SetCVar(TEXT("r.PostProcessing.PropagateAlpha"), 1);
     if (!IsInteractive()) {
         // Offline hosts (husk) get Movie Render Queue's Game Overrides: Cinematic scalability (keeping the screen
         // percentage), fully loaded texture streaming (Draw waits for it) and no GPU timeout for long Path Tracer
@@ -525,6 +583,10 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
         FScopeLock Lock(&Runtime.SessionLock);
         Runtime.Session.Reset();
     }
+    // The scene's static meshes, materials and textures go now, as UE frees the previous level before the next one
+    // loads (UEngine::TrimMemory from LoadMap), not at the next periodic GC: Houdini recreates its renderer (a new
+    // session) and syncs the stage into it at once, and NVIDIA's Da Vinci Workshop's meshes were held twice meanwhile.
+    UEngine::TrimMemory();
     return HDUE_OK;
 }
 
@@ -704,7 +766,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         static uint64 Logged = 0;
         if (Logged != Request->generation) {
             Logged = Request->generation;
-            UE_LOG(LogTemp, Display, TEXT("hdUE request %llu pending: %s"), Request->generation, Reason);
+            UE_LOG(LogTemp, Log, TEXT("hdUE request %llu pending: %s"), Request->generation, Reason);
         }
         return HDUE_PENDING;
     };
@@ -1022,15 +1084,17 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Job->DrawIndex = ++Session->Draws;
     // Offline frames (husk) wait for PSO compilation: r.PSOPrecache.ProxyCreationStrategy=2 draws meshes whose PSOs
     // are still compiling with the default material, and nothing else would stop such a frame from converging.
-    const uint32 Compiling = IsInteractive() ? 0
+    // Interactive frames wait for the background mesh builds (FHdueScene::PendingConversions): until they swap in,
+    // meshes draw a first pass without Lumen cards or nothing, and the viewport stops drawing once a frame converges.
+    const uint32 Compiling = IsInteractive() ? Session->Scene->PendingConversions()
                                              : FShaderPipelineCache::NumPrecompilesRemaining() +
                                                    PipelineStateCache::NumActivePrecacheRequests();
     if (Compiling) {
         static uint64 Logged = 0;
         if (Logged != Request.generation) {
             Logged = Request.generation;
-            UE_LOG(LogTemp, Display, TEXT("hdUE request %llu waits for %u PSO compilations"), Request.generation,
-                   Compiling);
+            UE_LOG(LogTemp, Log, TEXT("hdUE request %llu waits for %u %s"), Request.generation, Compiling,
+                   IsInteractive() ? TEXT("mesh builds") : TEXT("PSO compilations"));
         }
     }
     Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;
@@ -1221,8 +1285,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // texture UE clamps it and lights only part of the image, so, as UE raises Lumen's screen probe downsampling for
     // such views (LumenScreenProbeGather.cpp), these frames trace at half resolution (2x2, UE's Epic level), which
     // keeps the buffer within the view.
-    IConsoleVariable* Downsample =
-        PathTracing ? nullptr : IConsoleManager::Get().FindConsoleVariable(TEXT("r.MegaLights.DownsampleMode"));
+    IConsoleVariable* Downsample = PathTracing ? nullptr : FindCVar(TEXT("r.MegaLights.DownsampleMode"));
     const int32 DownsampleWas = Downsample ? Downsample->GetInt() : 2;
     const int32 Samples = CVarInt(TEXT("r.MegaLights.NumSamplesPerPixel"));
     const uint32 Max = GetMax2DTextureDimension();

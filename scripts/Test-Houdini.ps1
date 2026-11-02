@@ -32,6 +32,10 @@ Write-Output "Verified Solaris / same-process UE: $RunOutput"
 # A post-process setting set back to its default (Revert to Defaults, or typed) renders as before it was changed.
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory (Join-Path $RunOutput 'postprocess') -TestKind postprocess -TimeoutSeconds $TimeoutSeconds
 Write-Output "Verified Solaris post-process defaults: $RunOutput\postprocess"
+# Shared background mesh builds: copies removed, re-added and made translucent while their key's build runs or waits for memory.
+& (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory (Join-Path $RunOutput 'shared-builds') -TestKind shared-builds -TimeoutSeconds $TimeoutSeconds
+if (-not (Get-Content -LiteralPath (Join-Path $RunOutput 'shared-builds\verified.json') -Raw | ConvertFrom-Json).shared_builds) { throw "Shared build test failed: $RunOutput\shared-builds" }
+Write-Output "Verified Solaris shared mesh builds: $RunOutput\shared-builds"
 # Selection highlight and click picking: a Y-up metre stage (cube, mesh, instancer, points, curves) in the free view,
 # and the Z-up Cornell box through its camera (render buffers of another size than the viewport).
 foreach ($Case in @(

@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include "Misc/PackageName.h"
 #include "Lighting.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -53,6 +54,11 @@
 FHdueScene::FHdueScene(UWorld* InWorld, bool InInteractive)
     : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld), Interactive(InInteractive) {}
 FHdueScene::~FHdueScene() {
+    // Launched builds finish first, as UE finishes a static mesh's async build before it destroys the mesh
+    // (UStaticMesh::IsReadyForFinishDestroy) and the running ones at exit (FStaticMeshCompilingManager::Shutdown):
+    // their Nanite builds hold the task workers, and UE shutting down under them crashed in a readback copy pass.
+    for (const auto& [Key, Pending] : PendingStatic) Pending.Task.Wait();
+    for (const FPendingStatic& Retired : RetiredBuilds) Retired.Task.Wait();
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
@@ -134,6 +140,7 @@ void FHdueScene::Remove(const FString& Id) {
     OneSided.Remove(Id);
     MeshMaterials.Remove(Id);
     SingleSided.Remove(Id);
+    TranslucentStatic.Remove(Id);
     PrimIds.Remove(Id);
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
@@ -147,10 +154,19 @@ void FHdueScene::ForgetPending(const FString& Id) {
     if (!PendingKeys.RemoveAndCopyValue(Id, Key)) return;
     FPendingStatic& Shared = PendingStatic.FindChecked(Key);
     Shared.Ids.Remove(Id);
-    if (Shared.Ids.Num()) return;
+    if (Shared.Ids.Num()) {
+        ++(Shared.Task.IsValid() ? ShrunkBuilds : QueuedShrunk);
+        return;
+    }
     FPendingStatic Pending;
     PendingStatic.RemoveAndCopyValue(Key, Pending);
-    if (Pending.Task.IsValid()) RetiredBuilds.Add(MoveTemp(Pending));
+    QuickMemory -= Pending.QuickMemory;
+    if (!Pending.Task.IsValid()) {
+        ++QueuedDropped;
+        return;
+    }
+    ++DroppedBuilds;
+    RetiredBuilds.Add(MoveTemp(Pending));
 }
 namespace {
 // The root component of an hdUE actor: movable and render-only. Collision stays off, so UE neither cooks physics
@@ -358,11 +374,15 @@ void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
         };
         const FString MaterialId = Mesh.material_id ? UTF8_TO_TCHAR(Mesh.material_id) : TEXT("");
         // Apply's choices that depend on these fields: a static mesh built here (not editable) or a dynamic one, and
-        // Nanite for opaque and masked materials only.
+        // Nanite for opaque and masked materials only, compared with the mesh as built: its material may have changed
+        // blend mode in place (the delegate then sends its meshes here), as UE's Nanite proxy re-audits its materials'
+        // blend modes when they change (Nanite::IsSupportedBlendMode, NaniteResources.cpp).
         const bool WantStatic = Cast<UInstancedStaticMeshComponent>(Root) || !(Mesh.flags & HDUE_MESH_EDITABLE);
         if (!Root || !MeshMaterials.Contains(Id) || bool(Static) != WantStatic ||
-            (Static && (!Built || Built->GetOuter() != GetTransientPackage() ||  // generated here, not a native asset
-                        Translucent(MeshMaterials[Id]) != Translucent(MaterialId)))) {
+            // A mesh waiting for its background build without a first pass draws none (Apply).
+            (Static && ((!Built && !PendingKeys.Contains(Id)) ||
+                        (Built && Built->GetOuter() != GetTransientPackage()) ||  // generated here, not a native asset
+                        TranslucentStatic.Contains(Id) != Translucent(MaterialId)))) {
             Mesh.needs_upload = 1;
             continue;
         }
@@ -377,6 +397,12 @@ void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
     }
     BindMaterials();
 }
+namespace {
+// For comparing the two paths (unreal:cvar:r:HdUE:IdSwap = 1): every mesh swaps to M_HdUEId, switch or not.
+TAutoConsoleVariable<int32> CVarIdSwap(TEXT("r.HdUE.IdSwap"), 0,
+                                       TEXT("ID passes: 1 swaps every mesh to M_HdUEId instead of switching the "
+                                            "materials that have the HdUEIdPass switch."));
+}  // namespace
 bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
     if (Mode == IdMode) return true;
     const bool On = Mode != 0;
@@ -385,18 +411,21 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
         Error = TEXT("ID material /Game/HdUE/M_HdUEId is missing; run Prepare-Content.ps1 and stage the runtime.");
         return false;
     }
-    // Materials with the HdUEIdPass switch (the Preview Surface masters) draw the ID themselves when custom primitive
+    // Materials with the HdUEIdPass switch (every material hdUE generates: the Preview Surface and Standard Surface
+    // masters, M_Glass, prepared MaterialX and Substrate Builder graphs) draw the ID themselves when custom primitive
     // data 5 is set: a GPU Scene update, where SetMaterial rebuilds the mesh's render state. Other meshes (native
-    // assets, Standard Surface and MaterialX materials) swap to M_HdUEId.
+    // assets) swap to M_HdUEId.
     const FHashedMaterialParameterInfo Switch(TEXT("HdUEIdPass"));
     const auto Switches = [&](const UMeshComponent* Mesh) {
         float Unused;
+        if (CVarIdSwap.GetValueOnGameThread()) return false;
         for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
             if (const auto* Material = Mesh->GetMaterial(Slot);
                 !Material || !Material->GetScalarParameterDefaultValue(Switch, Unused))
                 return false;
         return Mesh->GetNumMaterials() > 0;
     };
+    int32 Switched = 0, Swapped = 0;
     const auto Apply = [&](AActor* Actor, int32 Id) {
         TArray<UMeshComponent*> Meshes;
         Actor->GetComponents(Meshes);
@@ -413,10 +442,13 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
                                                             : FVector4f(0, 0, 0, 0));
                 Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
                 // Already swapped (prim to instance IDs): no switch, and SetMaterial does nothing.
-                if (Switches(Mesh))
+                if (Switches(Mesh)) {
                     Mesh->SetCustomPrimitiveDataFloat(5, 1.f);
-                else
+                    ++Switched;
+                } else {
                     for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
+                    ++Swapped;
+                }
             } else if (Switches(Mesh)) {
                 Mesh->SetCustomPrimitiveDataFloat(5, 0.f);
             } else {
@@ -436,6 +468,9 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
     // ponytail: native catalog assets carry no Hydra prim ID; they read as background in the ID pass.
     for (auto* Actor : Assets.GetActors())
         if (IsValid(Actor)) Apply(Actor, -1);
+    // Read by tests: meshes of hdUE materials must all switch.
+    if (On && !IdMode)
+        UE_LOG(LogTemp, Log, TEXT("hdUE ID pass: %d meshes switched, %d swapped to M_HdUEId"), Switched, Swapped);
     IdMode = Mode;
     if (!On) BindMaterials();
     return true;
@@ -775,8 +810,12 @@ UMaterialInterface* FHdueScene::MeshMaterial(const FString& MeshId) {
         auto* Instance = Cast<UMaterialInstanceDynamic>(Twin.Base);
         if (Instance && Instance->Parent) {
             const FString Name = Instance->Parent->GetName() + TEXT("OneSided");
-            const FString Path = Instance->Parent->GetPackage()->GetName() + TEXT("OneSided.") + Name;
-            if (auto* Parent = LoadObject<UMaterialInterface>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet)) {
+            const FString Package = Instance->Parent->GetPackage()->GetName() + TEXT("OneSided");
+            // Asked first: LoadObject of a package that does not exist logs a LogStreaming warning (SkipPackage),
+            // LOAD_NoWarn or not, and cooked MaterialX parents have no twin.
+            if (auto* Parent = FPackageName::DoesPackageExist(Package)
+                                   ? LoadObject<UMaterialInterface>(nullptr, *(Package + TEXT(".") + Name))
+                                   : nullptr) {
                 auto* OneSidedInstance = UMaterialInstanceDynamic::Create(Parent, World);
                 OneSidedInstance->CopyParameterOverrides(Instance);
                 Twin.Material.Reset(OneSidedInstance);
@@ -795,6 +834,13 @@ void FHdueScene::BindMaterials() {
             if (const auto* Wet = WetBindings.Find(Entry.Key);
                 Wet && (*Wet)->Base == Material->Get() && (*Wet)->Revision == GeometryRevisions.FindRef(Entry.Key))
                 Desired = (*Wet)->Material.Get();
+            // A Nanite mesh whose material turned translucent keeps its previous material until the re-upload
+            // UpdateMeshes asked for: UE draws only opaque and masked materials with Nanite (NaniteResourcesHelper.h)
+            // and finds no fallback mesh to draw instead, so the component had no proxy (StaticMeshComponentHelper.h).
+            const auto* Static = Cast<UStaticMeshComponent>(Component);
+            if (Static && Static->GetStaticMesh() && Static->GetStaticMesh()->HasValidNaniteData() &&
+                IsTranslucentBlendMode(*Desired) && !TranslucentStatic.Contains(Entry.Key))
+                continue;
             if (Component->GetMaterial(0) != Desired) Component->SetMaterial(0, Desired);
         }
     }
@@ -1156,6 +1202,11 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
 
 // Replaces one static mesh queued by Apply with its version with Lumen cards (and Nanite data) once that build has
 // finished. Both must be attached before a mesh's GPU resources exist, so that version is a second static mesh.
+// Interactive hosts' first-pass meshes (Apply): their estimated GPU memory, in MB.
+static TAutoConsoleVariable<int32> CVarFirstPassMemory(
+    TEXT("r.HdUE.InteractiveFirstPassMemory"), 2048,
+    TEXT("Interactive hosts: estimated GPU memory (MB) of the full-resolution meshes drawn while their Lumen cards and "
+         "Nanite data build in the background; meshes beyond it appear when their build is done. 0: none."));
 // UE's Editor.AsyncAssetCompilationMaxMemoryUsage for hdUE's background mesh builds (UE's applies to the editor only).
 static TAutoConsoleVariable<int32> CVarMeshBuildMaxMemoryUsage(
     TEXT("r.HdUE.MeshBuildMaxMemoryUsage"), 0,
@@ -1168,6 +1219,7 @@ void FHdueScene::TickConversions() {
     // AssetCompilingManager.cpp, editor-only): an estimate of 7 times the source mesh (UStaticMesh::
     // GetBuildRequiredMemoryEstimate, StaticMesh.cpp) against the available physical and virtual memory less 64 MB,
     // with builds already started (or finished and waiting to be swapped in) holding theirs.
+    ConversionsBusy |= PendingStatic.Num() || RetiredBuilds.Num();
     RetiredBuilds.RemoveAll([&](const FPendingStatic& Retired) {
         if (!Retired.Task.IsCompleted()) return false;
         ReservedMemory -= Retired.Memory;
@@ -1197,6 +1249,7 @@ void FHdueScene::TickConversions() {
     for (auto It = PendingStatic.CreateIterator(); It; ++It) {
         if (!It.Value().Task.IsValid() || !It.Value().Task.IsCompleted()) continue;  // queued or not built yet
         ReservedMemory -= It.Value().Memory;
+        QuickMemory -= It.Value().QuickMemory;  // released with the first-pass mesh it replaces
         // Every mesh of the key draws the one converted mesh, as offline hosts share it (Apply).
         TArray<UStaticMeshComponent*> Components;
         for (const FString& Id : It.Value().Ids) {
@@ -1222,11 +1275,36 @@ void FHdueScene::TickConversions() {
         ++Tried;
         if (Built->HasValidNaniteData()) ++NaniteMeshes;
         if (Tried % 50 == 1 || PendingStatic.Num() == 1)
-            UE_LOG(LogTemp, Display, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes,
-                   Tried);
+            UE_LOG(LogTemp, Log, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
         for (UStaticMeshComponent* Component : Components) Component->SetStaticMesh(Built);
+        ++SwappedBuilds;
+        SwappedMeshes += Components.Num();
         It.RemoveCurrent();
         return;  // one per tick keeps frames smooth
+    }
+    if (!ConversionsBusy || PendingStatic.Num() || RetiredBuilds.Num()) return;
+    // All builds done: every generated static mesh should now draw its key's converted mesh (SharedMeshes holds only
+    // those here), and no memory stays reserved.
+    ConversionsBusy = false;
+    TSet<const UStaticMesh*> Converted;
+    for (const auto& [Key, Mesh] : SharedMeshes) Converted.Add(Mesh.Get());
+    int32 Generated = 0, Unconverted = 0;
+    for (const auto& [Id, Actor] : Actors) {
+        const auto* Component = IsValid(Actor) ? Cast<UStaticMeshComponent>(Actor->GetRootComponent()) : nullptr;
+        const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+        if (!Mesh || Mesh->GetOuter() != GetTransientPackage()) continue;  // a native asset
+        ++Generated;
+        Unconverted += !Converted.Contains(Mesh);
+    }
+    const FString Summary = FString::Printf(
+        TEXT("hdUE conversions done: %d builds swapped into %d meshes, %d dropped and %d shrunk by edits while they "
+             "ran, %d dropped and %d shrunk while queued; %d of %d generated meshes unconverted; %lld bytes reserved"),
+        SwappedBuilds, SwappedMeshes, DroppedBuilds, ShrunkBuilds, QueuedDropped, QueuedShrunk, Unconverted, Generated,
+        ReservedMemory);
+    if (Unconverted || ReservedMemory) {
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *Summary);
+    } else {
+        UE_LOG(LogTemp, Log, TEXT("%s"), *Summary);
     }
 }
 
@@ -1591,8 +1669,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // (UUsdAssetCache3, keyed by a hash of the mesh: USDGeomMeshTranslator.cpp): NVIDIA's Da Vinci Workshop references
     // the same assets thousands of times without USD instancing, and each copy held its own render data, Nanite pages
     // and ray-tracing geometry. Keys are hashed on all cores; the first mesh of a key in the batch builds it, the
-    // others (and later batches, while it lives) reuse it. Interactive hosts share a batch's quick mesh and run
-    // one background conversion per key (PendingStatic), which TickConversions swaps into every mesh of the key.
+    // others (and later batches, while it lives) reuse it. Interactive hosts run one background conversion per key
+    // (PendingStatic), whose first pass every mesh of the key draws meanwhile, and which TickConversions swaps into
+    // every mesh of the key.
     for (auto It = SharedMeshes.CreateIterator(); It; ++It)
         if (!It.Value().IsValid()) {
             NaniteFits(It.Key(), nullptr);  // its root pages are back once UE has destroyed it
@@ -1613,9 +1692,37 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     {
         TSet<FString> Claimed;
         for (int32 Index = 0; Index < Keys.Num(); ++Index) {
-            bool Seen = Keys[Index].IsEmpty() || SharedMeshes.Contains(Keys[Index]);
+            // A key whose background build is pending (interactive) keeps its first pass for later batches too.
+            bool Seen =
+                Keys[Index].IsEmpty() || SharedMeshes.Contains(Keys[Index]) || PendingStatic.Contains(Keys[Index]);
             if (!Seen) Claimed.Add(Keys[Index], &Seen);
             Build[Index] = !Seen;
+        }
+    }
+    // Interactive hosts draw a first-pass static mesh (no cards, no Nanite) while a key's background build runs,
+    // smallest meshes first, while the first passes' estimated GPU memory stays under
+    // r.HdUE.InteractiveFirstPassMemory. The others draw nothing until their build swaps in, as UE draws no static mesh
+    // while it compiles (UStaticMeshComponent::ShouldCreateRenderState, StaticMeshComponent.cpp). Full-resolution first
+    // passes of NVIDIA's Da Vinci Workshop (553M vertices) needed more than the GPU has, and Windows charges D3D12
+    // allocations to the process's commit.
+    TArray<int64> FirstPass;  // estimated bytes of the meshes that get one
+    FirstPass.Init(0, Batch.mesh_count);
+    if (Interactive) {
+        TArray<int32> Smallest;
+        for (int32 Index = 0; Index < Build.Num(); ++Index)
+            if (Build[Index]) Smallest.Add(Index);
+        Smallest.Sort([&](int32 A, int32 B) { return Batch.meshes[A].index_count < Batch.meshes[B].index_count; });
+        const int64 Budget = int64(CVarFirstPassMemory.GetValueOnGameThread()) << 20;
+        for (const int32 Index : Smallest) {
+            const auto& Desc = Batch.meshes[Index];
+            // Per vertex: position, tangents, 4 half-float UVs and colour (BuildStatic: a vertex per corner without
+            // normals), plus 32-bit indices; doubled for the ray-tracing geometry and upload copies. Plus one: nonzero
+            // marks the meshes that get one, empty ones included.
+            const int64 Bytes =
+                2 * (40 * int64(Desc.normals ? Desc.vertex_count : Desc.index_count) + 4 * int64(Desc.index_count)) + 1;
+            if (QuickMemory + Bytes > Budget) break;  // sorted: the larger ones do not fit either
+            QuickMemory += Bytes;
+            FirstPass[Index] = Bytes;
         }
     }
     TMap<FString, UStaticMesh*> BatchBuilt;  // static meshes built in this batch, for its other meshes of the key
@@ -1637,6 +1744,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 (!Keys[Index].IsEmpty() && !Build[Index]))
                 return;
             if (StaticGenerated(Desc)) {
+                if (Interactive && !FirstPass[Index]) return;
                 StaticData[Index] = BuildStatic(Desc, !Interactive);
                 if (NaniteMeshes && !Interactive && !Translucent[Index])  // Nanite draws opaque and masked only
                     StaticData[Index].Nanite = BuildNanite(Desc, StaticData[Index].Fallback);
@@ -1701,7 +1809,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Error = TEXT("Native asset has no cooked Nanite data.");
                 return false;
             }
-            UE_LOG(LogTemp, Display, TEXT("hdUE native mesh %s: NaniteData=%d"), *Mesh->GetPathName(),
+            UE_LOG(LogTemp, Log, TEXT("hdUE native mesh %s: NaniteData=%d"), *Mesh->GetPathName(),
                    Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
@@ -1709,10 +1817,17 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             if (!Static || PendingKeys.FindRef(Id) != Keys[Index]) ForgetPending(Id);
             if (Static) {
                 const FString& Key = Keys[Index];
+                if (Translucent[Index])
+                    TranslucentStatic.Add(Id);
+                else
+                    TranslucentStatic.Remove(Id);
                 UStaticMesh* Built = BatchBuilt.FindRef(Key);
-                const bool Converted = !Built && !Build[Index];  // a finished shared mesh (SharedMeshes)
-                if (Converted) Built = SharedMeshes.FindRef(Key).Get();
-                if (!Built) {
+                FPendingStatic* Pending = Interactive ? PendingStatic.Find(Key) : nullptr;
+                if (!Built && Pending)
+                    Built = Pending->Quick.Get();  // the key's build is queued or running: its first pass, if any
+                else if (!Built && !Build[Index])
+                    Built = SharedMeshes.FindRef(Key).Get();  // a finished shared mesh
+                if (!Built && Build[Index] && (!Interactive || FirstPass[Index])) {
                     // Static meshes belong to no actor: the components that draw them keep them alive.
                     Built = NewStaticMesh(GetTransientPackage());
                     // Nanite draws opaque and masked materials only.
@@ -1729,10 +1844,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     InstanceMesh = Built;
                 else
                     Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-                if (Interactive && !Converted && PendingStatic.Contains(Key)) {
-                    PendingStatic[Key].Ids.Add(Id);  // the key's build is queued or running: it swaps in here too
+                if (Pending) {
+                    Pending->Ids.Add(Id);  // the key's build swaps in here too
                     PendingKeys.Add(Id, Key);
-                } else if (Interactive && !Converted) {
+                } else if (Interactive && Build[Index]) {
                     // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s). TickConversions starts them.
@@ -1741,7 +1856,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const int64 Source = Copy->Positions.GetAllocatedSize() + Copy->Normals.GetAllocatedSize() +
                                          Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
                                          Copy->Indices.GetAllocatedSize();
-                    PendingStatic.Add(Key, {Copy, 7 * Source, {}, Translucent[Index], {Id}});
+                    PendingStatic.Add(Key, {Copy, 7 * Source, {}, Translucent[Index], {Id}, Built, FirstPass[Index]});
                     PendingKeys.Add(Id, Key);
                 }
             } else
@@ -1782,7 +1897,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     const double MeshesDone = FPlatformTime::Seconds();
     BindMaterials();
     if (Batch.material_count || Batch.mesh_count)
-        UE_LOG(LogTemp, Display,
+        UE_LOG(LogTemp, Log,
                TEXT("hdUE apply: %u materials %.0f ms (%d textures: prepare %.0f ms, create %.0f ms), %u meshes %.0f "
                     "ms, bind %.0f ms"),
                Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, PrepareSeconds * 1000,

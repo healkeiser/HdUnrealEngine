@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from prepare_substrate import publish
-from substrate_graph import signature
+from substrate_graph import COMPILER_VERSION, signature
 from substrate_live import LivePreparation
 
 
@@ -75,7 +75,7 @@ class LiveTests(unittest.TestCase):
                 json.dumps(dict(inline_shader_code=True))
             )
             (active["output"] / "library.json").write_text(
-                json.dumps(dict(compiler=2, materials=[entry]))
+                json.dumps(dict(compiler=COMPILER_VERSION, materials=[entry]))
             )
             active["process"].code = 0
             manager.tick()
@@ -174,7 +174,7 @@ class LiveTests(unittest.TestCase):
                 (source / name).write_bytes(b"owned fixture")
             library = dict(
                 version=1,
-                compiler=2,
+                compiler=COMPILER_VERSION,
                 materials=[
                     dict(
                         asset=destination + "/M.M",

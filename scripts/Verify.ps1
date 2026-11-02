@@ -38,8 +38,8 @@ $HydraMetrics = Read-Passed (Join-Path $Hydra 'metrics.json')
 & uv run --quiet (Join-Path $PSScriptRoot 'compare_pfm.py') (Join-Path $Native 'cycle-0-pathtraced.pfm') (Join-Path $Hydra 'cycle-0-pathtraced.pfm') --output (Join-Path $RunRoot 'reference-comparison.json')
 if ($LASTEXITCODE) { throw "Native UE versus Hydra image comparison failed. Evidence: $RunRoot" }
 if ($WithUsdview) {
-    Invoke-Step usdview { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'usdview') }
-    Invoke-Step camera { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check camera -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera') }
+    Invoke-Step usdview-step { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'usdview') }
+    Invoke-Step camera-step { & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check camera -OpenUsdRoot $OpenUsdRoot -OutputDirectory (Join-Path $RunRoot 'camera') }
     Invoke-Step buffer { & (Join-Path $PSScriptRoot 'Test-BufferPerf.ps1') -OpenUsdRoot $OpenUsdRoot -OutputFile (Join-Path $RunRoot 'buffer.json') }
     # These suites check their own counts and throw; their evidence must exist.
     foreach ($File in 'usdview\verified.json', 'camera\verified.json', 'buffer.json') {

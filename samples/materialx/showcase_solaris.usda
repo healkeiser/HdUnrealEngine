@@ -421,9 +421,10 @@ def Xform "MaterialXShowcase"
             }
         }
 
-        def Material "SS_Metal"
+        def Material "SS_Metal" (
+            prepend references = @standard_surface.mtlx@</MaterialX/Materials/SS_Metal>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/SS_Metal/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/SS_Metal/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -434,23 +435,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @standard_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Metal"
-                float inputs:base = 0.9
-                color3f inputs:base_color = (0.7, 0.27, 0.07)
-                float inputs:metalness = 0.95
-                float inputs:specular_roughness = 0.32
-                token outputs:surface
-            }
         }
 
-        def Material "SS_Anisotropy"
+        def Material "SS_Anisotropy" (
+            prepend references = @standard_surface.mtlx@</MaterialX/Materials/SS_Anisotropy>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/SS_Anisotropy/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/SS_Anisotropy/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -461,24 +451,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @standard_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Anisotropy"
-                float inputs:base = 0.9
-                color3f inputs:base_color = (0.7, 0.27, 0.07)
-                float inputs:metalness = 0.95
-                float inputs:specular_anisotropy = 0.8
-                float inputs:specular_roughness = 0.32
-                token outputs:surface
-            }
         }
 
-        def Material "SS_Glass"
+        def Material "SS_Glass" (
+            prepend references = @standard_surface.mtlx@</MaterialX/Materials/SS_Glass>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/SS_Glass/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/SS_Glass/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -489,27 +467,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @standard_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Glass"
-                float inputs:base = 0.9
-                color3f inputs:base_color = (0.35, 0.08, 0.04)
-                float inputs:metalness = 0.02
-                float inputs:specular_IOR = 1.45
-                float inputs:specular_roughness = 0.07
-                float inputs:transmission = 0.98
-                color3f inputs:transmission_color = (0.45, 0.8, 0.95)
-                float inputs:transmission_depth = 20
-                token outputs:surface
-            }
         }
 
-        def Material "SS_Subsurface"
+        def Material "SS_Subsurface" (
+            prepend references = @standard_surface.mtlx@</MaterialX/Materials/SS_Subsurface>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/SS_Subsurface/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/SS_Subsurface/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -520,27 +483,13 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @standard_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Subsurface"
-                float inputs:base = 0.9
-                color3f inputs:base_color = (0.35, 0.08, 0.04)
-                float inputs:metalness = 0.02
-                float inputs:specular_roughness = 0.32
-                float inputs:subsurface = 0.85
-                color3f inputs:subsurface_color = (0.85, 0.25, 0.08)
-                color3f inputs:subsurface_radius = (1, 0.4, 0.15)
-                float inputs:subsurface_scale = 3
-                token outputs:surface
-            }
         }
 
-        def Material "SS_Coat"
+        def Material "SS_Coat" (
+            prepend references = @standard_surface.mtlx@</MaterialX/Materials/SS_Coat>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/SS_Coat/MaterialX.outputs:surface>
+            string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/Standard/warm_png.warm_png"
             token outputs:surface.connect = </MaterialXShowcase/Looks/SS_Coat/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -551,25 +500,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @standard_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Coat"
-                float inputs:base = 0.9
-                float inputs:coat = 0.9
-                float inputs:coat_roughness = 0.07
-                string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/Standard/warm_png.warm_png"
-                float inputs:metalness = 0.02
-                float inputs:specular_roughness = 0.32
-                token outputs:surface
-            }
         }
 
-        def Material "OP_Metal"
+        def Material "OP_Metal" (
+            prepend references = @open_pbr_surface.mtlx@</MaterialX/Materials/OP_Metal>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/OP_Metal/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/OP_Metal/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -580,23 +516,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @open_pbr_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "OP_Metal"
-                color3f inputs:base_color = (0.7, 0.27, 0.07)
-                float inputs:base_metalness = 0.95
-                float inputs:base_weight = 0.9
-                float inputs:specular_roughness = 0.32
-                token outputs:surface
-            }
         }
 
-        def Material "OP_Anisotropy"
+        def Material "OP_Anisotropy" (
+            prepend references = @open_pbr_surface.mtlx@</MaterialX/Materials/OP_Anisotropy>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/OP_Anisotropy/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/OP_Anisotropy/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -607,24 +532,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @open_pbr_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "OP_Anisotropy"
-                color3f inputs:base_color = (0.7, 0.27, 0.07)
-                float inputs:base_metalness = 0.95
-                float inputs:base_weight = 0.9
-                float inputs:specular_roughness = 0.32
-                float inputs:specular_roughness_anisotropy = 0.8
-                token outputs:surface
-            }
         }
 
-        def Material "OP_Glass"
+        def Material "OP_Glass" (
+            prepend references = @open_pbr_surface.mtlx@</MaterialX/Materials/OP_Glass>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/OP_Glass/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/OP_Glass/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -635,27 +548,12 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @open_pbr_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "OP_Glass"
-                color3f inputs:base_color = (0.35, 0.08, 0.04)
-                float inputs:base_metalness = 0.02
-                float inputs:base_weight = 0.9
-                float inputs:specular_ior = 1.45
-                float inputs:specular_roughness = 0.07
-                color3f inputs:transmission_color = (0.45, 0.8, 0.95)
-                float inputs:transmission_depth = 20
-                float inputs:transmission_weight = 0.98
-                token outputs:surface
-            }
         }
 
-        def Material "OP_Subsurface"
+        def Material "OP_Subsurface" (
+            prepend references = @open_pbr_surface.mtlx@</MaterialX/Materials/OP_Subsurface>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/OP_Subsurface/MaterialX.outputs:surface>
             token outputs:surface.connect = </MaterialXShowcase/Looks/OP_Subsurface/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -666,26 +564,13 @@ def Xform "MaterialXShowcase"
                 float inputs:roughness = 0.45
                 token outputs:surface
             }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @open_pbr_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "OP_Subsurface"
-                color3f inputs:base_color = (0.35, 0.08, 0.04)
-                float inputs:base_metalness = 0.02
-                float inputs:base_weight = 0.9
-                float inputs:specular_roughness = 0.32
-                color3f inputs:subsurface_color = (0.85, 0.25, 0.08)
-                float inputs:subsurface_radius = 3
-                float inputs:subsurface_weight = 0.85
-                token outputs:surface
-            }
         }
 
-        def Material "OP_Coat"
+        def Material "OP_Coat" (
+            prepend references = @open_pbr_surface.mtlx@</MaterialX/Materials/OP_Coat>
+        )
         {
-            token outputs:mtlx:surface.connect = </MaterialXShowcase/Looks/OP_Coat/MaterialX.outputs:surface>
+            string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/OpenPBR/cool_png.cool_png"
             token outputs:surface.connect = </MaterialXShowcase/Looks/OP_Coat/Preview.outputs:surface>
 
             def Shader "Preview"
@@ -694,20 +579,6 @@ def Xform "MaterialXShowcase"
                 color3f inputs:diffuseColor = (0.7, 0.27, 0.07)
                 float inputs:metallic = 0.02
                 float inputs:roughness = 0.45
-                token outputs:surface
-            }
-
-            def Shader "MaterialX"
-            {
-                uniform token info:implementationSource = "sourceAsset"
-                uniform asset info:mtlx:sourceAsset = @open_pbr_surface.mtlx@
-                uniform token info:mtlx:sourceAsset:subIdentifier = "OP_Coat"
-                float inputs:base_metalness = 0.02
-                float inputs:base_weight = 0.9
-                float inputs:coat_roughness = 0.07
-                float inputs:coat_weight = 0.9
-                string inputs:unreal:base_color_texture = "/Game/HdUE/MaterialX/OpenPBR/cool_png.cool_png"
-                float inputs:specular_roughness = 0.32
                 token outputs:surface
             }
         }
@@ -730,9 +601,9 @@ def Xform "MaterialXShowcase"
 
     def RectLight "Key"
     {
+        float inputs:exposure = 13.14
         float inputs:height = 150
         float inputs:intensity = 1
-        float inputs:exposure = 13.14
         float inputs:width = 300
         matrix4d xformOp:transform = ( (0.8137334712067349, -0.5812381937190964, 2.7755575615628907e-17, 0), (0.37607967367983214, 0.5265115431517651, 0.7624629000632213, 0), (-0.4431725588105707, -0.620441582334799, 0.6470319358634333, 0), (-250, -350, 500, 1) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )
@@ -741,9 +612,9 @@ def Xform "MaterialXShowcase"
 
     def RectLight "Fill"
     {
+        float inputs:exposure = 12.14
         float inputs:height = 250
         float inputs:intensity = 1
-        float inputs:exposure = 12.14
         float inputs:width = 150
         matrix4d xformOp:transform = ( (0.4061384660534475, 0.9138115486202569, 0, 0), (-0.20781069222970558, 0.09236030765764694, 0.9737988959556252, -0), (0.8898686771579066, -0.39549718984795856, 0.22741088416257615, 0), (449.99999999999994, -200, 249.99999999999994, 0.9999999999999998) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )
@@ -752,8 +623,8 @@ def Xform "MaterialXShowcase"
 
     def DistantLight "AnisotropyKey"
     {
-        float inputs:intensity = 1
         float inputs:exposure = 1
+        float inputs:intensity = 1
         bool inputs:normalize = 1
         matrix4d xformOp:transform = ( (0.8137334712067349, -0.5812381937190964, 2.7755575615628907e-17, 0), (0.37607967367983214, 0.5265115431517651, 0.7624629000632213, 0), (-0.4431725588105707, -0.620441582334799, 0.6470319358634333, 0), (-250, -350, 500, 1) )
         matrix4d xformOp:transform:hdueSolarisSpacePost = ( (0, 0, -0.01, 0), (-0.01, 0, 0, 0), (0, 0.01, -0, 0), (0, 0, -0, 1) )

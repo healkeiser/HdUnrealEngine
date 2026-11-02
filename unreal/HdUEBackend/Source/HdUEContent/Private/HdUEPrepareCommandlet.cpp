@@ -1,4 +1,5 @@
 #include "HdUEPrepareCommandlet.h"
+#include "IdSwitch.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -135,49 +136,6 @@ UTexture2D* CreateLinearWhite() {
     Texture->PostEditChange();
     return SaveAsset(Texture) ? Texture : nullptr;
 }
-// The ID passes' emission (HDUE_AOV_PRIM_ID): custom primitive data 0..2, set per component to the encoded Hydra
-// prim ID; with custom primitive data 4 set (instance pass), the instance's Hydra instanceId from per-instance custom
-// data 3 in the same encoding (exact in the float16 readback: both halves stay below 2048).
-template <class FAdd>
-UMaterialExpression* IdEmission(UMaterial* Material, const FAdd& Add) {
-    auto* Id = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
-    Id->ParameterName = TEXT("HdUEId");
-    Id->DefaultValue = FLinearColor(0, 0, 0, 0);
-    Id->bUseCustomPrimitiveData = true;
-    Id->PrimitiveDataIndex = 0;
-    auto* InstanceMode = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
-    InstanceMode->ParameterName = TEXT("HdUEInstanceMode");
-    InstanceMode->DefaultValue = 0.f;
-    InstanceMode->bUseCustomPrimitiveData = true;
-    InstanceMode->PrimitiveDataIndex = 4;
-    auto* Instance = Add(NewObject<UMaterialExpressionPerInstanceCustomData>(Material));
-    Instance->DataIndex = 3;
-    Instance->ConstDefaultValue = -1.f;
-    auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
-    Scaled->A.Connect(0, Instance);
-    Scaled->ConstB = 2048.f;
-    auto* High = Add(NewObject<UMaterialExpressionFloor>(Material));
-    High->Input.Connect(0, Scaled);
-    auto* HighScaled = Add(NewObject<UMaterialExpressionMultiply>(Material));
-    HighScaled->A.Connect(0, High);
-    HighScaled->ConstB = 2048.f;
-    auto* Low = Add(NewObject<UMaterialExpressionSubtract>(Material));
-    Low->A.Connect(0, Instance);
-    Low->B.Connect(0, HighScaled);
-    auto* HighLow = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    HighLow->A.Connect(0, High);
-    HighLow->B.Connect(0, Low);
-    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
-    One->R = 1.f;
-    auto* Encoded = Add(NewObject<UMaterialExpressionAppendVector>(Material));
-    Encoded->A.Connect(0, HighLow);
-    Encoded->B.Connect(0, One);
-    auto* Select = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
-    Select->A.Connect(0, Id);
-    Select->B.Connect(0, Encoded);
-    Select->Alpha.Connect(0, InstanceMode);
-    return Select;
-}
 // Surface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar inputs then dot
 // <Slot>Mask), so an untextured input is Scale 0, Bias constant. Preview Surface masters shade
 // one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
@@ -196,7 +154,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     };
     if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
         Material->TwoSided == TwoSided &&
-        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion4") : TEXT("PreviewSurfaceVersion6")) &&
+        HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion6") : TEXT("PreviewSurfaceVersion6")) &&
         Material->bUsedWithNanite)
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
@@ -359,7 +317,7 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     // the function's "Refraction (IOR)").
     const bool Transmissive = Layered && Blend == BLEND_TranslucentColoredTransmittance;
     if (Layered) {
-        Scalar(TEXT("StandardSurfaceVersion4"),
+        Scalar(TEXT("StandardSurfaceVersion6"),
                1.f);  // unconnected marker: bump the name when this graph changes, to regenerate
         auto* Call = Add(NewObject<UMaterialExpressionMaterialFunctionCall>(Material));
         Call->SetMaterialFunction(LoadObject<UMaterialFunction>(
@@ -530,6 +488,11 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     Material->bUsedWithInstancedStaticMeshes = true;
     Material->bUsedWithNanite = true;  // runtime-built Nanite meshes (Scene.cpp BuildNanite)
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
+    // The Preview Surface masters carry their ID slab above; UE's standard_surface function gets its inputs switched.
+    if (Layered && !HdUEAddIdSwitch(Material)) {
+        UE_LOG(LogTemp, Error, TEXT("%s: no ID switch for UE's standard_surface function"), Name);
+        return nullptr;
+    }
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
@@ -584,8 +547,8 @@ UMaterial* CreateAovMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
-// ID pass material: unlit IdEmission. The backend swaps it onto meshes whose materials have no HdUEIdPass switch
-// (native assets, Standard Surface and MaterialX materials).
+// ID pass material: unlit IdEmission. The backend swaps it onto meshes whose materials have no HdUEIdPass switch:
+// native assets, and prepared graphs HdUEAddIdSwitch cannot switch.
 UMaterial* CreateIdMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEId");
     UPackage* Package = CreatePackage(*Path);
@@ -783,7 +746,9 @@ UMaterial* CreateGlass() {
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_Glass.M_Glass"), nullptr, LOAD_NoWarn);
     if (Material && Material->HasSubstrateFrontMaterialConnected()) {
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
-            if (Cast<UMaterialExpressionPathTracingQualitySwitch>(Expression)) return Material;
+            if (const auto* Switch = Cast<UMaterialExpressionScalarParameter>(Expression);
+                Switch && Switch->ParameterName == TEXT("HdUEIdPass"))  // the newest graph: ID switch
+                return Material;
     }
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_Glass"), RF_Public | RF_Standalone);
     Material->PreEditChange(nullptr);
@@ -857,6 +822,7 @@ UMaterial* CreateGlass() {
     Material->RefractionMethod = RM_IndexOfRefraction;
     Material->bIsThinSurface = false;
     Material->TwoSided = true;
+    if (!HdUEAddIdSwitch(Material)) return nullptr;
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }

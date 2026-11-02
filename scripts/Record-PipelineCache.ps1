@@ -11,7 +11,8 @@ param(
     [string]$InputUsd = '',
     [string]$CameraPath = '/Camera',
     [int]$HoudiniSeconds = 90,
-    [switch]$SkipCook
+    [switch]$SkipCook,
+    [switch]$SkipConformance
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
@@ -39,7 +40,9 @@ $Bundled = Join-Path $Game 'Content\PipelineCaches'
 $SetAside = Join-Path $RunRoot 'staged-PipelineCaches'
 if (Test-Path -LiteralPath $Bundled) { Move-Item -LiteralPath $Bundled -Destination $SetAside }
 try {
-    Add-Content -LiteralPath $Ini -Value "`r`n[SystemSettings]`r`nr.ShaderPipelineCache.LogPSO=1`r`nr.ShaderPipelineCache.SaveBoundPSOLog=1"
+    # AutoSaveTimeBoundPSO: husk ends its process without shutting UE down, so its recording is saved while it renders
+    # (UE leaves this autosave off by default since it can deadlock on CPUs with few cores; recording only).
+    Add-Content -LiteralPath $Ini -Value "`r`n[SystemSettings]`r`nr.ShaderPipelineCache.LogPSO=1`r`nr.ShaderPipelineCache.SaveBoundPSOLog=1`r`nr.ShaderPipelineCache.AutoSaveTimeBoundPSO=1"
     $Common = @{ OpenUsdRoot = $OpenUsdRoot; RuntimeConfig = $RuntimeConfig; Mode = 'both'; Cycles = 1 }
     & (Join-Path $PSScriptRoot 'Test-Backend.ps1') -RuntimeConfig $RuntimeConfig -Mode both -Cycles 1 -OutputDirectory (Join-Path $RunRoot 'backend')
     & (Join-Path $PSScriptRoot 'Test-Hydra.ps1') @Common -SelfTest -OutputDirectory (Join-Path $RunRoot 'hydra-selftest')
@@ -73,6 +76,75 @@ threading.Timer($HoudiniSeconds, lambda: hdefereval.executeDeferred(lambda: hou.
         finally { $env:HOUDINI_PATH = $PreviousPath }
         $Houdini = Get-Process -Id ([regex]::Match("$Launch", 'Houdini PID (\d+)').Groups[1].Value)
         if (-not $Houdini.WaitForExit(($HoudiniSeconds + 120) * 1000)) { $Houdini.Kill(); throw "Houdini (PID $($Houdini.Id)) did not quit; killed it." }
+        # The viewport's other profiles: the in-Houdini tests render realtime and Path Tracer frames, the ID passes
+        # behind Solaris's selection (the Cornell box through its camera too), camera moves (the interactive
+        # resolution), native assets, post-process settings, shared mesh builds and a resize, each quitting Houdini.
+        # The runs Test-Houdini.ps1 makes; a failed check only warns: the recording is what counts here.
+        $Smoke = Join-Path $TaskRoot 'samples\smoke.usda'
+        $Runs = @(
+            @{ Kind = 'integration'; Usd = $Smoke }, @{ Kind = 'postprocess'; Usd = $Smoke }, @{ Kind = 'shared-builds'; Usd = $Smoke },
+            @{ Kind = 'selection'; Usd = (Join-Path $TaskRoot 'tests\houdini\selection.usda'); Camera = ''; Select = '/World/Cube,/World/Mesh' },
+            @{ Kind = 'selection'; Name = 'selection-cornell'; Usd = (Join-Path $TaskRoot 'samples\cornell\cornell.usda'); Camera = '/cornell_box/camera'; Select = '/cornell_box/tall_box_front/tall_box_front' })
+        # NVIDIA DLSS (off by default, as in the plugin; users turn it on): its passes, with and without Ray
+        # Reconstruction, when the runtime has the plugin.
+        $Dlss = Test-Path -LiteralPath (Join-Path $Game 'Plugins\DLSS\DLSS.uplugin')
+        if ($Dlss) { $Runs += @{ Kind = 'dlss'; Usd = $Smoke } }
+        # Cooked MaterialX materials (Test-HoudiniReferences.ps1) and the wet surface layer (-TestKind surfaces), when a
+        # library has been imported.
+        $Library = Join-Path $TaskRoot 'out\materialx\library.json'
+        if (Test-Path -LiteralPath $Library) {
+            $Runs += @{ Kind = 'references'; Usd = (Join-Path $TaskRoot 'samples\materialx\showcase_solaris.usda'); Library = $Library }
+            $Runs += @{ Kind = 'surfaces'; Usd = (Join-Path $TaskRoot 'samples\wet_surface\showcase.usda'); Library = $Library }
+        }
+        foreach ($Run in $Runs) {
+            $env:HDUE_TEST_CAMERA = $Run.Camera
+            $env:HDUE_TEST_SELECT = $Run.Select
+            try {
+                $Extra = if ($Run.Library) { @{ MaterialXLibrary = $Run.Library } } else { @{} }
+                & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $HoudiniRuntimeConfig -InputUsd $Run.Usd -TestKind $Run.Kind `
+                    -LogDirectory (Join-Path $RunRoot "houdini-$(if ($Run.Name) { $Run.Name } else { $Run.Kind })") @Extra
+            }
+            catch { Write-Warning "$($Run.Kind) test: $_ (its PSOs are recorded anyway)" }
+            finally { Remove-Item Env:HDUE_TEST_CAMERA, Env:HDUE_TEST_SELECT -ErrorAction SilentlyContinue }
+        }
+        # husk: the scene's own render products (render vars, AOVs) in both modes; three frames, so the last PSOs
+        # bound get saved (AutoSaveTimeBoundPSO) before husk ends.
+        if ($InputUsd) {
+            $HoudiniRoot = Get-HdUELocalPath -Key houdini_root
+            $Names = 'HOUDINI_PATH', 'PXR_PLUGINPATH_NAME', 'HDUE_RUNTIME_CONFIG'
+            $Saved = @{}; foreach ($Name in $Names) { $Saved[$Name] = [Environment]::GetEnvironmentVariable($Name, 'Process') }
+            try {
+                $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;&"
+                $env:PXR_PLUGINPATH_NAME = Join-Path (Get-HdUELocalPath -Key houdini_build_root) 'resources'
+                $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($HoudiniRuntimeConfig)
+                # The mode is set on the scene's render settings prim (renderSettingsPrimPath), as run_conformance.py does.
+                $Settings = (Get-Content -LiteralPath $InputUsd -TotalCount 40 | Select-String 'renderSettingsPrimPath = "([^"]+)"').Matches
+                if (-not $Settings) { throw "$InputUsd names no renderSettingsPrimPath for husk." }
+                $Prims = $Settings[0].Groups[1].Value.Trim('/') -split '/'
+                foreach ($Variant in @('realtime', 'pathtraced') + $(if ($Dlss) { 'realtime-dlss' })) {
+                    $Mode = $Variant -replace '-dlss$'
+                    $Out = Join-Path $RunRoot "husk-$Variant"
+                    New-Item -ItemType Directory -Force -Path $Out | Out-Null
+                    $Root = Join-Path $Out 'root.usda'
+                    $Lines = @('#usda 1.0', '(', "    renderSettingsPrimPath = `"$($Settings[0].Groups[1].Value)`"",
+                        "    subLayers = [@$(([IO.Path]::GetFullPath($InputUsd)) -replace '\\', '/')@]", ')')
+                    foreach ($Prim in $Prims) { $Lines += "over `"$Prim`"", '{' }
+                    $Lines += "token unreal:renderMode = `"$Mode`""
+                    if ($Variant -ne $Mode) { $Lines += 'int unreal:cvar:r:NGX:DLSS:Enable = 1' }
+                    foreach ($Prim in $Prims) { $Lines += '}' }
+                    Set-Content -LiteralPath $Root -Encoding utf8 -Value $Lines
+                    & (Join-Path $HoudiniRoot 'bin\husk.exe') --renderer HdUnrealEngine -f 1 -n 3 -o (Join-Path $Out 'frame.$F4.exr') $Root *> (Join-Path $Out 'husk.log')
+                    if ($LASTEXITCODE) { throw "husk ($Variant) failed; see $Out\husk.log." }
+                }
+            }
+            finally { foreach ($Name in $Names) { [Environment]::SetEnvironmentVariable($Name, $Saved[$Name], 'Process') } }
+        }
+        # The conformance set (samples/conformance, both modes through husk, about an hour): the USD features hdUE
+        # renders. Its checks only report here; -SkipConformance leaves it out.
+        if (-not $SkipConformance) {
+            & (Join-Path (Get-HdUELocalPath -Key houdini_root) 'bin\hython.exe') (Join-Path $PSScriptRoot 'run_conformance.py') `
+                --runtime-config ([IO.Path]::GetFullPath($HoudiniRuntimeConfig)) *> (Join-Path $RunRoot 'conformance.log')
+        }
     }
 }
 finally {

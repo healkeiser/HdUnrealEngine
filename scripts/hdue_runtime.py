@@ -230,8 +230,8 @@ class Runtime:
         )
         if not self.window:
             raise C.WinError(C.get_last_error())
-        # -stdout: without it UE echoes its log with wprintf, which reaches the host's console as UTF-16.
-        arguments = ("-stdout" if visible else "-stdout -RenderOffscreen") + (
+        # No -stdout: the backend echoes UE's errors and hdUE's warnings (Bridge.cpp); -stdout echoes every line.
+        arguments = ("" if visible else "-RenderOffscreen") + (
             f' -abslog="{Path(log).resolve()}"' if log else ""
         )
         project_bytes = str(Path(project).resolve()).encode("utf-8")

@@ -53,6 +53,8 @@ public:
 #endif
         try {
             return new HdUERenderDelegate(settings);
+        } catch (const HdUEStopped&) {
+            return nullptr;
         } catch (const std::exception& e) {
             TF_RUNTIME_ERROR("hdUE: %s", e.what());
             return nullptr;

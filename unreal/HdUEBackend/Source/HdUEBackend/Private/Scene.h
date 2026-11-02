@@ -68,6 +68,9 @@ public:
     ~FHdueScene();
     bool Apply(const HdueSceneBatch& Batch, FString& Error);
     void TickConversions();
+    // Interactive hosts: background builds not yet swapped in. Their meshes draw a first-pass mesh or nothing, so
+    // frames do not converge while there are any.
+    uint32 PendingConversions() const { return uint32(PendingStatic.Num()); }
     void UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up);
     HdueResult SetMaterialParameters(const HdueMaterialUpdate& Update, FString& Error);
     HdueResult GetMaterialStats(const char* Id, HdueMaterialStats& Stats, FString& Error);
@@ -96,6 +99,9 @@ private:
     TMap<FString, AActor*> Actors;
     TMap<FString, FString> MeshMaterials;
     TSet<FString> SingleSided;  // meshes sent with HDUE_MESH_SINGLE_SIDED
+    // Generated static meshes built for a translucent material, so without Nanite (Apply): UpdateMeshes asks for the
+    // geometry again when the material's blend mode no longer matches, whether the binding or the material changed.
+    TSet<FString> TranslucentStatic;
     // By material id: Base's twin on the one-sided parent (null when Base has none).
     struct FOneSided {
         UMaterialInterface* Base = nullptr;
@@ -138,6 +144,8 @@ private:
         UE::Tasks::TTask<TSharedPtr<FConversion>> Task;  // invalid while queued
         bool Translucent = false;                        // its material keeps it off Nanite
         TSet<FString> Ids;                               // the meshes of the key that receive the build
+        TWeakObjectPtr<UStaticMesh> Quick;               // what its meshes draw meanwhile: the first-pass mesh, or none
+        int64 QuickMemory = 0;  // Quick's estimated GPU memory, counted in FHdueScene::QuickMemory
     };
     // Generated static meshes by content key (MeshKey): identical meshes draw one static mesh, as UE's USD importer
     // shares assets between identical prims. Weak: components keep a shared mesh alive.
@@ -146,6 +154,13 @@ private:
     TMap<FString, FString> PendingKeys;           // mesh id -> its PendingStatic key
     TArray<FPendingStatic> RetiredBuilds;         // launched builds of removed or rebuilt meshes, finishing unused
     int64 ReservedMemory = 0;
+    int64 QuickMemory = 0;  // first-pass meshes waiting for their build (r.HdUE.InteractiveFirstPassMemory)
+    // For the log line TickConversions writes once the builds are done (the in-Houdini shared-builds test reads it):
+    // builds swapped in and the meshes that received them, launched builds dropped (every mesh of the key removed or
+    // changed) or left with fewer meshes while they ran, and the same for builds still queued for memory.
+    int32 SwappedBuilds = 0, SwappedMeshes = 0, DroppedBuilds = 0, ShrunkBuilds = 0, QueuedDropped = 0,
+          QueuedShrunk = 0;
+    bool ConversionsBusy = false;
     void ForgetPending(const FString& Id);
     // Nanite root pages of the meshes that carry Nanite data (NaniteFits): every page of a runtime mesh is a root page,
     // and UE's root pool is bounded (NaniteStreamingManager.cpp, GetMaxPagePoolSizeInMB).

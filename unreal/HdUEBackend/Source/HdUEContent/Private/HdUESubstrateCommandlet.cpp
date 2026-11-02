@@ -1,4 +1,5 @@
 #include "HdUESubstrateCommandlet.h"
+#include "IdSwitch.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialExpressionSubstrate.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
@@ -482,7 +483,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     if (!Root->TryGetObjectField(TEXT("graph"), GraphPtr) || (*GraphPtr)->GetIntegerField(TEXT("version")) != 1)
         return 2;
     auto Graph = *GraphPtr;
-    if (!Root->HasField(TEXT("compiler")) || Root->GetIntegerField(TEXT("compiler")) != 2 ||
+    if (!Root->HasField(TEXT("compiler")) || Root->GetIntegerField(TEXT("compiler")) != 3 ||
         !Root->HasTypedField<EJson::Array>(TEXT("parameters")))
         return 2;
     const FString Asset = Root->GetStringField(TEXT("asset"));
@@ -536,6 +537,11 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         return 4;
     }
     Material->GetEditorOnlyData()->FrontMaterial.Connect(Output.Index, Output.Expression);
+    // As HdUEImportMaterialX: Hydra meshes become Nanite and instancers ISMs, and a cooked runtime cannot compile usage
+    // permutations (a graph without a MaterialX base drew UE's default material).
+    Material->bUsedWithNanite = true;
+    Material->bUsedWithInstancedStaticMeshes = true;
+    const bool IdSwitch = HdUEAddIdSwitch(Material);  // false: ID passes swap this material to M_HdUEId
     Material->PostEditChange();
     FAssetCompilingManager::Get().FinishAllCompilation();
     FAssetRegistryModule::AssetCreated(Material);
@@ -548,7 +554,8 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     auto Result = MakeShared<FJsonObject>();
     Result->SetNumberField(TEXT("version"), 1);
     Result->SetStringField(TEXT("asset"), Material->GetPathName());
-    Result->SetNumberField(TEXT("compiler"), 2);
+    Result->SetNumberField(TEXT("compiler"), 3);  // 3: ID switch (IdSwitch.h)
+    Result->SetBoolField(TEXT("id_switch"), IdSwitch);
     Result->SetNumberField(TEXT("automatic_parameters"), Compiler.LiveBuilt.Num());
     Result->SetNumberField(TEXT("expressions"), Material->GetExpressions().Num());
     Result->SetBoolField(TEXT("native_substrate"), Material->HasSubstrateFrontMaterialConnected());

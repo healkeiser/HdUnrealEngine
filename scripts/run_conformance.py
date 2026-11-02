@@ -210,9 +210,12 @@ def measure(frames, probe):
             ),
         }[stat]()
     if "channel" in probe:
-        return float(pixels[..., probe["channel"]].mean())
+        # float64: a depth background at the float32 maximum overflowed a float32 sum.
+        return float(pixels[..., probe["channel"]].mean(dtype=np.float64))
     if image.ndim == 2:
-        return float(pixels.mean() if stat != "max" else pixels.max())
+        return float(
+            pixels.mean(dtype=np.float64) if stat != "max" else pixels.max()
+        )
     rgb = pixels[..., :3].astype(np.float64)
     alpha = pixels[..., 3] if pixels.shape[-1] > 3 else np.ones(rgb.shape[:-1])
     if stat == "partial":

@@ -379,11 +379,25 @@ def panel_image(target, title, doc, panels):
         )
         settings, brightness = detail
         # A line longer than the panel shrinks to fit, measured in the caption font.
-        fit = lambda line: detail_px if not line.strip() else min(
-            detail_px,
+        fit = lambda line: (
             detail_px
-            * (width - 1.2 * margin)
-            / max(TextPath((0, 0), line, size=detail_px, prop=FontProperties(family=FONTS)).get_extents().width, 1),
+            if not line.strip()
+            else min(
+                detail_px,
+                detail_px
+                * (width - 1.2 * margin)
+                / max(
+                    TextPath(
+                        (0, 0),
+                        line,
+                        size=detail_px,
+                        prop=FontProperties(family=FONTS),
+                    )
+                    .get_extents()
+                    .width,
+                    1,
+                ),
+            )
         )
         fig.text(
             *at(x + 0.6 * margin, first + 3 * detail_px),
@@ -849,7 +863,9 @@ def section(which, results, machine):
         and total.get("lumen", 0) > 0
         and total.get("pathtraced", 0) > 0
     ):
-        cells = " | ".join(f"**{duration(total[k])}**" for k, _, _, _ in present)
+        cells = " | ".join(
+            f"**{duration(total[k])}**" for k, _, _, _ in present
+        )
         summary.append(
             f"| **All {len(order)}** | {cells} | **{total[reference] / total['lumen']:.0f}x / "
             f"{total[reference] / total['pathtraced']:.0f}x** | |"

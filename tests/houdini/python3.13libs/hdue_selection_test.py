@@ -98,7 +98,19 @@ class Selection:
                 lambda: viewer.curViewport().setCamera(camera)
             )
         else:
-            hdefereval.execute_deferred(viewer.curViewport().frameAll)
+            # The geometry's bounds (UsdGeom.BBoxCache counts no camera or light): frameAll also framed the stage's
+            # camera, and the smaller objects then fell under the Sun's handle.
+            box = (
+                UsdGeom.BBoxCache(
+                    Usd.TimeCode.Default(), [UsdGeom.Tokens.default_]
+                )
+                .ComputeWorldBound(viewer.stage().GetPseudoRoot())
+                .ComputeAlignedRange()
+            )
+            bounds = hou.BoundingBox(*box.GetMin(), *box.GetMax())
+            hdefereval.execute_deferred(
+                lambda: viewer.curViewport().frameBoundingBox(bounds)
+            )
         while True:
             s = self.host.api.status()
             if s["error"]:

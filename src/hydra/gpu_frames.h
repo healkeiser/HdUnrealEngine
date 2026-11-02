@@ -12,7 +12,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 class Hgi;
-class HdUEGpuFrames {
+class HdUEGpuFrames : public std::enable_shared_from_this<HdUEGpuFrames> {
 public:
     HdUEGpuFrames(Hgi* hgi, std::shared_ptr<hdue::Backend> backend) : hgi_(hgi), backend_(std::move(backend)) {}
     // UE thread: the session the frames come from.
@@ -25,14 +25,17 @@ public:
     // viewport, as through a camera, left the highlight out).
     VtValue color(uint32_t width, uint32_t height, bool converged);
     VtValue depth() const { return depthCopied_ ? VtValue(depthTexture_) : VtValue(); }
-    // GL thread, before the delegate goes: frees the GL objects. Later calls return empty.
-    void release();
+    // GL thread, before the delegate goes: its GL objects are freed by the next delegate's frame or, when `last` (UE
+    // has shut down, so no delegate draws again), at once. Later calls return empty.
+    void release(bool last);
 
 private:
     bool supported();
     bool import(HdueGpuFrame& frame);
     void freeImports();
     void fail(const std::string& reason);
+    void freeRetired(bool now);
+    void free(bool now);
     Hgi* hgi_;
     std::shared_ptr<hdue::Backend> backend_;
     std::atomic<HdueSession> session_{0};

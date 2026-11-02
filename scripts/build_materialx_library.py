@@ -2,6 +2,7 @@
 # requires-python = ">=3.11"
 # ///
 """Build the host's MaterialX-to-cooked-asset registry from UE import receipts."""
+
 import argparse
 import hashlib
 import json
@@ -242,7 +243,7 @@ def build(reports, destination):
                             dependencies=sorted(
                                 report["dependencies_sha1"].values()
                             ),
-                            profile=1,
+                            profile=2,  # 2: ID switch (IdSwitch.h)
                             substrate=report["substrate"],
                             gbuffer=report["gbuffer_format"],
                             shader_config=report.get("shader_config", {}),

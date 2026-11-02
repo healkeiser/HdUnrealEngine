@@ -34,8 +34,8 @@
         "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
         "displayName": "VisibilityAPI purpose visibility for hdUE"
       },
-      "HdUE_HermiteCurvesAdapter": {
-        "bases": ["UsdImagingHermiteCurvesAdapter"], "primTypeName": "HermiteCurves"
+      "HdUE_HermiteCurvesAPIAdapter": {
+        "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": ""
       },
       "HdUE_LocalFogVolumeAdapter": {
         "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealLocalFogVolume"

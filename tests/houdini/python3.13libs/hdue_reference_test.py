@@ -37,10 +37,12 @@ class Test(ViewportTest):
                 + str(x)
                 + ",0,0))"
             )
-            edit.setDisplayFlag(True)
-            edit.setCurrent(True, clear_all_selected=True)
 
         move(2)
+        # Displayed once: set_mode adds a Render Settings LOP after it and displays that; displaying this LOP again
+        # would drop the Path Tracer mode.
+        edit.setDisplayFlag(True)
+        edit.setCurrent(True, clear_all_selected=True)
         viewer = integration.scene_viewer()
         viewer.setPwd(network)
         for _ in range(30):

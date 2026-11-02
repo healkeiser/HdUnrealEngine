@@ -182,6 +182,13 @@ assert not overrides().GetPrimAtPath(
 ) or not overrides().GetPrimAtPath("/Instance").HasInfo("instanceable")
 assert assets.sync(network, look, look.stage(), materials=True)
 assert not overrides().GetPrimAtPath("/Instance").GetInfo("instanceable")
+assert not assets.sync(
+    network,
+    look,
+    look.stage(apply_viewport_overrides=True),
+    materials=True,
+), "the viewed stage, with the instance made editable, must not re-author (it alternated on every tick)"
+assert not overrides().GetPrimAtPath("/Instance").GetInfo("instanceable")
 assert not overrides().GetPrimAtPath(
     "/Instance/Asset/" + integration.NativeAssets.PROXY
 )

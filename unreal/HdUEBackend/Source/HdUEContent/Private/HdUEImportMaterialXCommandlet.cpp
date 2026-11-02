@@ -1,5 +1,6 @@
 #include "HdUEImportMaterialXCommandlet.h"
 #include "WetMaterials.h"
+#include "IdSwitch.h"
 #include "HdUEMaterialXAssetsPipeline.h"
 #include "InterchangeManager.h"
 #include "InterchangeSourceData.h"
@@ -206,6 +207,8 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
             // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
             Material->bUsedWithInstancedStaticMeshes = true;
             Entry->SetNumberField(TEXT("normal_scale_corrections"), CorrectNormalScale(Material));
+            // ID passes switch the material to its ID emission instead of swapping it (false: it keeps the swap).
+            Entry->SetBoolField(TEXT("id_switch"), HdUEAddIdSwitch(Material));
             Material->PostEditChange();
             Entry->SetBoolField(TEXT("native_substrate"), true);
             Entry->SetNumberField(TEXT("blend_mode"), int32(Interface->GetBlendMode()));

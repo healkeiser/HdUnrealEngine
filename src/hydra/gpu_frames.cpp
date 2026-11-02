@@ -4,6 +4,8 @@
 #include "pxr/base/tf/diagnostic.h"
 #include <windows.h>
 #include <cstring>
+#include <mutex>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
@@ -19,6 +21,13 @@ void clearErrors() {
     for (int i = 0; i < 8 && glGetError() != GL_NO_ERROR; ++i) {
     }
 }
+// GL objects of released delegates, freed by the next delegate's frame (or the last delegate's release once UE has
+// shut down), while a GL context is current. Hgi only queues a destroyed texture, and Houdini empties that queue once a
+// delegate is gone without a current GL context: each texture destroyed in release() logged 256 "GL error: invalid
+// operation ... ~HgiGLTexture" (512 per delegate, at every renderer switch and at exit). Deleting them in release()
+// instead freed textures Hydra's tasks still referenced.
+std::mutex retiredMutex;
+std::vector<std::shared_ptr<HdUEGpuFrames>> retired;
 }  // namespace
 void HdUEGpuFrames::fail(const std::string& reason) {
     if (!failed_.exchange(true)) TF_WARN("hdUE: GPU viewport frames off (%s); using CPU frames", reason.c_str());
@@ -74,7 +83,9 @@ bool HdUEGpuFrames::import(HdueGpuFrame& frame) {
 VtValue HdUEGpuFrames::color(uint32_t width, uint32_t height, bool converged) {
     depthCopied_ = false;
     const HdueSession session = session_;
-    if (converged || released_ || !session || !supported()) return {};
+    if (released_) return {};
+    freeRetired(false);
+    if (converged || !session || !supported()) return {};
     HdueGpuFrame frame{};
     frame.struct_size = sizeof(frame);
     frame.ring = ring_;
@@ -130,12 +141,42 @@ void HdUEGpuFrames::freeImports() {
     ready_ = release_ = 0;
     ring_ = 0;
 }
-void HdUEGpuFrames::release() {
+void HdUEGpuFrames::freeRetired(bool now) {
+    std::vector<std::shared_ptr<HdUEGpuFrames>> frames;
+    {
+        std::lock_guard lock(retiredMutex);
+        for (auto it = retired.begin(); it != retired.end();)
+            if ((*it)->hgi_ == hgi_) {
+                frames.push_back(std::move(*it));
+                it = retired.erase(it);
+            } else {
+                ++it;
+            }
+    }
+    for (const auto& frame : frames) frame->free(now);
+}
+void HdUEGpuFrames::free(bool now) {
+    freeImports();
+    for (auto* texture : {&colorTexture_, &depthTexture_}) {
+        if (!*texture) continue;
+        if (now)
+            delete texture->Get();  // nothing draws any more: UE has shut down
+        else
+            hgi_->DestroyTexture(texture);  // inside a frame: Hgi collects it with its context current
+        *texture = HgiTextureHandle();
+    }
+}
+void HdUEGpuFrames::release(bool last) {
     if (released_) return;
     released_ = true;
-    // ponytail: without a current GL context the imported objects leak until Houdini exits; HgiGL defers its own.
-    if (wglGetCurrentContext()) freeImports();
-    if (colorTexture_) hgi_->DestroyTexture(&colorTexture_);
-    if (depthTexture_) hgi_->DestroyTexture(&depthTexture_);
+    if (last && wglGetCurrentContext()) {
+        freeRetired(true);
+        free(true);
+        return;
+    }
+    // Without a current context nothing may free GL objects: they wait for the next delegate's frame. After UE has
+    // shut down no delegate draws again, and GL frees them with the context when Houdini exits.
+    std::lock_guard lock(retiredMutex);
+    retired.push_back(shared_from_this());
 }
 PXR_NAMESPACE_CLOSE_SCOPE

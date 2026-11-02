@@ -461,6 +461,8 @@ struct ScenePacket {
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyLocalFogs,
         dirtyGrooms, removedIds;
+    // Meshes in dirtyMeshes only because their material changed: they go through update_meshes, released or not.
+    std::set<std::string> materialMeshes;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points, and
     // sheared-instance companions (bakedInstances) baked at the sub-frame's instance matrices.
     std::map<std::string, std::vector<GfVec3f>> points;
@@ -479,6 +481,16 @@ struct ScenePacket {
         this->bytes = bytes;
         movedMeshes.swap(state.movedMeshes);
         dirtyMaterials.swap(state.dirtyMaterials);
+        // A material changed in place can change blend mode, and with it the backend's Nanite choice for the static
+        // meshes drawn with it: its meshes go through update_meshes, which asks for the geometry of those built for
+        // the other blend mode (FHdueScene::UpdateMeshes). Meshes Sync dirtied upload in full anyway.
+        if (!dirtyMaterials.empty())
+            for (const auto& [id, mesh] : state.meshes)
+                if (dirtyMaterials.count(mesh.material) && mesh.sceneAsset.empty() && !dirtyMeshes.count(id) &&
+                    !state.dirtyMeshes.count(id)) {
+                    dirtyMeshes.insert(id);
+                    materialMeshes.insert(id);
+                }
         dirtyLights.swap(state.dirtyLights);
         dirtyVolumes.swap(state.dirtyVolumes);
         dirtyLocalFogs.swap(state.dirtyLocalFogs);
@@ -738,6 +750,13 @@ std::optional<HdUEDicedMesh> displaced(HdUEState& state, const HdUEMeshData& dat
         textured);
     return mesh;
 }
+// Surface effects edit vertex colours after upload, and deforming meshes upload again per motion blur sub-frame, so
+// their meshes stay editable (dynamic) in UE: a static mesh rebuilt its cards and Nanite data every sub-frame. A moving
+// sheared-instance companion uploads again per sub-frame (applyMotion) likewise.
+bool editable(const HdUEState& state, const HdUEMeshData& data) {
+    return (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) || !data.deformTimes.empty() ||
+           (data.bakedInstances && data.moving());
+}
 void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto convert = state.converter();
     const auto basis = sceneBasis(state);
@@ -760,16 +779,15 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     }
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
-        if (data.released) {
-            // UE keeps its geometry: the changed fields go through update_meshes, and the mesh is re-pulled from
-            // Hydra only when UE needs it in full (sendScene, finishScene).
+        if (data.released || packet.materialMeshes.count(id)) {
+            // UE keeps its geometry: the changed fields go through update_meshes, and the mesh is uploaded again
+            // (re-pulled from Hydra if released) only when UE needs it in full (sendScene, finishScene).
             HdueMeshUpdate update{};
             update.id = packet.own(data.id);
             update.material_id = packet.own(data.material);
             update.visible = data.visible && state.shown(data.renderTag);
-            update.flags = cullBackface && !data.doubleSided ? HDUE_MESH_SINGLE_SIDED : 0;
-            if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty())
-                update.flags |= HDUE_MESH_EDITABLE;  // UE then asks for the geometry (needs_upload)
+            update.flags = editable(state, data) ? HDUE_MESH_EDITABLE : 0;  // UE then asks for the geometry
+            if (cullBackface && !data.doubleSided) update.flags |= HDUE_MESH_SINGLE_SIDED;
             update.prim_id = data.primId;
             packet.updates.push_back(update);
             packet.updateSources.push_back(data.sourceId);
@@ -943,13 +961,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             desc.instance_transforms = matrices.empty() ? &none : packet.own(packet.doubles, std::move(matrices));
         }
         desc.flags = requireNanite && !nativeAsset.empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
-        // Surface effects edit vertex colours after upload, and deforming meshes upload again per motion blur
-        // sub-frame, so their meshes stay editable (dynamic) in UE: a static mesh rebuilt its cards and Nanite data
-        // every sub-frame.
-        // A moving sheared-instance companion uploads again per sub-frame (applyMotion) likewise.
-        if ((state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) || !data.deformTimes.empty() ||
-            (data.bakedInstances && data.moving()))
-            desc.flags |= HDUE_MESH_EDITABLE;
+        if (editable(state, data)) desc.flags |= HDUE_MESH_EDITABLE;
         if (cullBackface && !data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!baked) rowMajor(inverse * data.transform * basis, desc.transform);
@@ -1416,7 +1428,10 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
         }
     }
     for (const auto& id : packet.reupload)
-        if (auto mesh = state.meshes.find(id); mesh != state.meshes.end() && mesh->second.released) {
+        if (auto mesh = state.meshes.find(id); mesh != state.meshes.end() && !mesh->second.released) {
+            if (state.dirtyMeshes.insert(id).second) state.pendingBytes += HdUEMeshBytes(mesh->second);
+            ++state.revision;  // it still holds its geometry: the next upload sends it in full
+        } else if (mesh != state.meshes.end()) {
             state.fullUploads.insert(id);
             state.repull.insert(mesh->second.sourceId);  // its arrays come back with the next Sync
             if (HdUETraceScene()) std::fprintf(stderr, "hdUE re-pulls %s from Hydra (geometry released)\n", id.c_str());
@@ -1935,20 +1950,28 @@ class Pass final : public HdRenderPass {
         bool operator==(const BufferVar&) const = default;
     };
     std::vector<BufferVar> bufferVars_;
-    void publishBuffers(HdUEState& s, const HdueFrameInfo& frame) {
+    // False when the Render Thread published another AOV frame after copy_frame (as copy_frame itself can find):
+    // nothing is published, and the next Execute copies the newer frame.
+    bool publishBuffers(HdUEState& s, const HdueFrameInfo& frame) {
         std::vector<const char*> names;
+        std::vector<std::vector<float>> copies;
         for (const auto& var : bufferVars_) {
             const auto index = std::find(names.begin(), names.end(), var.row->buffer) - names.begin();
             if (size_t(index) == names.size()) names.push_back(var.row->buffer);
             std::vector<float> rgba(size_t(frame.required_bytes / sizeof(float)));
-            s.backend->require(s.backend->api().copy_aov_buffer(s.session, frame.frame_id, uint32_t(index), rgba.data(),
-                                                                frame.required_bytes),
-                               "copy_buffer");
-            // UE's direction buffers (WorldNormal, WorldTangent) are encoded as 0.5 + 0.5 * direction.
-            if (var.row->format == HdUEAovFormat::Vector)
-                for (auto& value : rgba) value = 2 * value - 1;
-            publishAov(*var.target, var.row->format, frame, std::move(rgba));
+            const auto copied = s.backend->api().copy_aov_buffer(s.session, frame.frame_id, uint32_t(index),
+                                                                 rgba.data(), frame.required_bytes);
+            if (copied == HDUE_STALE_FRAME) return false;
+            s.backend->require(copied, "copy_buffer");
+            copies.push_back(std::move(rgba));
         }
+        for (size_t i = 0; i < bufferVars_.size(); ++i) {
+            // UE's direction buffers (WorldNormal, WorldTangent) are encoded as 0.5 + 0.5 * direction.
+            if (bufferVars_[i].row->format == HdUEAovFormat::Vector)
+                for (auto& value : copies[i]) value = 2 * value - 1;
+            publishAov(*bufferVars_[i].target, bufferVars_[i].row->format, frame, std::move(copies[i]));
+        }
+        return true;
     }
     // The ID passes' encoding (HDUE_AOV_PRIM_ID): R = id / 2048, G = id % 2048, B = 1 where a mesh is visible.
     static int32_t idAt(const float* p) {
@@ -2157,6 +2180,10 @@ public:
             snapshot.sizes.emplace_back(b ? int(b->GetWidth()) : 0, b ? int(b->GetHeight()) : 0);
         }
         if (camera) snapshot.projection = framedProjection(*state, *camera, snapshot.sizes);
+        // Houdini's viewport, looking through a scene camera during a long first sync (NVIDIA's Da Vinci Workshop),
+        // passed an identity projection: no camera yet, which the backend rejected as an orthographic camera with
+        // clipping 1..-1. Nothing is drawn until a later Execute has the camera.
+        if (snapshot.projection == GfMatrix4d(1)) return;
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
         // Released meshes an upload needs again come back through Hydra, re-synced here on the thread that drives Sync.
@@ -2731,10 +2758,11 @@ public:
                     } else {
                         s.backend->require(copied, "copy_frame");
                         const uint32_t id = aovs_[aovSlot_].second;
+                        bool published = true;
                         if (aovs_[aovSlot_].first == cryptoIds_.get())
                             accumulateCryptomatte(s, aovFrame, pixels);
                         else if (id == HDUE_AOV_BUFFERS)
-                            publishBuffers(s, aovFrame);
+                            published = publishBuffers(s, aovFrame);
                         else
                             publishAov(*aovs_[aovSlot_].first,
                                        (id & 0xffu) == HDUE_AOV_LIGHTING                      ? HdUEAovFormat::Beauty
@@ -2743,8 +2771,12 @@ public:
                                        : id == HDUE_AOV_PRIM_ID || id == HDUE_AOV_INSTANCE_ID ? HdUEAovFormat::Int
                                                                                               : HdUEAovFormat::Float,
                                        aovFrame, std::move(pixels));
-                        aovInFlight_ = false;
-                        ++aovSlot_;
+                        if (!published)
+                            ++s.staleFrameRetries;
+                        else {
+                            aovInFlight_ = false;
+                            ++aovSlot_;
+                        }
                     }
                 } else if (polled != HDUE_PENDING && polled != HDUE_OK)
                     s.backend->require(polled, "poll_aov");
@@ -3171,6 +3203,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             else
                 host.run(rendererInfo);
         } else {
+            if (status.state == HDUE_STATE_STOPPED) throw HdUEStopped("UE has shut down in this process");
             // A host (usdview, or a test) started UE and ticks it.
             if (status.state != HDUE_STATE_READY || !status.world_ready || !status.rhi_ready)
                 throw std::runtime_error(
@@ -3201,7 +3234,7 @@ HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)
     HdUEUnregisterViewport(this);
     if (const auto frames = state_->locked([&] { return state_->gpuFrames; }))
-        frames->release();  // GL objects, on Houdini's GL thread
+        frames->release(!selfHost().backend);  // GL objects, on Houdini's GL thread; UE gone: the last one
 #endif
     auto& host = selfHost();
     if (!selfHosted_) {

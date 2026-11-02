@@ -10,6 +10,31 @@ from pxr import Gf, Sdf, UsdShade
 from usd_materialx_graph import graph_data, graph_signature, rebase_graph
 
 
+def mtlx_material(prim):
+    """(resolved .mtlx path casefolded, material name) of a Material that references a material in a .mtlx document
+    through USD's usdMtlx file format (references = @file.mtlx@</MaterialX/Materials/<name>>), or (None, None).
+    An older form, a Shader with info:mtlx:sourceAsset and a subIdentifier naming the material, is still read: USD
+    expects a nodedef name there and warns ("Invalid MaterialX NodeDef").
+    """
+    for spec in prim.GetPrimStack():
+        if spec.layer.GetFileFormat().formatId == "mtlx":
+            return (
+                str(Path(spec.layer.realPath).resolve()).casefold(),
+                spec.path.name,
+            )
+    output = UsdShade.Material(prim).GetSurfaceOutput("mtlx")
+    connection = output.GetConnectedSource() if output else None
+    if connection:
+        shader = connection[0].GetPrim()
+        source = shader.GetAttribute("info:mtlx:sourceAsset").Get()
+        name = shader.GetAttribute("info:mtlx:sourceAsset:subIdentifier").Get()
+        if isinstance(source, Sdf.AssetPath) and name:
+            return str(
+                Path(source.resolvedPath or source.path).resolve()
+            ).casefold(), str(name)
+    return None, None
+
+
 class OfflineView:
     """usdview's stage view and data model as MaterialXLibrary reads them, for hosts without usdview. It is its own
     controller; renderer settings land in .settings.
@@ -183,29 +208,24 @@ class MaterialXLibrary:
             )
             if not entry:
                 shader = UsdShade.Shader(connection[0].GetPrim())
-                source = (
-                    shader.GetPrim().GetAttribute("info:mtlx:sourceAsset").Get()
-                )
-                name = (
-                    shader.GetPrim()
-                    .GetAttribute("info:mtlx:sourceAsset:subIdentifier")
-                    .Get()
-                )
-                if not isinstance(source, Sdf.AssetPath) or not name:
+                file, name = mtlx_material(prim)
+                if not file:
                     raise ValueError(
                         f"Inline MaterialX needs Import-UsdMaterialX.ps1 preparation: {path}"
                     )
-                file = str(
-                    Path(source.resolvedPath or source.path).resolve()
-                ).casefold()
-                entry = self.materials.get((file, str(name)))
+                entry = self.materials.get((file, name))
                 if entry is None:
                     raise ValueError(
-                        f"MaterialX material is absent from the cooked library: {source.path} / {name}"
+                        f"MaterialX material is absent from the cooked library: {file} / {name}"
                     )
                 values = []
+                material = UsdShade.Material(prim)
                 for name, p in entry["bindings"].items():
-                    source_input = shader.GetInput(name)
+                    # usdMtlx publishes a referenced material's inputs on the Material (its shader connects to
+                    # them); hdUE's unreal:*_texture overrides are authored there too.
+                    source_input = material.GetInput(name) or shader.GetInput(
+                        name
+                    )
                     values.append(
                         (
                             p,

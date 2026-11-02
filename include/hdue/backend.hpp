@@ -15,7 +15,7 @@ public:
     const HdueApi& api() const { return api_; }
     void initialize(const HdueInitDesc& desc);
     // initialize with the command line every host starts UE with: the cooked map, headless (HDUE_SHOW_WINDOW=1 shows
-    // the window), -stdout, HDUE_UE_ARGS, -userdir from HDUE_USER_DIR; HDUE_INIT_INTERACTIVE for Houdini's UI.
+    // the window), HDUE_UE_ARGS, -userdir from HDUE_USER_DIR; HDUE_INIT_INTERACTIVE for Houdini's UI.
     void boot(uint64_t instance, uint64_t window, const std::string& project, bool interactive);
     void shutdown();
     bool initialized() const { return initialized_; }

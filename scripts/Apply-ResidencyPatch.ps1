@@ -80,3 +80,60 @@ Edit-EngineSource -Path $CullRaster -Label 'Nanite raster patch' -Marker 'hdUE: 
 Edit-EngineSource -Path $CullRaster -Label 'Nanite binning patch' -Marker 'hdUE: as AddPass_Rasterize' -Edits @(, @(
         "CommonBinBuildParameters.InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV(TotalPrevDrawClustersBuffer);",
         "CommonBinBuildParameters.InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV((RenderFlags & NANITE_RENDER_FLAG_HAS_PREV_DRAW_DATA) ? TotalPrevDrawClustersBuffer : GSystemTextures.GetDefaultStructuredBuffer(GraphBuilder, 8));`t// hdUE: as AddPass_Rasterize"))
+# The rect light texture atlas's add and filter passes (FRectLightAtlasVS with FRectAtlasAddTexturePS or
+# FRectAtlasFilterTexturePS) compiled their PSOs on the render thread at the first textured rect light: UE has no
+# precache for them, and the cook drops them from the bundled PSO cache (ShaderPipelineCacheToolsCommandlet does not
+# list FRectLightAtlasVS among the shaders usable with an empty vertex declaration). They are precached at startup
+# through a global PSO collector, as LightRendering.cpp precaches the deferred light PSOs.
+$RectCollector = @'
+IMPLEMENT_GLOBAL_SHADER(FRectAtlasFilterTexturePS, "/Engine/Private/RectLightAtlas.usf", "MainPS", SF_Pixel);
+
+// hdUE: the atlas's add and filter PSOs, precached at startup (r.PSOPrecache.GlobalShaders) as the deferred light PSOs
+// are (LightRendering.cpp): with the same states as AddSlotsPass and FilterSlotsPass, into the atlas format.
+static const TCHAR* RectLightAtlasGlobalPSOCollectorName = TEXT("RectLightAtlasGlobalPSOCollector");
+static void RectLightAtlasGlobalPSOCollector(const FSceneTexturesConfig& SceneTexturesConfig, int32 GlobalPSOCollectorIndex, TArray<FPSOPrecacheData>& PSOInitializers)
+{
+	const EShaderPlatform ShaderPlatform = SceneTexturesConfig.ShaderPlatform;
+	if (!PlatformSupportsRectLightAtlas(ShaderPlatform))
+	{
+		return;
+	}
+	FGlobalShaderMap* GlobalShaderMap = GetGlobalShaderMap(ShaderPlatform);
+	TShaderMapRef<FRectLightAtlasVS> VertexShader(GlobalShaderMap);
+	TShaderMapRef<FRectAtlasAddTexturePS> AddShader(GlobalShaderMap);
+	TShaderMapRef<FRectAtlasFilterTexturePS> FilterShader(GlobalShaderMap);
+	const EPixelFormat AtlasFormat = CVarRectLighAtlasFormat.GetValueOnAnyThread() > 0 ? PF_FloatRGBA : PF_FloatR11G11B10;
+	for (FRHIPixelShader* PixelShader : { AddShader.GetPixelShader(), FilterShader.GetPixelShader() })
+	{
+		FGraphicsPipelineStateInitializer GraphicsPSOInit;
+		GraphicsPSOInit.BlendState = TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_Zero, BO_Add, BF_One, BF_Zero>::GetRHI();
+		GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
+		GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
+		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GEmptyVertexDeclaration.VertexDeclarationRHI;
+		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
+		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader;
+		GraphicsPSOInit.PrimitiveType = PT_TriangleList;
+
+		FGraphicsPipelineRenderTargetsInfo RenderTargetsInfo;
+		RenderTargetsInfo.NumSamples = 1;
+		AddRenderTargetInfo(AtlasFormat, ETextureCreateFlags::UAV | ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable, RenderTargetsInfo);
+		GraphicsPSOInit.StatePrecachePSOHash = RHIComputeStatePrecachePSOHash(GraphicsPSOInit);
+		ApplyTargetsInfo(GraphicsPSOInit, RenderTargetsInfo);
+
+		FPSOPrecacheData PSOPrecacheData;
+		PSOPrecacheData.bRequired = true;
+		PSOPrecacheData.Type = FPSOPrecacheData::EType::Graphics;
+		PSOPrecacheData.GraphicsPSOInitializer = GraphicsPSOInit;
+#if PSO_PRECACHING_VALIDATE
+		PSOPrecacheData.PSOCollectorIndex = GlobalPSOCollectorIndex;
+		PSOPrecacheData.VertexFactoryType = nullptr;
+#endif // PSO_PRECACHING_VALIDATE
+		PSOInitializers.Add(MoveTemp(PSOPrecacheData));
+	}
+}
+FRegisterGlobalPSOCollectorFunction RegisterRectLightAtlasGlobalPSOCollector(&RectLightAtlasGlobalPSOCollector, RectLightAtlasGlobalPSOCollectorName);
+'@ -replace "`r`n", "`n"
+Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\Private\RectLightTextureManager.cpp') `
+    -Label 'rect light atlas PSO precache patch' -Marker 'RectLightAtlasGlobalPSOCollector' -Edits @(
+    @('#include "DataDrivenShaderPlatformInfo.h"', "#include `"DataDrivenShaderPlatformInfo.h`"`n#include `"PSOPrecache.h`"`t// hdUE: RectLightAtlasGlobalPSOCollector`n#include `"MeshPassProcessor.h`""),
+    @('IMPLEMENT_GLOBAL_SHADER(FRectAtlasFilterTexturePS, "/Engine/Private/RectLightAtlas.usf", "MainPS", SF_Pixel);', $RectCollector.TrimEnd("`n")))

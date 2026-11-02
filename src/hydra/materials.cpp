@@ -533,7 +533,8 @@ void readDisplacement(const HdMaterialNetwork2& network, HdUEMaterialData& data)
     texture.scale *= scale;
     texture.bias *= scale;
 }
-void readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) {
+// False when hdUE has no translation for the surface shader.
+bool readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shader, HdUEMaterialData& data) {
     SurfaceReader reader(network, shader, data);
     const auto& type = shader.nodeTypeId.GetString();
     if (type == "UsdPreviewSurface" || type == "ND_UsdPreviewSurface_surfaceshader")
@@ -543,8 +544,8 @@ void readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shade
     else if (TfStringStartsWith(type, "ND_open_pbr_surface_surfaceshader"))
         readMaterialX(reader, data, openPbr);
     else
-        warnOnce(TfStringPrintf("surface shader %s is not translated; its materials render with the default surface",
-                                type.c_str()));
+        return false;
+    return true;
 }
 
 class Material final : public HdMaterial {
@@ -556,9 +557,16 @@ public:
         data.id = GetId().GetString();
         const auto net = network(delegate, GetId());
         readDisplacement(net, data);
-        if (const auto* shader = surface(net)) readSurface(net, *shader, data);
+        const auto* shader = surface(net);
+        const bool translated = !shader || readSurface(net, *shader, data);
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->mutex);
+        // A material the host maps to a cooked native asset (nativeMaterialAssets, the MaterialX library) renders as
+        // that asset, whatever hdUE makes of its network.
+        if (!translated && !state->setting<VtDictionary>("nativeMaterialAssets", {}).count(data.id))
+            warnOnce(
+                TfStringPrintf("surface shader %s is not translated; its materials render with the default surface",
+                               shader->nodeTypeId.GetText()));
         // Displacement moves vertices when meshes are packed: a change re-packs the meshes bound to the material.
         const auto displacement = [](const HdUEMaterialData& m) {
             const auto& t = m.textures[HDUE_TEXTURE_DISPLACEMENT];

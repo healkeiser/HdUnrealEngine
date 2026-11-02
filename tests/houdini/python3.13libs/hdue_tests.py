@@ -17,7 +17,62 @@ MODULES = {
     "viewport": "hdue_solaris_probe",
     "selection": "hdue_selection_test",
     "parity": "hdue_parity_test",
+    "shared-builds": "hdue_shared_build_test",
+    "heavy": "hdue_heavy_test",
 }
+
+
+def capture_logs():
+    """Keeps what Houdini's Log Viewer would show (every hou.logging source) and writes it to log-viewer.json and
+    log-viewer.txt in the run's log directory when Houdini quits, so a test run shows what it leaves there.
+    """
+    import atexit
+    import json
+
+    import hou
+
+    sink = hou.logging.MemorySink()
+    for source in hou.logging.sources():
+        sink.connect(source)
+
+    def write():
+        folder = os.environ.get("HDUE_HOUDINI_LOG_DIR")
+        if not folder:
+            return
+        entries = list(sink.logEntries())
+        hou.logging.saveLogsToFile(
+            entries, os.path.join(folder, "log-viewer.json")
+        )
+        counts = {}
+        for entry in entries:
+            key = (
+                entry.source(),
+                entry.severity().name() if entry.severity() else "None",
+            )
+            counts[key] = counts.get(key, 0) + 1
+        lines = [
+            f"{n:6} {source} / {severity}"
+            for (source, severity), n in sorted(counts.items())
+        ]
+        lines += [
+            "",
+            *(
+                f"[{e.source()}|{e.severity().name() if e.severity() else None}] {e.message().rstrip()}"
+                for e in entries
+            ),
+        ]
+        with open(
+            os.path.join(folder, "log-viewer.txt"), "w", encoding="utf-8"
+        ) as file:
+            file.write("\n".join(lines) + "\n")
+        print(
+            json.dumps(
+                {f"{s} / {v}": n for (s, v), n in sorted(counts.items())}
+            )
+        )
+
+    # hscript "quit -f", which the tests end with, emits no aboutToQuit.
+    atexit.register(write)
 
 
 def run():

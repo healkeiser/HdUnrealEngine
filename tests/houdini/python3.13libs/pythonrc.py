@@ -8,4 +8,5 @@ if os.environ.get("HDUE_HOUDINI_TEST"):
     import hdefereval
     import hdue_tests
 
+    hdue_tests.capture_logs()
     hdefereval.execute_deferred(hdue_tests.run)

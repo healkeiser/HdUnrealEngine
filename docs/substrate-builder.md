@@ -136,7 +136,7 @@ Graph signatures include operators, wiring, public parameter names, and static o
 
 Texture asset paths, color space, address mode, UV set index, and selected output sockets remain static graph inputs. Source hashes and UDIM membership are stored in the prepared library and checked when loading it. Replacing an image or changing its tile set requires preparing, cooking, and staging again; filenames are not runtime texture parameters.
 
-Automatic parameters use compiler version 2 in preparation manifests and libraries. Previously prepared materials must be rebuilt, cooked, and staged once to obtain the generated parameters. A library from the earlier compiler produces an explicit preparation message instead of accepting value edits that its cooked shader cannot apply. Existing USD graphs and editable VOP assets retain their graph schema version.
+Automatic parameters use compiler version 2 in preparation manifests and libraries; version 3 adds the ID-pass switch ([AOVs](houdini.md#aovs)) and Nanite usage to every prepared material. Previously prepared materials must be rebuilt, cooked, and staged once to obtain the generated parameters. A library from the earlier compiler produces an explicit preparation message instead of accepting value edits that its cooked shader cannot apply. Existing USD graphs and editable VOP assets retain their graph schema version.
 
 The generated Builder library records the graph signature, MaterialX dependency identity, cooked material, and cooked mask-preview material. It is local generated data and belongs outside Git.
 

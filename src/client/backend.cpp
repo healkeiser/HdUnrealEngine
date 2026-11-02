@@ -33,11 +33,11 @@ void Backend::boot(uint64_t instance, uint64_t window, const std::string& projec
         return std::string(value ? value : "");
     };
     const auto show = env("HDUE_SHOW_WINDOW");
-    // Frames are read back from render targets, so UE needs no visible window. Without -stdout, UE echoes
-    // Display/Warning/Error lines with wprintf, which reached the host's console (Houdini, husk) as UTF-16 and showed
-    // as spaced-out text; -stdout writes the same lines as UTF-8. HDUE_USER_DIR (set by the Houdini package): UE's
-    // Saved (logs, shader caches) per user, not in a possibly shared or read-only install folder.
-    std::string arguments = (show.empty() || show == "0" || show == "false" ? "-RenderOffscreen -stdout" : "-stdout");
+    // Frames are read back from render targets, so UE needs no visible window. No -stdout: the backend echoes UE's
+    // errors and hdUE's warnings to the host's console (Bridge.cpp), and HDUE_UE_ARGS=-stdout every log line.
+    // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user, not in a possibly shared
+    // or read-only install folder.
+    std::string arguments = (show.empty() || show == "0" || show == "false" ? "-RenderOffscreen" : "");
     arguments += " " + env("HDUE_UE_ARGS");
     if (const auto user = env("HDUE_USER_DIR"); !user.empty()) arguments += " -userdir=\"" + user + "\"";
     HdueInitDesc init{};

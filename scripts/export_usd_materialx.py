@@ -3,6 +3,7 @@
 # dependencies = ["MaterialX==1.39.4"]
 # ///
 """Export supported composed USD MaterialX graphs to UE's MaterialX version."""
+
 import argparse
 import hashlib
 import json
@@ -135,11 +136,15 @@ def export(source, output, time=Usd.TimeCode.Default(), texture_manifest=None):
         material = UsdShade.Material(prim)
         if not material.GetSurfaceOutput("mtlx"):
             continue
-        # Keep the external sourceAsset route separate and unchanged.
+        # Materials from a .mtlx document (a reference through usdMtlx, or a sourceAsset shader) are imported from
+        # that document by Import-MaterialX.ps1, not as inline graphs.
         surface = material.ComputeSurfaceSource("mtlx")[0]
         if (
             surface
             and surface.GetImplementationSource() == UsdShade.Tokens.sourceAsset
+        ) or any(
+            spec.layer.GetFileFormat().formatId == "mtlx"
+            for spec in prim.GetPrimStack()
         ):
             continue
         graph = graph_data(material, time)

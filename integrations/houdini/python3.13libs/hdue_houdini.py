@@ -41,7 +41,13 @@ def log_directory():
 
 
 def _report(message):
+    """A problem: printed (Houdini's Log Viewer shows the output) and logged."""
     print("hdUE Houdini: " + message, flush=True)
+    _note(message)
+
+
+def _note(message):
+    """Progress, for integration.log only: a normal session's Log Viewer stays free of it."""
     directory = os.environ.get("HDUE_HOUDINI_LOG_DIR")
     if directory:
         path = Path(directory)
@@ -149,7 +155,10 @@ class Host:
             Usd.Notice.ObjectsChanged, self.stage_changed, stage
         )
 
-    def stage_changed(self, notice, stage):
+    def stage_changed(self, notice, sender):
+        # Houdini composes LOP stages on worker threads, where the sender arrives as None ("Tf Python Exception" in
+        # the Log Viewer, one per stage edit, from GetPrimAtPath on None); the notice keeps its stage.
+        stage = notice.GetStage()
         # Asset overrides follow unreal:asset and unreal:surface:* opinions, material bindings, instancing and the
         # stage's units and up axis (root metadata).
         if not self.assets_dirty and (
@@ -485,7 +494,7 @@ def start():
 
         hdue_substrate.install()
         _host = Host()
-        _report("hdUE host started (UE runs on its own thread)")
+        _note("hdUE host started (UE runs on its own thread)")
         input_usd = os.environ.get("HDUE_HOUDINI_INPUT")
         if input_usd:
             open_usd(input_usd)
@@ -621,7 +630,7 @@ def activate_saved_hip():
             control = builder.node("amount") or builder.node("uv")
             if control:
                 control.setCurrent(True, clear_all_selected=True)
-        _report("Opened HIP: " + hou.hipFile.path())
+        _note("Opened HIP: " + hou.hipFile.path())
     except (hou.Error, ValueError, RuntimeError):
         _report(traceback.format_exc())
 
@@ -633,7 +642,7 @@ def activate():
         raise RuntimeError(_failure or "UE not ready")
     viewer = scene_viewer()
     names = viewer.hydraRenderers()
-    _report("Available Solaris renderers: " + repr(names))
+    _note("Available Solaris renderers: " + repr(names))
     viewer.setHydraRenderer(LABEL if LABEL in names else PLUGIN)
     if os.environ.get("HDUE_HOUDINI_IMAGE_VIEWER") == "1":
         show_viewer()
@@ -762,6 +771,9 @@ class NativeAssets:
         authored = {
             path for kind, path in self.authored if kind == "instanceable"
         }
+        # Their prims are no longer instance proxies; without this the overrides are cleared on the next sync, the
+        # instance comes back, and the two alternate on every tick (a scene upload per tick, no converged frame).
+        made_editable = [Sdf.Path(path) for path in authored]
         for prim in Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies()):
             attr = prim.GetAttribute("unreal:asset")
             asset = attr.Get() if attr else None
@@ -774,12 +786,15 @@ class NativeAssets:
                         + str(prim.GetPath())
                     )
                 refs[str(prim.GetPath())] = (asset, prim.IsA(UsdGeom.Mesh))
-            elif not prim.IsInstanceProxy() or not (
+            elif not (
                 any(
                     name.startswith("unreal:surface:")
                     for name in prim.GetPropertyNames()
                 )
                 or (materials and _materialx(prim))
+            ) or not (
+                prim.IsInstanceProxy()
+                or any(prim.GetPath().HasPrefix(p) for p in made_editable)
             ):
                 continue
             parent = prim
@@ -930,8 +945,8 @@ def render_settings_node(input_node, mode="realtime", samples=64):
             else None
         )
     )
-    if camera:
-        node.parm("camera").set(str(camera.GetPath()))
+    # A stage without a camera keeps none: the default path made the LOP report "/cameras/camera1 missing from input".
+    node.parm("camera").set(str(camera.GetPath()) if camera else "")
     for name, value in (("renderMode", mode), ("samplesPerPixel", samples)):
         attr = existing.GetAttribute("unreal:" + name) if existing else None
         _render_property(
@@ -1027,7 +1042,7 @@ def open_usd(path):
     stage.layoutChildren()
     viewer = scene_viewer()
     viewer.setPwd(stage)
-    _report("USD loaded at " + node.path())
+    _note("USD loaded at " + node.path())
     activate()
     import hdefereval
     from PySide6 import QtCore

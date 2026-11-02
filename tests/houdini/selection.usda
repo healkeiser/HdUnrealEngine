@@ -84,6 +84,15 @@ def Xform "World"
         }
     }
 
+    # The stage's camera, which the hdUE settings node renders through (a stage without one made the Render Settings
+    # LOP report its default /cameras/camera1 missing); the test itself selects in the free view.
+    def Camera "Camera"
+    {
+        float focalLength = 35
+        double3 xformOp:translate = (0, 1.5, 12)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
     def DistantLight "Sun"
     {
         float inputs:intensity = 1

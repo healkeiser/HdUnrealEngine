@@ -244,7 +244,9 @@ def times(theme, data):
     ]
     ax.xaxis.set_major_locator(FixedLocator(ticks))
     ax.xaxis.set_minor_locator(NullLocator())
-    ax.set_xticks(ticks, [f"{v * 1000:g} ms" if v < 1 else f"{v:g} s" for v in ticks])
+    ax.set_xticks(
+        ticks, [f"{v * 1000:g} ms" if v < 1 else f"{v:g} s" for v in ticks]
+    )
     # How many times faster hdUE is than the GPU Karma, at the end of each row.
     reference = "xpu" if any("xpu" in r for _, r in data) else "karma"
     for y, (_, r) in enumerate(data):
