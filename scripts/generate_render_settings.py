@@ -983,6 +983,13 @@ def parse_defaults(
     body = source[source.index(constructor) :]
     body = body[: body.index("\n}\n")]
     defaults = {}
+    # The initializer list (UVolumetricCloudComponent: ", LayerBottomAltitude(5.0f)"), before the body's assignments.
+    for name, expression in re.findall(
+        r"^\s*[:,]\s*(\w+)\((.*)\)\s*(?://.*)?$",
+        body[: body.index("\n{")],
+        re.M,
+    ):
+        defaults[name] = expression
     for name, expression in re.findall(r"^\s*(\w+)\s*=\s*(.+?);", body, re.M):
         defaults[name] = (
             expression  # the else branch: r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange is 0
@@ -1012,6 +1019,16 @@ def default_value(expression, kind, size, enum):
         return [expression.strip() not in ("0", "false")]
     if kind == "string":
         return [""]
+    if expression.startswith("FColor("):
+        # sRGB bytes, as FLinearColor(FColor) decodes them: Houdini's colours are linear (TYPES).
+        return [
+            round(
+                c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4, 6
+            )
+            for c in (
+                int(n) / 255 for n in re.findall(r"\d+", expression)[:size]
+            )
+        ]
     if expression in ("FLinearColor::Black", "FVector2f::ZeroVector"):
         numbers = [0.0, 0.0, 0.0]
     elif expression in (
@@ -1254,6 +1271,8 @@ USD_TYPES = {
     "int": "int",
     "toggle": "bool",
     "color": "color3f",
+    "menu": "token",
+    "string": "string",
 }
 
 
@@ -1325,6 +1344,23 @@ SCHEMA_CLASSES = (
         "is inside or near it. The render settings' unreal:postProcess:* apply after the volumes, as a camera's do in "
         "UE.",
     ),
+    (
+        "UnrealExponentialHeightFog",
+        "A UE Exponential Height Fog (UExponentialHeightFogComponent), rendered by hdUE: its density is FogDensity at "
+        "the prim's height (its world position along the up axis). It takes the place of the render settings' "
+        "unreal:heightFog; UE draws one height fog, the first prim by path.",
+    ),
+    (
+        "UnrealSkyAtmosphere",
+        "A UE Sky Atmosphere (USkyAtmosphereComponent), rendered by hdUE, at the prim's world position (UE's Transform "
+        "Mode decides whether it is used). It takes the place of the render settings' unreal:skyAtmosphere; UE draws "
+        "one, the first prim by path.",
+    ),
+    (
+        "UnrealVolumetricCloud",
+        "A UE Volumetric Cloud (UVolumetricCloudComponent), rendered by hdUE with a Sky Atmosphere. It takes the place "
+        "of the render settings' unreal:volumetricCloud; UE draws one, the first prim by path.",
+    ),
 )
 
 
@@ -1342,6 +1378,8 @@ def write_schema(*settings):
             return "true" if v[0] else "false"
         if setting["kind"] == "color":
             return "(" + ", ".join(ds_number(c) for c in v) + ")"
+        if setting["kind"] in ("menu", "string"):
+            return json.dumps(str(v[0]))
         return ds_number(v[0])
 
     lines = [
@@ -2301,9 +2339,18 @@ def main():
         return
 
     local_fog = local_fog_volume_settings(args.engine_root, skipped)
+    # Each scene component's properties, without the render settings' switches (a prim places it).
+    placed = [
+        [s for s in fog + sky if s["attribute"].startswith(f"unreal:{name}:")]
+        for name in ("heightFog", "skyAtmosphere", "volumetricCloud")
+    ]
     write_schema(
-        local_fog, post_process_volume_settings(args.engine_root)
-    )  # its Settings struct is the unreal:postProcess:* attributes
+        local_fog,
+        post_process_volume_settings(
+            args.engine_root
+        ),  # its Settings are the unreal:postProcess:* attributes
+        *placed,
+    )
     tree = layout(post + fog + sky + console + HDUE)
     replace_generated(
         PARAMETERS / "HdUnrealEngine_Global.ds",

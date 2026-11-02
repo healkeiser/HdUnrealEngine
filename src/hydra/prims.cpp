@@ -1703,7 +1703,7 @@ HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
     return new Unsupported(id, type);
 }
 // UnrealLocalFogVolume and UnrealPostProcessVolume (HdUE_ActorAdapter): the transform, visibility and dictionary of
-// property values (unreal:localFogVolume, unreal:postProcessVolume), uploaded when one of them changes.
+// property values, uploaded when one of them changes (scene components: sent with the render settings).
 HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
     struct Actor final : HdSprim {
         Actor(const SdfPath& id, HdUEActorData::Kind kind) : HdSprim(id), kind(kind) {}
@@ -1711,14 +1711,21 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
         void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
             *bits = HdChangeTracker::Clean;
             if (GetId().IsEmpty()) return;
-            const bool postProcess = kind == HdUEActorData::Kind::PostProcess;
+            static constexpr std::pair<HdUEActorData::Kind, const char*> primvars[] = {
+                {HdUEActorData::Kind::LocalFog, "unreal:localFogVolume"},
+                {HdUEActorData::Kind::PostProcess, "unreal:postProcessVolume"},
+                {HdUEActorData::Kind::HeightFog, "unreal:heightFog"},
+                {HdUEActorData::Kind::SkyAtmosphere, "unreal:skyAtmosphere"},
+                {HdUEActorData::Kind::VolumetricCloud, "unreal:volumetricCloud"}};
+            const char* primvar = "";
+            for (const auto& [k, name] : primvars)
+                if (k == kind) primvar = name;
             HdUEActorData data;
             data.kind = kind;
             data.id = GetId().GetString();
             data.localToWorld = delegate->GetTransform(GetId());
             data.visible = delegate->GetVisible(GetId());
-            const auto values =
-                delegate->Get(GetId(), TfToken(postProcess ? "unreal:postProcessVolume" : "unreal:localFogVolume"));
+            const auto values = delegate->Get(GetId(), TfToken(primvar));
             if (values.IsHolding<VtDictionary>())
                 for (const auto& [name, value] : values.UncheckedGet<VtDictionary>()) {  // sorted by name
                     // unreal:postProcessMaterials: a string or token array, or one string, as the render setting.
@@ -1731,13 +1738,15 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
                             text += (text.empty() ? "" : " ") + token.GetString();
                     else
                         text = HdUESettingText(value);  // texture settings: an image file or a cooked path
+                    // An empty cooked path (a schema fallback) keeps the component's own default, such as the
+                    // Volumetric Cloud's default material, as an unset render setting does.
+                    if (text.empty() && HdUEActorData::component(kind)) continue;
                     data.values.emplace_back(name, std::move(text));
                 }
             if (HdUETraceScene()) {
                 std::string text;
                 for (const auto& [name, value] : data.values) text += " " + name + "=" + value;
-                std::fprintf(stderr, "hdUE %s %s synced, visible=%d:%s\n",
-                             postProcess ? "post-process volume" : "local fog volume", data.id.c_str(), data.visible,
+                std::fprintf(stderr, "hdUE %s %s synced, visible=%d:%s\n", primvar, data.id.c_str(), data.visible,
                              text.c_str());
                 std::fflush(stderr);
             }
@@ -1746,10 +1755,18 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
             const auto old = state->actors.find(data.id);
             if (old != state->actors.end() && old->second == data) return;
             state->actors[data.id] = std::move(data);
-            state->dirtyActors.insert(GetId().GetString());
-            ++state->revision;
+            if (HdUEActorData::component(kind))
+                ++state->requestSettingsRevision;  // sent with the render settings
+            else {
+                state->dirtyActors.insert(GetId().GetString());
+                ++state->revision;
+            }
         }
-        void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+        void Finalize(HdRenderParam* param) override {
+            auto* state = static_cast<HdUEState*>(param);
+            state->erase(GetId().GetString());
+            if (HdUEActorData::component(kind)) ++state->requestSettingsRevision;
+        }
         HdUEActorData::Kind kind;
     };
     return new Actor(id, kind);

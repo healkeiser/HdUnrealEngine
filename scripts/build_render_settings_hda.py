@@ -1217,7 +1217,7 @@ def build_prim_lop(
 ):
     """A create/edit LOP for one prim type: Edit Properties' header (the prim type fixed, only that type editable),
     Sphere's transform section and folders of (label, settings); in Create mode,
-    guide(subnet, previous) adds the prim's viewport guide after the internal Edit Properties LOP.
+    guide(subnet, previous), if given, adds the prim's viewport guide after the internal Edit Properties LOP.
     """
     import hou
 
@@ -1288,12 +1288,16 @@ def build_prim_lop(
         ):
             target.set(source)
 
-    last = switch(
-        subnet,
-        "create",
-        props,
-        guide(subnet, props),
-        'ch("../createprims") == 1',
+    last = (
+        switch(
+            subnet,
+            "create",
+            props,
+            guide(subnet, props),
+            'ch("../createprims") == 1',
+        )
+        if guide
+        else props
     )
     subnet.node("output0").setInput(0, last)
     subnet.layoutChildren()
@@ -1375,12 +1379,13 @@ def build_local_fog_volume():
     )
 
 
-def post_process_folders():
-    """The unreal:postProcess:* parameters of the Render Settings LOP's Unreal Engine tab (HdUnrealEngine_Global.ds),
-    in its tabs and sections, for a post-process volume: the volume blends the same FPostProcessSettings. Each keeps its
-    control menu (Do Nothing by default: as UE's bOverride_ flags, only the settings turned on override), without the
-    render settings' Essential | Advanced and render-mode conditions. Texture files are left out: a volume's textures
-    are cooked paths, which the backend does not import from image files.
+def render_settings_folders(*prefixes):
+    """The parameters of the Render Settings LOP's Unreal Engine tab (HdUnrealEngine_Global.ds) whose attributes start
+    with one of prefixes, in its tabs and sections, for a prim that carries the same UE properties (a post-process
+    volume's settings, a height fog's, ...). Each keeps its control menu (Do Nothing by default: the prim's fallback,
+    UE's default, or for a post-process volume, as UE's bOverride_ flags, no override), without the render settings'
+    Essential | Advanced and render-mode conditions. Texture files are left out: these prims take cooked paths, which
+    the backend does not import from image files.
     """
     import hou
 
@@ -1400,7 +1405,7 @@ def post_process_folders():
     values = {
         t.name()
         for t in flatten(renderer)
-        if hou.text.decode(t.name()).startswith("unreal:postProcess")
+        if hou.text.decode(t.name()).startswith(prefixes)
         and not hou.text.decode(t.name()).endswith("_control")
         and not (
             t.type() == hou.parmTemplateType.String
@@ -1504,8 +1509,70 @@ def build_post_process_volume():
         "settings' post-process settings: turn a setting's control to Set or Create to override it, as UE's override "
         "checkboxes. UE blends the volumes the camera is in or near, by priority, before the render settings' own "
         "post-process settings (which act as the camera's). Textures take cooked paths here, not image files.",
-        extra=post_process_folders(),
+        extra=render_settings_folders(
+            "unreal:postProcess:", "unreal:postProcessMaterials"
+        ),
     )
+
+
+# The scene components a UE level places once (UE draws one of each): (type name, label, prim type, attribute prefix,
+# summary, overview).
+SCENE_COMPONENTS = (
+    (
+        "hdueheightfog",
+        "hdUE Height Fog",
+        "UnrealExponentialHeightFog",
+        "unreal:heightFog:",
+        "Creates or edits a UE Exponential Height Fog: fog thickest below the prim's height.",
+        "Like an Exponential Height Fog placed in a UE level, it creates or edits an UnrealExponentialHeightFog prim: "
+        "the fog's density is Fog Density at the prim's height (its world position along the up axis), with UE's "
+        "properties (Volumetric Fog included). A prim takes the place of hdUE Render Settings' Fog tab; UE draws one "
+        "height fog, the first prim by path. Each property's control starts at Do Nothing: the prim's fallback is UE's "
+        "default.",
+    ),
+    (
+        "hdueskyatmosphere",
+        "hdUE Sky Atmosphere",
+        "UnrealSkyAtmosphere",
+        "unreal:skyAtmosphere:",
+        "Creates or edits a UE Sky Atmosphere: UE's physical sky, lit by the distant lights.",
+        "Like a Sky Atmosphere placed in a UE level, it creates or edits an UnrealSkyAtmosphere prim with UE's "
+        "properties (kilometres, as in UE). Distant lights light it as atmosphere suns. A prim takes the place of hdUE "
+        "Render Settings' Sky Atmosphere; UE draws one, the first prim by path. Its position counts only when Transform "
+        "Mode places the planet at the component.",
+    ),
+    (
+        "hduevolumetriccloud",
+        "hdUE Volumetric Cloud",
+        "UnrealVolumetricCloud",
+        "unreal:volumetricCloud:",
+        "Creates or edits a UE Volumetric Cloud layer, drawn with a Sky Atmosphere.",
+        "Like a Volumetric Cloud placed in a UE level, it creates or edits an UnrealVolumetricCloud prim with UE's "
+        "properties; with no Material it uses UE's default cloud material. It needs a Sky Atmosphere (prim or render "
+        "setting). A prim takes the place of hdUE Render Settings' Volumetric Cloud; UE draws one, the first prim by "
+        "path.",
+    ),
+)
+
+
+def build_scene_components():
+    """HdUE Height Fog, Sky Atmosphere and Volumetric Cloud: create/edit LOPs for the prims that place UE's scene
+    components, with the render settings' Fog and Sky properties.
+    """
+    for name, label, prim_type, prefix, summary, overview in SCENE_COMPONENTS:
+        build_prim_lop(
+            OTLS / f"hdue_{name[4:]}.hda",
+            f"hdue::{name}::{VERSION}",
+            label,
+            "HDUE_hdue",
+            prim_type,
+            "/environment/$OS",
+            [],
+            None,
+            summary,
+            overview,
+            extra=render_settings_folders(prefix),
+        )
 
 
 if __name__ == "__main__":
@@ -1515,5 +1582,6 @@ if __name__ == "__main__":
         build_render_products()
         build_local_fog_volume()
         build_post_process_volume()
+        build_scene_components()
     else:
         relaunch()

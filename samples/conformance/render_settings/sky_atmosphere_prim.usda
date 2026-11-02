@@ -1,0 +1,65 @@
+#usda 1.0
+(
+    doc = """hdUE's UnrealSkyAtmosphere and UnrealVolumetricCloud prims (resources/generatedSchema.usda): UE's Sky
+Atmosphere and Volumetric Cloud placed by prims, lit by the scene's distant light. Frame 1: no sky (no DomeLight: the
+background is black). Frame 2: the sky prim, as sky_atmosphere.usda's render setting: the sky above the horizon is lit
+and blue. Frame 3: a cloud prim too (UE's default cloud material), realtime only: UE's Path Tracer renders clouds with
+Reference Atmosphere only."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE UnrealSkyAtmosphere, UnrealVolumetricCloud",
+ "feature": "Sky Atmosphere and Volumetric Cloud prims",
+ "frames": 3,
+ "checks": [
+  {
+   "name": "no sky without the prim",
+   "value": {"frame": 1, "region": [-5.0, 2.0, 5.0, 5.0]},
+   "max": 0.001
+  },
+  {
+   "name": "the sky is lit",
+   "value": {"frame": 2, "region": [-5.0, 2.0, 5.0, 5.0]},
+   "min": 0.01
+  },
+  {
+   "name": "the sky is blue",
+   "ratio": [
+    {"frame": 2, "region": [-5.0, 2.0, 5.0, 5.0], "channel": 2},
+    {"frame": 2, "region": [-5.0, 2.0, 5.0, 5.0], "channel": 0}
+   ],
+   "min": 1.1
+  },
+  {
+   "name": "clouds whiten the sky",
+   "modes": ["realtime"],
+   "ratio": [
+    {"frame": 3, "region": [-5.0, 2.0, 5.0, 5.0], "channel": 0},
+    {"frame": 2, "region": [-5.0, 2.0, 5.0, 5.0], "channel": 0}
+   ],
+   "min": 1.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 3
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def UnrealSkyAtmosphere "Sky"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        2: "inherited",
+    }
+}
+def UnrealVolumetricCloud "Clouds"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        3: "inherited",
+    }
+}

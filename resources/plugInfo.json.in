@@ -51,6 +51,27 @@
         "alias": { "UsdSchemaBase": "UnrealPostProcessVolume" }, "bases": ["UsdGeomXformable"],
         "schemaIdentifier": "UnrealPostProcessVolume", "schemaKind": "concreteTyped"
       },
+      "HdUE_HeightFogAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealExponentialHeightFog"
+      },
+      "HdUEUnrealExponentialHeightFog": {
+        "alias": { "UsdSchemaBase": "UnrealExponentialHeightFog" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealExponentialHeightFog", "schemaKind": "concreteTyped"
+      },
+      "HdUE_SkyAtmosphereAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealSkyAtmosphere"
+      },
+      "HdUEUnrealSkyAtmosphere": {
+        "alias": { "UsdSchemaBase": "UnrealSkyAtmosphere" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealSkyAtmosphere", "schemaKind": "concreteTyped"
+      },
+      "HdUE_VolumetricCloudAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealVolumetricCloud"
+      },
+      "HdUEUnrealVolumetricCloud": {
+        "alias": { "UsdSchemaBase": "UnrealVolumetricCloud" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealVolumetricCloud", "schemaKind": "concreteTyped"
+      },
       "HdUE_VisibilityAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },

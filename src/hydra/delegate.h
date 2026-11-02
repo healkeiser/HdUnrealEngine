@@ -211,9 +211,18 @@ struct HdUEVolumeData {
 // A UE actor placed from a typed prim (HdUE_ActorAdapter): its transform, visibility, and its property values as
 // text by UE name. An UnrealLocalFogVolume is UE's base volume in the unit sphere of its local space, by
 // ULocalFogVolumeComponent property; an UnrealPostProcessVolume a box filling the cube from -1 to 1, by
-// UPostProcessComponent property, and Settings:<FPostProcessSettings property> for its settings.
+// UPostProcessComponent property, and Settings:<FPostProcessSettings property> for its settings. The scene components
+// (HeightFog, SkyAtmosphere, VolumetricCloud) by their UE component property, sent with the render settings
+// (set_post_process) in place of theirs.
 struct HdUEActorData {
-    enum class Kind { LocalFog, PostProcess } kind = Kind::LocalFog;
+    enum class Kind { LocalFog, PostProcess, HeightFog, SkyAtmosphere, VolumetricCloud } kind = Kind::LocalFog;
+    // The set_post_process name of a scene component kind, else null.
+    static const char* component(Kind kind) {
+        return kind == Kind::HeightFog         ? "HeightFog"
+               : kind == Kind::SkyAtmosphere   ? "SkyAtmosphere"
+               : kind == Kind::VolumetricCloud ? "VolumetricCloud"
+                                               : nullptr;
+    }
     std::string id;
     bool visible = true;
     GfMatrix4d localToWorld{1};

@@ -1,0 +1,83 @@
+#usda 1.0
+(
+    doc = """hdUE's UnrealExponentialHeightFog prim (resources/generatedSchema.usda): UE's Exponential Height Fog placed
+by a prim, whose density is FogDensity at the prim's height. Frame 1: no fog (the reference). Frame 2: the prim at
+height 0 with height_fog.usda's render-setting fog (density 1, Volumetric Fog) dims the wall. Frame 3: the prim 20 m
+higher puts the wall deeper in the fog: darker still. Frame 4: back at 0 while the render settings ask for a thin fog
+of their own: the prim takes their place, so the image is frame 2's."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE UnrealExponentialHeightFog",
+ "feature": "Exponential Height Fog prim",
+ "frames": 4,
+ "checks": [
+  {
+   "name": "fog dims the wall",
+   "ratio": [
+    {"frame": 2, "region": [-4.5, -4.5, 4.5, 4.5]},
+    {"frame": 1, "region": [-4.5, -4.5, 4.5, 4.5]}
+   ],
+   "max": 0.9
+  },
+  {
+   "name": "a higher fog is thicker at the wall",
+   "ratio": [
+    {"frame": 3, "region": [-4.5, -4.5, 4.5, 4.5]},
+    {"frame": 2, "region": [-4.5, -4.5, 4.5, 4.5]}
+   ],
+   "max": 0.98
+  },
+  {
+   "name": "the prim wins over the render settings' fog",
+   "ratio": [
+    {"frame": 4, "region": [-4.5, -4.5, 4.5, 4.5]},
+    {"frame": 2, "region": [-4.5, -4.5, 4.5, 4.5]}
+   ],
+   "min": 0.97,
+   "max": 1.03
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 4
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        bool unreal:heightFog.timeSamples = {
+            1: 0,
+            4: 1,
+        }
+        float unreal:heightFog:FogDensity = 0.02
+    }
+}
+def UnrealExponentialHeightFog "Fog"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        2: "inherited",
+    }
+    float unreal:heightFog:FogDensity = 1
+    bool unreal:heightFog:bEnableVolumetricFog = 1
+    # Every frame keyed: USD interpolates doubles between samples.
+    double3 xformOp:translate.timeSamples = {
+        1: (0, 0, 0),
+        2: (0, 0, 0),
+        3: (0, 20, 0),
+        4: (0, 0, 0),
+    }
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+def Cube "Wall"
+{
+        double size = 1.0
+        double3 xformOp:scale = (12, 12, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+}

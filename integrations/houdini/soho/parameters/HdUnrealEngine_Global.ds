@@ -3909,7 +3909,7 @@
                 label   "Ground Albedo"
                 type    color
                 size    3
-                default { 170 170 170 }
+                default { 0.401978 0.401978 0.401978 }
                 help    "The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0."
                 parmtag { "spare_category" "Planet" }
                 parmtag { "usdvaluetype" "color3f" }
@@ -3921,7 +3921,7 @@
                 label   "Planet Radius"
                 type    float
                 size    1
-                default { 0 }
+                default { 6360 }
                 range   { 0.1! 10000! }
                 help    "The planet radius used when there is not SkyAtmosphere component present in the scene."
                 parmtag { "spare_category" "Planet" }
@@ -3934,7 +3934,7 @@
                 label   "Ground Albedo"
                 type    color
                 size    3
-                default { 0 0 0 }
+                default { 0.401978 0.401978 0.401978 }
                 help    "The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled."
                 parmtag { "spare_category" "Planet" }
                 parmtag { "usdvaluetype" "color3f" }
@@ -4342,7 +4342,7 @@
                 label   "Render In Main Pass"
                 type    toggle
                 size    1
-                default { 0 }
+                default { 1 }
                 help    "If true, this component will be rendered in the main pass (basepass, transparency)"
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "usdvaluetype" "bool" }
@@ -4355,7 +4355,7 @@
                 label   "Visible In Real Time Sky Captures"
                 type    toggle
                 size    1
-                default { 0 }
+                default { 1 }
                 help    "If true, this component will be visible in real-time sky light reflection captures."
                 parmtag { "spare_category" "Rendering" }
                 parmtag { "usdvaluetype" "bool" }
@@ -4375,7 +4375,7 @@
                 label   "Layer Bottom Altitude"
                 type    float
                 size    1
-                default { 0 }
+                default { 5 }
                 range   { 0 20 }
                 help    "The altitude at which the cloud layer starts. (kilometers above the ground)"
                 parmtag { "spare_category" "Layer" }
@@ -4388,7 +4388,7 @@
                 label   "Layer Height"
                 type    float
                 size    1
-                default { 0 }
+                default { 10 }
                 range   { 0.1! 20 }
                 help    "The height of the the cloud layer. (kilometers above the layer bottom altitude)"
                 parmtag { "spare_category" "Layer" }
@@ -4401,7 +4401,7 @@
                 label   "Tracing Start Max Distance"
                 type    float
                 size    1
-                default { 0 }
+                default { 350 }
                 range   { 1! 500 }
                 help    "The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)"
                 parmtag { "spare_category" "Layer" }
@@ -4428,7 +4428,7 @@
                 label   "Tracing Max Distance"
                 type    float
                 size    1
-                default { 0 }
+                default { 50 }
                 range   { 0.1! 500 }
                 help    "The maximum distance that will be traced inside the cloud layer. (kilometers)"
                 parmtag { "spare_category" "Layer" }
@@ -4479,7 +4479,7 @@
                 label   "Sky Light Cloud Bottom Occlusion"
                 type    float
                 size    1
-                default { 0 }
+                default { 0.5 }
                 range   { 0! 1! }
                 help    "Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4493,7 +4493,7 @@
                 label   "View Sample Count Scale"
                 type    float
                 size    1
-                default { 0 }
+                default { 1 }
                 range   { 0.05! 8 }
                 help    "Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4507,7 +4507,7 @@
                 label   "Reflection View Sample Count Scale Value"
                 type    float
                 size    1
-                default { 0 }
+                default { 1 }
                 range   { 0.05! 8 }
                 help    "Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4521,7 +4521,7 @@
                 label   "Shadow View Sample Count Scale"
                 type    float
                 size    1
-                default { 0 }
+                default { 1 }
                 range   { 0.05! 8 }
                 help    "Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4535,7 +4535,7 @@
                 label   "Shadow Reflection View Sample Count Scale Value"
                 type    float
                 size    1
-                default { 0 }
+                default { 1 }
                 range   { 0.05! 8 }
                 help    "Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4549,7 +4549,7 @@
                 label   "Shadow Tracing Distance"
                 type    float
                 size    1
-                default { 0 }
+                default { 15 }
                 range   { 0.01! 50 }
                 help    "The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows."
                 parmtag { "spare_category" "Cloud Tracing" }
@@ -4563,7 +4563,7 @@
                 label   "Stop Tracing Transmittance Threshold"
                 type    float
                 size    1
-                default { 0 }
+                default { 0.005 }
                 range   { 0! 1! }
                 help    "When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance."
                 parmtag { "spare_category" "Cloud Tracing" }

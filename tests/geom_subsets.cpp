@@ -86,8 +86,8 @@ int main() {
         mesh.sourceCorners = welded;
         for (const uint32_t corner : welded) {
             const int vertex = triangles[corner / 3][corner % 3];
-            mesh.points.emplace_back(float(vertex), 1, 2);
-            mesh.normals.emplace_back(0, 1, 0);
+            mesh.points.emplace_back(float(vertex), 1.f, 2.f);
+            mesh.normals.emplace_back(0.f, 1.f, 0.f);
             mesh.uv.emplace_back(float(vertex), .25f);
             mesh.uvSets.resize(1);
             mesh.uvSets[0].emplace_back(.5f, float(vertex));  // a second UV set follows its vertices too

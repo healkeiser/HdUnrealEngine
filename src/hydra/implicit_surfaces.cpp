@@ -369,19 +369,40 @@ public:
 // dictionary, which the scene delegate's Get() returns. Scene indices only: the legacy UsdImagingDelegate populates
 // nothing for them. Traits name the Sprim type, the primvar, and which attributes are values under which key.
 //
-// UnrealLocalFogVolume: unreal:localFogVolume:<ULocalFogVolumeComponent property>, all of them (the schema's fallbacks
-// are UE's defaults).
-struct HdUE_LocalFogTraits {
-    static constexpr const char* sprim = "unrealLocalFogVolume";
-    static constexpr const char* values = "unreal:localFogVolume";
-    static constexpr const char* label = "local fog volume";
+// The UE component's properties under one attribute namespace, all of them (the schema's fallbacks are UE's defaults),
+// by name after it (SecondFogData:FogDensity for a struct field).
+template <class Traits>
+struct HdUE_PrefixKey {
     static bool key(const TfToken& attribute, std::string* key) {
-        static const std::string prefix = "unreal:localFogVolume:";
+        static const std::string prefix = std::string(Traits::values) + ":";
         const auto& name = attribute.GetString();
         if (!TfStringStartsWith(name, prefix)) return false;
         if (key) *key = name.substr(prefix.size());
         return true;
     }
+};
+// UnrealLocalFogVolume: unreal:localFogVolume:<ULocalFogVolumeComponent property>.
+struct HdUE_LocalFogTraits : HdUE_PrefixKey<HdUE_LocalFogTraits> {
+    static constexpr const char* sprim = "unrealLocalFogVolume";
+    static constexpr const char* values = "unreal:localFogVolume";
+    static constexpr const char* label = "local fog volume";
+};
+// UnrealExponentialHeightFog, UnrealSkyAtmosphere, UnrealVolumetricCloud: the render settings' unreal:heightFog:*,
+// unreal:skyAtmosphere:* and unreal:volumetricCloud:* properties on a prim, which takes the render settings' place.
+struct HdUE_HeightFogTraits : HdUE_PrefixKey<HdUE_HeightFogTraits> {
+    static constexpr const char* sprim = "unrealExponentialHeightFog";
+    static constexpr const char* values = "unreal:heightFog";
+    static constexpr const char* label = "height fog";
+};
+struct HdUE_SkyAtmosphereTraits : HdUE_PrefixKey<HdUE_SkyAtmosphereTraits> {
+    static constexpr const char* sprim = "unrealSkyAtmosphere";
+    static constexpr const char* values = "unreal:skyAtmosphere";
+    static constexpr const char* label = "sky atmosphere";
+};
+struct HdUE_VolumetricCloudTraits : HdUE_PrefixKey<HdUE_VolumetricCloudTraits> {
+    static constexpr const char* sprim = "unrealVolumetricCloud";
+    static constexpr const char* values = "unreal:volumetricCloud";
+    static constexpr const char* label = "volumetric cloud";
 };
 // UnrealPostProcessVolume: unreal:postProcessVolume:<APostProcessVolume property> (all, UE's defaults as fallbacks),
 // and the authored unreal:postProcess:<FPostProcessSettings property> and unreal:postProcessMaterials, with the render
@@ -502,6 +523,9 @@ private:
 // Named classes: plugInfo.json registers the adapters by type name.
 class HdUE_LocalFogVolumeAdapter final : public HdUE_ActorAdapter<HdUE_LocalFogTraits> {};
 class HdUE_PostProcessVolumeAdapter final : public HdUE_ActorAdapter<HdUE_PostProcessVolumeTraits> {};
+class HdUE_HeightFogAdapter final : public HdUE_ActorAdapter<HdUE_HeightFogTraits> {};
+class HdUE_SkyAtmosphereAdapter final : public HdUE_ActorAdapter<HdUE_SkyAtmosphereTraits> {};
+class HdUE_VolumetricCloudAdapter final : public HdUE_ActorAdapter<HdUE_VolumetricCloudTraits> {};
 struct HdUEPurposeVisibility {
     static HdContainerDataSourceHandle edit(const HdSceneIndexBase& input, const SdfPath& path,
                                             const HdSceneIndexPrim& prim) {
@@ -689,6 +713,12 @@ TF_REGISTRY_FUNCTION(TfType) {
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_LocalFogVolumeAdapter>>();
     TfType::Define<HdUE_PostProcessVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_PostProcessVolumeAdapter>>();
+    TfType::Define<HdUE_HeightFogAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_HeightFogAdapter>>();
+    TfType::Define<HdUE_SkyAtmosphereAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_SkyAtmosphereAdapter>>();
+    TfType::Define<HdUE_VolumetricCloudAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_VolumetricCloudAdapter>>();
     TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_VisibilityAPIAdapter>>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassVisibilitySceneIndexPlugin>();

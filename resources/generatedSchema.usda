@@ -86,3 +86,397 @@ class UnrealPostProcessVolume "UnrealPostProcessVolume" (
         doc = """Whether this volume covers the whole world, or just the area inside its bounds."""
     )
 }
+
+class UnrealExponentialHeightFog "UnrealExponentialHeightFog" (
+    doc = """A UE Exponential Height Fog (UExponentialHeightFogComponent), rendered by hdUE: its density is FogDensity at the prim's height (its world position along the up axis). It takes the place of the render settings' unreal:heightFog; UE draws one height fog, the first prim by path."""
+)
+{
+    rel proxyPrim
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+    )
+    uniform token[] xformOpOrder
+    float unreal:heightFog:FogDensity = 0.02 (
+        displayName = "Fog Density"
+        doc = """Global density factor."""
+    )
+    float unreal:heightFog:FogHeightFalloff = 0.2 (
+        displayName = "Fog Height Falloff"
+        doc = """Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger."""
+    )
+    float unreal:heightFog:SecondFogData:FogDensity = 0 (
+        displayName = "Second Fog Density"
+        doc = """Global density factor for this fog. Density 0 turns the second fog off."""
+    )
+    float unreal:heightFog:SecondFogData:FogHeightFalloff = 0.2 (
+        displayName = "Second Fog Height Falloff"
+        doc = """Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger."""
+    )
+    float unreal:heightFog:SecondFogData:FogHeightOffset = 0 (
+        displayName = "Second Fog Height Offset"
+        doc = """Height offset, relative to the actor position Z."""
+    )
+    color3f unreal:heightFog:FogInscatteringLuminance = (0, 0, 0) (
+        displayName = "Fog Inscattering Color"
+        doc = """Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead."""
+    )
+    color3f unreal:heightFog:SkyAtmosphereAmbientContributionColorScale = (1, 1, 1) (
+        displayName = "Sky Atmosphere Ambient Contribution Color Scale"
+        doc = """Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0"""
+    )
+    string unreal:heightFog:InscatteringColorCubemap = "" (
+        displayName = "Inscattering Color Cubemap"
+        doc = """Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."""
+    )
+    float unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength = 0 (
+        displayName = "Sky Light Capture In-Scattering Strength"
+        doc = """When >0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog."""
+    )
+    float unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness = 0.15 (
+        displayName = "Sky Light Capture In-Scattering Roughness"
+        doc = """This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function."""
+    )
+    float unreal:heightFog:InscatteringColorCubemapAngle = 0 (
+        displayName = "Inscattering Color Cubemap Angle"
+        doc = """Angle to rotate the InscatteringColorCubemap around the Z axis."""
+    )
+    color3f unreal:heightFog:InscatteringTextureTint = (1, 1, 1) (
+        displayName = "Inscattering Texture Tint"
+        doc = """Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap."""
+    )
+    float unreal:heightFog:FullyDirectionalInscatteringColorDistance = 100000 (
+        displayName = "Fully Directional Inscattering Color Distance"
+        doc = """Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color."""
+    )
+    float unreal:heightFog:NonDirectionalInscatteringColorDistance = 1000 (
+        displayName = "Non Directional Inscattering Color Distance"
+        doc = """Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color."""
+    )
+    float unreal:heightFog:DirectionalInscatteringExponent = 4 (
+        displayName = "Directional Inscattering Exponent"
+        doc = """Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead."""
+    )
+    float unreal:heightFog:DirectionalInscatteringStartDistance = 10000 (
+        displayName = "Directional Inscattering Start Distance"
+        doc = """Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored."""
+    )
+    color3f unreal:heightFog:DirectionalInscatteringLuminance = (0, 0, 0) (
+        displayName = "Directional Inscattering Color"
+        doc = """Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored."""
+    )
+    float unreal:heightFog:FogMaxOpacity = 1 (
+        displayName = "Fog Max Opacity"
+        doc = """Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all."""
+    )
+    float unreal:heightFog:StartDistance = 0 (
+        displayName = "Start Distance"
+        doc = """Distance from the camera that the fog will start, in world units."""
+    )
+    float unreal:heightFog:EndDistance = 0 (
+        displayName = "End Distance"
+        doc = """Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0."""
+    )
+    float unreal:heightFog:FogCutoffDistance = 0 (
+        displayName = "Fog Cutoff Distance"
+        doc = """Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in."""
+    )
+    bool unreal:heightFog:bEnableVolumetricFog = false (
+        displayName = "Volumetric Fog"
+        doc = """Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior."""
+    )
+    float unreal:heightFog:VolumetricFogScatteringDistribution = 0.2 (
+        displayName = "Scattering Distribution"
+        doc = """Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0."""
+    )
+    color3f unreal:heightFog:VolumetricFogAlbedo = (1, 1, 1) (
+        displayName = "Albedo"
+        doc = """The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value."""
+    )
+    color3f unreal:heightFog:VolumetricFogEmissive = (0, 0, 0) (
+        displayName = "Emissive"
+        doc = """Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all."""
+    )
+    float unreal:heightFog:VolumetricFogExtinctionScale = 1 (
+        displayName = "Extinction Scale"
+        doc = """Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light."""
+    )
+    float unreal:heightFog:VolumetricFogDistance = 6000 (
+        displayName = "View Distance"
+        doc = """Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details."""
+    )
+    float unreal:heightFog:VolumetricFogStartDistance = 0 (
+        displayName = "Start Distance"
+        doc = """Distance from the camera that the volumetric fog will start, in world units."""
+    )
+    float unreal:heightFog:VolumetricFogNearFadeInDistance = 0 (
+        displayName = "Near Fade In Distance"
+        doc = """Distance over which volumetric fog will fade in from the start distance."""
+    )
+    float unreal:heightFog:VolumetricFogStaticLightingScatteringIntensity = 1 (
+        displayName = "Static Lighting Scattering Intensity"
+        doc = """"""
+    )
+    bool unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors = false (
+        displayName = "Override Light Colors With Fog Inscattering Colors"
+        doc = """Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting."""
+    )
+    bool unreal:heightFog:bEnableFSSS = false (
+        displayName = "Enable Fog Screen Space Scattering"
+        doc = """Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering."""
+    )
+    float unreal:heightFog:FSSSSceneColorScatteringAmountScale = 1 (
+        displayName = "Scene Color Scattering Amount Scale"
+        doc = """The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however."""
+    )
+    float unreal:heightFog:FSSSSceneColorScatteringAmountPower = 1 (
+        displayName = "Scene Color Scattering Amount Power"
+        doc = """Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense."""
+    )
+    float unreal:heightFog:FSSSSpreadScale = 0.1 (
+        displayName = "Spread Scale"
+        doc = """The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities."""
+    )
+    float unreal:heightFog:FSSSBlurControl = 0.5 (
+        displayName = "Blur Control"
+        doc = """When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture."""
+    )
+    bool unreal:heightFog:bHoldout = false (
+        displayName = "Holdout"
+        doc = """If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer."""
+    )
+    bool unreal:heightFog:bRenderInMainPass = true (
+        displayName = "Render In Main Pass"
+        doc = """If true, this component will be rendered in the main pass (basepass, transparency)"""
+    )
+    bool unreal:heightFog:bVisibleInReflectionCaptures = true (
+        displayName = "Visible In Reflection Captures"
+        doc = """If true, this component will be visible in reflection captures."""
+    )
+    bool unreal:heightFog:bVisibleInRealTimeSkyCaptures = true (
+        displayName = "Visible In Real Time Sky Captures"
+        doc = """If true, this component will be visible in real-time sky light reflection captures."""
+    )
+}
+
+class UnrealSkyAtmosphere "UnrealSkyAtmosphere" (
+    doc = """A UE Sky Atmosphere (USkyAtmosphereComponent), rendered by hdUE, at the prim's world position (UE's Transform Mode decides whether it is used). It takes the place of the render settings' unreal:skyAtmosphere; UE draws one, the first prim by path."""
+)
+{
+    rel proxyPrim
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+    )
+    uniform token[] xformOpOrder
+    token unreal:skyAtmosphere:TransformMode = "ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin" (
+        displayName = "Transform Mode"
+        doc = """The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0."""
+    )
+    float unreal:skyAtmosphere:BottomRadius = 6360 (
+        displayName = "Ground Radius"
+        doc = """The radius in kilometers from the center of the planet to the ground level."""
+    )
+    color3f unreal:skyAtmosphere:GroundAlbedo = (0.401978, 0.401978, 0.401978) (
+        displayName = "Ground Albedo"
+        doc = """The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0."""
+    )
+    float unreal:skyAtmosphere:AtmosphereHeight = 60 (
+        displayName = "Atmosphere Height"
+        doc = """The height of the atmosphere layer above the ground in kilometers."""
+    )
+    float unreal:skyAtmosphere:MultiScatteringFactor = 1 (
+        displayName = "MultiScattering"
+        doc = """Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0."""
+    )
+    float unreal:skyAtmosphere:TraceSampleCountScale = 1 (
+        displayName = "Trace Sample Count Scale"
+        doc = """Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'."""
+    )
+    float unreal:skyAtmosphere:RayleighScatteringScale = 0.0331 (
+        displayName = "Rayleigh Scattering Scale"
+        doc = """Rayleigh scattering coefficient scale."""
+    )
+    color3f unreal:skyAtmosphere:RayleighScattering = (0.1752870090634441, 0.40960725075528703, 1) (
+        displayName = "Rayleigh Scattering"
+        doc = """The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer."""
+    )
+    float unreal:skyAtmosphere:RayleighExponentialDistribution = 8 (
+        displayName = "Rayleigh Exponential Distribution"
+        doc = """The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%."""
+    )
+    float unreal:skyAtmosphere:MieScatteringScale = 0.003996 (
+        displayName = "Mie Scattering Scale"
+        doc = """Mie scattering coefficient scale."""
+    )
+    color3f unreal:skyAtmosphere:MieScattering = (1, 1, 1) (
+        displayName = "Mie Scattering"
+        doc = """The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more."""
+    )
+    float unreal:skyAtmosphere:MieAbsorptionScale = 0.000444 (
+        displayName = "Mie Absorption Scale"
+        doc = """Mie absorption coefficient scale."""
+    )
+    color3f unreal:skyAtmosphere:MieAbsorption = (1, 1, 1) (
+        displayName = "Mie Absorption"
+        doc = """The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more."""
+    )
+    float unreal:skyAtmosphere:MieAnisotropy = 0.8 (
+        displayName = "Mie Anisotropy"
+        doc = """A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources."""
+    )
+    float unreal:skyAtmosphere:MieExponentialDistribution = 1.2 (
+        displayName = "Mie Exponential Distribution"
+        doc = """The altitude in kilometer at which Mie effects are reduced to 40%."""
+    )
+    float unreal:skyAtmosphere:OtherAbsorptionScale = 0.001881 (
+        displayName = "Absorption Scale"
+        doc = """Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere."""
+    )
+    color3f unreal:skyAtmosphere:OtherAbsorption = (0.34556087187666135, 1, 0.045188729399255716) (
+        displayName = "Absorption"
+        doc = """Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere."""
+    )
+    color3f unreal:skyAtmosphere:SkyLuminanceFactor = (1, 1, 1) (
+        displayName = "Sky Luminance Factor"
+        doc = """Scales the luminance of pixels representing the sky. This will impact the captured sky light."""
+    )
+    color3f unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor = (1, 1, 1) (
+        displayName = "Sky And Aerial Perspective Luminance Factor"
+        doc = """Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light."""
+    )
+    float unreal:skyAtmosphere:AerialPespectiveViewDistanceScale = 1 (
+        displayName = "Aerial Perspective View Distance Scale"
+        doc = """Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent)."""
+    )
+    float unreal:skyAtmosphere:HeightFogContribution = 1 (
+        displayName = "Height Fog Contribution"
+        doc = """Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true."""
+    )
+    float unreal:skyAtmosphere:TransmittanceMinLightElevationAngle = -90 (
+        displayName = "Transmittance Min Light Elevation Angle"
+        doc = """The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective."""
+    )
+    float unreal:skyAtmosphere:AerialPerspectiveStartDepth = 0.1 (
+        displayName = "Aerial Perspective Start Depth"
+        doc = """The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test."""
+    )
+    bool unreal:skyAtmosphere:bHoldout = false (
+        displayName = "Holdout"
+        doc = """If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer."""
+    )
+    bool unreal:skyAtmosphere:bRenderInMainPass = true (
+        displayName = "Render In Main Pass"
+        doc = """If true, this component will be rendered in the main pass (basepass, transparency)"""
+    )
+}
+
+class UnrealVolumetricCloud "UnrealVolumetricCloud" (
+    doc = """A UE Volumetric Cloud (UVolumetricCloudComponent), rendered by hdUE with a Sky Atmosphere. It takes the place of the render settings' unreal:volumetricCloud; UE draws one, the first prim by path."""
+)
+{
+    rel proxyPrim
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+    )
+    uniform token[] xformOpOrder
+    float unreal:volumetricCloud:LayerBottomAltitude = 5 (
+        displayName = "Layer Bottom Altitude"
+        doc = """The altitude at which the cloud layer starts. (kilometers above the ground)"""
+    )
+    float unreal:volumetricCloud:LayerHeight = 10 (
+        displayName = "Layer Height"
+        doc = """The height of the the cloud layer. (kilometers above the layer bottom altitude)"""
+    )
+    float unreal:volumetricCloud:TracingStartMaxDistance = 350 (
+        displayName = "Tracing Start Max Distance"
+        doc = """The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)"""
+    )
+    float unreal:volumetricCloud:TracingStartDistanceFromCamera = 0 (
+        displayName = "Tracing Start Distance From Camera"
+        doc = """The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)"""
+    )
+    float unreal:volumetricCloud:TracingMaxDistance = 50 (
+        displayName = "Tracing Max Distance"
+        doc = """The maximum distance that will be traced inside the cloud layer. (kilometers)"""
+    )
+    float unreal:volumetricCloud:PlanetRadius = 6360 (
+        displayName = "Planet Radius"
+        doc = """The planet radius used when there is not SkyAtmosphere component present in the scene."""
+    )
+    color3f unreal:volumetricCloud:GroundAlbedo = (0.401978, 0.401978, 0.401978) (
+        displayName = "Ground Albedo"
+        doc = """The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled."""
+    )
+    string unreal:volumetricCloud:Material = "" (
+        displayName = "Material"
+        doc = """The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."""
+    )
+    bool unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance = false (
+        displayName = "Use Per Sample Atmospheric Light Transmittance"
+        doc = """Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance."""
+    )
+    float unreal:volumetricCloud:SkyLightCloudBottomOcclusion = 0.5 (
+        displayName = "Sky Light Cloud Bottom Occlusion"
+        doc = """Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value."""
+    )
+    float unreal:volumetricCloud:ViewSampleCountScale = 1 (
+        displayName = "View Sample Count Scale"
+        doc = """Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'."""
+    )
+    float unreal:volumetricCloud:ReflectionViewSampleCountScaleValue = 1 (
+        displayName = "Reflection View Sample Count Scale Value"
+        doc = """Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'."""
+    )
+    float unreal:volumetricCloud:ShadowViewSampleCountScale = 1 (
+        displayName = "Shadow View Sample Count Scale"
+        doc = """Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'."""
+    )
+    float unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue = 1 (
+        displayName = "Shadow Reflection View Sample Count Scale Value"
+        doc = """Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'."""
+    )
+    float unreal:volumetricCloud:ShadowTracingDistance = 15 (
+        displayName = "Shadow Tracing Distance"
+        doc = """The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows."""
+    )
+    float unreal:volumetricCloud:StopTracingTransmittanceThreshold = 0.005 (
+        displayName = "Stop Tracing Transmittance Threshold"
+        doc = """When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance."""
+    )
+    float unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance = 0 (
+        displayName = "Aerial Pespective Rayleigh Scattering Start Distance"
+        doc = """Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)"""
+    )
+    float unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance = 0 (
+        displayName = "Aerial Pespective Rayleigh Scattering Fade Distance"
+        doc = """Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"""
+    )
+    float unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance = 0 (
+        displayName = "Aerial Pespective Mie Scattering Start Distance"
+        doc = """Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)"""
+    )
+    float unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance = 0 (
+        displayName = "Aerial Pespective Mie Scattering Fade Distance"
+        doc = """Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)"""
+    )
+    bool unreal:volumetricCloud:bHoldout = false (
+        displayName = "Holdout"
+        doc = """If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer."""
+    )
+    bool unreal:volumetricCloud:bRenderInMainPass = true (
+        displayName = "Render In Main Pass"
+        doc = """If true, this component will be rendered in the main pass (basepass, transparency)"""
+    )
+    bool unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures = true (
+        displayName = "Visible In Real Time Sky Captures"
+        doc = """If true, this component will be visible in real-time sky light reflection captures."""
+    )
+}

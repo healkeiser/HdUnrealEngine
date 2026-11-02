@@ -1218,6 +1218,7 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
         const auto it = state.actors.find(id);
         if (it == state.actors.end()) continue;
         const auto& actor = it->second;
+        if (HdUEActorData::component(actor.kind)) continue;  // sent with the render settings
         const bool postProcess = actor.kind == HdUEActorData::Kind::PostProcess;
         HdueLocalFogVolumeDesc desc{};  // HduePostProcessVolumeDesc is the same struct
         desc.struct_size = sizeof(desc);
@@ -2836,7 +2837,28 @@ public:
                     // unreal:heightFog places UE's Exponential Height Fog (volumetric fog included),
                     // unreal:heightFog:<UExponentialHeightFogComponent property> sets it, and unreal:heightFogHeight
                     // (scene units along the up axis) is where its density is FogDensity.
-                    const bool heightFog = s.setting<bool>("heightFog", false);
+                    // Scene prims (UnrealExponentialHeightFog, UnrealSkyAtmosphere, UnrealVolumetricCloud) take the
+                    // render settings' place: the first visible prim of each kind by path (UE draws one of each), at
+                    // its world position (UE centimetres; a height fog's Z is its height).
+                    std::map<std::string, std::pair<std::string, std::vector<std::pair<std::string, std::string>>>>
+                        placed;  // UE name -> location, values
+                    s.locked([&] {
+                        for (const auto& [id, actor] : s.actors)
+                            if (const char* ue = HdUEActorData::component(actor.kind);
+                                ue && actor.visible && !placed.count(ue)) {
+                                const auto at = s.convert(actor.localToWorld.ExtractTranslation());
+                                placed[ue] = {TfStringPrintf("%.9g %.9g %.9g", at[0], at[1], at[2]), actor.values};
+                            }
+                    });
+                    for (const auto& [ue, component] : placed) {
+                        names.insert(names.end(), {ue, ue + ":RelativeLocation"});
+                        values.insert(values.end(), {"True", component.first});
+                        for (const auto& [name, value] : component.second) {
+                            names.push_back(ue + ":" + name);
+                            values.push_back(value);
+                        }
+                    }
+                    const bool heightFog = s.setting<bool>("heightFog", false) && !placed.count("HeightFog");
                     if (heightFog) {
                         const double heightCm =
                             s.setting<double>("heightFogHeight", 0) * s.setting<double>("metersPerUnit", .01) * 100;
@@ -2851,7 +2873,7 @@ public:
                         {"volumetricCloud", "VolumetricCloud"}};
                     std::map<std::string, std::string> enabled;  // setting prefix "<name>:" -> UE name
                     for (const auto& [setting, ue] : components)
-                        if (s.setting<bool>(setting, false)) {
+                        if (s.setting<bool>(setting, false) && !placed.count(ue)) {
                             enabled[std::string(setting) + ":"] = ue;
                             if (std::string(ue) != "HeightFog") {  // HeightFog is above, with its height
                                 names.push_back(ue);
@@ -3287,12 +3309,24 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedRprimTypes() const {
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
-    static TfTokenVector t{
-        HdPrimTypeTokens->camera,       HdPrimTypeTokens->material,      HdPrimTypeTokens->extComputation,
-        HdPrimTypeTokens->distantLight, HdPrimTypeTokens->sphereLight,   HdPrimTypeTokens->rectLight,
-        HdPrimTypeTokens->domeLight,    HdPrimTypeTokens->diskLight,     HdPrimTypeTokens->cylinderLight,
-        HdPrimTypeTokens->meshLight,    HdPrimTypeTokens->pluginLight,   TfToken("portalLight"),
-        HdPrimTypeTokens->light,        TfToken("unrealLocalFogVolume"), TfToken("unrealPostProcessVolume")};
+    static TfTokenVector t{HdPrimTypeTokens->camera,
+                           HdPrimTypeTokens->material,
+                           HdPrimTypeTokens->extComputation,
+                           HdPrimTypeTokens->distantLight,
+                           HdPrimTypeTokens->sphereLight,
+                           HdPrimTypeTokens->rectLight,
+                           HdPrimTypeTokens->domeLight,
+                           HdPrimTypeTokens->diskLight,
+                           HdPrimTypeTokens->cylinderLight,
+                           HdPrimTypeTokens->meshLight,
+                           HdPrimTypeTokens->pluginLight,
+                           TfToken("portalLight"),
+                           HdPrimTypeTokens->light,
+                           TfToken("unrealLocalFogVolume"),
+                           TfToken("unrealPostProcessVolume"),
+                           TfToken("unrealExponentialHeightFog"),
+                           TfToken("unrealSkyAtmosphere"),
+                           TfToken("unrealVolumetricCloud")};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -3337,6 +3371,9 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
         return HdUECreateUnsupportedLight(id, type);
     if (type == TfToken("unrealLocalFogVolume")) return HdUECreateActor(id, HdUEActorData::Kind::LocalFog);
     if (type == TfToken("unrealPostProcessVolume")) return HdUECreateActor(id, HdUEActorData::Kind::PostProcess);
+    if (type == TfToken("unrealExponentialHeightFog")) return HdUECreateActor(id, HdUEActorData::Kind::HeightFog);
+    if (type == TfToken("unrealSkyAtmosphere")) return HdUECreateActor(id, HdUEActorData::Kind::SkyAtmosphere);
+    if (type == TfToken("unrealVolumetricCloud")) return HdUECreateActor(id, HdUEActorData::Kind::VolumetricCloud);
     return nullptr;
 }
 HdSprim* HdUERenderDelegate::CreateFallbackSprim(const TfToken& type) {

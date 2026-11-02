@@ -278,6 +278,54 @@ class PostProcessVolume(unittest.TestCase):
         self.assertFalse(edit.stage().GetPrimAtPath("/postprocess/edit"))
 
 
+class SceneComponents(unittest.TestCase):
+    """hdUE Height Fog, Sky Atmosphere and Volumetric Cloud: their prim, with UE's defaults as the schema's fallbacks."""
+
+    NODES = (
+        (
+            "hdue::hdueheightfog::1.0",
+            "UnrealExponentialHeightFog",
+            "unreal:heightFog:FogDensity",
+            0.02,
+        ),
+        (
+            "hdue::hdueskyatmosphere::1.0",
+            "UnrealSkyAtmosphere",
+            "unreal:skyAtmosphere:BottomRadius",
+            6360,
+        ),
+        (
+            "hdue::hduevolumetriccloud::1.0",
+            "UnrealVolumetricCloud",
+            "unreal:volumetricCloud:LayerBottomAltitude",
+            5,
+        ),
+    )
+
+    def test_create_and_set(self):
+        for node_type, prim_type, attribute, default in self.NODES:
+            with self.subTest(node_type):
+                hou.hipFile.clear(suppress_save_prompt=True)
+                node = hou.node("/stage").createNode(node_type, "component")
+                prim = node.stage().GetPrimAtPath("/environment/component")
+                self.assertEqual(prim.GetTypeName(), prim_type)
+                # Do Nothing by default: the schema's fallback, UE's constructor value, applies.
+                self.assertFalse(prim.GetAttribute(attribute).IsAuthored())
+                self.assertAlmostEqual(
+                    prim.GetAttribute(attribute).Get(), default, places=5
+                )
+                self.assertAlmostEqual(
+                    node.parm(encode(attribute)).eval(), default, places=5
+                )
+                node.parm(encode(attribute + "_control")).set("set")
+                node.parm(encode(attribute)).set(default * 0.5)
+                prim = node.stage().GetPrimAtPath("/environment/component")
+                self.assertAlmostEqual(
+                    prim.GetAttribute(attribute).Get(), default * 0.5, places=4
+                )
+                self.assertFalse(node.errors())
+
+
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=2).result
     sys.exit(0 if result.wasSuccessful() else 1)
