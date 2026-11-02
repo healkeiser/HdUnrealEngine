@@ -137,3 +137,21 @@ Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\P
     -Label 'rect light atlas PSO precache patch' -Marker 'RectLightAtlasGlobalPSOCollector' -Edits @(
     @('#include "DataDrivenShaderPlatformInfo.h"', "#include `"DataDrivenShaderPlatformInfo.h`"`n#include `"PSOPrecache.h`"`t// hdUE: RectLightAtlasGlobalPSOCollector`n#include `"MeshPassProcessor.h`""),
     @('IMPLEMENT_GLOBAL_SHADER(FRectAtlasFilterTexturePS, "/Engine/Private/RectLightAtlas.usf", "MainPS", SF_Pixel);', $RectCollector.TrimEnd("`n")))
+# FShaderLibraryInstance::GetOrCreateShader checks its cache, then creates the shader without the lock. Shaders with the
+# same code share one library shader, so two threads can create it at once: the first one's shader map releases its
+# preload of the code as soon as it has the shader (FShaderMapResource::CreateShaderOrCrash), and the second then reads
+# the code again and waits for it ("Spent N ms in a blocking wait for shader preload", 20-30 per startup, from the
+# global compute PSO precache's tasks and the default material's Nanite raster PSO precache). Under the cache's lock,
+# a shader created meanwhile is used, or the code gets a reference that lasts until the shader is created.
+$Anchor = "`t`t`t`tShader.PreloadingState = EPreloadingState::CannotPreload;`n`t`t`t}`n`t`t}`n`n`t`tRHIShader = Library->CreateShader(ShaderIndex, bRequired);"
+$Fixed = (
+    "`t`t`t`tShader.PreloadingState = EPreloadingState::CannotPreload;", "`t`t`t}",
+    "`t`t`t// hdUE: another thread may have created it since the read above, and its shader map released the preloaded",
+    "`t`t`t// code then: use that shader, or keep the code until this one is created (Apply-ResidencyPatch.ps1).",
+    "`t`t`tif (Shader.RHIShader)", "`t`t`t{", "`t`t`t`treturn Shader.RHIShader;", "`t`t`t}",
+    "`t`t`tFGraphEventArray PreloadEvents;", "`t`t`tLibrary->PreloadShader(ShaderIndex, PreloadEvents);", "`t`t}", "",
+    "`t`tRHIShader = Library->CreateShader(ShaderIndex, bRequired);",
+    "`t`tLibrary->ReleasePreloadedShader(ShaderIndex);`t// hdUE: the reference taken under the lock"
+) -join "`n"
+Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\RenderCore\Private\ShaderLibrary\ShaderLibraryInstance.cpp') `
+    -Label 'shader creation race patch' -Marker 'hdUE: the reference taken under the lock' -Edits @(, @($Anchor, $Fixed))

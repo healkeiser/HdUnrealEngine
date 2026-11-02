@@ -188,6 +188,7 @@ hdUE runs a stock Unreal Engine 5.8.4 built from source, with these changes to t
 |---|---|
 | `VirtualTextureSystem.h`: one `friend` declaration (`scripts/Apply-ResidencyPatch.ps1`) | The Path Tracer waits until every virtual-texture page it needs is loaded; UE's public API cannot report that. |
 | `NaniteDisplace.cpp`: an editor-only guard around one displacement-texture read (same script) | So Nanite meshes can be built at runtime, outside the editor. |
+| `ShaderLibraryInstance.cpp`: a second cache check, under the lock, before creating a shader (same script) | Two threads creating the same shader at startup read its code twice and waited for it ([building](docs/building.md#bundled-pso-cache)). |
 | `MeshCards.cpp` compiles two of UE's private source files (`MeshRepresentationCommon.cpp`, `MeshCardRepresentationUtilities.cpp`) into the backend | To build Lumen cards for meshes created at runtime; the editor normally builds them on import. |
 | Build settings: a monolithic UELibrary target with Developer modules, and `IS_RUNNING_GAMETHREAD_ON_EXTERNAL_THREAD` | UE runs as a DLL inside Houdini, on a thread hdUE starts; Nanite and Lumen cards need the Developer modules ([EULA note](docs/houdini.md)). |
 
