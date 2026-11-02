@@ -36,3 +36,5 @@ uv.lock
 # (docs/building.md)
 /unreal/HdUEBackend/Plugins/DLSS/
 /unreal/HdUEBackend/Plugins/StreamlineNGXCommon/
+# Claude Code local settings and session state
+/.claude/
