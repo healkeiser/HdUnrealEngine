@@ -21,6 +21,9 @@
 #include "Engine/World.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/LocalFogVolumeComponent.h"
+#include "Components/BoxComponent.h"
+#include "Components/PostProcessComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "CameraCalibrationSubsystem.h"
@@ -219,8 +222,8 @@ struct FSession {
     TStrongObjectPtr<USphericalLensDistortionModelHandler> LensHandler;
     TStrongObjectPtr<ACameraActor> LensCamera;
     float LensOverscan = 0;
-    // upsert_local_fog_volume: the Local Fog Volume actors, by id.
-    TMap<FString, TWeakObjectPtr<AActor>> LocalFogVolumes;
+    // upsert_local_fog_volume and upsert_post_process_volume: the actors placed from prims, by id.
+    TMap<FString, TWeakObjectPtr<AActor>> PlacedActors;
     bool Tonemapper = false;
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
@@ -435,7 +438,9 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         // package against Houdini's): log the one this process uses.
         if (HMODULE Tbb = GetModuleHandleW(L"tbb12.dll")) {
             using FVersion = int (*)();
-            const auto Version = reinterpret_cast<FVersion>(GetProcAddress(Tbb, "TBB_runtime_interface_version"));
+            // Through void*: a direct FARPROC cast warns (C4191).
+            const auto Version = reinterpret_cast<FVersion>(
+                reinterpret_cast<void*>(GetProcAddress(Tbb, "TBB_runtime_interface_version")));
             GetModuleFileNameW(Tbb, Path.GetData(), Path.Num());
             UE_LOG(LogTemp, Log, TEXT("hdUE: tbb12 interface version %d from %s"), Version ? Version() : -1,
                    Path.GetData());
@@ -558,8 +563,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     HdueSharedFrames::Reset();
     for (auto& [Prefix, Component] : Session->SceneComponents)
         if (Component.Actor.IsValid()) Component.Actor->Destroy();
-    for (const auto& Fog : Session->LocalFogVolumes)
-        if (Fog.Value.IsValid()) Fog.Value->Destroy();
+    for (const auto& Placed : Session->PlacedActors)
+        if (Placed.Value.IsValid()) Placed.Value->Destroy();
     Session->Scene.Reset();
     // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
     // or the persistent view go.
@@ -939,6 +944,9 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         Settings.DepthOfFieldFstop = 0.f;
     }
     if (!Aov) {
+        // Post-process volumes first, then the render settings, as Movie Render Queue blends the world's volumes
+        // before the camera's settings (MoviePipelineUtils.cpp, DoPostProcessBlend).
+        Runtime.World->AddPostProcessingSettings(Options.ViewOrigin, &View);
         View.OverridePostProcessSettings(Session.PostProcess, 1.f);
         // DepthOfFieldEnabled (Lens > Depth of Field > Enabled) only switches off the raster DOF: the Path Tracer's
         // reference DOF reads the show flag, PathTracingEnableReferenceDOF and the focal distance (PathTracing.cpp).
@@ -1766,8 +1774,8 @@ HdueResult HDUE_CALL UpsertLocalFogVolume(HdueSession Handle, const HdueLocalFog
         if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     const FString Id = UTF8_TO_TCHAR(Desc->id);
-    if (const auto* Old = Session->LocalFogVolumes.Find(Id); Old && Old->IsValid()) (*Old)->Destroy();
-    Session->LocalFogVolumes.Remove(Id);
+    if (const auto* Old = Session->PlacedActors.Find(Id); Old && Old->IsValid()) (*Old)->Destroy();
+    Session->PlacedActors.Remove(Id);
     Session->HasRequest = false;  // restart accumulation, as scene batches do
     if (!Desc->visible) return HDUE_OK;
     AActor* Actor = Runtime.World->SpawnActor<AActor>();
@@ -1791,7 +1799,96 @@ HdueResult HDUE_CALL UpsertLocalFogVolume(HdueSession Handle, const HdueLocalFog
         Properties += FString::Printf(TEXT(" %hs=%hs"), Desc->names[Index], Desc->values[Index]);
     UE_LOG(LogTemp, Log, TEXT("hdUE: local fog volume %s at %s:%s"), *Id, *Fog->GetComponentTransform().ToString(),
            *Properties);
-    Session->LocalFogVolumes.Add(Id, Actor);
+    Session->PlacedActors.Add(Id, Actor);
+    return HDUE_OK;
+}
+
+// One FPostProcessSettings property from its text, with its bOverride_ flag set (UE blends only overridden ones).
+static bool ImportPostProcessSetting(FPostProcessSettings& Settings, const FString& Name, const FString& Text) {
+    FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
+    if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPropertyValue(Property, Text, &Settings))
+        return false;
+    if (auto* Override = CastField<FBoolProperty>(
+            FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name))))
+        Override->SetPropertyValue_InContainer(&Settings, true);
+    return true;
+}
+
+// A post-process material (a cooked path) added to the settings' blendables, kept loaded by Materials.
+static void AddPostProcessMaterial(FPostProcessSettings& Settings,
+                                   TArray<TStrongObjectPtr<UMaterialInterface>>& Materials, const FString& Path) {
+    auto* Material = Path.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Path);
+    if (!Material || !Material->GetMaterial() || Material->GetMaterial()->MaterialDomain != MD_PostProcess) {
+        UE_LOG(LogTemp, Warning,
+               TEXT("hdUE: post-process material '%s' skipped (missing or not a post-process material)"), *Path);
+        return;
+    }
+    Materials.Emplace(Material);
+    Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
+}
+
+// upsert_post_process_volume: an actor with a box (the volume's bounds, as APostProcessVolume's brush: no collision,
+// but a physics state for UPostProcessComponent's distance queries) and a UPostProcessComponent attached to it, which
+// registers with the world's post-process volumes; ApplyPostProcess blends them with UE's own
+// UWorld::AddPostProcessingSettings. Rebuilt on every upsert, as local fog volumes. Texture settings take cooked paths
+// (image files are imported for the render settings only).
+HdueResult HDUE_CALL UpsertPostProcessVolume(HdueSession Handle, const HduePostProcessVolumeDesc* Desc) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id || (Desc->count && (!Desc->names || !Desc->values)))
+        return HDUE_INVALID_ARGUMENT;
+    for (double Value : Desc->transform)
+        if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
+    for (uint32 Index = 0; Index < Desc->count; ++Index)
+        if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    const FString Id = UTF8_TO_TCHAR(Desc->id);
+    if (const auto* Old = Session->PlacedActors.Find(Id); Old && Old->IsValid()) (*Old)->Destroy();
+    Session->PlacedActors.Remove(Id);
+    Session->HasRequest = false;  // restart accumulation, as scene batches do
+    if (!Desc->visible) return HDUE_OK;
+    AActor* Actor = Runtime.World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Actor);
+    Box->SetBoxExtent(FVector(100.0), false);
+    Box->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+    Box->bAlwaysCreatePhysicsState = true;
+    Box->SetMobility(EComponentMobility::Movable);
+    Actor->SetRootComponent(Box);
+    Actor->AddInstanceComponent(Box);
+    auto* Volume = NewObject<UPostProcessComponent>(Actor);
+    Volume->bUnbound = false;  // APostProcessVolume's default (UPostProcessComponent's is unbound)
+    FString Properties;
+    for (uint32 Index = 0; Index < Desc->count; ++Index) {
+        const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        Properties += FString::Printf(TEXT(" %s=%s"), *Name, *Text);
+        bool Done = false;
+        if (Name == TEXT("Settings:Materials")) {
+            TArray<FString> Paths;
+            Text.ParseIntoArrayWS(Paths);
+            TArray<TStrongObjectPtr<UMaterialInterface>> Loaded;  // the component's settings reference them
+            for (const FString& Path : Paths) AddPostProcessMaterial(Volume->Settings, Loaded, Path);
+            Done = true;
+        } else if (Name.StartsWith(TEXT("Settings:"))) {
+            Done = ImportPostProcessSetting(Volume->Settings, Name.RightChop(9), Text);
+        } else if (FProperty* Property = UPostProcessComponent::StaticClass()->FindPropertyByName(*Name);
+                   Property && Name != TEXT("Settings")) {
+            Done = ImportPropertyValue(Property, Text, Volume);
+        }
+        if (!Done)
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: post-process volume setting %s = '%s' skipped (unknown property or value)"), *Name,
+                   *Text);
+    }
+    FMatrix Matrix;
+    for (int R = 0; R < 4; ++R)
+        for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc->transform[R * 4 + C];
+    Box->SetWorldTransform(FTransform(Matrix));
+    Box->RegisterComponent();
+    Volume->SetupAttachment(Box);
+    Actor->AddInstanceComponent(Volume);
+    Volume->RegisterComponent();
+    UE_LOG(LogTemp, Log, TEXT("hdUE: post-process volume %s at %s:%s"), *Id, *Box->GetComponentTransform().ToString(),
+           *Properties);
+    Session->PlacedActors.Add(Id, Actor);
     return HDUE_OK;
 }
 
@@ -1843,25 +1940,14 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
             }
             continue;
         }
-        if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPropertyValue(Property, Text, &Settings)) {
+        if (!ImportPostProcessSetting(Settings, Name, Text))
             UE_LOG(LogTemp, Warning, TEXT("hdUE: post-process setting %s = '%s' skipped (unknown property or value)"),
                    *Name, *Text);
-            continue;
-        }
-        if (Override) Override->SetPropertyValue_InContainer(&Settings, true);
     }
     TArray<TStrongObjectPtr<UMaterialInterface>> Materials;
-    for (uint32 Index = 0; Index < Desc->material_count; ++Index) {
-        const FString Path = Desc->materials[Index] ? UTF8_TO_TCHAR(Desc->materials[Index]) : TEXT("");
-        auto* Material = Path.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Path);
-        if (!Material || !Material->GetMaterial() || Material->GetMaterial()->MaterialDomain != MD_PostProcess) {
-            UE_LOG(LogTemp, Warning,
-                   TEXT("hdUE: post-process material '%s' skipped (missing or not a post-process material)"), *Path);
-            continue;
-        }
-        Materials.Emplace(Material);
-        Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, Material));
-    }
+    for (uint32 Index = 0; Index < Desc->material_count; ++Index)
+        AddPostProcessMaterial(Settings, Materials,
+                               Desc->materials[Index] ? UTF8_TO_TCHAR(Desc->materials[Index]) : TEXT(""));
     RestoreConsoleVariables(Variables);
     for (auto It = Session->PostProcessTextures.CreateIterator(); It; ++It)
         if (!Files.Contains(It.Key())) It.RemoveCurrent();  // no longer set from a file
@@ -2175,9 +2261,9 @@ HdueResult HDUE_CALL RemoveAsset(HdueSession Handle, const char* Id) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.Remove(UTF8_TO_TCHAR(Id));
-    if (TWeakObjectPtr<AActor> Fog;
-        Runtime.Session->LocalFogVolumes.RemoveAndCopyValue(UTF8_TO_TCHAR(Id), Fog) && Fog.IsValid())
-        Fog->Destroy();
+    if (TWeakObjectPtr<AActor> Placed;
+        Runtime.Session->PlacedActors.RemoveAndCopyValue(UTF8_TO_TCHAR(Id), Placed) && Placed.IsValid())
+        Placed->Destroy();
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
     Runtime.World->SetShouldTick(true);
@@ -2285,7 +2371,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .acquire_gpu_frame = AcquireGpuFrame,
             .update_meshes = UpdateMeshes,
             .upsert_local_fog_volume = UpsertLocalFogVolume,
-            .upsert_groom = UpsertGroom};
+            .upsert_groom = UpsertGroom,
+            .upsert_post_process_volume = UpsertPostProcessVolume};
     return HDUE_OK;
 }
 #endif

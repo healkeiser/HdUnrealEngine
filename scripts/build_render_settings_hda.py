@@ -1213,6 +1213,7 @@ def build_prim_lop(
     guide,
     summary,
     overview,
+    extra=(),
 ):
     """A create/edit LOP for one prim type: Edit Properties' header (the prim type fixed, only that type editable),
     Sphere's transform section and folders of (label, settings); in Create mode,
@@ -1265,6 +1266,7 @@ def build_prim_lop(
             for template in property_templates(setting):
                 folder.addParmTemplate(template)
         properties.append(folder)
+    properties += list(extra)  # folders of ready-made control/value parameters
 
     inner = props.parmTemplateGroup()
     for template in properties:
@@ -1373,11 +1375,145 @@ def build_local_fog_volume():
     )
 
 
+def post_process_folders():
+    """The unreal:postProcess:* parameters of the Render Settings LOP's Unreal Engine tab (HdUnrealEngine_Global.ds),
+    in its tabs and sections, for a post-process volume: the volume blends the same FPostProcessSettings. Each keeps its
+    control menu (Do Nothing by default: as UE's bOverride_ flags, only the settings turned on override), without the
+    render settings' Essential | Advanced and render-mode conditions. Texture files are left out: a volume's textures
+    are cooked paths, which the backend does not import from image files.
+    """
+    import hou
+
+    source = hou.node("/stage").createNode(
+        "rendersettings", "post_process_source"
+    )
+    renderer = source.parmTemplateGroup().findFolder("Unreal Engine")
+    source.destroy()
+
+    def flatten(template):
+        if template.type() == hou.parmTemplateType.Folder:
+            for child in template.parmTemplates():
+                yield from flatten(child)
+        else:
+            yield template
+
+    values = {
+        t.name()
+        for t in flatten(renderer)
+        if hou.text.decode(t.name()).startswith("unreal:postProcess")
+        and not hou.text.decode(t.name()).endswith("_control")
+        and not (
+            t.type() == hou.parmTemplateType.String
+            and t.stringType() == hou.stringParmType.FileReference
+        )
+    }
+
+    def kept(template):
+        decoded = hou.text.decode(template.name())
+        if decoded.endswith("_control"):
+            return hou.text.encode(decoded[: -len("_control")]) in values
+        return template.name() in values
+
+    def strip(template):
+        if template.type() == hou.parmTemplateType.Folder:
+            children = [
+                strip(t)
+                for t in template.parmTemplates()
+                if t.type() == hou.parmTemplateType.Folder or kept(t)
+            ]
+            template.setParmTemplates([t for t in children if t is not None])
+            for kind in (
+                hou.parmCondType.HideWhen,
+                hou.parmCondType.DisableWhen,
+            ):
+                template.setTabConditional(kind, "")
+            return template if template.parmTemplates() else None
+        conditionals = template.conditionals()
+        template.setConditional(hou.parmCondType.HideWhen, "")
+        disable = " ".join(
+            term
+            for term in re.findall(
+                r"\{[^}]*\}", conditionals.get(hou.parmCondType.DisableWhen, "")
+            )
+            if "_control" in term
+        )
+        template.setConditional(hou.parmCondType.DisableWhen, disable)
+        tags = dict(template.tags())
+        tags.pop("hdue::essential_hidewhen", None)
+        template.setTags(tags)
+        return template
+
+    # The tab's main settings above its tabs (Exposure Compensation, ...) in a first tab of their own.
+    main = hou.FolderParmTemplate(
+        "folder_main", "Main", folder_type=hou.folderType.Tabs
+    )
+    main.setParmTemplates(
+        [
+            t
+            for t in renderer.parmTemplates()
+            if t.type() != hou.parmTemplateType.Folder
+        ]
+    )
+    folders = [
+        strip(t)
+        for t in [main, *renderer.parmTemplates()]
+        if t.type() == hou.parmTemplateType.Folder
+    ]
+    return [f for f in folders if f is not None]
+
+
+def build_post_process_volume():
+    """HdUE Post Process Volume: creates or edits an UnrealPostProcessVolume prim (UE's APostProcessVolume), a box
+    whose post-process settings UE blends into the view by priority, blend radius and weight.
+    """
+    from generate_render_settings import post_process_volume_settings
+    from local_paths import local_path
+
+    def guide(subnet, previous):
+        # The volume's box in the viewport: the cube from -1 to 1 it fills, a guide under the prim.
+        cube = subnet.createNode("cube", "guide")
+        cube.setInput(0, previous)
+        cube.parm("primpath").set('`chs("../primpath")`/guide')
+        cube.parm("size").set(2.0)
+        purpose = subnet.createNode("configureprimitive", "guide_purpose")
+        purpose.setInput(0, cube)
+        purpose.parm("primpattern").set('`chs("../primpath")`/guide')
+        purpose.parm("setpurpose").set(True)
+        purpose.parm("purpose").set("guide")
+        return purpose
+
+    build_prim_lop(
+        OTLS / "hdue_postprocessvolume.hda",
+        f"hdue::hduepostprocessvolume::{VERSION}",
+        "hdUE Post Process Volume",
+        "HDUE_hdue",
+        "UnrealPostProcessVolume",
+        "/postprocess/$OS",
+        [
+            (
+                "Post Process Volume",
+                post_process_volume_settings(local_path("engine_root")),
+            )
+        ],
+        guide,
+        "Creates or edits a UE Post Process Volume: a box whose post-process settings blend in while the camera is "
+        "inside or near it.",
+        "Like a Post Process Volume placed in a UE level, it creates or edits an UnrealPostProcessVolume prim: a box "
+        "filling the cube from -1 to 1 of its local space (Uniform Scale 1 is a 2-unit box), with UE's Priority, Blend "
+        "Radius (UE centimetres), Blend Weight, Enabled and Infinite Extent (Unbound). Its other tabs are the render "
+        "settings' post-process settings: turn a setting's control to Set or Create to override it, as UE's override "
+        "checkboxes. UE blends the volumes the camera is in or near, by priority, before the render settings' own "
+        "post-process settings (which act as the camera's). Textures take cooked paths here, not image files.",
+        extra=post_process_folders(),
+    )
+
+
 if __name__ == "__main__":
     if os.environ.get("HDUE_BUILD_HDA"):
         build()
         build_standard_render_vars()
         build_render_products()
         build_local_fog_volume()
+        build_post_process_volume()
     else:
         relaunch()

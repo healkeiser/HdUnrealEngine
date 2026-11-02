@@ -208,14 +208,17 @@ struct HdUEVolumeData {
     VtFloatArray emission;
     float emissionIntensity = 1, temperatureScale = 1;
 };
-// An UnrealLocalFogVolume prim: a unit sphere in its local space, and its unreal:localFogVolume:<property> values as
-// text, by ULocalFogVolumeComponent property name.
-struct HdUELocalFogData {
+// A UE actor placed from a typed prim (HdUE_ActorAdapter): its transform, visibility, and its property values as
+// text by UE name. An UnrealLocalFogVolume is UE's base volume in the unit sphere of its local space, by
+// ULocalFogVolumeComponent property; an UnrealPostProcessVolume a box filling the cube from -1 to 1, by
+// UPostProcessComponent property, and Settings:<FPostProcessSettings property> for its settings.
+struct HdUEActorData {
+    enum class Kind { LocalFog, PostProcess } kind = Kind::LocalFog;
     std::string id;
     bool visible = true;
     GfMatrix4d localToWorld{1};
     std::vector<std::pair<std::string, std::string>> values;
-    bool operator==(const HdUELocalFogData&) const = default;
+    bool operator==(const HdUEActorData&) const = default;
 };
 // BasisCurves with unreal:groom: UE hair strands (a UGroomAsset built at runtime) instead of tube meshes. Points are
 // the curves' evaluated samples in their own space, widths per point in scene units, counts the points per curve.
@@ -298,7 +301,7 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
-    std::map<std::string, HdUELocalFogData> localFogs;
+    std::map<std::string, HdUEActorData> actors;
     std::map<std::string, HdUEGroomData> grooms;
     std::map<std::string, HdUEMotionSamples> cameraMotion;  // absolute camera transforms by camera id
     std::atomic<bool> paused{false};  // Pause()/houdini:render_pause: no frames are requested or drawn
@@ -315,7 +318,7 @@ struct HdUEState : HdRenderParam {
     mutable std::mutex stageMutex;
     std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex;  // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
-    std::set<std::string> dirtyVolumes, dirtyLocalFogs, dirtyGrooms;
+    std::set<std::string> dirtyVolumes, dirtyActors, dirtyGrooms;
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;

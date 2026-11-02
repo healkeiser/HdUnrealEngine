@@ -215,6 +215,69 @@ class LocalFogVolume(unittest.TestCase):
         )
 
 
+class PostProcessVolume(unittest.TestCase):
+    TYPE = "hdue::hduepostprocessvolume::1.0"
+    BIAS = "unreal:postProcess:AutoExposureBias"
+
+    def setUp(self):
+        hou.hipFile.clear(suppress_save_prompt=True)
+        self.create = hou.node("/stage").createNode(self.TYPE, "volume")
+
+    def test_create(self):
+        node = self.create
+        node.parm(encode(self.BIAS + "_control")).set("set")
+        node.parm(encode(self.BIAS)).set(-1)
+        node.parm(encode("unreal:postProcessVolume:Priority")).set(2)
+        prim = node.stage().GetPrimAtPath("/postprocess/volume")
+        self.assertEqual(prim.GetTypeName(), "UnrealPostProcessVolume")
+        self.assertAlmostEqual(prim.GetAttribute(self.BIAS).Get(), -1)
+        self.assertAlmostEqual(
+            prim.GetAttribute("unreal:postProcessVolume:Priority").Get(), 2
+        )
+        # APostProcessVolume's defaults are authored, and are UE's.
+        self.assertFalse(
+            prim.GetAttribute("unreal:postProcessVolume:bUnbound").Get()
+        )
+        self.assertAlmostEqual(
+            prim.GetAttribute("unreal:postProcessVolume:BlendRadius").Get(), 100
+        )
+        # Post-process settings start at Do Nothing: only the ones turned on override, as UE's bOverride_ flags.
+        authored = [
+            a.GetName()
+            for a in prim.GetAttributes()
+            if a.GetName().startswith("unreal:postProcess:") and a.IsAuthored()
+        ]
+        self.assertEqual(authored, [self.BIAS])
+        guide = UsdGeom.Cube(
+            node.stage().GetPrimAtPath("/postprocess/volume/guide")
+        )
+        self.assertEqual(guide.GetSizeAttr().Get(), 2)
+        self.assertEqual(guide.GetPurposeAttr().Get(), UsdGeom.Tokens.guide)
+        self.assertFalse(node.errors())
+
+    def test_no_render_settings_conditions(self):
+        """The render settings' Essential | Advanced and render-mode parameters do not exist here."""
+        for template in self.create.parmTemplateGroup().entriesWithoutFolders():
+            for condition in template.conditionals().values():
+                for word in (
+                    "hdue_show",
+                    "xn__unrealrenderMode",
+                    "xn__unrealtonemapper",
+                ):
+                    self.assertNotIn(word, condition, template.name())
+
+    def test_edit(self):
+        edit = hou.node("/stage").createNode(self.TYPE, "edit")
+        edit.setInput(0, self.create)
+        edit.parm("createprims").set(0)
+        edit.parm("primpattern").set("/postprocess/volume")
+        edit.parm(encode(self.BIAS + "_control")).set("set")
+        edit.parm(encode(self.BIAS)).set(1)
+        prim = edit.stage().GetPrimAtPath("/postprocess/volume")
+        self.assertAlmostEqual(prim.GetAttribute(self.BIAS).Get(), 1)
+        self.assertFalse(edit.stage().GetPrimAtPath("/postprocess/edit"))
+
+
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=2).result
     sys.exit(0 if result.wasSuccessful() else 1)

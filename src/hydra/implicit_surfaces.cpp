@@ -364,66 +364,110 @@ public:
         return data;
     }
 };
-// UnrealLocalFogVolume (resources/generatedSchema.usda; UE's USD importer has no fog): an unrealLocalFogVolume Sprim
-// with the prim's own data (transform, visibility) and its unreal:localFogVolume:<property> values as one constant
-// primvar holding a dictionary, which the scene delegate's Get() returns. Scene indices only: the legacy
-// UsdImagingDelegate populates nothing for it.
-TF_DEFINE_PRIVATE_TOKENS(HdUELocalFogTokens, ((sprim, "unrealLocalFogVolume"))((values, "unreal:localFogVolume")));
-class HdUE_LocalFogValues final : public HdSampledDataSource {
+// UE actors that hdUE places from typed prims (resources/generatedSchema.usda; UE's USD importer has neither): an Sprim
+// with the prim's own data (transform, visibility) and the UE property values as one constant primvar holding a
+// dictionary, which the scene delegate's Get() returns. Scene indices only: the legacy UsdImagingDelegate populates
+// nothing for them. Traits name the Sprim type, the primvar, and which attributes are values under which key.
+//
+// UnrealLocalFogVolume: unreal:localFogVolume:<ULocalFogVolumeComponent property>, all of them (the schema's fallbacks
+// are UE's defaults).
+struct HdUE_LocalFogTraits {
+    static constexpr const char* sprim = "unrealLocalFogVolume";
+    static constexpr const char* values = "unreal:localFogVolume";
+    static constexpr const char* label = "local fog volume";
+    static bool key(const TfToken& attribute, std::string* key) {
+        static const std::string prefix = "unreal:localFogVolume:";
+        const auto& name = attribute.GetString();
+        if (!TfStringStartsWith(name, prefix)) return false;
+        if (key) *key = name.substr(prefix.size());
+        return true;
+    }
+};
+// UnrealPostProcessVolume: unreal:postProcessVolume:<APostProcessVolume property> (all, UE's defaults as fallbacks),
+// and the authored unreal:postProcess:<FPostProcessSettings property> and unreal:postProcessMaterials, with the render
+// settings' names, as Settings:<property> and Settings:Materials. Only authored settings override, as UE's bOverride_.
+struct HdUE_PostProcessVolumeTraits {
+    static constexpr const char* sprim = "unrealPostProcessVolume";
+    static constexpr const char* values = "unreal:postProcessVolume";
+    static constexpr const char* label = "post-process volume";
+    static bool key(const TfToken& attribute, std::string* key) {
+        static const std::string volume = "unreal:postProcessVolume:", settings = "unreal:postProcess:",
+                                 materials = "unreal:postProcessMaterials";
+        const auto& name = attribute.GetString();
+        std::string result;
+        if (TfStringStartsWith(name, volume))
+            result = name.substr(volume.size());
+        else if (TfStringStartsWith(name, settings))
+            result = "Settings:" + name.substr(settings.size());
+        else if (name == materials)
+            result = "Settings:Materials";
+        else
+            return false;
+        if (key) *key = result;
+        return true;
+    }
+    static bool authoredOnly(const std::string& key) { return TfStringStartsWith(key, "Settings:"); }
+};
+template <class Traits>
+class HdUE_ActorValues final : public HdSampledDataSource {
 public:
-    HD_DECLARE_DATASOURCE(HdUE_LocalFogValues);
+    HD_DECLARE_DATASOURCE(HdUE_ActorValues<Traits>);
     VtValue GetValue(Time) override {
         VtDictionary values;
-        const auto prefix = HdUELocalFogTokens->values.GetString() + ":";
-        for (const auto& attribute : prim_.GetAttributes())
-            if (VtValue value; TfStringStartsWith(attribute.GetName().GetString(), prefix) &&
-                               attribute.Get(&value, globals_.GetTime()))
-                values[attribute.GetName().GetString().substr(prefix.size())] = value;
+        for (const auto& attribute : prim_.GetAttributes()) {
+            std::string key;
+            if (!Traits::key(attribute.GetName(), &key)) continue;
+            if constexpr (requires { Traits::authoredOnly(key); })
+                if (Traits::authoredOnly(key) && !attribute.HasAuthoredValue()) continue;
+            if (VtValue value; attribute.Get(&value, globals_.GetTime())) values[key] = value;
+        }
         return VtValue(values);
     }
     bool GetContributingSampleTimesForInterval(Time, Time, std::vector<Time>*) override { return false; }
 
 private:
-    HdUE_LocalFogValues(const UsdPrim& prim, const UsdImagingDataSourceStageGlobals& globals)
+    HdUE_ActorValues(const UsdPrim& prim, const UsdImagingDataSourceStageGlobals& globals)
         : prim_(prim), globals_(globals) {}
     UsdPrim prim_;
     const UsdImagingDataSourceStageGlobals& globals_;
 };
-class HdUE_LocalFogVolumeAdapter final : public UsdImagingPrimAdapter {
+template <class Traits>
+class HdUE_ActorAdapter : public UsdImagingPrimAdapter {
 public:
     using BaseAdapter = UsdImagingPrimAdapter;
     TfTokenVector GetImagingSubprims(const UsdPrim&) override { return {TfToken()}; }
     TfToken GetImagingSubprimType(const UsdPrim&, const TfToken& subprim) override {
-        return subprim.IsEmpty() ? HdUELocalFogTokens->sprim : TfToken();
+        static const TfToken sprim(Traits::sprim);
+        return subprim.IsEmpty() ? sprim : TfToken();
     }
     HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim,
                                                       const UsdImagingDataSourceStageGlobals& globals) override {
         if (!subprim.IsEmpty()) return nullptr;
         const auto data = UsdImagingDataSourcePrim::New(prim.GetPath(), prim, globals);
-        const auto locator = HdPrimvarsSchema::GetDefaultLocator().Append(HdUELocalFogTokens->values);
         for (const auto& attribute : prim.GetAttributes())
-            if (properties(attribute.GetName()) && attribute.ValueMightBeTimeVarying())
-                globals.FlagAsTimeVarying(prim.GetPath(), locator);
+            if (Traits::key(attribute.GetName(), nullptr) && attribute.ValueMightBeTimeVarying())
+                globals.FlagAsTimeVarying(prim.GetPath(), locator());
         const auto primvar =
             HdPrimvarSchema::Builder()
-                .SetPrimvarValue(HdUE_LocalFogValues::New(prim, globals))
+                .SetPrimvarValue(HdUE_ActorValues<Traits>::New(prim, globals))
                 .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->constant))
                 .Build();
         return HdOverlayContainerDataSource::OverlayedContainerDataSources(
             HdRetainedContainerDataSource::New(HdPrimvarsSchema::GetSchemaToken(),
-                                               HdRetainedContainerDataSource::New(HdUELocalFogTokens->values, primvar)),
+                                               HdRetainedContainerDataSource::New(values(), primvar)),
             data);
     }
     HdDataSourceLocatorSet InvalidateImagingSubprim(const UsdPrim& prim, const TfToken& subprim,
                                                     const TfTokenVector& names,
                                                     UsdImagingPropertyInvalidationType type) override {
         auto result = BaseAdapter::InvalidateImagingSubprim(prim, subprim, names, type);
-        if (subprim.IsEmpty() && std::any_of(names.begin(), names.end(), properties))
-            result.insert(HdPrimvarsSchema::GetDefaultLocator().Append(HdUELocalFogTokens->values));
+        if (subprim.IsEmpty() &&
+            std::any_of(names.begin(), names.end(), [](const TfToken& name) { return Traits::key(name, nullptr); }))
+            result.insert(locator());
         if (static const bool trace = TfGetenvBool("HDUE_TRACE_SCENE", false); trace) {
             std::string list;
             for (const auto& name : names) list += " " + (name.IsEmpty() ? std::string("<prim>") : name.GetString());
-            std::fprintf(stderr, "hdUE local fog volume %s invalidated (%s):%s -> %zu locators\n",
+            std::fprintf(stderr, "hdUE %s %s invalidated (%s):%s -> %zu locators\n", Traits::label,
                          prim.GetPath().GetText(),
                          type == UsdImagingPropertyInvalidationType::Resync ? "resync" : "update", list.c_str(),
                          result.end() - result.begin());
@@ -446,10 +490,18 @@ protected:
     void _RemovePrim(const SdfPath&, UsdImagingIndexProxy*) override {}
 
 private:
-    static bool properties(const TfToken& name) {
-        return TfStringStartsWith(name.GetString(), HdUELocalFogTokens->values.GetString() + ":");
+    static const TfToken& values() {
+        static const TfToken token(Traits::values);
+        return token;
+    }
+    static const HdDataSourceLocator& locator() {
+        static const auto result = HdPrimvarsSchema::GetDefaultLocator().Append(values());
+        return result;
     }
 };
+// Named classes: plugInfo.json registers the adapters by type name.
+class HdUE_LocalFogVolumeAdapter final : public HdUE_ActorAdapter<HdUE_LocalFogTraits> {};
+class HdUE_PostProcessVolumeAdapter final : public HdUE_ActorAdapter<HdUE_PostProcessVolumeTraits> {};
 struct HdUEPurposeVisibility {
     static HdContainerDataSourceHandle edit(const HdSceneIndexBase& input, const SdfPath& path,
                                             const HdSceneIndexPrim& prim) {
@@ -635,6 +687,8 @@ TF_REGISTRY_FUNCTION(TfType) {
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_HermiteCurvesAPIAdapter>>();
     TfType::Define<HdUE_LocalFogVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_LocalFogVolumeAdapter>>();
+    TfType::Define<HdUE_PostProcessVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_PostProcessVolumeAdapter>>();
     TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_VisibilityAPIAdapter>>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassVisibilitySceneIndexPlugin>();

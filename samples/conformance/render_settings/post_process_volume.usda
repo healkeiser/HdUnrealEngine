@@ -1,0 +1,111 @@
+#usda 1.0
+(
+    doc = """hdUE's UnrealPostProcessVolume prim (resources/generatedSchema.usda): UE's post-process volume, a box
+filling the cube from -1 to 1 of the prim's local space, blended into the view by UE's own rules. The camera is at
+(0, 0, 10). Frame 1: the volume is hidden (the reference). Frame 2: a 4 m box around the camera with Exposure
+Compensation -1 darkens the image. Frame 3: the same box 60 m away, past its 1 m blend radius, does nothing. Frame 4:
+that far box made unbound applies everywhere again. Frame 5: back around the camera, with a second box of higher
+priority and Exposure Compensation +1, which wins: brighter than the reference. The Unreal tonemapper is on: without it
+the beauty is scene-linear and exposure does not show (docs/rendering.md); its curve makes one stop about 0.76x and
+1.15x here."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "hdUE UnrealPostProcessVolume",
+ "feature": "Post Process Volume",
+ "frames": 5,
+ "checks": [
+  {
+   "name": "inside the volume: its exposure",
+   "ratio": [
+    {"frame": 2, "region": [-1, -1, 1, 1]},
+    {"frame": 1, "region": [-1, -1, 1, 1]}
+   ],
+   "min": 0.7,
+   "max": 0.85
+  },
+  {
+   "name": "outside its blend radius: nothing",
+   "ratio": [
+    {"frame": 3, "region": [-1, -1, 1, 1]},
+    {"frame": 1, "region": [-1, -1, 1, 1]}
+   ],
+   "min": 0.95,
+   "max": 1.05
+  },
+  {
+   "name": "unbound: everywhere",
+   "ratio": [
+    {"frame": 4, "region": [-1, -1, 1, 1]},
+    {"frame": 1, "region": [-1, -1, 1, 1]}
+   ],
+   "min": 0.7,
+   "max": 0.85
+  },
+  {
+   "name": "higher priority wins",
+   "ratio": [
+    {"frame": 5, "region": [-1, -1, 1, 1]},
+    {"frame": 1, "region": [-1, -1, 1, 1]}
+   ],
+   "min": 1.08,
+   "max": 1.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 5
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        bool unreal:tonemapper = 1
+    }
+}
+def UnrealPostProcessVolume "Dark"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        2: "inherited",
+    }
+    float unreal:postProcess:AutoExposureBias = -1
+    bool unreal:postProcessVolume:bUnbound.timeSamples = {
+        1: false,
+        4: true,
+        5: false,
+    }
+    # Every frame keyed: USD interpolates doubles between samples.
+    double3 xformOp:translate.timeSamples = {
+        1: (0, 0, 10),
+        2: (0, 0, 10),
+        3: (0, 0, -50),
+        4: (0, 0, -50),
+        5: (0, 0, 10),
+    }
+    double3 xformOp:scale = (2, 2, 2)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+}
+def UnrealPostProcessVolume "Bright"
+{
+    token visibility.timeSamples = {
+        1: "invisible",
+        5: "inherited",
+    }
+    float unreal:postProcessVolume:Priority = 1
+    float unreal:postProcess:AutoExposureBias = 1
+    double3 xformOp:translate = (0, 0, 10)
+    double3 xformOp:scale = (2, 2, 2)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+}
+def Cube "Wall"
+{
+        double size = 1.0
+        double3 xformOp:scale = (12, 12, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+}

@@ -44,6 +44,13 @@
         "alias": { "UsdSchemaBase": "UnrealLocalFogVolume" }, "bases": ["UsdGeomXformable"],
         "schemaIdentifier": "UnrealLocalFogVolume", "schemaKind": "concreteTyped"
       },
+      "HdUE_PostProcessVolumeAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealPostProcessVolume"
+      },
+      "HdUEUnrealPostProcessVolume": {
+        "alias": { "UsdSchemaBase": "UnrealPostProcessVolume" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealPostProcessVolume", "schemaKind": "concreteTyped"
+      },
       "HdUE_VisibilityAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },

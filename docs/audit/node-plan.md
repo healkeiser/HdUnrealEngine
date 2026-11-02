@@ -33,7 +33,7 @@ other prim types, the hidden legacy type, and that the new version authors the s
 | # | Node | UE feature | Today | Work | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | hdUE Local Fog Volume 2.0 | `ULocalFogVolumeComponent` | Create only, Python LOP inside | Rebuild on `build_prim_lop`; 1.0 kept | Done |
-| 2 | hdUE Post Process Volume | `APostProcessVolume` (`IInterface_PostProcessVolume`: Priority, BlendRadius, BlendWeight, bEnabled, bUnbound) | Global `unreal:postProcess:*` only | Codeless schema `UnrealPostProcessVolume` (box of the prim's extent), Hydra Sprim, ABI bump, backend volumes blended by UE's own `UWorld::AddPostProcessingSettings` | Next |
+| 2 | hdUE Post Process Volume | `APostProcessVolume` (`IInterface_PostProcessVolume`: Priority, BlendRadius, BlendWeight, bEnabled, bUnbound) | Global `unreal:postProcess:*` only | Codeless schema `UnrealPostProcessVolume` (box of the prim's extent), Hydra Sprim, ABI bump, backend volumes blended by UE's own `UWorld::AddPostProcessingSettings` | Done |
 | 3 | hdUE Height Fog | `UExponentialHeightFogComponent` | Fog tab of the render settings | Schema `UnrealExponentialHeightFog`, height from the prim's transform; render settings keep working when no prim exists | Planned |
 | 4 | hdUE Sky | `USkyAtmosphereComponent`, `UVolumetricCloudComponent`, the atmosphere sun | Sky tab of the render settings | Schemas for both, sun direction from a DistantLight relationship; render settings stay the fallback | Planned |
 | 5 | Native Asset (Render Geometry Settings) | Cooked StaticMesh, Blueprint, Level, Sparse Volume Texture | Text field on Render Geometry Settings | No new node: a menu of the cooked registry's objects on the existing field; bounds proxy authoring is the open question | Planned |

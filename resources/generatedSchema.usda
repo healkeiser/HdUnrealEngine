@@ -52,3 +52,37 @@ class UnrealLocalFogVolume "UnrealLocalFogVolume" (
         doc = """The priority can be used as a way to override the sorting by distance. A lower value means the volume will be considered further away, i.e. it will draw behind the one with a higher priority value."""
     )
 }
+
+class UnrealPostProcessVolume "UnrealPostProcessVolume" (
+    doc = """A UE Post Process Volume (APostProcessVolume), rendered by hdUE: a box filling the cube from -1 to 1 of the prim's local space (a Cube prim's default extent), whose unreal:postProcess:<FPostProcessSettings property> attributes blend into the view by UE's own rules (priority, blend radius and weight, unbound) while the camera is inside or near it. The render settings' unreal:postProcess:* apply after the volumes, as a camera's do in UE."""
+)
+{
+    rel proxyPrim
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+    )
+    uniform token[] xformOpOrder
+    float unreal:postProcessVolume:Priority = 0 (
+        displayName = "Priority"
+        doc = """Priority of this volume. In the case of overlapping volumes the one with the highest priority overrides the lower priority ones. The order is undefined if two or more overlapping volumes have the same priority."""
+    )
+    float unreal:postProcessVolume:BlendRadius = 100 (
+        displayName = "Blend Radius"
+        doc = """World space radius around the volume that is used for blending (only if not unbound)."""
+    )
+    float unreal:postProcessVolume:BlendWeight = 1 (
+        displayName = "Blend Weight"
+        doc = """0:no effect, 1:full effect"""
+    )
+    bool unreal:postProcessVolume:bEnabled = true (
+        displayName = "Enabled"
+        doc = """Whether this volume is enabled or not."""
+    )
+    bool unreal:postProcessVolume:bUnbound = false (
+        displayName = "Infinite Extent (Unbound)"
+        doc = """Whether this volume covers the whole world, or just the area inside its bounds."""
+    )
+}

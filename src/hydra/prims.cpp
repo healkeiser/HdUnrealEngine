@@ -1702,43 +1702,57 @@ HdSprim* HdUECreateUnsupportedLight(const SdfPath& id, const TfToken& type) {
     };
     return new Unsupported(id, type);
 }
-// UnrealLocalFogVolume (HdUE_LocalFogVolumeAdapter): its transform, visibility and the unreal:localFogVolume dictionary
-// of property values, uploaded when one of them changes.
-HdSprim* HdUECreateLocalFog(const SdfPath& id) {
-    struct LocalFog final : HdSprim {
-        explicit LocalFog(const SdfPath& id) : HdSprim(id) {}
+// UnrealLocalFogVolume and UnrealPostProcessVolume (HdUE_ActorAdapter): the transform, visibility and dictionary of
+// property values (unreal:localFogVolume, unreal:postProcessVolume), uploaded when one of them changes.
+HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
+    struct Actor final : HdSprim {
+        Actor(const SdfPath& id, HdUEActorData::Kind kind) : HdSprim(id), kind(kind) {}
         HdDirtyBits GetInitialDirtyBitsMask() const override { return HdChangeTracker::AllDirty; }
         void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits) override {
             *bits = HdChangeTracker::Clean;
             if (GetId().IsEmpty()) return;
-            HdUELocalFogData data;
+            const bool postProcess = kind == HdUEActorData::Kind::PostProcess;
+            HdUEActorData data;
+            data.kind = kind;
             data.id = GetId().GetString();
             data.localToWorld = delegate->GetTransform(GetId());
             data.visible = delegate->GetVisible(GetId());
-            const auto values = delegate->Get(GetId(), TfToken("unreal:localFogVolume"));
+            const auto values =
+                delegate->Get(GetId(), TfToken(postProcess ? "unreal:postProcessVolume" : "unreal:localFogVolume"));
             if (values.IsHolding<VtDictionary>())
-                for (const auto& [name, value] : values.UncheckedGet<VtDictionary>())  // sorted by name
-                    data.values.emplace_back(name, value.IsHolding<bool>()
-                                                       ? (value.UncheckedGet<bool>() ? "True" : "False")
-                                                       : TfStringify(value));
+                for (const auto& [name, value] : values.UncheckedGet<VtDictionary>()) {  // sorted by name
+                    // unreal:postProcessMaterials: a string or token array, or one string, as the render setting.
+                    std::string text;
+                    if (value.IsHolding<VtStringArray>())
+                        for (const auto& path : value.UncheckedGet<VtStringArray>())
+                            text += (text.empty() ? "" : " ") + path;
+                    else if (value.IsHolding<VtTokenArray>())
+                        for (const auto& token : value.UncheckedGet<VtTokenArray>())
+                            text += (text.empty() ? "" : " ") + token.GetString();
+                    else
+                        text = HdUESettingText(value);  // texture settings: an image file or a cooked path
+                    data.values.emplace_back(name, std::move(text));
+                }
             if (HdUETraceScene()) {
                 std::string text;
                 for (const auto& [name, value] : data.values) text += " " + name + "=" + value;
-                std::fprintf(stderr, "hdUE local fog volume %s synced, visible=%d:%s\n", data.id.c_str(), data.visible,
+                std::fprintf(stderr, "hdUE %s %s synced, visible=%d:%s\n",
+                             postProcess ? "post-process volume" : "local fog volume", data.id.c_str(), data.visible,
                              text.c_str());
                 std::fflush(stderr);
             }
             auto* state = static_cast<HdUEState*>(param);
             std::lock_guard lock(state->mutex);
-            const auto old = state->localFogs.find(data.id);
-            if (old != state->localFogs.end() && old->second == data) return;
-            state->localFogs[data.id] = std::move(data);
-            state->dirtyLocalFogs.insert(GetId().GetString());
+            const auto old = state->actors.find(data.id);
+            if (old != state->actors.end() && old->second == data) return;
+            state->actors[data.id] = std::move(data);
+            state->dirtyActors.insert(GetId().GetString());
             ++state->revision;
         }
         void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
+        HdUEActorData::Kind kind;
     };
-    return new LocalFog(id);
+    return new Actor(id, kind);
 }
 // Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
 void HdUETakeMeshSyncStats(double& milliseconds, int& count) {

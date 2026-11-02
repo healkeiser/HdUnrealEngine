@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 18u
+#define HDUE_ABI_VERSION 19u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -466,6 +466,13 @@ typedef struct HdueLocalFogVolumeDesc {
     const char* const* values;
     uint32_t count;
 } HdueLocalFogVolumeDesc;
+/* upsert_post_process_volume (ABI 19): one UE post-process volume, as an APostProcessVolume a level places: a box of
+ * 100 cm half-size placed by transform (as upsert_local_fog_volume's). names and values set UPostProcessComponent
+ * properties (Priority, BlendRadius, BlendWeight, bEnabled, bUnbound), and Settings:<FPostProcessSettings property>
+ * and Settings:Materials (post-process material paths, space separated) its settings, as set_post_process sets the
+ * view's; unknown ones are skipped with a warning. UE blends the volumes into each view by its own rules
+ * (UWorld::AddPostProcessingSettings), before set_post_process's settings. remove_asset removes it. */
+typedef HdueLocalFogVolumeDesc HduePostProcessVolumeDesc;
 /* upsert_groom (ABI 16): curves as UE hair strands, a UGroomAsset built at runtime and drawn by a groom component (UE's
  * default hair material). points: point_count xyz in UE world centimeters; widths_cm per point; curve_point_counts per
  * curve, summing to point_count. Guides are generated from every strand (no simulation). apply_scene's removed_ids
@@ -688,6 +695,8 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* upsert_local_fog_volume)(HdueSession session, const HdueLocalFogVolumeDesc* volume);
 
     HdueResult(HDUE_CALL* upsert_groom)(HdueSession session, const HdueGroomDesc* groom);
+
+    HdueResult(HDUE_CALL* upsert_post_process_volume)(HdueSession session, const HduePostProcessVolumeDesc* volume);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */
