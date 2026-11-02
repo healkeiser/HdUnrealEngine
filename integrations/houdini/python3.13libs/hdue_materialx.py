@@ -40,7 +40,10 @@ class PreparedMaterials(OfflineView):
             self.library = None
             self.embedded = {}
             self.checked = {}
-            self.settings = {}
+            # The host's wet-mask preview toggle is not the library's: it survives a library change.
+            self.settings = {
+                k: v for k, v in self.settings.items() if k == "wetMaskPreview"
+            }
             if identity:
                 self.library = MaterialXLibrary(path, self)
                 # Original embedded resources must still match the cooked images.

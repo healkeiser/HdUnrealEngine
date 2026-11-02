@@ -152,7 +152,21 @@ class Cache:
             pending.unlink()
         else:
             pending.replace(result)
-        self.entries[key] = dict(stamp=self.stamp(node), path=str(result))
+        old = self.entries.get(key)
+        self.entries[key] = dict(
+            stamp=self.stamp(node),
+            path=str(result),
+            previous=old["path"] if old else None,
+        )
+        # An animated COP exports a new image per frame: the one from two exports back goes (the previous one may still
+        # be read by a render in flight), unless another entry still names it.
+        stale = old.get("previous") if old else None
+        if stale and stale not in {
+            p
+            for e in self.entries.values()
+            for p in (e["path"], e.get("previous"))
+        }:
+            Path(stale).unlink(missing_ok=True)
         return str(result)
 
     def dirty(self, key):

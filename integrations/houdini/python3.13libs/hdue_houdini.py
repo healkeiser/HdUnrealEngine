@@ -124,7 +124,9 @@ class Host:
         self.z_up = False
         self.closed = False
         self.last_state = time.monotonic()
-        self.last_textures = None
+        # NativeAssets.sync walks the whole stage: only after a change it reads (stage_changed), not per LOP cook.
+        self.assets_dirty = True
+        self.assets_network = None
         self.texture_error = None
         self.running = True
         # Housekeeping only (preparation, textures, status): UE ticks on its own thread. Rescheduled after each
@@ -142,12 +144,28 @@ class Host:
         if self.watched_stage is not None and stage == self.watched_stage:
             return
         self.watched_stage = stage
-        self.materials_dirty = self.textures_dirty = True
+        self.materials_dirty = self.textures_dirty = self.assets_dirty = True
         self.stage_listener = Tf.Notice.Register(
             Usd.Notice.ObjectsChanged, self.stage_changed, stage
         )
 
     def stage_changed(self, notice, stage):
+        # Asset overrides follow unreal:asset and unreal:surface:* opinions, material bindings, instancing and the
+        # stage's units and up axis (root metadata).
+        if not self.assets_dirty and (
+            notice.GetResyncedPaths()
+            or any(
+                path.IsAbsoluteRootPath()
+                or "unreal:" in path.name
+                or "material:binding" in path.name
+                or (
+                    path.IsPrimPath()
+                    and "instanceable" in notice.GetChangedFields(path)
+                )
+                for path in notice.GetChangedInfoOnlyPaths()
+            )
+        ):
+            self.assets_dirty = True
         if self.materials_dirty and self.textures_dirty:
             return
         if any(
@@ -231,9 +249,7 @@ class Host:
                             self.options_key = key
                             self.libraries = libraries(stage, node)
                             self.z_up = UsdGeom.GetStageUpAxis(stage) == "Z"
-                        self.sync_scene(
-                            state["session"], key, any(self.libraries)
-                        )
+                        self.sync_scene(state["session"], any(self.libraries))
                         # Material preparation walks the stage and hashes embedded textures: only after a change.
                         self.watch_stage(stage)
                         # Preparation reads materials and wet opinions at the current frame: redo it per frame only if they are animated.
@@ -354,7 +370,7 @@ class Host:
             if self.running:
                 self.timer.start(16)
 
-    def sync_scene(self, session, key, materials=False):
+    def sync_scene(self, session, materials=False):
         """What the delegate cannot read from USD by itself, kept out of the LOP graph: images of op:/opdef: texture
         paths (exported here, outside any cook) and bounds meshes for unreal:asset prims (viewport overrides).
         """
@@ -364,8 +380,8 @@ class Host:
         redraw = False
         try:
             stage = viewer.stage()
-            if key != self.last_textures:
-                network = viewer.pwd()
+            network = viewer.pwd()
+            if self.assets_dirty or (network, materials) != self.assets_network:
                 display = (
                     network.displayNode()
                     if isinstance(network, hou.LopNetwork)
@@ -379,7 +395,8 @@ class Host:
                     redraw = self.assets.sync(
                         network, display, stage, materials
                     )
-            self.last_textures = key
+                self.assets_dirty = False
+                self.assets_network = (network, materials)
             if self.textures_dirty or cache().dirty("viewport"):
                 self.textures_dirty = False
                 self.texture_files = prepare_stage(stage)
@@ -690,22 +707,8 @@ def settings_node(input_node):
             "hdue_wet_mask_preview", "Preview Primvar mask", default_value=False
         )
     )
-    group.append(
-        hou.ToggleParmTemplate(
-            "hdue_substrate_auto_prepare",
-            "Prepare graph edits automatically",
-            default_value=True,
-        )
-    )
-    retry = hou.ButtonParmTemplate(
-        "hdue_substrate_retry", "Retry material preparation"
-    )
-    retry.setScriptCallback(
-        "import hdue_houdini; hdue_houdini._host.live_substrate.retry()"
-    )
-    retry.setScriptCallbackLanguage(hou.scriptLanguage.Python)
-    group.append(retry)
     node.setParmTemplateGroup(group)
+    configure_live_preparation(node)
     node.node("output0").setInput(0, node.indirectInputs()[0])
     return node
 

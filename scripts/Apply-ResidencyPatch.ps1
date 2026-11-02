@@ -55,7 +55,9 @@ $Header = Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Public\Rendering\N
 $Manager = Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Private\Rendering\NaniteStreamingManager.cpp'
 $HeaderSource = [IO.File]::ReadAllText($Header)
 $ManagerSource = [IO.File]::ReadAllText($Manager)
-if (-not $ManagerSource.Contains('bFromMemory')) {
+# Each file is checked on its own: a run interrupted between the two writes patched the header only.
+$Patched = @{ $Header = $HeaderSource.Contains('bFromMemory'); $Manager = $ManagerSource.Contains('bFromMemory') }
+if (-not ($Patched[$Header] -and $Patched[$Manager])) {
     $Newline = if ($ManagerSource.Contains("`r`n")) { "`r`n" } else { "`n" }
     $Edits = @(
         @($Header, "`t`tFIoBuffer`t`t`t`tRequestBuffer;", "`t`tbool`t`t`t`t`tbFromMemory = false;`t// hdUE: copied from in-memory bulk data$Newline`t`tFIoBuffer`t`t`t`tRequestBuffer;"),
@@ -72,6 +74,7 @@ if (-not $ManagerSource.Contains('bFromMemory')) {
         @($Manager, 'if (!PendingPage.Request.IsOk())', 'if (!PendingPage.bFromMemory && !PendingPage.Request.IsOk())'),
         @($Manager, 'check(Task.PendingPage->Request.IsCompleted());', 'check(Task.PendingPage->bFromMemory || Task.PendingPage->Request.IsCompleted());')
     )
+    $Edits = @($Edits | Where-Object { -not $Patched[$_[0]] })
     foreach ($Edit in $Edits) {
         $Text = if ($Edit[0] -eq $Header) { $HeaderSource } else { $ManagerSource }
         if (($Text.Split($Edit[1]).Length - 1) -ne 1) { throw "Unexpected $($Edit[0]); inspect the engine before applying the Nanite streaming patch." }
@@ -79,7 +82,33 @@ if (-not $ManagerSource.Contains('bFromMemory')) {
     foreach ($Edit in $Edits) {
         if ($Edit[0] -eq $Header) { $HeaderSource = $HeaderSource.Replace($Edit[1], $Edit[2]) } else { $ManagerSource = $ManagerSource.Replace($Edit[1], $Edit[2]) }
     }
-    [IO.File]::WriteAllText($Header, $HeaderSource, [Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText($Manager, $ManagerSource, [Text.UTF8Encoding]::new($false))
+    if (-not $Patched[$Header]) { [IO.File]::WriteAllText($Header, $HeaderSource, [Text.UTF8Encoding]::new($false)) }
+    if (-not $Patched[$Manager]) { [IO.File]::WriteAllText($Manager, $ManagerSource, [Text.UTF8Encoding]::new($false)) }
     Write-Host 'Applied hdUE runtime Nanite streaming patch to UE 5.8.4.'
+}
+# UE 5.8.4's Nanite AddPass_Rasterize assigns its read-only dummy buffer to the renderer's TotalPrevDrawClustersBuffer
+# member when a pass has no previous draw data; a later draw of the same renderer that has previous draw data (Lumen's
+# card capture in several Nanite passes, as NVIDIA's Da Vinci Workshop needs) then creates a UAV on that dummy, and D3D12
+# removes the device (DXGI_ERROR_INVALID_CALL). The dummy is used through a local instead.
+$CullRaster = Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\Private\Nanite\NaniteCullRaster.cpp'
+$Source = [IO.File]::ReadAllText($CullRaster)
+if (-not $Source.Contains('hdUE: a local')) {
+    $Newline = if ($Source.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $Assign = "`tif (!bHasPrevDrawData)$Newline`t{$Newline`t`tTotalPrevDrawClustersBuffer = DummyBuffer8;$Newline`t}"
+    $Use = "RasterPassParameters->InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV(TotalPrevDrawClustersBuffer);"
+    if (($Source.Split($Assign).Length - 1) -ne 1 -or ($Source.Split($Use).Length - 1) -ne 1) { throw 'Unexpected NaniteCullRaster.cpp; inspect the pinned engine before applying the Nanite raster patch.' }
+    $Source = $Source.Replace($Assign, "`t// hdUE: a local, not the member: a later draw with previous draw data made a UAV of the read-only dummy.$Newline`tconst FRDGBufferRef TotalPrevDrawClusters = bHasPrevDrawData ? TotalPrevDrawClustersBuffer : DummyBuffer8;")
+    $Source = $Source.Replace($Use, "RasterPassParameters->InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV(TotalPrevDrawClusters);")
+    [IO.File]::WriteAllText($CullRaster, $Source, [Text.UTF8Encoding]::new($false))
+    Write-Host 'Applied hdUE Nanite raster patch to UE 5.8.4.'
+}
+# The binning passes, which run after that assignment, read the dummy the same way (a created buffer that no pass has
+# written fails RDG validation).
+$Source = [IO.File]::ReadAllText($CullRaster)
+if (-not $Source.Contains('hdUE: as AddPass_Rasterize')) {
+    $Use = "CommonBinBuildParameters.InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV(TotalPrevDrawClustersBuffer);"
+    if (($Source.Split($Use).Length - 1) -ne 1) { throw 'Unexpected NaniteCullRaster.cpp; inspect the pinned engine before applying the Nanite binning patch.' }
+    $Source = $Source.Replace($Use, "CommonBinBuildParameters.InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV((RenderFlags & NANITE_RENDER_FLAG_HAS_PREV_DRAW_DATA) ? TotalPrevDrawClustersBuffer : GSystemTextures.GetDefaultStructuredBuffer(GraphBuilder, 8));`t// hdUE: as AddPass_Rasterize")
+    [IO.File]::WriteAllText($CullRaster, $Source, [Text.UTF8Encoding]::new($false))
+    Write-Host 'Applied hdUE Nanite binning patch to UE 5.8.4.'
 }

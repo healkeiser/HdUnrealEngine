@@ -293,6 +293,15 @@ HdueResult FHdueNativeAssets::GetStatus(const FString& Id, HdueAssetStatus& S) c
     Stats(**E, S);
     return HDUE_OK;
 }
+bool FHdueNativeAssets::Loading(FString& Failure) const {
+    Failure.Empty();
+    bool Pending = Retiring.Num() > 0;
+    for (const auto& [Id, E] : Entries) {
+        Pending |= E->State == HDUE_ASSET_LOADING;
+        if (E->State == HDUE_ASSET_FAILED && Failure.IsEmpty()) Failure = Id + TEXT(": ") + E->Error;
+    }
+    return Pending;
+}
 void FHdueNativeAssets::GetSceneStatus(HdueAssetSceneStatus& S) const {
     S = {};
     S.struct_size = sizeof(S);

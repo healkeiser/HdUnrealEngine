@@ -15,6 +15,9 @@ public:
     void Reset();
     void Tick();
     void GetSceneStatus(HdueAssetSceneStatus& Status) const;
+    // What a render request waits for, without GetSceneStatus's per-asset bounds: whether an asset still loads, and
+    // the first failure (empty when none).
+    bool Loading(FString& Failure) const;
     HdueResult GetStatus(const FString& Id, HdueAssetStatus& Status) const;
     TArray<AActor*> GetActors() const;
 

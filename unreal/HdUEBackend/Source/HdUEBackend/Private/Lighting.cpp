@@ -135,7 +135,7 @@ void FHdueLighting::Remove(const FString& Id) {
         Actors.Remove(Id);
     }
     if (const auto* Definition = Definitions.Find(Id)) EnvironmentDirty |= Definition->Data.type == HDUE_DOME_LIGHT;
-    Definitions.Remove(Id);
+    if (Definitions.Remove(Id)) PruneCaches();  // Remove is called for every removed scene prim, lights or not
 }
 bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
     if (Batch.struct_size != sizeof(Batch) || Batch.light_count > 65536 || (Batch.light_count && !Batch.lights) ||
@@ -283,8 +283,25 @@ bool FHdueLighting::Apply(const HdueLightBatch& Batch, FString& Error) {
         if (Definition.Data.type != HDUE_DOME_LIGHT && !UpdateLocal(Definition, Error)) return false;
     }
     if (Batch.flags & HDUE_LIGHT_BATCH_LINKS) Objects = MoveTemp(Links);
+    PruneCaches();
     LastError.Empty();
     return true;
+}
+// Drops the images, light textures and IES profiles no light uses any more: a look-development session that tried
+// HDRIs kept each one (a 16k x 8k HDRI is 2 GB as RGBA32F) until the session ended.
+void FHdueLighting::PruneCaches() {
+    TSet<FString> Files, Profiled;
+    for (const auto& [Id, Definition] : Definitions) {
+        Files.Add(Definition.File);
+        Files.Add(Definition.LightFunction);
+        Profiled.Add(Definition.Ies);
+    }
+    for (auto It = Images.CreateIterator(); It; ++It)
+        if (!Files.Contains(It.Key())) It.RemoveCurrent();
+    for (auto It = LightTextures.CreateIterator(); It; ++It)
+        if (!Files.Contains(It.Key())) It.RemoveCurrent();
+    for (auto It = Profiles.CreateIterator(); It; ++It)
+        if (!Profiled.Contains(It.Value().File)) It.RemoveCurrent();
 }
 void FHdueLighting::Link(const FString& Id, UPrimitiveComponent* Mesh) const {
     if (!Mesh) return;
@@ -564,6 +581,7 @@ const FHdueLighting::FProfileEntry* FHdueLighting::Profile(const FString& File, 
         }
     }
     auto& Entry = Profiles.FindOrAdd(Key);
+    Entry.File = File;
     Entry.Modified = Stat.ModificationTime;
     Entry.Size = Stat.FileSize;
     Entry.Texture.Reset(Texture);

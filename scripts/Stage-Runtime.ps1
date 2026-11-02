@@ -4,8 +4,11 @@ $ErrorActionPreference = 'Stop'
 $EngineRoot = Get-HdUELocalPath -Key engine_root -Value $EngineRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
+# -NoCleanStage: UAT otherwise deletes the whole staging folder first (CleanStagingDirectory), which holds every
+# profile's hashed backend DLL (Update-HoudiniRuntime.ps1), UE's Saved folder (logs, Nanite cache) and the live Substrate
+# content; a running Houdini's locked DLL stopped that delete halfway.
 $Stage = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot 'out\runtime' }
-& (Join-Path $EngineRoot 'Engine\Build\BatchFiles\RunUAT.bat') BuildCookRun "-project=$Project" -noP4 -platform=Win64 "-clientconfig=$Configuration" -target=HdUEBackend -skipbuild -skipcook -stage -skippackage "-stagingdirectory=$Stage" -unattended -utf8output
+& (Join-Path $EngineRoot 'Engine\Build\BatchFiles\RunUAT.bat') BuildCookRun "-project=$Project" -noP4 -platform=Win64 "-clientconfig=$Configuration" -target=HdUEBackend -skipbuild -skipcook -stage -skippackage -NoCleanStage "-stagingdirectory=$Stage" -unattended -utf8output
 if ($LASTEXITCODE) { throw 'Runtime staging failed.' }
 $Runtime = Join-Path $Stage 'Windows'
 $Game = Join-Path $Runtime 'HdUEBackend'

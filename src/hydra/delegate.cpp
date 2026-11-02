@@ -253,12 +253,16 @@ LRESULT CALLBACK selfHostWindow(HWND window, UINT message, WPARAM wparam, LPARAM
     }
     return DefWindowProcW(window, message, wparam, lparam);
 }
+// A UTF-8 string as a path (std::filesystem::u8path is deprecated in C++20).
+std::filesystem::path utf8Path(std::string_view text) {
+    return std::u8string_view(reinterpret_cast<const char8_t*>(text.data()), text.size());
+}
 // backend_dll / runtime_project from the runtime profile named by HDUE_RUNTIME_CONFIG.
 // Relative paths resolve against the profile's folder, as in hdue_houdini.runtime_config.
 std::string runtimeConfig(const char* key) {
     const auto path = TfGetenv("HDUE_RUNTIME_CONFIG");
     if (path.empty()) return {};
-    const auto file_path = std::filesystem::u8path(path);
+    const auto file_path = utf8Path(path);
     std::ifstream file(file_path);
     std::stringstream text;
     text << file.rdbuf();
@@ -267,7 +271,7 @@ std::string runtimeConfig(const char* key) {
     const auto& object = root.GetJsObject();
     const auto it = object.find(key);
     if (it == object.end() || !it->second.IsString()) return {};
-    const auto value = std::filesystem::u8path(it->second.GetString());
+    const auto value = utf8Path(it->second.GetString());
     if (value.is_absolute()) return it->second.GetString();
     const auto resolved = (std::filesystem::absolute(file_path).parent_path() / value).lexically_normal().u8string();
     return std::string(resolved.begin(), resolved.end());
@@ -311,7 +315,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             host.window = CreateWindowExW(0, cls.lpszClassName, L"hdUE", WS_OVERLAPPEDWINDOW, 0, 0, 640, 360, nullptr,
                                           nullptr, instance, nullptr);
             if (!host.window) throw std::runtime_error("hdUE cannot create its UE host window");
-            host.backend = std::make_unique<hdue::Backend>(std::filesystem::u8path(dll));
+            host.backend = std::make_unique<hdue::Backend>(utf8Path(dll));
             host.thread = GetCurrentThreadId();
             // Returns once UE's world and RHI are up (the backend is then ready), or throws.
             host.backend->boot(reinterpret_cast<uint64_t>(instance), reinterpret_cast<uint64_t>(host.window), project,
@@ -871,8 +875,9 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             std::vector<int32_t> instanceIds;
             const bool perInstanceColors = data.instanceColors.size() == data.instances.size();
             const bool perInstanceIds = data.instanceIds.size() == data.instances.size();
+            const bool bake = HdUEBakesShear(data, nativeAsset.empty());
             for (size_t i = 0; i < data.instances.size(); ++i) {
-                if (nativeAsset.empty() && HdUEHasShear(data.instances[i])) {
+                if (bake && HdUEHasShear(data.instances[i])) {
                     sheared.push_back(i);
                     continue;
                 }
@@ -884,8 +889,9 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
                 }
                 if (perInstanceIds) instanceIds.push_back(data.instanceIds[i]);
             }
-            if (!nativeAsset.empty() && std::any_of(data.instances.begin(), data.instances.end(), HdUEHasShear)) {
-                static std::once_flag warned;  // a cooked asset has no vertices here to bake
+            if (!bake && std::any_of(data.instances.begin(), data.instances.end(), HdUEHasShear)) {
+                // A cooked asset has no vertices here to bake, and a companion past UE's vertex limit is not built.
+                static std::once_flag warned;
                 std::call_once(warned,
                                [&] { TF_WARN("Sheared instances of %s render without shear", data.id.c_str()); });
             }
@@ -961,15 +967,19 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             desc.instance_transforms = matrices.empty() ? &none : packet.own(packet.doubles, std::move(matrices));
         }
         desc.flags = requireNanite && !nativeAsset.empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
-        // Surface effects edit vertex colours after upload, so their meshes stay editable (dynamic) in UE.
-        if (state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) desc.flags |= HDUE_MESH_EDITABLE;
+        // Surface effects edit vertex colours after upload, and deforming meshes upload again per motion blur
+        // sub-frame, so their meshes stay editable (dynamic) in UE: a static mesh rebuilt its cards and Nanite data
+        // every sub-frame.
+        if ((state.wetBindings && !HdUEWetSettings(*state.wetBindings, data).empty()) || !data.deformTimes.empty())
+            desc.flags |= HDUE_MESH_EDITABLE;
         if (cullBackface && !data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
         for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
         if (!baked) rowMajor(inverse * data.transform * basis, desc.transform);
         if (nativeAsset.empty()) packet.genericMeshes.push_back(id);
         packet.meshes.push_back(desc);
         if (shearedCompanion) {
-            shearedCompanion->flags = desc.flags;
+            // A moving mesh's companion uploads again per sub-frame (applyMotion): dynamic, as deforming meshes are.
+            shearedCompanion->flags = desc.flags | (data.moving() ? HDUE_MESH_EDITABLE : 0);
             packet.meshes.push_back(*shearedCompanion);
         }
         if (HdUETraceScene())
@@ -1508,13 +1518,16 @@ bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh) { return r
 uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
     const uint64_t bytes = HdUEMeshBytes(m);
     m.releasedTriangles = uint32_t(m.indices.size() / 3);
-    m.points = {};
-    m.normals = {};
-    m.uv = {};
-    m.uvSets = {};
-    m.colors = {};
-    m.indices = {};
-    m.sourceCorners = {};
+    // Swapped with empty vectors: `v = {}` is assign(initializer_list), which keeps the capacity, so released meshes
+    // kept all their memory (NVIDIA's Da Vinci Workshop: about 30 GB).
+    const auto drop = [](auto& v) { std::decay_t<decltype(v)>().swap(v); };
+    drop(m.points);
+    drop(m.normals);
+    drop(m.uv);
+    drop(m.uvSets);
+    drop(m.colors);
+    drop(m.indices);
+    drop(m.sourceCorners);
     m.pickMesh = nullptr;
     m.released = true;
     return bytes;
@@ -1533,7 +1546,8 @@ void HdUEStreamMeshes(HdUEState& s) {
         TfGetenvInt("HDUE_STREAM_BYTES", 0) > 0 ? uint64_t(TfGetenvInt("HDUE_STREAM_BYTES", 0)) : uint64_t(1) << 30;
     const uint64_t Cap = 4 * Batch;
     std::unique_lock lock(s.mutex);
-    if (s.pendingBytes < Batch) return;
+    // After a failed upload, Execute reports the error: posting the batch again on every later Sync repeated it.
+    if (s.pendingBytes < Batch || !s.error.empty()) return;
     if (!s.streamQueued) {
         s.streamQueued = true;
         host.post([&s] {
@@ -1614,17 +1628,14 @@ class Pass final : public HdRenderPass {
             if (mesh.instanced) {
                 // A generic mesh's sheared instances live in its baked companion (HdUEShearedId), which is resubmitted
                 // with them at t, as deforming meshes are.
-                const bool generic = asset(nativeMeshes, id).empty();
-                std::vector<GfMatrix4d> placed(mesh.instances.size());
-                bool sheared = false;
+                const bool bake = HdUEBakesShear(mesh, asset(nativeMeshes, id).empty());
+                std::vector<GfMatrix4d> placed(bake ? mesh.instances.size() : 0);
                 for (size_t i = 0; i < mesh.instances.size(); ++i) {
-                    placed[i] = place(mesh.instanceAt(i, tm), i);
-                    if (generic && HdUEHasShear(mesh.instances[i]))
-                        sheared = true;
-                    else
-                        push(placed[i]);
+                    const auto m = place(mesh.instanceAt(i, tm), i);
+                    if (bake) placed[i] = m;
+                    if (!bake || !HdUEHasShear(mesh.instances[i])) push(m);
                 }
-                if (sheared) {
+                if (bake) {
                     instances[id] = std::move(placed);
                     s.dirtyMeshes.insert(id);
                 }
@@ -1741,6 +1752,7 @@ class Pass final : public HdRenderPass {
 #if defined(HDUE_HOUDINI)
         HdUERenderBuffer *albedo = nullptr, *normal = nullptr;
         for (const auto& [target, id] : aovs_) {
+            if (target->GetFormat() != HdFormatFloat32Vec3) continue;  // topDown reads 3 floats per pixel
             if (id == HDUE_AOV_ALBEDO) albedo = target;
             if (id == HDUE_AOV_NORMAL) normal = target;
         }
@@ -1989,7 +2001,7 @@ public:
     }
     bool IsConverged() const override {
         if (const auto error = state_->setting<std::string>("wetValidationError", ""); !error.empty())
-            return converged_ && state_->error == error;
+            return converged_ && state_->locked([&] { return state_->error == error; });  // the UE thread writes it
         if (!state_->setting<bool>("materialGraphValid", true)) return true;
         return converged_ && aovsDone_ && !denoisePending_ && settingsVersion_ == state_->requestSettingsRevision &&
                state_->submittedRevision == state_->revision && state_->locked([&] { return state_->repull.empty(); });
@@ -2301,8 +2313,12 @@ public:
             const bool denoising = s.setting<std::string>("renderMode", "realtime") == "pathtraced" &&
                                    TfStringToLower(s.setting<std::string>("denoiser", "off")) == "oidn";
             if (denoising && buffer && buffer->GetWidth()) {
+                // A bound albedo or normal var serves as the guide only in OIDN's layout (3 floats per pixel, topDown);
+                // a var of another format (color4h, ...) keeps its own buffer and the guide renders internally too.
                 const auto guide = [&](std::unique_ptr<HdUERenderBuffer>& owned, uint32_t id, const char* path) {
-                    if (std::any_of(aovs.begin(), aovs.end(), [&](const auto& aov) { return aov.second == id; }))
+                    if (std::any_of(aovs.begin(), aovs.end(), [&](const auto& aov) {
+                            return aov.second == id && aov.first->GetFormat() == HdFormatFloat32Vec3;
+                        }))
                         return;
                     if (!owned || owned->GetWidth() != buffer->GetWidth() ||
                         owned->GetHeight() != buffer->GetHeight()) {
@@ -3033,8 +3049,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     if (const auto file = settings.find(TfToken("usdFilename"));
         file != settings.end() && file->second.IsHolding<std::string>() &&
         !state_->namespaced.count(TfToken("upAxis")) && !settings.count(TfToken("stageUpAxis")))
-        if (const auto path =
-                (hostDirectory / std::filesystem::u8path(file->second.UncheckedGet<std::string>())).u8string();
+        if (const auto path = (hostDirectory / utf8Path(file->second.UncheckedGet<std::string>())).u8string();
             const auto layer = SdfLayer::FindOrOpen(std::string(path.begin(), path.end()))) {
             VtValue axis;
             if (layer->HasField(SdfPath::AbsoluteRootPath(), TfToken("upAxis"), &axis) && axis.IsHolding<TfToken>())
@@ -3053,7 +3068,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     auto dll = state_->setting<std::string>("backendLibrary", TfGetenv("HDUE_BACKEND_DLL"));
     if (dll.empty()) dll = runtimeConfig("backend_dll");
     if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
-    state_->backend = std::make_shared<hdue::Backend>(std::filesystem::u8path(dll));
+    state_->backend = std::make_shared<hdue::Backend>(utf8Path(dll));
     auto& host = selfHost();
     const auto rendererInfo = [state = state_] {
         state->backend->require(state->backend->api().get_renderer_info(&state->rendererInfo), "get_renderer_info");
@@ -3479,7 +3494,14 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (sceneSpaceChanged) {
         for (const auto& [id, v] : state_->materials) state_->dirtyMaterials.insert(id);
-        for (const auto& [id, v] : state_->meshes) state_->dirtyMeshes.insert(id);
+        for (const auto& [id, mesh] : state_->meshes) {
+            state_->dirtyMeshes.insert(id);
+            // UE holds a released mesh's vertices in the old units and axes: its arrays come back from Hydra.
+            if (mesh.released) {
+                state_->fullUploads.insert(id);
+                state_->repull.insert(mesh.sourceId);
+            }
+        }
         for (const auto& [id, v] : state_->lights) state_->dirtyLights.insert(id);
         ++state_->revision;
     }

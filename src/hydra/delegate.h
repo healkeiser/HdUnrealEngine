@@ -136,14 +136,25 @@ struct HdUEMeshData {
     bool released = false;
     uint32_t releasedTriangles = 0;
 };
-// Whether placing an uploaded mesh at transform needs no new geometry: a non-instanced mesh uploaded in local space,
-// moved without shear (HdUEShears). The motion extension then moves its UE actor.
+// Whether an instanced mesh's sheared instances are baked into its companion mesh (HdUEShearedId): only for a generic
+// mesh (a cooked asset has no vertices here), and not when the companion's arrays would pass UE's int32 element counts
+// (Scene.cpp: positions, UV sets, indices); those instances then render without shear. Sheared meshes keep their
+// arrays (releasable), so the counts are there.
+inline bool HdUEBakesShear(const HdUEMeshData& mesh, bool generic) {
+    if (!generic) return false;
+    const auto sheared = size_t(std::count_if(mesh.instances.begin(), mesh.instances.end(), HdUEHasShear));
+    const size_t perVertex = std::max<size_t>(3, 2 * (1 + mesh.uvSets.size()));
+    return sheared && mesh.points.size() * sheared * perVertex <= size_t(INT32_MAX) &&
+           mesh.indices.size() * sheared <= size_t(INT32_MAX);
+}
 // Uploads dirty meshes while Hydra still syncs a large scene (husk, hython); delegate.cpp. Call without the state lock.
 struct HdUEState;
 void HdUEStreamMeshes(HdUEState& state);
 // Whether a mesh's arrays can be freed once UE has it, and freeing them (delegate.cpp). Under the state lock.
 bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh);
 uint64_t HdUEReleaseGeometry(HdUEMeshData& mesh);
+// Whether placing an uploaded mesh at transform needs no new geometry: a non-instanced mesh uploaded in local space,
+// moved without shear (HdUEShears). The motion extension then moves its UE actor.
 inline bool HdUEPlacedOnly(const HdUEMeshData& mesh, const GfMatrix4d& transform) {
     return mesh.transform != transform && !mesh.instanced && mesh.sceneAsset.empty() && !HdUEShears(mesh.transform) &&
            !HdUEShears(transform);

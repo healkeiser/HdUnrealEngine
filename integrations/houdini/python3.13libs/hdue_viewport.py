@@ -287,9 +287,11 @@ class Viewport:
         f = Frame()
         f.struct_size = C.sizeof(f)
         code = self.poll(status["session"], C.byref(f))
-        if code == 1 or not f.frame_id:
+        if code == 1:  # pending: no frame yet
             return None
         self.runtime.check(code, "poll image")
+        if not f.frame_id:
+            return None
         pixels = (C.c_float * (f.width * f.height))()
         code = self.copy_depth(
             status["session"], f.frame_id, pixels, C.sizeof(pixels)

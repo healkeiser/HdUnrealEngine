@@ -771,11 +771,12 @@ public:
                                      previous->second.maskErrors != part.maskErrors ||
                                      previous->second.categories != part.categories;
             // A released mesh Hydra resent with the same geometry stays released: UE has it, and update_meshes (or a
-            // move) carries what changed, unless UE asked for it in full (fullUploads).
-            if (!revived && previous != missing && previous->second.released && !state->fullUploads.count(id) &&
-                previous->second.geometryHash == part.geometryHash && part.sceneAsset.empty() &&
-                previous->second.sceneAsset.empty() && previous->second.instanced == part.instanced &&
-                previous->second.instances == part.instances &&
+            // move) carries what changed, unless UE asked for it in full (fullUploads). A revived mesh whose removal
+            // is still queued (not taken into an upload) is one UE still holds.
+            if ((!revived || state->removed.count(id)) && previous != missing && previous->second.released &&
+                !state->fullUploads.count(id) && previous->second.geometryHash == part.geometryHash &&
+                part.sceneAsset.empty() && previous->second.sceneAsset.empty() &&
+                previous->second.instanced == part.instanced && previous->second.instances == part.instances &&
                 previous->second.instanceColors == part.instanceColors &&
                 (previous->second.transform == part.transform || moved) && HdUEReleasable(*state, part))
                 HdUEReleaseGeometry(part);
@@ -984,6 +985,7 @@ public:
             if (placed.instanceColors.size() != placements.size()) placed.instanceColors.clear();
         }
         const auto velocities = value(delegate->Get(GetId(), HdTokens->velocities), VtVec3fArray());
+        mesh.instanceSamples.resize(placed.instanceTimes.size());
         // Every point of every placement (nested under a Hydra instancer when there is one).
         for (size_t p = 0; p < placements.size(); ++p)
             for (size_t i = 0; i < points.size(); ++i) {
@@ -997,7 +999,6 @@ public:
                 const double radius = .5 * HdUEWidth(widths, i, .1f);
                 const auto sphere = GfMatrix4d(1).SetScale(radius) * GfMatrix4d(1).SetTranslate(GfVec3d(points[i]));
                 mesh.instances.push_back(sphere * placements[p]);
-                mesh.instanceSamples.resize(placed.instanceTimes.size());
                 for (size_t k = 0; k < placed.instanceTimes.size(); ++k)
                     mesh.instanceSamples[k].push_back(sphere * placed.instanceSamples[k][p]);
                 if (!placed.instanceColors.empty())
@@ -1283,7 +1284,7 @@ public:
             if (mesh.instanceColors.size() != mesh.instances.size())
                 mesh.instanceColors.clear();
             else
-                mesh.colors.clear();
+                std::vector<GfVec3f>().swap(mesh.colors);  // freed: clear() kept the capacity in the stored mesh
         }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
     }

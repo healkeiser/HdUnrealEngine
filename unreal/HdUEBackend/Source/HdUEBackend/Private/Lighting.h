@@ -57,6 +57,7 @@ private:
     FString LoadImageFile(const FString& File);     // into Images; the error, empty on success
     UTexture2D* ImageTexture(const FString& File);  // a loaded image as a texture, kept in LightTextures
     struct FProfileEntry {
+        FString File;  // the key without its angle scale
         FDateTime Modified;
         int64 Size = 0;
         TStrongObjectPtr<UTextureLightProfile> Texture;
@@ -76,5 +77,6 @@ private:
     float RadianceScale = 1, MaximumRadiance = 0;
     FString LastError;
     bool RebuildEnvironment(FString& Error);
+    void PruneCaches();
     bool UpdateLocal(const FDefinition& Definition, FString& Error);
 };

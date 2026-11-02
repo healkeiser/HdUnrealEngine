@@ -660,8 +660,9 @@ typedef struct HdueApi {
 
     /* AOV requests (HdueRenderRequest.aov other than HDUE_AOV_COLOR) render on their own view state and publish into
      * their own frame slot, so the beauty's history, poll_frame, copy_frame and copy_depth are unaffected. poll_aov
-     * reports the newest frame of the newest AOV request; copy_frame copies it by its frame_id. AOV generations are
-     * independent of beauty generations. */
+     * reports the newest frame of the newest AOV request; copy_frame copies it by its frame_id. Beauty and AOV requests
+     * share one increasing generation sequence: request_render returns HDUE_STALE_FRAME for a generation not above the
+     * newest of either. */
     HdueResult(HDUE_CALL* poll_aov)(HdueSession session, HdueFrameInfo* frame);
     /* The buffers HDUE_AOV_BUFFERS requests render, all in one raster render (Movie Render Queue's buffer
      * visualization pipes): keys of UE's [Engine.BufferVisualizationMaterials] (BaseColor, WorldNormal, ...) or

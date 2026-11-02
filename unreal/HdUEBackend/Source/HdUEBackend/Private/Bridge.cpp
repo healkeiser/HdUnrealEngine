@@ -713,10 +713,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         return Fail(HDUE_ENGINE_ERROR, *Session->Scene->Lighting->GetError());
     if (!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
     UpdateSkyCapture(*Session);  // a DomeLight added or removed since set_post_process
-    HdueAssetSceneStatus Assets{};
-    Session->Scene->Assets.GetSceneStatus(Assets);
-    if (Assets.loading) return Pending(TEXT("native assets"));
-    if (Assets.failed) return Fail(HDUE_ENGINE_ERROR, UTF8_TO_TCHAR(Assets.message));
+    FString AssetFailure;
+    if (Session->Scene->Assets.Loading(AssetFailure)) return Pending(TEXT("native assets"));
+    if (!AssetFailure.IsEmpty()) return Fail(HDUE_ENGINE_ERROR, *AssetFailure);
     ReleaseResidency(Session);
     // A moving realtime camera needs Lumen's persistent temporal history. Scene and light edits at the same time cancel
     // HasRequest and reset it: the request converges again, and a viewport stops drawing once it has (a kept history
@@ -1321,6 +1320,10 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                 }
                 if (Request.aov != HDUE_AOV_COLOR) {
                     Session->AovBuffers = MoveTemp(Job->Buffers);
+                    // The previous AOV frame's array becomes the spare (and the depth spare stays), so the next beauty
+                    // frame reuses arrays instead of page-faulting fresh ones.
+                    Session->SparePixels = MoveTemp(Session->AovPixels);
+                    Session->SpareDepth = MoveTemp(DepthPixels);
                     Session->AovPixels = MoveTemp(Pixels);
                     Session->AovFrame = Info;
                 } else {
@@ -1355,10 +1358,11 @@ HdueResult HDUE_CALL Tick() {
     // Retire finished readbacks, then poll every pending one: render commands run in order, so frames still publish
     // oldest first, and a frame no longer waits a tick per older readback.
     while (Session->InFlight.Num() && Session->InFlight[0]->Complete.Load()) {
-        if (Session->InFlight[0]->Failed.Load())
+        const bool Failed = Session->InFlight[0]->Failed.Load();
+        Session->InFlight.RemoveAt(0);  // before failing: kept, it failed every later tick and nothing drew again
+        if (Failed)
             return Fail(HDUE_ENGINE_ERROR,
                         TEXT("GPU color/depth readback failed, was not queued, or returned an invalid stride."));
-        Session->InFlight.RemoveAt(0);
     }
     for (const auto& Job : Session->InFlight) PollReadback(Session, Job);
     if (Session->Preparing) {

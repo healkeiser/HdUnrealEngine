@@ -57,6 +57,7 @@ FHdueScene::~FHdueScene() {
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
 TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
+    TSet<const UMaterialInterface*> Seen;  // materials are shared by many meshes: their textures are listed once
     TSet<UTexture2D*> Unique;
     TArray<TStrongObjectPtr<UTexture2D>> Result;
     TArray<AActor*> All = Assets.GetActors();
@@ -69,7 +70,8 @@ TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
             if (!Mesh->IsVisible()) continue;
             for (int32 Index = 0; Index < Mesh->GetNumMaterials(); ++Index) {
                 const auto* Material = Mesh->GetMaterial(Index);
-                if (!Material) continue;
+                if (!Material || Seen.Contains(Material)) continue;
+                Seen.Add(Material);
                 TArray<UTexture*> Textures;
                 Material->GetUsedTextures(Textures);
                 for (UTexture* Texture : Textures) {
@@ -136,6 +138,14 @@ void FHdueScene::Remove(const FString& Id) {
     PrimIds.Remove(Id);
     WetBindings.Remove(Id);
     GeometryRevisions.Remove(Id);
+    ForgetPending(Id);
+}
+// Drops a mesh's background build: a queued one at once, a launched one once it finishes (TickConversions), holding its
+// reserved memory until then. Removed meshes kept their geometry copy and still had cards and Nanite built.
+void FHdueScene::ForgetPending(const FString& Id) {
+    FPendingStatic Pending;
+    if (!PendingStatic.RemoveAndCopyValue(Id, Pending) || !Pending.Task.IsValid()) return;
+    RetiredBuilds.Add(MoveTemp(Pending));
 }
 namespace {
 // The root component of an hdUE actor: movable and render-only. Collision stays off, so UE neither cooks physics
@@ -346,8 +356,8 @@ void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
         // Nanite for opaque and masked materials only.
         const bool WantStatic = Cast<UInstancedStaticMeshComponent>(Root) || !(Mesh.flags & HDUE_MESH_EDITABLE);
         if (!Root || !MeshMaterials.Contains(Id) || bool(Static) != WantStatic ||
-            (Static &&
-             (!Built || Built->GetOuter() != Actor || Translucent(MeshMaterials[Id]) != Translucent(MaterialId)))) {
+            (Static && (!Built || Built->GetOuter() != GetTransientPackage() ||  // generated here, not a native asset
+                        Translucent(MeshMaterials[Id]) != Translucent(MaterialId)))) {
             Mesh.needs_upload = 1;
             continue;
         }
@@ -823,11 +833,143 @@ void HydraTangents(TArray<FStaticMeshBuildVertex>& Vertices, const TArray<uint32
     SMikkTSpaceContext Context = {&Interface, &Mesh, true};
     genTangSpaceDefault(&Context);
 }
+// A static mesh LOD's GPU buffers from build vertices (any thread). No CPU copies once the GPU has the buffers, as
+// UE's runtime mesh builds (FBuildMeshDescriptionsParams::bAllowCpuAccess false); they were as large as the delegate's
+// copy of the scene. Lumen cards read the buffers before InitResources; native picking reads cooked native meshes only.
+void InitLOD(FStaticMeshLODResources& LOD, const TArray<FStaticMeshBuildVertex>& Vertices,
+             const TArray<uint32>& Indices) {
+    const int32 Count = Vertices.Num();
+    LOD.VertexBuffers.PositionVertexBuffer.Init(Vertices, false);
+    FStaticMeshVertexBufferFlags Flags;
+    Flags.bNeedsCPUAccess = false;
+    Flags.bUseBackwardsCompatibleF16TruncUVs = false;
+    LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, HdueVertexUVs, Flags);
+    if (Vertices.ContainsByPredicate([](const FStaticMeshBuildVertex& V) { return V.Color != FColor::White; }))
+        LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices, false);
+    else
+        LOD.VertexBuffers.ColorVertexBuffer.InitFromColorArray(&FColor::White, Count, 0, false);
+    LOD.bHasColorVertexData = true;
+    FStaticMeshSection& Section = LOD.Sections.AddDefaulted_GetRef();
+    Section.MaterialIndex = 0;
+    Section.FirstIndex = 0;
+    Section.NumTriangles = Indices.Num() / 3;
+    Section.MinVertexIndex = 0;
+    Section.MaxVertexIndex = Count - 1;
+    Section.bCastShadow = true;
+    LOD.IndexBuffer.SetIndices(
+        Indices, Count - 1 > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
+}
+// An array of plain structs as its count and bytes (the Nanite cache's fallback mesh).
+template <class T>
+void SerializeRaw(FArchive& Ar, TArray<T>& Array) {
+    int32 Count = Array.Num();
+    Ar << Count;
+    if (Ar.IsLoading()) {
+        if (Count < 0 || int64(Count) * int64(sizeof(T)) > Ar.TotalSize() - Ar.Tell()) {
+            Ar.SetError();
+            return;
+        }
+        Array.SetNumUninitialized(Count);
+    }
+    Ar.Serialize(Array.GetData(), int64(Count) * sizeof(T));
+}
+// The Nanite build's fallback mesh as a static mesh's LOD 0, as UE's static mesh build makes it (BuildNanite,
+// StaticMeshBuilder.cpp): what draws where Nanite does not, and what ray tracing (Lumen's, the Path Tracer) traces.
+TUniquePtr<FStaticMeshRenderData> FallbackRenderData(const TArray<FStaticMeshBuildVertex>& Vertices,
+                                                     const TArray<uint32>& Indices) {
+    auto Data = MakeUnique<FStaticMeshRenderData>();
+    Data->AllocateLODResources(1);
+    InitLOD(Data->LODResources[0], Vertices, Indices);
+    return Data;
+}
+// The key under which identical generated meshes share one static mesh (FHdueScene::SharedMeshes): their arrays, and
+// whether a translucent material keeps them off Nanite (whose fallback mesh is coarse), which makes another mesh.
+FString MeshKey(const HdueMeshDesc& Desc, bool Translucent) {
+    FBlake3 Hasher;
+    const auto Add = [&](const void* Data, uint64 Size) {
+        if (Data) Hasher.Update(Data, Size);
+    };
+    const uint32 Header[] = {Desc.vertex_count,
+                             Desc.index_count,
+                             Desc.uv_set_count,
+                             uint32(Desc.normals != nullptr),
+                             uint32(Desc.colors != nullptr),
+                             uint32(Translucent)};
+    Add(Header, sizeof(Header));
+    Add(Desc.positions, Desc.vertex_count * 12ull);
+    Add(Desc.normals, Desc.vertex_count * 12ull);
+    Add(Desc.uv, Desc.vertex_count * 8ull * FMath::Max(1u, Desc.uv_set_count));
+    Add(Desc.colors, Desc.vertex_count * 12ull);
+    Add(Desc.indices, Desc.index_count * 4ull);
+    return LexToString(Hasher.Finalize());
+}
 // Nanite data for one generated mesh (any thread). Its root pages (one per mesh, UE's default minimum residency) stay
 // on the GPU; the other pages stay in memory in StreamablePages and stream to the GPU when the view needs them, as the
 // editor streams them (UE's non-editor path reads only cooked files: Apply-ResidencyPatch.ps1 adds the memory path).
-TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
+//
+// Fallback receives the builder's fallback mesh, at UE's default relative error (Fallback Target Auto:
+// r.Nanite.Builder.FallbackTargetAutoRelativeError above r.Nanite.Builder.FallbackTriangleThreshold). A full-resolution
+// LOD 0 and its ray-tracing BLAS took more GPU memory than the Nanite data, and Windows charges the process a commit
+// for its GPU allocations: NVIDIA's Da Vinci Workshop added about 200 bytes per triangle and ended at a 38 GB job
+// limit.
+TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc, TUniquePtr<FStaticMeshRenderData>& Fallback) {
     if (!Desc.vertex_count || Desc.index_count < 3) return nullptr;
+    const uint32 Triangles = Desc.index_count / 3;
+    FMeshNaniteSettings Settings;
+    Settings.bEnabled = true;
+    Settings.TargetMinimumResidencyInKB = 0;
+    // Fallback Target Auto, as Nanite::CorrectFallbackSettings applies it (NaniteHelper.cpp; MeshBuilderCommon does not
+    // compile into this game target).
+    static const auto* FallbackThreshold =
+        IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Nanite.Builder.FallbackTriangleThreshold"));
+    static const auto* FallbackError =
+        IConsoleManager::Get().FindTConsoleVariableDataFloat(TEXT("r.Nanite.Builder.FallbackTargetAutoRelativeError"));
+    Settings.FallbackPercentTriangles = 1.f;
+    Settings.FallbackRelativeError =
+        int32(Triangles) <= FallbackThreshold->GetValueOnAnyThread() ? 0.f : FallbackError->GetValueOnAnyThread();
+    // The Nanite build is most of a scene's conversion (450 meshes, 4.4M triangles: 10.5 s of 11.2 s), so builds are
+    // kept across runs as UE's derived data cache keeps a static mesh's (FStaticMeshRenderData::Cache, StaticMesh.cpp):
+    // keyed by the builder's version and the mesh's content, the resources as Serialize writes them (bCooked false).
+    // UE's cache itself is unavailable here: GetCache() creates none where RequiresCookedData() (cooked runtimes,
+    // DerivedDataCacheModule.cpp), so this keeps a file per mesh under Saved/NaniteCache.
+    FBlake3 Hasher;
+    const FString Version = Nanite::IBuilderModule::Get().GetVersionString();
+    Hasher.Update(*Version, Version.Len() * sizeof(TCHAR));
+    Hasher.Update("fallback key", 12);  // entries without the fallback mesh, or keyed by the input, are not reused
+    Hasher.Update(&Settings.FallbackRelativeError, sizeof(float));
+    // The builder's input follows from the descriptor alone (HydraVertex), so the descriptor's key stands for it, and a
+    // cache hit builds no input.
+    const FString Key = MeshKey(Desc, false);
+    Hasher.Update(*Key, Key.Len() * sizeof(TCHAR));
+    const FString Path =
+        FPaths::ProjectSavedDir() / TEXT("NaniteCache") / LexToString(Hasher.Finalize()) + TEXT(".nanite");
+    auto Resources = MakeShared<Nanite::FResources>();
+    TArray<uint8> Bytes;
+    if (FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) {
+        FMemoryReader Reader(Bytes);  // not persistent: see the writer
+        Resources->Serialize(Reader, nullptr, false);
+        // The streaming pages follow the resources (see the writer), restored as UE's DDC rebuild restores them.
+        int64 Streamable = 0;
+        Reader << Streamable;
+        if (!Reader.IsError() && Streamable >= 0 && Reader.Tell() + Streamable < Reader.TotalSize()) {
+            if (Streamable) {
+                Resources->StreamablePages.Lock(LOCK_READ_WRITE);
+                Reader.Serialize(Resources->StreamablePages.Realloc(Streamable), Streamable);
+                Resources->StreamablePages.Unlock();
+                Resources->StreamablePages.SetBulkDataFlags(BULKDATA_Force_NOT_InlinePayload);
+            }
+            TArray<FStaticMeshBuildVertex> Vertices;
+            TArray<uint32> Indices;
+            SerializeRaw(Reader, Vertices);
+            SerializeRaw(Reader, Indices);
+            if (!Reader.IsError() && Reader.AtEnd() && Indices.Num() >= 3) {
+                Fallback = FallbackRenderData(Vertices, Indices);
+                IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
+                return Resources;
+            }
+        }
+        *Resources = Nanite::FResources();
+    }
     Nanite::IBuilderModule::FInputMeshData Input;
     const int32 Sets = HdueUVSets(Desc);
     Input.Vertices.Empty(int32(Desc.vertex_count), Sets, 0);
@@ -845,7 +987,6 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     // The builder's vertex view drops all-white colours but its format still counts them: keep none in that case.
     if (!Input.Vertices.Color.ContainsByPredicate([](const FColor& C) { return C != FColor::White; }))
         Input.Vertices.Color.Empty();
-    const uint32 Triangles = Desc.index_count / 3;
     Input.TriangleIndices = TArray<uint32>(Desc.indices, int32(Triangles * 3));
     Input.TriangleCounts.Add(Triangles);
     Input.MaterialIndices.Init(0, int32(Triangles));
@@ -858,49 +999,25 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
     Input.Sections.Add(Section);
     Input.VertexBounds = FBounds3f(Bounds.Min, Bounds.Max);
     Input.NumTexCoords = uint8(Sets);
-    FMeshNaniteSettings Settings;
-    Settings.bEnabled = true;
-    Settings.TargetMinimumResidencyInKB = 0;
-    // The Nanite build is most of a scene's conversion (450 meshes, 4.4M triangles: 10.5 s of 11.2 s), so builds are
-    // kept across runs as UE's derived data cache keeps a static mesh's (FStaticMeshRenderData::Cache, StaticMesh.cpp):
-    // keyed by the builder's version and the mesh's content, the resources as Serialize writes them (bCooked false).
-    // UE's cache itself is unavailable here: GetCache() creates none where RequiresCookedData() (cooked runtimes,
-    // DerivedDataCacheModule.cpp), so this keeps a file per mesh under Saved/NaniteCache.
-    FBlake3 Hasher;
-    const FString Version = Nanite::IBuilderModule::Get().GetVersionString();
-    Hasher.Update(*Version, Version.Len() * sizeof(TCHAR));
-    Hasher.Update("streaming", 9);  // entries from builds that kept every page a root page are not reused
-    const auto Add = [&](const auto& Array) { Hasher.Update(Array.GetData(), Array.Num() * Array.GetTypeSize()); };
-    Add(Input.Vertices.Position);
-    Add(Input.Vertices.TangentX);
-    Add(Input.Vertices.TangentY);
-    Add(Input.Vertices.TangentZ);
-    for (const auto& UVs : Input.Vertices.UVs) Add(UVs);
-    Add(Input.Vertices.Color);
-    Add(Input.TriangleIndices);
-    const FString Path =
-        FPaths::ProjectSavedDir() / TEXT("NaniteCache") / LexToString(Hasher.Finalize()) + TEXT(".nanite");
-    auto Resources = MakeShared<Nanite::FResources>();
-    TArray<uint8> Bytes;
-    if (FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) {
-        FMemoryReader Reader(Bytes);  // not persistent: see the writer
-        Resources->Serialize(Reader, nullptr, false);
-        // The streaming pages follow the resources (see the writer), restored as UE's DDC rebuild restores them.
-        int64 Streamable = 0;
-        Reader << Streamable;
-        if (!Reader.IsError() && Streamable >= 0 && Reader.Tell() + Streamable == Reader.TotalSize()) {
-            if (Streamable) {
-                Resources->StreamablePages.Lock(LOCK_READ_WRITE);
-                Reader.Serialize(Resources->StreamablePages.Realloc(Streamable), Streamable);
-                Resources->StreamablePages.Unlock();
-                Resources->StreamablePages.SetBulkDataFlags(BULKDATA_Force_NOT_InlinePayload);
-            }
-            IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
-            return Resources;
-        }
-        *Resources = Nanite::FResources();
+    Nanite::IBuilderModule::FOutputMeshData Output;
+    if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, &Output, nullptr, nullptr, Settings) ||
+        Output.TriangleIndices.Num() < 3)
+        return nullptr;
+    TArray<FStaticMeshBuildVertex> Vertices;
+    Vertices.SetNum(Output.Vertices.Position.Num());
+    const int32 OutputSets = Output.Vertices.UVs.Num();
+    for (int32 V = 0; V < Vertices.Num(); ++V) {
+        FStaticMeshBuildVertex& Vertex = Vertices[V];
+        Vertex.Position = Output.Vertices.Position[V];
+        Vertex.TangentX = Output.Vertices.TangentX[V];
+        Vertex.TangentY = Output.Vertices.TangentY[V];
+        Vertex.TangentZ = Output.Vertices.TangentZ[V];
+        for (int32 Set = 0; Set < HdueVertexUVs; ++Set)  // the last set repeated, as HydraVertex fills them
+            Vertex.UVs[Set] =
+                OutputSets ? Output.Vertices.UVs[FMath::Min(Set, OutputSets - 1)][V] : FVector2f::ZeroVector;
+        Vertex.Color = Output.Vertices.Color.IsValidIndex(V) ? Output.Vertices.Color[V] : FColor::White;
     }
-    if (!Nanite::IBuilderModule::Get().Build(*Resources, Input, nullptr, nullptr, nullptr, Settings)) return nullptr;
+    Fallback = FallbackRenderData(Vertices, Output.TriangleIndices);
     // Runtime builds cannot save bulk data (USE_RUNTIME_BULKDATA, BulkData.cpp) but still read its header; a
     // non-persistent archive skips it both ways, so the streaming pages are appended raw after the resources.
     // Identical meshes share a key: one written by another task is kept as it is.
@@ -914,6 +1031,8 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc) {
         Writer.Serialize(const_cast<void*>(Resources->StreamablePages.LockReadOnly()), Streamable);
         Resources->StreamablePages.Unlock();
     }
+    SerializeRaw(Writer, Vertices);  // the fallback mesh follows the pages
+    SerializeRaw(Writer, Output.TriangleIndices);
     // Another task may build the same mesh: write a private file, then move it into place, once (UE's Move retries for
     // seconds while the other task's file is in the way).
     const FString Temporary = FPaths::CreateTempFilename(*FPaths::GetPath(Path), TEXT("nanite"));
@@ -930,8 +1049,14 @@ UStaticMesh* NewStaticMesh(UObject* Outer) {
     return Mesh;
 }
 // Game thread: Nanite data is attached before the GPU resources exist.
+// With Nanite data, the Nanite build's fallback mesh (BuildNanite) replaces the full-resolution LOD 0, keeping its
+// cards.
 void FinishStaticMesh(UStaticMesh* Built, TUniquePtr<FStaticMeshRenderData> RenderData, const FBoxSphereBounds& Bounds,
-                      Nanite::FResources* Nanite) {
+                      Nanite::FResources* Nanite, TUniquePtr<FStaticMeshRenderData> Fallback) {
+    if (Nanite && Fallback) {
+        Swap(Fallback->LODResources[0].CardRepresentationData, RenderData->LODResources[0].CardRepresentationData);
+        RenderData = MoveTemp(Fallback);
+    }
     Built->SetRenderData(MoveTemp(RenderData));
     FStaticMeshRenderData& Data = *Built->GetRenderData();
     if (Nanite) {
@@ -976,7 +1101,6 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
         return FVector3f(Desc.positions[V * 3], Desc.positions[V * 3 + 1], Desc.positions[V * 3 + 2]);
     };
     FBox3f Bounds(ForceInit);
-    bool Colored = false;
     for (int32 I = 0; I < Count; ++I) {
         uint32 V = uint32(I);
         FVector3f Normal;
@@ -990,7 +1114,6 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
             Normal = HydraNormal(Desc, V);
         Vertices[I] = HydraVertex(Desc, V, Normal);
         Bounds += Vertices[I].Position;
-        Colored |= Vertices[I].Color != FColor::White;
     }
     // UV tangents (~4 us per triangle) come with the cards: interactive hosts show the first build sooner and get them
     // with the background rebuild.
@@ -999,28 +1122,7 @@ FHdueScene::FConversion FHdueScene::BuildStatic(const HdueMeshDesc& Desc, bool C
     Result.RenderData->AllocateLODResources(1);
     if (Indices.IsEmpty()) return Result;
     FStaticMeshLODResources& LOD = Result.RenderData->LODResources[0];
-    // No CPU copies once the GPU has the buffers, as UE's runtime mesh builds (FBuildMeshDescriptionsParams::
-    // bAllowCpuAccess false); they were as large as the delegate's copy of the scene. The cards below read the
-    // buffers before InitResources; native picking reads cooked native meshes only.
-    LOD.VertexBuffers.PositionVertexBuffer.Init(Vertices, false);
-    FStaticMeshVertexBufferFlags Flags;
-    Flags.bNeedsCPUAccess = false;
-    Flags.bUseBackwardsCompatibleF16TruncUVs = false;
-    LOD.VertexBuffers.StaticMeshVertexBuffer.Init(Vertices, HdueVertexUVs, Flags);
-    if (Colored)
-        LOD.VertexBuffers.ColorVertexBuffer.Init(Vertices, false);
-    else
-        LOD.VertexBuffers.ColorVertexBuffer.InitFromColorArray(&FColor::White, Count, 0, false);
-    LOD.bHasColorVertexData = true;
-    FStaticMeshSection& Section = LOD.Sections.AddDefaulted_GetRef();
-    Section.MaterialIndex = 0;
-    Section.FirstIndex = 0;
-    Section.NumTriangles = Indices.Num() / 3;
-    Section.MinVertexIndex = 0;
-    Section.MaxVertexIndex = Count - 1;
-    Section.bCastShadow = true;
-    LOD.IndexBuffer.SetIndices(
-        Indices, Count - 1 > MAX_uint16 ? EIndexBufferStride::Force32Bit : EIndexBufferStride::Force16Bit);
+    InitLOD(LOD, Vertices, Indices);
     if (Cards) LOD.CardRepresentationData = HdueMeshCards(LOD, Result.Bounds);
     return Result;
 }
@@ -1039,6 +1141,11 @@ void FHdueScene::TickConversions() {
     // AssetCompilingManager.cpp, editor-only): an estimate of 7 times the source mesh (UStaticMesh::
     // GetBuildRequiredMemoryEstimate, StaticMesh.cpp) against the available physical and virtual memory less 64 MB,
     // with builds already started (or finished and waiting to be swapped in) holding theirs.
+    RetiredBuilds.RemoveAll([&](const FPendingStatic& Retired) {
+        if (!Retired.Task.IsCompleted()) return false;
+        ReservedMemory -= Retired.Memory;
+        return true;
+    });
     if (PendingStatic.Num()) {
         const FPlatformMemoryStats Stats = FPlatformMemory::GetStats();
         int64 Available = int64(FMath::Min(Stats.AvailablePhysical, Stats.AvailableVirtual)) - 64 * 1024 * 1024;
@@ -1054,7 +1161,7 @@ void FHdueScene::TickConversions() {
                 TEXT("HdueConversion"),
                 [Source = MoveTemp(Pending.Source)]() -> TSharedPtr<FConversion> {
                     auto Result = MakeShared<FConversion>(BuildStatic(Source->Desc, true));
-                    if (Source->Nanite) Result->Nanite = BuildNanite(Source->Desc);
+                    if (Source->Nanite) Result->Nanite = BuildNanite(Source->Desc, Result->Fallback);
                     return Result;
                 },
                 UE::Tasks::ETaskPriority::BackgroundLow);
@@ -1070,14 +1177,14 @@ void FHdueScene::TickConversions() {
             It.RemoveCurrent();
             continue;
         }
-        const UMaterialInterface* Material = Component->GetMaterial(0);
+        const FString& Key = It.Value().Key;
         // Nanite draws opaque and masked materials only.
-        const bool Nanite = NaniteFits(It.Key(), Conversion->Nanite && !(Material && IsTranslucentBlendMode(*Material))
-                                                     ? Conversion->Nanite.Get()
-                                                     : nullptr);
-        UStaticMesh* Built = NewStaticMesh(Actor);
+        const bool Nanite =
+            NaniteFits(Key, Conversion->Nanite && !It.Value().Translucent ? Conversion->Nanite.Get() : nullptr);
+        UStaticMesh* Built = NewStaticMesh(GetTransientPackage());
         FinishStaticMesh(Built, MoveTemp(Conversion->RenderData), Conversion->Bounds,
-                         Nanite ? Conversion->Nanite.Get() : nullptr);
+                         Nanite ? Conversion->Nanite.Get() : nullptr, MoveTemp(Conversion->Fallback));
+        SharedMeshes.Add(Key, Built);
         static int32 NaniteMeshes = 0, Tried = 0;
         ++Tried;
         if (Built->HasValidNaniteData()) ++NaniteMeshes;
@@ -1448,6 +1555,38 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 IFileManager::Get().Delete(*(Folder / File));
         return true;
     }();
+    // Identical generated meshes share one static mesh, as UE's USD importer shares one asset between identical prims
+    // (UUsdAssetCache3, keyed by a hash of the mesh: USDGeomMeshTranslator.cpp): NVIDIA's Da Vinci Workshop references
+    // the same assets thousands of times without USD instancing, and each copy held its own render data, Nanite pages
+    // and ray-tracing geometry. Keys are hashed on all cores; the first mesh of a key in the batch builds it, the
+    // others (and later batches, while it lives) reuse it. Interactive hosts share only finished conversions
+    // (TickConversions).
+    for (auto It = SharedMeshes.CreateIterator(); It; ++It)
+        if (!It.Value().IsValid()) {
+            NaniteFits(It.Key(), nullptr);  // its root pages are back once UE has destroyed it
+            It.RemoveCurrent();
+        }
+    TArray<FString> Keys;
+    TArray<bool> Translucent, Build;  // Build: the first mesh of a key no live static mesh has
+    Keys.SetNum(Batch.mesh_count);
+    Translucent.Init(false, Batch.mesh_count);
+    Build.Init(false, Batch.mesh_count);
+    ParallelFor(Batch.mesh_count, [&](int32 Index) {
+        const auto& Desc = Batch.meshes[Index];
+        if (!ValidMeshes[Index] || !StaticGenerated(Desc)) return;
+        const auto* Material = Desc.material_id ? Materials.Find(UTF8_TO_TCHAR(Desc.material_id)) : nullptr;
+        Translucent[Index] = Material && IsTranslucentBlendMode(*Material->Get());
+        Keys[Index] = MeshKey(Desc, Translucent[Index]);
+    });
+    {
+        TSet<FString> Claimed;
+        for (int32 Index = 0; Index < Keys.Num(); ++Index) {
+            bool Seen = Keys[Index].IsEmpty() || SharedMeshes.Contains(Keys[Index]);
+            if (!Seen) Claimed.Add(Keys[Index], &Seen);
+            Build[Index] = !Seen;
+        }
+    }
+    TMap<FString, UStaticMesh*> BatchBuilt;  // static meshes built in this batch, for its other meshes of the key
     TArray<UE::Geometry::FDynamicMesh3> BuiltMeshes;
     BuiltMeshes.SetNum(Batch.mesh_count);
     TArray<FConversion> StaticData;
@@ -1462,10 +1601,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         [&](int32 Task) {
             const int32 Index = Order[Task];
             const auto& Desc = Batch.meshes[Index];
-            if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset)) return;
+            if (!ValidMeshes[Index] || (Desc.native_asset && *Desc.native_asset) ||
+                (!Keys[Index].IsEmpty() && !Build[Index]))
+                return;
             if (StaticGenerated(Desc)) {
                 StaticData[Index] = BuildStatic(Desc, !Interactive);
-                if (NaniteMeshes && !Interactive) StaticData[Index].Nanite = BuildNanite(Desc);
+                if (NaniteMeshes && !Interactive && !Translucent[Index])  // Nanite draws opaque and masked only
+                    StaticData[Index].Nanite = BuildNanite(Desc, StaticData[Index].Fallback);
             } else
                 BuiltMeshes[Index] = BuildDynamicMesh(Desc);
         },
@@ -1531,35 +1673,39 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                    Mesh->HasValidNaniteData());
             Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Mesh);
         } else {
-            // A background build for the previous geometry finishes unused (its memory is released with it).
-            if (const FPendingStatic* Previous = PendingStatic.Find(Id)) {
-                if (Previous->Task.IsValid()) ReservedMemory -= Previous->Memory;
-                PendingStatic.Remove(Id);
-            }
+            ForgetPending(Id);  // a background build for the previous geometry finishes unused
             if (Static) {
-                auto* Built = NewStaticMesh(Actor);
-                // Nanite draws opaque and masked materials only.
-                const auto* Material = Desc.material_id ? Materials.Find(UTF8_TO_TCHAR(Desc.material_id)) : nullptr;
-                const bool Nanite =
-                    NaniteFits(Id, StaticData[Index].Nanite && !(Material && IsTranslucentBlendMode(*Material->Get()))
-                                       ? StaticData[Index].Nanite.Get()
-                                       : nullptr);
-                FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds,
-                                 Nanite ? StaticData[Index].Nanite.Get() : nullptr);
+                const FString& Key = Keys[Index];
+                UStaticMesh* Built = BatchBuilt.FindRef(Key);
+                const bool Converted = !Built && !Build[Index];  // a finished shared mesh (SharedMeshes)
+                if (Converted) Built = SharedMeshes.FindRef(Key).Get();
+                if (!Built) {
+                    // Static meshes belong to no actor: the components that draw them keep them alive.
+                    Built = NewStaticMesh(GetTransientPackage());
+                    // Nanite draws opaque and masked materials only.
+                    const bool Nanite =
+                        NaniteFits(Key, StaticData[Index].Nanite && !Translucent[Index] ? StaticData[Index].Nanite.Get()
+                                                                                        : nullptr);
+                    FinishStaticMesh(Built, MoveTemp(StaticData[Index].RenderData), StaticData[Index].Bounds,
+                                     Nanite ? StaticData[Index].Nanite.Get() : nullptr,
+                                     MoveTemp(StaticData[Index].Fallback));
+                    BatchBuilt.Add(Key, Built);
+                    if (!Interactive) SharedMeshes.Add(Key, Built);
+                }
                 if (Instanced)
                     InstanceMesh = Built;
                 else
                     Actor->FindComponentByClass<UStaticMeshComponent>()->SetStaticMesh(Built);
-                if (Interactive) {
+                if (Interactive && !Converted) {
                     // Cards, Nanite data and the converted mesh's render data are built on background workers, from a
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s). TickConversions starts them.
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    Copy->Nanite = NaniteMeshes;
+                    Copy->Nanite = NaniteMeshes && !Translucent[Index];
                     const int64 Source = Copy->Positions.GetAllocatedSize() + Copy->Normals.GetAllocatedSize() +
                                          Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
                                          Copy->Indices.GetAllocatedSize();
-                    PendingStatic.Add(Id, {Copy, 7 * Source, {}});
+                    PendingStatic.Add(Id, {Copy, 7 * Source, {}, Key, Translucent[Index]});
                 }
             } else
                 Actor->FindComponentByClass<UDynamicMeshComponent>()->SetMesh(MoveTemp(BuiltMeshes[Index]));

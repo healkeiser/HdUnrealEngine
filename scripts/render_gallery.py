@@ -151,8 +151,9 @@ def mode_layer(layer, mode, out):
 
 
 def husk(renderer, layer, output, frames=1):
-    """husk's wall time or, for a sequence, its time per frame after the first: the delegate's timing trace between
-    frame changes, so neither UE startup (which varies by seconds) nor the first frame's warm-up counts."""
+    """Husk's wall time or, for a sequence, its time per frame after the first: the delegate's timing trace between
+    frame changes, so neither UE startup (which varies by seconds) nor the first frame's warm-up counts.
+    """
     start = time.perf_counter()
     env = {**os.environ, "HDUE_TRACE_TIMING": "1"} if frames > 2 else None
     result = subprocess.run(
@@ -287,8 +288,8 @@ def panel_image(target, title, doc, panels):
 
     matplotlib.use("agg")
     import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
     from matplotlib.font_manager import FontProperties
+    from matplotlib.lines import Line2D
     from matplotlib.textpath import TextPath
 
     tiles = [display(image, tonemapped) for image, *_, tonemapped in panels]
