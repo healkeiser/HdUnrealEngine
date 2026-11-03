@@ -113,6 +113,14 @@ def upgrade(node):
     subnet = node.changeNodeType(
         "subnet", keep_network_contents=True, keep_parms=False
     )
+    # Outputs of scenes saved before the nodes' Substrate data was the VOP surface type.
+    for child in subnet.children():
+        if (
+            child.type().name() == "subnetconnector"
+            and child.parm("connectorkind").evalAsString() == "output"
+            and child.parm("parmtype").evalAsString() == "bsdf"
+        ):
+            child.parm("parmtype").set("surface")
     voptoolutils._addMtlSubnetParms(
         subnet, TAB_MASK, RENDER_CONTEXT, "hdUE Substrate Material Builder"
     )

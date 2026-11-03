@@ -440,9 +440,12 @@ def connector(network, name, kind, value_type, default=None):
     node.parm("parmlabel").set(label(name))
     node.parm("parmtype").set(
         {
-            "surface": "bsdf",
-            "volume": "bsdf",  # as Karma's volume shaders, wired to the builder's output
-            "decal": "bsdf",
+            # Substrate data (UE's Front Material) as the VOP surface type, the type of the builder's surface output
+            # and of what Karma wires there (Standard Surface): bsdf here made every builder report "Input data type
+            # does not match output for input 'suboutput'".
+            "surface": "surface",
+            "volume": "surface",
+            "decal": "surface",
             "color3": "color",
             "color4": "coloralpha",
             "vector2": "float2",
