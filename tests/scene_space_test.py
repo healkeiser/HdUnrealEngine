@@ -7,7 +7,6 @@ from pathlib import Path
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from asset_proxy import author_proxy
 from scene_space import normalize_stage, ue_basis
 
 
@@ -96,8 +95,9 @@ class SpaceTest(unittest.TestCase):
                     * ue_basis(axis, meters)
                 )
                 normalize_stage(stage, axis, meters)
-                proxy = author_proxy(
-                    stage, str(prim.GetPath()), "/Game/A.A", {}, 100.0, "Y"
+                # A child mesh in the asset's space, where the delegate's bounds mesh sits.
+                proxy = UsdGeom.Mesh.Define(
+                    stage, str(prim.GetPath()) + "/__HdUEAssetProxy"
                 )
                 correction = prim.GetAttribute("unreal:assetSpace")
                 UsdGeom.Xformable(proxy).AddTransformOp().Set(
@@ -110,13 +110,6 @@ class SpaceTest(unittest.TestCase):
                     ue_basis("Y", 1).GetInverse() * world * ue_basis("Y", 1)
                 )
                 self.assertTrue(Gf.IsClose(before, actual, 1e-8))
-                # Repeated preparation reuses only proxies marked as generated.
-                self.assertEqual(
-                    author_proxy(
-                        stage, str(prim.GetPath()), "/Game/B.B", {}, 100.0, "Y"
-                    ).GetPath(),
-                    proxy.GetPath(),
-                )
 
 
 if __name__ == "__main__":

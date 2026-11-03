@@ -287,6 +287,9 @@ void HdUEWarnMaterial(const HdUEMaterialData& data);
 std::string HdUESettingText(const VtValue& value);
 // The stage UsdImaging populates hdUE from (implicit_surfaces.cpp), or null before population.
 UsdStageRefPtr HdUEBatchStage();
+// A cooked asset's bounds in UE centimetres, from the runtime profile's asset catalog (Prepare-ProjectAssets.ps1);
+// false when the profile has no catalog or the catalog has no bounds for the asset.
+bool HdUEAssetBoundsCm(const std::string& asset, GfVec3d& min, GfVec3d& max);
 struct HdUELightData {
     std::string id;
     std::string texture;

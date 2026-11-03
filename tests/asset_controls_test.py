@@ -1,4 +1,4 @@
-"""Verify host proxy composition, units and editable references with real USD."""
+"""usdview's asset catalog warnings, with real USD; the stage is left unchanged."""
 
 import sys
 import unittest
@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from asset_controls import AssetReferences
-from pxr import Gf, Sdf, Usd, UsdGeom
+from pxr import Sdf, Usd, UsdGeom
 
 
 class Signal:
@@ -15,94 +15,29 @@ class Signal:
         pass
 
 
-class AssetProxyTest(unittest.TestCase):
-    def setUp(self):
-        self.stage = Usd.Stage.CreateInMemory()
-        UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.z)
-        UsdGeom.SetStageMetersPerUnit(self.stage, 0.01)
-        self.prim = UsdGeom.Xform.Define(self.stage, "/Asset").GetPrim()
-        self.prim.CreateAttribute(
-            "unreal:asset", Sdf.ValueTypeNames.String
-        ).Set("/Game/M.M")
+class AssetReferencesTest(unittest.TestCase):
+    def test_catalog_warnings_without_stage_edits(self):
+        stage = Usd.Stage.CreateInMemory()
+        prim = UsdGeom.Xform.Define(stage, "/Asset").GetPrim()
+        prim.CreateAttribute("unreal:asset", Sdf.ValueTypeNames.String).Set(
+            "/Game/M.M"
+        )
         model = SimpleNamespace(
-            stage=self.stage,
+            stage=stage,
             currentFrame=Usd.TimeCode.Default(),
             signalStageReplaced=Signal(),
             signalPrimsChanged=Signal(),
         )
-        self.refs = AssetReferences(SimpleNamespace(_dataModel=model))
-
-    def test_session_layer_bounds_edit_and_removal(self):
-        original = self.stage.GetRootLayer().ExportToString()
-        self.refs.catalog = {
-            "/Game/M.M": {"bounds_cm": {"min": [1, 2, 3], "max": [10, 20, 30]}}
+        refs = AssetReferences(SimpleNamespace(_dataModel=model))
+        refs.catalog = {
+            "/Game/M.M": {"unavailable_script_packages": ["/Script/X"]}
         }
-        self.refs.sync()
-        proxy = UsdGeom.Mesh(
-            self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy")
-        )
-        self.assertEqual(str(proxy.GetExtentAttr().Get()[0]), "(1, -20, 3)")
-        self.assertEqual(
-            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("unreal:asset").Get(),
-            "/Game/M.M",
-        )
-        self.assertEqual(self.stage.GetRootLayer().ExportToString(), original)
-        self.stage.SetEditTarget(self.stage.GetSessionLayer())
-        self.prim.GetAttribute("unreal:asset").Set("/Game/N.N")
-        self.refs.invalidate()
-        self.refs.sync()
-        proxy = UsdGeom.Mesh(
-            self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy")
-        )
-        self.assertEqual(
-            UsdGeom.PrimvarsAPI(proxy).GetPrimvar("unreal:asset").Get(),
-            "/Game/N.N",
-        )
-        self.prim.GetAttribute("unreal:asset").Set("")
-        self.refs.invalidate()
-        self.refs.sync()
-        self.assertFalse(self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy"))
-
-    def test_y_up_meters(self):
-        UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.y)
-        UsdGeom.SetStageMetersPerUnit(self.stage, 1)
-        self.refs.catalog = {
-            "/Game/M.M": {
-                "bounds_cm": {"min": [100, 200, 300], "max": [400, 500, 600]}
-            }
-        }
-        self.refs.sync()
-        proxy = UsdGeom.Mesh(
-            self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy")
-        )
-        self.assertEqual(str(proxy.GetExtentAttr().Get()[0]), "(2, 3, -4)")
-
-    def test_loaded_bounds_use_parent_inverse_without_source_edits(self):
-        UsdGeom.Xformable(self.prim).AddTranslateOp().Set(Gf.Vec3d(100, 0, 0))
-        root = self.stage.GetRootLayer().ExportToString()
-        self.refs.sync()
-        calls = []
-
-        def status(session, id):
-            calls.append((session, id))
-            return dict(
-                state=1, bounds_min=[110, 20, 30], bounds_max=[120, 40, 50]
-            )
-
-        self.refs.api = SimpleNamespace(status=status)
-        stats = {
-            "sessionHandle": 7,
-            "nativeAssetInstances": 1,
-            "nativeAssetIds": {"/Asset": "/delegate/Asset/__HdUEAssetProxy"},
-        }
-        self.refs.refresh_bounds(None, stats)
-        self.refs.refresh_bounds(None, stats)
-        self.assertEqual(calls, [(7, "/delegate/Asset/__HdUEAssetProxy")])
-        proxy = UsdGeom.Mesh(
-            self.stage.GetPrimAtPath("/Asset/__HdUEAssetProxy")
-        )
-        self.assertEqual(str(proxy.GetExtentAttr().Get()[0]), "(10, -40, 30)")
-        self.assertEqual(self.stage.GetRootLayer().ExportToString(), root)
+        before = stage.GetSessionLayer().ExportToString()
+        refs.sync()
+        self.assertEqual(len(refs.warnings), 1)
+        self.assertIn("/Script/X", refs.warnings[0])
+        self.assertEqual(stage.GetSessionLayer().ExportToString(), before)
+        self.assertFalse(stage.GetPrimAtPath("/Asset/__HdUEAssetProxy"))
 
 
 if __name__ == "__main__":

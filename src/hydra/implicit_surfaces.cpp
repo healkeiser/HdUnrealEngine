@@ -11,6 +11,12 @@
 #include "pxr/imaging/hd/visibilitySchema.h"
 #include "pxr/imaging/hdsi/utils.h"
 #include "pxr/imaging/hd/extentSchema.h"
+#include "pxr/imaging/hd/instancedBySchema.h"
+#include "pxr/imaging/hd/meshSchema.h"
+#include "pxr/imaging/hd/meshTopologySchema.h"
+#include "pxr/base/gf/range3d.h"
+#include "pxr/imaging/pxOsd/tokens.h"
+#include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/imaging/hd/xformSchema.h"
 #include "pxr/imaging/hd/nurbsCurvesSchema.h"
 #include "pxr/imaging/hd/nurbsPatchSchema.h"
@@ -374,6 +380,181 @@ public:
         static const auto data = HdRetainedContainerDataSource::New(TfToken("unreal:hermiteCurves"),
                                                                     HdRetainedTypedSampledDataSource<bool>::New(true));
         return data;
+    }
+};
+// Native assets (unreal:asset on a Mesh, Xform or Scope, docs/materials.md): the delegate places a cooked UE object
+// through a mesh carrying the constant primvar unreal:asset (prims.cpp). This keyless adapter hands the attribute on,
+// with the bounds mesh's points in stage space (the asset catalog's bounds, else a 1 m box, as scripts/asset_proxy.py
+// sized the hosts' proxies), under a private key that other renderers ignore; HdUE_NativeAssetSceneIndex makes the
+// mesh. Every host (the viewport, husk, usdview) then renders the same placements from the stage alone.
+bool HdUEAssetBoundsCm(const std::string& asset, GfVec3d& min, GfVec3d& max);  // delegate.cpp
+TF_DEFINE_PRIVATE_TOKENS(HdUENativeAssetTokens,
+                         ((attribute,
+                           "unreal:asset"))((key, "unreal:nativeAsset"))(asset)(points)((proxy, "__HdUEAssetProxy")));
+class HdUE_NativeAssetAPIAdapter final : public UsdImagingAPISchemaAdapter {
+public:
+    HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim,
+                                                      const TfToken& instance,
+                                                      const UsdImagingDataSourceStageGlobals&) override {
+        if (!subprim.IsEmpty() || !instance.IsEmpty()) return nullptr;
+        const auto attribute = prim.GetAttribute(HdUENativeAssetTokens->attribute);
+        std::string asset;
+        if (SdfAssetPath path; attribute && !attribute.Get(&asset) && attribute.Get(&path)) asset = path.GetAssetPath();
+        if (asset.empty()) return nullptr;
+        GfVec3d low(-50), high(50);
+        HdUEAssetBoundsCm(asset, low, high);
+        // UE centimetres (Z up, Y left) to the stage's units and up axis.
+        const auto stage = prim.GetStage();
+        const double units = UsdGeomGetStageMetersPerUnit(stage) * 100;
+        const bool zUp = UsdGeomGetStageUpAxis(stage) == UsdGeomTokens->z;
+        VtVec3fArray points;
+        for (const double x : {low[0], high[0]})
+            for (const double y : {low[1], high[1]})
+                for (const double z : {low[2], high[2]})
+                    points.push_back(GfVec3f(zUp ? GfVec3d(x, -y, z) / units : GfVec3d(y, z, -x) / units));
+        return HdRetainedContainerDataSource::New(
+            HdUENativeAssetTokens->key,
+            HdRetainedContainerDataSource::New(
+                HdUENativeAssetTokens->asset, HdRetainedTypedSampledDataSource<std::string>::New(asset),
+                HdUENativeAssetTokens->points, HdRetainedTypedSampledDataSource<VtVec3fArray>::New(points)));
+    }
+    // shortcut: a change of the stage's units or up axis keeps the points until the prim resyncs; resync it then.
+    HdDataSourceLocatorSet InvalidateImagingSubprim(const UsdPrim&, const TfToken& subprim, const TfToken&,
+                                                    const TfTokenVector& properties,
+                                                    UsdImagingPropertyInvalidationType) override {
+        if (subprim.IsEmpty() && std::count(properties.begin(), properties.end(), HdUENativeAssetTokens->attribute))
+            return HdDataSourceLocator(HdUENativeAssetTokens->key);
+        return {};
+    }
+};
+// The meshes for HdUE_NativeAssetAPIAdapter's prims: a Mesh gets the unreal:asset primvar; another prim gets a child
+// box, __HdUEAssetProxy (the path the hosts' proxies had), with the prim's world transform, visibility, purpose and
+// instancing (this runs after UsdImaging's flattening), its constant primvars (unreal:volume:frame) and unreal:asset.
+class HdUE_NativeAssetSceneIndex final : public HdSingleInputFilteringSceneIndexBase {
+public:
+    explicit HdUE_NativeAssetSceneIndex(const HdSceneIndexBaseRefPtr& input)
+        : HdSingleInputFilteringSceneIndexBase(input) {}
+    HdSceneIndexPrim GetPrim(const SdfPath& path) const override {
+        if (path.IsPrimPath() && path.GetNameToken() == HdUENativeAssetTokens->proxy) {
+            const auto parent = _GetInputSceneIndex()->GetPrim(path.GetParentPath());
+            if (const auto native = nativeAsset(parent); native && parent.primType != HdPrimTypeTokens->mesh)
+                return {HdPrimTypeTokens->mesh, proxy(parent.dataSource, native)};
+        }
+        auto prim = _GetInputSceneIndex()->GetPrim(path);
+        if (prim.primType == HdPrimTypeTokens->mesh)
+            if (const auto native = nativeAsset(prim))
+                prim.dataSource = HdOverlayContainerDataSource::New(
+                    HdRetainedContainerDataSource::New(
+                        HdPrimvarsSchema::GetSchemaToken(),
+                        HdRetainedContainerDataSource::New(HdUENativeAssetTokens->attribute, assetPrimvar(native))),
+                    prim.dataSource);
+        return prim;
+    }
+    SdfPathVector GetChildPrimPaths(const SdfPath& path) const override {
+        auto children = _GetInputSceneIndex()->GetChildPrimPaths(path);
+        if (hasProxy(path)) children.push_back(path.AppendChild(HdUENativeAssetTokens->proxy));
+        return children;
+    }
+
+protected:
+    void _PrimsAdded(const HdSceneIndexBase&, const HdSceneIndexObserver::AddedPrimEntries& entries) override {
+        auto added = entries;
+        for (const auto& entry : entries)
+            if (hasProxy(entry.primPath))
+                added.emplace_back(entry.primPath.AppendChild(HdUENativeAssetTokens->proxy), HdPrimTypeTokens->mesh);
+        _SendPrimsAdded(added);
+    }
+    void _PrimsRemoved(const HdSceneIndexBase&, const HdSceneIndexObserver::RemovedPrimEntries& entries) override {
+        _SendPrimsRemoved(entries);  // a subtree's removal takes its proxy with it
+    }
+    void _PrimsDirtied(const HdSceneIndexBase&, const HdSceneIndexObserver::DirtiedPrimEntries& entries) override {
+        static const HdDataSourceLocator key(HdUENativeAssetTokens->key);
+        HdSceneIndexObserver::AddedPrimEntries added;
+        HdSceneIndexObserver::RemovedPrimEntries removed;
+        auto dirtied = entries;
+        for (const auto& entry : entries) {
+            const auto proxyPath = entry.primPath.AppendChild(HdUENativeAssetTokens->proxy);
+            if (entry.dirtyLocators.Intersects(key)) {
+                // The asset changed, appeared or went: the proxy is made (again) or removed.
+                if (hasProxy(entry.primPath))
+                    added.emplace_back(proxyPath, HdPrimTypeTokens->mesh);
+                else
+                    removed.emplace_back(proxyPath);
+            } else if (hasProxy(entry.primPath)) {
+                dirtied.emplace_back(proxyPath, entry.dirtyLocators);  // transform, visibility, primvars, ...
+            }
+        }
+        if (!removed.empty()) _SendPrimsRemoved(removed);
+        if (!added.empty()) _SendPrimsAdded(added);
+        _SendPrimsDirtied(dirtied);
+    }
+
+private:
+    static HdContainerDataSourceHandle nativeAsset(const HdSceneIndexPrim& prim) {
+        return prim.dataSource ? HdContainerDataSource::Cast(prim.dataSource->Get(HdUENativeAssetTokens->key))
+                               : nullptr;
+    }
+    bool hasProxy(const SdfPath& path) const {
+        const auto prim = _GetInputSceneIndex()->GetPrim(path);
+        return nativeAsset(prim) && prim.primType != HdPrimTypeTokens->mesh;
+    }
+    static HdContainerDataSourceHandle assetPrimvar(const HdContainerDataSourceHandle& native) {
+        return HdPrimvarSchema::Builder()
+            .SetPrimvarValue(HdSampledDataSource::Cast(native->Get(HdUENativeAssetTokens->asset)))
+            .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->constant))
+            .Build();
+    }
+    static HdContainerDataSourceHandle proxy(const HdContainerDataSourceHandle& parent,
+                                             const HdContainerDataSourceHandle& native) {
+        static const auto topology =
+            HdMeshSchema::Builder()
+                .SetTopology(HdMeshTopologySchema::Builder()
+                                 .SetFaceVertexCounts(
+                                     HdRetainedTypedSampledDataSource<VtIntArray>::New(VtIntArray{4, 4, 4, 4, 4, 4}))
+                                 .SetFaceVertexIndices(HdRetainedTypedSampledDataSource<VtIntArray>::New(VtIntArray{
+                                     0, 2, 3, 1, 4, 5, 7, 6, 0, 1, 5, 4, 2, 6, 7, 3, 0, 4, 6, 2, 1, 3, 7, 5}))
+                                 .SetOrientation(HdMeshTopologySchema::BuildOrientationDataSource(
+                                     HdMeshTopologySchemaTokens->rightHanded))
+                                 .Build())
+                .SetSubdivisionScheme(HdRetainedTypedSampledDataSource<TfToken>::New(PxOsdOpenSubdivTokens->none))
+                .Build();
+        const auto points = HdTypedSampledDataSource<VtVec3fArray>::Cast(native->Get(HdUENativeAssetTokens->points));
+        const auto value = points ? points->GetTypedValue(0) : VtVec3fArray();
+        GfRange3d range;
+        for (const auto& p : value) range.UnionWith(GfVec3d(p));
+        const auto primvars = HdRetainedContainerDataSource::New(
+            HdPrimvarsSchemaTokens->points,
+            HdPrimvarSchema::Builder()
+                .SetPrimvarValue(points)
+                .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->vertex))
+                .SetRole(HdPrimvarSchema::BuildRoleDataSource(HdPrimvarSchemaTokens->point))
+                .Build(),
+            HdUENativeAssetTokens->attribute, assetPrimvar(native));
+        const auto get = [&](const TfToken& name) { return parent->Get(name); };
+        const TfToken names[] = {HdMeshSchema::GetSchemaToken(),       HdPrimvarsSchema::GetSchemaToken(),
+                                 HdExtentSchema::GetSchemaToken(),     HdXformSchema::GetSchemaToken(),
+                                 HdVisibilitySchema::GetSchemaToken(), HdPurposeSchema::GetSchemaToken(),
+                                 HdInstancedBySchema::GetSchemaToken()};
+        const HdDataSourceBaseHandle values[] = {
+            topology,
+            HdOverlayContainerDataSource::New(primvars,
+                                              HdContainerDataSource::Cast(get(HdPrimvarsSchema::GetSchemaToken()))),
+            HdExtentSchema::Builder()
+                .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(range.GetMin()))
+                .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(range.GetMax()))
+                .Build(),
+            get(HdXformSchema::GetSchemaToken()),
+            get(HdVisibilitySchema::GetSchemaToken()),
+            get(HdPurposeSchema::GetSchemaToken()),
+            get(HdInstancedBySchema::GetSchemaToken())};
+        return HdRetainedContainerDataSource::New(std::size(names), names, values);
+    }
+};
+class HdUE_NativeAssetSceneIndexPlugin final : public HdSceneIndexPlugin {
+protected:
+    HdSceneIndexBaseRefPtr _AppendSceneIndex(const HdSceneIndexBaseRefPtr& input,
+                                             const HdContainerDataSourceHandle&) override {
+        return TfCreateRefPtr(new HdUE_NativeAssetSceneIndex(input));
     }
 };
 // UE actors that hdUE places from typed prims (resources/generatedSchema.usda; UE's USD importer has neither): an Sprim
@@ -744,6 +925,9 @@ TF_REGISTRY_FUNCTION(TfType) {
     HdSceneIndexPluginRegistry::Define<HdUE_PurposeVisibilitySceneIndexPlugin>();
     TfType::Define<HdUE_HermiteCurvesAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_HermiteCurvesAPIAdapter>>();
+    TfType::Define<HdUE_NativeAssetAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
+        .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_NativeAssetAPIAdapter>>();
+    HdSceneIndexPluginRegistry::Define<HdUE_NativeAssetSceneIndexPlugin>();
     TfType::Define<HdUE_LocalFogVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_LocalFogVolumeAdapter>>();
     TfType::Define<HdUE_PostProcessVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
@@ -768,6 +952,9 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin) {
     // The renderer display name from plugInfo.json.
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
         "Unreal Engine", TfToken("HdUE_ImplicitSurfaceSceneIndexPlugin"), nullptr, 0,
+        HdSceneIndexPluginRegistry::InsertionOrderAtStart);
+    HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
+        "Unreal Engine", TfToken("HdUE_NativeAssetSceneIndexPlugin"), nullptr, 0,
         HdSceneIndexPluginRegistry::InsertionOrderAtStart);
     HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
         "Unreal Engine", TfToken("HdUE_LightLinkingSceneIndexPlugin"), nullptr, 0,

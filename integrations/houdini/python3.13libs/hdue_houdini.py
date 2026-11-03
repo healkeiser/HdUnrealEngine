@@ -758,16 +758,12 @@ def _materialx(prim):
 
 
 class NativeAssets:
-    """unreal:asset prims, shown to Hydra as bounds meshes carrying the asset (the delegate places the cooked UE asset).
-
-    Like usdview's session layer: authored only into the LOP network's viewport overrides (Houdini's session-only
-    layer over the displayed stage), never into the graph or its layers. A Mesh with unreal:asset becomes a guide.
-    Instances are left to Hydra, except around what the host maps by stage path (asset prims, unreal:surface:*
-    attributes, and MaterialX materials when a cooked library is set): those instances are made non-instanceable
-    there, as a prototype's Hydra paths are not its stage paths.
+    """unreal:asset prims, which the delegate itself turns into bounds meshes carrying the asset in every host
+    (HdUE_NativeAssetSceneIndex): here only their catalog warnings. Also the instances around what the host maps by
+    stage path (unreal:surface:* attributes, and MaterialX materials when a cooked library is set), made
+    non-instanceable in the LOP network's viewport overrides (Houdini's session-only layer over the displayed stage),
+    as a prototype's Hydra paths are not its stage paths.
     """
-
-    PROXY = "__HdUEAssetProxy"
 
     def __init__(self):
         self.network = None
@@ -798,8 +794,10 @@ class NativeAssets:
                         "unreal:asset requires a UE object path string: "
                         + str(prim.GetPath())
                     )
-                refs[str(prim.GetPath())] = (asset, prim.IsA(UsdGeom.Mesh))
-            elif not (
+                # Assets in instances stay instanced: the delegate's bounds mesh carries the prim's instancing.
+                refs[str(prim.GetPath())] = asset
+                continue
+            if not (
                 any(
                     name.startswith("unreal:surface:")
                     for name in prim.GetPropertyNames()
@@ -815,13 +813,7 @@ class NativeAssets:
                 if parent.IsInstance() or str(parent.GetPath()) in authored:
                     instances.add(str(parent.GetPath()))
                 parent = parent.GetParent()
-        current = (
-            network.path(),
-            refs,
-            instances,
-            UsdGeom.GetStageMetersPerUnit(stage),
-            str(UsdGeom.GetStageUpAxis(stage)),
-        )
+        current = (network.path(), refs, instances)
         if current == self.previous:
             return False
         changed = bool(self.authored)
@@ -829,40 +821,19 @@ class NativeAssets:
         if not refs and not instances:
             self.previous = current
             return changed
-        from asset_proxy import author_proxy
-
         catalog = _catalog()
-        scratch = Usd.Stage.CreateInMemory()
-        for path, (asset, _) in refs.items():
-            proxy = author_proxy(
-                scratch, path, asset, catalog, current[3] * 100, current[4]
-            )
-            proxy.CreatePurposeAttr(UsdGeom.Tokens.render)
-        with network.viewportOverrides(display) as overrides:
-            layer = overrides.layer()
-            with Sdf.ChangeBlock():
-                for path in sorted(instances):
-                    Sdf.CreatePrimInLayer(layer, path).SetInfo(
-                        "instanceable", False
-                    )
-                    self.authored.append(("instanceable", path))
-                for path, (asset, is_mesh) in refs.items():
-                    proxy = path + "/" + self.PROXY
-                    Sdf.CreatePrimInLayer(layer, proxy)
-                    Sdf.CopySpec(scratch.GetRootLayer(), proxy, layer, proxy)
-                    self.authored.append(("spec", proxy))
-                    if is_mesh:
-                        purpose = Sdf.AttributeSpec(
-                            layer.GetPrimAtPath(path),
-                            "purpose",
-                            Sdf.ValueTypeNames.Token,
-                            Sdf.VariabilityUniform,
+        if instances:
+            with network.viewportOverrides(display) as overrides:
+                layer = overrides.layer()
+                with Sdf.ChangeBlock():
+                    for path in sorted(instances):
+                        Sdf.CreatePrimInLayer(layer, path).SetInfo(
+                            "instanceable", False
                         )
-                        purpose.default = UsdGeom.Tokens.guide
-                        self.authored.append(("spec", path + ".purpose"))
+                        self.authored.append(("instanceable", path))
         self.network = network
         self.previous = current
-        for path, (asset, _) in refs.items():
+        for path, asset in refs.items():
             for package in catalog.get(asset, {}).get(
                 "unavailable_script_packages", []
             ):

@@ -384,6 +384,40 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
     }
 }
 }  // namespace
+bool HdUEAssetBoundsCm(const std::string& asset, GfVec3d& min, GfVec3d& max) {
+    // The catalog read once per file: the adapter asks for every asset prim of a stage.
+    static std::mutex mutex;
+    static std::string cachedPath;
+    static JsValue cached;
+    const auto path = runtimeConfig("asset_catalog");
+    if (path.empty()) return false;
+    std::lock_guard lock(mutex);
+    if (path != cachedPath) {
+        std::ifstream file(utf8Path(path));
+        std::stringstream text;
+        text << file.rdbuf();
+        cached = JsParseString(text.str());
+        cachedPath = path;
+    }
+    if (!cached.IsObject()) return false;
+    const auto& assets = cached.GetJsObject().find("assets");
+    if (assets == cached.GetJsObject().end() || !assets->second.IsObject()) return false;
+    const auto entry = assets->second.GetJsObject().find(asset);
+    if (entry == assets->second.GetJsObject().end() || !entry->second.IsObject()) return false;
+    const auto bounds = entry->second.GetJsObject().find("bounds_cm");
+    if (bounds == entry->second.GetJsObject().end() || !bounds->second.IsObject()) return false;
+    const auto corner = [&](const char* name, GfVec3d& out) {
+        const auto it = bounds->second.GetJsObject().find(name);
+        if (it == bounds->second.GetJsObject().end() || !it->second.IsArray() || it->second.GetJsArray().size() != 3)
+            return false;
+        for (int i = 0; i < 3; ++i) {
+            const auto& v = it->second.GetJsArray()[i];
+            out[i] = v.IsInt() ? double(v.GetInt64()) : v.GetReal();
+        }
+        return true;
+    };
+    return corner("min", min) && corner("max", max);
+}
 HdRprim* HdUECreateMesh(const SdfPath&);
 HdRprim* HdUECreatePoints(const SdfPath&);
 HdRprim* HdUECreateCurves(const SdfPath&);

@@ -37,6 +37,13 @@
       "HdUE_HermiteCurvesAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": ""
       },
+      "HdUE_NativeAssetAPIAdapter": {
+        "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": ""
+      },
+      "HdUE_NativeAssetSceneIndexPlugin": {
+        "bases": ["HdSceneIndexPlugin"], "loadWithRenderer": "Unreal Engine", "priority": 0,
+        "displayName": "Native asset meshes for hdUE"
+      },
       "HdUE_LocalFogVolumeAdapter": {
         "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealLocalFogVolume"
       },

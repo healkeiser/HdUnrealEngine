@@ -112,6 +112,8 @@ class Launcher(Usdviewq.Launcher):
         if options.hdue_runtime_config:
             config_path = options.hdue_runtime_config.resolve()
             config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+            # The delegate reads the profile's asset catalog for native assets' bounds, as in Houdini's hosts.
+            os.environ["HDUE_RUNTIME_CONFIG"] = str(config_path)
             if config.get("version") != 1:
                 raise ValueError("Unsupported hdUE runtime config")
 
@@ -425,8 +427,7 @@ class Launcher(Usdviewq.Launcher):
             if view.GetCurrentRendererId() == PLUGIN:
                 stats = view._renderer.GetRenderStats()
                 if self.asset_references:
-                    self.asset_references.refresh_bounds(self.runtime, stats)
-                    # Proxy creation/bounds notices can make stock usdview frame
+                    # Native asset bounds notices can make stock usdview frame
                     # its initial empty stage and select Free Camera. Restore an
                     # explicitly requested camera after the first native image.
                     if (
