@@ -32,10 +32,35 @@ class Test(ViewportTest):
         decal = yield from self.image(
             "01-decal", 0, self.frames[-1]["generation"] if self.frames else 0
         )
-        yield from self.capture(
-            "01-decal-solaris.png"
-        )  # with the decal: the capture checks for red pixels
+        # With the decal: the capture checks for red pixels.
+        yield from self.capture("01-decal-solaris.png")
+        # A live edit of the decal graph's Slab color (a generated material parameter) repaints it without recompiling.
         display = viewer.pwd().displayNode()
+        green = display.parent().createNode("pythonscript", "green_paint")
+        green.setInput(0, display)
+        green.parm("python").set(
+            "from pxr import Gf\nhou.pwd().editableStage().GetPrimAtPath('/Looks/Paint/Graph/paint')"
+            ".GetAttribute('inputs:diffuse_albedo').Set(Gf.Vec3f(0.05, 0.8, 0.05))"
+        )
+        green.setDisplayFlag(True)
+        recolored = yield from self.image(
+            "02-decal-green", 0, self.frames[-1]["generation"]
+        )
+        painted_green = float(
+            (recolored[..., 1] > 3 * recolored[..., 0]).mean()
+        )
+        self.frames[-1]["green"] = painted_green
+        if not (
+            painted_green > 0.002 and float(red(recolored).mean()) < 0.0005
+        ):
+            raise AssertionError(
+                f"The decal's live color edit did not repaint it: {painted_green} green"
+            )
+        green.destroy()
+        display.setDisplayFlag(True)
+        yield from self.image(
+            "03-decal-red-again", 0, self.frames[-1]["generation"]
+        )
         hide = display.parent().createNode("pythonscript", "hide_decal")
         hide.setInput(0, display)
         hide.parm("python").set(
@@ -43,7 +68,7 @@ class Test(ViewportTest):
         )
         hide.setDisplayFlag(True)
         plain = yield from self.image(
-            "02-no-decal", 0, self.frames[-1]["generation"]
+            "04-no-decal", 0, self.frames[-1]["generation"]
         )
         painted, bare = float(red(decal).mean()), float(red(plain).mean())
         # Elsewhere the two frames match: the decal stays inside its box.

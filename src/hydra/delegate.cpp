@@ -461,6 +461,7 @@ struct ScenePacket {
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyActors, dirtyGrooms,
         removedIds;
+    std::set<std::string> volumeParameters;  // volumes whose bound material's parameters alone changed
     // Meshes in dirtyMeshes only because their material changed: they go through update_meshes, released or not.
     std::set<std::string> materialMeshes;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points, and
@@ -493,6 +494,7 @@ struct ScenePacket {
                 }
         dirtyLights.swap(state.dirtyLights);
         dirtyVolumes.swap(state.dirtyVolumes);
+        volumeParameters.swap(state.volumeParameters);
         dirtyActors.swap(state.dirtyActors);
         dirtyGrooms.swap(state.dirtyGrooms);
         removedIds.swap(state.removed);
@@ -509,6 +511,7 @@ struct ScenePacket {
         restore(dirtyMaterials, state.dirtyMaterials, state.materials);
         restore(dirtyLights, state.dirtyLights, state.lights);
         restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
+        restore(volumeParameters, state.volumeParameters, state.volumes);
         restore(dirtyActors, state.dirtyActors, state.actors);
         restore(dirtyGrooms, state.dirtyGrooms, state.grooms);
         for (const auto& id : removedIds)
@@ -718,6 +721,23 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         update.parameters = packet.own(packet.parameters, std::move(parameters));
         packet.materialUpdates.push_back(update);
     }
+}
+// A set_material_parameters update of id's material instance with the host's parameters for material (a volume's or
+// a decal's bound Substrate Builder material); none when the host has none.
+void addParameterUpdate(ScenePacket& packet, const VtDictionary& overrides, const std::string& id,
+                        const std::string& material) {
+    const auto entry = overrides.find(material);
+    if (entry == overrides.end() || !entry->second.IsHolding<VtDictionary>()) return;
+    std::vector<HdueMaterialParameter> parameters;
+    for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
+        parameters.push_back(materialParameter(packet, name, value));
+    if (parameters.empty()) return;
+    HdueMaterialUpdate update{};
+    update.struct_size = sizeof(update);
+    update.material_id = packet.own(id);
+    update.parameter_count = uint32_t(parameters.size());
+    update.parameters = packet.own(packet.parameters, std::move(parameters));
+    packet.materialUpdates.push_back(update);
 }
 // The mesh diced and displaced by its material's displacement (displacement.h), in object space and units; nullopt when
 // its material does not displace. ponytail: meshes with surface effects keep their vertices (their masks are per
@@ -1170,7 +1190,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     }
 }
 void prepareVolumes(HdUEState& state, ScenePacket& packet) {
-    if (packet.dirtyVolumes.empty()) return;
+    if (packet.dirtyVolumes.empty() && packet.volumeParameters.empty()) return;
     // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
     const auto basis = sceneBasis(state);
     const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
@@ -1215,6 +1235,11 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         }
         packet.volumes.push_back(desc);
     }
+    // Parameter edits of a volume's bound material update its instance (set_material_parameters), not its grids.
+    for (const auto& id : packet.volumeParameters)
+        if (const auto it = state.volumes.find(id); it != state.volumes.end() && !packet.dirtyVolumes.count(id) &&
+                                                    !asset(nativeMaterials, it->second.material).empty())
+            addParameterUpdate(packet, nativeParameters, id, it->second.material);
 }
 // Placed UE actors. UE's base Local Fog Volume is a sphere of radius 500 cm
 // (ULocalFogVolumeComponent::GetBaseVolumeSize); the prim's is the unit sphere of its local space. A post-process
@@ -1233,6 +1258,7 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
     // up axis negated), a rotation of the UE local frame (X to -Z, Z to X).
     const GfMatrix4d decalAxes(0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1);
     const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
+    const auto nativeParameters = state.setting<VtDictionary>("nativeMaterialParameters", {});
     for (const auto& id : packet.dirtyActors) {
         const auto it = state.actors.find(id);
         if (it == state.actors.end()) continue;
@@ -1248,9 +1274,14 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
             (decal ? decalAxes : GfMatrix4d(1)) * toUnit(postProcess || decal ? 100 : 500) * actor.localToWorld * basis,
             desc.transform);
         // A decal's bound material, when the host mapped it to a prepared asset, wins over unreal:decal:DecalMaterial.
-        std::string bound;
+        std::string bound, boundPath;
         for (const auto& [name, value] : actor.values)
-            if (name == "BoundMaterial") bound = asset(nativeMaterials, value);
+            if (name == "BoundMaterial") {
+                bound = asset(nativeMaterials, value);
+                boundPath = value;
+            }
+        // Its parameters (graph values and live edits) reach its material instance after upsert_decal.
+        if (decal && !bound.empty() && actor.visible) addParameterUpdate(packet, nativeParameters, actor.id, boundPath);
         std::vector<const char*> names, values;
         if (!bound.empty()) {
             names.push_back("DecalMaterial");
@@ -2882,7 +2913,7 @@ public:
                             if (const char* ue = HdUEActorData::component(actor.kind);
                                 ue && actor.visible && !placed.count(ue)) {
                                 const auto at = s.convert(actor.localToWorld.ExtractTranslation());
-                                placed[ue] = {TfStringPrintf("%.9g %.9g %.9g", at[0], at[1], at[2]), actor.values};
+                                placed[ue] = {TfStringPrintf("%.4f %.4f %.4f", at[0], at[1], at[2]), actor.values};
                             }
                     });
                     for (const auto& [ue, component] : placed) {
@@ -3609,14 +3640,19 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
                 const auto it = d.find(volume.material);
                 return it == d.end() ? VtValue() : it->second;
             };
-            if (entry(previousDictionary) != entry(currentDictionary)) state_->dirtyVolumes.insert(id);
+            if (entry(previousDictionary) != entry(currentDictionary))
+                (key == TfToken("nativeMaterialAssets") ? state_->dirtyVolumes : state_->volumeParameters).insert(id);
         }
-        // Decals take their bound material's prepared asset.
-        if (key == TfToken("nativeMaterialAssets"))
-            for (const auto& [id, actor] : state_->actors)
-                for (const auto& [name, value] : actor.values)
-                    if (name == "BoundMaterial" && asset(previousDictionary, value) != asset(currentDictionary, value))
-                        state_->dirtyActors.insert(id);
+        // Decals take their bound material's prepared asset and parameters again (an upsert is cheap).
+        for (const auto& [id, actor] : state_->actors)
+            for (const auto& [name, value] : actor.values)
+                if (name == "BoundMaterial") {
+                    const auto entry = [&](const VtDictionary& d) {
+                        const auto it = d.find(value);
+                        return it == d.end() ? VtValue() : it->second;
+                    };
+                    if (entry(previousDictionary) != entry(currentDictionary)) state_->dirtyActors.insert(id);
+                }
         ++state_->revision;
     }
     if (key == TfToken("nativeMeshAssets")) {
@@ -3710,6 +3746,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             }
         }
         for (const auto& [id, v] : state_->lights) state_->dirtyLights.insert(id);
+        for (const auto& [id, v] : state_->volumes) state_->dirtyVolumes.insert(id);
+        for (const auto& [id, v] : state_->actors) state_->dirtyActors.insert(id);
         ++state_->revision;
     }
 }

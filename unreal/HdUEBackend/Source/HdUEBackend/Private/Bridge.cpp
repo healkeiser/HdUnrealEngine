@@ -223,8 +223,10 @@ struct FSession {
     TStrongObjectPtr<USphericalLensDistortionModelHandler> LensHandler;
     TStrongObjectPtr<ACameraActor> LensCamera;
     float LensOverscan = 0;
-    // upsert_local_fog_volume and upsert_post_process_volume: the actors placed from prims, by id.
+    // upsert_local_fog_volume, upsert_post_process_volume and upsert_decal: the actors placed from prims, by id.
     TMap<FString, TWeakObjectPtr<AActor>> PlacedActors;
+    // upsert_decal: each decal's material instance, which set_material_parameters also reaches by the decal's id.
+    TMap<FString, TWeakObjectPtr<UMaterialInstanceDynamic>> DecalMaterials;
     bool Tonemapper = false;
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
@@ -897,11 +899,6 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     // on auto exposure (two identical Sponza renders with it differed by 7%).
     Settings.AutoExposureMethod = AEM_Manual;
     Settings.AutoExposureBias = 0;
-    Settings.bMegaLights = !PathTracing;
-    Settings.DynamicGlobalIlluminationMethod =
-        Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
-    Settings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
-    Settings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
     Settings.LumenFrontLayerTranslucencyReflections = true;
     if (!IsInteractive()) {
         // Offline frames use Lumen's final-frame quality (UE's defaults are game quality); authored values override it.
@@ -911,6 +908,15 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         // Ray lighting stays UE's: the project's r.Lumen.HardwareRayTracing.LightingMode (surface cache), which
         // neither Cinematic scalability nor Movie Render Queue changes. Authored LumenRayLightingMode still wins.
     }
+    // Post-process volumes blend over hdUE's defaults above. What the request decides (render mode, samples, lighting
+    // components, the USD camera's depth of field) applies after them, and the render settings last: Movie Render
+    // Queue blends a world's volumes before the camera's settings (MoviePipelineUtils.cpp, DoPostProcessBlend).
+    if (!Aov) Runtime.World->AddPostProcessingSettings(Options.ViewOrigin, &View);
+    Settings.bMegaLights = !PathTracing;
+    Settings.DynamicGlobalIlluminationMethod =
+        Request.lumen_enabled ? EDynamicGlobalIlluminationMethod::Lumen : EDynamicGlobalIlluminationMethod::None;
+    Settings.ReflectionMethod = Request.lumen_enabled ? EReflectionMethod::Lumen : EReflectionMethod::None;
+    Settings.PathTracingSamplesPerPixel = Request.samples_per_pixel;
     if (Components) {
         // The Path Tracer's Lighting Components (MRQ/MRG render layers use the same settings); realtime drops Lumen's
         // indirect diffuse or reflections.
@@ -945,9 +951,6 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
         Settings.DepthOfFieldFstop = 0.f;
     }
     if (!Aov) {
-        // Post-process volumes first, then the render settings, as Movie Render Queue blends the world's volumes
-        // before the camera's settings (MoviePipelineUtils.cpp, DoPostProcessBlend).
-        Runtime.World->AddPostProcessingSettings(Options.ViewOrigin, &View);
         View.OverridePostProcessSettings(Session.PostProcess, 1.f);
         // DepthOfFieldEnabled (Lens > Depth of Field > Enabled) only switches off the raster DOF: the Path Tracer's
         // reference DOF reads the show flag, PathTracingEnableReferenceDOF and the focal distance (PathTracing.cpp).
@@ -1921,6 +1924,20 @@ HdueResult HDUE_CALL UpsertDecal(HdueSession Handle, const HdueDecalDesc* Desc) 
             UE_LOG(LogTemp, Warning, TEXT("hdUE: decal setting %s = '%s' skipped (unknown property or value)"), *Name,
                    *Text);
     }
+    // Its material as an instance, so set_material_parameters reaches its parameters (a Substrate Builder decal
+    // material's values and live edits), as a mesh's; only UE's Deferred Decal domain draws as a decal.
+    Session->DecalMaterials.Remove(Id);
+    if (UMaterialInterface* Material = Decal->GetDecalMaterial()) {
+        if (!Material->GetMaterial() || Material->GetMaterial()->MaterialDomain != MD_DeferredDecal) {
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: decal %s material %s is not a Deferred Decal material; skipped"), *Id,
+                   *Material->GetPathName());
+            Decal->SetDecalMaterial(nullptr);
+        } else {
+            auto* Instance = UMaterialInstanceDynamic::Create(Material, Decal);
+            Decal->SetDecalMaterial(Instance);
+            Session->DecalMaterials.Add(Id, Instance);
+        }
+    }
     FMatrix Matrix;
     for (int R = 0; R < 4; ++R)
         for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc->transform[R * 4 + C];
@@ -2255,7 +2272,12 @@ HdueResult HDUE_CALL SetMaterialParameters(HdueSession Handle, const HdueMateria
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Update)) return HDUE_INVALID_ARGUMENT;
     FString Error;
-    const auto Code = Runtime.Session->Scene->SetMaterialParameters(*Update, Error);
+    // A decal's material instance by the decal's id, else a scene material or volume's.
+    const auto* Decal =
+        Update->material_id ? Runtime.Session->DecalMaterials.Find(UTF8_TO_TCHAR(Update->material_id)) : nullptr;
+    const auto Code = Decal && Decal->IsValid() ? HdueApplyMaterialParameters(*Decal->Get(), Update->parameters,
+                                                                              Update->parameter_count, Error)
+                                                : Runtime.Session->Scene->SetMaterialParameters(*Update, Error);
     if (Code != HDUE_OK) return Fail(Code, *Error);
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);

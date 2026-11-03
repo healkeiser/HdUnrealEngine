@@ -256,6 +256,7 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     // A bound volume material (a prepared Substrate Builder one: Volume domain, heterogeneous volumes usage), else
     // hdUE's M_HdUEVolume. Both read the same grids and parameters.
     UMaterialInterface* Parent = nullptr;
+    bool Bound = false;  // the bound material is used: its parameters apply
     if (Desc.material && *Desc.material) {
         Parent = LoadObject<UMaterialInterface>(nullptr, UTF8_TO_TCHAR(Desc.material));
         const UMaterial* Base = Parent ? Parent->GetMaterial() : nullptr;
@@ -266,6 +267,7 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
                    *Id, Desc.material);
             Parent = nullptr;
         }
+        Bound = Parent != nullptr;
     }
     if (!Parent) Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"));
     if (!Parent) {
@@ -326,7 +328,7 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
                                              FLinearColor(Desc.albedo[0], Desc.albedo[1], Desc.albedo[2], 1));
     Volume.Material->SetScalarParameterValue(TEXT("ExtinctionScale"), Desc.extinction_scale);
     // A bound volume material's public and generated parameters (its graph's values and live edits).
-    if (Desc.parameter_count) {
+    if (Bound && Desc.parameter_count) {
         if (const HdueResult Code =
                 HdueApplyMaterialParameters(*Volume.Material.Get(), Desc.parameters, Desc.parameter_count, Error);
             Code != HDUE_OK)

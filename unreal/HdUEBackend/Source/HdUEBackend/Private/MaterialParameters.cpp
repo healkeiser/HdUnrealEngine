@@ -10,6 +10,8 @@ HdueResult FHdueScene::SetMaterialParameters(const HdueMaterialUpdate& Update, F
         return HDUE_INVALID_ARGUMENT;
     const auto* Entry = Materials.Find(UTF8_TO_TCHAR(Update.material_id));
     auto* Material = Entry ? Cast<UMaterialInstanceDynamic>(Entry->Get()) : nullptr;
+    if (const FVolume* Volume = Material ? nullptr : Volumes.Find(UTF8_TO_TCHAR(Update.material_id)))
+        Material = Volume->Material.Get();  // a volume's bound material: its live parameter edits, without the grids
     if (!Material) {
         Error = TEXT("Material instance was not found in the scene.");
         return HDUE_INVALID_ARGUMENT;

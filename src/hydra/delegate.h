@@ -330,6 +330,7 @@ struct HdUEState : HdRenderParam {
     std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex;  // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
     std::set<std::string> dirtyVolumes, dirtyActors, dirtyGrooms;
+    std::set<std::string> volumeParameters;  // bound volume materials' parameter edits (no grid upload)
     std::map<std::string, uint64_t> geometryRevisions;
     HdRenderIndex* renderIndex = nullptr;
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;

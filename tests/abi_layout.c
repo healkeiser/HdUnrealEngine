@@ -31,6 +31,7 @@ _Static_assert(sizeof(HdueSceneBatch) == 48, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");
 _Static_assert(sizeof(HdueMeshDesc) == 248, "Mesh C ABI layout (ABI 10)");
 _Static_assert(sizeof(HdueMaterialDesc) == 992, "Material C ABI layout (ABI 16)");
+_Static_assert(sizeof(HdueVolumeDesc) == 224, "Volume C ABI layout (ABI 20: material and its parameters)");
 _Static_assert(sizeof(HdueNativeRay) == 72, "Native ray C ABI layout");
 _Static_assert(sizeof(HdueNativeHit) == 72, "Native hit C ABI layout");
 _Static_assert(sizeof(HduePickMaterialInfo) == 8, "Material info C ABI layout");

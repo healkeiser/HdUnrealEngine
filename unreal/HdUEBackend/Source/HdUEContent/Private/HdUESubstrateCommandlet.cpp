@@ -38,6 +38,7 @@
 #include "Factories/TextureFactory.h"
 #include "Engine/Texture2D.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 
 namespace {
 struct FOutput {
@@ -163,7 +164,7 @@ struct FCompiler {
         Connect(E->B, B);
         return {E, Type, 0};
     }
-    // Ramps: each a UE curve (<asset>_<node>) in the material's curve atlas (<asset>_Ramps), read by a
+    // Ramps: each a UE curve (<asset>_Curves/<node>) in the material's curve atlas (<asset>_Ramps), read by a
     // CurveAtlasRowParameter at the input's position, as a UE artist samples a gradient.
     FString MaterialAsset;  // the material's package path, which its ramps' assets extend
     UCurveLinearColorAtlas* Atlas = nullptr;
@@ -186,7 +187,10 @@ struct FCompiler {
             Error = TEXT("Ramp without keys: ") + Id;
             return {};
         }
-        auto* Curve = NewAsset<UCurveLinearColor>(MaterialAsset + TEXT("_") + Id);
+        // The material's curves live in a folder of their own, cleared first: a renamed or removed ramp leaves none.
+        const FString Folder = MaterialAsset + TEXT("_Curves");
+        if (!Atlas) IFileManager::Get().DeleteDirectory(*FPackageName::LongPackageNameToFilename(Folder), false, true);
+        auto* Curve = NewAsset<UCurveLinearColor>(Folder + TEXT("/") + Id);
         for (const auto& Value : *Keys) {
             const auto& Key = Value->AsArray();
             if (Key.Num() != 3) {
