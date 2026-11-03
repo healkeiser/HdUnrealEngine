@@ -735,6 +735,38 @@ def _catalog():
     return _catalog_cache[key]
 
 
+def native_asset_menu():
+    """The Native Asset field's menu (Render Geometry Settings' Unreal Engine tab): the cooked objects a prim can stand
+    for. With the profile's asset catalog (Prepare-ProjectAssets.ps1), its levels, meshes, Blueprints and Sparse Volume
+    Textures; else the staged runtime's levels and the assets named with UE's prefixes for those (SM_, SK_, BP_, SVT_).
+    """
+    try:
+        catalog = _catalog()
+        content = Path(runtime_config()["runtime_project"]).parent / "Content"
+    except (KeyError, OSError, ValueError):  # no runtime profile: no menu
+        return []
+    if catalog:
+        paths = sorted(
+            p
+            for p, a in catalog.items()
+            if a.get("kind", "resource") != "resource"
+        )
+    else:
+        paths = sorted(
+            "/Game/"
+            + f.relative_to(content).with_suffix("").as_posix()
+            + "."
+            + f.stem
+            for f in content.rglob("*")
+            if f.suffix == ".umap"
+            or (
+                f.suffix == ".uasset"
+                and f.stem.startswith(("SM_", "SK_", "BP_", "SVT_"))
+            )
+        )
+    return [entry for path in paths for entry in (path, path)]
+
+
 def _materialx(prim):
     output = (
         UsdShade.Material(prim).GetSurfaceOutput("mtlx")

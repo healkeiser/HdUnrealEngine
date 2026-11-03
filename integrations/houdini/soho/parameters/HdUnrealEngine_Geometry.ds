@@ -33,7 +33,12 @@
         type    string
         size    1
         default { "" }
-        help    "Cooked UE object this prim stands for: a StaticMesh, SkeletalMesh, Actor Blueprint, Level or Sparse Volume Texture, as an object path (/Game/HdUE/SM_Nanite.SM_Nanite). It renders in place of the prim's own geometry."
+        menureplace {
+            [ "import hdue_houdini" ]
+            [ "return hdue_houdini.native_asset_menu()" ]
+            language python
+        }
+        help    "Cooked UE object this prim stands for: a StaticMesh, SkeletalMesh, Actor Blueprint, Level or Sparse Volume Texture, as an object path (/Game/HdUE/SM_Nanite.SM_Nanite). It renders in place of the prim's own geometry. The menu lists the runtime's cooked objects."
         parmtag { "spare_category" "Native Asset" }
         parmtag { "usdvaluetype" "string" }
         disablewhen R"({ xn__unrealasset_control_06a == block } { xn__unrealasset_control_06a == none })"
