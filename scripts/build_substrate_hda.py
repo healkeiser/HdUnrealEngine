@@ -227,6 +227,21 @@ HELP = {
             "primvars:unreal:emissionField names.",
         },
     ),
+    "float_ramp": (
+        "Remaps a float through a ramp (a UE curve in the material's curve atlas).",
+        {
+            "value": "Position on the ramp, from 0 to 1, for example a Volume Field.",
+            "ramp": "The ramp. Editing it recompiles the material.",
+        },
+    ),
+    "color_ramp": (
+        "Maps a float to a color through a ramp (a UE curve in the material's curve atlas), for example density to "
+        "smoke color.",
+        {
+            "value": "Position on the ramp, from 0 to 1.",
+            "ramp": "The ramp. Editing it recompiles the material.",
+        },
+    ),
     "blackbody": (
         "The color of a black body at a temperature (UE's BlackBody expression), for fire and hot gases.",
         {"temperature": "Temperature in kelvin."},
@@ -335,6 +350,27 @@ def parameter(kind, name, value_type, default):
             template.setMenuLabels(tuple(MENUS[name].values()))
             template.setMenuType(hou.menuType.Normal)
         return template
+    if value_type == "ramp":
+        # Houdini's ramp, with the node's default keys (rampfloatdefault / rampcolordefault, as SideFX's VOPs set them).
+        color = kind == "color_ramp"
+        keys = " ".join(
+            f"{i}pos ( {position} ) {i}{'c' if color else 'value'} ( "
+            + (" ".join(str(c) for c in value) if color else str(value))
+            + f" ) {i}interp ( linear )"
+            for i, (position, value, _) in enumerate(default, 1)
+        )
+        return hou.RampParmTemplate(
+            name,
+            label(name),
+            hou.rampParmType.Color if color else hou.rampParmType.Float,
+            default_value=len(default),
+            default_basis=hou.rampBasis.Linear,
+            tags={
+                "rampcolordefault" if color else "rampfloatdefault": keys,
+                "rampshowcontrolsdefault": "1",
+            },
+            **args,
+        )
     if value_type == "bool":
         return hou.ToggleParmTemplate(
             name, label(name), default_value=default, **args

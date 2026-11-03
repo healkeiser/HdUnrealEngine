@@ -202,6 +202,65 @@ class GraphTests(unittest.TestCase):
         ):
             validate(graph)
 
+    def test_ramps(self):
+        """Ramp keys round-trip through USD (as JSON) and change the signature; malformed keys are rejected."""
+        graph = dict(
+            version=1,
+            output="volume",
+            nodes={
+                "density": dict(type="volume_field"),
+                "remap": dict(
+                    type="float_ramp",
+                    inputs={"value": {"node": "density"}},
+                    properties={
+                        "ramp": [
+                            [0.0, 0.0, "linear"],
+                            [0.5, 2.0, "smooth"],
+                            [1.0, 4.0, "constant"],
+                        ]
+                    },
+                ),
+                "smoke": dict(
+                    type="color_ramp",
+                    inputs={"value": {"node": "density"}},
+                    properties={
+                        "ramp": [
+                            [0.0, [0.1, 0.1, 0.1], "linear"],
+                            [1.0, [0.8, 0.7, 0.6], "linear"],
+                        ]
+                    },
+                ),
+                "extinction": dict(
+                    type="color_from_float", inputs={"value": {"node": "remap"}}
+                ),
+                "volume": dict(
+                    type="volume_fog_cloud",
+                    inputs={
+                        "albedo": {"node": "smoke"},
+                        "extinction": {"node": "extinction"},
+                    },
+                ),
+            },
+        )
+        stage = Usd.Stage.CreateInMemory()
+        material = author(stage, "/Looks/Smoke", graph)
+        self.assertEqual(
+            signature(graph), signature(read(material, Usd.TimeCode.Default()))
+        )
+        edited = copy.deepcopy(graph)
+        edited["nodes"]["remap"]["properties"]["ramp"][1][1] = 3.0
+        self.assertNotEqual(signature(graph), signature(edited))
+        for keys in (
+            [],
+            [[0.0, 1.0]],
+            [[0.5, 1.0, "linear"], [0.2, 0.0, "linear"]],
+            [[0.0, 1.0, "cubic"]],
+        ):
+            broken = copy.deepcopy(graph)
+            broken["nodes"]["remap"]["properties"]["ramp"] = keys
+            with self.assertRaises(ValueError):
+                validate(broken)
+
     def test_disconnect_blocks_weaker_usd_connections(self):
         base = Usd.Stage.CreateInMemory()
         author(base, "/Looks/Test", self.graph)

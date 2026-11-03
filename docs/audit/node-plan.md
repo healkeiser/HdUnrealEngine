@@ -56,7 +56,7 @@ Each emits the UE material expression of the same name (to check against the 5.8
 
 | # | Node | UE expression | Output |
 | --- | --- | --- | --- |
-| D1 | Substrate Volumetric Fog Cloud, Volume Field, Blackbody (done; ramps later) | `SubstrateVolumetricFogCloudBSDF` (Volume domain), `TextureSampleParameterVolume`, `BlackBody`, `CurveAtlasRowParameter` | Volume material bound to Volume prims, replacing the fixed `M_HdUEVolume` (`Scene.cpp`), which it must reproduce first |
+| D1 | Substrate Volumetric Fog Cloud, Volume Field, Blackbody, Float/Color Ramp (done) | `SubstrateVolumetricFogCloudBSDF` (Volume domain), `TextureSampleParameterVolume`, `BlackBody`, `CurveAtlasRowParameter` | Volume material bound to Volume prims, replacing the fixed `M_HdUEVolume` (`Scene.cpp`), which it must reproduce first |
 | D2 | Substrate Hair, Eye, Single Layer Water, Thin Film, Add, Select; Metalness to Albedo/F0, Transmittance to MFP, Haziness to Secondary Roughness (done) | `SubstrateHairBSDF`, `SubstrateEyeBSDF`, `SubstrateSingleLayerWaterBSDF`, `SubstrateThinFilm`, `SubstrateAdd`, `SubstrateSelect`, the conversion helpers | Surface |
 | D3 | Decal Output (done: Substrate Convert To Decal) | `SubstrateConvertToDecal`, Deferred Decal domain | Decal material for item 8 |
 

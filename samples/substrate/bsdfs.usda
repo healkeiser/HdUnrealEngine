@@ -416,5 +416,57 @@ def "Looks"
             token outputs:surface
         }
     }
+
+    def Material "Smoke"
+    {
+        token outputs:unreal:volume.connect = </Looks/Smoke/Graph/volume.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "density"
+            {
+                uniform token info:id = "unreal:substrate:volume_field"
+                string inputs:field = "density"
+                string inputs:field.connect = None
+                float outputs:out
+            }
+
+            def Shader "remap"
+            {
+                uniform token info:id = "unreal:substrate:float_ramp"
+                string inputs:ramp = '[[0.0, 0.0, "linear"], [0.5, 2.0, "smooth"], [1.0, 4.0, "linear"]]'
+                string inputs:ramp.connect = None
+                float inputs:value.connect = </Looks/Smoke/Graph/density.outputs:out>
+                float outputs:out
+            }
+
+            def Shader "smoke"
+            {
+                uniform token info:id = "unreal:substrate:color_ramp"
+                string inputs:ramp = '[[0.0, [0.1, 0.1, 0.1], "linear"], [1.0, [0.8, 0.7, 0.6], "linear"]]'
+                string inputs:ramp.connect = None
+                float inputs:value.connect = </Looks/Smoke/Graph/density.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "extinction"
+            {
+                uniform token info:id = "unreal:substrate:color_from_float"
+                float inputs:value.connect = </Looks/Smoke/Graph/remap.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "volume"
+            {
+                uniform token info:id = "unreal:substrate:volume_fog_cloud"
+                color3f inputs:albedo.connect = </Looks/Smoke/Graph/smoke.outputs:out>
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:extinction.connect = </Looks/Smoke/Graph/extinction.outputs:out>
+                token outputs:out
+            }
+        }
+    }
 }
 

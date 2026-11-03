@@ -179,6 +179,21 @@ def create(parent=None, preset="slab", material="/Looks/Base"):
     return network
 
 
+def _ramp_keys(ramp):
+    """A Houdini ramp as graph keys [position, value, interpolation]: linear and constant kept, the curved bases smooth."""
+    bases = {hou.rampBasis.Linear: "linear", hou.rampBasis.Constant: "constant"}
+    return [
+        [
+            float(position),
+            list(value) if isinstance(value, tuple) else float(value),
+            bases.get(basis, "smooth"),
+        ]
+        for position, value, basis in zip(
+            ramp.keys(), ramp.values(), ramp.basis(), strict=True
+        )
+    ]
+
+
 def graph(network):
     output_nodes = [
         n
@@ -250,6 +265,9 @@ def graph(network):
                     else node.evalParm(port)
                 )
         for prop, (value_type, default) in schema["properties"].items():
+            if value_type == "ramp":
+                result["properties"][prop] = _ramp_keys(node.evalParm(prop))
+                continue
             value = (
                 list(node.evalParmTuple(prop))
                 if value_type in ("color3", "vector2", "color4")

@@ -21,6 +21,9 @@
 #include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Materials/MaterialExpressionBlackBody.h"
+#include "Materials/MaterialExpressionCurveAtlasRowParameter.h"
+#include "Curves/CurveLinearColor.h"
+#include "Curves/CurveLinearColorAtlas.h"
 #include "Materials/MaterialExpressionTextureSampleParameterVolume.h"
 #include "Materials/MaterialExpressionWorldPosition.h"
 #include "Engine/VolumeTexture.h"
@@ -159,6 +162,94 @@ struct FCompiler {
         Connect(E->A, A);
         Connect(E->B, B);
         return {E, Type, 0};
+    }
+    // Ramps: each a UE curve (<asset>_<node>) in the material's curve atlas (<asset>_Ramps), read by a
+    // CurveAtlasRowParameter at the input's position, as a UE artist samples a gradient.
+    FString MaterialAsset;  // the material's package path, which its ramps' assets extend
+    UCurveLinearColorAtlas* Atlas = nullptr;
+    TArray<UPackage*> RampPackages;
+    template <class T>
+    T* NewAsset(const FString& Path) {
+        auto* Package = CreatePackage(*Path);
+        Package->FullyLoad();
+        const auto Name = FPackageName::GetLongPackageAssetName(Path);
+        if (auto* Old = FindObject<UObject>(Package, *Name)) {
+            Old->ClearFlags(RF_Public | RF_Standalone);
+            Old->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+        }
+        RampPackages.AddUnique(Package);
+        return NewObject<T>(Package, *Name, RF_Public | RF_Standalone);
+    }
+    FOutput Ramp(const FString& Id, const TSharedPtr<FJsonObject>& Props, bool ColorRamp, FOutput Position) {
+        const TArray<TSharedPtr<FJsonValue>>* Keys = nullptr;
+        if (!Props->TryGetArrayField(TEXT("ramp"), Keys) || Keys->IsEmpty()) {
+            Error = TEXT("Ramp without keys: ") + Id;
+            return {};
+        }
+        auto* Curve = NewAsset<UCurveLinearColor>(MaterialAsset + TEXT("_") + Id);
+        for (const auto& Value : *Keys) {
+            const auto& Key = Value->AsArray();
+            if (Key.Num() != 3) {
+                Error = TEXT("Invalid ramp key: ") + Id;
+                return {};
+            }
+            const float Time = float(Key[0]->AsNumber());
+            FLinearColor Color(1, 1, 1, 1);
+            if (ColorRamp) {
+                const auto& C = Key[1]->AsArray();
+                if (C.Num() != 3) {
+                    Error = TEXT("Invalid ramp color: ") + Id;
+                    return {};
+                }
+                Color = FLinearColor(float(C[0]->AsNumber()), float(C[1]->AsNumber()), float(C[2]->AsNumber()), 1);
+            } else
+                Color.R = Color.G = Color.B = float(Key[1]->AsNumber());
+            const auto Interp = Key[2]->AsString();
+            const ERichCurveInterpMode Mode = Interp == TEXT("constant") ? RCIM_Constant
+                                              : Interp == TEXT("smooth") ? RCIM_Cubic
+                                                                         : RCIM_Linear;
+            for (int32 Channel = 0; Channel < 4; ++Channel) {
+                auto& Channel_ = Curve->FloatCurves[Channel];
+                const FKeyHandle Handle = Channel_.AddKey(Time, Channel == 0   ? Color.R
+                                                                : Channel == 1 ? Color.G
+                                                                : Channel == 2 ? Color.B
+                                                                               : Color.A);
+                Channel_.SetKeyInterpMode(Handle, Mode);
+            }
+        }
+        if (!Atlas) {
+            Atlas = NewAsset<UCurveLinearColorAtlas>(MaterialAsset + TEXT("_Ramps"));
+            Atlas->TextureSize = 256;
+            Atlas->bDisableAllAdjustments = true;  // keep the keys' values (adjustments clamp)
+        }
+        Atlas->GradientCurves.Add(Curve);
+        auto* E = Add<UMaterialExpressionCurveAtlasRowParameter>();
+        E->ParameterName = *(TEXT("HdUE_Ramp_") + Id);
+        E->Curve = Curve;
+        E->Atlas = Atlas;
+        Connect(E->InputTime, Position);
+        if (ColorRamp) {
+            auto* RGB = Add<UMaterialExpressionComponentMask>();
+            RGB->Input.Connect(0, E);
+            RGB->R = RGB->G = RGB->B = true;
+            RGB->A = false;
+            return {RGB, 1, 0};
+        }
+        return {E, 0, 1};  // its red channel
+    }
+    // Writes the ramps' curves and atlas (the atlas's texture rebuilt from its curves) before the material compiles.
+    bool SaveRamps() {
+        if (Atlas) Atlas->UpdateTextures();
+        for (UPackage* Package : RampPackages) {
+            FSavePackageArgs Args;
+            Args.TopLevelFlags = RF_Public | RF_Standalone;
+            if (!UPackage::SavePackage(Package, nullptr,
+                                       *FPackageName::LongPackageNameToFilename(
+                                           Package->GetName(), FPackageName::GetAssetPackageExtension()),
+                                       Args))
+                return false;
+        }
+        return true;
     }
     // The named outputs of multi-output utility nodes (Thin Film, Metalness to Albedo and F0, ...), by expression.
     TMap<UMaterialExpression*, TMap<FString, FOutput>> Ports;
@@ -528,6 +619,8 @@ struct FCompiler {
             R = {E, 6, 0};
             Connect(E->DecalMaterial, Input(Inputs, TEXT("surface"), 2));
             Connect(E->Coverage, Input(Inputs, TEXT("coverage"), 0, 1));
+        } else if (Kind == TEXT("float_ramp") || Kind == TEXT("color_ramp")) {
+            R = Ramp(Id, Props, Kind == TEXT("color_ramp"), Input(Inputs, TEXT("value"), 0, 0));
         } else if (Kind == TEXT("volume_fog_cloud")) {
             auto* E = Add<UMaterialExpressionSubstrateVolumetricFogCloudBSDF>();
             R = {E, 5, 0};
@@ -687,6 +780,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
                           : NewObject<UMaterial>(Package, *Name, RF_Public | RF_Standalone);
     FCompiler Compiler;
     Compiler.Material = Material;
+    Compiler.MaterialAsset = Asset;
     Compiler.Nodes = Graph->GetObjectField(TEXT("nodes"));
     for (const auto& Value : Root->GetArrayField(TEXT("parameters"))) {
         const auto Parameter = Value->AsObject();
@@ -720,6 +814,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         UE_LOG(LogTemp, Error, TEXT("Substrate Builder: %s"), *Compiler.Error);
         return 4;
     }
+    if (!Compiler.SaveRamps()) return 5;
     Material->GetEditorOnlyData()->FrontMaterial.Connect(Output.Index, Output.Expression);
     bool IdSwitch = false;
     if (Volume) {

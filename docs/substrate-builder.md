@@ -95,6 +95,7 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Substrate Volumetric Fog Cloud | Albedo, extinction and emission; unconnected extinction and emission are hdUE's default volume material's | Volume |
 | Volume Field | `density` or `emission` grid of the Volume prim at the shaded point | Float |
 | Blackbody | Temperature in kelvin (UE's BlackBody) | Color |
+| Float Ramp / Color Ramp | A float position and a Houdini ramp (linear, constant or smooth keys), compiled into a UE curve in the material's curve atlas (`CurveAtlasRowParameter`); editing the ramp recompiles | Float / Color |
 | Texture Sample | Image file or explicit `<UDIM>` pattern, `srgb` / `raw`, `wrap` / `clamp` / `mirror`, optional UV | RGB, RGBA, R, G, B, A |
 | UV Coordinates | UV0 (`st`), two-component scale and offset | Vector2 |
 | Extract Channel | RGBA input and `r` / `g` / `b` / `a` selector | Float |

@@ -251,6 +251,30 @@ NODES = {
         inputs={},
         properties={"field": ("string", "density")},
     ),
+    # Ramps: keys [position, value, interpolation] (linear, constant or smooth), compiled into a UE curve in the
+    # material's curve atlas (CurveAtlasRowParameter). Editing a key recompiles the material.
+    "float_ramp": dict(
+        label="Float Ramp",
+        output="float",
+        inputs={"value": ("float", 0.0)},
+        properties={
+            "ramp": ("ramp", [[0.0, 0.0, "linear"], [1.0, 1.0, "linear"]])
+        },
+    ),
+    "color_ramp": dict(
+        label="Color Ramp",
+        output="color3",
+        inputs={"value": ("float", 0.0)},
+        properties={
+            "ramp": (
+                "ramp",
+                [
+                    [0.0, [0.0, 0.0, 0.0], "linear"],
+                    [1.0, [1.0, 1.0, 1.0], "linear"],
+                ],
+            )
+        },
+    ),
     "blackbody": dict(
         label="Blackbody",
         output="color3",
@@ -313,6 +337,7 @@ USD_TYPES = {
     "volume": Sdf.ValueTypeNames.Token,
     "decal": Sdf.ValueTypeNames.Token,
     "string": Sdf.ValueTypeNames.String,
+    "ramp": Sdf.ValueTypeNames.String,  # its keys as JSON
     "bool": Sdf.ValueTypeNames.Bool,
     "asset": Sdf.ValueTypeNames.Asset,
     "vector2": Sdf.ValueTypeNames.Float2,
@@ -371,7 +396,30 @@ def outputs(definition):
     return definition.get("outputs", {"out": definition["output"]})
 
 
+def _ramp(value, where, color):
+    if not isinstance(value, list) or not value:
+        raise ValueError(where + ": a ramp needs at least one key")
+    previous = -math.inf
+    for key in value:
+        if not isinstance(key, list) or len(key) != 3:
+            raise ValueError(
+                where + ": ramp keys are [position, value, interpolation]"
+            )
+        position, data, interpolation = key
+        _value(position, "float", where)
+        _value(data, "color3" if color else "float", where)
+        if position < previous:
+            raise ValueError(where + ": ramp keys must be in position order")
+        if interpolation not in ("linear", "constant", "smooth"):
+            raise ValueError(
+                where + ": ramp interpolation is linear, constant or smooth"
+            )
+        previous = position
+
+
 def _value(value, kind, where):
+    if kind == "ramp":
+        return  # checked with its node (float or color ramp)
     if kind in ("string", "asset"):
         if not isinstance(value, str):
             raise ValueError(where + ": expected string")
@@ -499,6 +547,12 @@ def validate(graph):
             and not 0 <= props.get("threshold", 0.5) <= 1
         ):
             raise ValueError(name + ": Select threshold must be in [0, 1]")
+        if node["type"] in ("float_ramp", "color_ramp"):
+            _ramp(
+                props.get("ramp", definition["properties"]["ramp"][1]),
+                name + ".ramp",
+                node["type"] == "color_ramp",
+            )
         if node["type"] == "uv" and props.get("index", 0) != 0:
             raise ValueError(
                 name
@@ -684,7 +738,11 @@ def author(stage, path, graph, replace=True):
                     attribute.Set(
                         constructors[kind](*value)
                         if kind in constructors
-                        else Sdf.AssetPath(value) if kind == "asset" else value
+                        else (
+                            Sdf.AssetPath(value)
+                            if kind == "asset"
+                            else json.dumps(value) if kind == "ramp" else value
+                        )
                     )
     if output_kind(graph) == "volume":
         # A volume material: UsdShade's volume terminal, which Volume prims bind; no Preview Surface.
@@ -789,6 +847,8 @@ def read(material, time):
                         from substrate_textures import resolve_asset
 
                         value = resolve_asset(attr.GetAttr(), value, time)
+                    if value_type == "ramp":
+                        value = json.loads(value)
                     node[category][port] = (
                         list(value)
                         if value_type in ("color3", "vector2", "color4")
