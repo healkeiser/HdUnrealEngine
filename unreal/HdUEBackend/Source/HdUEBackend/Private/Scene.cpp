@@ -51,6 +51,10 @@
 #include "StaticMeshResources.h"
 #include "Tasks/Task.h"
 #include "mikktspace.h"
+#include "Algo/AnyOf.h"
+#include "UDIMUtilities.h"
+#include "VirtualTextureBuild.h"
+#include <atomic>
 
 FHdueScene::FHdueScene(UWorld* InWorld, bool InInteractive)
     : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld), Interactive(InInteractive) {}
@@ -761,6 +765,60 @@ void WriteCache(const FString& Path, FTexturePlatformData& Data) {
     if (!Written || !IFileManager::Get().Move(*Path, *Temporary, true, true, false, true))
         IFileManager::Get().Delete(*Temporary, false, false, true);
 }
+bool IsUdim(const FString& File) { return File.Contains(TEXT("<UDIM>")); }
+// A virtual texture of File's UDIM tiles, or of File alone (one block) for the other textures of a UDIM material, with
+// the 2D textures' decoding, mips, alpha coverage and block formats. ponytail: not in the texture cache; rebuilt on
+// each load.
+TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdueScene::FPreviewTexture& Texture,
+                                                       FString& Error) {
+    TMap<int32, FString> Found;
+    if (IsUdim(File))
+        Found = HdueUdimTiles(File);
+    else
+        Found.Add(1001, File);
+    const TArray<TPair<int32, FString>> Tiles = Found.Array();
+    if (Tiles.IsEmpty()) {
+        Error = TEXT("no UDIM tile on disk");
+        return nullptr;
+    }
+    TArray<FHdueVirtualTextureBlock> Blocks;
+    Blocks.SetNum(Tiles.Num());
+    std::atomic<int32> Unread = INDEX_NONE;
+    ParallelFor(Tiles.Num(), [&](int32 Index) {
+        UE::TextureUtilitiesCommon::ExtractUDIMCoordinates(Tiles[Index].Key, Blocks[Index].X, Blocks[Index].Y);
+        if (!FImageUtils::LoadImage(*Tiles[Index].Value, Blocks[Index].Image)) Unread = Index;
+    });
+    if (Unread != INDEX_NONE) {
+        Error = TEXT("cannot read ") + Tiles[Unread].Value;
+        return nullptr;
+    }
+    // One format for every tile, as UE converts a UDIM set's mismatched images (InterchangeTextureFactory.cpp): half
+    // floats if any tile is HDR, BGRA8 otherwise.
+    const bool Float =
+        Algo::AnyOf(Blocks, [](const auto& Block) { return ERawImageFormat::IsHDR(Block.Image.Format); });
+    const ERawImageFormat::Type Raw = Float ? ERawImageFormat::RGBA16F : ERawImageFormat::BGRA8;
+    for (auto& Block : Blocks)
+        if (Block.Image.Format != Raw) {
+            FImage Converted;
+            Block.Image.CopyTo(Converted, Raw, Block.Image.GammaSpace);
+            Block.Image = MoveTemp(Converted);
+        }
+    const bool Compress = !Float && BlockCompression();
+    FHdueVirtualTextureCodec Codec;
+    Codec.Format = Compress ? BlockFormat(Texture) : FImageCoreUtils::GetPixelFormatForRawImageFormat(Raw);
+    Codec.Mips = [&](FImage&& Image) {
+        TArray<FImage> Chain = MipChain(MoveTemp(Image));
+        if (Texture.Coverage > 0.f && !Float) ScaleAlphaCoverage(Chain, Texture.Read, Texture.Coverage);
+        return Chain;
+    };
+    Codec.Encode = [&](const FImage& Tile, uint8* Out) {
+        if (Compress)
+            CompressMip(Tile, Codec.Format, Texture, Out);
+        else
+            FMemory::Memcpy(Out, Tile.RawData.GetData(), Tile.RawData.Num());
+    };
+    return HdueBuildVirtualTexture(MoveTemp(Blocks), Codec, Texture.Address, Error);
+}
 // sourceColorSpace decides sRGB decoding of 8-bit texels; auto leaves it to the slot (colour or data).
 bool TextureSRGB(const HdueTextureDesc& Texture, int32 Slot) {
     return Texture.encoding == HDUE_TEXTURE_ENCODING_AUTO ? hdue_texture_is_color(Slot) != 0
@@ -783,11 +841,24 @@ float CoverageThreshold(const HdueMaterialDesc& Desc, int32 Slot) {
         }
     return 0;
 }
-// One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), and the clip value its
-// mips keep the coverage of: other uses of the file keep plain mips.
-FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot, float Coverage) {
-    return FString::Printf(TEXT("%s|%s|%d|%d|%g"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
-                           int32(TextureWrap(Texture.wrap[0])), int32(TextureWrap(Texture.wrap[1])), Coverage);
+// A UDIM set wraps: UE places tile rows for UVs with V flipped (1 - v), which puts tiles above 1001 at negative V
+// (VirtualTextureDataBuilder.cpp, BlockY), and UE's UDIM textures keep the default wrap.
+TextureAddress TextureWrap(const HdueTextureDesc& Texture, int32 Axis) {
+    return IsUdim(UTF8_TO_TCHAR(Texture.file)) ? TA_Wrap : TextureWrap(Texture.wrap[Axis]);
+}
+// A material with a UDIM texture draws on a VT parent, every texture of it virtual: UE's USD import does the same (its
+// VT reference material, UniversalMaterialSchemaHandler.cpp), as a material's sampler is virtual or not.
+bool VirtualMaterial(const HdueMaterialDesc& Desc) {
+    for (const auto& Texture : Desc.textures)
+        if (Texture.file && IsUdim(UTF8_TO_TCHAR(Texture.file))) return true;
+    return false;
+}
+// One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), the clip value its
+// mips keep the coverage of (other uses of the file keep plain mips), and whether it is virtual.
+FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot, float Coverage, bool Virtual) {
+    return FString::Printf(TEXT("%s|%s|%d|%d|%g%s"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
+                           int32(TextureWrap(Texture, 0)), int32(TextureWrap(Texture, 1)), Coverage,
+                           Virtual ? TEXT("|vt") : TEXT(""));
 }
 // Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
 bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
@@ -808,6 +879,8 @@ const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key
         // a CPU copy of every texture for the scene's lifetime. ponytail: the resource can't be rebuilt from this
         // texture; it is never updated again (create a new one).
         for (FTexture2DMipMap& Mip : Texture->Pending->Mips) Mip.BulkData.SetBulkDataFlags(BULKDATA_AlwaysAllowDiscard);
+        // A virtual texture streams its tiles from the chunks in VTData, kept in memory (Apply-ResidencyPatch.ps1).
+        Created->VirtualTextureStreaming = Texture->Pending->VTData != nullptr;
         Created->SetPlatformData(Texture->Pending.Release());
         Created->UpdateResource();
         Texture->Texture.Reset(Created);
@@ -1464,11 +1537,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
             if (Desc.native_asset && *Desc.native_asset) continue;
+            const bool Virtual = VirtualMaterial(Desc);
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 const auto& Texture = Desc.textures[Slot];
                 if (!Texture.file || !*Texture.file) continue;
                 const FString File = UTF8_TO_TCHAR(Texture.file),
-                              Key = TextureKey(File, Texture, Slot, CoverageThreshold(Desc, Slot));
+                              Key = TextureKey(File, Texture, Slot, CoverageThreshold(Desc, Slot), Virtual);
                 const bool Vector = !ScalarSlot(Slot);
                 uint8 Read = 0;
                 for (int32 Channel = 0; Channel < 4; ++Channel)
@@ -1479,7 +1553,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 Entry.Vector |= Vector;
                 Entry.SRGB = TextureSRGB(Texture, Slot);
                 Entry.Coverage = CoverageThreshold(Desc, Slot);
-                for (int32 Axis = 0; Axis < 2; ++Axis) Entry.Address[Axis] = uint8(TextureWrap(Texture.wrap[Axis]));
+                Entry.Virtual = Virtual;
+                for (int32 Axis = 0; Axis < 2; ++Axis) Entry.Address[Axis] = uint8(TextureWrap(Texture, Axis));
                 Files.FindOrAdd(File).AddUnique(Key);
             }
         }
@@ -1491,6 +1566,14 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 const TArray<FString>& Keys = Work[Index].Value;
                 for (int32 Variant = 0; Variant < Keys.Num(); ++Variant) {
                     FPreviewTexture& Entry = PreviewTextures[Keys[Variant]];
+                    if (Entry.Virtual) {
+                        FString VirtualError;
+                        Entry.Pending = PrepareVirtualTexture(Work[Index].Key, Entry, VirtualError);
+                        if (!Entry.Pending)
+                            UE_LOG(LogTemp, Warning, TEXT("hdUE virtual texture %s: %s."), *Work[Index].Key,
+                                   *VirtualError);
+                        continue;
+                    }
                     const bool SRGB = Entry.SRGB;
                     const FString Cache = CachePath(Work[Index].Key, Entry, SRGB);
                     if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
@@ -1543,13 +1626,16 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                               !(Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW);
             const bool Layered = Transmissive || (!Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f || Coat));
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
+            const bool Virtual = VirtualMaterial(Desc);
             const FString ParentName =
-                Transmissive  ? FString::Printf(TEXT("M_StandardSurfaceTranslucent%s"), Thin ? TEXT("Thin") : TEXT(""))
-                 : Layered ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
-                                            Thin ? TEXT("Thin") : TEXT(""))
-                 : Masked ? TEXT("M_PreviewSurfaceMasked")
-                : Translucent ? TEXT("M_PreviewSurfaceTranslucent")
-                              : TEXT("M_PreviewSurface");
+                FString(Transmissive
+                            ? FString::Printf(TEXT("M_StandardSurfaceTranslucent%s"), Thin ? TEXT("Thin") : TEXT(""))
+                        : Layered ? FString::Printf(TEXT("M_StandardSurface%s%s"), Masked ? TEXT("Masked") : TEXT(""),
+                                                    Thin ? TEXT("Thin") : TEXT(""))
+                        : Masked ? TEXT("M_PreviewSurfaceMasked")
+                        : Translucent ? TEXT("M_PreviewSurfaceTranslucent")
+                                      : TEXT("M_PreviewSurface")) +
+                (Virtual ? TEXT("VT") : TEXT(""));  // virtual samplers (VirtualMaterial)
             auto* Parent = LoadObject<UMaterialInterface>(
                 nullptr, *FString::Printf(TEXT("/Game/HdUE/%s.%s"), *ParentName, *ParentName));
             if (Parent) {
@@ -1580,9 +1666,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const FPreviewTexture* Image = nullptr;
                     if (HasTexture(Slot)) {
                         FString TextureError;
-                        Image = PreviewTexture(
-                            TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot, CoverageThreshold(Desc, Slot)),
-                            TextureError);
+                        Image = PreviewTexture(TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot,
+                                                          CoverageThreshold(Desc, Slot), Virtual),
+                                               TextureError);
                         if (!Image)
                             UE_LOG(LogTemp, Warning, TEXT("hdUE material %s: %s; %s stays untextured."),
                                    UTF8_TO_TCHAR(Desc.id), *TextureError, *Name);
@@ -1607,7 +1693,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     FLinearColor Set(0, 0, 0, 0);
                     Set.Component(FMath::Min<uint32>(Texture.uv_set, 3)) = 1;
                     Instance->SetVectorParameterValue(*(Name + TEXT("UVSet")), Set);
-                    if (Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK)
+                    // A UDIM set is the whole UV plane's texture: it is not masked outside [0,1].
+                    if ((Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK) &&
+                        !IsUdim(UTF8_TO_TCHAR(Texture.file)))
                         Instance->SetVectorParameterValue(
                             *(Name + TEXT("Black")),
                             FLinearColor(Texture.wrap[0] == HDUE_WRAP_BLACK ? 1.f : 0.f,

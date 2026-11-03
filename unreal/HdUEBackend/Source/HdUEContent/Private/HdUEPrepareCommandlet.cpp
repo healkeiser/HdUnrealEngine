@@ -136,12 +136,31 @@ UTexture2D* CreateLinearWhite() {
     Texture->PostEditChange();
     return SaveAsset(Texture) ? Texture : nullptr;
 }
+// The default textures of the VT parents' virtual samplers (sRGB for colour, linear for data), which accept only
+// virtual textures: a white tile.
+UTexture2D* CreateVirtualWhite(bool SRGB) {
+    const FString Name = SRGB ? TEXT("T_VirtualWhite") : TEXT("T_VirtualLinearWhite");
+    const FString Path = TEXT("/Game/HdUE/") + Name;
+    if (auto* Existing = LoadObject<UTexture2D>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn))
+        return Existing;
+    UPackage* Package = CreatePackage(*Path);
+    auto* Texture = NewObject<UTexture2D>(Package, *Name, RF_Public | RF_Standalone);
+    TArray<uint8> White;
+    White.Init(255, 128 * 128 * 4);
+    Texture->Source.Init(128, 128, 1, 1, TSF_BGRA8, White.GetData());
+    Texture->SRGB = SRGB;
+    Texture->CompressionSettings = SRGB ? TC_Default : TC_VectorDisplacementmap;
+    Texture->VirtualTextureStreaming = true;
+    Texture->PostEditChange();
+    return SaveAsset(Texture) ? Texture : nullptr;
+}
 // Surface master. Every input is texel * <Slot>Scale + <Slot>Bias (scalar inputs then dot
 // <Slot>Mask), so an untextured input is Scale 0, Bias constant. Preview Surface masters shade
 // one Substrate slab; Standard Surface masters (Layered: MaterialX subsurface and sheen) feed the
 // same inputs to UE's Substrate standard_surface function, whose slabs and layers cost more per pixel.
+// Virtual: every texture is sampled as a virtual texture (the backend's runtime UDIM sets), the <Name>VT parents.
 UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWhite, bool Layered = false,
-                         bool Thin = false, bool TwoSided = true) {
+                         bool Thin = false, bool TwoSided = true, bool Virtual = false) {
     const FString Path = FString(TEXT("/Game/HdUE/")) + Name;
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, *(Path + TEXT(".") + Name), nullptr, LOAD_NoWarn);
@@ -227,10 +246,16 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
         auto* Sample = Add(NewObject<UMaterialExpressionTextureSampleParameter2D>(Material));
         Sample->ParameterName = *(Slot + TEXT("Texture"));
         Sample->Coordinates.Connect(0, UV);
-        Sample->SamplerType = Color ? SAMPLERTYPE_Color : SAMPLERTYPE_LinearColor;
-        Sample->Texture =
-            Color ? LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
-                  : LinearWhite;
+        if (Virtual) {
+            Sample->SamplerType = Color ? SAMPLERTYPE_VirtualColor : SAMPLERTYPE_VirtualLinearColor;
+            Sample->Texture = CreateVirtualWhite(Color);
+        } else {
+            Sample->SamplerType = Color ? SAMPLERTYPE_Color : SAMPLERTYPE_LinearColor;
+            Sample->Texture = Color
+                                  ? LoadObject<UTexture>(
+                                        nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"))
+                                  : LinearWhite;
+        }
         auto* BlackAxes = Add(NewObject<UMaterialExpressionComponentMask>(Material));
         BlackAxes->Input.Connect(0, Vector(Slot + TEXT("Black"), FLinearColor(0, 0, 0, 0)));
         BlackAxes->R = BlackAxes->G = 1;
@@ -841,28 +866,40 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
     UMaterial* Masked = CreateSurface(TEXT("M_PreviewSurfaceMasked"), BLEND_Masked, LinearWhite);
     UMaterial* Translucent =
         CreateSurface(TEXT("M_PreviewSurfaceTranslucent"), BLEND_TranslucentGreyTransmittance, LinearWhite);
-    // One-sided twins (USD doubleSided off). Thin-walled shells stay two-sided.
+    // VT twins of every parent (<Name>VT, its one-sided twin <Name>VTOneSided) for materials with UDIM textures.
     for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentGreyTransmittance})
         if (!CreateSurface(
-                *FString::Printf(TEXT("M_PreviewSurface%sOneSided"), Blend == BLEND_Masked   ? TEXT("Masked")
-                                                                     : Blend == BLEND_Opaque ? TEXT("")
-                                                                                             : TEXT("Translucent")),
-                Blend, LinearWhite, false, false, false))
+                *FString::Printf(TEXT("M_PreviewSurface%sVT"), Blend == BLEND_Masked   ? TEXT("Masked")
+                                                               : Blend == BLEND_Opaque ? TEXT("")
+                                                                                       : TEXT("Translucent")),
+                Blend, LinearWhite, false, false, true, true))
             return 3;
+    // One-sided twins (USD doubleSided off). Thin-walled shells stay two-sided.
+    for (const bool Virtual : {false, true})
+        for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentGreyTransmittance})
+            if (!CreateSurface(*FString::Printf(TEXT("M_PreviewSurface%s%sOneSided"),
+                                                Blend == BLEND_Masked   ? TEXT("Masked")
+                                                : Blend == BLEND_Opaque ? TEXT("")
+                                                                        : TEXT("Translucent"),
+                                                Virtual ? TEXT("VT") : TEXT("")),
+                               Blend, LinearWhite, false, false, false, Virtual))
+                return 3;
     // Standard Surface masters, selected by the backend by blend mode and thin_walled (a static input of UE's
     // function); Translucent for MaterialX transmission.
-    for (const bool Thin : {false, true})
-        for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentColoredTransmittance})
-            for (const bool TwoSided : {true, false})
-                if ((TwoSided || !Thin) &&
-                    !CreateSurface(
-                        *FString::Printf(TEXT("M_StandardSurface%s%s%s"),
-                                         Blend == BLEND_Masked                            ? TEXT("Masked")
-                                         : Blend == BLEND_TranslucentColoredTransmittance ? TEXT("Translucent")
-                                                                                          : TEXT(""),
-                                         Thin ? TEXT("Thin") : TEXT(""), TwoSided ? TEXT("") : TEXT("OneSided")),
-                        Blend, LinearWhite, true, Thin, TwoSided))
-                    return 3;
+    for (const bool Virtual : {false, true})
+        for (const bool Thin : {false, true})
+            for (const EBlendMode Blend : {BLEND_Opaque, BLEND_Masked, BLEND_TranslucentColoredTransmittance})
+                for (const bool TwoSided : {true, false})
+                    if ((TwoSided || !Thin) &&
+                        !CreateSurface(
+                            *FString::Printf(TEXT("M_StandardSurface%s%s%s%s"),
+                                             Blend == BLEND_Masked                            ? TEXT("Masked")
+                                             : Blend == BLEND_TranslucentColoredTransmittance ? TEXT("Translucent")
+                                                                                              : TEXT(""),
+                                             Thin ? TEXT("Thin") : TEXT(""), Virtual ? TEXT("VT") : TEXT(""),
+                                             TwoSided ? TEXT("") : TEXT("OneSided")),
+                            Blend, LinearWhite, true, Thin, TwoSided, Virtual))
+                        return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial() ||
         !CreateLightFunctionMaterial() || !CreateSparseVolumeAssets())
         return 3;

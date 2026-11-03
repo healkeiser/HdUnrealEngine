@@ -172,3 +172,11 @@ Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\P
     @(
         'FRDGTextureDesc SceneColorMipchainDesc = FRDGTextureDesc::Create2D(SceneColorMip0Resolution, PF_FloatR11G11B10, FClearValueBinding::None,',
         "// hdUE: alpha for r.PostProcessing.PropagateAlpha (coverage seen through refraction)`n`t`t`tFRDGTextureDesc SceneColorMipchainDesc = FRDGTextureDesc::Create2D(SceneColorMip0Resolution, IsPostProcessingWithAlphaChannelSupported() ? PF_FloatRGBA : PF_FloatR11G11B10, FClearValueBinding::None,"))
+# Runtime UDIM virtual textures (UdimTexture.cpp) keep their chunks in memory, as runtime Nanite keeps its pages: outside
+# the editor, FUploadingVirtualTexture::ReadData reads a chunk only through a file handle on cooked bulk data. In
+# non-editor builds a chunk of loaded (in-memory) bulk data is served from memory, as the editor serves unsaved lightmaps;
+# cooked bulk data is never loaded, so cooked virtual textures stream from disk as before.
+Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Private\VT\UploadingVirtualTexture.cpp') `
+    -Label 'runtime virtual texture patch' -Marker 'hdUE: runtime-built' -Edits @(, @(
+    "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if WITH_EDITOR`n",
+    "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if 1`t// hdUE: runtime-built virtual textures (UdimTexture.cpp) stream from memory outside the editor too`n"))

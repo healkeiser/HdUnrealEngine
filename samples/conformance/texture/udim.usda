@@ -1,31 +1,104 @@
 #usda 1.0
 (
-    doc = """A UsdUVTexture file with a <UDIM> pattern reads tile 1001 for u in [0, 1] and 1002 for u in [1, 2]: a quad
-whose st spans u = 0..2 shows tile 1001 (red) on its left half and 1002 (blue) on its right half. hdUE does not import
-uncooked UDIMs at runtime (docs/materials.md) and must say so (a warning naming the file); the quad still renders."""
+    doc = """A UsdUVTexture file with a <UDIM> pattern reads tile 1001 for u, v in [0, 1], 1002 for u in [1, 2] and 1011 for v
+in [1, 2]: a quad whose st spans 0..2 on both axes shows 1001 bottom left (its image red over green: the image top at v = 1), 1002 (blue) bottom right, 1011 (green)
+top left and 1012 (yellow, a 4x4 image among 8x8 ones) top right. hdUE builds UE's virtual texture of the set at
+runtime (docs/materials.md)."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdUVTexture",
- "feature": "<UDIM> file pattern (unsupported at runtime, warned)",
+ "feature": "<UDIM> file pattern",
  "frames": 1,
  "checks": [
   {
-   "name": "warning names the UDIM texture",
+   "name": "no warning about the UDIM texture",
    "log": "hdUE.*<UDIM>",
-   "present": true
+   "present": false
   },
   {
-   "name": "the quad still renders",
-   "value": {
+   "name": "tile 1001 (u 0-1, v 0-1): the image top (red) at v near 1",
+   "color": {
     "region": [
-     -3.5,
-     -1.5,
-     3.5,
-     1.5
-    ],
-    "stat": "coverage"
+     -2.3,
+     -0.8,
+     -1.7,
+     -0.2
+    ]
    },
-   "min": 0.9
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "tile 1001: the image bottom (green) at v near 0",
+   "color": {
+    "region": [
+     -2.3,
+     -1.8,
+     -1.7,
+     -1.2
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "tile 1002 (u 1-2, v 0-1) blue",
+   "color": {
+    "region": [
+     1.5,
+     -1.5,
+     2.5,
+     -0.5
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "tile 1011 (u 0-1, v 1-2) green",
+   "color": {
+    "region": [
+     -2.5,
+     0.5,
+     -1.5,
+     1.5
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.9,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "tile 1012 (u 1-2, v 1-2) yellow, a smaller image",
+   "color": {
+    "region": [
+     1.5,
+     0.5,
+     2.5,
+     1.5
+    ]
+   },
+   "rgb": [
+    0.5,
+    0.5,
+    0.02
+   ],
+   "tol": 0.25
   }
  ]
 }"""
@@ -70,7 +143,7 @@ def Mesh "Quad" (
     point3f[] points = [(-4, -2, 0), (4, -2, 0), (4, 2, 0), (-4, 2, 0)]
     uniform token subdivisionScheme = "none"
     uniform bool doubleSided = 1
-    texCoord2f[] primvars:st = [(0, 0), (2, 0), (2, 1), (0, 1)] (
+    texCoord2f[] primvars:st = [(0, 0), (2, 0), (2, 2), (0, 2)] (
         interpolation = "faceVarying"
     )
     int[] primvars:st:indices = [0, 1, 2, 3]

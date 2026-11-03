@@ -22,7 +22,8 @@ bool HdUERawColorSpace(const std::string& space);
 bool HdUESRGBColorSpace(const std::string& space);
 // A colour texture as linear Rec.709 for UE: a cached EXR converted through OCIO from space, its authored colour
 // space; empty or auto means scene_linear, and only for float images (EXR, HDR). raw, sRGB-encoded and linear
-// Rec.709 files, spaces the config does not know, and builds without OCIO return the path unchanged. Converted files
-// live in %TEMP%/hdue_ocio; entries unused for a week are removed.
+// Rec.709 files, spaces the config does not know, and builds without OCIO return the path unchanged. A UDIM pattern
+// (<UDIM> in the name) has each tile converted and returns the converted pattern. Converted files live in
+// %TEMP%/hdue_ocio; entries unused for a week are removed.
 std::string HdUELinearRec709Texture(const std::string& file, const std::string& space = {});
 PXR_NAMESPACE_CLOSE_SCOPE

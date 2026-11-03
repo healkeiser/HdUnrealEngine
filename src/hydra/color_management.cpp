@@ -14,6 +14,8 @@ namespace OCIO = OCIO_NAMESPACE;
 #include <functional>
 #include <mutex>
 #include <set>
+#include <utility>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 namespace {
@@ -119,15 +121,10 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
         TF_WARN("hdUE: %s: %s", from.c_str(), error.what());
         return file;
     }
-    std::error_code error;
-    const auto stamp = std::filesystem::last_write_time(file, error);
-    if (error) return file;
-    const auto key = std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + "|" +
-                                              std::to_string(stamp.time_since_epoch().count()));
     const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
-    const auto cached = folder / (std::to_string(key) + ".exr");
     static std::mutex convert;
     std::lock_guard lock(convert);
+    std::error_code error;
     // UE copies textures when they load, so the cache only saves converting again. Each process first evicts the
     // conversions it has not used for a week, and a hit counts as a use.
     static std::once_flag evict;
@@ -138,27 +135,61 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
             if (entry.last_write_time(ignored) < expired) std::filesystem::remove(entry.path(), ignored);
         }
     });
-    if (std::filesystem::exists(cached, error)) {
-        std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), error);
-        return cached.string();
-    }
     std::filesystem::create_directories(folder, error);
-    // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept 8-bit.
-    OIIO::ImageBuf image(file);
-    const bool read = image.read(0, 0, true, OIIO::TypeDesc::FLOAT) && image.localpixels() && image.nchannels() >= 3;
-    if (read) {
-        const auto& spec = image.spec();
-        const auto pixel = std::ptrdiff_t(spec.nchannels * sizeof(float));
-        OCIO::PackedImageDesc pixels(image.localpixels(), spec.width, spec.height * spec.depth,
-                                     std::min(spec.nchannels, 4), OCIO::BIT_DEPTH_F32, sizeof(float), pixel,
-                                     pixel * spec.width);
-        processor->apply(pixels);
+    // One image into cached, an EXR, unless it is there already.
+    const auto converted = [&](const std::string& source, const std::filesystem::path& cached) {
+        std::error_code missing;
+        if (std::filesystem::exists(cached, missing)) {
+            std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), missing);
+            return true;
+        }
+        // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept
+        // 8-bit.
+        OIIO::ImageBuf image(source);
+        const bool read =
+            image.read(0, 0, true, OIIO::TypeDesc::FLOAT) && image.localpixels() && image.nchannels() >= 3;
+        if (read) {
+            const auto& spec = image.spec();
+            const auto pixel = std::ptrdiff_t(spec.nchannels * sizeof(float));
+            OCIO::PackedImageDesc pixels(image.localpixels(), spec.width, spec.height * spec.depth,
+                                         std::min(spec.nchannels, 4), OCIO::BIT_DEPTH_F32, sizeof(float), pixel,
+                                         pixel * spec.width);
+            processor->apply(pixels);
+        }
+        if (read && image.write(cached.string(), OIIO::TypeDesc::HALF)) return true;
+        TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", source.c_str(), from.c_str());
+        return false;
+    };
+    // The images: the file, or each tile of a UDIM pattern (four digits in place of <UDIM>), converted under the
+    // same pattern.
+    std::vector<std::pair<std::string, std::string>> images;  // source, tile number (empty: not a UDIM set)
+    const auto token = file.find("<UDIM>");
+    if (token == std::string::npos) {
+        images.emplace_back(file, "");
+    } else {
+        const std::filesystem::path prefix(file.substr(0, token));
+        const auto head = prefix.filename().string(), tail = file.substr(token + 6);
+        for (const auto& entry : std::filesystem::directory_iterator(prefix.parent_path(), error)) {
+            const auto name = entry.path().filename().string();
+            if (name.size() != head.size() + 4 + tail.size() || name.compare(0, head.size(), head) ||
+                name.compare(name.size() - tail.size(), tail.size(), tail))
+                continue;
+            const auto digits = name.substr(head.size(), 4);
+            if (std::all_of(digits.begin(), digits.end(), [](char c) { return c >= '0' && c <= '9'; }))
+                images.emplace_back(entry.path().string(), digits);
+        }
     }
-    if (!read || !image.write(cached.string(), OIIO::TypeDesc::HALF)) {
-        TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", file.c_str(), from.c_str());
-        return file;
+    std::string stamps;
+    for (const auto& [source, tile] : images) {
+        const auto stamp = std::filesystem::last_write_time(source, error);
+        if (error) return file;
+        stamps += "|" + tile + std::to_string(stamp.time_since_epoch().count());
     }
-    return cached.string();
+    if (images.empty()) return file;
+    const auto key = std::to_string(std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + stamps));
+    for (const auto& [source, tile] : images)
+        if (!converted(source, folder / (key + (tile.empty() ? "" : "." + tile) + ".exr"))) return file;
+    return (folder / (key + (token == std::string::npos ? "" : ".<UDIM>") + ".exr")).string();
 #else
     (void)space;
     return file;

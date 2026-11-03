@@ -167,7 +167,7 @@ The scene keeps its `op:` paths. Only Houdini can evaluate them, so the host exp
 
 Images are exported as 32-bit float without colour conversion; colour inputs are then converted from the OCIO `scene_linear` role to linear Rec.709 as for any other EXR, and `raw` inputs are left as they are. Legacy COP color-plane export requires integer frames.
 
-MaterialX Image nodes and UsdUVTexture read these textures in every input hdUE translates (see [MaterialX surfaces](rendering.md#materialx-surfaces)). COP UDIM collections, alpha-to-opacity wiring, and texture replacement inside cooked native materials are not implemented.
+MaterialX Image nodes and UsdUVTexture read these textures in every input hdUE translates (see [MaterialX surfaces](rendering.md#materialx-surfaces)). `<UDIM>` file patterns are read at runtime ([Normal maps and UDIMs](materials.md#normal-maps-and-udims)). COP UDIM collections, alpha-to-opacity wiring, and texture replacement inside cooked native materials are not implemented.
 
 Embedded `opdef:` images are also supported. Houdini extracts the original image bytes into immutable content-hash files without changing the source definition or USD asset. MaterialX preparation automatically extracts these images when `houdini_root` is configured; `Import-UsdMaterialX.ps1 -HoudiniRoot` can select it explicitly.
 
