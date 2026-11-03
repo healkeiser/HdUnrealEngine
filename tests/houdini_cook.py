@@ -20,7 +20,8 @@ import hdue_houdini as integration
 ASSET = "/Game/HdUE/SM_Nanite.SM_Nanite"
 network = hou.node("/stage")
 source = network.createNode("pythonscript", "test_source")
-source.parm("python").set("""from pxr import UsdGeom, Sdf
+source.parm("python").set(
+    """from pxr import UsdGeom, Sdf
 stage=hou.pwd().editableStage()
 prim=UsdGeom.Xform.Define(stage,'/Native').GetPrim()
 prim.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
@@ -34,7 +35,9 @@ asset=stage.DefinePrim('/Prototype/Asset','Xform')
 asset.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
 instance=stage.DefinePrim('/Instance','Xform')
 instance.GetReferences().AddInternalReference('/Prototype'); instance.SetInstanceable(True)
-""" % (ASSET, ASSET, ASSET))
+"""
+    % (ASSET, ASSET, ASSET)
+)
 before = source.stage().GetRootLayer().ExportToString()
 # A Z-up centimetre input, as a scene file would bring it: a standard Configure Layer LOP.
 units = network.createNode("configurelayer", "z_up_centimeters")
@@ -150,14 +153,16 @@ assert (
 # MaterialX inside an instance needs its stage path only with a cooked library.
 look = network.createNode("pythonscript", "instanced_materialx")
 look.setInput(0, render)
-look.parm("python").set("""from pxr import Sdf, UsdShade
+look.parm("python").set(
+    """from pxr import Sdf, UsdShade
 stage=hou.pwd().editableStage()
 material=UsdShade.Material.Define(stage,'/Prototype/Asset/Looks/Paint')
 shader=UsdShade.Shader.Define(stage,'/Prototype/Asset/Looks/Paint/Surface'); shader.CreateIdAttr('ND_standard_surface_surfaceshader')
 material.CreateSurfaceOutput('mtlx').ConnectToSource(shader.CreateOutput('out',Sdf.ValueTypeNames.Token))
 stage.OverridePrim('/Native').SetActive(False)
 stage.OverridePrim('/Parent').SetActive(False)
-stage.OverridePrim('/Prototype/Asset').GetAttribute('unreal:asset').Set('')""")
+stage.OverridePrim('/Prototype/Asset').GetAttribute('unreal:asset').Set('')"""
+)
 assert not look.errors(), look.errors()
 assets.sync(network, look, look.stage())
 assert not instanceable_override(overrides())
