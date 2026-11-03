@@ -169,7 +169,7 @@ TOOL = """<?xml version="1.0" encoding="UTF-8"?>
     <toolMenuContext name="network">
       <contextOpType>$HDA_TABLE_AND_NAME</contextOpType>
     </toolMenuContext>
-    <toolSubmenu>Rendering/hdUE</toolSubmenu>
+    <toolSubmenu>hdUE/SUBMENU</toolSubmenu>
     <script scriptType="python"><![CDATA[import loptoolutils
 loptoolutils.genericTool(kwargs, '$HDA_NAME')]]></script>
   </tool>
@@ -750,8 +750,11 @@ def save(
     on_created=None,
     max_inputs=1,
     input_labels=(),
+    submenu="Rendering",
 ):
-    """Turn the subnet into the asset saved to hda, with the parameters, icon, TAB menu entry and help card."""
+    """Turn the subnet into the asset saved to hda, with the parameters, icon, TAB menu entry (in hdUE/submenu) and
+    help card.
+    """
     import hou
 
     hda.unlink(missing_ok=True)
@@ -768,7 +771,7 @@ def save(
         group
     )  # the subnet's spare parameters are not carried over
     definition.setIcon(icon)
-    definition.addSection("Tools.shelf", TOOL)
+    definition.addSection("Tools.shelf", TOOL.replace("SUBMENU", submenu))
     definition.addSection("Help", help_text)
     if on_created:
         definition.addSection("OnCreated", on_created)
@@ -1317,6 +1320,8 @@ def build_prim_lop(
         icon,
         group,
         help_page(group, name, label, icon, summary, overview),
+        # The actors UE's Place Actors panel files under Visual Effects: fog, sky, clouds, post-processing, decals.
+        submenu="Visual Effects",
     )
     # The transform handles of SideFX's Sphere LOP, bound to the same parameters.
     sphere_script = (

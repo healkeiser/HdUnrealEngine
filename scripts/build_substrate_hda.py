@@ -290,6 +290,45 @@ MENUS = {
     "channel": {c: c.upper() for c in "rgba"},
     "field": {"density": "Density", "emission": "Emission"},
 }
+# TAB menu folders under hdUE, as UE's Material Editor palette files the matching expressions: every Substrate
+# expression in "Substrate" (MenuCategories, MaterialExpressionSubstrate.cpp), the rest as the Material Expressions
+# Reference groups them (Constant, Coordinates, Math, Utility, ... Material Expressions in Unreal Engine).
+CATEGORY = dict(
+    **dict.fromkeys(
+        (
+            "materialx",
+            "slab",
+            "weight",
+            "vertical",
+            "horizontal",
+            "add",
+            "select",
+            "hair",
+            "eye",
+            "water",
+            "unlit",
+            "thin_film",
+            "metalness",
+            "haziness",
+            "transmittance",
+            "decal",
+            "volume_fog_cloud",
+        ),
+        "Substrate",
+    ),
+    **dict.fromkeys(
+        ("scalar", "color", "float_ramp", "color_ramp"), "Parameters"
+    ),
+    **dict.fromkeys(("constant", "constant_color", "primvar"), "Constants"),
+    **dict.fromkeys(
+        ("multiply", "saturate", "channel", "color_from_float"), "Math"
+    ),
+    uv="Coordinates",
+    texture="Texture",
+    normalmap="Texture",
+    blackbody="Utility",
+    volume_field="Volume",
+)
 TOOL = """<?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
   <tool name="$HDA_DEFAULT_TOOL" label="$HDA_LABEL" icon="$HDA_ICON">
@@ -299,7 +338,7 @@ TOOL = """<?xml version="1.0" encoding="UTF-8"?>
     <toolMenuContext name="network">
       <contextOpType>$HDA_TABLE_AND_NAME</contextOpType>
     </toolMenuContext>
-    <toolSubmenu>hdUE</toolSubmenu>
+    <toolSubmenu>hdUE/SUBMENU</toolSubmenu>
     <script scriptType="python"><![CDATA[import voptoolutils
 voptoolutils.genericTool(kwargs, '$HDA_NAME')]]></script>
     <keywordList>
@@ -485,7 +524,10 @@ def finish(asset, kind, summary, group, inputs, keyword):
     # Type Properties' VopNet mask, which TAB menu masks test.
     definition.setExtraInfo(f"shadertype={shader_type} vopnetmask='{keyword}' ")
     definition.setIcon(ICON)
-    definition.addSection("Tools.shelf", TOOL.replace("KEYWORD", keyword))
+    definition.addSection(
+        "Tools.shelf",
+        TOOL.replace("KEYWORD", keyword).replace("SUBMENU", CATEGORY[kind]),
+    )
     definition.addSection("Help", help_page(kind, summary, group, inputs))
     definition.addSection(
         "HDUE.Substrate.json", json.dumps(dict(version=1, operation=kind))
@@ -498,6 +540,9 @@ def build():
 
     HDA.unlink(missing_ok=True)
     scratch = hou.node("/mat").createNode("subnet", "hdue_definition_build")
+    assert set(CATEGORY) == set(NODES), set(CATEGORY) ^ set(
+        NODES
+    )  # every node in a TAB menu folder
     for kind, definition in NODES.items():
         node = scratch.createNode("subnet", kind)
         for name, (value_type, default) in definition["inputs"].items():
