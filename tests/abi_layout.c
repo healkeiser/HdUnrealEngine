@@ -25,7 +25,7 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 208, "RenderRequest C ABI layout");
-_Static_assert(HDUE_ABI_VERSION == 20u, "ABI 20: one function table, no extension tables");
+_Static_assert(HDUE_ABI_VERSION == 21u, "ABI 21: one function table, no extension tables");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 48, "Scene batch C ABI layout");
 _Static_assert(sizeof(HdueTextureDesc) == 72, "Texture C ABI layout (ABI 9)");
@@ -47,5 +47,5 @@ _Static_assert(sizeof(HdueViewportStatus) == 648, "Houdini viewport status C ABI
 _Static_assert(sizeof(HdueMeshUpdate) == 32, "Mesh update C ABI layout (ABI 13)");
 _Static_assert(sizeof(HdueLocalFogVolumeDesc) == 168, "Local fog volume C ABI layout (ABI 14)");
 _Static_assert(sizeof(HdueGroomDesc) == 48, "Groom C ABI layout (ABI 16)");
-_Static_assert(sizeof(HdueApi) == 8 + 43 * 8, "Function table: header and 43 functions");
+_Static_assert(sizeof(HdueApi) == 8 + 44 * 8, "Function table: header and 44 functions");
 int main(void) { return 0; }

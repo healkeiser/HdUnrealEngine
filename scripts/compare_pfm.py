@@ -3,6 +3,7 @@
 # dependencies = ["numpy>=2"]
 # ///
 """Compare a native UE reference and the Hydra AOV (linear HDR)."""
+
 import argparse
 import json
 from pathlib import Path

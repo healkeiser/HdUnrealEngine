@@ -2,6 +2,7 @@
 # requires-python = ">=3.11"
 # ///
 """Export typed USD Substrate graphs, then assemble editor preparation receipts."""
+
 import argparse
 import hashlib
 import json

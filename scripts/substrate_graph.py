@@ -221,6 +221,14 @@ NODES = {
         },
         properties={},
     ),
+    # A decal material (an UnrealDecal prim's): UE's Substrate Convert To Decal over a surface, in UE's Deferred Decal
+    # domain, its coverage the decal's opacity.
+    "decal": dict(
+        label="Substrate Convert To Decal",
+        output="decal",
+        inputs={"surface": ("surface", None), "coverage": ("float", 1.0)},
+        properties={},
+    ),
     # Volume materials (a Volume prim's heterogeneous volume): UE's Substrate Volumetric-Fog-Cloud BSDF, which
     # heterogeneous volumes read (HeterogeneousVolumesLiveShadingUtils.ush). Unconnected, extinction and emission are
     # those of hdUE's default volume material (M_HdUEVolume): the density grid times the volume's extinction scale, and
@@ -303,6 +311,7 @@ USD_TYPES = {
     "color3": Sdf.ValueTypeNames.Color3f,
     "surface": Sdf.ValueTypeNames.Token,
     "volume": Sdf.ValueTypeNames.Token,
+    "decal": Sdf.ValueTypeNames.Token,
     "string": Sdf.ValueTypeNames.String,
     "bool": Sdf.ValueTypeNames.Bool,
     "asset": Sdf.ValueTypeNames.Asset,
@@ -545,8 +554,10 @@ def validate(graph):
                 + " must be the material's output, not under an operator"
             )
     kind = NODES[nodes[output]["type"]]["output"]
-    if kind not in ("surface", "volume"):
-        raise ValueError("Substrate output must be a surface or a volume")
+    if kind not in ("surface", "volume", "decal"):
+        raise ValueError(
+            "Substrate output must be a surface, a volume or a decal"
+        )
     if fields and kind != "volume":
         raise ValueError(
             "Volume Field reads a volume's grids: use it in a volume graph"
@@ -611,7 +622,7 @@ def signature(graph):
 
 
 def output_kind(graph):
-    """The graph's material kind: surface or volume (its output node's type)."""
+    """The graph's material kind: surface, volume or decal (its output node's type)."""
     return NODES[graph["nodes"][graph["output"]]["type"]]["output"]
 
 

@@ -326,6 +326,36 @@ class SceneComponents(unittest.TestCase):
                 self.assertFalse(node.errors())
 
 
+class Decal(unittest.TestCase):
+    def test_create_and_edit(self):
+        hou.hipFile.clear(suppress_save_prompt=True)
+        node = hou.node("/stage").createNode("hdue::hduedecal::1.0", "decal")
+        node.parmTuple(encode("unreal:decal:DecalColor")).set((1, 0.5, 0.25))
+        prim = node.stage().GetPrimAtPath("/decals/decal")
+        self.assertEqual(prim.GetTypeName(), "UnrealDecal")
+        self.assertEqual(
+            tuple(prim.GetAttribute("unreal:decal:DecalColor").Get()),
+            (1, 0.5, 0.25),
+        )
+        guide = UsdGeom.Cube(node.stage().GetPrimAtPath("/decals/decal/guide"))
+        self.assertEqual(guide.GetSizeAttr().Get(), 2)
+        self.assertEqual(guide.GetPurposeAttr().Get(), UsdGeom.Tokens.guide)
+        edit = hou.node("/stage").createNode("hdue::hduedecal::1.0", "edit")
+        edit.setInput(0, node)
+        edit.parm("createprims").set(0)
+        edit.parm("primpattern").set("/decals/decal")
+        loputils.initializeParameters(edit, "setdonothing")
+        edit.parm(encode("unreal:decal:SortOrder_control")).set("set")
+        edit.parm(encode("unreal:decal:SortOrder")).set(3)
+        prim = edit.stage().GetPrimAtPath("/decals/decal")
+        self.assertEqual(prim.GetAttribute("unreal:decal:SortOrder").Get(), 3)
+        self.assertEqual(
+            tuple(prim.GetAttribute("unreal:decal:DecalColor").Get()),
+            (1, 0.5, 0.25),
+        )
+        self.assertFalse(node.errors() or edit.errors())
+
+
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=2).result
     sys.exit(0 if result.wasSuccessful() else 1)

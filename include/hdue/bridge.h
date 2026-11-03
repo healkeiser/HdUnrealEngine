@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 20u
+#define HDUE_ABI_VERSION 21u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -479,6 +479,11 @@ typedef struct HdueLocalFogVolumeDesc {
  * view's; unknown ones are skipped with a warning. UE blends the volumes into each view by its own rules
  * (UWorld::AddPostProcessingSettings), before set_post_process's settings. remove_asset removes it. */
 typedef HdueLocalFogVolumeDesc HduePostProcessVolumeDesc;
+/* upsert_decal (ABI 21): one UE decal (UDecalComponent), as a decal actor a level places: a box of 100 cm half-size
+ * placed by transform, projecting along its local X. names and values set UDecalComponent properties (DecalMaterial, a
+ * cooked Deferred Decal material path, SortOrder, FadeScreenSize, DecalColor); unknown ones are skipped with a warning.
+ * remove_asset removes it. */
+typedef HdueLocalFogVolumeDesc HdueDecalDesc;
 /* upsert_groom (ABI 16): curves as UE hair strands, a UGroomAsset built at runtime and drawn by a groom component (UE's
  * default hair material). points: point_count xyz in UE world centimeters; widths_cm per point; curve_point_counts per
  * curve, summing to point_count. Guides are generated from every strand (no simulation). apply_scene's removed_ids
@@ -703,6 +708,8 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* upsert_groom)(HdueSession session, const HdueGroomDesc* groom);
 
     HdueResult(HDUE_CALL* upsert_post_process_volume)(HdueSession session, const HduePostProcessVolumeDesc* volume);
+
+    HdueResult(HDUE_CALL* upsert_decal)(HdueSession session, const HdueDecalDesc* decal);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */

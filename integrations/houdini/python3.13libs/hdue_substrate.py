@@ -165,6 +165,11 @@ def create(parent=None, preset="slab", material="/Looks/Base"):
             output.setInput(
                 0, network.createNode(type_name("volume_fog_cloud"), "volume")
             )
+        elif preset == "decal":
+            # A decal material: the Slab, converted to a decal, on the builder's output.
+            decal = network.createNode(type_name("decal"), "decal")
+            decal.setInput(0, network.node("slab"))
+            output.setInput(0, decal)
         elif preset != "slab":
             network.destroy()
             raise ValueError("Unknown Substrate preset: " + preset)

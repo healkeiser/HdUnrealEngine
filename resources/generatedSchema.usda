@@ -480,3 +480,33 @@ class UnrealVolumetricCloud "UnrealVolumetricCloud" (
         doc = """If true, this component will be visible in real-time sky light reflection captures."""
     )
 }
+
+class UnrealDecal "UnrealDecal" (
+    doc = """A UE decal (UDecalComponent), rendered by hdUE: its material projected onto the surfaces inside a box filling the cube from -1 to 1 of the prim's local space, along the prim's local down axis (the stage's up axis, negated). Its material is the bound material (a prepared Substrate Builder decal material), else unreal:decal:DecalMaterial, a cooked path."""
+)
+{
+    rel proxyPrim
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+    )
+    uniform token[] xformOpOrder
+    string unreal:decal:DecalMaterial = "" (
+        displayName = "Decal Material"
+        doc = """Decal material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...)."""
+    )
+    int unreal:decal:SortOrder = 0 (
+        displayName = "Sort Order"
+        doc = """Controls the order in which decal elements are rendered. Higher values draw later (on top). Setting many different sort orders on many different decals prevents sorting by state and can reduce performance."""
+    )
+    float unreal:decal:FadeScreenSize = 0.01 (
+        displayName = "Fade Screen Size"
+        doc = """"""
+    )
+    color3f unreal:decal:DecalColor = (1, 1, 1) (
+        displayName = "Decal Color"
+        doc = """Decal color, can be accessed using the material Decal Color node."""
+    )
+}

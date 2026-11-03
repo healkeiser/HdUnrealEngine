@@ -1719,7 +1719,8 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
                 {HdUEActorData::Kind::PostProcess, "unreal:postProcessVolume"},
                 {HdUEActorData::Kind::HeightFog, "unreal:heightFog"},
                 {HdUEActorData::Kind::SkyAtmosphere, "unreal:skyAtmosphere"},
-                {HdUEActorData::Kind::VolumetricCloud, "unreal:volumetricCloud"}};
+                {HdUEActorData::Kind::VolumetricCloud, "unreal:volumetricCloud"},
+                {HdUEActorData::Kind::Decal, "unreal:decal"}};
             const char* primvar = "";
             for (const auto& [k, name] : primvars)
                 if (k == kind) primvar = name;
@@ -1742,8 +1743,10 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
                     else
                         text = HdUESettingText(value);  // texture settings: an image file or a cooked path
                     // An empty cooked path (a schema fallback) keeps the component's own default, such as the
-                    // Volumetric Cloud's default material, as an unset render setting does.
-                    if (text.empty() && HdUEActorData::component(kind)) continue;
+                    // Volumetric Cloud's default material, as an unset render setting does; a decal without one draws
+                    // nothing.
+                    if (text.empty() && (HdUEActorData::component(kind) || kind == HdUEActorData::Kind::Decal))
+                        continue;
                     data.values.emplace_back(name, std::move(text));
                 }
             if (HdUETraceScene()) {

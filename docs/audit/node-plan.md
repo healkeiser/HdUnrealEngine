@@ -39,7 +39,7 @@ other prim types, the hidden legacy type, and that the new version authors the s
 | 5 | Native Asset (Render Geometry Settings) | Cooked StaticMesh, Blueprint, Level, Sparse Volume Texture | Text field on Render Geometry Settings | No new node: a menu of the cooked registry's objects on the existing field; bounds proxy authoring is the open question | Planned |
 | 6 | Hair Strands (Render Geometry Settings) | Groom component | `primvars:unreal:groom = 1` by hand | No new node: a toggle on Render Geometry Settings' Unreal Engine tab | Done |
 | 7 | hdUE Wet Surface | hdUE's wet layer | Python Script LOP from `hdue_surface.create()` | No new node: `create()` makes a Render Geometry Settings LOP, whose hdUE tab already has the wet attributes with control menus | Done |
-| 8 | hdUE Decal | `ADecalActor`, Deferred Decal domain | Missing | Needs builder item D3 first | Later |
+| 8 | hdUE Decal | `ADecalActor`, Deferred Decal domain | Missing | Needs builder item D3 first | Done |
 
 Item 2 reuses UE's blending: the backend already owns a `UWorld` and builds each view's settings in `ApplyPostProcess`
 (`Bridge.cpp`, between `StartFinalPostprocessSettings` and `EndFinalPostprocessSettings`). It spawns one
@@ -58,7 +58,7 @@ Each emits the UE material expression of the same name (to check against the 5.8
 | --- | --- | --- | --- |
 | D1 | Substrate Volumetric Fog Cloud, Volume Field, Blackbody (done; ramps later) | `SubstrateVolumetricFogCloudBSDF` (Volume domain), `TextureSampleParameterVolume`, `BlackBody`, `CurveAtlasRowParameter` | Volume material bound to Volume prims, replacing the fixed `M_HdUEVolume` (`Scene.cpp`), which it must reproduce first |
 | D2 | Substrate Hair, Eye, Single Layer Water, Thin Film, Add, Select; Metalness to Albedo/F0, Transmittance to MFP, Haziness to Secondary Roughness (done) | `SubstrateHairBSDF`, `SubstrateEyeBSDF`, `SubstrateSingleLayerWaterBSDF`, `SubstrateThinFilm`, `SubstrateAdd`, `SubstrateSelect`, the conversion helpers | Surface |
-| D3 | Decal Output | `SubstrateConvertToDecal`, Deferred Decal domain | Decal material for item 8 |
+| D3 | Decal Output (done: Substrate Convert To Decal) | `SubstrateConvertToDecal`, Deferred Decal domain | Decal material for item 8 |
 
 Light function and post-process material outputs are not planned: lights and render settings take cooked paths, and a
 post-process material would belong to item 2's volume.

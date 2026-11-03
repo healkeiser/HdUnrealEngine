@@ -533,6 +533,7 @@ struct ScenePacket {
     std::vector<HdueVolumeDesc> volumes;
     std::vector<HdueLocalFogVolumeDesc> localFogs;
     std::vector<HduePostProcessVolumeDesc> postProcessVolumes;
+    std::vector<HdueDecalDesc> decals;
     std::vector<HdueGroomDesc> grooms;
     std::vector<HdueMaterialUpdate> materialUpdates;
     std::vector<HdueWetBinding> wet;
@@ -1228,19 +1229,35 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
     const auto toUnit = [&](double ueSize) {
         return GfMatrix4d().SetScale(1. / ueSize) * basis.GetInverse() * GfMatrix4d().SetScale(cmPerUnit);
     };
+    // A decal projects along its local X (UDecalComponent): turned to the prim's local down axis (UE's -Z, the stage's
+    // up axis negated), a rotation of the UE local frame (X to -Z, Z to X).
+    const GfMatrix4d decalAxes(0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1);
+    const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
     for (const auto& id : packet.dirtyActors) {
         const auto it = state.actors.find(id);
         if (it == state.actors.end()) continue;
         const auto& actor = it->second;
         if (HdUEActorData::component(actor.kind)) continue;  // sent with the render settings
         const bool postProcess = actor.kind == HdUEActorData::Kind::PostProcess;
-        HdueLocalFogVolumeDesc desc{};  // HduePostProcessVolumeDesc is the same struct
+        const bool decal = actor.kind == HdUEActorData::Kind::Decal;
+        HdueLocalFogVolumeDesc desc{};  // HduePostProcessVolumeDesc and HdueDecalDesc are the same struct
         desc.struct_size = sizeof(desc);
         desc.id = packet.own(actor.id);
         desc.visible = actor.visible;
-        rowMajor(toUnit(postProcess ? 100 : 500) * actor.localToWorld * basis, desc.transform);
+        rowMajor(
+            (decal ? decalAxes : GfMatrix4d(1)) * toUnit(postProcess || decal ? 100 : 500) * actor.localToWorld * basis,
+            desc.transform);
+        // A decal's bound material, when the host mapped it to a prepared asset, wins over unreal:decal:DecalMaterial.
+        std::string bound;
+        for (const auto& [name, value] : actor.values)
+            if (name == "BoundMaterial") bound = asset(nativeMaterials, value);
         std::vector<const char*> names, values;
+        if (!bound.empty()) {
+            names.push_back("DecalMaterial");
+            values.push_back(packet.own(bound));
+        }
         for (const auto& [name, value] : actor.values) {
+            if (name == "BoundMaterial" || (name == "DecalMaterial" && !bound.empty())) continue;
             names.push_back(packet.own(name));
             values.push_back(packet.own(value));
         }
@@ -1248,9 +1265,12 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
         desc.names = packet.own(packet.strings, std::move(names));
         desc.values = packet.own(packet.strings, std::move(values));
         if (HdUETraceScene())
-            TF_STATUS("hdUE %s %s visible=%u properties=%u", postProcess ? "post-process volume" : "local fog volume",
+            TF_STATUS("hdUE %s %s visible=%u properties=%u",
+                      decal         ? "decal"
+                      : postProcess ? "post-process volume"
+                                    : "local fog volume",
                       desc.id, desc.visible, desc.count);
-        (postProcess ? packet.postProcessVolumes : packet.localFogs).push_back(desc);
+        (decal ? packet.decals : postProcess ? packet.postProcessVolumes : packet.localFogs).push_back(desc);
     }
 }
 // Grooms reach UE in world space (cm, UE axes): their points through the curves' transform, widths scaled with it.
@@ -1412,6 +1432,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         backend.require(api.upsert_local_fog_volume(session, &desc), "upsert_local_fog_volume");
     for (const auto& desc : packet.postProcessVolumes)
         backend.require(api.upsert_post_process_volume(session, &desc), "upsert_post_process_volume");
+    for (const auto& desc : packet.decals) backend.require(api.upsert_decal(session, &desc), "upsert_decal");
     for (const auto& desc : packet.grooms) backend.require(api.upsert_groom(session, &desc), "upsert_groom");
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
@@ -3340,7 +3361,8 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedSprimTypes() const {
                            TfToken("unrealPostProcessVolume"),
                            TfToken("unrealExponentialHeightFog"),
                            TfToken("unrealSkyAtmosphere"),
-                           TfToken("unrealVolumetricCloud")};
+                           TfToken("unrealVolumetricCloud"),
+                           TfToken("unrealDecal")};
     return t;
 }
 const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
@@ -3386,6 +3408,7 @@ HdSprim* HdUERenderDelegate::CreateSprim(const TfToken& type, const SdfPath& id)
     if (type == TfToken("unrealLocalFogVolume")) return HdUECreateActor(id, HdUEActorData::Kind::LocalFog);
     if (type == TfToken("unrealPostProcessVolume")) return HdUECreateActor(id, HdUEActorData::Kind::PostProcess);
     if (type == TfToken("unrealExponentialHeightFog")) return HdUECreateActor(id, HdUEActorData::Kind::HeightFog);
+    if (type == TfToken("unrealDecal")) return HdUECreateActor(id, HdUEActorData::Kind::Decal);
     if (type == TfToken("unrealSkyAtmosphere")) return HdUECreateActor(id, HdUEActorData::Kind::SkyAtmosphere);
     if (type == TfToken("unrealVolumetricCloud")) return HdUECreateActor(id, HdUEActorData::Kind::VolumetricCloud);
     return nullptr;
@@ -3588,6 +3611,12 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
             };
             if (entry(previousDictionary) != entry(currentDictionary)) state_->dirtyVolumes.insert(id);
         }
+        // Decals take their bound material's prepared asset.
+        if (key == TfToken("nativeMaterialAssets"))
+            for (const auto& [id, actor] : state_->actors)
+                for (const auto& [name, value] : actor.values)
+                    if (name == "BoundMaterial" && asset(previousDictionary, value) != asset(currentDictionary, value))
+                        state_->dirtyActors.insert(id);
         ++state_->revision;
     }
     if (key == TfToken("nativeMeshAssets")) {

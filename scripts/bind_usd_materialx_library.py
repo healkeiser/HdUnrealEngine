@@ -2,6 +2,7 @@
 # requires-python = ">=3.11"
 # ///
 """Attach original USD attribute/graph identities to a native UE registry."""
+
 import argparse
 import hashlib
 import json

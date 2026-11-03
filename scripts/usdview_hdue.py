@@ -3,6 +3,7 @@
 # dependencies = ["PySide6==6.8.3", "PyOpenGL==3.1.9", "numpy==2.2.6"]
 # ///
 """Stock OpenUSD 26.03 usdview with a same-process UELibrary owner."""
+
 import importlib
 import json
 import os

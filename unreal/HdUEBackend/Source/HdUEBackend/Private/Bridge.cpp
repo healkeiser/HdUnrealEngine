@@ -23,6 +23,7 @@
 #include "Components/LocalFogVolumeComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/PostProcessComponent.h"
+#include "Components/DecalComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
@@ -1892,6 +1893,46 @@ HdueResult HDUE_CALL UpsertPostProcessVolume(HdueSession Handle, const HduePostP
     return HDUE_OK;
 }
 
+// upsert_decal: an actor with a UDecalComponent (100 cm half-size box, projecting along its local X), its properties
+// set by reflection before it registers; rebuilt on every upsert, as the other placed actors.
+HdueResult HDUE_CALL UpsertDecal(HdueSession Handle, const HdueDecalDesc* Desc) {
+    HDUE_RETURN_UNLESS_READY();
+    if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id || (Desc->count && (!Desc->names || !Desc->values)))
+        return HDUE_INVALID_ARGUMENT;
+    for (double Value : Desc->transform)
+        if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;
+    for (uint32 Index = 0; Index < Desc->count; ++Index)
+        if (!Desc->names[Index] || !Desc->values[Index]) return HDUE_INVALID_ARGUMENT;
+    const auto Session = Runtime.Session;
+    const FString Id = UTF8_TO_TCHAR(Desc->id);
+    if (const auto* Old = Session->PlacedActors.Find(Id); Old && Old->IsValid()) (*Old)->Destroy();
+    Session->PlacedActors.Remove(Id);
+    Session->HasRequest = false;  // restart accumulation, as scene batches do
+    if (!Desc->visible) return HDUE_OK;
+    AActor* Actor = Runtime.World->SpawnActor<AActor>();
+    auto* Decal = NewObject<UDecalComponent>(Actor);
+    Decal->DecalSize = FVector(100.0);
+    FString Properties;
+    for (uint32 Index = 0; Index < Desc->count; ++Index) {
+        const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
+        Properties += FString::Printf(TEXT(" %s=%s"), *Name, *Text);
+        FProperty* Property = UDecalComponent::StaticClass()->FindPropertyByName(*Name);
+        if (!Property || Name == TEXT("DecalSize") || !ImportPropertyValue(Property, Text, Decal))
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: decal setting %s = '%s' skipped (unknown property or value)"), *Name,
+                   *Text);
+    }
+    FMatrix Matrix;
+    for (int R = 0; R < 4; ++R)
+        for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Desc->transform[R * 4 + C];
+    Actor->SetRootComponent(Decal);
+    Actor->AddInstanceComponent(Decal);
+    Decal->SetWorldTransform(FTransform(Matrix));
+    Decal->RegisterComponent();
+    UE_LOG(LogTemp, Log, TEXT("hdUE: decal %s at %s:%s"), *Id, *Decal->GetComponentTransform().ToString(), *Properties);
+    Session->PlacedActors.Add(Id, Actor);
+    return HDUE_OK;
+}
+
 HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || (Desc->count && (!Desc->names || !Desc->values)) ||
@@ -2372,7 +2413,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .update_meshes = UpdateMeshes,
             .upsert_local_fog_volume = UpsertLocalFogVolume,
             .upsert_groom = UpsertGroom,
-            .upsert_post_process_volume = UpsertPostProcessVolume};
+            .upsert_post_process_volume = UpsertPostProcessVolume,
+            .upsert_decal = UpsertDecal};
     return HDUE_OK;
 }
 #endif

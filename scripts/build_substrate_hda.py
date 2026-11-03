@@ -200,6 +200,14 @@ HELP = {
         "Copies a float into red, green and blue.",
         {"value": "Float to copy."},
     ),
+    "decal": (
+        "A decal material for hdUE Decal prims: UE's Substrate Convert To Decal over a surface, projected onto what the "
+        "decal's box covers. Wire it to the builder's output, and bind the material to the decal prim.",
+        {
+            "surface": "Surface the decal paints, usually a Slab.",
+            "coverage": "Opacity of the decal, for example a texture's alpha.",
+        },
+    ),
     "volume_fog_cloud": (
         "A volume material for Volume prims: UE's Substrate Volumetric Fog Cloud BSDF, rendered as a heterogeneous "
         "volume. Wire it to the builder's output, and bind the material to a Volume prim.",
@@ -359,6 +367,7 @@ def connector(network, name, kind, value_type, default=None):
         {
             "surface": "bsdf",
             "volume": "bsdf",  # as Karma's volume shaders, wired to the builder's output
+            "decal": "bsdf",
             "color3": "color",
             "color4": "coloralpha",
             "vector2": "float2",
@@ -423,7 +432,7 @@ def finish(asset, kind, summary, group, inputs, keyword):
     # surface output (with the whole builder graph); the others are generic, as kma_ao.
     shader_type = (
         "surface"
-        if {"surface", "volume"} & set(outputs(NODES[kind]).values())
+        if {"surface", "volume", "decal"} & set(outputs(NODES[kind]).values())
         else "generic"
     )
     script = definition.sections()["DialogScript"].contents()

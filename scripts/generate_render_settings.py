@@ -1104,14 +1104,21 @@ def parse_component(
         encoding="utf-8"
     )
     start = header.index(f"class U{name}")
-    defaults = parse_defaults(
-        (source / f"Runtime/Engine/Private/Components/{name}.cpp").read_text(
-            encoding="utf-8"
-        ),
-        f"U{name}::U{name}(",
+    body = header[start : header.index(end, start)]
+    # In-class initializers (DecalColor = FLinearColor::White), then the constructor's, which win.
+    defaults = dict(
+        re.findall(r"^\s*[\w:<>]+\s+(\w+)\s*=\s*(.+?);", body, re.M)
+    )
+    defaults.update(
+        parse_defaults(
+            (
+                source / f"Runtime/Engine/Private/Components/{name}.cpp"
+            ).read_text(encoding="utf-8"),
+            f"U{name}::U{name}(",
+        )
     )
     settings = parse_properties(
-        header[start : header.index(end, start)],
+        body,
         defaults,
         enums or {},
         skipped,
@@ -1329,6 +1336,32 @@ def post_process_volume_settings(engine_root, skipped=None):
     )
 
 
+# UDecalComponent's properties an UnrealDecal prim carries: its material and look. Its size is the prim's (a box filling
+# the cube from -1 to 1), and the fade timers are gameplay (they destroy the actor).
+DECAL_PROPERTIES = (
+    "DecalMaterial",
+    "SortOrder",
+    "FadeScreenSize",
+    "DecalColor",
+)
+
+
+def decal_settings(engine_root):
+    """UDecalComponent's DECAL_PROPERTIES as unreal:decal:<Property>, with UE's defaults."""
+    settings = parse_component(
+        Path(engine_root) / "Engine/Source",
+        "DecalComponent",
+        "decal",
+        "Decal",
+        {},
+        [],
+        end="\n};",
+    )
+    return [
+        s for s in settings if s["attribute"].split(":")[-1] in DECAL_PROPERTIES
+    ]
+
+
 SCHEMA_CLASSES = (
     (
         "UnrealLocalFogVolume",
@@ -1360,6 +1393,13 @@ SCHEMA_CLASSES = (
         "UnrealVolumetricCloud",
         "A UE Volumetric Cloud (UVolumetricCloudComponent), rendered by hdUE with a Sky Atmosphere. It takes the place "
         "of the render settings' unreal:volumetricCloud; UE draws one, the first prim by path.",
+    ),
+    (
+        "UnrealDecal",
+        "A UE decal (UDecalComponent), rendered by hdUE: its material projected onto the surfaces inside a box filling "
+        "the cube from -1 to 1 of the prim's local space, along the prim's local down axis (the stage's up axis, "
+        "negated). Its material is the bound material (a prepared Substrate Builder decal material), else "
+        "unreal:decal:DecalMaterial, a cooked path.",
     ),
 )
 
@@ -2350,6 +2390,7 @@ def main():
             args.engine_root
         ),  # its Settings are the unreal:postProcess:* attributes
         *placed,
+        decal_settings(args.engine_root),
     )
     tree = layout(post + fog + sky + console + HDUE)
     replace_generated(

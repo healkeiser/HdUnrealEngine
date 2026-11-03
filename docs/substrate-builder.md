@@ -91,6 +91,7 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Metalness to Albedo and F0 | Base color, metallic, specular | Diffuse albedo, F0 |
 | Haziness to Second Roughness | Base roughness, haziness | Second roughness, its weight |
 | Transmittance to MFP | Transmittance color, thickness (cm) | MFP, thickness |
+| Substrate Convert To Decal | Surface and coverage; a decal material (Deferred Decal domain) for UnrealDecal prims | Decal |
 | Substrate Volumetric Fog Cloud | Albedo, extinction and emission; unconnected extinction and emission are hdUE's default volume material's | Volume |
 | Volume Field | `density` or `emission` grid of the Volume prim at the shaded point | Float |
 | Blackbody | Temperature in kelvin (UE's BlackBody) | Color |
@@ -254,6 +255,10 @@ Mask-only updates use color-buffer notifications. They do not upload positions, 
 A builder whose output is a **Substrate Volumetric Fog Cloud** (`hdue_substrate.create(preset="volume")`) is a volume material: it authors UsdShade's volume terminal (`outputs:unreal:volume`, no Preview Surface) and prepares into a UE material of the Volume domain, used with heterogeneous volumes, whose front material is UE's `SubstrateVolumetricFogCloudBSDF` (the closure UE's heterogeneous volumes read with Substrate, `HeterogeneousVolumesLiveShadingUtils.ush`). Bound to a Volume prim (a material binding, as on meshes), it replaces hdUE's default `M_HdUEVolume` in the Houdini viewport; elsewhere (husk) the volume keeps `M_HdUEVolume`, as surfaces keep their Preview Surface fallback.
 
 The backend gives it what it gives `M_HdUEVolume`: the volume's `density` grid and the field `primvars:unreal:emissionField` names as the 3D textures `Density` and `Emission`, the `WorldToUVW0..2` rows placing them, and the `ExtinctionScale`, `TemperatureScale` and `EmissionIntensity` scalars. **Volume Field** samples one of the two grids; left unconnected, the Fog Cloud's extinction is the density times `ExtinctionScale` and its emission the BlackBody of the emission field, so an unedited volume graph renders as `M_HdUEVolume` does. Its numeric inputs update live as on surfaces. `samples/volume_material/volume_material.usda` and the in-Houdini test `-TestKind volume-material` check both: the default graph against `M_HdUEVolume`, and a live albedo edit.
+
+## Decal materials
+
+A builder whose output is a **Substrate Convert To Decal** (`hdue_substrate.create(preset="decal")`: the Slab, converted) is a decal material: it prepares into a UE material of the Deferred Decal domain, translucent (UE's DBuffer decals, which Substrate requires), whose front material is UE's `SubstrateConvertToDecal` of the surface wired to it, with Coverage as its opacity. Bound to an `UnrealDecal` prim, it is that decal's material in Houdini's viewport ([decals](rendering.md#decals)).
 
 ## Water coating example
 

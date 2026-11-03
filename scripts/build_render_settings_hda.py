@@ -1159,6 +1159,14 @@ def property_templates(setting):
             default_value=bool(setting["default"][0]),
             **common,
         )
+    elif setting["kind"] == "string":
+        value = hou.StringParmTemplate(
+            name,
+            setting["label"],
+            1,
+            default_value=tuple(setting["default"]),
+            **common,
+        )
     elif setting["kind"] == "color":
         value = hou.FloatParmTemplate(
             name,
@@ -1515,6 +1523,45 @@ def build_post_process_volume():
     )
 
 
+def build_decal():
+    """HdUE Decal: creates or edits an UnrealDecal prim (UE's decal actor): a box projecting its material along the
+    prim's local down axis, with a guide box in Create mode.
+    """
+    from generate_render_settings import decal_settings
+    from local_paths import local_path
+
+    def guide(subnet, previous):
+        # The decal's box in the viewport: the cube from -1 to 1 it fills, a guide under the prim.
+        cube = subnet.createNode("cube", "guide")
+        cube.setInput(0, previous)
+        cube.parm("primpath").set('`chs("../primpath")`/guide')
+        cube.parm("size").set(2.0)
+        purpose = subnet.createNode("configureprimitive", "guide_purpose")
+        purpose.setInput(0, cube)
+        purpose.parm("primpattern").set('`chs("../primpath")`/guide')
+        purpose.parm("setpurpose").set(True)
+        purpose.parm("purpose").set("guide")
+        return purpose
+
+    build_prim_lop(
+        OTLS / "hdue_decal.hda",
+        f"hdue::hduedecal::{VERSION}",
+        "hdUE Decal",
+        "HDUE_hdue",
+        "UnrealDecal",
+        "/decals/$OS",
+        [("Decal", decal_settings(local_path("engine_root")))],
+        guide,
+        "Creates or edits a UE decal: a box projecting its material onto the surfaces it covers.",
+        "Like a Decal Actor placed in a UE level, it creates or edits an UnrealDecal prim: a box filling the cube from "
+        "-1 to 1 of its local space (Uniform Scale 1 is a 2-unit box), projecting along the prim's local down axis. "
+        "Its material is the material bound to the prim (Assign Material LOP), a Substrate Builder decal material "
+        "(hdUE Substrate Material Builder, decal preset) prepared for hdUE, applied in Houdini's viewport; else Decal "
+        "Material, a cooked Deferred Decal material path. Decal Color tints it, Sort Order orders overlapping decals, "
+        "and Fade Screen Size hides it below that screen size.",
+    )
+
+
 # The scene components a UE level places once (UE draws one of each): (type name, label, prim type, attribute prefix,
 # summary, overview).
 SCENE_COMPONENTS = (
@@ -1583,5 +1630,6 @@ if __name__ == "__main__":
         build_local_fog_volume()
         build_post_process_volume()
         build_scene_components()
+        build_decal()
     else:
         relaunch()

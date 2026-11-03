@@ -217,7 +217,7 @@ struct HdUEVolumeData {
 // (HeightFog, SkyAtmosphere, VolumetricCloud) by their UE component property, sent with the render settings
 // (set_post_process) in place of theirs.
 struct HdUEActorData {
-    enum class Kind { LocalFog, PostProcess, HeightFog, SkyAtmosphere, VolumetricCloud } kind = Kind::LocalFog;
+    enum class Kind { LocalFog, PostProcess, HeightFog, SkyAtmosphere, VolumetricCloud, Decal } kind = Kind::LocalFog;
     // The set_post_process name of a scene component kind, else null.
     static const char* component(Kind kind) {
         return kind == Kind::HeightFog         ? "HeightFog"

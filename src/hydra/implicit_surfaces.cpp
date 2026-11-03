@@ -32,6 +32,7 @@
 #include "pxr/imaging/hd/basisCurvesSchema.h"
 #include "pxr/imaging/hd/basisCurvesTopologySchema.h"
 #include "pxr/usd/usdGeom/hermiteCurves.h"
+#include "pxr/usd/usdShade/materialBindingAPI.h"
 #include "pxr/usd/usdGeom/primvarsAPI.h"
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/visibilityAPI.h"
@@ -429,6 +430,21 @@ struct HdUE_PostProcessVolumeTraits {
     }
     static bool authoredOnly(const std::string& key) { return TfStringStartsWith(key, "Settings:"); }
 };
+// UnrealDecal: unreal:decal:<UDecalComponent property>, and its bound material's path as BoundMaterial (the host maps
+// a prepared Substrate Builder decal material to its cooked asset); a binding edit re-reads it.
+struct HdUE_DecalTraits : HdUE_PrefixKey<HdUE_DecalTraits> {
+    static constexpr const char* sprim = "unrealDecal";
+    static constexpr const char* values = "unreal:decal";
+    static constexpr const char* label = "decal";
+    static bool key(const TfToken& attribute, std::string* key) {
+        if (TfStringStartsWith(attribute.GetString(), "material:binding")) return !key;  // invalidates, no value
+        return HdUE_PrefixKey<HdUE_DecalTraits>::key(attribute, key);
+    }
+    static void extra(const UsdPrim& prim, VtDictionary& values) {
+        if (const auto material = UsdShadeMaterialBindingAPI(prim).ComputeBoundMaterial())
+            values["BoundMaterial"] = material.GetPath().GetString();
+    }
+};
 template <class Traits>
 class HdUE_ActorValues final : public HdSampledDataSource {
 public:
@@ -442,6 +458,7 @@ public:
                 if (Traits::authoredOnly(key) && !attribute.HasAuthoredValue()) continue;
             if (VtValue value; attribute.Get(&value, globals_.GetTime())) values[key] = value;
         }
+        if constexpr (requires { Traits::extra(prim_, values); }) Traits::extra(prim_, values);
         return VtValue(values);
     }
     bool GetContributingSampleTimesForInterval(Time, Time, std::vector<Time>*) override { return false; }
@@ -524,6 +541,7 @@ private:
 class HdUE_LocalFogVolumeAdapter final : public HdUE_ActorAdapter<HdUE_LocalFogTraits> {};
 class HdUE_PostProcessVolumeAdapter final : public HdUE_ActorAdapter<HdUE_PostProcessVolumeTraits> {};
 class HdUE_HeightFogAdapter final : public HdUE_ActorAdapter<HdUE_HeightFogTraits> {};
+class HdUE_DecalAdapter final : public HdUE_ActorAdapter<HdUE_DecalTraits> {};
 class HdUE_SkyAtmosphereAdapter final : public HdUE_ActorAdapter<HdUE_SkyAtmosphereTraits> {};
 class HdUE_VolumetricCloudAdapter final : public HdUE_ActorAdapter<HdUE_VolumetricCloudTraits> {};
 struct HdUEPurposeVisibility {
@@ -713,6 +731,8 @@ TF_REGISTRY_FUNCTION(TfType) {
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_LocalFogVolumeAdapter>>();
     TfType::Define<HdUE_PostProcessVolumeAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_PostProcessVolumeAdapter>>();
+    TfType::Define<HdUE_DecalAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
+        .SetFactory<UsdImagingPrimAdapterFactory<HdUE_DecalAdapter>>();
     TfType::Define<HdUE_HeightFogAdapter, TfType::Bases<UsdImagingPrimAdapter>>()
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_HeightFogAdapter>>();
     TfType::Define<HdUE_SkyAtmosphereAdapter, TfType::Bases<UsdImagingPrimAdapter>>()

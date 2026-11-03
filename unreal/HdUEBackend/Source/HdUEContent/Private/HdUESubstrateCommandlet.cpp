@@ -523,6 +523,11 @@ struct FCompiler {
             R = Utility(E, {{TEXT("mfp"), 1}, {TEXT("thickness"), 0}});
             Connect(E->TransmittanceColor, Input(Inputs, TEXT("transmittance"), 1, 0, FLinearColor(.5f, .5f, .5f)));
             Connect(E->Thickness, Input(Inputs, TEXT("thickness"), 0, .01f));
+        } else if (Kind == TEXT("decal")) {
+            auto* E = Add<UMaterialExpressionSubstrateConvertToDecal>();
+            R = {E, 6, 0};
+            Connect(E->DecalMaterial, Input(Inputs, TEXT("surface"), 2));
+            Connect(E->Coverage, Input(Inputs, TEXT("coverage"), 0, 1));
         } else if (Kind == TEXT("volume_fog_cloud")) {
             auto* E = Add<UMaterialExpressionSubstrateVolumetricFogCloudBSDF>();
             R = {E, 5, 0};
@@ -709,7 +714,8 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     }
     auto Output = Compiler.Build(Graph->GetStringField(TEXT("output")));
     const bool Volume = Output.Type == 5;  // a volume material (Substrate Volumetric Fog Cloud)
-    if (!Compiler.Error.IsEmpty() || !Output.Expression || (Output.Type != 2 && !Volume) ||
+    const bool Decal = Output.Type == 6;   // a decal material (Substrate Convert To Decal)
+    if (!Compiler.Error.IsEmpty() || !Output.Expression || (Output.Type != 2 && !Volume && !Decal) ||
         Compiler.Built.Num() != Compiler.Nodes->Values.Num() || Compiler.LiveBuilt.Num() != Compiler.Live.Num()) {
         UE_LOG(LogTemp, Error, TEXT("Substrate Builder: %s"), *Compiler.Error);
         return 4;
@@ -721,6 +727,10 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         Material->MaterialDomain = MD_Volume;
         Material->BlendMode = BLEND_Additive;
         Material->SetUsageByFlag(MATUSAGE_HeterogeneousVolumes, true);
+    } else if (Decal) {
+        // UE's decal materials: the Deferred Decal domain, translucent (DBuffer decals, which Substrate requires).
+        Material->MaterialDomain = MD_DeferredDecal;
+        Material->BlendMode = BLEND_Translucent;
     } else {
         // As HdUEImportMaterialX: Hydra meshes become Nanite and instancers ISMs, and a cooked runtime cannot compile
         // usage permutations (a graph without a MaterialX base drew UE's default material).
@@ -742,7 +752,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     Result->SetStringField(TEXT("asset"), Material->GetPathName());
     Result->SetNumberField(TEXT("compiler"), 3);  // 3: ID switch (IdSwitch.h)
     Result->SetBoolField(TEXT("id_switch"), IdSwitch);
-    Result->SetStringField(TEXT("domain"), Volume ? TEXT("volume") : TEXT("surface"));
+    Result->SetStringField(TEXT("domain"), Volume ? TEXT("volume") : Decal ? TEXT("decal") : TEXT("surface"));
     Result->SetNumberField(TEXT("automatic_parameters"), Compiler.LiveBuilt.Num());
     Result->SetNumberField(TEXT("expressions"), Material->GetExpressions().Num());
     Result->SetBoolField(TEXT("native_substrate"), Material->HasSubstrateFrontMaterialConnected());

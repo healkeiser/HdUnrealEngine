@@ -51,6 +51,13 @@
         "alias": { "UsdSchemaBase": "UnrealPostProcessVolume" }, "bases": ["UsdGeomXformable"],
         "schemaIdentifier": "UnrealPostProcessVolume", "schemaKind": "concreteTyped"
       },
+      "HdUE_DecalAdapter": {
+        "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealDecal"
+      },
+      "HdUEUnrealDecal": {
+        "alias": { "UsdSchemaBase": "UnrealDecal" }, "bases": ["UsdGeomXformable"],
+        "schemaIdentifier": "UnrealDecal", "schemaKind": "concreteTyped"
+      },
       "HdUE_HeightFogAdapter": {
         "bases": ["UsdImagingPrimAdapter"], "primTypeName": "UnrealExponentialHeightFog"
       },
