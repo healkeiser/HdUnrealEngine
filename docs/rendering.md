@@ -14,7 +14,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:motionSamples` | 16 | Motion-blur sub-frames; Path Tracer samples are divided between them |
 | `unreal:denoiser` | `off` | `oidn` denoises the converged Path Tracer image with Open Image Denoise (Houdini build) |
 | `unreal:debugView` | `off` | One of UE's viewport view modes instead of the realtime beauty; see [debug views](#debug-views) |
-| `unreal:subdivisionLevel` | 0 | Uniform refinement of catmullClark and loop meshes; see [subdivision](#subdivision-surfaces) |
+| `unreal:subdivisionLevel` | 0 | Uniform refinement of catmullClark and loop meshes (a prim's `primvars:unreal:subdivisionLevel` replaces it); see [subdivision](#subdivision-surfaces) |
 | `unreal:cullBackface` | 1 | Meshes whose `doubleSided` is off render their front faces only, as UE's USD importer does; 0 renders both sides, as Karma; see [geometry](#geometry) |
 | `unreal:tonemapper` | 0 | Run UE's tonemapper and the effects inside it; see [post-processing](#unreal-post-processing) |
 | `unreal:postProcess:<Property>` | | Any `FPostProcessSettings` property, for the beauty; see [post-processing](#unreal-post-processing) |
@@ -201,7 +201,7 @@ UE's own path-tracer denoiser plugins were not usable here: in UE 5.8.4 the Opti
 
 Meshes whose `subdivisionScheme` is `catmullClark` (USD's default) or `loop` are refined uniformly with OpenSubdiv to `unreal:subdivisionLevel` levels (0 by default, as UE's USD Stage Actor: `SubdivisionLevel`, `USDStageActor.cpp`; each level has 4x the faces), with their creases, corners and holes. Vertex, varying, face-varying and uniform primvars (`st`, `displayColor`, `velocities`, time-sampled `points`) follow the refined surface, and GeomSubsets keep their faces. Authored normals are ignored, as USD specifies for subdivision surfaces; normals come from the refined surface. `bilinear` and `none` render the mesh as authored.
 
-Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; the default 2 still shows facets on close silhouettes. There is no adaptive or screen-space refinement; a displaced subdivision mesh is diced further (see [Displacement](#displacement)). Wet-surface masks are not translated on subdivided meshes.
+A prim, or an ancestor, can set its own level with the constant primvar `primvars:unreal:subdivisionLevel` (**Subdivision Level** on the Unreal Engine tab of Render Geometry Settings LOPs), which replaces the render setting for its meshes; UE's USD Stage Actor has only the global level. Each level multiplies the face count by four. Level 3 matches Karma's surfaces closely on a cube; level 2 still shows facets on close silhouettes, and the default 0 shows the control cage (implicit spheres, which Hydra meshes coarsely, look faceted). There is no adaptive or screen-space refinement; a displaced subdivision mesh is diced further (see [Displacement](#displacement)). Wet-surface masks are not translated on subdivided meshes.
 
 ## Cameras
 

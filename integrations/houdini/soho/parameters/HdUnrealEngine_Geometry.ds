@@ -56,6 +56,19 @@
         parmtag { "usdvaluetype" "float" }
         disablewhen R"({ xn__primvarsunrealvolumeframe_control_vubgg == block } { xn__primvarsunrealvolumeframe_control_vubgg == none })"
     }
+    HDUE_CONTROL("xn__primvarsunrealsubdivisionLevel_control_02bg", "Subdivision Level")
+    parm {
+        name    "xn__primvarsunrealsubdivisionLevel_zpbg"
+        label   "Subdivision Level"
+        type    integer
+        size    1
+        default { 2 }
+        range   { 0! 5 }
+        help    "Uniform refinement of this prim's catmullClark and loop meshes, in place of the render settings' Subdivision Level (unreal:subdivisionLevel); each level has 4x the faces. A constant primvar, so it can sit on an ancestor of the meshes."
+        parmtag { "spare_category" "Geometry" }
+        parmtag { "usdvaluetype" "int" }
+        disablewhen R"({ xn__primvarsunrealsubdivisionLevel_control_02bg == block } { xn__primvarsunrealsubdivisionLevel_control_02bg == none })"
+    }
     HDUE_CONTROL("xn__primvarsunrealgroom_control_3kbg", "Hair Strands")
     parm {
         name    "xn__primvarsunrealgroom_26ag"

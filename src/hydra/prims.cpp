@@ -464,7 +464,11 @@ class Mesh final : public HdMesh {
         shape.topology = delegate->GetMeshTopology(GetId());
         std::tie(shape.uvNames, shape.colorName) =
             meshPrimvars(delegate, delegate->GetMaterialId(GetId()), shape.topology);
-        if (const int level = asset ? 0 : state.setting<int>("subdivisionLevel", 0);
+        // primvars:unreal:subdivisionLevel on the prim or an ancestor (a constant primvar) overrides the render
+        // setting.
+        if (const int level = asset ? 0
+                                    : value(delegate->Get(GetId(), TfToken("unreal:subdivisionLevel")),
+                                            state.setting<int>("subdivisionLevel", 0));
             level > 0 && (shape.topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark ||
                           shape.topology.GetScheme() == PxOsdOpenSubdivTokens->loop)) {
             shape.topology.SetSubdivTags(delegate->GetSubdivTags(GetId()));
