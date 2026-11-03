@@ -1,0 +1,420 @@
+#usda 1.0
+(
+    doc = "One Substrate Builder material per BSDF and utility node beyond the Slab (scripts/substrate_graph.py), authored with substrate_graph.author(). Prepare-Substrate.ps1 -InputUsd on it compiles each into a UE Substrate material: the check that UE accepts every node's wiring."
+)
+
+def "Looks"
+{
+    def Material "Iridescent"
+    {
+        token outputs:surface.connect = </Looks/Iridescent/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Iridescent/Graph/slab.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "metal"
+            {
+                uniform token info:id = "unreal:substrate:metalness"
+                color3f inputs:base_color = (0.9, 0.6, 0.2)
+                color3f inputs:base_color.connect = None
+                float inputs:metallic = 1
+                float inputs:metallic.connect = None
+                float inputs:specular = 0.5
+                float inputs:specular.connect = None
+                color3f outputs:diffuse_albedo
+                color3f outputs:f0
+            }
+
+            def Shader "film"
+            {
+                uniform token info:id = "unreal:substrate:thin_film"
+                color3f inputs:f0.connect = </Looks/Iridescent/Graph/metal.outputs:f0>
+                color3f inputs:f90 = (1, 1, 1)
+                color3f inputs:f90.connect = None
+                float inputs:ior = 1.44
+                float inputs:ior.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:thickness = 0.4
+                float inputs:thickness.connect = None
+                color3f outputs:f0
+                color3f outputs:f90
+            }
+
+            def Shader "haze"
+            {
+                uniform token info:id = "unreal:substrate:haziness"
+                float inputs:base_roughness = 0.2
+                float inputs:base_roughness.connect = None
+                float inputs:haziness = 0.3
+                float inputs:haziness.connect = None
+                float outputs:second_roughness
+                float outputs:second_roughness_weight
+            }
+
+            def Shader "slab"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo.connect = </Looks/Iridescent/Graph/metal.outputs:diffuse_albedo>
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:f0.connect = </Looks/Iridescent/Graph/film.outputs:f0>
+                color3f inputs:f90.connect = </Looks/Iridescent/Graph/film.outputs:f90>
+                color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.2
+                float inputs:roughness.connect = None
+                float inputs:second_roughness.connect = </Looks/Iridescent/Graph/haze.outputs:second_roughness>
+                float inputs:second_roughness_weight.connect = </Looks/Iridescent/Graph/haze.outputs:second_roughness_weight>
+                string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Wax"
+    {
+        token outputs:surface.connect = </Looks/Wax/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Wax/Graph/slab.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "depth"
+            {
+                uniform token info:id = "unreal:substrate:transmittance"
+                float inputs:thickness = 1
+                float inputs:thickness.connect = None
+                color3f inputs:transmittance = (0.9, 0.6, 0.4)
+                color3f inputs:transmittance.connect = None
+                color3f outputs:mfp
+                float outputs:thickness
+            }
+
+            def Shader "slab"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo = (0.9, 0.8, 0.6)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:f0 = (0.04, 0.04, 0.04)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
+                color3f inputs:mfp.connect = </Looks/Wax/Graph/depth.outputs:mfp>
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
+                string inputs:subsurface = "simple_volume"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Switch"
+    {
+        token outputs:surface.connect = </Looks/Switch/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Switch/Graph/select.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "a"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo = (0.8, 0.1, 0.1)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:f0 = (0.04, 0.04, 0.04)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
+                color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
+                string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+
+            def Shader "b"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo = (0.1, 0.1, 0.8)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:f0 = (0.04, 0.04, 0.04)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
+                color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
+                string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+
+            def Shader "select"
+            {
+                uniform token info:id = "unreal:substrate:select"
+                token inputs:a.connect = </Looks/Switch/Graph/a.outputs:out>
+                token inputs:b.connect = </Looks/Switch/Graph/b.outputs:out>
+                float inputs:select = 0.7
+                float inputs:select.connect = None
+                float inputs:threshold = 0.5
+                float inputs:threshold.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Hair"
+    {
+        token outputs:surface.connect = </Looks/Hair/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Hair/Graph/hair.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "hair"
+            {
+                uniform token info:id = "unreal:substrate:hair"
+                float inputs:backlit = 0
+                float inputs:backlit.connect = None
+                color3f inputs:base_color = (0.3, 0.15, 0.05)
+                color3f inputs:base_color.connect = None
+                color3f inputs:emission = (0, 0, 0)
+                color3f inputs:emission.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:scatter = 0
+                float inputs:scatter.connect = None
+                float inputs:specular = 0.5
+                float inputs:specular.connect = None
+                color3f inputs:tangent = None
+                color3f inputs:tangent.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Eye"
+    {
+        token outputs:surface.connect = </Looks/Eye/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Eye/Graph/eye.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "eye"
+            {
+                uniform token info:id = "unreal:substrate:eye"
+                color3f inputs:cornea_normal = None
+                color3f inputs:cornea_normal.connect = None
+                color3f inputs:diffuse_color = (0.3, 0.4, 0.6)
+                color3f inputs:diffuse_color.connect = None
+                color3f inputs:emission = (0, 0, 0)
+                color3f inputs:emission.connect = None
+                float inputs:iris_distance = 0
+                float inputs:iris_distance.connect = None
+                float inputs:iris_mask = 0
+                float inputs:iris_mask.connect = None
+                color3f inputs:iris_normal = None
+                color3f inputs:iris_normal.connect = None
+                color3f inputs:iris_plane_normal = None
+                color3f inputs:iris_plane_normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Water"
+    {
+        token outputs:surface.connect = </Looks/Water/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Water/Graph/water.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "water"
+            {
+                uniform token info:id = "unreal:substrate:water"
+                color3f inputs:base_color = (0, 0, 0)
+                color3f inputs:base_color.connect = None
+                color3f inputs:color_behind_water = (1, 1, 1)
+                color3f inputs:color_behind_water.connect = None
+                color3f inputs:emission = (0, 0, 0)
+                color3f inputs:emission.connect = None
+                float inputs:metallic = 0
+                float inputs:metallic.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.05
+                float inputs:roughness.connect = None
+                float inputs:specular = 0.5
+                float inputs:specular.connect = None
+                float inputs:top_opacity = 0
+                float inputs:top_opacity.connect = None
+                color3f inputs:water_albedo = (0.1, 0.4, 0.5)
+                color3f inputs:water_albedo.connect = None
+                color3f inputs:water_extinction = (0.05, 0.02, 0.01)
+                color3f inputs:water_extinction.connect = None
+                float inputs:water_phase_g = 0
+                float inputs:water_phase_g.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+
+    def Material "Glow"
+    {
+        token outputs:surface.connect = </Looks/Glow/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Glow/Graph/add.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "slab"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo = (0.18, 0.18, 0.18)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:f0 = (0.04, 0.04, 0.04)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
+                color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
+                string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+
+            def Shader "light"
+            {
+                uniform token info:id = "unreal:substrate:slab"
+                color3f inputs:diffuse_albedo = (0, 0, 0)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = (0.2, 0.5, 1)
+                color3f inputs:emission.connect = None
+                color3f inputs:f0 = (0, 0, 0)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
+                color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
+                float inputs:roughness = 0.5
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
+                string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
+                token outputs:out
+            }
+
+            def Shader "add"
+            {
+                uniform token info:id = "unreal:substrate:add"
+                token inputs:a.connect = </Looks/Glow/Graph/slab.outputs:out>
+                token inputs:b.connect = </Looks/Glow/Graph/light.outputs:out>
+                bool inputs:parameter_blending = 0
+                bool inputs:parameter_blending.connect = None
+                token outputs:out
+            }
+        }
+
+        def Shader "Preview"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.18, 0.18, 0.18)
+            token outputs:surface
+        }
+    }
+}
+

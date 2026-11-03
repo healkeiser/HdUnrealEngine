@@ -24,6 +24,11 @@ NODES = {
             "roughness": ("float", 0.5),
             "normal": ("color3", None),
             "mfp": ("color3", (0.0, 0.0, 0.0)),
+            # Optional: UE's own value when unconnected (F90 white, no second roughness, no emission).
+            "f90": ("color3", None),
+            "second_roughness": ("float", None),
+            "second_roughness_weight": ("float", None),
+            "emission": ("color3", None),
         },
         properties={"subsurface": ("string", "none")},
     ),
@@ -105,6 +110,115 @@ NODES = {
         label="Float to Color",
         output="color3",
         inputs={"value": ("float", 0.0)},
+        properties={},
+    ),
+    # More of UE's Substrate BSDFs and operators, with UE's defaults for unconnected inputs (MaterialExpressionSubstrate.cpp,
+    # each Compile). Normal and tangent inputs are optional: unconnected, the surface's own.
+    "add": dict(
+        label="Substrate Add",
+        output="surface",
+        inputs={"a": ("surface", None), "b": ("surface", None)},
+        properties={"parameter_blending": ("bool", False)},
+    ),
+    "select": dict(
+        label="Substrate Select",
+        output="surface",
+        inputs={
+            "a": ("surface", None),
+            "b": ("surface", None),
+            "select": ("float", 0.0),
+        },
+        properties={"threshold": ("float", 0.5)},
+    ),
+    "hair": dict(
+        label="Substrate Hair",
+        output="surface",
+        inputs={
+            "base_color": ("color3", (0.0, 0.0, 0.0)),
+            "scatter": ("float", 0.0),
+            "specular": ("float", 0.5),
+            "roughness": ("float", 0.5),
+            "backlit": ("float", 0.0),
+            "tangent": ("color3", None),
+            "emission": ("color3", (0.0, 0.0, 0.0)),
+        },
+        properties={},
+    ),
+    "eye": dict(
+        label="Substrate Eye",
+        output="surface",
+        inputs={
+            "diffuse_color": ("color3", (0.0, 0.0, 0.0)),
+            "roughness": ("float", 0.5),
+            "cornea_normal": ("color3", None),
+            "iris_normal": ("color3", None),
+            "iris_plane_normal": ("color3", None),
+            "iris_mask": ("float", 0.0),
+            "iris_distance": ("float", 0.0),
+            "emission": ("color3", (0.0, 0.0, 0.0)),
+        },
+        properties={},
+    ),
+    "water": dict(
+        label="Substrate Single Layer Water",
+        output="surface",
+        inputs={
+            "base_color": ("color3", (0.0, 0.0, 0.0)),
+            "metallic": ("float", 0.0),
+            "specular": ("float", 0.5),
+            "roughness": ("float", 0.5),
+            "normal": ("color3", None),
+            "emission": ("color3", (0.0, 0.0, 0.0)),
+            "top_opacity": ("float", 0.0),
+            "water_albedo": ("color3", (0.0, 0.0, 0.0)),
+            "water_extinction": ("color3", (0.0, 0.0, 0.0)),
+            "water_phase_g": ("float", 0.0),
+            "color_behind_water": ("color3", (1.0, 1.0, 1.0)),
+        },
+        properties={},
+    ),
+    "thin_film": dict(
+        label="Substrate Thin Film",
+        output="color3",
+        outputs={"f0": "color3", "f90": "color3"},
+        inputs={
+            "normal": ("color3", None),
+            "f0": ("color3", (0.04, 0.04, 0.04)),
+            "f90": ("color3", (1.0, 1.0, 1.0)),
+            "thickness": ("float", 1.0),
+            "ior": ("float", 1.44),
+        },
+        properties={},
+    ),
+    "metalness": dict(
+        label="Metalness to Albedo and F0",
+        output="color3",
+        outputs={"diffuse_albedo": "color3", "f0": "color3"},
+        inputs={
+            "base_color": ("color3", (0.18, 0.18, 0.18)),
+            "metallic": ("float", 0.0),
+            "specular": ("float", 0.5),
+        },
+        properties={},
+    ),
+    "haziness": dict(
+        label="Haziness to Second Roughness",
+        output="float",
+        outputs={
+            "second_roughness": "float",
+            "second_roughness_weight": "float",
+        },
+        inputs={"base_roughness": ("float", 0.1), "haziness": ("float", 0.5)},
+        properties={},
+    ),
+    "transmittance": dict(
+        label="Transmittance to MFP",
+        output="color3",
+        outputs={"mfp": "color3", "thickness": "float"},
+        inputs={
+            "transmittance": ("color3", (0.5, 0.5, 0.5)),
+            "thickness": ("float", 0.01),
+        },
         properties={},
     ),
     # Volume materials (a Volume prim's heterogeneous volume): UE's Substrate Volumetric-Fog-Cloud BSDF, which
@@ -195,6 +309,8 @@ USD_TYPES = {
     "vector2": Sdf.ValueTypeNames.Float2,
     "color4": Sdf.ValueTypeNames.Color4f,
 }
+# BSDFs UE's Substrate accepts only as the root of a material (MaterialExpressionSubstrate.cpp's topology checks).
+ROOT_ONLY = ("unlit", "hair", "eye", "water")
 COMPILER_VERSION = 3  # 3: ID switch (IdSwitch.h)
 ERROR_ATTRIBUTE = "unreal:substrate:authoringError"
 
@@ -369,6 +485,11 @@ def validate(graph):
             raise ValueError(name + ": expected the density or emission field")
         if node["type"] == "volume_field":
             fields.append(name)
+        if (
+            node["type"] == "select"
+            and not 0 <= props.get("threshold", 0.5) <= 1
+        ):
+            raise ValueError(name + ": Select threshold must be in [0, 1]")
         if node["type"] == "uv" and props.get("index", 0) != 0:
             raise ValueError(
                 name
@@ -413,6 +534,16 @@ def validate(graph):
         visited.add(name)
 
     visit(output)
+    # UE's Substrate takes these only as a material's whole surface: no operator may combine them ("Operator Add cannot
+    # be used with the following data flowing through {Unlit}").
+    for name, node in nodes.items():
+        if node["type"] in ROOT_ONLY and name != output:
+            raise ValueError(
+                name
+                + ": "
+                + NODES[node["type"]]["label"]
+                + " must be the material's output, not under an operator"
+            )
     kind = NODES[nodes[output]["type"]]["output"]
     if kind not in ("surface", "volume"):
         raise ValueError("Substrate output must be a surface or a volume")

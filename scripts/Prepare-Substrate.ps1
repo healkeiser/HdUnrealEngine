@@ -47,5 +47,7 @@ if ($LASTEXITCODE) { throw 'Substrate registry generation failed.' }
 if (-not $SkipCook) {
     & $Editor $Project -run=Cook -TargetPlatform=Windows -Map=/Game/HdUETest -unattended -nop4 -nosplash -stdout *> (Join-Path $RunOutput 'cook.log')
     if ($LASTEXITCODE) { throw 'Substrate cook failed.' }
+    # The cook compiles the shaders: UE's Substrate graph rules fail there, not in the commandlet (as Prepare-SubstrateLive.ps1).
+    if ((Get-Content -LiteralPath (Join-Path $RunOutput 'cook.log') -Raw) -match 'Failed to compile Material') { throw "Substrate material compilation failed; see $(Join-Path $RunOutput 'cook.log')." }
 }
 Write-Output "Substrate library: $(Join-Path $RunOutput 'library.json')"

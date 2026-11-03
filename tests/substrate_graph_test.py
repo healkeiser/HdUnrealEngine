@@ -140,6 +140,68 @@ class GraphTests(unittest.TestCase):
                 )
             )
 
+    def test_root_only_bsdfs(self):
+        """UE's Substrate takes Unlit, Hair, Eye and Single Layer Water only as the material's whole surface."""
+        for kind in ("unlit", "hair", "eye", "water"):
+            graph = dict(
+                version=1,
+                output="add",
+                nodes={
+                    "slab": dict(type="slab"),
+                    "special": dict(type=kind),
+                    "add": dict(
+                        type="add",
+                        inputs={
+                            "a": {"node": "slab"},
+                            "b": {"node": "special"},
+                        },
+                    ),
+                },
+            )
+            with self.assertRaisesRegex(
+                ValueError, "must be the material's output"
+            ):
+                validate(graph)
+            validate(
+                dict(
+                    version=1,
+                    output="special",
+                    nodes={"special": dict(type=kind)},
+                )
+            )
+
+    def test_utility_outputs_roundtrip(self):
+        """Multi-output utilities connect by output name, through USD too."""
+        graph = dict(
+            version=1,
+            output="slab",
+            nodes={
+                "metal": dict(type="metalness", inputs={"metallic": 1.0}),
+                "slab": dict(
+                    type="slab",
+                    inputs={
+                        "diffuse_albedo": {
+                            "node": "metal",
+                            "output": "diffuse_albedo",
+                        },
+                        "f0": {"node": "metal", "output": "f0"},
+                    },
+                ),
+            },
+        )
+        stage = Usd.Stage.CreateInMemory()
+        material = author(stage, "/Looks/Metal", graph)
+        self.assertEqual(
+            signature(graph), signature(read(material, Usd.TimeCode.Default()))
+        )
+        graph["nodes"]["slab"]["inputs"]["f0"] = {
+            "node": "metal"
+        }  # no default output
+        with self.assertRaisesRegex(
+            ValueError, "type mismatch or unknown output"
+        ):
+            validate(graph)
+
     def test_disconnect_blocks_weaker_usd_connections(self):
         base = Usd.Stage.CreateInMemory()
         author(base, "/Looks/Test", self.graph)

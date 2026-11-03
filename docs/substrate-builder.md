@@ -71,7 +71,7 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Node | Inputs / properties | Output |
 | --- | --- | --- |
 | MaterialX Surface | Existing USD Material path, resolved through the selected prepared MaterialX library | Surface |
-| Substrate Slab | Diffuse albedo, F0, roughness, optional normal, mean free path; `none` or `simple_volume` subsurface mode | Surface |
+| Substrate Slab | Diffuse albedo, F0, roughness, optional normal, mean free path; `none` or `simple_volume` subsurface mode; optional F90, second roughness and its weight, emission (unconnected: UE's values) | Surface |
 | Substrate Weight | Surface and coverage weight | Surface |
 | Substrate Vertical Layer | Top, base, thickness in UE centimeters; explicit parameter-blending option | Surface |
 | Substrate Horizontal Mix | Background, foreground, mix; explicit parameter-blending option | Surface |
@@ -82,6 +82,15 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Float Mask Primvar | Primvar base name and default value | Float |
 | Float to Color | Replicate a scalar into RGB | Color |
 | Substrate Unlit | Emission color; also used by generated mask-preview materials | Surface |
+| Substrate Add | Two surfaces whose light adds; parameter-blending option | Surface |
+| Substrate Select | Two surfaces and a Select value: A below the threshold, B above (UE's Substrate Select) | Surface |
+| Substrate Hair | UE's Hair BSDF: base color, scatter, specular, roughness, backlit, optional tangent, emission | Surface |
+| Substrate Eye | UE's Eye BSDF: diffuse color, roughness, cornea, iris and iris-plane normals, iris mask and distance, emission | Surface |
+| Substrate Single Layer Water | UE's Single Layer Water BSDF: top material (base color, metallic, specular, roughness, opacity), water albedo, extinction and phase, color behind the water | Surface |
+| Substrate Thin Film | Normal, F0, F90, thickness (micrometres), IOR | F0, F90 |
+| Metalness to Albedo and F0 | Base color, metallic, specular | Diffuse albedo, F0 |
+| Haziness to Second Roughness | Base roughness, haziness | Second roughness, its weight |
+| Transmittance to MFP | Transmittance color, thickness (cm) | MFP, thickness |
 | Substrate Volumetric Fog Cloud | Albedo, extinction and emission; unconnected extinction and emission are hdUE's default volume material's | Volume |
 | Volume Field | `density` or `emission` grid of the Volume prim at the shaded point | Float |
 | Blackbody | Temperature in kelvin (UE's BlackBody) | Color |
@@ -91,6 +100,8 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Normal Map | Encoded RGB, strength, Flip Green | Normal vector |
 
 Surface connections use native VOP BSDF sockets. Numeric connections use float/vector sockets. The exporter validates its own port types and rejects unsupported implicit conversions or unrecognized VOP nodes.
+
+Unconnected inputs take UE's own defaults (each node's `Compile` in `MaterialExpressionSubstrate.cpp`). Unlit, Hair, Eye and Single Layer Water must be the graph's output: UE's Substrate does not let an operator combine them. Multi-output nodes connect by output name. `samples/substrate/bsdfs.usda` holds one material per node above the Slab; `Prepare-Substrate.ps1 -InputUsd` on it compiles and cooks them all, and the script fails when UE's cook rejects a material (its shader compile, where Substrate's graph rules apply).
 
 The first graph format allows up to 256 connected nodes, one MaterialX Surface input, and one Float Mask Primvar node. Disconnected serialized nodes, cycles, incompatible ports, missing surface inputs, duplicate public names, reserved `HdUE_` parameter names, and non-finite numeric data are errors. Unconnected VOP work-in-progress branches are excluded from export.
 

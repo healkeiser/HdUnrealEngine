@@ -54,6 +54,101 @@ HELP = {
             "normal": "Shading normal from a Normal Map node. Unconnected, the mesh normal.",
             "mfp": "Mean free path of light in the slab, in scene units, used by Simple Volume subsurface.",
             "subsurface": "None: an opaque slab. Simple Volume: light scatters in the slab over its mean free path.",
+            "f90": "Specular reflectance at grazing angles, for example a Thin Film's F90. Unconnected, white.",
+            "second_roughness": "Roughness of a second specular lobe, for example from Haziness to Second "
+            "Roughness. Unconnected, none.",
+            "second_roughness_weight": "Weight of the second specular lobe. Unconnected, none.",
+            "emission": "Emitted light. Unconnected, none.",
+        },
+    ),
+    "add": (
+        "Adds two surfaces' light (Substrate Add), as for a glow over a surface.",
+        {
+            "a": "First surface.",
+            "b": "Second surface.",
+        },
+    ),
+    "select": (
+        "Picks one of two surfaces where Select is below or above the threshold (Substrate Select).",
+        {
+            "a": "Surface where Select is below the threshold.",
+            "b": "Surface where Select is above the threshold.",
+            "select": "Value compared with the threshold, for example a mask.",
+            "threshold": "Threshold between A and B. Changing it recompiles the material.",
+        },
+    ),
+    "hair": (
+        "UE's Substrate Hair BSDF, for hair cards.",
+        {
+            "base_color": "Hair color.",
+            "scatter": "Light scattered through the hair, for light hair colors.",
+            "specular": "Specular intensity.",
+            "roughness": "Roughness of the hair's specular highlights.",
+            "backlit": "How much light coming from behind the hair shows.",
+            "tangent": "Hair direction. Unconnected, the mesh tangent.",
+            "emission": "Emitted light.",
+        },
+    ),
+    "eye": (
+        "UE's Substrate Eye BSDF, for eyes modeled as UE's eye shading expects (cornea, iris and their normals).",
+        {
+            "diffuse_color": "Iris and sclera color.",
+            "roughness": "Roughness of the cornea.",
+            "cornea_normal": "Cornea normal. Unconnected, the mesh normal.",
+            "iris_normal": "Iris normal. Unconnected, the mesh normal.",
+            "iris_plane_normal": "Normal of the iris plane. Unconnected, the mesh normal.",
+            "iris_mask": "1 on the iris, 0 elsewhere.",
+            "iris_distance": "Depth of the iris below the cornea.",
+            "emission": "Emitted light.",
+        },
+    ),
+    "water": (
+        "UE's Substrate Single Layer Water BSDF: a water surface with its medium below, rendered by UE's water pass. "
+        "It must be the material's whole surface.",
+        {
+            "base_color": "Color of what floats on the surface (foam), with Top Opacity.",
+            "metallic": "Metalness of the top material.",
+            "specular": "Specular intensity.",
+            "roughness": "Roughness of the water surface.",
+            "normal": "Shading normal, for waves. Unconnected, the mesh normal.",
+            "emission": "Emitted light.",
+            "top_opacity": "Opacity of the top material (foam) over the water.",
+            "water_albedo": "Color of the light the water scatters.",
+            "water_extinction": "Extinction of the water per centimetre: higher is murkier.",
+            "water_phase_g": "Anisotropy of the scattering, from -1 (backward) to 1 (forward).",
+            "color_behind_water": "Tint of what is seen through the water.",
+        },
+    ),
+    "thin_film": (
+        "Iridescence of a thin film (soap bubbles, oil, coatings): F0 and F90 for a Slab (Substrate Thin-Film).",
+        {
+            "normal": "Shading normal. Unconnected, the mesh normal.",
+            "f0": "Reflectance at normal incidence of the surface under the film.",
+            "f90": "Reflectance at grazing angles of the surface under the film.",
+            "thickness": "Film thickness in micrometres: 1 is about 1000 nm.",
+            "ior": "Index of refraction of the film.",
+        },
+    ),
+    "metalness": (
+        "Converts metalness-workflow values (base color, metallic, specular) into a Slab's diffuse albedo and F0.",
+        {
+            "base_color": "Base color.",
+            "metallic": "Metalness, from 0 (dielectric) to 1 (metal).",
+            "specular": "Specular level of dielectrics: 0.5 is F0 0.04.",
+        },
+    ),
+    "haziness": (
+        "Converts a roughness and a haziness into a Slab's second roughness and its weight (a hazy gloss).",
+        {
+            "base_roughness": "Roughness of the main specular lobe.",
+            "haziness": "Strength of the hazy second lobe.",
+        },
+    ),
+    "transmittance": (
+        "Converts the color light keeps through a thickness into a Slab's mean free path.",
+        {
+            "transmittance": "Color of white light after crossing Thickness.",
+            "thickness": "Thickness in centimetres.",
         },
     ),
     "weight": (

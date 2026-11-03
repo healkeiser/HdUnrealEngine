@@ -160,11 +160,24 @@ struct FCompiler {
         Connect(E->B, B);
         return {E, Type, 0};
     }
+    // The named outputs of multi-output utility nodes (Thin Film, Metalness to Albedo and F0, ...), by expression.
+    TMap<UMaterialExpression*, TMap<FString, FOutput>> Ports;
+    FOutput Utility(UMaterialExpression* E, std::initializer_list<TPair<const TCHAR*, int32>> Outputs) {
+        auto& Named = Ports.Add(E);
+        int32 Index = 0;
+        for (const auto& [Name, Type] : Outputs) Named.Add(Name, {E, Type, Index++});
+        return {E, Outputs.begin()->Value, 0};
+    }
     FOutput Source(const TSharedPtr<FJsonObject>& Connection) {
         const auto Name = Text(Connection, TEXT("node"));
         auto R = Build(Name);
         const auto Port = Text(Connection, TEXT("output"), TEXT("out"));
         if (Port == TEXT("out")) return R;
+        if (const auto* Named = Ports.Find(R.Expression)) {
+            if (const auto* Output = Named->Find(Port)) return *Output;
+            Error = TEXT("Unsupported graph output: ") + Port;
+            return {};
+        }
         if (!Cast<UMaterialExpressionTextureSample>(R.Expression)) {
             Error = TEXT("Unsupported graph output: ") + Port;
             return {};
@@ -374,6 +387,13 @@ struct FCompiler {
             if (Mode != TEXT("none") && Mode != TEXT("simple_volume"))
                 Error = TEXT("Unsupported Substrate subsurface mode.");
             E->SubSurfaceType = Mode == TEXT("simple_volume") ? MSS_SimpleVolume : MSS_None;
+            // Optional inputs: unconnected, UE's own value.
+            if (Inputs->HasField(TEXT("f90"))) Connect(E->F90, Input(Inputs, TEXT("f90"), 1));
+            if (Inputs->HasField(TEXT("second_roughness")))
+                Connect(E->SecondRoughness, Input(Inputs, TEXT("second_roughness"), 0));
+            if (Inputs->HasField(TEXT("second_roughness_weight")))
+                Connect(E->SecondRoughnessWeight, Input(Inputs, TEXT("second_roughness_weight"), 0));
+            if (Inputs->HasField(TEXT("emission"))) Connect(E->EmissiveColor, Input(Inputs, TEXT("emission"), 1));
         } else if (Kind == TEXT("weight")) {
             auto* E = Add<UMaterialExpressionSubstrateWeight>();
             R = {E, 2, 0};
@@ -427,6 +447,82 @@ struct FCompiler {
             auto* White = Add<UMaterialExpressionConstant3Vector>();
             White->Constant = FLinearColor::White;
             E->B.Connect(0, White);
+        } else if (Kind == TEXT("add")) {
+            auto* E = Add<UMaterialExpressionSubstrateAdd>();
+            R = {E, 2, 0};
+            Connect(E->A, Input(Inputs, TEXT("a"), 2));
+            Connect(E->B, Input(Inputs, TEXT("b"), 2));
+            bool Blend = false;
+            Props->TryGetBoolField(TEXT("parameter_blending"), Blend);
+            E->bUseParameterBlending = Blend;
+        } else if (Kind == TEXT("select")) {
+            auto* E = Add<UMaterialExpressionSubstrateSelect>();
+            R = {E, 2, 0};
+            Connect(E->A, Input(Inputs, TEXT("a"), 2));
+            Connect(E->B, Input(Inputs, TEXT("b"), 2));
+            Connect(E->SelectValue, Input(Inputs, TEXT("select"), 0, 0));
+            E->Threshold = FMath::Clamp(Number(Props, TEXT("threshold"), .5f), 0.f, 1.f);
+        } else if (Kind == TEXT("hair")) {
+            auto* E = Add<UMaterialExpressionSubstrateHairBSDF>();
+            R = {E, 2, 0};
+            Connect(E->BaseColor, Input(Inputs, TEXT("base_color"), 1, 0, FLinearColor::Black));
+            Connect(E->Scatter, Input(Inputs, TEXT("scatter"), 0, 0));
+            Connect(E->Specular, Input(Inputs, TEXT("specular"), 0, .5f));
+            Connect(E->Roughness, Input(Inputs, TEXT("roughness"), 0, .5f));
+            Connect(E->Backlit, Input(Inputs, TEXT("backlit"), 0, 0));
+            if (Inputs->HasField(TEXT("tangent"))) Connect(E->Tangent, Input(Inputs, TEXT("tangent"), 1));
+            Connect(E->EmissiveColor, Input(Inputs, TEXT("emission"), 1, 0, FLinearColor::Black));
+        } else if (Kind == TEXT("eye")) {
+            auto* E = Add<UMaterialExpressionSubstrateEyeBSDF>();
+            R = {E, 2, 0};
+            Connect(E->DiffuseColor, Input(Inputs, TEXT("diffuse_color"), 1, 0, FLinearColor::Black));
+            Connect(E->Roughness, Input(Inputs, TEXT("roughness"), 0, .5f));
+            if (Inputs->HasField(TEXT("cornea_normal")))
+                Connect(E->CorneaNormal, Input(Inputs, TEXT("cornea_normal"), 1));
+            if (Inputs->HasField(TEXT("iris_normal"))) Connect(E->IrisNormal, Input(Inputs, TEXT("iris_normal"), 1));
+            if (Inputs->HasField(TEXT("iris_plane_normal")))
+                Connect(E->IrisPlaneNormal, Input(Inputs, TEXT("iris_plane_normal"), 1));
+            Connect(E->IrisMask, Input(Inputs, TEXT("iris_mask"), 0, 0));
+            Connect(E->IrisDistance, Input(Inputs, TEXT("iris_distance"), 0, 0));
+            Connect(E->EmissiveColor, Input(Inputs, TEXT("emission"), 1, 0, FLinearColor::Black));
+        } else if (Kind == TEXT("water")) {
+            auto* E = Add<UMaterialExpressionSubstrateSingleLayerWaterBSDF>();
+            R = {E, 2, 0};
+            Connect(E->BaseColor, Input(Inputs, TEXT("base_color"), 1, 0, FLinearColor::Black));
+            Connect(E->Metallic, Input(Inputs, TEXT("metallic"), 0, 0));
+            Connect(E->Specular, Input(Inputs, TEXT("specular"), 0, .5f));
+            Connect(E->Roughness, Input(Inputs, TEXT("roughness"), 0, .5f));
+            if (Inputs->HasField(TEXT("normal"))) Connect(E->Normal, Input(Inputs, TEXT("normal"), 1));
+            Connect(E->EmissiveColor, Input(Inputs, TEXT("emission"), 1, 0, FLinearColor::Black));
+            Connect(E->TopMaterialOpacity, Input(Inputs, TEXT("top_opacity"), 0, 0));
+            Connect(E->WaterAlbedo, Input(Inputs, TEXT("water_albedo"), 1, 0, FLinearColor::Black));
+            Connect(E->WaterExtinction, Input(Inputs, TEXT("water_extinction"), 1, 0, FLinearColor::Black));
+            Connect(E->WaterPhaseG, Input(Inputs, TEXT("water_phase_g"), 0, 0));
+            Connect(E->ColorScaleBehindWater, Input(Inputs, TEXT("color_behind_water"), 1, 0, FLinearColor::White));
+        } else if (Kind == TEXT("thin_film")) {
+            auto* E = Add<UMaterialExpressionSubstrateThinFilm>();
+            R = Utility(E, {{TEXT("f0"), 1}, {TEXT("f90"), 1}});
+            if (Inputs->HasField(TEXT("normal"))) Connect(E->Normal, Input(Inputs, TEXT("normal"), 1));
+            Connect(E->F0, Input(Inputs, TEXT("f0"), 1, 0, FLinearColor(.04f, .04f, .04f)));
+            Connect(E->F90, Input(Inputs, TEXT("f90"), 1, 0, FLinearColor::White));
+            Connect(E->Thickness, Input(Inputs, TEXT("thickness"), 0, 1));
+            Connect(E->IOR, Input(Inputs, TEXT("ior"), 0, 1.44f));
+        } else if (Kind == TEXT("metalness")) {
+            auto* E = Add<UMaterialExpressionSubstrateMetalnessToDiffuseAlbedoF0>();
+            R = Utility(E, {{TEXT("diffuse_albedo"), 1}, {TEXT("f0"), 1}});
+            Connect(E->BaseColor, Input(Inputs, TEXT("base_color"), 1));
+            Connect(E->Metallic, Input(Inputs, TEXT("metallic"), 0, 0));
+            Connect(E->Specular, Input(Inputs, TEXT("specular"), 0, .5f));
+        } else if (Kind == TEXT("haziness")) {
+            auto* E = Add<UMaterialExpressionSubstrateHazinessToSecondaryRoughness>();
+            R = Utility(E, {{TEXT("second_roughness"), 0}, {TEXT("second_roughness_weight"), 0}});
+            Connect(E->BaseRoughness, Input(Inputs, TEXT("base_roughness"), 0, .1f));
+            Connect(E->Haziness, Input(Inputs, TEXT("haziness"), 0, .5f));
+        } else if (Kind == TEXT("transmittance")) {
+            auto* E = Add<UMaterialExpressionSubstrateTransmittanceToMFP>();
+            R = Utility(E, {{TEXT("mfp"), 1}, {TEXT("thickness"), 0}});
+            Connect(E->TransmittanceColor, Input(Inputs, TEXT("transmittance"), 1, 0, FLinearColor(.5f, .5f, .5f)));
+            Connect(E->Thickness, Input(Inputs, TEXT("thickness"), 0, .01f));
         } else if (Kind == TEXT("volume_fog_cloud")) {
             auto* E = Add<UMaterialExpressionSubstrateVolumetricFogCloudBSDF>();
             R = {E, 5, 0};
