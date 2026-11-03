@@ -27,22 +27,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 48 ms | 1.94 s | 8.08 s | 49.70 s | 168x / 4x | 0.97 / 1.01 |
-| Glossy materials | 50 ms | 1.95 s | 5.88 s | 30.30 s | 117x / 3x | 1.06 / 1.22 |
-| Depth of field | 50 ms | 2.02 s | 8.40 s | 51.03 s | 167x / 4x | 0.97 / 1.01 |
-| Motion blur | 55 ms | 2.20 s | 7.92 s | 50.24 s | 145x / 4x | 0.98 / 1.01 |
-| Subdivision surfaces | 50 ms | 1.96 s | 7.60 s | 48.27 s | 153x / 4x | 0.97 / 1.01 |
-| Instances, points, curves | 50 ms | 1.96 s | 7.63 s | 50.05 s | 154x / 4x | 0.99 / 1.04 |
-| Volumes (OpenVDB) | 51 ms | 4.00 s | 8.21 s | 58.66 s | 162x / 2x | 1.10 / 1.32 |
-| IES profile | 50 ms | 2.16 s | 9.81 s | 68.45 s | 197x / 5x | 1.05 / 1.09 |
-| Light linking | 49 ms | 1.96 s | 9.74 s | 64.69 s | 198x / 5x | 0.99 / 1.00 |
-| Clearcoat | 50 ms | 2.04 s | 6.34 s | 37.10 s | 128x / 3x | 0.99 / 1.01 |
-| Render region | 36 ms | 1.85 s | 2.33 s | 13.71 s | 65x / 1x | 0.98 / 1.04 |
-| Lens shift | 47 ms | 1.91 s | 5.63 s | 34.78 s | 120x / 3x | 0.97 / 1.03 |
-| Orthographic camera | 50 ms | 2.05 s | 7.23 s | 44.68 s | 145x / 4x | 0.85 / 1.05 |
-| Camera exposure | 50 ms | 2.17 s | 8.98 s | 57.14 s | 178x / 4x | 0.97 / 1.01 |
-| Unreal post-processing | 56 ms | 2.25 s | 7.77 s | 47.66 s | 138x / 3x | n/a |
-| **All 15** | **742 ms** | **32.40 s** | **111.57 s** | **706.49 s** | **150x / 3x** | |
+| Global illumination | 45 ms | 1.99 s | 8.08 s | 49.70 s | 178x / 4x | 0.93 / 1.01 |
+| Glossy materials | 47 ms | 2.01 s | 5.88 s | 30.30 s | 124x / 3x | 1.03 / 1.22 |
+| Depth of field | 48 ms | 2.01 s | 8.40 s | 51.03 s | 174x / 4x | 0.93 / 1.01 |
+| Motion blur | 49 ms | 2.16 s | 7.92 s | 50.24 s | 162x / 4x | 0.97 / 1.01 |
+| Subdivision surfaces | 47 ms | 1.98 s | 7.60 s | 48.27 s | 161x / 4x | 0.93 / 1.01 |
+| Instances, points, curves | 47 ms | 2.03 s | 7.63 s | 50.05 s | 161x / 4x | 0.95 / 1.04 |
+| Volumes (OpenVDB) | 49 ms | 4.00 s | 8.21 s | 58.66 s | 169x / 2x | 1.05 / 1.32 |
+| IES profile | 46 ms | 2.03 s | 9.81 s | 68.45 s | 212x / 5x | 1.04 / 1.09 |
+| Light linking | 48 ms | 1.98 s | 9.74 s | 64.69 s | 205x / 5x | 0.95 / 1.00 |
+| Clearcoat | 49 ms | 2.15 s | 6.34 s | 37.10 s | 130x / 3x | 0.96 / 1.01 |
+| Render region | 33 ms | 2.28 s | 2.33 s | 13.71 s | 70x / 1x | 0.95 / 1.04 |
+| Lens shift | 46 ms | 1.99 s | 5.63 s | 34.78 s | 124x / 3x | 0.93 / 1.03 |
+| Orthographic camera | 46 ms | 2.02 s | 7.23 s | 44.68 s | 158x / 4x | 0.83 / 1.05 |
+| Camera exposure | 48 ms | 2.02 s | 8.98 s | 57.14 s | 188x / 4x | 0.93 / 1.01 |
+| Unreal post-processing | 49 ms | 2.03 s | 7.77 s | 47.66 s | 159x / 4x | n/a |
+| **All 15** | **697 ms** | **32.66 s** | **111.57 s** | **706.49 s** | **160x / 3x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](images/gallery/cornell.png)
 
