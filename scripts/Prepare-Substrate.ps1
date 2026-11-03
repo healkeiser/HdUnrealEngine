@@ -1,30 +1,21 @@
 param(
-    [string]$InputUsd = '', [string]$GraphJob = '',
+    [Parameter(Mandatory = $true)][string]$InputUsd,
     [string]$MaterialXLibrary = '',
     [string]$OutputDirectory = '',
     [string]$Destination = '/Game/HdUE/Substrate',
     [string]$HoudiniRoot = '', [string]$EditorRoot = '',
-    [switch]$SkipBuild, [switch]$SkipCook,
-    # The cook's switches: the commandlet cooks the new packages in the same editor (-CookAfter), as Prepare-SubstrateLive.ps1 does.
-    [string[]]$CookArguments = @(),
-    [switch]$SkipRegistry
+    [switch]$SkipBuild, [switch]$SkipCook
 )
 $ErrorActionPreference = 'Stop'
-if ((-not $InputUsd -and -not $GraphJob) -or ($InputUsd -and $GraphJob)) { throw 'Choose InputUsd or GraphJob.' }
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
-$HoudiniRoot = Get-HdUELocalPath houdini_root -Value $HoudiniRoot -Optional:([bool]$GraphJob)
+$HoudiniRoot = Get-HdUELocalPath houdini_root -Value $HoudiniRoot
 $EditorRoot = Get-HdUELocalPath editor_root -Value $EditorRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $RunOutput = New-HdUERun -Name substrate -Path $OutputDirectory
 if (-not $Destination.StartsWith('/Game/HdUE/')) { throw 'Substrate assets must be prepared below /Game/HdUE/.' }
-$Arguments = if ($GraphJob) { @('export-job', [IO.Path]::GetFullPath($GraphJob), '--output', $RunOutput, '--destination', $Destination) } else { @('export', [IO.Path]::GetFullPath($InputUsd), '--output', $RunOutput, '--destination', $Destination) }
+$Arguments = @('export', [IO.Path]::GetFullPath($InputUsd), '--output', $RunOutput, '--destination', $Destination)
 if ($MaterialXLibrary) { $Arguments += @('--library', [IO.Path]::GetFullPath($MaterialXLibrary)) }
-if ($GraphJob) {
-    & (Join-Path $PSScriptRoot 'Run-UsdPython.ps1') -Script (Join-Path $PSScriptRoot 'prepare_substrate.py') -ScriptArguments $Arguments
-}
-else {
-    & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $PSScriptRoot 'prepare_substrate.py') @Arguments
-}
+& uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $PSScriptRoot 'prepare_substrate.py') @Arguments
 if ($LASTEXITCODE) { throw 'Substrate graph export failed.' }
 $Project = Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
 if (-not $SkipBuild) { Build-HdUEEditor $EditorRoot *> (Join-Path $RunOutput 'build.log') }
@@ -41,27 +32,18 @@ $Lines = foreach ($Manifest in $Manifests) {
 $List = Join-Path $RunOutput 'graphs.txt'
 [IO.File]::WriteAllLines($List, [string[]]$Lines, [Text.UTF8Encoding]::new($false))
 $Log = Join-Path $RunOutput 'substrate.log'
-$CookAfter = if ($CookArguments) { @('-RunAsCookCommandlet', '-CookAfter') + $CookArguments } else { @() }
-& $Editor $Project -run=HdUESubstrate "-GraphList=$List" @CookAfter -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
+& $Editor $Project -run=HdUESubstrate "-GraphList=$List" -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
 if ($LASTEXITCODE) { throw "Substrate graph compilation failed: $Log" }
-# The cook compiles the shaders: UE's Substrate graph rules fail there.
-if ($CookArguments -and (Get-Content -LiteralPath $Log -Raw) -match 'Failed to compile Material') { throw "Substrate material compilation failed; see $Log." }
 foreach ($Line in $Lines) {
     if (-not (Test-Path -LiteralPath $Line.Split('|')[1])) { throw "Substrate graph compilation wrote no receipt for $($Line.Split('|')[0]): $Log" }
 }
 if ((Get-Content -LiteralPath $Log -Raw) -match 'Log\w+: Error:|Fatal error') { throw "Substrate graph compilation reported an error: $Log" }
-if ($SkipRegistry) { return }
-if ($GraphJob) {
-    & (Join-Path $PSScriptRoot 'Run-UsdPython.ps1') -Script (Join-Path $PSScriptRoot 'prepare_substrate.py') -ScriptArguments @('registry', $RunOutput)
-}
-else {
-    & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $PSScriptRoot 'prepare_substrate.py') registry $RunOutput
-}
+& uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $PSScriptRoot 'prepare_substrate.py') registry $RunOutput
 if ($LASTEXITCODE) { throw 'Substrate registry generation failed.' }
 if (-not $SkipCook) {
     & $Editor $Project -run=Cook -TargetPlatform=Windows -Map=/Game/HdUETest -unattended -nop4 -nosplash -stdout *> (Join-Path $RunOutput 'cook.log')
     if ($LASTEXITCODE) { throw 'Substrate cook failed.' }
-    # The cook compiles the shaders: UE's Substrate graph rules fail there, not in the commandlet (as Prepare-SubstrateLive.ps1).
+    # The cook compiles the shaders: UE's Substrate graph rules fail there, not in the commandlet (as Prepare-LiveMaterials.ps1).
     if ((Get-Content -LiteralPath (Join-Path $RunOutput 'cook.log') -Raw) -match 'Failed to compile Material') { throw "Substrate material compilation failed; see $(Join-Path $RunOutput 'cook.log')." }
 }
 Write-Output "Substrate library: $(Join-Path $RunOutput 'library.json')"

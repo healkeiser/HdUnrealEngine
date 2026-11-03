@@ -252,7 +252,8 @@ def publish(folder, runtime_project, destination):
     validate_dependencies(library)
     for entry in library["materials"]:
         for field in ("asset", "preview_asset"):
-            package = entry[field].split(".")[0]
+            # A MaterialX import has no mask preview.
+            package = (entry.get(field) or entry["asset"]).split(".")[0]
             if (
                 not package.startswith(destination + "/")
                 or not (
@@ -278,7 +279,7 @@ def publish(folder, runtime_project, destination):
     temporary = target.with_name(target.name + ".incoming-" + uuid.uuid4().hex)
     shutil.copytree(source, temporary)
     temporary.rename(target)
-    # The job's library next to its packages: later processes on this runtime load it (substrate_live.published), so
+    # The job's library next to its packages: later processes on this runtime load it (live_materials.published), so
     # a graph is prepared once per runtime, not once per process.
     shared = target / LIBRARY_NAME
     pending = shared.with_name(shared.name + ".incoming-" + uuid.uuid4().hex)
@@ -311,16 +312,6 @@ if __name__ == "__main__":
     p.add_argument("--time", type=float, default=0)
     p = sub.add_parser("registry")
     p.add_argument("folder", type=Path)
-    p = sub.add_parser("export-job")
-    p.add_argument("job", type=Path)
-    p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--destination", required=True)
-    p = sub.add_parser(
-        "finish"
-    )  # registry, then publish: one Python start for a live job
-    p.add_argument("folder", type=Path)
-    p.add_argument("--runtime-project", type=Path, required=True)
-    p.add_argument("--destination", required=True)
     p = sub.add_parser("publish")
     p.add_argument("folder", type=Path)
     p.add_argument("--runtime-project", type=Path, required=True)
@@ -328,20 +319,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.mode == "registry":
         registry(args.folder)
-    elif args.mode == "export-job":
-        job = json.loads(args.job.read_text(encoding="utf-8"))
-        if job.get("version") != 1:
-            raise ValueError("Unsupported live preparation job")
-        export_records(
-            job["materials"],
-            args.output,
-            args.destination,
-            job.get("previews", True),
-        )
     elif args.mode == "publish":
-        publish(args.folder, args.runtime_project, args.destination)
-    elif args.mode == "finish":
-        registry(args.folder)
         publish(args.folder, args.runtime_project, args.destination)
     else:
         export(

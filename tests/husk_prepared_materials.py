@@ -6,11 +6,12 @@
 The libraries are Prepare-Substrate.ps1's for samples/decal/decal.usda and samples/volume_material/volume_material.usda
 (staged with Stage-Runtime.ps1), and Import-MaterialX.ps1's for samples/materialx; by default the newest under out/
 (out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. A missing decal or
-volume library is prepared, and the runtime staged, first; without a MaterialX library its checks are skipped. Checks: the decal paints the wall;
-a volume material's albedo edit tints the fog; MaterialX materials render their cooked assets; a graph changed since its
-preparation fails the frame with the library's message without automatic preparation, and is prepared and rendered
-with it; wet surfaces bind; an object behind glass shows through it with
-its own alpha.
+volume library is prepared, and the runtime staged, first; without a MaterialX library its checks are skipped.
+Checks: the decal paints the wall; a volume material's albedo edit tints the fog; MaterialX materials render their
+cooked assets; a procedural MaterialX graph hdUE cannot translate renders translated without automatic preparation, and
+is prepared through UE's MaterialX importer with it; a graph changed since its preparation fails the frame with the
+library's message without automatic preparation, and is prepared and rendered with it; wet surfaces bind; an object
+behind glass shows through it with its own alpha.
 """
 
 import argparse
@@ -123,7 +124,10 @@ def forget_prepared(material):
         entries = json.loads(library.read_text(encoding="utf-8")).get(
             "materials", []
         )
-        if any(entry.get("material") == material for entry in entries):
+        if any(
+            material in (entry.get("material"), entry.get("usd_material"))
+            for entry in entries
+        ):
             library.unlink()
 
 
@@ -259,6 +263,47 @@ def main():
                     f"exit {code}, wet bindings {wet}",
                 )
             )
+        # A MaterialX graph hdUE cannot translate at render time (place2d, Houdini's checkers node, mix): without
+        # automatic preparation it renders translated (its base colour at its grey constant), with it husk prepares it
+        # through UE's MaterialX importer and renders the red and grey checkers.
+        forget_prepared("/World/Looks/Checkers")
+        procedural = ROOT / "samples/materialx/procedural.usda"
+        (temp / "procedural-off").mkdir()
+        code, log, image = husk(
+            procedural,
+            [
+                mode,
+                "rel camera = </Camera>",
+                "bool unreal:substrateAutoPrepare = 0",
+            ],
+            temp / "procedural-off",
+        )
+        results.append(
+            check(
+                "procedural MaterialX translated without preparation",
+                code == 0 and image is not None and red_fraction(image) < 0.01,
+                f"exit {code}, red fraction {red_fraction(image) if image is not None else None}",
+            )
+        )
+        (temp / "procedural").mkdir()
+        code, log, image = husk(
+            procedural,
+            [mode, "rel camera = </Camera>"],
+            temp / "procedural",
+            trace=True,
+        )
+        fraction = red_fraction(image) if image is not None else 0.0
+        results.append(
+            check(
+                "procedural MaterialX prepared by UE's importer",
+                code == 0
+                and re.search(
+                    r"Checkers rgb=\S+ native=/Game/HdUE/Live/\S+/MX/", log
+                )
+                and 0.2 < fraction < 0.4,
+                f"exit {code}, red fraction {fraction}",
+            )
+        )
         # Glass (hdUE's own MaterialX translation, the parent Interchange gives it): the orange sphere behind the clear
         # pane shows through it, and the beauty's alpha there stays the opaque sphere's (refraction kept coverage).
         (temp / "glass").mkdir()

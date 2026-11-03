@@ -23,7 +23,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:domeResolution` | 512 | Environment cubemap face size |
 | `unreal:autoViewerLight`, `unreal:viewerLightIntensity` | | Review light for scenes without lights |
 | `unreal:upAxis` | stage | Up axis override |
-| `unreal:substrateAutoPrepare` | on | Prepare Substrate Builder graphs missing from the library: in the viewport as you edit, in husk before the frame ([background preparation](substrate-builder.md#background-graph-preparation-in-solaris)) |
+| `unreal:substrateAutoPrepare` | on | **Prepare Edited Materials**: Substrate Builder graphs missing from the library, and MaterialX graphs the render-time translation cannot express, are prepared in the viewport as you edit, in husk before the frame ([background preparation](substrate-builder.md#background-graph-preparation-in-solaris), [MaterialX](materials.md#automatic-import-of-untranslatable-graphs)) |
 | `unreal:materialxLibrary`, `unreal:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied alike in Houdini's viewport, husk and usdview (`--hdue-substrate-library`); a stale or unprepared material fails a husk frame |
 | `unreal:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
 
@@ -125,7 +125,7 @@ Surfaces: `ND_standard_surface_surfaceshader`, `ND_open_pbr_surface_surfaceshade
 | `ND_multiply_*` by a constant | Scales the texture or constant |
 | `ND_constant_*` | Its value |
 
-Any other node (`ND_mix_*`, `ND_place2d_*`, procedurals, ...) leaves the input at its constant and is reported once as a warning; the material still renders. Textured weights (`base`, `sheen`, `subsurface`, ...) also use their constant.
+A graph with any other node (`ND_mix_*`, `ND_place2d_*`, procedurals, ...), or another surface, is prepared through UE's MaterialX importer ([automatic import](materials.md#automatic-import-of-untranslatable-graphs)) and renders translated until then: that node leaves the input at its constant, reported once as a warning. A multiply of two nodes is such a node too. Textured weights (`base`, `sheen`, `subsurface`, ...) also use their constant.
 
 | standard_surface (OpenPBR) | In UE |
 | --- | --- |

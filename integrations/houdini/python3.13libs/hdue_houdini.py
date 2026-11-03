@@ -85,12 +85,12 @@ class Host:
             raise RuntimeError(PLUGIN + " is not on PXR_PLUGINPATH_NAME")
         self.api = Viewport(self.runtime, plugin.path)
         from hdue_materialx import PreparedMaterials
-        from substrate_live import LivePreparation
+        from live_materials import LivePreparation
 
-        self.live_substrate = LivePreparation(
+        self.live_preparation = LivePreparation(
             config["runtime_project"], self.log_dir
         )
-        self.prepared_materials = PreparedMaterials(self.live_substrate)
+        self.prepared_materials = PreparedMaterials(self.live_preparation)
         self.assets = NativeAssets()
         self.texture_files = {}
         self.pushed_textures = None
@@ -188,7 +188,7 @@ class Host:
             error=error,
             texture_error=self.texture_error,
             material_error=self.material_error,
-            substrate_preparation=self.live_substrate.status(),
+            material_preparation=self.live_preparation.status(),
         )
         (self.log_dir / "runtime-state.json").write_text(
             json.dumps(data, indent=2), encoding="utf-8"
@@ -210,7 +210,7 @@ class Host:
             return
         try:
             state = self.api.status()
-            self.live_substrate.tick()
+            self.live_preparation.tick()
             # Optional UI shim (hdUE_settings subnet): mask preview and automatic Substrate preparation.
             node = current_settings_node()
             if _hdue_selected():
@@ -253,7 +253,7 @@ class Host:
                         if state["session"] and (
                             self.materials_dirty
                             or materials_key != self.last_materials
-                            or self.live_substrate.due()
+                            or self.live_preparation.due()
                         ):
                             self.last_materials = materials_key
                             self.materials_dirty = False
@@ -266,8 +266,8 @@ class Host:
                                 ] = (bool(preview.eval()) if preview else False)
                                 # Read when materials sync, not part of their key: a sync of its own when the
                                 # switch flips raced the wet-surface geometry upload ("Obsolete wet geometry
-                                # revision" in hdue_substrate_live_test).
-                                self.live_substrate.enabled = auto_prepare(
+                                # revision" in hdue_live_materials_test).
+                                self.live_preparation.enabled = auto_prepare(
                                     stage, node
                                 )
                                 changed = self.prepared_materials.sync(
@@ -413,7 +413,7 @@ class Host:
             self.assets.clear()
         except BaseException:
             _report(traceback.format_exc())
-        self.live_substrate.close()
+        self.live_preparation.close()
         if self.viewer:
             self.viewer.hide()
         self.runtime.close()
@@ -673,7 +673,7 @@ def configure_live_preparation(node):
         "hdue_substrate_retry", "Retry material preparation"
     )
     retry.setScriptCallback(
-        "import hdue_houdini; hdue_houdini._host.live_substrate.retry()"
+        "import hdue_houdini; hdue_houdini._host.live_preparation.retry()"
     )
     retry.setScriptCallbackLanguage(hou.scriptLanguage.Python)
     group.append(retry)
@@ -1009,7 +1009,8 @@ def libraries(stage, node=None):
 
 
 def auto_prepare(stage, node=None):
-    """Whether edited Substrate Builder graphs are prepared in the background: unreal:substrateAutoPrepare on the
+    """Whether edited materials (Substrate Builder graphs, MaterialX graphs hdUE cannot translate) are prepared in the
+    background: unreal:substrateAutoPrepare (named before MaterialX joined it) on the
     render settings prim, as husk reads it; else an older hdUE_settings subnet's toggle; else on.
     """
     prim = _settings_prim(stage)

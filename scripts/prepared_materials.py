@@ -1,5 +1,12 @@
 """Prepared materials in the order every host applies them (Houdini's viewport, husk, usdview)."""
 
+
+class NeedsPreparation(ValueError):
+    """A material is valid but has no prepared native material yet (a Substrate Builder graph, or a MaterialX graph
+    hdUE cannot translate at render time): the host prepares it (live_materials.LivePreparation) or reports it.
+    """
+
+
 SETTINGS = (
     "nativeMaterialAssets",
     "nativeMaterialParameters",
@@ -18,7 +25,7 @@ def sync(stage, time, materialx, substrate, view):
     entries = {}
     if materialx:
         if not materialx.sync():
-            raise ValueError(materialx.preparation_error)
+            raise materialx.preparation_exception
         entries = materialx.bound_entries
     settings = {name: view.GetRendererSetting(name) or {} for name in SETTINGS}
     if not materialx:

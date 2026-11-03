@@ -1,4 +1,11 @@
-"""Asynchronous, single-flight preparation of immutable Substrate variants."""
+# /// script
+# requires-python = ">=3.11,<3.12"
+# dependencies = ["MaterialX==1.39.4"]
+# ///
+"""Live material preparation: asynchronous, single-flight jobs in which UE's editor prepares materials the
+running renderer lacks (Substrate Builder graphs, MaterialX graphs through UE's importer), cooks them and publishes them
+into the runtime.
+"""
 
 import hashlib
 import json
@@ -11,6 +18,45 @@ import uuid
 from pathlib import Path
 
 from substrate_graph import COMPILER_VERSION, signature
+
+
+def identity(item):
+    """A prepared material's identity, of a job record or a library entry: a MaterialX graph's request key
+    (usd_materialx_graph.request_key), or a Substrate Builder graph's signature and base material.
+    """
+    if item.get("kind") == "materialx":
+        return ("materialx", item["key"])
+    key = item["signature"] if "signature" in item else signature(item["graph"])
+    return (key, item.get("base_identity", ""))
+
+
+_REPORTED = set()
+
+
+def materialx_records(materials, time):
+    """Job records for MaterialX materials hdUE cannot translate at render time (MaterialXLibrary.missing). One that
+    cannot be prepared (an image embedded in a Houdini asset, ...) keeps its render-time translation; its reason is
+    printed once.
+    """
+    import sys
+
+    from export_usd_materialx import record
+    from usd_materialx_graph import request_key
+
+    records = []
+    for material in materials:
+        try:
+            item = record(material, time)
+        except ValueError as error:
+            message = f"hdUE: {material.GetPath()} keeps its render-time translation: {error}"
+            if message not in _REPORTED:
+                _REPORTED.add(message)
+                print(message, file=sys.stderr)
+            continue
+        item.update(kind="materialx", key=request_key(item["graph"]))
+        records.append(item)
+    return records
+
 
 # Clean-up ages: another process may be publishing (interrupted publishes), or still using a job (the rest).
 INCOMING_AGE = 3600
@@ -47,7 +93,9 @@ def _jobs(content):
                     (
                         content
                         / (
-                            entry[f].split(".")[0].removeprefix("/Game/")
+                            (entry.get(f) or entry["asset"])
+                            .split(".")[0]
+                            .removeprefix("/Game/")
                             + ".uasset"
                         )
                     ).is_file()
@@ -72,9 +120,7 @@ def published(runtime_project, previews=True):
         for entry in usable:
             if previews and not entry.get("preview", True):
                 continue
-            entries[(entry["signature"], entry.get("base_identity", ""))] = (
-                entry
-            )
+            entries[identity(entry)] = entry
     return entries
 
 
@@ -130,11 +176,7 @@ def clean(runtime_project, log_directory=None, now=None):
     newest = {}
     for _, file, entries in jobs:
         for entry in entries:
-            key = (
-                entry["signature"],
-                entry.get("base_identity", ""),
-                entry.get("preview", True),
-            )
+            key = identity(entry) + (entry.get("preview", True),)
             if key not in newest or age(file) < age(newest[key]):
                 newest[key] = file
     for folder, file, entries in jobs:
@@ -142,14 +184,7 @@ def clean(runtime_project, log_directory=None, now=None):
             stale = age(folder if file is None else file) > STALE_AGE
         else:
             replaced = all(
-                newest[
-                    (
-                        e["signature"],
-                        e.get("base_identity", ""),
-                        e.get("preview", True),
-                    )
-                ]
-                != file
+                newest[identity(e) + (e.get("preview", True),)] != file
                 for e in entries
             )
             stale = (replaced and age(file) > STALE_AGE) or age(
@@ -161,7 +196,7 @@ def clean(runtime_project, log_directory=None, now=None):
         if process.is_dir() and not any(process.iterdir()):
             remove(process)
     if log_directory:
-        for worker in Path(log_directory, "substrate-live").glob("*"):
+        for worker in Path(log_directory, "live-materials").glob("*"):
             if worker.is_dir() and age(worker) > WORKER_AGE:
                 remove(worker)
     return removed
@@ -183,7 +218,7 @@ class LivePreparation:
         )
         self.directory = (
             Path(log_directory)
-            / "substrate-live"
+            / "live-materials"
             / self.namespace.rsplit("/", 1)[1]
         )
         self.debounce = debounce
@@ -219,9 +254,17 @@ class LivePreparation:
             daemon=True,
         ).start()
 
-    @staticmethod
-    def identity(record):
-        return (signature(record["graph"]), record.get("base_identity", ""))
+    identity = staticmethod(identity)
+
+    def substrate_entries(self):
+        return [
+            e for e in self.entries.values() if e.get("kind") != "materialx"
+        ]
+
+    def materialx_entries(self):
+        return [
+            e for e in self.entries.values() if e.get("kind") == "materialx"
+        ]
 
     def status(self):
         return dict(
@@ -283,15 +326,13 @@ class LivePreparation:
                     "The live material has an incompatible preparation receipt"
                 )
             for entry in data["materials"]:
-                self.entries[
-                    (entry["signature"], entry.get("base_identity", ""))
-                ] = entry
+                self.entries[identity(entry)] = entry
             # Published into the runtime: the worker's cooked copy is no longer needed (its logs stay).
             shutil.rmtree(active["output"] / "cooked", ignore_errors=True)
             self.revision += 1
             self.completed += 1
             self.phase = "ready"
-            self.message = "Edited Substrate material is ready"
+            self.message = "The edited materials are ready"
         except (OSError, ValueError, KeyError) as error:
             self.failures[active["key"]] = str(error)
             self.phase = "failed"
@@ -316,9 +357,8 @@ class LivePreparation:
         self.requested_revision = self.revision
         if not self.enabled or self.closed:
             return None
-        identities = {
-            (e["signature"], e.get("base_identity", "")) for e in known
-        }
+        # What this preparation made counts too: tick() above may just have added it, after the caller built known.
+        identities = {identity(e) for e in known} | set(self.entries)
         missing = [r for r in records if self.identity(r) not in identities]
         if not missing:
             return None
@@ -335,16 +375,16 @@ class LivePreparation:
                 "; latest edit is queued" if self.active["key"] != key else ""
             )
             return (
-                "Substrate: "
-                + (self.message or "Preparing the edited graph")
+                "Materials: "
+                + (self.message or "Preparing the edited materials")
                 + suffix
             )
         if now - self.changed_at < self.debounce:
             self.phase = "queued"
             self.message = "Waiting for graph edits to settle"
-            return "Substrate: " + self.message
+            return "Materials: " + self.message
         self._start(key, missing)
-        return "Substrate: Preparing the edited graph in the background"
+        return "Materials: Preparing the edited materials in the background"
 
     def _start(self, key, records):
         executable = shutil.which("pwsh") or shutil.which("powershell")
@@ -366,7 +406,7 @@ class LivePreparation:
             "-NoProfile",
             "-NonInteractive",
             "-File",
-            str(self.root / "scripts/Prepare-SubstrateLive.ps1"),
+            str(self.root / "scripts/Prepare-LiveMaterials.ps1"),
             "-GraphJob",
             str(job.resolve()),
             "-OutputDirectory",
@@ -401,7 +441,16 @@ class LivePreparation:
             folder.mkdir(parents=True, exist_ok=False)
             job.write_text(
                 json.dumps(
-                    dict(version=1, materials=records, previews=self.previews),
+                    dict(
+                        version=1,
+                        materials=[
+                            r for r in records if r.get("kind") != "materialx"
+                        ],
+                        materialx=[
+                            r for r in records if r.get("kind") == "materialx"
+                        ],
+                        previews=self.previews,
+                    ),
                     indent=2,
                 ),
                 encoding="utf-8",
@@ -426,7 +475,7 @@ class LivePreparation:
             key=key, process=process, folder=folder, output=output, log=log
         )
         self.phase = "starting"
-        self.message = "Starting background Substrate preparation"
+        self.message = "Starting background material preparation"
 
     def retry(self):
         self.failures.clear()
@@ -438,3 +487,106 @@ class LivePreparation:
         # finish its immutable output safely after the owning viewport closes.
         if self.active:
             self.active["log"].close()
+
+
+def export_job(job_file, output, destination):
+    """The worker's first step: the job's Substrate Builder graphs for HdUESubstrate (prepare_substrate) into output,
+    and its MaterialX graphs as one document for UE's MaterialX importer into output/materialx.
+    """
+    from prepare_substrate import export_records
+
+    job = json.loads(job_file.read_text(encoding="utf-8"))
+    if job.get("version") != 1:
+        raise ValueError("Unsupported live preparation job")
+    if job["materials"]:
+        export_records(
+            job["materials"], output, destination, job.get("previews", True)
+        )
+    else:
+        output.mkdir(parents=True)
+        (output / "export.json").write_text("[]", encoding="utf-8")
+        (output / "textures.json").write_text(
+            json.dumps(dict(dependencies={}, texture_sets=[])),
+            encoding="utf-8",
+        )
+    if job.get("materialx"):
+        from export_usd_materialx import write
+
+        write(
+            job["materialx"],
+            output / "materialx",
+            "Live",
+            extra=dict(
+                keys={r["material"]: r["key"] for r in job["materialx"]}
+            ),
+        )
+
+
+def finish(folder, runtime_project, destination):
+    """The worker's last step: the job's library (the Substrate Builder registry, and the MaterialX import's library
+    bound to the USD graphs it came from), then the packages published into the runtime.
+    """
+    from bind_usd_materialx_library import bind
+    from build_materialx_library import build
+    from prepare_substrate import publish, registry
+    from usd_materialx_graph import structure_key
+
+    registry(folder)
+    exported = folder / "materialx/export.json"
+    if exported.is_file():
+        build(
+            [folder / "materialx/import.json"],
+            folder / "materialx/library.json",
+        )
+        bind(
+            exported,
+            folder / "materialx/library.json",
+            folder / "materialx/bound.json",
+        )
+        export = json.loads(exported.read_text(encoding="utf-8"))
+        graphs = {m["usd_material"]: m["graph"] for m in export["materials"]}
+        bound = json.loads(
+            (folder / "materialx/bound.json").read_text(encoding="utf-8")
+        )
+        library_file = folder / "library.json"
+        library = json.loads(library_file.read_text(encoding="utf-8"))
+        for entry in bound["materials"]:
+            entry.update(
+                kind="materialx",
+                key=export["keys"][entry["usd_material"]],
+                structure=structure_key(graphs[entry["usd_material"]]),
+            )
+        library["materials"] += bound["materials"]
+        # The worker's own document goes with its folder (clean()); the published job depends on its textures.
+        library["dependencies"].update(
+            {
+                file: digest
+                for file, digest in bound["dependencies"].items()
+                if not Path(file).resolve().is_relative_to(folder.resolve())
+            }
+        )
+        library["texture_sets"] += bound.get("texture_sets", [])
+        library_file.write_text(json.dumps(library, indent=2), encoding="utf-8")
+    publish(folder, runtime_project, destination)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Live preparation worker steps."
+    )
+    sub = parser.add_subparsers(dest="mode", required=True)
+    p = sub.add_parser("export")
+    p.add_argument("job", type=Path)
+    p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--destination", required=True)
+    p = sub.add_parser("finish")
+    p.add_argument("folder", type=Path)
+    p.add_argument("--runtime-project", type=Path, required=True)
+    p.add_argument("--destination", required=True)
+    args = parser.parse_args()
+    if args.mode == "export":
+        export_job(args.job, args.output, args.destination)
+    else:
+        finish(args.folder, args.runtime_project, args.destination)

@@ -15,6 +15,7 @@ MODULES = {
     "references": "hdue_reference_test",
     "lighting": "hdue_lighting_test",
     "materials": "hdue_materialx_test",
+    "materialx-live": "hdue_materialx_live_test",
     "optextures": "hdue_op_texture_test",
     "viewport": "hdue_solaris_probe",
     "selection": "hdue_selection_test",

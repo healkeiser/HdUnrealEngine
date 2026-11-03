@@ -9,9 +9,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from live_materials import LivePreparation
 from prepare_substrate import publish
 from substrate_graph import COMPILER_VERSION, signature
-from substrate_live import LivePreparation
 
 
 def record(extra=False, value=0.5):
@@ -42,8 +42,8 @@ class LiveTests(unittest.TestCase):
         import os
         import time
 
+        from live_materials import STALE_AGE, UNUSED_AGE, clean
         from prepare_substrate import LIBRARY_NAME
-        from substrate_live import STALE_AGE, UNUSED_AGE, clean
 
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -130,8 +130,8 @@ class LiveTests(unittest.TestCase):
         # settled (to start the preparation) and once a preparation finished (to bind it).
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("substrate_live.shutil.which", return_value="pwsh"),
-            patch("substrate_live.subprocess.Popen", side_effect=Process),
+            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.subprocess.Popen", side_effect=Process),
         ):
             root = Path(folder)
             manager = LivePreparation(
@@ -161,9 +161,9 @@ class LiveTests(unittest.TestCase):
     def test_single_flight_latest_graph_cache_failure_and_retry(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("substrate_live.shutil.which", return_value="pwsh"),
+            patch("live_materials.shutil.which", return_value="pwsh"),
             patch(
-                "substrate_live.subprocess.Popen", side_effect=Process
+                "live_materials.subprocess.Popen", side_effect=Process
             ) as popen,
         ):
             root = Path(folder)
@@ -223,12 +223,54 @@ class LiveTests(unittest.TestCase):
             manager.close()
             self.assertEqual(popen.call_count, 3)
 
+    def test_a_job_finishing_inside_request_is_known(self):
+        # husk's wait loop builds known before request(); the tick() inside request() can then add the job that just
+        # finished. That job must count, or the same material is prepared a second time.
+        with (
+            tempfile.TemporaryDirectory() as folder,
+            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.subprocess.Popen", side_effect=Process),
+        ):
+            root = Path(folder)
+            manager = LivePreparation(
+                root / "runtime/HdUEBackend.uproject",
+                root / "logs",
+                root,
+                debounce=0,
+            )
+            a = record()
+            manager.request([a], [], now=0)
+            active = manager.active
+            active["output"].mkdir()
+            (active["output"] / "published.json").write_text(
+                json.dumps(dict(inline_shader_code=True))
+            )
+            (active["output"] / "library.json").write_text(
+                json.dumps(
+                    dict(
+                        compiler=COMPILER_VERSION,
+                        materials=[
+                            dict(
+                                signature=signature(a["graph"]),
+                                base_identity="",
+                                asset="/Game/A.A",
+                                preview_asset="/Game/AP.AP",
+                            )
+                        ],
+                    )
+                )
+            )
+            active["process"].code = 0
+            self.assertIsNone(manager.request([a], [], now=1))
+            self.assertEqual(manager.started, 1)
+            manager.close()
+
     def test_worker_does_not_inherit_gui_usd_startup_environment(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("substrate_live.shutil.which", return_value="pwsh"),
+            patch("live_materials.shutil.which", return_value="pwsh"),
             patch(
-                "substrate_live.subprocess.Popen", side_effect=Process
+                "live_materials.subprocess.Popen", side_effect=Process
             ) as popen,
             patch.dict(
                 os.environ,
@@ -262,7 +304,7 @@ class LiveTests(unittest.TestCase):
     def test_unavailable_worker_is_latched_until_retry(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("substrate_live.shutil.which", return_value=None),
+            patch("live_materials.shutil.which", return_value=None),
         ):
             manager = LivePreparation(
                 Path(folder) / "runtime/HdUEBackend.uproject",

@@ -46,7 +46,7 @@ if ($IsDefault -and (Test-Path -LiteralPath $Unhashed) -and
     catch { Write-Warning "$Unhashed is in use and keeps the previous build: $($_.Exception.Message)" }
 }
 $Config.backend_dll = $Destination
-# Profiles are replaced whole (written beside, then moved), as Prepare-SubstrateLive.ps1 publishes: a husk starting
+# Profiles are replaced whole (written beside, then moved), as Prepare-LiveMaterials.ps1 publishes: a husk starting
 # while Set-Content had truncated the file read half a profile.
 function Write-Profile([string]$Path) {
     $Pending = "$Path.pending"

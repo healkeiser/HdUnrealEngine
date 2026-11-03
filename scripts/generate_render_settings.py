@@ -762,14 +762,15 @@ HDUE = [
     ),
     hdue(
         "substrateAutoPrepare",
-        "Prepare Edited Substrate Materials",
+        "Prepare Edited Materials",
         "Rendering|Materials",
         "toggle",
         True,
-        "Substrate Builder materials missing from the Prepared Substrate Library are prepared in the background "
-        "(UE's editor compiles them, about a minute per graph) and render once ready: in Houdini's viewport as you "
-        "edit, and in husk before the frame renders. Off, such a material shows the library's message and fails a "
-        "husk frame.",
+        "Substrate Builder materials missing from the Prepared Substrate Library, and MaterialX materials hdUE cannot "
+        "translate at render time, are prepared in the background (UE's editor compiles or imports them, seconds per "
+        "job) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, "
+        "such a Substrate Builder material shows the library's message and fails a husk frame; such a MaterialX "
+        "material renders with the inputs hdUE cannot translate at their constants.",
         category="Materials",
         advanced=True,
     ),

@@ -11,7 +11,7 @@ from materialx_controls import MaterialXLibrary, OfflineView
 class PreparedMaterials(OfflineView):
     def __init__(self, live=None):
         super().__init__()
-        self.file = None
+        self.file = ()  # no library yet: the first sync makes one, with or without a file
         self.library = None
         self.embedded = {}
         self.checked = {}
@@ -44,8 +44,9 @@ class PreparedMaterials(OfflineView):
             self.settings = {
                 k: v for k, v in self.settings.items() if k == "wetMaskPreview"
             }
+            # Also without a file: it binds the MaterialX materials live preparation made.
+            self.library = MaterialXLibrary(path if identity else None, self)
             if identity:
-                self.library = MaterialXLibrary(path, self)
                 # Original embedded resources must still match the cooked images.
                 import json
 
@@ -87,33 +88,41 @@ class PreparedMaterials(OfflineView):
             self.applied = None
         if self.live:
             self.live.tick()
-            self.substrate.materials = self.substrate_base + list(
-                self.live.entries.values()
+            self.substrate.materials = (
+                self.substrate_base + self.live.substrate_entries()
             )
-        if self.library:
-            self.library.invalidate()
+            self.library.set_prepared(self.live.materialx_entries())
+        self.library.invalidate()
+
+        def known():
+            return self.substrate.materials + self.live.materialx_entries()
+
         try:
             self.settings.update(
                 sync(stage, time, self.library, self.substrate, self)
             )
             if self.live:
-                self.live.wanted = None
+                # MaterialX graphs hdUE cannot translate at render time: they render translated while UE's importer
+                # prepares them in the background.
+                from live_materials import materialx_records
+
+                records = materialx_records(self.library.missing, time)
+                if records:
+                    self.live.request(records, known())
+                else:
+                    self.live.wanted = None
         except ValueError as error:
             from substrate_library import NeedsPreparation
 
             message = str(error)
             if self.live and isinstance(error, NeedsPreparation):
+                from live_materials import materialx_records
                 from prepare_substrate import collect
 
                 records = collect(
-                    stage,
-                    time,
-                    self.library.bound_entries if self.library else {},
-                )
-                message = (
-                    self.live.request(records, self.substrate.materials)
-                    or message
-                )
+                    stage, time, self.library.bound_entries
+                ) + materialx_records(self.library.missing, time)
+                message = self.live.request(records, known()) or message
             self.publish_error(session, api, message)
             raise ValueError(message) from error
         assets = self.settings.get("nativeMaterialAssets", {})

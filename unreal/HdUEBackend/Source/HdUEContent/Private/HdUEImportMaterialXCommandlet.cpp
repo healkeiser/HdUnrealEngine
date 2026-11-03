@@ -101,6 +101,32 @@ int32 CorrectNormalScale(UMaterial* Material) {
     }
     return Count;
 }
+int32 CorrectPlace2DRotation(UMaterial* Material) {
+    // MaterialX's place2d rotates by `rotate` degrees. UE 5.8.4's MX_Place2D function scales it by 1/360 (turns) and
+    // feeds UE's Rotator, which reads radians (UMaterialExpressionRotator::Compile: cos(Time * Speed), Speed 1): 30
+    // degrees turn by 30/360 rad, 4.8 degrees. Scaling the input by 2 pi makes it rotate by the authored degrees.
+    const auto Original = Material->GetExpressions();
+    TArray<UMaterialExpression*> Expressions;
+    for (UMaterialExpression* Expression : Original) Expressions.Add(Expression);
+    int32 Count = 0;
+    for (auto* Expression : Expressions) {
+        auto* Call = Cast<UMaterialExpressionMaterialFunctionCall>(Expression);
+        if (!Call || !Call->MaterialFunction ||
+            !Call->MaterialFunction->GetPathName().EndsWith(TEXT("/MX_Place2D.MX_Place2D")))
+            continue;
+        for (auto& Input : Call->FunctionInputs) {
+            if (!Input.ExpressionInput || Input.ExpressionInput->InputName != TEXT("rotate") || !Input.Input.Expression)
+                continue;
+            auto* Turns = NewObject<UMaterialExpressionMultiply>(Material);
+            Turns->A = Input.Input;
+            Turns->ConstB = 2 * UE_PI;
+            Input.Input.Connect(0, Turns);
+            Material->GetExpressionCollection().AddExpression(Turns);
+            ++Count;
+        }
+    }
+    return Count;
+}
 }  // namespace
 UHdUEImportMaterialXCommandlet::UHdUEImportMaterialXCommandlet() {
     IsClient = false;
@@ -207,6 +233,7 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
             // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
             Material->bUsedWithInstancedStaticMeshes = true;
             Entry->SetNumberField(TEXT("normal_scale_corrections"), CorrectNormalScale(Material));
+            Entry->SetNumberField(TEXT("place2d_rotation_corrections"), CorrectPlace2DRotation(Material));
             // ID passes switch the material to its ID emission instead of swapping it (false: it keeps the swap).
             Entry->SetBoolField(TEXT("id_switch"), HdUEAddIdSwitch(Material));
             Material->PostEditChange();

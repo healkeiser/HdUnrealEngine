@@ -58,7 +58,7 @@ Reference material:
   - loads the delegate DLL (`hdue_viewport.py:38`);
   - starts `LivePreparation`;
   - arms a `QTimer` at 16 ms that re-arms after every run (`hdue_houdini.py:76-80`, `:185`).
-- Each `tick()` (`hdue_houdini.py:114-185`) runs a ctypes `status()` call, `live_substrate.tick()`, `current_settings_node()` (a pane lookup plus a walk up the input chain), and `hou.ui.paneTabOfType` lookups. It also writes `runtime-state.json` to disk every 2 s (`:177-178`, `:95-105`).
+- Each `tick()` (`hdue_houdini.py:114-185`) runs a ctypes `status()` call, `live_preparation.tick()`, `current_settings_node()` (a pane lookup plus a walk up the input chain), and `hou.ui.paneTabOfType` lookups. It also writes `runtime-state.json` to disk every 2 s (`:177-178`, `:95-105`).
 - None of this is gated on hdUE being the active renderer. The UE thread itself is now owned by the delegate (`hdue_houdini.py:51-53`, `src/hydra/delegate.cpp:242-300`), so this timer only does housekeeping, yet it still runs at 60 Hz.
 
 **What SideFX documents**
@@ -87,7 +87,7 @@ Reference material:
 **What we do**
 
 - **Cooked MaterialX / Substrate library selection.** These are spare parameters on a Python-built pass-through subnet, `hdUE_settings` (`hdue_houdini.py:377-399`). The subnet is found by walking `inputs()[0]` until a node has `hdue_materialx_library` (`:357-365`). The parameters are read only by the GUI host (`:133`, `:142-146`). They are not USD and never reach husk.
-- **Live Substrate preparation.** `LivePreparation` (`hdue_houdini.py:57-59`, `scripts/substrate_live.py:13`) is a host-side subprocess. Nothing documents what husk renders for a Substrate Builder material (unverified; `docs/substrate-builder.md` never mentions husk).
+- **Live Substrate preparation.** `LivePreparation` (`hdue_houdini.py:57-59`, `scripts/live_materials.py:13`) is a host-side subprocess. Nothing documents what husk renders for a Substrate Builder material (unverified; `docs/substrate-builder.md` never mentions husk).
 - **`hdue:asset` on Xform/Scope.** The asset needs the `__HdUEAssetProxy` bounds mesh. The host authors that mesh only in the LOP network's viewport overrides (`hdue_houdini.py:461-475`), and the delegate places assets only through a mesh (`src/hydra/prims.cpp:266-268`). `docs/houdini.md:84` itself says these overrides "are not part of what husk or a USD ROP sees". So an Xform with `hdue:asset` renders in the viewport and is missing in husk (inferred; `docs/materials.md:49` advertises Xform/Scope support).
 - **`op:` images.** These are exported by the host only. `docs/houdini.md:141` says "husk does not evaluate `op:` paths."
 

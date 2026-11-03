@@ -155,3 +155,79 @@ def rebase_graph(graph, old_root, new_root):
         for path, node in data["nodes"].items()
     }
     return data
+
+
+# What hdUE translates at render time (src/hydra/materials.cpp: readSurface and SurfaceReader::trace): these surfaces,
+# and inputs reached through these nodes. Keep the two in step.
+RUNTIME_SURFACES = (
+    "ND_standard_surface_surfaceshader",
+    "ND_open_pbr_surface_surfaceshader",
+    "ND_UsdPreviewSurface_surfaceshader",
+    "UsdPreviewSurface",
+)
+RUNTIME_NODES = (
+    "ND_image_",
+    "ND_tiledimage_",
+    "UsdUVTexture",
+    "ND_geompropvalue_vector2",
+    "ND_geompropvalue_color3",
+    "ND_geompropvalue_vector3",
+    "UsdPrimvarReader_",
+    "ND_texcoord_",
+    "UsdTransform2d",
+    "ND_constant_",
+    "ND_convert_",
+    "ND_dot_",
+    "ND_extract_",
+    "ND_normalmap",
+)
+
+
+def needs_import(graph):
+    """Whether hdUE's render-time translation cannot express graph (a node it would leave at its constant, or a
+    surface it does not read), so UE's MaterialX importer must prepare it.
+    """
+    nodes = graph["nodes"]
+    if not nodes[graph["terminal"]["node"]]["id"].startswith(RUNTIME_SURFACES):
+        return True
+    for path, node in nodes.items():
+        if path == graph["terminal"]["node"]:
+            continue
+        identity = node["id"]
+        if identity.startswith("ND_multiply_"):
+            # A multiply by a constant scales its other input; by another node it is a product hdUE does not form.
+            if all("node" in node["inputs"].get(i, {}) for i in ("in1", "in2")):
+                return True
+        elif not identity.startswith(RUNTIME_NODES):
+            return True
+    return False
+
+
+def _masked(graph, root):
+    """The graph rebased to root, with every numeric value masked: the values an imported material may expose as
+    parameters (bind_usd_materialx_library.py binds float, colour and vector inputs).
+    """
+    data = rebase_graph(graph, graph["material"], root)
+    for node in data["nodes"].values():
+        for item in node["inputs"].values():
+            value = item.get("value")
+            if isinstance(value, float) or (
+                isinstance(value, list)
+                and value
+                and all(isinstance(v, (int, float)) for v in value)
+            ):
+                item["value"] = "<number>"
+    return data
+
+
+def structure_key(graph):
+    """A prepared MaterialX graph's lookup key: its nodes, connections, files and non-numeric values, independent of
+    the material's path. Values the import kept as parameters can then change without a new preparation; an entry's
+    usd_graph_signature checks the ones it baked in.
+    """
+    return graph_signature(_masked(graph, "/M"))
+
+
+def request_key(graph):
+    """The exact identity of a graph to prepare, values included, independent of the material's path."""
+    return graph_signature(rebase_graph(graph, graph["material"], "/M"))

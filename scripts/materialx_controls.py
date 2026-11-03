@@ -7,7 +7,13 @@ from types import SimpleNamespace
 
 from materialx_textures import validate_texture_sets
 from pxr import Gf, Sdf, UsdShade
-from usd_materialx_graph import graph_data, graph_signature, rebase_graph
+from usd_materialx_graph import (
+    graph_data,
+    graph_signature,
+    needs_import,
+    rebase_graph,
+    structure_key,
+)
 
 
 def mtlx_material(prim):
@@ -60,9 +66,19 @@ class OfflineView:
 
 
 class MaterialXLibrary:
+    """Binds MaterialX materials to prepared native assets: a cooked library's (Import-MaterialX.ps1,
+    Import-UsdMaterialX.ps1; file, optional) and the ones live preparation made (set_prepared). A material neither has
+    renders through hdUE's render-time translation; one that translation cannot express is listed in missing for the
+    host to prepare (live_materials.LivePreparation), and renders translated meanwhile.
+    """
+
     def __init__(self, file, controller):
         self.controller = controller
-        library = json.loads(Path(file).read_text(encoding="utf-8-sig"))
+        library = (
+            json.loads(Path(file).read_text(encoding="utf-8-sig"))
+            if file
+            else dict(version=1, materials=[], dependencies={})
+        )
         if library.get("version") != 1:
             raise ValueError("Unsupported MaterialX library version")
         validate_texture_sets(library.get("texture_sets", []))
@@ -99,7 +115,10 @@ class MaterialXLibrary:
             if "usd_stage" in p
         }
         self.bound_entries = {}
+        self.prepared = {}
+        self.missing = []
         self.preparation_error = None
+        self.preparation_exception = None
         self.owned = set()
         self.dirty = True
         self.last_renderer = None
@@ -111,6 +130,48 @@ class MaterialXLibrary:
 
     def invalidate(self, *args):
         self.dirty = True
+
+    def set_prepared(self, entries):
+        """The MaterialX materials live preparation made (kind "materialx" entries), by structure_key."""
+        prepared = {}
+        for entry in entries:
+            entry.setdefault(
+                "_hdue_identity",
+                hashlib.sha256(
+                    json.dumps(
+                        dict(asset=entry["asset"], model=entry["model"]),
+                        sort_keys=True,
+                    ).encode()
+                ).hexdigest(),
+            )
+            prepared.setdefault(entry["structure"], []).append(entry)
+        if prepared != self.prepared:
+            self.prepared = prepared
+            self.dirty = True
+
+    @staticmethod
+    def _values(entry, path, stage, time):
+        values = []
+        for binding in entry["usd_bindings"]:
+            attribute = (
+                path + binding["attribute"][len(entry["usd_material"]) :]
+            )
+            attr = stage.GetAttributeAtPath(attribute)
+            values.append((binding, attr.Get(time) if attr else None))
+        return values
+
+    def prepared_binding(self, prim, graph, stage, time):
+        """A live-prepared entry for graph: the same structure, and the same values where the import baked them in."""
+        path = str(prim.GetPath())
+        for entry in self.prepared.get(structure_key(graph), []):
+            rebased = rebase_graph(graph, path, entry["usd_material"])
+            mutable = [b["attribute"] for b in entry["usd_bindings"]]
+            if (
+                graph_signature(rebased, mutable)
+                == entry["usd_graph_signature"]
+            ):
+                return entry, self._values(entry, path, stage, time)
+        return None, []
 
     def inline_binding(self, prim, stage, time):
         path = str(prim.GetPath())
@@ -157,22 +218,16 @@ class MaterialXLibrary:
                 + path
             )
         entry = matches[0]
-        values = []
-        for binding in entry["usd_bindings"]:
-            attribute = (
-                path + binding["attribute"][len(entry["usd_material"]) :]
-            )
-            attr = stage.GetAttributeAtPath(attribute)
-            values.append((binding, attr.Get(time) if attr else None))
-        return entry, values
+        return entry, self._values(entry, path, stage, time)
 
     def sync(self):
         try:
             self._sync()
-            self.preparation_error = None
+            self.preparation_error = self.preparation_exception = None
             return True
         except ValueError as error:
             self.preparation_error = str(error)
+            self.preparation_exception = error
             return False
 
     def _sync(self):
@@ -194,7 +249,7 @@ class MaterialXLibrary:
         for path in self.owned:
             asset_map.pop(path, None)
             overrides.pop(path, None)
-        owned, bindings, bound_entries = set(), [], {}
+        owned, bindings, bound_entries, missing = set(), [], {}, []
         for prim in model.stage.Traverse():
             if not prim.IsA(UsdShade.Material):
                 continue
@@ -206,18 +261,27 @@ class MaterialXLibrary:
             entry, values = self.inline_binding(
                 prim, model.stage, model.currentFrame
             )
-            if not entry:
+            file, name = mtlx_material(prim) if not entry else (None, None)
+            if not entry and (file, name) not in self.materials:
+                # Not in the cooked library: hdUE translates it at render time, unless the translation cannot
+                # express it; then a live-prepared material, else the host prepares one (missing).
+                try:
+                    graph = graph_data(
+                        UsdShade.Material(prim), model.currentFrame
+                    )
+                except ValueError:
+                    continue  # displacement or volume: the render-time translation reads it
+                if not needs_import(graph):
+                    continue
+                entry, values = self.prepared_binding(
+                    prim, graph, model.stage, model.currentFrame
+                )
+                if not entry:
+                    missing.append(UsdShade.Material(prim))
+                    continue
+            elif not entry:
                 shader = UsdShade.Shader(connection[0].GetPrim())
-                file, name = mtlx_material(prim)
-                if not file:
-                    raise ValueError(
-                        f"Inline MaterialX needs Import-UsdMaterialX.ps1 preparation: {path}"
-                    )
-                entry = self.materials.get((file, name))
-                if entry is None:
-                    raise ValueError(
-                        f"MaterialX material is absent from the cooked library: {file} / {name}"
-                    )
+                entry = self.materials[(file, name)]
                 values = []
                 material = UsdShade.Material(prim)
                 for name, p in entry["bindings"].items():
@@ -278,7 +342,7 @@ class MaterialXLibrary:
         ):
             view.SetRendererSetting("nativeMaterialParameters", overrides)
         self.owned, self.bindings = owned, bindings
-        self.bound_entries = bound_entries
+        self.bound_entries, self.missing = bound_entries, missing
         from surface_effects import resolve
 
         try:

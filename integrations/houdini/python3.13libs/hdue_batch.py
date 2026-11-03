@@ -89,10 +89,9 @@ class _Libraries:
 
         self.key = (materialx, substrate)
         self.view = OfflineView(None, None, object())
-        self.materialx = (
-            MaterialXLibrary(Path(materialx[0]), self.view)
-            if materialx
-            else None
+        # Also without a library file: it binds the MaterialX materials live preparation made.
+        self.materialx = MaterialXLibrary(
+            Path(materialx[0]) if materialx else None, self.view
         )
         self.substrate = SubstrateLibrary(
             Path(substrate[0]) if substrate else None
@@ -100,10 +99,10 @@ class _Libraries:
         self.substrate_base = list(self.substrate.materials)
         self.live = None
         if os.environ.get("HDUE_RUNTIME_CONFIG"):
-            # The graphs earlier renders prepared into this runtime count as prepared (substrate_live.published).
+            # The graphs earlier renders prepared into this runtime count as prepared (live_materials.published).
             import tempfile
 
-            from substrate_live import LivePreparation
+            from live_materials import LivePreparation
 
             self.live = LivePreparation(
                 runtime_config()["runtime_project"],
@@ -111,27 +110,34 @@ class _Libraries:
                 debounce=0,
                 previews=False,
             )
-            self.substrate.materials = self.substrate_base + list(
-                self.live.entries.values()
-            )
+            self.adopt()
+
+    def adopt(self):
+        """The live-prepared materials into the libraries."""
+        self.substrate.materials = (
+            self.substrate_base + self.live.substrate_entries()
+        )
+        self.materialx.set_prepared(self.live.materialx_entries())
 
     def prepare(self, stage, time):
-        """Prepares the stage's Substrate Builder graphs that the library lacks, as the viewport host does while you
-        edit (substrate_live.LivePreparation: UE's editor compiles them into the runtime), and waits for them: a batch
-        render has no later frame to show them on.
+        """Prepares the stage's Substrate Builder graphs that the library lacks, and the MaterialX graphs hdUE cannot
+        translate at render time, as the viewport host does while you edit (live_materials.LivePreparation: UE's
+        editor imports or compiles them into the runtime), and waits for them: a batch render has no later frame to
+        show them on.
         """
         import time as clock
 
+        from live_materials import materialx_records
         from prepare_substrate import collect
 
         if self.live is None:
             raise ValueError(
-                "Substrate preparation needs the runtime profile (HDUE_RUNTIME_CONFIG)"
+                "Material preparation needs the runtime profile (HDUE_RUNTIME_CONFIG)"
             )
         live = self.live
         records = collect(
-            stage, time, self.materialx.bound_entries if self.materialx else {}
-        )
+            stage, time, self.materialx.bound_entries
+        ) + materialx_records(self.materialx.missing, time)
         deadline = clock.monotonic() + 1800
         while live.request(
             records, self.substrate_base + list(live.entries.values())
@@ -139,11 +145,9 @@ class _Libraries:
             if live.phase == "failed":
                 raise ValueError(live.message)
             if clock.monotonic() > deadline:
-                raise ValueError("Substrate preparation took over 30 minutes")
+                raise ValueError("Material preparation took over 30 minutes")
             clock.sleep(0.5)
-        self.substrate.materials = self.substrate_base + list(
-            live.entries.values()
-        )
+        self.adopt()
 
 
 _LIBRARIES = None
@@ -153,7 +157,8 @@ def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
     """The three settings for stage at time, from the MaterialX and Substrate Builder libraries (library_file), as the
     viewport host applies them, and whether they are the same at every time (no prepared material and no wet surface:
     material bindings cannot be animated). With prepare (the render setting unreal:substrateAutoPrepare), Substrate
-    Builder graphs the library lacks are prepared first, as the viewport prepares them. Raises ValueError with the
+    Builder graphs the library lacks, and MaterialX graphs hdUE cannot translate at render time, are prepared first,
+    as the viewport prepares them. Raises ValueError with the
     library's message when a material is unprepared (and not prepared) or stale.
     """
     global _LIBRARIES
@@ -170,16 +175,20 @@ def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
     libraries = _LIBRARIES
     view = libraries.view
     view._dataModel.stage, view._dataModel.currentFrame = stage, time
-    if libraries.materialx:
-        libraries.materialx.invalidate()
+    libraries.materialx.invalidate()
     try:
         settings = sync(
             stage, time, libraries.materialx, libraries.substrate, view
         )
+        # MaterialX graphs hdUE cannot translate at render time: without preparation they render translated.
+        pending = prepare and bool(libraries.materialx.missing)
     except NeedsPreparation:
         if not prepare:
             raise
+        pending = True
+    if pending:
         libraries.prepare(stage, time)
+        libraries.materialx.invalidate()
         settings = sync(
             stage, time, libraries.materialx, libraries.substrate, view
         )

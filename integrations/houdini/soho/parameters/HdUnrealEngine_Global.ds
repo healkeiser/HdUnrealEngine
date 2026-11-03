@@ -553,14 +553,14 @@
                 disablewhen R"({ xn__unrealsubstrateLibrary_control_xpb == block } { xn__unrealsubstrateLibrary_control_xpb == none })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
-            HDUE_CONTROL("xn__unrealsubstrateAutoPrepare_control_gwb", "Prepare Edited Substrate Materials")
+            HDUE_CONTROL("xn__unrealsubstrateAutoPrepare_control_gwb", "Prepare Edited Materials")
             parm {
                 name    "xn__unrealsubstrateAutoPrepare_fjb"
-                label   "Prepare Edited Substrate Materials"
+                label   "Prepare Edited Materials"
                 type    toggle
                 size    1
                 default { 1 }
-                help    "Substrate Builder materials missing from the Prepared Substrate Library are prepared in the background (UE's editor compiles them, about a minute per graph) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, such a material shows the library's message and fails a husk frame."
+                help    "Substrate Builder materials missing from the Prepared Substrate Library, and MaterialX materials hdUE cannot translate at render time, are prepared in the background (UE's editor compiles or imports them, seconds per job) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, such a Substrate Builder material shows the library's message and fails a husk frame; such a MaterialX material renders with the inputs hdUE cannot translate at their constants."
                 parmtag { "spare_category" "Materials" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealsubstrateAutoPrepare_control_gwb == block } { xn__unrealsubstrateAutoPrepare_control_gwb == none })"

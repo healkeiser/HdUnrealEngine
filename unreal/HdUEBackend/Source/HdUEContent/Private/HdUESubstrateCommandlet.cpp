@@ -1,5 +1,6 @@
 #include "HdUESubstrateCommandlet.h"
 #include "IdSwitch.h"
+#include "HdUEImportMaterialXCommandlet.h"
 #include "Commandlets/Commandlet.h"
 #include "MaterialDomain.h"  // MD_Volume, MD_DeferredDecal
 #include "Materials/Material.h"
@@ -871,7 +872,23 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         // A whole preparation job in one editor (each line "graph|report"): its start-up (~4 s) once instead of per
         // graph, and the materials' shaders compile together at the end, across UE's shader workers.
         TArray<FString> Lines;
-        if (!FFileHelper::LoadFileToStringArray(Lines, *List) || Lines.IsEmpty()) return 1;
+        FString MaterialX, MaterialXDestination, MaterialXReport;
+        const bool bMaterialX = FParse::Value(*Params, TEXT("MaterialXSource="), MaterialX);
+        if (!FFileHelper::LoadFileToStringArray(Lines, *List) || (Lines.IsEmpty() && !bMaterialX)) return 1;
+        if (bMaterialX) {
+            // The job's MaterialX graphs (one document) through UE's MaterialX importer (HdUEImportMaterialX), in this
+            // editor: one start-up and one cook for the whole job.
+            if (!FParse::Value(*Params, TEXT("MaterialXDestination="), MaterialXDestination) ||
+                !FParse::Value(*Params, TEXT("MaterialXReport="), MaterialXReport))
+                return 1;
+            const int32 Code = NewObject<UHdUEImportMaterialXCommandlet>(GetTransientPackage())
+                                   ->Main(FString::Printf(TEXT("-Source=\"%s\" -Destination=%s -Report=\"%s\""),
+                                                          *MaterialX, *MaterialXDestination, *MaterialXReport));
+            if (Code) {
+                UE_LOG(LogTemp, Error, TEXT("Live preparation: MaterialX import of %s failed (%d)"), *MaterialX, Code);
+                return 20 + Code;
+            }
+        }
         for (const auto& Line : Lines) {
             FString Graph, GraphReport;
             if (Line.TrimStartAndEnd().IsEmpty()) continue;

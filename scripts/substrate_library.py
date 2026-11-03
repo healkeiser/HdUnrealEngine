@@ -3,6 +3,9 @@
 import json
 from pathlib import Path
 
+from prepared_materials import (
+    NeedsPreparation,
+)  # noqa: F401 (hosts import it from here)
 from pxr import Gf, UsdGeom, UsdShade
 from substrate_graph import (
     COMPILER_VERSION,
@@ -12,10 +15,6 @@ from substrate_graph import (
     signature,
 )
 from surface_effects import validate_mask
-
-
-class NeedsPreparation(ValueError):
-    """The graph is valid but has no matching compiled material."""
 
 
 def graph_base(graph, entries):
@@ -137,8 +136,8 @@ class SubstrateLibrary:
                     else ""
                 ),
             )
-        # Prepared materials published by earlier processes stay while bound somewhere (substrate_live.clean).
-        from substrate_live import used
+        # Prepared materials published by earlier processes stay while bound somewhere (live_materials.clean).
+        from live_materials import used
 
         for data in bound.values():
             used(data["entry"])

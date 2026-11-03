@@ -1,0 +1,102 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = "Procedural MaterialX check: UVs through place2d into Houdini's checkers node, which mixes red and grey into standard_surface's base colour. hdUE's render-time translation cannot express the chain (the base colour stays its constant), so the graph is prepared through UE's MaterialX importer (docs/materials.md)."
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Scope "Looks"
+    {
+        def Material "Checkers"
+        {
+            token outputs:mtlx:surface.connect = </World/Looks/Checkers/Surface.outputs:surface>
+
+            def Shader "Surface"
+            {
+                uniform token info:id = "ND_standard_surface_surfaceshader"
+                color3f inputs:base_color.connect = </World/Looks/Checkers/Mix.outputs:out>
+                float inputs:specular_roughness = 0.5
+                token outputs:surface
+            }
+
+            def Shader "Mix"
+            {
+                uniform token info:id = "ND_mix_color3"
+                color3f inputs:bg = (0.8, 0.8, 0.8)
+                color3f inputs:fg = (0.8, 0.04, 0.02)
+                float inputs:mix.connect = </World/Looks/Checkers/Checks.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "Checks"
+            {
+                uniform token info:id = "ND_hmtlxcheckers2d_float"
+                float2 inputs:freq = (4, 4)
+                float2 inputs:texcoord.connect = </World/Looks/Checkers/Place.outputs:out>
+                float outputs:out
+            }
+
+            def Shader "Place"
+            {
+                uniform token info:id = "ND_place2d_vector2"
+                float inputs:rotate = 30
+                float2 inputs:texcoord.connect = </World/Looks/Checkers/UV.outputs:out>
+                float2 outputs:out
+            }
+
+            def Shader "UV"
+            {
+                uniform token info:id = "ND_texcoord_vector2"
+                float2 outputs:out
+            }
+        }
+    }
+
+    def Mesh "Card" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-1, -1, 0), (1, 1, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Looks/Checkers>
+        point3f[] points = [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        uniform token subdivisionScheme = "none"
+        float3 xformOp:rotateXYZ = (0, 20, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+
+def "Lights"
+{
+    def DistantLight "Key"
+    {
+        float inputs:angle = 2
+        float inputs:exposure = 1.5
+        float inputs:intensity = 1
+        float3 xformOp:rotateXYZ = (-20, 15, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "Fill"
+    {
+        float inputs:exposure = -1
+        float inputs:intensity = 1
+    }
+}
+
+def Camera "Camera"
+{
+    float2 clippingRange = (0.05, 100)
+    float focalLength = 35
+    float horizontalAperture = 36
+    float verticalAperture = 20.25
+    double3 xformOp:translate = (0, 0, 3.2)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}

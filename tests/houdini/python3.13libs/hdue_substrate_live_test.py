@@ -19,7 +19,7 @@ class Test(MaterialTest):
         """
         import json
 
-        live = self.host.live_substrate
+        live = self.host.live_preparation
         for library in (live.runtime_project.parent / "Content/HdUE/Live").glob(
             "**/hdue-live-library.json"
         ):
@@ -51,7 +51,7 @@ class Test(MaterialTest):
         self.session = self.api.status()["session"]
         self.pid = os.getpid()
         original = yield from self.image("01-before-topology-edit", 0)
-        live = self.host.live_substrate
+        live = self.host.live_preparation
         tint = network.createNode(
             hdue_substrate.type_name("constant_color"), "live_tint"
         )
@@ -176,12 +176,12 @@ class Test(MaterialTest):
 
     def ready(self, count):
         while (
-            self.host.live_substrate.completed < count
+            self.host.live_preparation.completed < count
             or self.host.material_error
             or self.api.status()["error"]
         ):
-            if self.host.live_substrate.phase == "failed":
-                raise AssertionError(self.host.live_substrate.message)
+            if self.host.live_preparation.phase == "failed":
+                raise AssertionError(self.host.live_preparation.message)
             yield
 
 
