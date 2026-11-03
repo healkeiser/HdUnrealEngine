@@ -211,6 +211,10 @@ def registry(folder):
     )
 
 
+# A published live job's library, beside its packages in the runtime's Content/HdUE/Live.
+LIBRARY_NAME = "hdue-live-library.json"
+
+
 def publish(folder, runtime_project, destination):
     """Atomically add immutable loose cooked packages, without touching shaders/libraries already loaded."""
     import re
@@ -264,6 +268,12 @@ def publish(folder, runtime_project, destination):
     temporary = target.with_name(target.name + ".incoming-" + uuid.uuid4().hex)
     shutil.copytree(source, temporary)
     temporary.rename(target)
+    # The job's library next to its packages: later processes on this runtime load it (substrate_live.published), so
+    # a graph is prepared once per runtime, not once per process.
+    shared = target / LIBRARY_NAME
+    pending = shared.with_name(shared.name + ".incoming-" + uuid.uuid4().hex)
+    pending.write_text(json.dumps(library, indent=2), encoding="utf-8")
+    pending.rename(shared)
     (folder / "published.json").write_text(
         json.dumps(
             dict(

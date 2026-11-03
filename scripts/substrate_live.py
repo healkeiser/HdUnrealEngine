@@ -12,6 +12,40 @@ from pathlib import Path
 from substrate_graph import COMPILER_VERSION, signature
 
 
+def published(runtime_project):
+    """The materials earlier processes prepared into this runtime (prepare_substrate.publish), by identity: those whose
+    packages are still there, whose textures are unchanged and whose compiler is current.
+    """
+    from prepare_substrate import LIBRARY_NAME
+    from substrate_textures import validate_dependencies
+
+    content = Path(runtime_project).resolve().parent / "Content"
+    entries = {}
+    for file in sorted((content / "HdUE/Live").glob("**/" + LIBRARY_NAME)):
+        try:
+            data = json.loads(file.read_text(encoding="utf-8"))
+            if data.get("compiler") != COMPILER_VERSION:
+                continue
+            validate_dependencies(data)
+        except (OSError, ValueError, KeyError):
+            continue
+        for entry in data.get("materials", []):
+            packages = [
+                entry[field].split(".")[0]
+                for field in ("asset", "preview_asset")
+            ]
+            if all(
+                (
+                    content / (package.removeprefix("/Game/") + ".uasset")
+                ).is_file()
+                for package in packages
+            ):
+                entries[
+                    (entry["signature"], entry.get("base_identity", ""))
+                ] = entry
+    return entries
+
+
 class LivePreparation:
     def __init__(
         self, runtime_project, log_directory, root=None, debounce=0.65
@@ -41,6 +75,7 @@ class LivePreparation:
         self.phase = "idle"
         self.message = ""
         self.last_progress = 0.0
+        self.entries.update(published(self.runtime_project))
 
     @staticmethod
     def identity(record):

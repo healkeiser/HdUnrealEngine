@@ -752,11 +752,12 @@ UHdUESubstrateCommandlet::UHdUESubstrateCommandlet() {
     IsEditor = true;
     LogToConsole = true;
 }
-int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
-    FString File, Report, Json;
-    if (!FParse::Value(*Params, TEXT("Graph="), File) || !FParse::Value(*Params, TEXT("Report="), Report) ||
-        !FFileHelper::LoadFileToString(Json, *File))
-        return 1;
+namespace {
+// One graph (a prepare_substrate.py export) into its material package and receipt. Without WaitForShaders the
+// material's shaders keep compiling in the background (the caller waits once for a whole job).
+int32 CompileGraph(const FString& File, const FString& Report, bool WaitForShaders) {
+    FString Json;
+    if (!FFileHelper::LoadFileToString(Json, *File)) return 1;
     TSharedPtr<FJsonObject> Root;
     if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid()) return 2;
     const TSharedPtr<FJsonObject>* GraphPtr = nullptr;
@@ -839,7 +840,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         IdSwitch = HdUEAddIdSwitch(Material);  // false: ID passes swap this material to M_HdUEId
     }
     Material->PostEditChange();
-    FAssetCompilingManager::Get().FinishAllCompilation();
+    if (WaitForShaders) FAssetCompilingManager::Get().FinishAllCompilation();
     FAssetRegistryModule::AssetCreated(Material);
     FSavePackageArgs Args;
     Args.TopLevelFlags = RF_Public | RF_Standalone;
@@ -860,4 +861,28 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     FString Receipt;
     FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Receipt));
     return FFileHelper::SaveStringToFile(Receipt, *Report, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM) ? 0 : 6;
+}
+}  // namespace
+
+int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
+    FString File, Report, List;
+    if (FParse::Value(*Params, TEXT("GraphList="), List)) {
+        // A whole preparation job in one editor (each line "graph|report"): its start-up (~4 s) once instead of per
+        // graph, and the materials' shaders compile together at the end, across UE's shader workers.
+        TArray<FString> Lines;
+        if (!FFileHelper::LoadFileToStringArray(Lines, *List) || Lines.IsEmpty()) return 1;
+        for (const auto& Line : Lines) {
+            FString Graph, GraphReport;
+            if (Line.TrimStartAndEnd().IsEmpty()) continue;
+            if (!Line.Split(TEXT("|"), &Graph, &GraphReport)) return 1;
+            if (const int32 Code = CompileGraph(Graph, GraphReport, false)) {
+                UE_LOG(LogTemp, Error, TEXT("Substrate Builder: %s failed (%d)"), *Graph, Code);
+                return Code;
+            }
+        }
+        FAssetCompilingManager::Get().FinishAllCompilation();
+        return 0;
+    }
+    if (!FParse::Value(*Params, TEXT("Graph="), File) || !FParse::Value(*Params, TEXT("Report="), Report)) return 1;
+    return CompileGraph(File, Report, true);
 }

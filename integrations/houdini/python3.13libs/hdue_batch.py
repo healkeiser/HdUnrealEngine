@@ -99,23 +99,33 @@ class _Libraries:
         )
         self.substrate_base = list(self.substrate.materials)
         self.live = None
+        if os.environ.get("HDUE_RUNTIME_CONFIG"):
+            # The graphs earlier renders prepared into this runtime count as prepared (substrate_live.published).
+            import tempfile
+
+            from substrate_live import LivePreparation
+
+            self.live = LivePreparation(
+                runtime_config()["runtime_project"],
+                Path(tempfile.gettempdir()) / "hdue-husk",
+                debounce=0,
+            )
+            self.substrate.materials = self.substrate_base + list(
+                self.live.entries.values()
+            )
 
     def prepare(self, stage, time):
         """Prepares the stage's Substrate Builder graphs that the library lacks, as the viewport host does while you
         edit (substrate_live.LivePreparation: UE's editor compiles them into the runtime), and waits for them: a batch
         render has no later frame to show them on.
         """
-        import tempfile
         import time as clock
 
         from prepare_substrate import collect
-        from substrate_live import LivePreparation
 
         if self.live is None:
-            self.live = LivePreparation(
-                runtime_config()["runtime_project"],
-                Path(tempfile.gettempdir()) / "hdue-husk",
-                debounce=0,
+            raise ValueError(
+                "Substrate preparation needs the runtime profile (HDUE_RUNTIME_CONFIG)"
             )
         live = self.live
         records = collect(

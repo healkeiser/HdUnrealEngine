@@ -27,16 +27,22 @@ $Project = Join-Path $TaskRoot 'unreal\HdUEBackend\HdUEBackend.uproject'
 if (-not $SkipBuild) { Build-HdUEEditor $EditorRoot *> (Join-Path $RunOutput 'build.log') }
 $Editor = Join-Path $EditorRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $Manifests = Get-Content -LiteralPath (Join-Path $RunOutput 'export.json') -Raw | ConvertFrom-Json
+# Every graph of the job (each material and its mask-preview variant) in one editor: its start-up once, not per file.
 $Compiled = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-foreach ($Manifest in $Manifests) {
+$Lines = foreach ($Manifest in $Manifests) {
     foreach ($File in @($Manifest.file, $Manifest.preview)) {
-        if (-not $Compiled.Add($File)) { continue }
-        $Report = [IO.Path]::ChangeExtension($File, '.receipt.json'); $Log = [IO.Path]::ChangeExtension($File, '.log')
-        & $Editor $Project -run=HdUESubstrate "-Graph=$File" "-Report=$Report" -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
-        if ($LASTEXITCODE -or -not (Test-Path -LiteralPath $Report)) { throw "Substrate graph compilation failed: $Log" }
-        if ((Get-Content -LiteralPath $Log -Raw) -match 'Log\w+: Error:|Fatal error') { throw "Substrate graph compilation reported an error: $Log" }
+        if ($Compiled.Add($File)) { $File + '|' + [IO.Path]::ChangeExtension($File, '.receipt.json') }
     }
 }
+$List = Join-Path $RunOutput 'graphs.txt'
+[IO.File]::WriteAllLines($List, [string[]]$Lines, [Text.UTF8Encoding]::new($false))
+$Log = Join-Path $RunOutput 'substrate.log'
+& $Editor $Project -run=HdUESubstrate "-GraphList=$List" -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
+if ($LASTEXITCODE) { throw "Substrate graph compilation failed: $Log" }
+foreach ($Line in $Lines) {
+    if (-not (Test-Path -LiteralPath $Line.Split('|')[1])) { throw "Substrate graph compilation wrote no receipt for $($Line.Split('|')[0]): $Log" }
+}
+if ((Get-Content -LiteralPath $Log -Raw) -match 'Log\w+: Error:|Fatal error') { throw "Substrate graph compilation reported an error: $Log" }
 if ($GraphJob) {
     & (Join-Path $PSScriptRoot 'Run-UsdPython.ps1') -Script (Join-Path $PSScriptRoot 'prepare_substrate.py') -ScriptArguments @('registry', $RunOutput)
 }

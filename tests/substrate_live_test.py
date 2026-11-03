@@ -38,6 +38,40 @@ class Process:
 
 
 class LiveTests(unittest.TestCase):
+    def test_published_jobs_count_as_prepared(self):
+        # A job published by an earlier process (prepare_substrate.publish) is known to the next one, unless its
+        # packages are gone.
+        from prepare_substrate import LIBRARY_NAME
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "runtime/HdUEBackend.uproject"
+            project.parent.mkdir(parents=True)
+            project.write_text("{}")
+            for job, keep in (("V1_a", True), ("V2_b", False)):
+                packages = root / "runtime/Content/HdUE/Live/P1" / job
+                packages.mkdir(parents=True)
+                entry = dict(
+                    signature="sig-" + job,
+                    base_identity="",
+                    asset=f"/Game/HdUE/Live/P1/{job}/M_x.M_x",
+                    preview_asset=f"/Game/HdUE/Live/P1/{job}/M_x_preview.M_x_preview",
+                )
+                if keep:
+                    (packages / "M_x.uasset").write_bytes(b"")
+                    (packages / "M_x_preview.uasset").write_bytes(b"")
+                (packages / LIBRARY_NAME).write_text(
+                    json.dumps(
+                        dict(
+                            version=1,
+                            compiler=COMPILER_VERSION,
+                            materials=[entry],
+                        )
+                    )
+                )
+            manager = LivePreparation(project, root / "logs", root)
+            self.assertEqual(list(manager.entries), [("sig-V1_a", "")])
+
     def test_due_asks_the_host_to_sync_again(self):
         # The viewport host syncs materials only after stage edits: due() is what brings it back once an edit has
         # settled (to start the preparation) and once a preparation finished (to bind it).

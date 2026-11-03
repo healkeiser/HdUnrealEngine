@@ -13,8 +13,30 @@ _test = None
 
 
 class Test(MaterialTest):
+    def forget_published(self, material):
+        """Earlier runs published this test's edited graphs into the runtime (prepare_substrate.publish), which the
+        host loaded at start: forgets them, on disk and in the host, so the edits are prepared again.
+        """
+        import json
+
+        live = self.host.live_substrate
+        for library in (live.runtime_project.parent / "Content/HdUE/Live").glob(
+            "**/hdue-live-library.json"
+        ):
+            entries = json.loads(library.read_text(encoding="utf-8")).get(
+                "materials", []
+            )
+            if any(entry.get("material") == material for entry in entries):
+                library.unlink()
+        live.entries = {
+            key: entry
+            for key, entry in live.entries.items()
+            if entry.get("material") != material
+        }
+
     def run(self):
         self.deadline = time.monotonic() + 360
+        self.forget_published("/Looks/Textured")
         viewer = integration.scene_viewer()
         for _ in range(40):
             yield

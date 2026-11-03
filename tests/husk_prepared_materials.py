@@ -109,6 +109,24 @@ def red_fraction(rgb):
     )
 
 
+def forget_prepared(material):
+    """Removes the runtime's published live libraries that prepared material (earlier runs of this test): its stale
+    graph is then unprepared again, as on a fresh runtime. The packages stay; nothing refers to them.
+    """
+    import json
+
+    config = json.loads(ARGS.runtime_config.read_text(encoding="utf-8-sig"))
+    live = (
+        Path(config["runtime_project"]).resolve().parent / "Content/HdUE/Live"
+    )
+    for library in live.glob("**/hdue-live-library.json"):
+        entries = json.loads(library.read_text(encoding="utf-8")).get(
+            "materials", []
+        )
+        if any(entry.get("material") == material for entry in entries):
+            library.unlink()
+
+
 def check(name, condition, detail):
     print(("ok   " if condition else "FAIL ") + name + ": " + detail)
     if not condition and LAST_LOG:
@@ -135,6 +153,7 @@ def main():
         )
         # A graph changed since its preparation (the paint Slab's subsurface mode, which recompiles): without automatic
         # preparation it fails the frame; with it (the default), husk prepares it as the viewport does, then renders.
+        forget_prepared("/Looks/Paint")
         (temp / "stale").mkdir()
         stale = edit(
             "/Looks/Paint/Graph/paint",
