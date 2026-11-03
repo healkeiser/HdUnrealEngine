@@ -63,7 +63,10 @@ if ($SetDefault) {
 }
 # Hashed DLLs that no profile names any more go (253 MB each); one a running Houdini or husk has loaded stays until a
 # later run.
-$Named = @(Get-ChildItem -Path (Join-Path $TaskRoot '.local\*.json'), (Join-Path $TaskRoot 'out\project-assets\*.json') -ErrorAction SilentlyContinue |
+# The profiles read are the default ones and those beside -OutputConfig (a side profile can live anywhere); the DLL
+# just staged always stays.
+$ProfileFolders = @((Join-Path $TaskRoot '.local\*.json'), (Join-Path $TaskRoot 'out\project-assets\*.json'), (Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($OutputConfig))) '*.json'))
+$Named = @([IO.Path]::GetFullPath($Destination)) + @(Get-ChildItem -Path $ProfileFolders -ErrorAction SilentlyContinue |
         ForEach-Object { try { (Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json).backend_dll } catch { $null } } |
         Where-Object { $_ } | ForEach-Object { [IO.Path]::GetFullPath($_) })
 foreach ($Old in Get-ChildItem -LiteralPath (Split-Path -Parent $Destination) -Filter 'HdUEBackend-h22-*.dll') {
