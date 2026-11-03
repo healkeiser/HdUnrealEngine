@@ -7,7 +7,8 @@ The libraries are Prepare-Substrate.ps1's for samples/decal/decal.usda and sampl
 (staged with Stage-Runtime.ps1), and Import-MaterialX.ps1's for samples/materialx; by default the newest under out/
 (out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. Checks: the decal paints the wall;
 a volume material's albedo edit tints the fog; MaterialX materials render their cooked assets; a graph changed since its
-preparation fails the frame with the library's message.
+preparation fails the frame with the library's message; wet surfaces bind; an object behind glass shows through it with
+its own alpha.
 """
 
 import argparse
@@ -221,6 +222,36 @@ def main():
                     f"exit {code}, wet bindings {wet}",
                 )
             )
+        # Glass (hdUE's own MaterialX translation, the parent Interchange gives it): the orange sphere behind the clear
+        # pane shows through it, and the beauty's alpha there stays the opaque sphere's (refraction kept coverage).
+        (temp / "glass").mkdir()
+        code, log, image = husk(
+            ROOT / "samples/materialx/glass.usda",
+            [mode, "rel camera = </Camera>"],
+            temp / "glass",
+        )
+        sphere, covered = None, 0.0
+        if image is not None:
+            import OpenImageIO as oiio
+
+            file = oiio.ImageInput.open(str(temp / "glass/beauty.exr"))
+            alpha = file.read_image("float")[..., 3]
+            file.close()
+            h, w = alpha.shape
+            # The sphere behind the left pane, at 30% across and 51% down the frame.
+            y, x, r = int(0.51 * h), int(0.30 * w), max(4, h // 40)
+            sphere = image[y - r : y + r, x - r : x + r].reshape(-1, 3).mean(0)
+            covered = float(alpha[y - r : y + r, x - r : x + r].min())
+        results.append(
+            check(
+                "glass",
+                code == 0
+                and sphere is not None
+                and sphere[0] > 1.5 * sphere[2]
+                and covered > 0.99,
+                f"exit {code}, sphere rgb {None if sphere is None else sphere.round(3).tolist()}, alpha {covered}",
+            )
+        )
     sys.exit(0 if all(results) else 1)
 
 

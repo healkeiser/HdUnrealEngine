@@ -1,0 +1,243 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = "Glass check: an object behind clear glass (left) and behind glass with a fractal roughness grunge (right); prepared with Import-MaterialX.ps1 -Source samples/materialx/glass.mtlx."
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Scope "Looks"
+    {
+        def Material "Glass_Clear" (
+            prepend references = @glass.mtlx@</MaterialX/Materials/Glass_Clear>
+        )
+        {
+            token outputs:surface.connect = </World/Looks/Glass_Clear/Preview.outputs:surface>
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.9, 0.95, 1)
+                float inputs:opacity = 0.2
+                float inputs:roughness = 0.05
+                token outputs:surface
+            }
+        }
+
+        def Material "Glass_Smudged" (
+            prepend references = @glass.mtlx@</MaterialX/Materials/Glass_Smudged>
+        )
+        {
+            token outputs:surface.connect = </World/Looks/Glass_Smudged/Preview.outputs:surface>
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.9, 0.95, 1)
+                float inputs:opacity = 0.2
+                float inputs:roughness = 0.05
+                token outputs:surface
+            }
+        }
+
+        def Material "Grey"
+        {
+            token outputs:surface.connect = </World/Looks/Grey/Preview.outputs:surface>
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+                float inputs:roughness = 0.5
+                token outputs:surface
+            }
+        }
+
+        def Material "Orange"
+        {
+            token outputs:surface.connect = </World/Looks/Orange/Preview.outputs:surface>
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.8, 0.25, 0.05)
+                float inputs:roughness = 0.4
+                token outputs:surface
+            }
+        }
+
+        def Material "Blue"
+        {
+            token outputs:surface.connect = </World/Looks/Blue/Preview.outputs:surface>
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.05, 0.2, 0.8)
+                float inputs:roughness = 0.4
+                token outputs:surface
+            }
+        }
+    }
+
+    def Mesh "Floor" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-3, -0.01, -2), (3, 0.01, 2)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+        rel material:binding = </World/Looks/Grey>
+        point3f[] points = [(-3, -0.01, -2), (-3, -0.01, 2), (-3, 0.01, -2), (-3, 0.01, 2), (3, -0.01, -2), (3, -0.01, 2), (3, 0.01, -2), (3, 0.01, 2)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (0, -0.01, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "Backdrop" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-3, -1.5, -0.01), (3, 1.5, 0.01)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+        rel material:binding = </World/Looks/Grey>
+        point3f[] points = [(-3, -1.5, -0.01), (-3, -1.5, 0.01), (-3, 1.5, -0.01), (-3, 1.5, 0.01), (3, -1.5, -0.01), (3, -1.5, 0.01), (3, 1.5, -0.01), (3, 1.5, 0.01)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (0, 1.5, -1.6)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "Pane_Clear" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-0.6, -0.6, -0.015), (0.6, 0.6, 0.015)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+        rel material:binding = </World/Looks/Glass_Clear>
+        point3f[] points = [(-0.6, -0.6, -0.015), (-0.6, -0.6, 0.015), (-0.6, 0.6, -0.015), (-0.6, 0.6, 0.015), (0.6, -0.6, -0.015), (0.6, -0.6, 0.015), (0.6, 0.6, -0.015), (0.6, 0.6, 0.015)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (-0.8, 0.6, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def "Behind_Clear"
+    {
+        def Sphere "Sphere" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.25, -0.25, -0.25), (0.25, 0.25, 0.25)]
+            rel material:binding = </World/Looks/Orange>
+            double radius = 0.25
+            double3 xformOp:translate = (-0.9500000000000001, 0.45, -0.7)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Mesh "Post" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.04, -0.5, -0.04), (0.04, 0.5, 0.04)]
+            int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+            int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+            rel material:binding = </World/Looks/Blue>
+            point3f[] points = [(-0.04, -0.5, -0.04), (-0.04, -0.5, 0.04), (-0.04, 0.5, -0.04), (-0.04, 0.5, 0.04), (0.04, -0.5, -0.04), (0.04, -0.5, 0.04), (0.04, 0.5, -0.04), (0.04, 0.5, 0.04)]
+            texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+                interpolation = "faceVarying"
+            )
+            uniform token subdivisionScheme = "none"
+            double3 xformOp:translate = (-0.5, 0.5, -0.5)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+
+    def Mesh "Pane_Smudged" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-0.6, -0.6, -0.015), (0.6, 0.6, 0.015)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+        rel material:binding = </World/Looks/Glass_Smudged>
+        point3f[] points = [(-0.6, -0.6, -0.015), (-0.6, -0.6, 0.015), (-0.6, 0.6, -0.015), (-0.6, 0.6, 0.015), (0.6, -0.6, -0.015), (0.6, -0.6, 0.015), (0.6, 0.6, -0.015), (0.6, 0.6, 0.015)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (0.8, 0.6, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def "Behind_Smudged"
+    {
+        def Sphere "Sphere" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.25, -0.25, -0.25), (0.25, 0.25, 0.25)]
+            rel material:binding = </World/Looks/Orange>
+            double radius = 0.25
+            double3 xformOp:translate = (0.65, 0.45, -0.7)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Mesh "Post" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.04, -0.5, -0.04), (0.04, 0.5, 0.04)]
+            int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+            int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3]
+            rel material:binding = </World/Looks/Blue>
+            point3f[] points = [(-0.04, -0.5, -0.04), (-0.04, -0.5, 0.04), (-0.04, 0.5, -0.04), (-0.04, 0.5, 0.04), (0.04, -0.5, -0.04), (0.04, -0.5, 0.04), (0.04, 0.5, -0.04), (0.04, 0.5, 0.04)]
+            texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1)] (
+                interpolation = "faceVarying"
+            )
+            uniform token subdivisionScheme = "none"
+            double3 xformOp:translate = (1.1, 0.5, -0.5)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+}
+
+def "Lights"
+{
+    def DistantLight "Key"
+    {
+        float inputs:angle = 2
+        float inputs:exposure = 1.5
+        float inputs:intensity = 1
+        float3 xformOp:rotateXYZ = (-50, 25, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "Fill"
+    {
+        float inputs:exposure = -1.5
+        float inputs:intensity = 1
+    }
+}
+
+def Camera "Camera"
+{
+    float2 clippingRange = (0.05, 100)
+    float focalLength = 35
+    float horizontalAperture = 36
+    float verticalAperture = 20.25
+    matrix4d xformOp:transform = ( (1, -0, 0, -0), (0, 0.9902017961502159, -0.13964384304682534, 0), (0, 0.13964384304682534, 0.9902017961502159, -0), (0, 1.1, 3.6000000000000005, 1) )
+    uniform token[] xformOpOrder = ["xformOp:transform"]
+}
+

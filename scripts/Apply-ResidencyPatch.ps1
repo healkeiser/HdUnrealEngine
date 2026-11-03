@@ -155,3 +155,20 @@ $Fixed = (
 ) -join "`n"
 Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\RenderCore\Private\ShaderLibrary\ShaderLibraryInstance.cpp') `
     -Label 'shader creation race patch' -Marker 'hdUE: the reference taken under the lock' -Edits @(, @($Anchor, $Fixed))
+# Rough refraction (DistortionRendering.cpp) samples the scene behind a refracting surface from a copy of scene colour
+# made by CopySceneColorDepthTexturePS into a PF_FloatR11G11B10 mip chain. The copy writes alpha 1 and the format holds
+# none, so with r.PostProcessing.PropagateAlpha (scene colour alpha is 1 - coverage) every pixel seen through glass read
+# as uncovered: a husk beauty had alpha 0.06 over glass in front of opaque objects, and viewers showed the glass white.
+# The chain keeps alpha (PF_FloatRGBA) when post-processing propagates it, as SceneTextures.cpp sizes scene colour, and
+# the copy writes the scene's alpha; the downsample and blur passes already filter all four channels.
+foreach ($Root in @($EngineRoot, $EditorRoot) | Where-Object { $_ } | Select-Object -Unique) {
+    Edit-EngineSource -Path (Join-Path $Root 'Engine\Shaders\Private\DistortFiltering.usf') -Label 'refraction alpha shader patch' `
+        -Marker 'hdUE: keep coverage' -Edits @(, @("`tOutColor = float4(LinearColor.rgb, 1.0f);",
+            "`tOutColor = LinearColor;`t// hdUE: keep coverage (alpha) for r.PostProcessing.PropagateAlpha"))
+}
+Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\Private\DistortionRendering.cpp') `
+    -Label 'refraction alpha patch' -Marker 'hdUE: alpha for' -Edits @(
+    @('#include "DistortionRendering.h"', "#include `"DistortionRendering.h`"`n#include `"PostProcess/PostProcessing.h`" // hdUE: IsPostProcessingWithAlphaChannelSupported"),
+    @(
+        'FRDGTextureDesc SceneColorMipchainDesc = FRDGTextureDesc::Create2D(SceneColorMip0Resolution, PF_FloatR11G11B10, FClearValueBinding::None,',
+        "// hdUE: alpha for r.PostProcessing.PropagateAlpha (coverage seen through refraction)`n`t`t`tFRDGTextureDesc SceneColorMipchainDesc = FRDGTextureDesc::Create2D(SceneColorMip0Resolution, IsPostProcessingWithAlphaChannelSupported() ? PF_FloatRGBA : PF_FloatR11G11B10, FClearValueBinding::None,"))

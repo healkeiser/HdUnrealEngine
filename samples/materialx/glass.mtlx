@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='utf-8'?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <!-- Clear glass: full transmission, near-mirror specular. -->
+  <standard_surface name="Glass_Clear_surface" type="surfaceshader">
+    <input name="base" type="float" value="0.0" />
+    <input name="specular_roughness" type="float" value="0.02" />
+    <input name="specular_IOR" type="float" value="1.5" />
+    <input name="transmission" type="float" value="1.0" />
+    <input name="transmission_color" type="color3" value="0.92, 0.97, 1.0" />
+  </standard_surface>
+  <surfacematerial name="Glass_Clear" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="Glass_Clear_surface" />
+  </surfacematerial>
+  <!-- Smudged glass: the same, with a fractal-noise grunge (in texture space, so independent of scene units)
+       remapped to roughness between clean (0.02) and smudged (0.45). -->
+  <texcoord name="Grunge_uv" type="vector2" />
+  <multiply name="Grunge_scale" type="vector2">
+    <input name="in1" type="vector2" nodename="Grunge_uv" />
+    <input name="in2" type="vector2" value="6.0, 6.0" />
+  </multiply>
+  <fractal2d name="Grunge_noise" type="float">
+    <input name="texcoord" type="vector2" nodename="Grunge_scale" />
+    <input name="amplitude" type="float" value="1.0" />
+    <input name="octaves" type="integer" value="4" />
+    <input name="lacunarity" type="float" value="2.0" />
+    <input name="diminish" type="float" value="0.5" />
+  </fractal2d>
+  <remap name="Grunge_roughness" type="float">
+    <input name="in" type="float" nodename="Grunge_noise" />
+    <input name="inlow" type="float" value="-0.1" />
+    <input name="inhigh" type="float" value="0.4" />
+    <input name="outlow" type="float" value="0.02" />
+    <input name="outhigh" type="float" value="0.45" />
+  </remap>
+  <clamp name="Grunge_clamped" type="float">
+    <input name="in" type="float" nodename="Grunge_roughness" />
+    <input name="low" type="float" value="0.02" />
+    <input name="high" type="float" value="0.45" />
+  </clamp>
+  <standard_surface name="Glass_Smudged_surface" type="surfaceshader">
+    <input name="base" type="float" value="0.0" />
+    <input name="specular_roughness" type="float" nodename="Grunge_clamped" />
+    <input name="specular_IOR" type="float" value="1.5" />
+    <input name="transmission" type="float" value="1.0" />
+    <input name="transmission_color" type="color3" value="0.92, 0.97, 1.0" />
+  </standard_surface>
+  <surfacematerial name="Glass_Smudged" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="Glass_Smudged_surface" />
+  </surfacematerial>
+</materialx>
