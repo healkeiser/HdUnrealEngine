@@ -36,9 +36,9 @@ for name, type_name, icon in (
         name,
         definition.icon(),
     )  # by name only
-    # TAB menu > Rendering > hdUE, as Karma's LOPs are under Rendering > Karma.
+    # TAB menu > hdUE > Rendering for the render nodes (scripts/build_render_settings_hda.py).
     assert (
-        "<toolSubmenu>Rendering/hdUE</toolSubmenu>"
+        "<toolSubmenu>hdUE/Rendering</toolSubmenu>"
         in definition.sections()["Tools.shelf"].contents()
     ), name
 # Scenes saved with the unversioned names load the namespaced types (integrations/houdini/OPcustomize).

@@ -50,8 +50,10 @@ def library_file(name, value=None):
     return value or None
 
 
-def configured(materialx_file="", substrate_file=""):
-    """Whether any library applies (the delegate checks this when it has no stage to resolve)."""
+def configured(materialx_file="", substrate_file="", prepare=True):
+    """Whether any library applies (the delegate checks this when it has no stage to resolve). prepare is resolve()'s,
+    which the delegate passes alike.
+    """
     return bool(
         library_file("materialx", materialx_file)
         or library_file("substrate", substrate_file)
@@ -95,19 +97,57 @@ class _Libraries:
         self.substrate = SubstrateLibrary(
             Path(substrate[0]) if substrate else None
         )
+        self.substrate_base = list(self.substrate.materials)
+        self.live = None
+
+    def prepare(self, stage, time):
+        """Prepares the stage's Substrate Builder graphs that the library lacks, as the viewport host does while you
+        edit (substrate_live.LivePreparation: UE's editor compiles them into the runtime), and waits for them: a batch
+        render has no later frame to show them on.
+        """
+        import tempfile
+        import time as clock
+
+        from prepare_substrate import collect
+        from substrate_live import LivePreparation
+
+        if self.live is None:
+            self.live = LivePreparation(
+                runtime_config()["runtime_project"],
+                Path(tempfile.gettempdir()) / "hdue-husk",
+                debounce=0,
+            )
+        live = self.live
+        records = collect(
+            stage, time, self.materialx.bound_entries if self.materialx else {}
+        )
+        deadline = clock.monotonic() + 1800
+        while live.request(
+            records, self.substrate_base + list(live.entries.values())
+        ):
+            if live.phase == "failed":
+                raise ValueError(live.message)
+            if clock.monotonic() > deadline:
+                raise ValueError("Substrate preparation took over 30 minutes")
+            clock.sleep(0.5)
+        self.substrate.materials = self.substrate_base + list(
+            live.entries.values()
+        )
 
 
 _LIBRARIES = None
 
 
-def resolve(stage, time, materialx_file="", substrate_file=""):
+def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
     """The three settings for stage at time, from the MaterialX and Substrate Builder libraries (library_file), as the
     viewport host applies them, and whether they are the same at every time (no prepared material and no wet surface:
-    material bindings cannot be animated). Raises ValueError with the library's message when a material is unprepared
-    or stale.
+    material bindings cannot be animated). With prepare (the render setting unreal:substrateAutoPrepare), Substrate
+    Builder graphs the library lacks are prepared first, as the viewport prepares them. Raises ValueError with the
+    library's message when a material is unprepared (and not prepared) or stale.
     """
     global _LIBRARIES
     from prepared_materials import sync
+    from substrate_library import NeedsPreparation
 
     key = (
         _identity(library_file("materialx", materialx_file)),
@@ -121,9 +161,18 @@ def resolve(stage, time, materialx_file="", substrate_file=""):
     view._dataModel.stage, view._dataModel.currentFrame = stage, time
     if libraries.materialx:
         libraries.materialx.invalidate()
-    view.settings.update(
-        sync(stage, time, libraries.materialx, libraries.substrate, view)
-    )
+    try:
+        settings = sync(
+            stage, time, libraries.materialx, libraries.substrate, view
+        )
+    except NeedsPreparation:
+        if not prepare:
+            raise
+        libraries.prepare(stage, time)
+        settings = sync(
+            stage, time, libraries.materialx, libraries.substrate, view
+        )
+    view.settings.update(settings)
     result = {
         key: _plain(view.settings.get(key) or {})
         for key in (
@@ -138,7 +187,9 @@ def resolve(stage, time, materialx_file="", substrate_file=""):
     return result
 
 
-def resolve_json(stage_id, frame, materialx_file="", substrate_file=""):
+def resolve_json(
+    stage_id, frame, materialx_file="", substrate_file="", prepare=True
+):
     """resolve() for the delegate (the HDK's Python API returns a string): the stage from UsdUtils' stage cache by id,
     the result or {"error": message} as JSON.
     """
@@ -153,7 +204,13 @@ def resolve_json(stage_id, frame, materialx_file="", substrate_file=""):
                 "the rendered stage is not in UsdUtils' stage cache"
             )
         return json.dumps(
-            resolve(stage, Usd.TimeCode(frame), materialx_file, substrate_file)
+            resolve(
+                stage,
+                Usd.TimeCode(frame),
+                materialx_file,
+                substrate_file,
+                prepare,
+            )
         )
     except (
         Exception

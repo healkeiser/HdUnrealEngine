@@ -23,6 +23,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:domeResolution` | 512 | Environment cubemap face size |
 | `unreal:autoViewerLight`, `unreal:viewerLightIntensity` | | Review light for scenes without lights |
 | `unreal:upAxis` | stage | Up axis override |
+| `unreal:substrateAutoPrepare` | on | Prepare Substrate Builder graphs missing from the library: in the viewport as you edit, in husk before the frame ([background preparation](substrate-builder.md#background-graph-preparation-in-solaris)) |
 | `unreal:materialxLibrary`, `unreal:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied alike in Houdini's viewport, husk and usdview (`--hdue-substrate-library`); a stale or unprepared material fails a husk frame |
 | `unreal:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
 

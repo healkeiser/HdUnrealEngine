@@ -460,12 +460,17 @@ protected:
     void _PrimsAdded(const HdSceneIndexBase&, const HdSceneIndexObserver::AddedPrimEntries& entries) override {
         auto added = entries;
         for (const auto& entry : entries)
-            if (hasProxy(entry.primPath))
+            if (hasProxy(entry.primPath)) {
                 added.emplace_back(entry.primPath.AppendChild(HdUENativeAssetTokens->proxy), HdPrimTypeTokens->mesh);
+                proxies_.insert(entry.primPath);
+            }
         _SendPrimsAdded(added);
     }
     void _PrimsRemoved(const HdSceneIndexBase&, const HdSceneIndexObserver::RemovedPrimEntries& entries) override {
-        _SendPrimsRemoved(entries);  // a subtree's removal takes its proxy with it
+        for (const auto& entry : entries)  // a subtree's removal takes its proxies with it
+            for (auto it = proxies_.lower_bound(entry.primPath); it != proxies_.end() && it->HasPrefix(entry.primPath);)
+                it = proxies_.erase(it);
+        _SendPrimsRemoved(entries);
     }
     void _PrimsDirtied(const HdSceneIndexBase&, const HdSceneIndexObserver::DirtiedPrimEntries& entries) override {
         static const HdDataSourceLocator key(HdUENativeAssetTokens->key);
@@ -475,12 +480,14 @@ protected:
         for (const auto& entry : entries) {
             const auto proxyPath = entry.primPath.AppendChild(HdUENativeAssetTokens->proxy);
             if (entry.dirtyLocators.Intersects(key)) {
-                // The asset changed, appeared or went: the proxy is made (again) or removed.
-                if (hasProxy(entry.primPath))
+                // The asset changed, appeared or went: the proxy is made (again), or removed if there was one.
+                if (hasProxy(entry.primPath)) {
                     added.emplace_back(proxyPath, HdPrimTypeTokens->mesh);
-                else
+                    proxies_.insert(entry.primPath);
+                } else if (proxies_.erase(entry.primPath)) {
                     removed.emplace_back(proxyPath);
-            } else if (hasProxy(entry.primPath)) {
+                }
+            } else if (proxies_.count(entry.primPath)) {
                 dirtied.emplace_back(proxyPath, entry.dirtyLocators);  // transform, visibility, primvars, ...
             }
         }
@@ -490,6 +497,7 @@ protected:
     }
 
 private:
+    std::set<SdfPath> proxies_;  // the prims whose proxy was announced (notices arrive on one thread)
     static HdContainerDataSourceHandle nativeAsset(const HdSceneIndexPrim& prim) {
         return prim.dataSource ? HdContainerDataSource::Cast(prim.dataSource->Get(HdUENativeAssetTokens->key))
                                : nullptr;

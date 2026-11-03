@@ -761,6 +761,19 @@ HDUE = [
         advanced=True,
     ),
     hdue(
+        "substrateAutoPrepare",
+        "Prepare Edited Substrate Materials",
+        "Rendering|Materials",
+        "toggle",
+        True,
+        "Substrate Builder materials missing from the Prepared Substrate Library are prepared in the background "
+        "(UE's editor compiles them, about a minute per graph) and render once ready: in Houdini's viewport as you "
+        "edit, and in husk before the frame renders. Off, such a material shows the library's message and fails a "
+        "husk frame.",
+        category="Materials",
+        advanced=True,
+    ),
+    hdue(
         "lumenEnabled",
         "Lumen",
         "Lighting|Global Illumination",

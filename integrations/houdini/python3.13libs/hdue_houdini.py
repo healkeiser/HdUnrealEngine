@@ -264,13 +264,11 @@ class Host:
                                 self.prepared_materials.settings[
                                     "wetMaskPreview"
                                 ] = (bool(preview.eval()) if preview else False)
-                                automatic = node and node.parm(
-                                    "hdue_substrate_auto_prepare"
-                                )
-                                self.live_substrate.enabled = (
-                                    bool(automatic.eval())
-                                    if automatic
-                                    else True
+                                # Read when materials sync, not part of their key: a sync of its own when the
+                                # switch flips raced the wet-surface geometry upload ("Obsolete wet geometry
+                                # revision" in hdue_substrate_live_test).
+                                self.live_substrate.enabled = auto_prepare(
+                                    stage, node
                                 )
                                 changed = self.prepared_materials.sync(
                                     stage,
@@ -1008,6 +1006,18 @@ def libraries(stage, node=None):
         value = getattr(value, "path", value) or (parm.eval() if parm else None)
         result.append(library_file(name, value))
     return tuple(result)
+
+
+def auto_prepare(stage, node=None):
+    """Whether edited Substrate Builder graphs are prepared in the background: unreal:substrateAutoPrepare on the
+    render settings prim, as husk reads it; else an older hdUE_settings subnet's toggle; else on.
+    """
+    prim = _settings_prim(stage)
+    attr = prim.GetAttribute("unreal:substrateAutoPrepare") if prim else None
+    if attr and attr.HasAuthoredValue():
+        return bool(attr.Get())
+    parm = node.parm("hdue_substrate_auto_prepare") if node else None
+    return bool(parm.eval()) if parm else True
 
 
 def open_usd(path):

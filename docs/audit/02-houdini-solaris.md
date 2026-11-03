@@ -82,6 +82,8 @@ Reference material:
 
 ## HOU-02: Viewport and husk/ROP render different things (High, L)
 
+**Status: resolved (2026-11-03).** Libraries are render settings applied by the delegate in husk too (`hdue_batch.py`, the viewport's own library code); husk prepares unprepared Substrate graphs as the viewport does (`unreal:substrateAutoPrepare`); the delegate makes native assets' bounds meshes in every host (`HdUE_NativeAssetSceneIndex`), with no host-side proxies; `op:` images reach husk as the files the USD (Render) ROP writes. The findings below are the original audit.
+
 **What we do**
 
 - **Cooked MaterialX / Substrate library selection.** These are spare parameters on a Python-built pass-through subnet, `hdUE_settings` (`hdue_houdini.py:377-399`). The subnet is found by walking `inputs()[0]` until a node has `hdue_materialx_library` (`:357-365`). The parameters are read only by the GUI host (`:133`, `:142-146`). They are not USD and never reach husk.

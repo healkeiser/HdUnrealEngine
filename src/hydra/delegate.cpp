@@ -1410,9 +1410,11 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
             binding.mask = packet.own(packet.floats, std::vector<float>(mask->second.begin(), mask->second.end()));
             binding.mask_count = uint32_t(mask->second.size());
         }
-        // The revision this upload leaves the mesh at: generic meshes advance by one when re-uploaded.
-        const bool reuploaded =
-            packet.dirtyMeshes.count(id) && data.sceneAsset.empty() && asset(nativeMeshes, id).empty();
+        // The revision this upload leaves the mesh at: generic meshes advance by one when re-uploaded. A mesh dirty
+        // only because its material changed goes through update_meshes and keeps its geometry and revision: counting it
+        // made UE reject the binding as obsolete after a material edit (a live Substrate graph on a wet mesh).
+        const bool reuploaded = packet.dirtyMeshes.count(id) && !packet.materialMeshes.count(id) &&
+                                data.sceneAsset.empty() && asset(nativeMeshes, id).empty();
         binding.geometry_revision = state.geometryRevisions[data.id] + uint64_t(reuploaded);
         packet.wet.push_back(binding);
     }
@@ -2295,8 +2297,10 @@ public:
             for (const char c : text) out += c == '\\' || c == '\'' ? std::string("\\") + c : std::string(1, c);
             return out + "'";
         };
+        // The libraries and whether unprepared Substrate Builder graphs are prepared first (as the viewport does).
         const auto libraries = quoted(s.setting<std::string>("materialxLibrary", "")) + ", " +
-                               quoted(s.setting<std::string>("substrateLibrary", ""));
+                               quoted(s.setting<std::string>("substrateLibrary", "")) + ", " +
+                               (s.setting<bool>("substrateAutoPrepare", true) ? "True" : "False");
         const double frame = s.setting<double>("houdini:frame", 1.);
         const auto stage = HdUEBatchStage();
         std::string error;

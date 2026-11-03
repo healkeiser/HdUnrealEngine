@@ -8,7 +8,8 @@ The libraries are Prepare-Substrate.ps1's for samples/decal/decal.usda and sampl
 (out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. A missing decal or
 volume library is prepared, and the runtime staged, first; without a MaterialX library its checks are skipped. Checks: the decal paints the wall;
 a volume material's albedo edit tints the fog; MaterialX materials render their cooked assets; a graph changed since its
-preparation fails the frame with the library's message; wet surfaces bind; an object behind glass shows through it with
+preparation fails the frame with the library's message without automatic preparation, and is prepared and rendered
+with it; wet surfaces bind; an object behind glass shows through it with
 its own alpha.
 """
 
@@ -132,7 +133,8 @@ def main():
                 f"exit {code}, red fraction {red_fraction(image) if image is not None else None}",
             )
         )
-        # A graph changed since its preparation (the paint Slab's subsurface mode, which recompiles) fails the frame.
+        # A graph changed since its preparation (the paint Slab's subsurface mode, which recompiles): without automatic
+        # preparation it fails the frame; with it (the default), husk prepares it as the viewport does, then renders.
         (temp / "stale").mkdir()
         stale = edit(
             "/Looks/Paint/Graph/paint",
@@ -140,15 +142,29 @@ def main():
         )
         code, log, _ = husk(
             ROOT / "samples/decal/decal.usda",
-            [library, mode],
+            [library, mode, "bool unreal:substrateAutoPrepare = 0"],
             temp / "stale",
             stale,
         )
         results.append(
             check(
-                "stale graph fails the frame",
+                "stale graph fails the frame without automatic preparation",
                 code != 0 and "hdUE prepared materials" in log,
                 f"exit {code}",
+            )
+        )
+        (temp / "prepared").mkdir()
+        code, log, image = husk(
+            ROOT / "samples/decal/decal.usda",
+            [library, mode],
+            temp / "prepared",
+            stale,
+        )
+        results.append(
+            check(
+                "stale graph prepared by husk",
+                code == 0 and image is not None and red_fraction(image) > 0.02,
+                f"exit {code}, red fraction {red_fraction(image) if image is not None else None}",
             )
         )
         library = f'string unreal:substrateLibrary = "{Path(ARGS.volume_library).as_posix()}"'

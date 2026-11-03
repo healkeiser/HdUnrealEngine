@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 import hou
-from pxr import Sdf, UsdGeom, UsdRender
+from pxr import UsdGeom, UsdRender
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / "integrations/houdini/python3.13libs"))
@@ -20,8 +20,7 @@ import hdue_houdini as integration
 ASSET = "/Game/HdUE/SM_Nanite.SM_Nanite"
 network = hou.node("/stage")
 source = network.createNode("pythonscript", "test_source")
-source.parm("python").set(
-    """from pxr import UsdGeom, Sdf
+source.parm("python").set("""from pxr import UsdGeom, Sdf
 stage=hou.pwd().editableStage()
 prim=UsdGeom.Xform.Define(stage,'/Native').GetPrim()
 prim.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
@@ -35,9 +34,7 @@ asset=stage.DefinePrim('/Prototype/Asset','Xform')
 asset.CreateAttribute('unreal:asset',Sdf.ValueTypeNames.String).Set('%s')
 instance=stage.DefinePrim('/Instance','Xform')
 instance.GetReferences().AddInternalReference('/Prototype'); instance.SetInstanceable(True)
-"""
-    % (ASSET, ASSET, ASSET)
-)
+""" % (ASSET, ASSET, ASSET))
 before = source.stage().GetRootLayer().ExportToString()
 # A Z-up centimetre input, as a scene file would bring it: a standard Configure Layer LOP.
 units = network.createNode("configurelayer", "z_up_centimeters")
@@ -60,7 +57,8 @@ assert (
 assert stage.GetPrimAtPath(
     "/Instance"
 ).IsInstance(), "native instancing must reach Hydra"
-assert not stage.GetPrimAtPath("/Native/" + integration.NativeAssets.PROXY)
+# The delegate makes native assets' bounds meshes (HdUE_NativeAssetSceneIndex): none in the stage.
+assert not stage.GetPrimAtPath("/Native/__HdUEAssetProxy")
 assert not stage.GetPrimAtPath(
     "/Render/rendersettings"
 ), "hdUE settings must leave render settings to Render Settings LOPs"
@@ -122,9 +120,10 @@ assert integration.render_options(edited.stage()) == (
     64,
 ), "the default value renders, not the scene prim (samples apply to the Path Tracer only)"
 
-# Native asset bounds live in the viewport overrides (session-only), sized in the stage's own units.
+# Native assets need no viewport overrides: the delegate makes their bounds meshes (HdUE_NativeAssetSceneIndex), and
+# assets in instances stay instanced, as in husk.
 assets = integration.NativeAssets()
-assert assets.sync(network, render, render.stage())
+assets.sync(network, render, render.stage())
 assert not assets.sync(
     network, render, render.stage()
 ), "unchanged stage must not re-author"
@@ -135,29 +134,15 @@ def overrides():
         return edit.layer()
 
 
+def instanceable_override(layer):
+    spec = layer.GetPrimAtPath("/Instance")
+    return bool(spec) and spec.HasInfo("instanceable")
+
+
 layer = overrides()
 for path in ("/Native", "/Parent/MeshAsset", "/Instance/Asset"):
-    proxy = layer.GetPrimAtPath(path + "/" + integration.NativeAssets.PROXY)
-    assert (
-        proxy
-        and proxy.specifier == Sdf.SpecifierDef
-        and proxy.typeName == "Mesh"
-    ), path
-    assert proxy.attributes["primvars:unreal:asset"].default == ASSET
-    assert proxy.attributes["purpose"].default == "render"
-    points = proxy.attributes["points"].default
-    assert (
-        len(points) == 8
-        and abs(max(p[0] for p in points) - min(p[0] for p in points) - 100)
-        < 1e-4
-    ), "100 cm in a centimetre stage"
-assert (
-    layer.GetPrimAtPath("/Parent/MeshAsset").attributes["purpose"].default
-    == "guide"
-)
-assert layer.GetPrimAtPath("/Instance").HasInfo(
-    "instanceable"
-) and not layer.GetPrimAtPath("/Instance").GetInfo("instanceable")
+    assert not layer.GetPrimAtPath(path + "/__HdUEAssetProxy"), path
+assert not instanceable_override(layer), "an instance around an asset stays one"
 assert (
     render.stage().GetPrimAtPath("/Instance").IsInstance()
 ), "the graph keeps its instancing"
@@ -165,21 +150,17 @@ assert (
 # MaterialX inside an instance needs its stage path only with a cooked library.
 look = network.createNode("pythonscript", "instanced_materialx")
 look.setInput(0, render)
-look.parm("python").set(
-    """from pxr import Sdf, UsdShade
+look.parm("python").set("""from pxr import Sdf, UsdShade
 stage=hou.pwd().editableStage()
 material=UsdShade.Material.Define(stage,'/Prototype/Asset/Looks/Paint')
 shader=UsdShade.Shader.Define(stage,'/Prototype/Asset/Looks/Paint/Surface'); shader.CreateIdAttr('ND_standard_surface_surfaceshader')
 material.CreateSurfaceOutput('mtlx').ConnectToSource(shader.CreateOutput('out',Sdf.ValueTypeNames.Token))
 stage.OverridePrim('/Native').SetActive(False)
 stage.OverridePrim('/Parent').SetActive(False)
-stage.OverridePrim('/Prototype/Asset').GetAttribute('unreal:asset').Set('')"""
-)
+stage.OverridePrim('/Prototype/Asset').GetAttribute('unreal:asset').Set('')""")
 assert not look.errors(), look.errors()
-assert assets.sync(network, look, look.stage())
-assert not overrides().GetPrimAtPath(
-    "/Instance"
-) or not overrides().GetPrimAtPath("/Instance").HasInfo("instanceable")
+assets.sync(network, look, look.stage())
+assert not instanceable_override(overrides())
 assert assets.sync(network, look, look.stage(), materials=True)
 assert not overrides().GetPrimAtPath("/Instance").GetInfo("instanceable")
 assert not assets.sync(
@@ -189,27 +170,9 @@ assert not assets.sync(
     materials=True,
 ), "the viewed stage, with the instance made editable, must not re-author (it alternated on every tick)"
 assert not overrides().GetPrimAtPath("/Instance").GetInfo("instanceable")
-assert not overrides().GetPrimAtPath(
-    "/Instance/Asset/" + integration.NativeAssets.PROXY
-)
-# A downstream edit clearing the asset removes its proxy; restoring it brings it back.
-clear = network.createNode("pythonscript", "clear_asset_reference")
-clear.setInput(0, render)
-clear.parm("python").set(
-    'stage=hou.pwd().editableStage()\nstage.GetPrimAtPath("/Parent/MeshAsset").GetAttribute("unreal:asset").Set("")'
-)
-assert assets.sync(network, clear, clear.stage())
-layer = overrides()
-assert not layer.GetPrimAtPath(
-    "/Parent/MeshAsset/" + integration.NativeAssets.PROXY
-)
-assert not layer.GetPropertyAtPath("/Parent/MeshAsset.purpose")
-assert layer.GetPrimAtPath("/Native/" + integration.NativeAssets.PROXY)
 assets.clear()
-layer = overrides()
-assert not layer.GetPrimAtPath("/Native/" + integration.NativeAssets.PROXY)
-assert not layer.GetPrimAtPath("/Instance").HasInfo("instanceable")
+assert not instanceable_override(overrides())
 assert source.stage().GetRootLayer().ExportToString() == before
 print(
-    "PASS: pass-through hdUE settings, render settings, native asset overrides and source preservation"
+    "PASS: pass-through hdUE settings, render settings, instance overrides and source preservation"
 )
