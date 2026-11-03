@@ -38,6 +38,59 @@ class Process:
 
 
 class LiveTests(unittest.TestCase):
+    def test_clean_removes_only_what_no_process_needs(self):
+        import os
+        import time
+
+        from prepare_substrate import LIBRARY_NAME
+        from substrate_live import STALE_AGE, UNUSED_AGE, clean
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "runtime/HdUEBackend.uproject"
+            project.parent.mkdir(parents=True)
+            project.write_text("{}")
+            live = root / "runtime/Content/HdUE/Live"
+            now = time.time()
+
+            def job(name, signature, age, library=True, package=True):
+                folder = live / "P1" / name
+                folder.mkdir(parents=True)
+                asset = f"/Game/HdUE/Live/P1/{name}/M_x.M_x"
+                if package:
+                    (folder / "M_x.uasset").write_bytes(b"")
+                if library:
+                    (folder / LIBRARY_NAME).write_text(
+                        json.dumps(
+                            dict(
+                                version=1,
+                                compiler=COMPILER_VERSION,
+                                materials=[
+                                    dict(
+                                        signature=signature,
+                                        asset=asset,
+                                        preview_asset=asset,
+                                    )
+                                ],
+                            )
+                        )
+                    )
+                for path in [folder, *folder.iterdir()]:
+                    os.utime(path, (now - age, now - age))
+                return folder
+
+            kept = job("V1_current", "a", 0)
+            fresh_orphan = job("V2_publishing", "b", 60, library=False)
+            orphan = job("V3_orphan", "c", STALE_AGE + 60, library=False)
+            replaced = job("V4_replaced", "a", STALE_AGE + 60)
+            broken = job("V5_missing", "d", STALE_AGE + 60, package=False)
+            unused = job("V6_unused", "e", UNUSED_AGE + 60)
+            recent_replaced = job("V7_replaced_recently", "a", 60)
+            removed = set(clean(project, now=now))
+            self.assertEqual(removed, {orphan, replaced, broken, unused})
+            for path in (kept, fresh_orphan, recent_replaced):
+                self.assertTrue(path.is_dir(), path)
+
     def test_published_jobs_count_as_prepared(self):
         # A job published by an earlier process (prepare_substrate.publish) is known to the next one, unless its
         # packages are gone.

@@ -4,7 +4,10 @@ param(
     [string]$OutputDirectory = '',
     [string]$Destination = '/Game/HdUE/Substrate',
     [string]$HoudiniRoot = '', [string]$EditorRoot = '',
-    [switch]$SkipBuild, [switch]$SkipCook
+    [switch]$SkipBuild, [switch]$SkipCook,
+    # The cook's switches: the commandlet cooks the new packages in the same editor (-CookAfter), as Prepare-SubstrateLive.ps1 does.
+    [string[]]$CookArguments = @(),
+    [switch]$SkipRegistry
 )
 $ErrorActionPreference = 'Stop'
 if ((-not $InputUsd -and -not $GraphJob) -or ($InputUsd -and $GraphJob)) { throw 'Choose InputUsd or GraphJob.' }
@@ -31,18 +34,23 @@ $Manifests = Get-Content -LiteralPath (Join-Path $RunOutput 'export.json') -Raw 
 $Compiled = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $Lines = foreach ($Manifest in $Manifests) {
     foreach ($File in @($Manifest.file, $Manifest.preview)) {
-        if ($Compiled.Add($File)) { $File + '|' + [IO.Path]::ChangeExtension($File, '.receipt.json') }
+        # A batch render's job has no mask-preview graphs (prepare_substrate.export_records).
+        if ($File -and $Compiled.Add($File)) { $File + '|' + [IO.Path]::ChangeExtension($File, '.receipt.json') }
     }
 }
 $List = Join-Path $RunOutput 'graphs.txt'
 [IO.File]::WriteAllLines($List, [string[]]$Lines, [Text.UTF8Encoding]::new($false))
 $Log = Join-Path $RunOutput 'substrate.log'
-& $Editor $Project -run=HdUESubstrate "-GraphList=$List" -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
+$CookAfter = if ($CookArguments) { @('-RunAsCookCommandlet', '-CookAfter') + $CookArguments } else { @() }
+& $Editor $Project -run=HdUESubstrate "-GraphList=$List" @CookAfter -unattended -nop4 -nosplash -nullrhi -stdout *> $Log
 if ($LASTEXITCODE) { throw "Substrate graph compilation failed: $Log" }
+# The cook compiles the shaders: UE's Substrate graph rules fail there.
+if ($CookArguments -and (Get-Content -LiteralPath $Log -Raw) -match 'Failed to compile Material') { throw "Substrate material compilation failed; see $Log." }
 foreach ($Line in $Lines) {
     if (-not (Test-Path -LiteralPath $Line.Split('|')[1])) { throw "Substrate graph compilation wrote no receipt for $($Line.Split('|')[0]): $Log" }
 }
 if ((Get-Content -LiteralPath $Log -Raw) -match 'Log\w+: Error:|Fatal error') { throw "Substrate graph compilation reported an error: $Log" }
+if ($SkipRegistry) { return }
 if ($GraphJob) {
     & (Join-Path $PSScriptRoot 'Run-UsdPython.ps1') -Script (Join-Path $PSScriptRoot 'prepare_substrate.py') -ScriptArguments @('registry', $RunOutput)
 }

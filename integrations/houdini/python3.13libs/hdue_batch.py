@@ -109,6 +109,7 @@ class _Libraries:
                 runtime_config()["runtime_project"],
                 Path(tempfile.gettempdir()) / "hdue-husk",
                 debounce=0,
+                previews=False,
             )
             self.substrate.materials = self.substrate_base + list(
                 self.live.entries.values()

@@ -1,5 +1,6 @@
 #include "HdUESubstrateCommandlet.h"
 #include "IdSwitch.h"
+#include "Commandlets/Commandlet.h"
 #include "MaterialDomain.h"  // MD_Volume, MD_DeferredDecal
 #include "Materials/Material.h"
 #include "Materials/MaterialExpressionSubstrate.h"
@@ -881,6 +882,22 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
             }
         }
         FAssetCompilingManager::Get().FinishAllCompilation();
+        if (FParse::Param(*Params, TEXT("CookAfter"))) {
+            // The new packages cooked in this editor (launched with -RunAsCookCommandlet and the cook's switches), by
+            // UE's own cook commandlet: a second editor start-up saved. UnrealEd exports no UCookCommandlet, so it is
+            // reached through its class and UCommandlet::Main.
+            UClass* Cook = FindObject<UClass>(nullptr, TEXT("/Script/UnrealEd.CookCommandlet"));
+            if (!Cook || !IsRunningCookCommandlet()) {
+                UE_LOG(LogTemp, Error, TEXT("Substrate Builder: -CookAfter needs -RunAsCookCommandlet"));
+                return 7;
+            }
+            // The cook asks the asset registry whether each package exists (FPackageDatas::TryLookupFileNameOnDisk);
+            // the registry was scanned at start-up, before these packages were saved.
+            FString CookDir;
+            if (FParse::Value(*Params, TEXT("CookDir="), CookDir))
+                IAssetRegistry::GetChecked().ScanPathsSynchronous({CookDir}, true);
+            return NewObject<UCommandlet>(GetTransientPackage(), Cook)->Main(Params);
+        }
         return 0;
     }
     if (!FParse::Value(*Params, TEXT("Graph="), File) || !FParse::Value(*Params, TEXT("Report="), Report)) return 1;

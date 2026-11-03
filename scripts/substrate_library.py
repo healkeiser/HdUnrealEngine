@@ -137,6 +137,11 @@ class SubstrateLibrary:
                     else ""
                 ),
             )
+        # Prepared materials published by earlier processes stay while bound somewhere (substrate_live.clean).
+        from substrate_live import used
+
+        for data in bound.values():
+            used(data["entry"])
         effects = dict(settings.get("surfaceEffects", {}))
         diagnostics = []
         for prim in stage.Traverse():

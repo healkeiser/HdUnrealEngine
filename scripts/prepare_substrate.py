@@ -54,7 +54,10 @@ def export(scene, library, output, destination, time):
     export_records(collect(stage, time, entries), output, destination)
 
 
-def export_records(records, output, destination):
+def export_records(records, output, destination, previews=True):
+    """Each record's graph for HdUESubstrate, and, with previews, its mask-preview variant (the viewport's wet-mask
+    preview; a batch render needs none, and preparing it doubled the graphs to compile).
+    """
     output.mkdir(parents=True, exist_ok=False)
     manifests = []
     dependencies = {}
@@ -121,22 +124,23 @@ def export_records(records, output, destination):
         )
         validate(preview_graph)
         preview = output / ("M_" + cache + "_preview.json")
-        preview.write_text(
-            json.dumps(
-                dict(
-                    asset=package + "_Mask",
-                    graph=preview_graph,
-                    compiler=COMPILER_VERSION,
-                    parameters=live_parameters(preview_graph),
+        if previews:
+            preview.write_text(
+                json.dumps(
+                    dict(
+                        asset=package + "_Mask",
+                        graph=preview_graph,
+                        compiler=COMPILER_VERSION,
+                        parameters=live_parameters(preview_graph),
+                    ),
+                    indent=2,
                 ),
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
+                encoding="utf-8",
+            )
         manifests.append(
             dict(
                 file=str(file.resolve()),
-                preview=str(preview.resolve()),
+                preview=str(preview.resolve()) if previews else None,
                 material=record["material"],
                 signature=key,
                 base_identity=identity,
@@ -166,10 +170,15 @@ def registry(folder):
         receipt = json.loads(
             file.with_suffix(".receipt.json").read_text(encoding="utf-8-sig")
         )
-        preview = json.loads(
-            Path(entry["preview"])
-            .with_suffix(".receipt.json")
-            .read_text(encoding="utf-8-sig")
+        # No preview: the job prepared none (a batch render's); the material stands in for it.
+        preview = (
+            json.loads(
+                Path(entry["preview"])
+                .with_suffix(".receipt.json")
+                .read_text(encoding="utf-8-sig")
+            )
+            if entry.get("preview")
+            else receipt
         )
         if not receipt.get("native_substrate") or not preview.get(
             "native_substrate"
@@ -189,6 +198,7 @@ def registry(folder):
                 base_identity=entry["base_identity"],
                 asset=receipt["asset"],
                 preview_asset=preview["asset"],
+                preview=bool(entry.get("preview")),
             )
         )
     textures = json.loads(
@@ -305,6 +315,12 @@ if __name__ == "__main__":
     p.add_argument("job", type=Path)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--destination", required=True)
+    p = sub.add_parser(
+        "finish"
+    )  # registry, then publish: one Python start for a live job
+    p.add_argument("folder", type=Path)
+    p.add_argument("--runtime-project", type=Path, required=True)
+    p.add_argument("--destination", required=True)
     p = sub.add_parser("publish")
     p.add_argument("folder", type=Path)
     p.add_argument("--runtime-project", type=Path, required=True)
@@ -316,8 +332,16 @@ if __name__ == "__main__":
         job = json.loads(args.job.read_text(encoding="utf-8"))
         if job.get("version") != 1:
             raise ValueError("Unsupported live preparation job")
-        export_records(job["materials"], args.output, args.destination)
+        export_records(
+            job["materials"],
+            args.output,
+            args.destination,
+            job.get("previews", True),
+        )
     elif args.mode == "publish":
+        publish(args.folder, args.runtime_project, args.destination)
+    elif args.mode == "finish":
+        registry(args.folder)
         publish(args.folder, args.runtime_project, args.destination)
     else:
         export(

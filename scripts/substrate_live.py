@@ -5,50 +5,176 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
 
 from substrate_graph import COMPILER_VERSION, signature
 
+# Clean-up ages: another process may be publishing (interrupted publishes), or still using a job (the rest).
+INCOMING_AGE = 3600
+STALE_AGE = 86400
+UNUSED_AGE = 30 * 86400
+WORKER_AGE = 7 * 86400
 
-def published(runtime_project):
-    """The materials earlier processes prepared into this runtime (prepare_substrate.publish), by identity: those whose
-    packages are still there, whose textures are unchanged and whose compiler is current.
+
+def _jobs(content):
+    """The runtime's published live jobs (Content/HdUE/Live/<process>/<job>): (folder, library file or None, entries
+    usable now). A job is usable while its compiler is current, its textures are unchanged and its packages exist.
     """
     from prepare_substrate import LIBRARY_NAME
     from substrate_textures import validate_dependencies
 
-    content = Path(runtime_project).resolve().parent / "Content"
-    entries = {}
-    for file in sorted((content / "HdUE/Live").glob("**/" + LIBRARY_NAME)):
+    for folder in sorted(
+        p for p in (content / "HdUE/Live").glob("*/*") if p.is_dir()
+    ):
+        if ".incoming-" in folder.name:
+            continue
+        file = folder / LIBRARY_NAME
+        if not file.is_file():
+            yield folder, None, []
+            continue
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
             if data.get("compiler") != COMPILER_VERSION:
-                continue
+                raise ValueError("compiler")
             validate_dependencies(data)
-        except (OSError, ValueError, KeyError):
-            continue
-        for entry in data.get("materials", []):
-            packages = [
-                entry[field].split(".")[0]
-                for field in ("asset", "preview_asset")
+            entries = [
+                dict(entry, _published=str(file))
+                for entry in data.get("materials", [])
+                if all(
+                    (
+                        content
+                        / (
+                            entry[f].split(".")[0].removeprefix("/Game/")
+                            + ".uasset"
+                        )
+                    ).is_file()
+                    for f in ("asset", "preview_asset")
+                )
             ]
-            if all(
-                (
-                    content / (package.removeprefix("/Game/") + ".uasset")
-                ).is_file()
-                for package in packages
-            ):
-                entries[
-                    (entry["signature"], entry.get("base_identity", ""))
-                ] = entry
+            if len(entries) != len(data.get("materials", [])):
+                raise ValueError("missing packages")
+        except (OSError, ValueError, KeyError):
+            entries = []
+        yield folder, file, entries
+
+
+def published(runtime_project, previews=True):
+    """The materials earlier processes prepared into this runtime (prepare_substrate.publish), by identity, from the
+    usable jobs; with previews, only those prepared with their mask preview (a batch render prepares none). Each
+    entry names its library (_published), which binding it marks as used (used()).
+    """
+    content = Path(runtime_project).resolve().parent / "Content"
+    entries = {}
+    for _, _, usable in _jobs(content):
+        for entry in usable:
+            if previews and not entry.get("preview", True):
+                continue
+            entries[(entry["signature"], entry.get("base_identity", ""))] = (
+                entry
+            )
     return entries
+
+
+_USED = set()
+
+
+def used(entry):
+    """Marks a published entry's job as used now (its library's modification time), once per process: clean()
+    removes jobs no process has bound for UNUSED_AGE.
+    """
+    file = entry.get("_published")
+    if file and file not in _USED:
+        _USED.add(file)
+        try:
+            os.utime(file)
+        except OSError:
+            pass
+
+
+def clean(runtime_project, log_directory=None, now=None):
+    """Removes, from the runtime's live content, what no process needs: interrupted publishes, jobs without a library
+    (crashed, or published before libraries were kept) or no longer usable, jobs a newer job fully replaces, and jobs
+    unused for UNUSED_AGE; from log_directory, worker folders older than WORKER_AGE. Files a running UE holds open
+    stay (the next clean() retries). Returns the removed paths.
+    """
+    now = time.time() if now is None else now
+    content = Path(runtime_project).resolve().parent / "Content"
+    removed = []
+
+    def age(path):
+        try:
+            return now - path.stat().st_mtime
+        except OSError:
+            return 0
+
+    def remove(path):
+        (
+            shutil.rmtree(path, ignore_errors=True)
+            if path.is_dir()
+            else path.unlink(missing_ok=True)
+        )
+        if not path.exists():
+            removed.append(path)
+
+    live = content / "HdUE/Live"
+    if not live.is_dir():
+        return removed
+    for path in live.glob("**/*.incoming-*"):
+        if age(path) > INCOMING_AGE:
+            remove(path)
+    jobs = list(_jobs(content))
+    # The newest usable job for each identity: older jobs whose identities all have a newer one are replaced.
+    newest = {}
+    for _, file, entries in jobs:
+        for entry in entries:
+            key = (
+                entry["signature"],
+                entry.get("base_identity", ""),
+                entry.get("preview", True),
+            )
+            if key not in newest or age(file) < age(newest[key]):
+                newest[key] = file
+    for folder, file, entries in jobs:
+        if file is None or not entries:
+            stale = age(folder if file is None else file) > STALE_AGE
+        else:
+            replaced = all(
+                newest[
+                    (
+                        e["signature"],
+                        e.get("base_identity", ""),
+                        e.get("preview", True),
+                    )
+                ]
+                != file
+                for e in entries
+            )
+            stale = (replaced and age(file) > STALE_AGE) or age(
+                file
+            ) > UNUSED_AGE
+        if stale:
+            remove(folder)
+    for process in live.glob("*"):
+        if process.is_dir() and not any(process.iterdir()):
+            remove(process)
+    if log_directory:
+        for worker in Path(log_directory, "substrate-live").glob("*"):
+            if worker.is_dir() and age(worker) > WORKER_AGE:
+                remove(worker)
+    return removed
 
 
 class LivePreparation:
     def __init__(
-        self, runtime_project, log_directory, root=None, debounce=0.65
+        self,
+        runtime_project,
+        log_directory,
+        root=None,
+        debounce=0.65,
+        previews=True,
     ):
         self.root = Path(root) if root else Path(__file__).resolve().parents[1]
         self.runtime_project = Path(runtime_project).resolve()
@@ -75,7 +201,23 @@ class LivePreparation:
         self.phase = "idle"
         self.message = ""
         self.last_progress = 0.0
-        self.entries.update(published(self.runtime_project))
+        self.previews = previews  # mask-preview variants: the viewport's wet-mask preview needs them, husk does not
+        self.entries.update(published(self.runtime_project, previews))
+
+        # What earlier processes left behind, in the background: start-up does not wait for it.
+        def clean_quietly():
+            try:
+                clean(self.runtime_project, log_directory)
+            except (
+                OSError
+            ):  # a clean-up never disturbs preparation; the next process retries
+                pass
+
+        threading.Thread(
+            target=clean_quietly,
+            name="hdUE live clean-up",
+            daemon=True,
+        ).start()
 
     @staticmethod
     def identity(record):
@@ -144,6 +286,8 @@ class LivePreparation:
                 self.entries[
                     (entry["signature"], entry.get("base_identity", ""))
                 ] = entry
+            # Published into the runtime: the worker's cooked copy is no longer needed (its logs stay).
+            shutil.rmtree(active["output"] / "cooked", ignore_errors=True)
             self.revision += 1
             self.completed += 1
             self.phase = "ready"
@@ -256,7 +400,10 @@ class LivePreparation:
         try:
             folder.mkdir(parents=True, exist_ok=False)
             job.write_text(
-                json.dumps(dict(version=1, materials=records), indent=2),
+                json.dumps(
+                    dict(version=1, materials=records, previews=self.previews),
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
             log = (folder / "worker.log").open("wb")
