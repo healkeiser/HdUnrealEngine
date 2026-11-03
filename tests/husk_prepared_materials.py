@@ -5,7 +5,8 @@
 
 The libraries are Prepare-Substrate.ps1's for samples/decal/decal.usda and samples/volume_material/volume_material.usda
 (staged with Stage-Runtime.ps1), and Import-MaterialX.ps1's for samples/materialx; by default the newest under out/
-(out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. Checks: the decal paints the wall;
+(out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. A missing decal or
+volume library is prepared, and the runtime staged, first; without a MaterialX library its checks are skipped. Checks: the decal paints the wall;
 a volume material's albedo edit tints the fog; MaterialX materials render their cooked assets; a graph changed since its
 preparation fails the frame with the library's message; wet surfaces bind; an object behind glass shows through it with
 its own alpha.
@@ -17,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -281,8 +283,53 @@ if __name__ == "__main__":
         "--materialx-library", default=newest("out/materialx/library.json")
     )
     ARGS = parser.parse_args()
-    if not ARGS.decal_library or not ARGS.volume_library:
-        parser.error(
-            "prepare samples/decal and samples/volume_material with Prepare-Substrate.ps1 first"
+    # A missing library is prepared (exported, cooked) and staged here, as the docs prepare them: a fresh checkout
+    # then tests them too. Staging replaces the runtime's binaries, so the runtime profile is updated after it.
+    missing = [
+        (name, scene)
+        for name, scene in (
+            ("decal", "samples/decal/decal.usda"),
+            ("volume", "samples/volume_material/volume_material.usda"),
+        )
+        if not getattr(ARGS, f"{name}_library")
+    ]
+    if missing:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        scripts = ROOT / "scripts"
+        for name, scene in missing:
+            print(f"Preparing samples for the {name} library", flush=True)
+            subprocess.run(
+                [
+                    "pwsh",
+                    "-NoProfile",
+                    "-File",
+                    str(scripts / "Prepare-Substrate.ps1"),
+                    "-InputUsd",
+                    str(ROOT / scene),
+                    "-SkipBuild",
+                    "-OutputDirectory",
+                    str(ROOT / f"out/substrate/{name}-{stamp}"),
+                ],
+                check=True,
+            )
+            setattr(
+                ARGS,
+                f"{name}_library",
+                str(ROOT / f"out/substrate/{name}-{stamp}/library.json"),
+            )
+        subprocess.run(
+            ["pwsh", "-NoProfile", "-File", str(scripts / "Stage-Runtime.ps1")],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "pwsh",
+                "-NoProfile",
+                "-File",
+                str(scripts / "Update-HoudiniRuntime.ps1"),
+                "-OutputConfig",
+                str(ARGS.runtime_config),
+            ],
+            check=True,
         )
     main()

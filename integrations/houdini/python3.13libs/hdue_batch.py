@@ -107,7 +107,7 @@ def resolve(stage, time, materialx_file="", substrate_file=""):
     or stale.
     """
     global _LIBRARIES
-    from surface_effects import resolve as resolve_effects
+    from prepared_materials import sync
 
     key = (
         _identity(library_file("materialx", materialx_file)),
@@ -119,15 +119,11 @@ def resolve(stage, time, materialx_file="", substrate_file=""):
     libraries = _LIBRARIES
     view = libraries.view
     view._dataModel.stage, view._dataModel.currentFrame = stage, time
-    entries = {}
     if libraries.materialx:
         libraries.materialx.invalidate()
-        if not libraries.materialx.sync():
-            raise ValueError(libraries.materialx.preparation_error)
-        entries = libraries.materialx.bound_entries
-    else:
-        view.settings["surfaceEffects"], _ = resolve_effects(stage, {}, time)
-    libraries.substrate.sync(stage, time, entries, view.settings)
+    view.settings.update(
+        sync(stage, time, libraries.materialx, libraries.substrate, view)
+    )
     result = {
         key: _plain(view.settings.get(key) or {})
         for key in (

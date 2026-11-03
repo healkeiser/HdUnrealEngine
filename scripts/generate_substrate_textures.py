@@ -253,9 +253,7 @@ def save_hip(file, hip, runtime_config):
     lopnet = hou.node("/stage")
     source = lopnet.createNode("sublayer", "Texture_scene")
     source.parm("filepath1").set(str(file))
-    controls = hdue_houdini.settings_node(
-        source, dict(metersperunit=0.01, upaxis="Z")
-    )
+    controls = hdue_houdini.settings_node(source)  # units: the stage's metadata
     library = lopnet.createNode("materiallibrary", "MaterialLibrary")
     library.setInput(0, controls)
     network = vops(library, graph)

@@ -69,19 +69,7 @@ class PreparedMaterials(OfflineView):
         self._dataModel.stage = stage
         self._dataModel.currentFrame = time
         self._renderer = session
-        if self.library:
-            self.library.invalidate()
-            if not self.library.sync():
-                self.publish_error(session, api, self.library.preparation_error)
-                raise ValueError(self.library.preparation_error)
-        else:
-            from surface_effects import resolve
-
-            try:
-                self.settings["surfaceEffects"], _ = resolve(stage, {}, time)
-            except ValueError as error:
-                self.publish_error(session, api, str(error))
-                raise
+        from prepared_materials import sync
         from substrate_library import SubstrateLibrary
 
         substrate_identity = None
@@ -102,12 +90,11 @@ class PreparedMaterials(OfflineView):
             self.substrate.materials = self.substrate_base + list(
                 self.live.entries.values()
             )
+        if self.library:
+            self.library.invalidate()
         try:
-            self.substrate.sync(
-                stage,
-                time,
-                self.library.bound_entries if self.library else {},
-                self.settings,
+            self.settings.update(
+                sync(stage, time, self.library, self.substrate, self)
             )
             if self.live:
                 self.live.wanted = None

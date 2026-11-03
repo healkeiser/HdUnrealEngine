@@ -268,9 +268,10 @@ class Launcher(Usdviewq.Launcher):
             view.SetRendererSetting(key, value)
 
     def sync_substrate(self, stage):
-        """Substrate Builder materials (and, without a MaterialX library, the wet surface bindings) through the same
-        SubstrateLibrary.sync as Houdini's hosts, after the MaterialX library. Runs again when the stage, the frame
-        or the MaterialX bindings change. False while a material is unprepared or stale.
+        """Substrate Builder materials (and, without a MaterialX library, the wet surface bindings) as Houdini's hosts
+        apply them (prepared_materials.sync), after the MaterialX library, whose sync in sync_stage this repeats at no
+        cost. Runs again when the stage, the frame or the MaterialX bindings change. False while a material is
+        unprepared or stale.
         """
         view = self.controller._stageView
         time = self.controller._dataModel.currentFrame
@@ -285,22 +286,16 @@ class Launcher(Usdviewq.Launcher):
         key = (id(stage), id(view._renderer), time, repr(current))
         if key == self.substrate_key:
             return not self.substrate_error
-        settings = dict(current)
-        message = None
-        try:
-            if not self.materialx_library:
-                from surface_effects import resolve
+        from prepared_materials import sync
 
-                settings["surfaceEffects"], _ = resolve(stage, {}, time)
-            self.substrate_library.sync(
+        settings, message = {}, None
+        try:
+            settings = sync(
                 stage,
                 time,
-                (
-                    self.materialx_library.bound_entries
-                    if self.materialx_library
-                    else {}
-                ),
-                settings,
+                self.materialx_library,
+                self.substrate_library,
+                view,
             )
         except ValueError as error:
             message = str(error)
@@ -378,7 +373,9 @@ class Launcher(Usdviewq.Launcher):
                         "MaterialX graph restored; rendering resumed"
                     )
                 self.material_preparation_error = message
-            materials_valid = self.sync_substrate(stage) and materials_valid
+            # Substrate Builder materials build on valid MaterialX bindings.
+            if materials_valid:
+                materials_valid = self.sync_substrate(stage)
             if self.glass_profile:
                 valid = self.glass_profile.sync()
                 materials_valid = materials_valid and valid

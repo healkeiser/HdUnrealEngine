@@ -123,8 +123,8 @@ def generate(output, hip=None, runtime_config=None, single=False):
             "$HIP/" + os.path.relpath(output, hip.parent).replace("\\", "/")
         )
         controls = hdue_houdini.settings_node(
-            source, dict(metersperunit=0.01, upaxis="Z")
-        )
+            source
+        )  # units: the stage's metadata
         library = lopnet.createNode("materiallibrary", "MaterialLibrary")
         library.setInput(0, controls)
         # Move the already validated editable network into Material Library.
