@@ -656,6 +656,8 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         HdueMaterialDesc desc{};
         desc.id = packet.own(data.id);
         desc.native_asset = packet.own(asset(nativeMaterials, id));
+        // A material mapped to a cooked asset renders as that asset, whatever hdUE makes of its network.
+        if (!*desc.native_asset) HdUEWarnMaterial(data);
         for (int i = 0; i < 3; ++i) {
             desc.base_color[i] = data.color[i];
             desc.emissive_color[i] = data.emissive[i];
@@ -2240,47 +2242,66 @@ public:
         return projection * remap;
     }
 #if defined(HDUE_HOUDINI)
+    // The Python expression's string result; "" with error set when Python failed.
+    static std::string python(const std::string& expression, std::string& error) {
+        const auto result = PYrunPythonExpression(expression.c_str(), PY_Result::STRING);
+        if (result.myResultType == PY_Result::STRING) return result.myStringValue.toStdString();
+        error = "Python failed: " + result.myErrValue.toStdString();
+        return {};
+    }
     // Prepared materials in batch renders: the Solaris viewport's host binds the cooked MaterialX and Substrate Builder
     // assets from a Python stage walk (hdue_materialx.PreparedMaterials); husk runs no host, so the delegate runs the
     // same walk (hdue_batch.resolve) on the stage it renders, through Houdini's Python, whenever the frame or a library
     // changes, and applies its three settings itself. An unprepared or stale material fails the frame with the
     // library's message, as the viewport shows it.
-    std::string resolvedKey_, materialError_;  // materialError_: the last resolution's failure, kept until it changes
     void resolvePreparedMaterials() {
-        const auto stage = HdUEBatchStage();
-        if (!stage) return;
         auto& s = *state_;
-        const auto materialx = s.setting<std::string>("materialxLibrary", "");
-        const auto substrate = s.setting<std::string>("substrateLibrary", "");
-        const double frame = s.setting<double>("houdini:frame", 1.);
-        const auto key = TfStringPrintf("%p|%.6f|", stage.operator->(), frame) + materialx + "|" + substrate;
-        if (key == resolvedKey_) return;
-        resolvedKey_ = key;
-        materialError_.clear();
-        const auto id = UsdUtilsStageCache::Get().Insert(stage);
         const auto quoted = [](const std::string& text) {
             std::string out = "'";
             for (const char c : text) out += c == '\\' || c == '\'' ? std::string("\\") + c : std::string(1, c);
             return out + "'";
         };
-        const auto result =
-            PYrunPythonExpression(("__import__('hdue_batch').resolve_json(" + std::to_string(id.ToLongInt()) + ", " +
-                                   TfStringify(frame) + ", " + quoted(materialx) + ", " + quoted(substrate) + ")")
-                                      .c_str(),
-                                  PY_Result::STRING);
+        const auto libraries = quoted(s.setting<std::string>("materialxLibrary", "")) + ", " +
+                               quoted(s.setting<std::string>("substrateLibrary", ""));
+        const double frame = s.setting<double>("houdini:frame", 1.);
+        const auto stage = HdUEBatchStage();
         std::string error;
+        if (!stage) {
+            // No stage reached UsdImaging's adapters (implicit_surfaces.cpp): with a library to apply, the frame
+            // fails rather than render every prepared material with its fallback.
+            if (s.preparedKey != "no stage|" + libraries) {
+                s.preparedKey = "no stage|" + libraries;
+                const auto configured = python("str(__import__('hdue_batch').configured(" + libraries + "))", error);
+                s.preparedError = !error.empty() ? "hdUE prepared materials: " + error
+                                  : configured == "True"
+                                      ? "hdUE prepared materials: no USD stage to resolve the material libraries on"
+                                      : "";
+            }
+            return;
+        }
+        // A result that is the same at every frame (no prepared material, no wet surface) is not resolved again.
+        const auto stageKey = TfStringPrintf("%p|", stage.operator->()) + libraries;
+        if (s.preparedKey == stageKey + "|static" || s.preparedKey == stageKey + TfStringPrintf("|%.6f", frame)) return;
+        s.preparedError.clear();
+        auto& cache = UsdUtilsStageCache::Get();
+        const auto id = cache.Insert(stage);
+        const auto text = python("__import__('hdue_batch').resolve_json(" + std::to_string(id.ToLongInt()) + ", " +
+                                     TfStringify(frame) + ", " + libraries + ")",
+                                 error);
+        cache.Erase(id);  // the stage stays alive through UsdImaging; the cache would keep it for the process
         JsParseError parse;
-        const auto json = result.myResultType == PY_Result::STRING
-                              ? JsParseString(result.myStringValue.toStdString(), &parse)
-                              : JsValue();
-        if (!json.IsObject())
-            error = result.myResultType == PY_Result::STRING ? "unreadable result: " + parse.reason
-                                                             : "Python failed: " + result.myErrValue.toStdString();
-        else if (const auto it = json.GetJsObject().find("error"); it != json.GetJsObject().end())
-            error = it->second.GetString();
+        const auto json = error.empty() ? JsParseString(text, &parse) : JsValue();
+        if (error.empty()) {
+            if (!json.IsObject())
+                error = "unreadable result: " + parse.reason;
+            else if (const auto it = json.GetJsObject().find("error"); it != json.GetJsObject().end())
+                error = it->second.GetString();
+        }
+        const auto staticResult = json.IsObject() && json.GetJsObject().count("static") &&
+                                  json.GetJsObject().at("static").IsBool() && json.GetJsObject().at("static").GetBool();
+        s.preparedKey = stageKey + (staticResult ? std::string("|static") : TfStringPrintf("|%.6f", frame));
         if (!error.empty()) {
-            materialError_ = "hdUE prepared materials: " + error;
-            batchWarning(materialError_);
+            s.preparedError = "hdUE prepared materials: " + error;  // reported once, as the frame's error
             return;
         }
         // JSON to the hosts' value types: parameters' 3 and 4 numbers as GfVec3f and GfVec4f, numbers as float.
@@ -2355,8 +2376,8 @@ public:
             resolvePreparedMaterials();
             // A material that cannot render as prepared fails the frame (husk's exit status), rather than render
             // with fallbacks.
-            if (!materialError_.empty()) {
-                state_->setError(materialError_);
+            if (!state_->preparedError.empty()) {
+                state_->setError(state_->preparedError);
                 converged_ = true;
                 return;
             }
@@ -3418,6 +3439,16 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
         if (!state_->settings.count(desc.key)) state_->settings[desc.key] = desc.defaultValue;
         HdRenderDelegate::SetRenderSetting(desc.key, state_->settings[desc.key]);
     }
+#if !defined(HDUE_HOUDINI)
+    // Batch hosts of the standalone build have no prepared-material resolution (the Houdini build's husk resolves them,
+    // usdview's host applies them).
+    if (selfHosted_ && !host.continuous)
+        for (const char* library : {"materialxLibrary", "substrateLibrary"})
+            if (!state_->setting<std::string>(library, "").empty())
+                batchWarning(std::string("unreal:") + library +
+                             " is set, but this host renders MaterialX and Substrate Builder materials with their "
+                             "Preview Surface fallback: cooked libraries apply in Houdini, husk and usdview.");
+#endif
 }
 HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)

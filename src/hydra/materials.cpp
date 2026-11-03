@@ -133,7 +133,8 @@ public:
                     out = transformed(GfVec3f(1), source.texture);
                     return false;
                 }
-            warnOnce(TfStringPrintf("primvar readers drive only the base colour; %s uses its constant", input));
+            data_.warnings.push_back(
+                TfStringPrintf("primvar readers drive only the base colour; %s uses its constant", input));
             return false;
         }
         if (!source.image) {
@@ -141,8 +142,8 @@ public:
             return false;
         }
         if (!texture) {
-            warnOnce(TfStringPrintf("textured %s inputs are not translated; %s uses its constant", input,
-                                    shader_.nodeTypeId.GetText()));
+            data_.warnings.push_back(TfStringPrintf("textured %s inputs are not translated; %s uses its constant",
+                                                    input, shader_.nodeTypeId.GetText()));
             return false;
         }
         *texture = source.texture;
@@ -276,8 +277,8 @@ private:
             affine(vec4(param(node, driven[2] == '1' ? "in2" : "in1")), GfVec4f(0));
             upstream(driven);
         } else
-            warnOnce(TfStringPrintf("MaterialX node %s is not translated; inputs it drives use their constant",
-                                    type.c_str()));
+            data_.warnings.push_back(TfStringPrintf(
+                "MaterialX node %s is not translated; inputs it drives use their constant", type.c_str()));
     }
     // The texture coordinate transform an image applies; false when it reads no coordinates, so a later image may.
     bool uvTransform(const HdMaterialNode2& image, std::array<float, 6>& out) const {
@@ -293,7 +294,7 @@ private:
             out = uvAffine(value(param(node->second, "scale"), GfVec2f(1)), value(param(node->second, "rotation"), 0.f),
                            value(param(node->second, "translation"), GfVec2f(0)));
         else if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_place2d"))
-            warnOnce("MaterialX place2d is not translated; textures use their mesh UVs");
+            data_.warnings.push_back("MaterialX place2d is not translated; textures use their mesh UVs");
         return true;
     }
     // The UV set an image reads: its st / texcoord reader's primvar, also through a UsdTransform2d; 0 unconnected.
@@ -305,7 +306,7 @@ private:
             if (const auto name = uvPrimvar(node->second); !name.IsEmpty()) {
                 const auto set = size_t(std::find(uvNames_.begin(), uvNames_.end(), name) - uvNames_.begin());
                 if (set < 4) return uint32_t(set);
-                warnOnce("materials read up to 4 UV primvars; textures reading others use the first");
+                data_.warnings.push_back("materials read up to 4 UV primvars; textures reading others use the first");
                 return 0;
             }
             st = connection(node->second, "in");  // UsdTransform2d
@@ -436,10 +437,10 @@ void weight(HdUEMaterialData& data, int slot, GfVec3f& constant, float weight) {
 }
 // Subsurface and sheen colours reuse the base colour texture when they read the same image (the usual authoring);
 // their tint is then relative to the base colour slot. Other images fall back to the input's constant.
-bool baseTextureTint(const HdUEMaterialData& data, const HdUETextureData& texture, GfVec3f& tint, const char* input) {
+bool baseTextureTint(HdUEMaterialData& data, const HdUETextureData& texture, GfVec3f& tint, const char* input) {
     const auto& base = data.textures[HDUE_TEXTURE_BASE_COLOR];
     if (texture.file != base.file) {
-        warnOnce(TfStringPrintf("%s reads an image other than base_color's; using its constant", input));
+        data.warnings.push_back(TfStringPrintf("%s reads an image other than base_color's; using its constant", input));
         return false;
     }
     for (int i = 0; i < 3; ++i) tint[i] = base.scale[i] != 0 ? texture.scale[i] / base.scale[i] : 1;
@@ -523,7 +524,7 @@ void readDisplacement(const HdMaterialNetwork2& network, HdUEMaterialData& data)
     if (node == network.nodes.end() || !TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_displacement_"))
         return;
     if (node->second.nodeTypeId != TfToken("ND_displacement_float")) {
-        warnOnce("MaterialX vector displacement is not translated");
+        data.warnings.push_back("MaterialX vector displacement is not translated");
         return;
     }
     SurfaceReader(network, node->second, data).read("displacement", data.displacement, HDUE_TEXTURE_DISPLACEMENT);
@@ -561,10 +562,8 @@ public:
         const bool translated = !shader || readSurface(net, *shader, data);
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->mutex);
-        // A material the host maps to a cooked native asset (nativeMaterialAssets, the MaterialX library) renders as
-        // that asset, whatever hdUE makes of its network.
-        if (!translated && !state->setting<VtDictionary>("nativeMaterialAssets", {}).count(data.id))
-            warnOnce(
+        if (!translated)
+            data.warnings.push_back(
                 TfStringPrintf("surface shader %s is not translated; its materials render with the default surface",
                                shader->nodeTypeId.GetText()));
         // Displacement moves vertices when meshes are packed: a change re-packs the meshes bound to the material.
@@ -586,6 +585,10 @@ public:
     void Finalize(HdRenderParam* param) override { static_cast<HdUEState*>(param)->erase(GetId().GetString()); }
 };
 }  // namespace
+
+void HdUEWarnMaterial(const HdUEMaterialData& data) {
+    for (const auto& message : data.warnings) warnOnce(message);
+}
 
 // The UV primvars a material reads (its meshes' UV sets, uvPrimvars) and the vec3 primvar it reads as vertex colours
 // (displayColor, Cd, ...); empty when none.

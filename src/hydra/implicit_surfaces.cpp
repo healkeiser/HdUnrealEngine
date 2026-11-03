@@ -734,6 +734,8 @@ protected:
 };
 UsdStageRefPtr HdUEBatchStage() {
     std::lock_guard lock(batchStageMutex);
+    // A stage opened later at the address of this expired one must be recorded again.
+    if (batchStage.IsExpired()) batchStageSeen = nullptr;
     return batchStage;
 }
 TF_REGISTRY_FUNCTION(TfType) {

@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 
 import hou
+from hdue_batch import library_file, runtime_config
 from pxr import Plug, Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -54,28 +55,6 @@ def _note(message):
         path.mkdir(parents=True, exist_ok=True)
         with (path / "integration.log").open("a", encoding="utf-8") as log:
             log.write(time.strftime("%H:%M:%S ") + message + "\n")
-
-
-def runtime_config():
-    path = Path(os.environ["HDUE_RUNTIME_CONFIG"]).resolve()
-    config = json.loads(path.read_text(encoding="utf-8-sig"))
-    if config.get("version") != 1:
-        raise ValueError("Unsupported hdUE runtime config")
-    for key in (
-        "backend_dll",
-        "runtime_project",
-        "asset_catalog",
-        "materialx_library",
-        "substrate_library",
-    ):
-        if key in config:
-            value = Path(config[key])
-            config[key] = str(
-                value
-                if value.is_absolute()
-                else (path.parent / value).resolve()
-            )
-    return config
 
 
 class Host:
@@ -1052,13 +1031,9 @@ def libraries(stage, node=None):
         attr = prim.GetAttribute(f"unreal:{name}Library") if prim else None
         value = attr.Get() if attr and attr.HasAuthoredValue() else None
         parm = node.parm(f"hdue_{name}_library") if node else None
-        value = (
-            getattr(value, "path", value)
-            or (parm.eval() if parm else None)
-            or os.environ.get(f"HDUE_{name.upper()}_LIBRARY")
-            or runtime_config().get(f"{name}_library")
-        )
-        result.append(value or None)
+        # The rest of the lookup is husk's (hdue_batch.library_file).
+        value = getattr(value, "path", value) or (parm.eval() if parm else None)
+        result.append(library_file(name, value))
     return tuple(result)
 
 

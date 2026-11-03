@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include "pxr/base/arch/hash.h"
 #include "pxr/imaging/hd/renderDelegate.h"
+#include "pxr/usd/sdf/assetPath.h"
 #include "pxr/usd/usd/common.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -275,7 +276,12 @@ struct HdUEMaterialData {
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false;  // HDUE_MATERIAL_VERTEX_COLOR
+    // What the translation skipped, warned at upload (HdUEWarnMaterial) only when no cooked asset renders instead:
+    // a batch host maps cooked assets after Sync.
+    std::vector<std::string> warnings;
 };
+// Warns, once per message, what a material's translation skipped.
+void HdUEWarnMaterial(const HdUEMaterialData& data);
 // A setting's value as the backend reads UE properties from text: USD booleans as True/False, asset paths resolved,
 // everything else as USD prints it (vectors as "(x, y, z)", which fill a UE struct's fields in order).
 std::string HdUESettingText(const VtValue& value);
@@ -360,6 +366,9 @@ struct HdUEState : HdRenderParam {
     // Meshes erased since the last submit, kept so a re-created identical prim cancels its removal (HdUEState::erase).
     std::map<std::string, HdUEMeshData> erasedMeshes;
     HdRenderSettingsMap settings;
+    // Batch prepared-material resolution (the render pass's resolvePreparedMaterials): what was resolved, shared by
+    // the passes of a frame, and its failure, which fails every frame until the resolution changes. Render thread only.
+    std::string preparedKey, preparedError;
     // Guards settings: Houdini's UI thread writes them (SetRenderSetting) while hdUE's UE thread reads them.
     mutable std::recursive_mutex settingsMutex;
     std::set<TfToken> namespaced;  // settings set as unreal:<name>, which the bare <name> no longer overrides
@@ -416,6 +425,7 @@ struct HdUEState : HdRenderParam {
         // USD authors these as string or token, int or int64, float or double: accept either.
         if constexpr (std::is_same_v<T, std::string>) {
             if (it->second.IsHolding<TfToken>()) return it->second.UncheckedGet<TfToken>().GetString();
+            if (it->second.IsHolding<SdfAssetPath>()) return HdUESettingText(it->second);  // resolved when it can be
         } else if constexpr (std::is_arithmetic_v<T>) {
             const VtValue cast = VtValue::Cast<T>(it->second);
             if (!cast.IsEmpty()) return cast.UncheckedGet<T>();

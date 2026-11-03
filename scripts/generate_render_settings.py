@@ -739,9 +739,9 @@ HDUE = [
         "Rendering|Materials",
         "file",
         "",
-        "library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: the "
-        "runtime profile's materialx_library. Houdini's viewport prepares the bound MaterialX materials from it; "
-        "husk renders the Preview Surface fallback and warns.",
+        "library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: "
+        "HDUE_MATERIALX_LIBRARY, else the runtime profile's materialx_library. Houdini's viewport and husk render the "
+        "bound MaterialX materials as their cooked assets; a material changed since its import fails a husk frame.",
         category="Materials",
         pattern="*.json",
         advanced=True,
@@ -752,9 +752,10 @@ HDUE = [
         "Rendering|Materials",
         "file",
         "",
-        "library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: the runtime "
-        "profile's substrate_library. Houdini's viewport prepares Substrate Builder materials from it; husk renders "
-        "the Preview Surface fallback and warns.",
+        "library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: "
+        "HDUE_SUBSTRATE_LIBRARY, else the runtime profile's substrate_library. Houdini's viewport and husk render "
+        "Substrate Builder materials as their prepared assets; a graph changed since its preparation fails a husk "
+        "frame.",
         category="Materials",
         pattern="*.json",
         advanced=True,
