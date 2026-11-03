@@ -151,6 +151,13 @@ class _Libraries:
 
 
 _LIBRARIES = None
+_WARNED = set()
+
+
+def _warn_once(message):
+    if message not in _WARNED:
+        _WARNED.add(message)
+        print(message, file=sys.stderr, flush=True)
 
 
 def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
@@ -181,13 +188,23 @@ def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
             stage, time, libraries.materialx, libraries.substrate, view
         )
         # MaterialX graphs hdUE cannot translate at render time: without preparation they render translated.
-        pending = prepare and bool(libraries.materialx.missing)
+        pending = "materialx" if prepare and libraries.materialx.missing else ""
     except NeedsPreparation:
         if not prepare:
             raise
-        pending = True
+        pending = "substrate"
     if pending:
-        libraries.prepare(stage, time)
+        try:
+            libraries.prepare(stage, time)
+        except ValueError as error:
+            # A machine without UE's editor (a package) cannot prepare: MaterialX graphs keep their translation, as
+            # the viewport keeps it; a Substrate Builder graph has none and fails the frame.
+            if pending != "materialx":
+                raise
+            _warn_once(
+                "hdUE: MaterialX graphs render with their render-time translation; preparing them failed: "
+                + str(error)
+            )
         libraries.materialx.invalidate()
         settings = sync(
             stage, time, libraries.materialx, libraries.substrate, view
