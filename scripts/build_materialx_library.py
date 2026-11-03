@@ -13,6 +13,23 @@ from pathlib import Path
 from materialx_textures import udim_tiles
 
 
+def file_values(root):
+    """{filename input element: its value with the nearest fileprefix above it}: MaterialX resolves a filename
+    against the closest ancestor's (or its own element's) fileprefix, which the import receipt's paths include.
+    """
+    values = {}
+
+    def walk(element, prefix):
+        prefix = element.get("fileprefix", prefix)
+        if element.tag == "input" and element.get("type") == "filename":
+            values[element] = prefix + element.get("value", "")
+        for child in element:
+            walk(child, prefix)
+
+    walk(root, "")
+    return values
+
+
 def build(reports, destination):
     materials = []
     dependencies = {}
@@ -92,6 +109,7 @@ def build(reports, destination):
                             f"UDIM source membership differs from imported blocks: {p['name']}"
                         )
                     texture_sets[pattern] = dict(pattern=pattern, tiles=tiles)
+        filenames = file_values(root)
         nodes = {
             node.get("name"): node for node in root.iter() if node.get("name")
         }
@@ -121,9 +139,7 @@ def build(reports, destination):
             if file_input is not None and "<UDIM>" in file_input.get(
                 "value", ""
             ):
-                pattern = str(
-                    (source.parent / file_input.get("value")).resolve()
-                )
+                pattern = str((source.parent / filenames[file_input]).resolve())
                 expected = set(udim_tiles(pattern))
                 p = texture_parameters.get(node.get("name"))
                 if not p:
@@ -140,7 +156,7 @@ def build(reports, destination):
                     )
         for node in root.iter("input"):
             if node.get("type") == "filename" and node.get("value"):
-                file = (source.parent / node.get("value")).resolve()
+                file = (source.parent / filenames[node]).resolve()
                 files = [str(file)]
                 if "<UDIM>" in str(file):
                     tiles = {
