@@ -207,6 +207,8 @@ struct HdUEVolumeData {
     // value * temperatureScale (kelvin) times emissionIntensity.
     VtFloatArray emission;
     float emissionIntensity = 1, temperatureScale = 1;
+    // Its bound material: a prepared Substrate Builder volume material when nativeMaterialAssets maps it.
+    std::string material;
 };
 // A UE actor placed from a typed prim (HdUE_ActorAdapter): its transform, visibility, and its property values as
 // text by UE name. An UnrealLocalFogVolume is UE's base volume in the unit sphere of its local space, by

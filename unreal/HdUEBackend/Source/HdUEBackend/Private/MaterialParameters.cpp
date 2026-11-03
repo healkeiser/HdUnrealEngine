@@ -14,13 +14,20 @@ HdueResult FHdueScene::SetMaterialParameters(const HdueMaterialUpdate& Update, F
         Error = TEXT("Material instance was not found in the scene.");
         return HDUE_INVALID_ARGUMENT;
     }
+    return HdueApplyMaterialParameters(*Material, Update.parameters, Update.parameter_count, Error);
+}
+// Validates every parameter (known name and type, finite values, a texture of the slot's sampler kind) before setting
+// any, so a failed update changes nothing.
+HdueResult HdueApplyMaterialParameters(UMaterialInstanceDynamic& Material, const HdueMaterialParameter* Parameters,
+                                       uint32 Count, FString& Error) {
+    if (Count > 256 || (Count && !Parameters)) return HDUE_INVALID_ARGUMENT;
     TArray<FMaterialParameterInfo> Scalars, Vectors, Textures;
     TArray<FGuid> Guids;
-    Material->GetAllScalarParameterInfo(Scalars, Guids);
+    Material.GetAllScalarParameterInfo(Scalars, Guids);
     Guids.Empty();
-    Material->GetAllVectorParameterInfo(Vectors, Guids);
+    Material.GetAllVectorParameterInfo(Vectors, Guids);
     Guids.Empty();
-    Material->GetAllTextureParameterInfo(Textures, Guids);
+    Material.GetAllTextureParameterInfo(Textures, Guids);
     const auto Has = [](const TArray<FMaterialParameterInfo>& Info, FName Name) {
         return Info.ContainsByPredicate([&](const auto& P) {
             return P.Name == Name && P.Association == EMaterialParameterAssociation::GlobalParameter;
@@ -28,8 +35,8 @@ HdueResult FHdueScene::SetMaterialParameters(const HdueMaterialUpdate& Update, F
     };
     TSet<FName> Names;
     TArray<TStrongObjectPtr<UTexture>> LoadedTextures;
-    for (uint32 I = 0; I < Update.parameter_count; ++I) {
-        const auto& P = Update.parameters[I];
+    for (uint32 I = 0; I < Count; ++I) {
+        const auto& P = Parameters[I];
         if (!P.name || !*P.name || P.type > HDUE_PARAMETER_TEXTURE) return HDUE_INVALID_ARGUMENT;
         const FName Name(UTF8_TO_TCHAR(P.name));
         if (Names.Contains(Name)) {
@@ -54,7 +61,7 @@ HdueResult FHdueScene::SetMaterialParameters(const HdueMaterialUpdate& Update, F
                 return HDUE_INVALID_ARGUMENT;
             }
             UTexture* Default = nullptr;
-            Material->GetTextureParameterValue(FMaterialParameterInfo(Name), Default);
+            Material.GetTextureParameterValue(FMaterialParameterInfo(Name), Default);
             if (!Default || Texture->VirtualTextureStreaming != Default->VirtualTextureStreaming ||
                 (Texture->CompressionSettings == TC_Normalmap) != (Default->CompressionSettings == TC_Normalmap) ||
                 Texture->SRGB != Default->SRGB) {
@@ -65,15 +72,15 @@ HdueResult FHdueScene::SetMaterialParameters(const HdueMaterialUpdate& Update, F
         }
     }
     int32 TextureIndex = 0;
-    for (uint32 I = 0; I < Update.parameter_count; ++I) {
-        const auto& P = Update.parameters[I];
+    for (uint32 I = 0; I < Count; ++I) {
+        const auto& P = Parameters[I];
         const FName Name(UTF8_TO_TCHAR(P.name));
         if (P.type == HDUE_PARAMETER_SCALAR)
-            Material->SetScalarParameterValue(Name, P.value[0]);
+            Material.SetScalarParameterValue(Name, P.value[0]);
         else if (P.type == HDUE_PARAMETER_VECTOR)
-            Material->SetVectorParameterValue(Name, FLinearColor(P.value[0], P.value[1], P.value[2], P.value[3]));
+            Material.SetVectorParameterValue(Name, FLinearColor(P.value[0], P.value[1], P.value[2], P.value[3]));
         else
-            Material->SetTextureParameterValue(Name, LoadedTextures[TextureIndex++].Get());
+            Material.SetTextureParameterValue(Name, LoadedTextures[TextureIndex++].Get());
     }
     return HDUE_OK;
 }

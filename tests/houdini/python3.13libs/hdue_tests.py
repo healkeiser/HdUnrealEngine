@@ -5,6 +5,7 @@ import os
 
 MODULES = {
     "postprocess": "hdue_postprocess_test",
+    "volume-material": "hdue_volume_material_test",
     "dlss": "hdue_dlss_test",
     "substrate-live": "hdue_substrate_live_test",
     "substrate-textures": "hdue_substrate_texture_test",

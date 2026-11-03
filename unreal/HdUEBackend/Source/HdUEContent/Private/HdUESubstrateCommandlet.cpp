@@ -20,6 +20,10 @@
 #include "Materials/MaterialExpressionSaturate.h"
 #include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
+#include "Materials/MaterialExpressionBlackBody.h"
+#include "Materials/MaterialExpressionTextureSampleParameterVolume.h"
+#include "Materials/MaterialExpressionWorldPosition.h"
+#include "Engine/VolumeTexture.h"
 #include "AssetCompilingManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Dom/JsonObject.h"
@@ -105,6 +109,56 @@ struct FCompiler {
         E->R = X;
         E->G = Y;
         return {E, 3, 0};
+    }
+    // Volume materials: the backend binds a Volume prim's grids as 3D textures Density and Emission, placed by the
+    // WorldToUVW0..2 rows (world position to texture coordinates), as for hdUE's default volume material
+    // (M_HdUEVolume, HdUEPrepareCommandlet), and sets ExtinctionScale, TemperatureScale and EmissionIntensity.
+    UMaterialExpression* VolumeUVW = nullptr;
+    TMap<FName, UMaterialExpressionTextureSampleParameterVolume*> VolumeTextures;
+    FOutput VolumeGrid(FName Name) {
+        if (auto** Found = VolumeTextures.Find(Name)) return {*Found, 0, 1};
+        if (!VolumeUVW) {
+            auto* World = Add<UMaterialExpressionWorldPosition>();
+            auto* Homogeneous = Add<UMaterialExpressionAppendVector>();
+            Homogeneous->A.Connect(0, World);
+            Homogeneous->B.Connect(0, Constant(1).Expression);
+            UMaterialExpressionDotProduct* Axes[3];
+            for (int32 Axis = 0; Axis < 3; ++Axis) {
+                auto* Row = Add<UMaterialExpressionVectorParameter>();
+                Row->ParameterName = *FString::Printf(TEXT("WorldToUVW%d"), Axis);
+                Row->DefaultValue = FLinearColor(0, 0, 0, 0);
+                Axes[Axis] = Add<UMaterialExpressionDotProduct>();
+                Axes[Axis]->A.Connect(0, Homogeneous);
+                Axes[Axis]->B.Connect(5, Row);
+            }
+            auto* UV = Add<UMaterialExpressionAppendVector>();
+            UV->A.Connect(0, Axes[0]);
+            UV->B.Connect(0, Axes[1]);
+            auto* UVW = Add<UMaterialExpressionAppendVector>();
+            UVW->A.Connect(0, UV);
+            UVW->B.Connect(0, Axes[2]);
+            VolumeUVW = UVW;
+        }
+        auto* Texture = Add<UMaterialExpressionTextureSampleParameterVolume>();
+        Texture->ParameterName = Name;
+        Texture->Texture = LoadObject<UVolumeTexture>(nullptr, TEXT("/Game/HdUE/T_HdUEVolumeEmpty.T_HdUEVolumeEmpty"));
+        if (!Texture->Texture) Error = TEXT("Missing /Game/HdUE/T_HdUEVolumeEmpty: run Prepare-Content.ps1.");
+        Texture->SamplerType = SAMPLERTYPE_LinearColor;
+        Texture->Coordinates.Connect(0, VolumeUVW);
+        VolumeTextures.Add(Name, Texture);
+        return {Texture, 0, 1};  // its R channel
+    }
+    FOutput VolumeScalar(const TCHAR* Name, float Default) {
+        auto* E = Add<UMaterialExpressionScalarParameter>();
+        E->ParameterName = Name;
+        E->DefaultValue = Default;
+        return {E, 0, 0};
+    }
+    FOutput Times(FOutput A, FOutput B, int32 Type) {
+        auto* E = Add<UMaterialExpressionMultiply>();
+        Connect(E->A, A);
+        Connect(E->B, B);
+        return {E, Type, 0};
     }
     FOutput Source(const TSharedPtr<FJsonObject>& Connection) {
         const auto Name = Text(Connection, TEXT("node"));
@@ -373,6 +427,33 @@ struct FCompiler {
             auto* White = Add<UMaterialExpressionConstant3Vector>();
             White->Constant = FLinearColor::White;
             E->B.Connect(0, White);
+        } else if (Kind == TEXT("volume_fog_cloud")) {
+            auto* E = Add<UMaterialExpressionSubstrateVolumetricFogCloudBSDF>();
+            R = {E, 5, 0};
+            Connect(E->Albedo, Input(Inputs, TEXT("albedo"), 1, 0, FLinearColor(.8f, .8f, .8f)));
+            // Unconnected: M_HdUEVolume's extinction (density times ExtinctionScale) and emission (BlackBody of the
+            // emission field times TemperatureScale, times EmissionIntensity), so the backend's volume settings apply.
+            if (Inputs->HasField(TEXT("extinction")))
+                Connect(E->Extinction, Input(Inputs, TEXT("extinction"), 1));
+            else
+                Connect(E->Extinction,
+                        Times(VolumeGrid(TEXT("Density")), VolumeScalar(TEXT("ExtinctionScale"), 1.f), 0));
+            if (Inputs->HasField(TEXT("emission")))
+                Connect(E->EmissiveColor, Input(Inputs, TEXT("emission"), 1));
+            else {
+                auto* Body = Add<UMaterialExpressionBlackBody>();
+                Connect(Body->Temp,
+                        Times(VolumeGrid(TEXT("Emission")), VolumeScalar(TEXT("TemperatureScale"), 1.f), 0));
+                Connect(E->EmissiveColor, Times({Body, 1, 0}, VolumeScalar(TEXT("EmissionIntensity"), 0.f), 1));
+            }
+        } else if (Kind == TEXT("volume_field")) {
+            const auto Field = Text(Props, TEXT("field"), TEXT("density"));
+            if (Field != TEXT("density") && Field != TEXT("emission")) Error = TEXT("Unknown volume field: ") + Field;
+            R = VolumeGrid(Field == TEXT("emission") ? TEXT("Emission") : TEXT("Density"));
+        } else if (Kind == TEXT("blackbody")) {
+            auto* E = Add<UMaterialExpressionBlackBody>();
+            R = {E, 1, 0};
+            Connect(E->Temp, Input(Inputs, TEXT("temperature"), 0, 6500.f));
         } else if (Kind == TEXT("unlit")) {
             auto* E = Add<UMaterialExpressionSubstrateUnlitBSDF>();
             R = {E, 2, 0};
@@ -531,17 +612,26 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
         for (const auto& P : Info) Compiler.Parameters.Add(P.Name);
     }
     auto Output = Compiler.Build(Graph->GetStringField(TEXT("output")));
-    if (!Compiler.Error.IsEmpty() || !Output.Expression || Output.Type != 2 ||
+    const bool Volume = Output.Type == 5;  // a volume material (Substrate Volumetric Fog Cloud)
+    if (!Compiler.Error.IsEmpty() || !Output.Expression || (Output.Type != 2 && !Volume) ||
         Compiler.Built.Num() != Compiler.Nodes->Values.Num() || Compiler.LiveBuilt.Num() != Compiler.Live.Num()) {
         UE_LOG(LogTemp, Error, TEXT("Substrate Builder: %s"), *Compiler.Error);
         return 4;
     }
     Material->GetEditorOnlyData()->FrontMaterial.Connect(Output.Index, Output.Expression);
-    // As HdUEImportMaterialX: Hydra meshes become Nanite and instancers ISMs, and a cooked runtime cannot compile usage
-    // permutations (a graph without a MaterialX base drew UE's default material).
-    Material->bUsedWithNanite = true;
-    Material->bUsedWithInstancedStaticMeshes = true;
-    const bool IdSwitch = HdUEAddIdSwitch(Material);  // false: ID passes swap this material to M_HdUEId
+    bool IdSwitch = false;
+    if (Volume) {
+        // As M_HdUEVolume: UE's Volume domain, for heterogeneous volumes (the usage a cooked runtime cannot compile).
+        Material->MaterialDomain = MD_Volume;
+        Material->BlendMode = BLEND_Additive;
+        Material->SetUsageByFlag(MATUSAGE_HeterogeneousVolumes, true);
+    } else {
+        // As HdUEImportMaterialX: Hydra meshes become Nanite and instancers ISMs, and a cooked runtime cannot compile
+        // usage permutations (a graph without a MaterialX base drew UE's default material).
+        Material->SetUsageByFlag(MATUSAGE_Nanite, true);
+        Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
+        IdSwitch = HdUEAddIdSwitch(Material);  // false: ID passes swap this material to M_HdUEId
+    }
     Material->PostEditChange();
     FAssetCompilingManager::Get().FinishAllCompilation();
     FAssetRegistryModule::AssetCreated(Material);
@@ -556,6 +646,7 @@ int32 UHdUESubstrateCommandlet::Main(const FString& Params) {
     Result->SetStringField(TEXT("asset"), Material->GetPathName());
     Result->SetNumberField(TEXT("compiler"), 3);  // 3: ID switch (IdSwitch.h)
     Result->SetBoolField(TEXT("id_switch"), IdSwitch);
+    Result->SetStringField(TEXT("domain"), Volume ? TEXT("volume") : TEXT("surface"));
     Result->SetNumberField(TEXT("automatic_parameters"), Compiler.LiveBuilt.Num());
     Result->SetNumberField(TEXT("expressions"), Material->GetExpressions().Num());
     Result->SetBoolField(TEXT("native_substrate"), Material->HasSubstrateFrontMaterialConnected());

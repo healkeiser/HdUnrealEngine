@@ -82,6 +82,9 @@ Builders saved before the Material Builder subnet are instances of the asset `hd
 | Float Mask Primvar | Primvar base name and default value | Float |
 | Float to Color | Replicate a scalar into RGB | Color |
 | Substrate Unlit | Emission color; also used by generated mask-preview materials | Surface |
+| Substrate Volumetric Fog Cloud | Albedo, extinction and emission; unconnected extinction and emission are hdUE's default volume material's | Volume |
+| Volume Field | `density` or `emission` grid of the Volume prim at the shaded point | Float |
+| Blackbody | Temperature in kelvin (UE's BlackBody) | Color |
 | Texture Sample | Image file or explicit `<UDIM>` pattern, `srgb` / `raw`, `wrap` / `clamp` / `mirror`, optional UV | RGB, RGBA, R, G, B, A |
 | UV Coordinates | UV0 (`st`), two-component scale and offset | Vector2 |
 | Extract Channel | RGBA input and `r` / `g` / `b` / `a` selector | Float |
@@ -235,6 +238,12 @@ Supported inputs are float scalar constant primvars and float-array constant, un
 
 Mask-only updates use color-buffer notifications. They do not upload positions, indices, normals, or UVs. Topology changes create a new geometry revision; updates targeting an obsolete revision are rejected.
 
+## Volume materials
+
+A builder whose output is a **Substrate Volumetric Fog Cloud** (`hdue_substrate.create(preset="volume")`) is a volume material: it authors UsdShade's volume terminal (`outputs:unreal:volume`, no Preview Surface) and prepares into a UE material of the Volume domain, used with heterogeneous volumes, whose front material is UE's `SubstrateVolumetricFogCloudBSDF` (the closure UE's heterogeneous volumes read with Substrate, `HeterogeneousVolumesLiveShadingUtils.ush`). Bound to a Volume prim (a material binding, as on meshes), it replaces hdUE's default `M_HdUEVolume` in the Houdini viewport; elsewhere (husk) the volume keeps `M_HdUEVolume`, as surfaces keep their Preview Surface fallback.
+
+The backend gives it what it gives `M_HdUEVolume`: the volume's `density` grid and the field `primvars:unreal:emissionField` names as the 3D textures `Density` and `Emission`, the `WorldToUVW0..2` rows placing them, and the `ExtinctionScale`, `TemperatureScale` and `EmissionIntensity` scalars. **Volume Field** samples one of the two grids; left unconnected, the Fog Cloud's extinction is the density times `ExtinctionScale` and its emission the BlackBody of the emission field, so an unedited volume graph renders as `M_HdUEVolume` does. Its numeric inputs update live as on surfaces. `samples/volume_material/volume_material.usda` and the in-Houdini test `-TestKind volume-material` check both: the default graph against `M_HdUEVolume`, and a live albedo edit.
+
 ## Water coating example
 
 Use `samples/substrate/contrast.usda` for visual comparison. All three spheres share the composite material, with masks of 0, 1, and a split transition. The base MaterialX coat is overridden to 0 and its specular roughness to 0.65; the water roughness remains 0.08. This makes the change in reflection width easier to inspect while preserving the base color. `scripts/generate_substrate_comparison.py` generates the scene and can optionally create a Material Library HIP or a single-mesh variant. Published base-parameter overrides use the existing prepared library and do not require a new shader cook.
@@ -251,7 +260,7 @@ These values belong to the example graph. Artists can change its nodes, expose a
 
 The current backend uses Adaptive GBuffer with a four-closure, 128-byte-per-pixel budget. The owned MaterialX water example compiles to three closures and 92 bytes per pixel; its base compiles to two closures and 64 bytes. Arbitrarily complex graphs require separate qualification. Parameter blending is an explicit authored choice.
 
-Initial support covers opaque graphs on generic USD meshes. Native uasset material slots, arbitrary UE material expressions, multiple MaterialX bases, multiple float-primvar mask channels, unbounded float buffers, full transmission/glass authoring, volume/displacement, and compiling shaders inside the rendering DLL are outside this implementation. Existing prepared MaterialX textures remain on the imported graph. Direct Texture Samples additionally support image masks; Float Mask Primvar continues to use the separate per-mesh overlay transport. Additional UV sets, direct COP/opdef baking, and dedicated BC5 normal-map compression are outside the direct-texture implementation. Background topology preparation currently targets Solaris and this repository's loose-content backend runtime.
+Initial support covers opaque graphs on generic USD meshes. Native uasset material slots, arbitrary UE material expressions, multiple MaterialX bases, multiple float-primvar mask channels, unbounded float buffers, full transmission/glass authoring, displacement, volume fields other than density and the emission field, and compiling shaders inside the rendering DLL are outside this implementation. Existing prepared MaterialX textures remain on the imported graph. Direct Texture Samples additionally support image masks; Float Mask Primvar continues to use the separate per-mesh overlay transport. Additional UV sets, direct COP/opdef baking, and dedicated BC5 normal-map compression are outside the direct-texture implementation. Background topology preparation currently targets Solaris and this repository's loose-content backend runtime.
 
 Current checks cover typed graph validation, float32 USD round trips, remapped MaterialX relationships, native VOP-to-USD parameter updates, both SDK builds, and Lumen/64-sample Path Tracer output through repeated delegate sessions. The eight-case Solaris regression passes public coverage/roughness edits, preparation-error recovery after a structural edit is reverted, mask-only updates, and preview restoration. Generated logs, images, shader receipts, and HIP files remain under ignored output directories. No hardware-independent performance target is claimed.
 

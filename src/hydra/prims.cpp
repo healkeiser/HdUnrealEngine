@@ -1325,6 +1325,7 @@ public:
         volume.id = GetId().GetString();
         volume.visible = delegate->GetVisible(GetId());
         volume.renderTag = delegate->GetRenderTag(GetId());
+        volume.material = delegate->GetMaterialId(GetId()).GetString();
         _UpdateInstancer(delegate, bits);
         const auto transform = delegate->GetTransform(GetId());
         auto placements = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), transform);
@@ -1339,6 +1340,7 @@ public:
                 out.id = ids.back();
                 out.visible = volume.visible;
                 out.renderTag = volume.renderTag;
+                out.material = volume.material;
                 out.localToWorld = (gridToLocal_ ? *gridToLocal_ : loaded.localToWorld) * placements[i];
                 state->dirtyVolumes.insert(out.id);
                 state->removed.erase(out.id);
@@ -1353,11 +1355,12 @@ public:
             ++state->revision;
             *bits = HdChangeTracker::Clean;
         };
-        // Visibility, purpose, transform and instance edits keep the loaded grid instead of reading the file again.
+        // Visibility, purpose, transform, material and instance edits keep the loaded grid instead of reading the file
+        // again.
         if (gridToLocal_ && !emitted_.empty() &&
-            !(*bits &
-              ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag | HdChangeTracker::DirtyTransform |
-                HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex))) {
+            !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag |
+                        HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyMaterialId |
+                        HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex))) {
             std::lock_guard lock(state->mutex);
             if (const auto it = state->volumes.find(emitted_.front()); it != state->volumes.end()) {
                 const auto loaded = it->second;  // the density is shared, not copied

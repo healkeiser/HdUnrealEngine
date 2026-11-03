@@ -36,6 +36,110 @@ class GraphTests(unittest.TestCase):
             signature(read(material, Usd.TimeCode.Default())),
         )
 
+    def test_volume_graph(self):
+        """A Volumetric Fog Cloud output authors UsdShade's volume terminal (no Preview Surface) and reads back."""
+        graph = dict(
+            version=1,
+            output="volume",
+            nodes={
+                "density": dict(
+                    type="volume_field", properties={"field": "density"}
+                ),
+                "extinction": dict(
+                    type="color_from_float",
+                    inputs={"value": {"node": "density"}},
+                ),
+                "heat": dict(
+                    type="volume_field", properties={"field": "emission"}
+                ),
+                "fire": dict(
+                    type="blackbody", inputs={"temperature": {"node": "heat"}}
+                ),
+                "volume": dict(
+                    type="volume_fog_cloud",
+                    inputs={
+                        "extinction": {"node": "extinction"},
+                        "emission": {"node": "fire"},
+                    },
+                ),
+            },
+        )
+        stage = Usd.Stage.CreateInMemory()
+        material = author(stage, "/Looks/Smoke", graph)
+        self.assertTrue(material.GetVolumeOutput("unreal").GetConnectedSource())
+        self.assertFalse(material.GetSurfaceOutput("unreal"))
+        self.assertFalse(stage.GetPrimAtPath("/Looks/Smoke/Preview"))
+        self.assertEqual(
+            signature(graph), signature(read(material, Usd.TimeCode.Default()))
+        )
+        # Unconnected extinction and emission (hdUE's default volume material) are valid too.
+        validate(
+            dict(
+                version=1,
+                output="v",
+                nodes={"v": dict(type="volume_fog_cloud")},
+            )
+        )
+
+    def test_volume_nodes_rejected_where_they_do_not_apply(self):
+        field = dict(type="volume_field", properties={"field": "density"})
+        with self.assertRaisesRegex(
+            ValueError, "volume graph"
+        ):  # a grid in a surface material
+            validate(
+                dict(
+                    version=1,
+                    output="surface",
+                    nodes={
+                        "f": field,
+                        "c": dict(
+                            type="color_from_float",
+                            inputs={"value": {"node": "f"}},
+                        ),
+                        "surface": dict(
+                            type="slab",
+                            inputs={"diffuse_albedo": {"node": "c"}},
+                        ),
+                    },
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "density or emission"):
+            validate(
+                dict(
+                    version=1,
+                    output="v",
+                    nodes={
+                        "f": dict(
+                            type="volume_field",
+                            properties={"field": "temperature"},
+                        ),
+                        "c": dict(
+                            type="color_from_float",
+                            inputs={"value": {"node": "f"}},
+                        ),
+                        "v": dict(
+                            type="volume_fog_cloud",
+                            inputs={"extinction": {"node": "c"}},
+                        ),
+                    },
+                )
+            )
+        with self.assertRaisesRegex(
+            ValueError, "type mismatch"
+        ):  # a volume is no surface
+            validate(
+                dict(
+                    version=1,
+                    output="w",
+                    nodes={
+                        "v": dict(type="volume_fog_cloud"),
+                        "w": dict(
+                            type="weight", inputs={"surface": {"node": "v"}}
+                        ),
+                    },
+                )
+            )
+
     def test_disconnect_blocks_weaker_usd_connections(self):
         base = Usd.Stage.CreateInMemory()
         author(base, "/Looks/Test", self.graph)

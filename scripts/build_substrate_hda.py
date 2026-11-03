@@ -105,6 +105,29 @@ HELP = {
         "Copies a float into red, green and blue.",
         {"value": "Float to copy."},
     ),
+    "volume_fog_cloud": (
+        "A volume material for Volume prims: UE's Substrate Volumetric Fog Cloud BSDF, rendered as a heterogeneous "
+        "volume. Wire it to the builder's output, and bind the material to a Volume prim.",
+        {
+            "albedo": "Fraction of the light the medium scatters rather than absorbs.",
+            "extinction": "Extinction per scene unit (absorption plus scattering), usually a Volume Field times a "
+            "color. Unconnected, the density grid times the volume's extinction scale, as hdUE's default volume "
+            "material.",
+            "emission": "Emitted radiance, for example a Blackbody of a Volume Field. Unconnected, the Blackbody of "
+            "the emission field primvars:unreal:emissionField names, as hdUE's default volume material.",
+        },
+    ),
+    "volume_field": (
+        "A grid of the Volume prim at the shaded point.",
+        {
+            "field": "Density: the density field (or the first field). Emission: the field "
+            "primvars:unreal:emissionField names.",
+        },
+    ),
+    "blackbody": (
+        "The color of a black body at a temperature (UE's BlackBody expression), for fire and hot gases.",
+        {"temperature": "Temperature in kelvin."},
+    ),
     "unlit": (
         "An emissive surface without lighting.",
         {"emission": "Emitted color."},
@@ -147,6 +170,7 @@ MENUS = {
     "color_space": {"srgb": "sRGB", "raw": "Raw"},
     "address": {"wrap": "Wrap", "clamp": "Clamp", "mirror": "Mirror"},
     "channel": {c: c.upper() for c in "rgba"},
+    "field": {"density": "Density", "emission": "Emission"},
 }
 TOOL = """<?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
@@ -239,6 +263,7 @@ def connector(network, name, kind, value_type, default=None):
     node.parm("parmtype").set(
         {
             "surface": "bsdf",
+            "volume": "bsdf",  # as Karma's volume shaders, wired to the builder's output
             "color3": "color",
             "color4": "coloralpha",
             "vector2": "float2",
@@ -302,7 +327,9 @@ def finish(asset, kind, summary, group, inputs, keyword):
     # Surface nodes are surface shaders, so a Material Library translates the one wired to a Material Builder's
     # surface output (with the whole builder graph); the others are generic, as kma_ao.
     shader_type = (
-        "surface" if "surface" in outputs(NODES[kind]).values() else "generic"
+        "surface"
+        if {"surface", "volume"} & set(outputs(NODES[kind]).values())
+        else "generic"
     )
     script = definition.sections()["DialogScript"].contents()
     definition.addSection(

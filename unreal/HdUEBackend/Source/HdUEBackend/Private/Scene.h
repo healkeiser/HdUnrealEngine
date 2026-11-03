@@ -49,6 +49,9 @@ class UMaterialInstanceDynamic;
 struct FNativePickGeometry;
 class FHdueLighting;
 
+// Sets a material instance's parameters (hdue/bridge.h HdueMaterialParameter): all, or none when one is invalid.
+HdueResult HdueApplyMaterialParameters(class UMaterialInstanceDynamic& Material,
+                                       const HdueMaterialParameter* Parameters, uint32 Count, FString& Error);
 class FHdueScene {
 public:
     // A texture of the Preview Surface parents and the channels it was built for. Scalar inputs that read one or two

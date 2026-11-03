@@ -107,6 +107,34 @@ NODES = {
         inputs={"value": ("float", 0.0)},
         properties={},
     ),
+    # Volume materials (a Volume prim's heterogeneous volume): UE's Substrate Volumetric-Fog-Cloud BSDF, which
+    # heterogeneous volumes read (HeterogeneousVolumesLiveShadingUtils.ush). Unconnected, extinction and emission are
+    # those of hdUE's default volume material (M_HdUEVolume): the density grid times the volume's extinction scale, and
+    # the BlackBody of its emission field (primvars:unreal:emissionField, ...).
+    "volume_fog_cloud": dict(
+        label="Substrate Volumetric Fog Cloud",
+        output="volume",
+        inputs={
+            "albedo": ("color3", (0.8, 0.8, 0.8)),
+            "extinction": ("color3", None),
+            "emission": ("color3", None),
+        },
+        properties={},
+    ),
+    # A grid of the Volume prim, at the shaded point: its density field, or the field primvars:unreal:emissionField
+    # names (the grids the backend uploads).
+    "volume_field": dict(
+        label="Volume Field",
+        output="float",
+        inputs={},
+        properties={"field": ("string", "density")},
+    ),
+    "blackbody": dict(
+        label="Blackbody",
+        output="color3",
+        inputs={"temperature": ("float", 6500.0)},
+        properties={},
+    ),
     "unlit": dict(
         label="Substrate Unlit",
         output="surface",
@@ -160,6 +188,7 @@ USD_TYPES = {
     "float": Sdf.ValueTypeNames.Float,
     "color3": Sdf.ValueTypeNames.Color3f,
     "surface": Sdf.ValueTypeNames.Token,
+    "volume": Sdf.ValueTypeNames.Token,
     "string": Sdf.ValueTypeNames.String,
     "bool": Sdf.ValueTypeNames.Bool,
     "asset": Sdf.ValueTypeNames.Asset,
@@ -266,6 +295,7 @@ def validate(graph):
     parameters = set()
     bases = []
     masks = []
+    fields = []
 
     def visit(name):
         if name in active:
@@ -333,6 +363,12 @@ def validate(graph):
             "simple_volume",
         ):
             raise ValueError(name + ": unsupported subsurface mode")
+        if node["type"] == "volume_field" and props.get(
+            "field", "density"
+        ) not in ("density", "emission"):
+            raise ValueError(name + ": expected the density or emission field")
+        if node["type"] == "volume_field":
+            fields.append(name)
         if node["type"] == "uv" and props.get("index", 0) != 0:
             raise ValueError(
                 name
@@ -377,8 +413,13 @@ def validate(graph):
         visited.add(name)
 
     visit(output)
-    if NODES[nodes[output]["type"]]["output"] != "surface":
-        raise ValueError("Substrate output must be a surface")
+    kind = NODES[nodes[output]["type"]]["output"]
+    if kind not in ("surface", "volume"):
+        raise ValueError("Substrate output must be a surface or a volume")
+    if fields and kind != "volume":
+        raise ValueError(
+            "Volume Field reads a volume's grids: use it in a volume graph"
+        )
     if set(nodes) != visited:
         raise ValueError(
             "Disconnected Substrate nodes: "
@@ -436,6 +477,11 @@ def signature(graph):
     return hashlib.sha256(
         json.dumps(graph, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def output_kind(graph):
+    """The graph's material kind: surface or volume (its output node's type)."""
+    return NODES[graph["nodes"][graph["output"]]["type"]]["output"]
 
 
 def author(stage, path, graph, replace=True):
@@ -498,6 +544,12 @@ def author(stage, path, graph, replace=True):
                         if kind in constructors
                         else Sdf.AssetPath(value) if kind == "asset" else value
                     )
+    if output_kind(graph) == "volume":
+        # A volume material: UsdShade's volume terminal, which Volume prims bind; no Preview Surface.
+        material.CreateVolumeOutput("unreal").ConnectToSource(
+            shaders[graph["output"]].ConnectableAPI(), "out"
+        )
+        return material
     material.CreateSurfaceOutput("unreal").ConnectToSource(
         shaders[graph["output"]].ConnectableAPI(), "out"
     )
@@ -519,10 +571,17 @@ def read(material, time):
         raise ValueError(str(material.GetPath()) + ": " + error.Get(time))
     if material.GetPrim().GetAttribute("unreal:substrate:version").Get() != 1:
         raise ValueError("Unsupported Substrate material version")
-    terminal = material.GetSurfaceOutput("unreal").GetConnectedSource()
+    terminal = None
+    for output in (
+        material.GetSurfaceOutput("unreal"),
+        material.GetVolumeOutput("unreal"),
+    ):
+        if output and output.GetConnectedSource():
+            terminal = output.GetConnectedSource()
+            break
     if not terminal:
         raise ValueError(
-            str(material.GetPath()) + ": missing hdue surface output"
+            str(material.GetPath()) + ": missing hdue surface or volume output"
         )
     nodes = {}
 

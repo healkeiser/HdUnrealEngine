@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 19u
+#define HDUE_ABI_VERSION 20u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -452,6 +452,12 @@ typedef struct HdueVolumeDesc {
     const float* emission;
     float emission_intensity;
     float temperature_scale;
+    /* ABI 20: a cooked Volume-domain material for heterogeneous volumes (a prepared Substrate Builder volume
+       material; null or empty: hdUE's M_HdUEVolume). It receives the same grids and parameters. */
+    const char* material;
+    /* ABI 20: that material's parameters (its graph values and live edits), as set_material_parameters sets them. */
+    const HdueMaterialParameter* parameters;
+    uint32_t parameter_count;
 } HdueVolumeDesc;
 /* upsert_local_fog_volume (ABI 14): one UE Local Fog Volume, as the actor a level places. transform (row-major, row
  * vectors, UE world centimeters) places UE's base volume, a sphere of radius 500 cm. names and values set

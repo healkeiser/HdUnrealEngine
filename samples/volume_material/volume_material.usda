@@ -1,0 +1,61 @@
+#usda 1.0
+(
+    doc = "A Substrate Builder volume material (scripts/substrate_graph.py: a Volumetric Fog Cloud with every input unconnected, so hdUE's default volume material's extinction and emission) bound to the Cornell fog sphere of volume/openvdb.usda, in front of a wall (depth for the viewport test). tests/houdini/python3.13libs/hdue_volume_material_test.py prepares it in the Houdini viewport: bound, it renders as M_HdUEVolume does; its albedo edits live. Authored with substrate_graph.author()."
+    endTimeCode = 1
+    metersPerUnit = 1
+    renderSettingsPrimPath = "/Render/Settings"
+    startTimeCode = 1
+    subLayers = [
+        @../conformance/common/stage.usda@
+    ]
+    upAxis = "Y"
+)
+
+def "Looks"
+{
+    def Material "Smoke"
+    {
+        token outputs:unreal:volume.connect = </Looks/Smoke/Graph/volume.outputs:out>
+        custom int unreal:substrate:version = 1
+
+        def "Graph"
+        {
+            def Shader "volume"
+            {
+                uniform token info:id = "unreal:substrate:volume_fog_cloud"
+                color3f inputs:albedo = (0.8, 0.8, 0.8)
+                color3f inputs:albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
+                color3f inputs:extinction = None
+                color3f inputs:extinction.connect = None
+                token outputs:out
+            }
+        }
+    }
+}
+
+def Volume "Fog" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    custom rel field:density = </Fog/density>
+    rel material:binding = </Looks/Smoke>
+    float3 xformOp:scale = (3, 3, 3)
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+
+    def OpenVDBAsset "density"
+    {
+        token fieldName = "density"
+        asset filePath = @../cornell/fog.vdb@
+    }
+}
+
+
+def Cube "Wall"
+{
+    double size = 1
+    double3 xformOp:translate = (0, 0, -4)
+    double3 xformOp:scale = (12, 12, 0.1)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+}

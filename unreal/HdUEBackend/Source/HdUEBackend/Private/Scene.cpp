@@ -18,6 +18,7 @@
 #include "Async/ParallelFor.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
+#include "MaterialDomain.h"
 #include "MaterialShared.h"
 #include "RHI.h"
 #include "Algo/AllOf.h"
@@ -252,7 +253,21 @@ bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
 bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     const FString Id = UTF8_TO_TCHAR(Desc.id);
     const uint64 Count = uint64(Desc.width) * Desc.height * Desc.depth;
-    auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"));
+    // A bound volume material (a prepared Substrate Builder one: Volume domain, heterogeneous volumes usage), else
+    // hdUE's M_HdUEVolume. Both read the same grids and parameters.
+    UMaterialInterface* Parent = nullptr;
+    if (Desc.material && *Desc.material) {
+        Parent = LoadObject<UMaterialInterface>(nullptr, UTF8_TO_TCHAR(Desc.material));
+        const UMaterial* Base = Parent ? Parent->GetMaterial() : nullptr;
+        if (!Base || Base->MaterialDomain != MD_Volume || !Base->GetUsageByFlag(MATUSAGE_HeterogeneousVolumes)) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: volume %s material %hs is missing or not a heterogeneous volume material; using "
+                        "M_HdUEVolume"),
+                   *Id, Desc.material);
+            Parent = nullptr;
+        }
+    }
+    if (!Parent) Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"));
     if (!Parent) {
         Error =
             TEXT("Volume material /Game/HdUE/M_HdUEVolume is missing; run Prepare-Content.ps1 and stage the runtime.");
@@ -262,8 +277,9 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     if (!IsValid(Volume.Actor)) {
         Volume.Actor = World->SpawnActor<AActor>();
         AddRootComponent<UHeterogeneousVolumeComponent>(Volume.Actor, [](UHeterogeneousVolumeComponent&) {});
-        Volume.Material.Reset(UMaterialInstanceDynamic::Create(Parent, World));
     }
+    if (!Volume.Material.IsValid() || Volume.Material->Parent != Parent)
+        Volume.Material.Reset(UMaterialInstanceDynamic::Create(Parent, World));
     auto* Component = Volume.Actor->FindComponentByClass<UHeterogeneousVolumeComponent>();
     // ponytail: half-float dense 3D textures; sparse grids beyond a few hundred voxels per side cost memory.
     const auto Fill = [&](TStrongObjectPtr<UVolumeTexture>& Slot, const float* Values) -> UVolumeTexture* {
@@ -309,6 +325,13 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
     Volume.Material->SetVectorParameterValue(TEXT("Albedo"),
                                              FLinearColor(Desc.albedo[0], Desc.albedo[1], Desc.albedo[2], 1));
     Volume.Material->SetScalarParameterValue(TEXT("ExtinctionScale"), Desc.extinction_scale);
+    // A bound volume material's public and generated parameters (its graph's values and live edits).
+    if (Desc.parameter_count) {
+        if (const HdueResult Code =
+                HdueApplyMaterialParameters(*Volume.Material.Get(), Desc.parameters, Desc.parameter_count, Error);
+            Code != HDUE_OK)
+            return false;
+    }
     Component->SetMaterial(0, Volume.Material.Get());
     Component->SetVolumeResolution(FIntVector(Desc.width, Desc.height, Desc.depth));
     FMatrix Matrix;

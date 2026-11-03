@@ -158,6 +158,13 @@ def create(parent=None, preset="slab", material="/Looks/Base"):
             layer.setInput(1, base)
             layer.parm("thickness").set(0.01)
             output.setInput(0, layer)
+        elif preset == "volume":
+            # A volume material: a Volumetric Fog Cloud, whose unconnected extinction and emission are hdUE's
+            # default volume material's, on the builder's output.
+            network.node("slab").destroy()
+            output.setInput(
+                0, network.createNode(type_name("volume_fog_cloud"), "volume")
+            )
         elif preset != "slab":
             network.destroy()
             raise ValueError("Unknown Substrate preset: " + preset)

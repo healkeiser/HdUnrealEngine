@@ -1173,6 +1173,9 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
     // Voxel space to UE world: USD placement, then the USD -> UE basis and units (row vectors).
     const auto basis = sceneBasis(state);
     const double perCentimeter = 1 / (state.setting<double>("metersPerUnit", .01) * 100);
+    // A bound prepared Substrate Builder volume material (the host's nativeMaterialAssets) replaces M_HdUEVolume.
+    const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
+    const auto nativeParameters = state.setting<VtDictionary>("nativeMaterialParameters", {});
     for (const auto& id : packet.dirtyVolumes) {
         const auto it = state.volumes.find(id);
         if (it == state.volumes.end()) continue;
@@ -1197,6 +1200,17 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
                 packet.own(packet.floats, std::vector<float>(volume.emission.begin(), volume.emission.end()));
             desc.emission_intensity = volume.emissionIntensity;
             desc.temperature_scale = volume.temperatureScale;
+        }
+        if (const auto material = asset(nativeMaterials, volume.material); !material.empty()) {
+            desc.material = packet.own(material);
+            if (const auto fields = nativeParameters.find(volume.material);
+                fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>()) {
+                std::vector<HdueMaterialParameter> parameters;
+                for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
+                    parameters.push_back(materialParameter(packet, name, value));
+                desc.parameter_count = uint32_t(parameters.size());
+                desc.parameters = packet.own(packet.parameters, std::move(parameters));
+            }
         }
         packet.volumes.push_back(desc);
     }
@@ -3566,6 +3580,14 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         value.IsHolding<VtDictionary>() ? value.UncheckedGet<VtDictionary>() : VtDictionary();
     if (key == TfToken("nativeMaterialParameters") || key == TfToken("nativeMaterialAssets")) {
         dirtyChangedEntries(previousDictionary, currentDictionary, state_->materials, state_->dirtyMaterials);
+        // Volumes bound to a changed entry take their new material or parameters.
+        for (const auto& [id, volume] : state_->volumes) {
+            const auto entry = [&](const VtDictionary& d) {
+                const auto it = d.find(volume.material);
+                return it == d.end() ? VtValue() : it->second;
+            };
+            if (entry(previousDictionary) != entry(currentDictionary)) state_->dirtyVolumes.insert(id);
+        }
         ++state_->revision;
     }
     if (key == TfToken("nativeMeshAssets")) {
