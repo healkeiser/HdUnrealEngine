@@ -1,5 +1,6 @@
 #include "HdUESubstrateCommandlet.h"
 #include "IdSwitch.h"
+#include "MaterialDomain.h"  // MD_Volume, MD_DeferredDecal
 #include "Materials/Material.h"
 #include "Materials/MaterialExpressionSubstrate.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
