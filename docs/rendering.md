@@ -23,7 +23,7 @@ Renderer settings are `unreal:*` attributes on the UsdRenderSettings prim (the *
 | `unreal:domeResolution` | 512 | Environment cubemap face size |
 | `unreal:autoViewerLight`, `unreal:viewerLightIntensity` | | Review light for scenes without lights |
 | `unreal:upAxis` | stage | Up axis override |
-| `unreal:materialxLibrary`, `unreal:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied in Houdini's viewport; husk keeps the Preview Surface fallback and warns |
+| `unreal:materialxLibrary`, `unreal:substrateLibrary` | runtime profile | Cooked MaterialX and prepared Substrate libraries (`library.json`). Applied alike in Houdini's viewport, husk and usdview (`--hdue-substrate-library`); a stale or unprepared material fails a husk frame |
 | `unreal:viewportIdAovs` | 1 | Houdini's viewport renders the `primId`/`instanceId` AOVs for its selection highlight once the view settles (skipped while tumbling, scrubbing or playing); 0 never renders them (no highlight) |
 
 In Houdini's viewport, `houdini:interactive` (tumbling, scrubbing, playing) caps Path Tracer samples at 8 and skips the AOV passes; the full image renders once the viewport is still. Flipbooks render in full.

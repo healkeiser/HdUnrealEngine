@@ -21,10 +21,21 @@ class MaterialXTest(SmokeTest):
 
     def shader_for(self, name):
         entry = self.launcher.materialx_library.bound_entries["/Looks/" + name]
-        path = entry.get("usd_shader", "/Looks/" + name + "/MaterialX")
+        stage = self.controller._dataModel.stage
+        if "usd_shader" in entry:
+            return UsdShade.Shader(stage.GetPrimAtPath(entry["usd_shader"]))
+        # A referenced .mtlx material: usdMtlx names its shader after the MaterialX node, so follow the connection.
+        material = UsdShade.Material(stage.GetPrimAtPath("/Looks/" + name))
         return UsdShade.Shader(
-            self.controller._dataModel.stage.GetPrimAtPath(path)
+            material.GetSurfaceOutput("mtlx").GetConnectedSource()[0].GetPrim()
         )
+
+    def input_for(self, name, field):
+        """The input MaterialXLibrary reads: usdMtlx publishes a referenced material's inputs on the Material."""
+        material = UsdShade.Material(
+            self.controller._dataModel.stage.GetPrimAtPath("/Looks/" + name)
+        )
+        return material.GetInput(field) or self.shader_for(name).GetInput(field)
 
     def texture_for(self, name):
         entry = self.launcher.materialx_library.bound_entries["/Looks/" + name]
@@ -46,7 +57,7 @@ class MaterialXTest(SmokeTest):
             )
         else:
             field = entry["bindings"]["unreal:base_color_texture"]
-            port = self.shader_for(name).GetInput("unreal:base_color_texture")
+            port = self.input_for(name, "unreal:base_color_texture")
         return port, port.Get() or field["default"]
 
     def image(self, label, previous=0, samples=0):
@@ -100,8 +111,7 @@ class MaterialXTest(SmokeTest):
                         "subsurface" if family == "SS" else "subsurface_weight"
                     ),
                 }[kind]
-                shader = self.shader_for(name)
-                source_input = shader.GetInput(field)
+                source_input = self.input_for(name, field)
                 old = source_input.Get()
                 before_meshes = self.stats()["submittedMeshes"]
                 source_input.Set(
@@ -162,7 +172,12 @@ class MaterialXTest(SmokeTest):
                     raise AssertionError(
                         f"Material editing resubmitted geometry: {comparisons[-1]}"
                     )
-                source_input.Set(old)
+                if (
+                    old is None
+                ):  # the node definition's default: remove the edit (session layer) again
+                    source_input.GetAttr().Clear()
+                else:
+                    source_input.Set(old)
                 reference = yield from self.image(
                     mode + "-restore-" + name,
                     self.frames[-1]["generation"],
@@ -336,10 +351,9 @@ class MaterialXTest(SmokeTest):
                         "Undo did not resume inline MaterialX rendering"
                     )
                 inline_verified = True
-            metal = self.shader_for("SS_Metal")
-            color, rough = metal.GetInput("base_color"), metal.GetInput(
-                "specular_roughness"
-            )
+            color, rough = self.input_for(
+                "SS_Metal", "base_color"
+            ), self.input_for("SS_Metal", "specular_roughness")
             old_color, old_rough = color.Get(), rough.Get()
             meshes = self.stats()["submittedMeshes"]
             previous = self.frames[-1]["generation"]

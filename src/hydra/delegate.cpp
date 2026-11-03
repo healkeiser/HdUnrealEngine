@@ -30,6 +30,11 @@
 #include "pxr/base/work/loops.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/js/json.h"
+#if defined(HDUE_HOUDINI)
+#include "PY/PY_Python.h"
+#include "pxr/usd/usd/stage.h"
+#include "pxr/usd/usdUtils/stageCache.h"
+#endif
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/assetPath.h"
 #include <cmath>
@@ -700,8 +705,8 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         if (data.sheenBaseTexture) desc.flags |= HDUE_MATERIAL_SHEEN_BASE_TEXTURE;
         packet.materials.push_back(desc);
         if (HdUETraceScene())
-            TF_STATUS("hdUE material %s rgb=(%g,%g,%g)", desc.id, desc.base_color[0], desc.base_color[1],
-                      desc.base_color[2]);
+            std::fprintf(stderr, "hdUE material %s rgb=(%g,%g,%g) native=%s\n", desc.id, desc.base_color[0],
+                         desc.base_color[1], desc.base_color[2], desc.native_asset ? desc.native_asset : "");
     }
     // Native material parameter overrides.
     const auto overrides = state.setting<VtDictionary>("nativeMaterialParameters", {});
@@ -2234,6 +2239,88 @@ public:
         remap[3][1] = double(size[1] - 2 * w.GetMinY() - w.GetHeight()) / size[1];
         return projection * remap;
     }
+#if defined(HDUE_HOUDINI)
+    // Prepared materials in batch renders: the Solaris viewport's host binds the cooked MaterialX and Substrate Builder
+    // assets from a Python stage walk (hdue_materialx.PreparedMaterials); husk runs no host, so the delegate runs the
+    // same walk (hdue_batch.resolve) on the stage it renders, through Houdini's Python, whenever the frame or a library
+    // changes, and applies its three settings itself. An unprepared or stale material fails the frame with the
+    // library's message, as the viewport shows it.
+    std::string resolvedKey_, materialError_;  // materialError_: the last resolution's failure, kept until it changes
+    void resolvePreparedMaterials() {
+        const auto stage = HdUEBatchStage();
+        if (!stage) return;
+        auto& s = *state_;
+        const auto materialx = s.setting<std::string>("materialxLibrary", "");
+        const auto substrate = s.setting<std::string>("substrateLibrary", "");
+        const double frame = s.setting<double>("houdini:frame", 1.);
+        const auto key = TfStringPrintf("%p|%.6f|", stage.operator->(), frame) + materialx + "|" + substrate;
+        if (key == resolvedKey_) return;
+        resolvedKey_ = key;
+        materialError_.clear();
+        const auto id = UsdUtilsStageCache::Get().Insert(stage);
+        const auto quoted = [](const std::string& text) {
+            std::string out = "'";
+            for (const char c : text) out += c == '\\' || c == '\'' ? std::string("\\") + c : std::string(1, c);
+            return out + "'";
+        };
+        const auto result =
+            PYrunPythonExpression(("__import__('hdue_batch').resolve_json(" + std::to_string(id.ToLongInt()) + ", " +
+                                   TfStringify(frame) + ", " + quoted(materialx) + ", " + quoted(substrate) + ")")
+                                      .c_str(),
+                                  PY_Result::STRING);
+        std::string error;
+        JsParseError parse;
+        const auto json = result.myResultType == PY_Result::STRING
+                              ? JsParseString(result.myStringValue.toStdString(), &parse)
+                              : JsValue();
+        if (!json.IsObject())
+            error = result.myResultType == PY_Result::STRING ? "unreadable result: " + parse.reason
+                                                             : "Python failed: " + result.myErrValue.toStdString();
+        else if (const auto it = json.GetJsObject().find("error"); it != json.GetJsObject().end())
+            error = it->second.GetString();
+        if (!error.empty()) {
+            materialError_ = "hdUE prepared materials: " + error;
+            batchWarning(materialError_);
+            return;
+        }
+        // JSON to the hosts' value types: parameters' 3 and 4 numbers as GfVec3f and GfVec4f, numbers as float.
+        std::function<VtValue(const JsValue&)> convert = [&](const JsValue& v) -> VtValue {
+            if (v.IsObject()) {
+                VtDictionary d;
+                for (const auto& [name, item] : v.GetJsObject()) d[name] = convert(item);
+                return VtValue(d);
+            }
+            if (v.IsArray()) {
+                const auto& a = v.GetJsArray();
+                std::vector<float> c;
+                for (const auto& x : a) c.push_back(float(x.IsInt() ? double(x.GetInt64()) : x.GetReal()));
+                if (c.size() == 3) return VtValue(GfVec3f(c[0], c[1], c[2]));
+                if (c.size() == 4) return VtValue(GfVec4f(c[0], c[1], c[2], c[3]));
+                if (c.size() == 2) return VtValue(GfVec2f(c[0], c[1]));
+                return VtValue();
+            }
+            if (v.IsBool()) return VtValue(v.GetBool());
+            if (v.IsString()) return VtValue(v.GetString());
+            if (v.IsInt()) return VtValue(float(v.GetInt64()));
+            if (v.IsReal()) return VtValue(float(v.GetReal()));
+            return VtValue();
+        };
+        if (HdUETraceScene()) {
+            const auto& o = json.GetJsObject();
+            const auto count = [&](const char* name) {
+                const auto it = o.find(name);
+                return it != o.end() && it->second.IsObject() ? it->second.GetJsObject().size() : size_t(0);
+            };
+            std::fprintf(stderr, "hdUE prepared materials at frame %g: %zu assets, %zu parameter sets, %zu wet\n",
+                         frame, count("nativeMaterialAssets"), count("nativeMaterialParameters"),
+                         count("surfaceEffects"));
+        }
+        auto* delegate = GetRenderIndex()->GetRenderDelegate();
+        for (const char* name : {"nativeMaterialAssets", "nativeMaterialParameters", "surfaceEffects"})
+            if (const auto it = json.GetJsObject().find(name); it != json.GetJsObject().end())
+                delegate->SetRenderSetting(TfToken(name), convert(it->second));
+    }
+#endif
     void _Execute(const HdRenderPassStateSharedPtr& state, const TfTokenVector& tags) override {
         const auto* camera = state->GetCamera();
         PassSnapshot snapshot{state->GetAovBindings(), {}, state->GetWorldToViewMatrix(), state->GetProjectionMatrix()};
@@ -2262,6 +2349,19 @@ public:
         if (snapshot.projection == GfMatrix4d(1)) return;
         const auto pass = std::make_shared<const PassSnapshot>(std::move(snapshot));
         setRenderTags(tags);
+#if defined(HDUE_HOUDINI)
+        // Batch renders (husk) bind prepared materials as the Solaris viewport's host does, before the scene uploads.
+        if (!selfHost().continuous) {
+            resolvePreparedMaterials();
+            // A material that cannot render as prepared fails the frame (husk's exit status), rather than render
+            // with fallbacks.
+            if (!materialError_.empty()) {
+                state_->setError(materialError_);
+                converged_ = true;
+                return;
+            }
+        }
+#endif
         // Released meshes an upload needs again come back through Hydra, re-synced here on the thread that drives Sync.
         HdUERepullMeshes(*state_, GetRenderIndex());
         // Wet masks read the scene delegate, which only this thread may use while Hydra syncs.
@@ -3318,14 +3418,6 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
         if (!state_->settings.count(desc.key)) state_->settings[desc.key] = desc.defaultValue;
         HdRenderDelegate::SetRenderSetting(desc.key, state_->settings[desc.key]);
     }
-    // Cooked MaterialX and prepared Substrate libraries are applied by the hdUE host in Houdini's UI (a Python stage
-    // walk); batch renders without that host (husk) keep the Preview Surface fallback.
-    if (selfHosted_ && !host.continuous)
-        for (const char* library : {"materialxLibrary", "substrateLibrary"})
-            if (!state_->setting<std::string>(library, "").empty())
-                batchWarning(std::string("unreal:") + library +
-                             " is set, but husk renders MaterialX and Substrate Builder materials with their Preview "
-                             "Surface fallback: cooked libraries apply in Houdini's viewport only.");
 }
 HdUERenderDelegate::~HdUERenderDelegate() {
 #if defined(HDUE_HOUDINI)

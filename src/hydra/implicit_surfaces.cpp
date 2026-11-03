@@ -354,11 +354,22 @@ public:
 // for them. This keyless API schema adapter (it sees every prim) only adds a private unreal: key to them, so hdUE can
 // warn; replacing UsdImaging's HermiteCurves adapter instead made USD report a coding error in every session
 // ("Overriding prim adapters at runtime is not supported").
+// The stage UsdImaging populates hdUE from, recorded by this keyless adapter (UsdImaging calls it for every prim), for
+// batch hosts' prepared materials (HdUEBatchStage): Hydra hands a render delegate no stage of its own.
+std::mutex batchStageMutex;
+UsdStageWeakPtr batchStage;
+std::atomic<const UsdStage*> batchStageSeen{nullptr};
 class HdUE_HermiteCurvesAPIAdapter final : public UsdImagingAPISchemaAdapter {
 public:
     HdContainerDataSourceHandle GetImagingSubprimData(const UsdPrim& prim, const TfToken& subprim,
                                                       const TfToken& instance,
                                                       const UsdImagingDataSourceStageGlobals&) override {
+        // Any prim's stage (UsdImaging calls no adapter for the pseudo-root); the lock only when it changes.
+        if (const auto* stage = prim.GetStage().operator->(); batchStageSeen.load() != stage) {
+            std::lock_guard lock(batchStageMutex);
+            batchStage = prim.GetStage();
+            batchStageSeen = stage;
+        }
         if (!subprim.IsEmpty() || !instance.IsEmpty() || !prim.IsA<UsdGeomHermiteCurves>()) return nullptr;
         static const auto data = HdRetainedContainerDataSource::New(TfToken("unreal:hermiteCurves"),
                                                                     HdRetainedTypedSampledDataSource<bool>::New(true));
@@ -721,6 +732,10 @@ protected:
         return TfCreateRefPtr(new HdUE_UnsupportedSceneIndex(input));
     }
 };
+UsdStageRefPtr HdUEBatchStage() {
+    std::lock_guard lock(batchStageMutex);
+    return batchStage;
+}
 TF_REGISTRY_FUNCTION(TfType) {
     HdSceneIndexPluginRegistry::Define<HdUE_UnsupportedSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_DrawModeSceneIndexPlugin>();

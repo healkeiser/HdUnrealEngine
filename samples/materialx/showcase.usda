@@ -591,7 +591,7 @@ def Camera "Camera"
 
 def RectLight "Key"
 {
-    float inputs:exposure = 13.14
+    float inputs:exposure = 1.14
     float inputs:height = 150
     float inputs:intensity = 1
     float inputs:width = 300
@@ -601,7 +601,7 @@ def RectLight "Key"
 
 def RectLight "Fill"
 {
-    float inputs:exposure = 12.14
+    float inputs:exposure = 0.14
     float inputs:height = 250
     float inputs:intensity = 1
     float inputs:width = 150

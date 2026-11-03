@@ -93,7 +93,7 @@ Open:
 ## Then
 
 - **Lumen 0.6x Karma (LGT-02).** Units and exposure match the Path Tracer; the deficit is indirect light. Hypothesis: zero-thickness Cornell walls and a light 1 mm under the ceiling starve Lumen's surface cache. Test with the Lumen Scene debug view and a light moved 5 cm down before changing code. Also: offline Lumen runs at game quality (UE-06, UE-08).
-- **Viewport/husk parity (HOU-02).** The cooked material library, live Substrate, `hdue:asset` proxies and `op:` images exist only in the GUI host. Anything that changes the picture must live in USD or the delegate.
+- **Viewport/husk parity (HOU-02).** Cooked MaterialX and Substrate Builder libraries (surface, volume and decal materials, wet surfaces) now apply in husk: the delegate runs the viewport's library code on the rendered stage (`hdue_batch.py`) and fails the frame on a stale material. Live Substrate preparation, `hdue:asset` proxies and `op:` images still exist only in the GUI host. Anything that changes the picture must live in USD or the delegate.
 - **Geometry correctness (HYD-04, HYD-07, HYD-10).** Subdiv tags and face-varying topology, dirty-bit aware Sync (transform edits re-triangulate and re-upload today), curve widths/wrap/normals.
 - **Framing (HYD-05 = HOU-08).** Data window, pixel aspect and framing are ignored: crops, overscan and husk tiling render wrong.
 - **Materials and lights robustness (MAT-01, LGT-05).** One missing texture or one unsupported light attribute fails the whole batch; fall back per spec and warn instead. Light linking (LGT-04) is the largest missing feature.

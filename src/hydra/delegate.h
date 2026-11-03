@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include "pxr/base/arch/hash.h"
 #include "pxr/imaging/hd/renderDelegate.h"
+#include "pxr/usd/usd/common.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec2f.h"
@@ -278,6 +279,8 @@ struct HdUEMaterialData {
 // A setting's value as the backend reads UE properties from text: USD booleans as True/False, asset paths resolved,
 // everything else as USD prints it (vectors as "(x, y, z)", which fill a UE struct's fields in order).
 std::string HdUESettingText(const VtValue& value);
+// The stage UsdImaging populates hdUE from (implicit_surfaces.cpp), or null before population.
+UsdStageRefPtr HdUEBatchStage();
 struct HdUELightData {
     std::string id;
     std::string texture;

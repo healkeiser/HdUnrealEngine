@@ -29,5 +29,9 @@ if ($Suite -in 'houdini', 'all') {
     if ($RuntimeConfig) { $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($RuntimeConfig) }
     & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\houdini_prim_lops.py')
     if ($LASTEXITCODE) { throw 'Prim LOP tests failed.' }
+    # Prepared materials in husk (decal, volume and MaterialX libraries, a stale graph failing the frame).
+    $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
+    & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
+    if ($LASTEXITCODE) { throw 'husk prepared-material tests failed.' }
 }
 Write-Output "Suite $Suite passed."
