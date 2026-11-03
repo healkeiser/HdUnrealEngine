@@ -127,8 +127,12 @@ def generate(output, hip=None, runtime_config=None, single=False):
         )  # units: the stage's metadata
         library = lopnet.createNode("materiallibrary", "MaterialLibrary")
         library.setInput(0, controls)
-        # Move the already validated editable network into Material Library.
-        network = hou.moveNodesTo((network,), library)[0]
+        # The editable network in Material Library, made there again: Houdini 22's moveNodesTo from /mat drops a
+        # subnet's contents.
+        network.destroy()
+        network = hdue_substrate.create(
+            library, preset="wet", material="/Looks/SS_Coat"
+        )
         author_node = hdue_substrate.author_lop(
             network, "/Looks/WaterCoating", library, paths
         )

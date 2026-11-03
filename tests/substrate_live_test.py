@@ -38,6 +38,39 @@ class Process:
 
 
 class LiveTests(unittest.TestCase):
+    def test_due_asks_the_host_to_sync_again(self):
+        # The viewport host syncs materials only after stage edits: due() is what brings it back once an edit has
+        # settled (to start the preparation) and once a preparation finished (to bind it).
+        with (
+            tempfile.TemporaryDirectory() as folder,
+            patch("substrate_live.shutil.which", return_value="pwsh"),
+            patch("substrate_live.subprocess.Popen", side_effect=Process),
+        ):
+            root = Path(folder)
+            manager = LivePreparation(
+                root / "runtime/HdUEBackend.uproject",
+                root / "logs",
+                root,
+                debounce=0.5,
+            )
+            self.assertFalse(manager.due(now=0))
+            manager.request([record()], [], now=0)
+            self.assertEqual(manager.phase, "queued")
+            self.assertFalse(manager.due(now=0.2))
+            self.assertTrue(manager.due(now=0.6))
+            manager.request([record()], [], now=0.6)
+            self.assertEqual(manager.started, 1)
+            self.assertFalse(manager.due(now=1))
+            manager.active[
+                "log"
+            ].close()  # a finished preparation, as tick() records it
+            manager.active, manager.revision = None, manager.revision + 1
+            self.assertTrue(manager.due(now=1))
+            manager.wanted = (
+                None  # what the host does once the edited graph binds
+            )
+            self.assertFalse(manager.due(now=2))
+
     def test_single_flight_latest_graph_cache_failure_and_retry(self):
         with (
             tempfile.TemporaryDirectory() as folder,

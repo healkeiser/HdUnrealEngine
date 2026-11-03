@@ -249,9 +249,11 @@ class Host:
                             self.libraries,
                             hou.frame() if self.materials_animated else None,
                         )
+                        # Live Substrate preparation also needs a sync once an edit settles or its preparation ends.
                         if state["session"] and (
                             self.materials_dirty
                             or materials_key != self.last_materials
+                            or self.live_substrate.due()
                         ):
                             self.last_materials = materials_key
                             self.materials_dirty = False

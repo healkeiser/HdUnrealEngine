@@ -35,8 +35,11 @@ class Test(MaterialTest):
         )
         tint.parmTuple("value").set((0.8, 0.025, 0.01))
         network.node("base").setInput(0, tint)
-        ticks = self.host.runtime.ticks
-        yield from self.ready(1)
+        # UE ticks on its own thread; what preparation must not block is Houdini's UI, which advances this test.
+        passes = 0
+        for _ in self.ready(1):
+            passes += 1
+            yield
         added = yield from self.image(
             "02-node-added-lumen", 0, self.frames[-1]["generation"]
         )
@@ -44,9 +47,9 @@ class Test(MaterialTest):
             raise AssertionError(
                 "The newly compiled topology did not change the image"
             )
-        if self.host.runtime.ticks - ticks < 20:
+        if passes < 20:
             raise AssertionError(
-                "UE did not tick during background preparation"
+                "Houdini's UI did not run during background preparation"
             )
         started = live.started
         tint.parmTuple("value").set((0.02, 0.6, 0.04))

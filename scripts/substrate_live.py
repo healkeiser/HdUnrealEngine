@@ -35,6 +35,7 @@ class LivePreparation:
         self.changed_at = 0.0
         self.active = None
         self.revision = 0
+        self.requested_revision = 0  # revision at the last request(), so due() sees a finished preparation
         self.started = 0
         self.completed = 0
         self.phase = "idle"
@@ -117,8 +118,23 @@ class LivePreparation:
             self.phase = "failed"
             self.message = str(error)
 
+    def due(self, now=None):
+        """Whether the host should sync materials again without a stage edit: the latest edit has settled and can
+        start preparing, or a preparation finished since the last request and its material can bind. The host syncs
+        only after stage edits, and request() moves only when called.
+        """
+        if not self.wanted or not self.enabled or self.closed or self.active:
+            return False
+        if self.wanted[0] in self.failures:
+            return False
+        if self.revision != self.requested_revision:
+            return True
+        now = time.monotonic() if now is None else now
+        return now - self.changed_at >= self.debounce
+
     def request(self, records, known, now=None):
         self.tick()
+        self.requested_revision = self.revision
         if not self.enabled or self.closed:
             return None
         identities = {
