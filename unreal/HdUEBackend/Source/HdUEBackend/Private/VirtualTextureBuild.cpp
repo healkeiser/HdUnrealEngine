@@ -36,8 +36,11 @@ TMap<int32, FString> HdueUdimTiles(const FString& Pattern) {
     return Tiles;
 }
 
-// UploadingVirtualTexture.cpp (Apply-ResidencyPatch.ps1): where chunks without bulk data stream from.
+// UploadingVirtualTexture.cpp (Apply-ResidencyPatch.ps1): where chunks without bulk data stream from. Runtime only:
+// the editor that cooks content is the unpatched launcher build, and the patch reads it outside WITH_EDITOR.
+#if !WITH_EDITOR
 extern ENGINE_API FString GHdueVirtualTextureChunkDirectory;
+#endif
 
 namespace {
 // Built chunks are written to disk once and streamed from there, as the editor streams built chunks from its VT DDC
@@ -57,7 +60,9 @@ const FString& CacheDirectory() {
                    TEXT("hdUE: cannot create the virtual texture cache %s; virtual textures stay in memory."), *Path);
             Path.Reset();
         }
+#if !WITH_EDITOR
         GHdueVirtualTextureChunkDirectory = Path;  // before any chunk of it can stream
+#endif
         return Path;
     }();
     return Directory;
