@@ -4122,14 +4122,18 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
             error = it->second.UncheckedGet<std::string>();
         const auto stage = state_->currentStage();
         stats["rendererStage"] = VtValue(!error.empty() ? error : stage);
-        // The last refresh's progress is stale while UE starts or uploads.
-        if (!error.empty() || stage != "Rendering")
-            stats["renderProgressAnnotation"] = VtValue(!error.empty() ? "Error: " + error : stage);
+        // The last refresh's progress is stale while UE starts or uploads. Houdini's viewport shows rendererStage
+        // above the annotation, so the annotation does not repeat the stage or the error (they showed twice).
+        const bool staged = !error.empty() || stage != "Rendering";
+        if (staged) stats["renderProgressAnnotation"] = VtValue(std::string());
         if (error.empty())
             if (const auto load = loadProgress(*state_); !load.empty())
                 if (const auto it = stats.find("renderProgressAnnotation");
-                    it != stats.end() && it->second.IsHolding<std::string>())
-                    stats["renderProgressAnnotation"] = VtValue(it->second.UncheckedGet<std::string>() + load);
+                    it != stats.end() && it->second.IsHolding<std::string>()) {
+                    const auto& shown = it->second.UncheckedGet<std::string>();
+                    stats["renderProgressAnnotation"] =
+                        VtValue(shown.empty() ? load.substr(load[0] == '\n') : shown + load);
+                }
         return stats;
     }
     VtDictionary stats;

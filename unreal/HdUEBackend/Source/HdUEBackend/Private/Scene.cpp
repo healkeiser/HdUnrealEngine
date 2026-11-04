@@ -74,6 +74,11 @@ FHdueScene::~FHdueScene() {
     for (const FPendingStatic& Retired : RetiredBuilds) Retired.Task.Wait();
     for (const auto& Build : TextureBuilds)
         if (Build->Task.IsValid()) Build->Task.Wait();
+    // The load counters are the process's: builds this scene drops count as done, or a later session's progress
+    // (Houdini recreates its renderer after the first frame of a large stage) never reached its total.
+    for (const auto& Build : TextureBuilds)
+        if (!Build->Task.IsValid()) ++GHdueLoad.TexturesDone;
+    GHdueLoad.MeshBuildsDone += uint32(PendingStatic.Num());
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
@@ -1056,14 +1061,24 @@ void BindTextureSlot(UMaterialInstanceDynamic& Instance, int32 Slot, const HdueT
 // Memory a background texture build needs, after UE's estimate for a texture build (TextureBuildUtilities.cpp,
 // GetBuildRequiredMemoryEstimate): per pixel the source, a float RGBA mip chain (16 bytes, 4/3 for the mips) and the
 // encoder's working memory, about 48 bytes, plus 1 MB. The size comes from the image header (read for the virtual
-// texture choice, VirtualMaterial); a UDIM set builds all its tiles at once (PrepareVirtualTexture), and its tiles,
-// whose headers this thread does not read, count a pixel per byte of file (more than PNG and EXR compress to).
+// texture choice, VirtualMaterial). A UDIM set builds all its tiles at once (PrepareVirtualTexture) and, as UE's
+// virtual texture estimate (GetVirtualTextureRequiredMemoryEstimate), counts every tile's source with its output;
+// hdUE's build mips in the 8-bit format, without UE's float copy, so a tile pixel takes at most 8 bytes decoded (16-bit
+// PNG) and then 4 with its mips (4/3) and encoded tiles: 10 bytes. A tile without a PNG or JPEG header counts 48 bytes
+// per byte of file. The flat 48 per file byte estimated door_frame_albedo.<UDIM>.png on NVIDIA's Da Vinci Workshop at
+// 4460 MB, and every build queued behind it waited (TickTextures starts them in order, as UE's asset compilation
+// queue).
 int64 TextureBuildMemory(const FString& File) {
     constexpr int64 BytesPerPixel = 48;
     int64 Pixels = 0;
     if (IsUdim(File)) {
-        for (const auto& [Tile, Path] : HdueUdimTiles(File))
-            Pixels += FMath::Max<int64>(0, IFileManager::Get().FileSize(*Path));
+        int64 Memory = 1024 * 1024;
+        for (const auto& [Tile, Path] : HdueUdimTiles(File)) {
+            const FIntPoint Size = ImageSize(Path);
+            Memory += Size.X ? int64(Size.X) * Size.Y * 10
+                             : FMath::Max<int64>(0, IFileManager::Get().FileSize(*Path)) * BytesPerPixel;
+        }
+        return Memory;
     } else {
         const FIntPoint Size = ImageSize(File);
         Pixels = int64(Size.X) * Size.Y;
@@ -1541,7 +1556,9 @@ void FHdueScene::TickTextures() {
     // every file at once, beside the mesh builds, ended NVIDIA's Da Vinci Workshop at a 38 GB job memory limit.
     int64 Available = AvailableBuildMemory();
     TextureBuilds.RemoveAll([&](const TSharedPtr<FTextureBuild>& Build) {
-        return !Build->Task.IsValid() && Build->Epoch != TextureEpoch;  // queued before a scene reset
+        if (Build->Task.IsValid() || Build->Epoch == TextureEpoch) return false;
+        ++GHdueLoad.TexturesDone;  // queued before a scene reset: dropped, no longer waited for
+        return true;
     });
     for (const TSharedPtr<FTextureBuild>& Build : TextureBuilds) {
         if (Build->Task.IsValid()) continue;
@@ -1550,6 +1567,7 @@ void FHdueScene::TickTextures() {
         ReservedMemory += Build->Memory;
         Build->Task =
             UE::Tasks::Launch(TEXT("HdueTexture"), MoveTemp(Build->Work), UE::Tasks::ETaskPriority::BackgroundNormal);
+        Build->Launched = FPlatformTime::Seconds();
     }
     const double Start = FPlatformTime::Seconds();
     TMultiMap<const UMaterialInterface*, UMaterialInstanceDynamic*> Copies;
@@ -1599,6 +1617,25 @@ void FHdueScene::TickTextures() {
             }
         }
     }
+}
+FString FHdueScene::DescribePending() const {
+    int32 Queued = 0, Running = 0;
+    for (const auto& [Key, Pending] : PendingStatic) ++(Pending.Task.IsValid() ? Running : Queued);
+    FString Out = FString::Printf(TEXT("%d mesh builds (%d running), %d textures"), PendingStatic.Num(), Running,
+                                  PendingTextures.Num());
+    const double Now = FPlatformTime::Seconds();
+    int32 Listed = 0;
+    for (const auto& Build : TextureBuilds) {
+        if (Listed++ == 8) {
+            Out += TEXT(", ...");
+            break;
+        }
+        Out += Build->Task.IsValid()
+                   ? FString::Printf(TEXT("; %s running %.0f s"), *Build->File, Now - Build->Launched)
+                   : FString::Printf(TEXT("; %s queued (%lld MB)"), *Build->File, Build->Memory >> 20);
+    }
+    return Out + FString::Printf(TEXT("; %lld MB reserved, %lld MB available"), ReservedMemory >> 20,
+                                 AvailableBuildMemory() >> 20);
 }
 // Memory for more background builds (meshes and textures): the available physical and virtual memory less 64 MB and
 // what started builds reserve, within r.HdUE.MeshBuildMaxMemoryUsage.

@@ -83,6 +83,9 @@ public:
     // Interactive hosts: background mesh builds not yet swapped in, and textures still building. Their meshes draw a
     // first-pass mesh or nothing, their inputs a constant, so frames do not converge while there are any.
     uint32 PendingConversions() const { return uint32(PendingStatic.Num() + PendingTextures.Num()); }
+    // What the frame waits for (PendingConversions), for the log: the builds, and the memory they are scheduled
+    // against.
+    FString DescribePending() const;
     void UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up);
     HdueResult SetMaterialParameters(const HdueMaterialUpdate& Update, FString& Error);
     HdueResult GetMaterialStats(const char* Id, HdueMaterialStats& Stats, FString& Error);
@@ -147,6 +150,7 @@ private:
         int64 Memory = 0;                 // estimated (TextureBuildMemory), reserved while it runs
         TUniqueFunction<void()> Work;     // the build, moved into Task when its memory fits (TickTextures)
         UE::Tasks::FTask Task;            // invalid while queued
+        double Launched = 0;              // FPlatformTime::Seconds() at launch
     };
     TArray<TSharedPtr<FTextureBuild>> TextureBuilds;
     TMap<FString, int32> PendingTextures;  // texture key -> builds in flight that produce it
