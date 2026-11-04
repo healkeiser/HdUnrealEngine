@@ -5092,9 +5092,9 @@
                 label   "Translucency Method"
                 type    string
                 size    1
-                default { "ETranslucencyType::Raster" }
+                default { "ETranslucencyType::RayTraced" }
                 menu { "ETranslucencyType::Raster" "Raster" "ETranslucencyType::RayTraced" "Ray Traced" }
-                help    "Sets the translucency type"
+                help    "Sets the translucency type. Raster lights translucent layers behind the front one from Lumen's coarse Radiance Cache, which can show the sky through walls."
                 parmtag { "spare_category" "Rendering Features|Translucency" }
                 parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__unrealpostProcessTranslucencyType_control_u7bl == block } { xn__unrealpostProcessTranslucencyType_control_u7bl == none })"

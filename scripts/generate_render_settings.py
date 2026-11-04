@@ -230,6 +230,11 @@ HDUE_DEFAULTS = {
         "Overrides unreal:lumenEnabled.",
     ),
     "LumenFrontLayerTranslucencyReflections": (True, None),
+    "TranslucencyType": (
+        "ETranslucencyType::RayTraced",
+        "Raster lights translucent layers behind the front one from Lumen's coarse Radiance Cache, which can show the "
+        "sky through walls.",
+    ),
     "PathTracingMaxBounces": (
         None,
         "Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, "

@@ -900,6 +900,12 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     Settings.AutoExposureMethod = AEM_Manual;
     Settings.AutoExposureBias = 0;
     Settings.LumenFrontLayerTranslucencyReflections = true;
+    // UE's Ray Traced translucency (5.6+): its reflections and refractions trace every layer. Raster translucency
+    // lights the layers behind the front one from the Lumen Radiance Cache, whose probes are about a metre apart
+    // (r.Lumen.ScreenProbeGather.RadianceCache.ClipmapWorldExtent 2500, GridResolution 48), so glass inside a room read
+    // the sky through the walls (ForwardLightingCommon.ush: "Fallback to unshadowed skylight"): a bottle in a closed,
+    // dome-lit room was 18 times as bright as the Path Tracer's. UE falls back to raster without ray tracing.
+    Settings.TranslucencyType = ETranslucencyType::RayTraced;
     if (!IsInteractive()) {
         // Offline frames use Lumen's final-frame quality (UE's defaults are game quality); authored values override it.
         Settings.LumenFinalGatherQuality = FMath::Max(Settings.LumenFinalGatherQuality, 2.f);
