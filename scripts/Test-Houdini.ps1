@@ -15,7 +15,7 @@ $RunOutput = New-HdUERun -Name houdini -Path $OutputDirectory
 $PreviousHoudiniPath = $env:HOUDINI_PATH
 $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($PreviousHoudiniPath) { $PreviousHoudiniPath } else { '&' })
 try {
-    foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test') {
+    foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test', 'dialog_scripts_test') {
         & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }

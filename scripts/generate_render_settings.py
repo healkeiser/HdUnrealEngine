@@ -1474,7 +1474,7 @@ def ds_lights(settings, indent):
     lines = []
     for folder in dict.fromkeys(s["folder"] for s in settings):
         lines += ds_folder(
-            "collapsible", group_id("hdUE_light", folder), folder, indent
+            "groupcollapsible", group_id("hdUE_light", folder), folder, indent
         )
         for setting in settings:
             if setting["folder"] == folder:
