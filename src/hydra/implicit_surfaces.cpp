@@ -37,12 +37,16 @@
 #include "pxr/imaging/hdsi/tetMeshConversionSceneIndex.h"
 #include "pxr/imaging/hd/basisCurvesSchema.h"
 #include "pxr/imaging/hd/basisCurvesTopologySchema.h"
+#include "pxr/usd/usdGeom/camera.h"
 #include "pxr/usd/usdGeom/hermiteCurves.h"
 #include "pxr/usd/usdShade/materialBindingAPI.h"
 #include "pxr/usd/usdGeom/primvarsAPI.h"
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/visibilityAPI.h"
 #include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
+#include "pxr/imaging/hd/lightSchema.h"
+#include "pxr/imaging/hd/cameraSchema.h"
+#include "pxr/usd/usdLux/lightAPI.h"
 #include "pxr/usdImaging/usdImaging/dataSourcePrim.h"
 #include "pxr/usdImaging/usdImaging/dataSourceStageGlobals.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
@@ -353,6 +357,25 @@ public:
         for (const auto& property : properties)
             if (subprim.IsEmpty() && TfStringEndsWith(property.GetString(), "Visibility"))
                 return HdDataSourceLocator(HdUEPurposeVisibilityTokens->container);
+        return {};
+    }
+};
+// unreal:* attributes on lights (the Unreal Engine tab of Light LOPs) and cameras (unreal:lensDistortion:*,
+// docs/rendering.md): Hydra serves them by name, but UsdImaging's light and camera adapters invalidate only their
+// schemas' properties, so an edit of these alone left the prim unsynced in a live session (husk reads them once). This
+// keyless adapter (UsdImaging asks it about every property change) dirties the light or camera for them. Gprims and
+// volumes read theirs as primvars and hdUE's actor adapters invalidate their own keys, so neither needs this.
+class HdUE_UnrealPropertiesAdapter final : public UsdImagingAPISchemaAdapter {
+public:
+    HdDataSourceLocatorSet InvalidateImagingSubprim(const UsdPrim& prim, const TfToken& subprim, const TfToken&,
+                                                    const TfTokenVector& properties,
+                                                    UsdImagingPropertyInvalidationType) override {
+        if (!subprim.IsEmpty() || std::none_of(properties.begin(), properties.end(), [](const TfToken& name) {
+                return TfStringStartsWith(name.GetString(), "unreal:");
+            }))
+            return {};
+        if (prim.HasAPI<UsdLuxLightAPI>()) return HdLightSchema::GetDefaultLocator();
+        if (prim.IsA<UsdGeomCamera>()) return HdCameraSchema::GetDefaultLocator();
         return {};
     }
 };
@@ -950,6 +973,8 @@ TF_REGISTRY_FUNCTION(TfType) {
         .SetFactory<UsdImagingPrimAdapterFactory<HdUE_VolumetricCloudAdapter>>();
     TfType::Define<HdUE_VisibilityAPIAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
         .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_VisibilityAPIAdapter>>();
+    TfType::Define<HdUE_UnrealPropertiesAdapter, TfType::Bases<UsdImagingAPISchemaAdapter>>()
+        .SetFactory<UsdImagingAPISchemaAdapterFactory<HdUE_UnrealPropertiesAdapter>>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassVisibilitySceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_ConversionSceneIndexPlugin>();
     HdSceneIndexPluginRegistry::Define<HdUE_RenderPassPruneSceneIndexPlugin>();

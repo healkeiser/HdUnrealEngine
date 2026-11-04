@@ -86,6 +86,9 @@
         "alias": { "UsdSchemaBase": "UnrealVolumetricCloud" }, "bases": ["UsdGeomXformable"],
         "schemaIdentifier": "UnrealVolumetricCloud", "schemaKind": "concreteTyped"
       },
+      "HdUE_UnrealPropertiesAdapter": {
+        "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": ""
+      },
       "HdUE_VisibilityAPIAdapter": {
         "bases": ["UsdImagingAPISchemaAdapter"], "apiSchemaName": "VisibilityAPI"
       },

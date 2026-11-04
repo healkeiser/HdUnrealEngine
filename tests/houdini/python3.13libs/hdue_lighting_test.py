@@ -76,7 +76,7 @@ class Test(ViewportTest):
             "pythonscript", "hdue_environment_test"
         )
         edit.setInput(0, settings)
-        prefix = "from pxr import UsdLux,UsdGeom,Gf\nstage=hou.pwd().editableStage()\n"
+        prefix = "from pxr import UsdLux,UsdGeom,Gf,Sdf\nstage=hou.pwd().editableStage()\n"
         dome = next(
             p
             for p in viewer.stage().Traverse()
@@ -111,10 +111,27 @@ class Test(ViewportTest):
         self.lighting(0, 0)
         edit.parm("python").set(prefix + "pass")
         integration.set_mode("pathtraced")
-        yield from self.image(
+        restored = yield from self.image(
             "05-hdri-restored-pathtraced", 1, self.frames[-1]["generation"]
         )
         self.lighting(1)
+        # An unreal: property alone (the Light LOP's Unreal Engine tab), which
+        # UsdImaging's light adapter does not invalidate: the delegate's
+        # keyless adapter must re-sync the light.
+        edit.parm("python").set(
+            prefix
+            + "stage.GetPrimAtPath("
+            + repr(path)
+            + ").CreateAttribute('unreal:visibleBackground', "
+            + "Sdf.ValueTypeNames.Bool).Set(False)"
+        )
+        hidden = yield from self.image(
+            "06-unreal-background-hidden", 1, self.frames[-1]["generation"]
+        )
+        if float(np.abs(restored - hidden).mean()) < 0.001:
+            raise AssertionError(
+                "unreal:visibleBackground edit did not reach UE"
+            )
 
 
 def start(host):

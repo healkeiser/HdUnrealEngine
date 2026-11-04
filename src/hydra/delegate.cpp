@@ -1794,6 +1794,7 @@ class Pass final : public HdRenderPass {
     std::shared_ptr<HdUEState> state_;
     GfMatrix4d view_{0.0}, projection_{0.0};
     GfVec4f lens_{0.f};  // fStop, focus distance, focal length, linear exposure scale of the requested camera
+    std::array<float, 7> distortion_{0, 0, 0, 0, 0, .5f, .5f};  // its lens distortion (PassSnapshot::distortion)
     // Motion blur: the beauty averages subframes_ converged renders at times spread over the shutter.
     int subframe_ = 0, subframes_ = 1;
     uint32_t subframeSamples_ = 0;  // Path Tracer samples of the finished sub-frames
@@ -3018,7 +3019,8 @@ public:
             }
             converged_ = s.lastFrame.frame_id && s.lastFrame.converged;
             const bool settingsChanged = settingsVersion != settingsVersion_;
-            const bool cameraChanged = view != view_ || projection != projection_ || lens != lens_;
+            const bool cameraChanged =
+                view != view_ || projection != projection_ || lens != lens_ || pass->distortion != distortion_;
             const bool needsRequest = changed || settingsChanged || cameraChanged;
             if (HdUETracePass()) {
                 std::fprintf(stderr,
@@ -3225,6 +3227,7 @@ public:
                     view_ = view;
                     projection_ = projection;
                     lens_ = lens;
+                    distortion_ = pass->distortion;
                     settingsVersion_ = settingsVersion;
                     s.submittedRequestSettingsRevision = settingsVersion;
                     centimetersPerUnit_ = s.setting<double>("metersPerUnit", .01) * 100.;
