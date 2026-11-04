@@ -175,6 +175,7 @@ RUNTIME_NODES = (
     "UsdPrimvarReader_",
     "ND_texcoord_",
     "UsdTransform2d",
+    "ND_place2d_",
     "ND_constant_",
     "ND_convert_",
     "ND_dot_",
@@ -197,6 +198,15 @@ def needs_import(graph):
         if identity.startswith("ND_multiply_"):
             # A multiply by a constant scales its other input; by another node it is a product hdUE does not form.
             if all("node" in node["inputs"].get(i, {}) for i in ("in1", "in2")):
+                return True
+        elif identity.startswith("ND_mix_") and not identity.endswith(
+            ("shader", "df")
+        ):
+            # bg + (fg - bg) * mix scales and offsets the one input a node drives; with two it blends two nodes.
+            driven = (
+                "node" in node["inputs"].get(i, {}) for i in ("fg", "bg", "mix")
+            )
+            if sum(driven) != 1:
                 return True
         elif not identity.startswith(RUNTIME_NODES):
             return True

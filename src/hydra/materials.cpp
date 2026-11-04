@@ -59,22 +59,37 @@ HdMaterialNetwork2 network(HdSceneDelegate* delegate, const SdfPath& id) {
         return HdConvertToHdMaterialNetwork2(resource.UncheckedGet<HdMaterialNetworkMap>());
     return {};
 }
-// USD/MaterialX texture-space scale, rotation (degrees) and translation, as an affine in UE's flipped-V UV space.
-std::array<float, 6> uvAffine(GfVec2f scale, float degrees, GfVec2f translation) {
-    const double radians = degrees * 3.14159265358979323846 / 180;
-    // USD order: scale, then rotate, then translate.
-    const auto usd = [&](GfVec2f p) {
-        p = GfVec2f(p[0] * scale[0], p[1] * scale[1]);
-        return GfVec2f(float(std::cos(radians) * p[0] - std::sin(radians) * p[1]),
-                       float(std::sin(radians) * p[0] + std::cos(radians) * p[1])) +
-               translation;
-    };
+// An affine map of USD/MaterialX texture coordinates (V up), as an affine in UE's flipped-V UV space.
+template <class F>
+std::array<float, 6> uvAffineOf(const F& usd) {
     const auto ue = [&](float u, float v) {
         const auto p = usd(GfVec2f(u, 1 - v));
         return GfVec2f(p[0], 1 - p[1]);
     };
     const auto origin = ue(0, 0), du = ue(1, 0) - origin, dv = ue(0, 1) - origin;
     return {du[0], dv[0], origin[0], du[1], dv[1], origin[1]};
+}
+// USD/MaterialX texture-space scale, rotation (degrees) and translation, in that order.
+std::array<float, 6> uvAffine(GfVec2f scale, float degrees, GfVec2f translation) {
+    const double radians = degrees * 3.14159265358979323846 / 180;
+    return uvAffineOf([&](GfVec2f p) {
+        p = GfVec2f(p[0] * scale[0], p[1] * scale[1]);
+        return GfVec2f(float(std::cos(radians) * p[0] - std::sin(radians) * p[1]),
+                       float(std::sin(radians) * p[0] + std::cos(radians) * p[1])) +
+               translation;
+    });
+}
+// MaterialX place2d (stdlib_ng.mtlx, NG_place2d_vector2), as UE's Interchange MaterialX imports it (MxPlace2D):
+// operationorder 0 (SRT) rotate2d((uv - pivot) / scale) - offset + pivot, 1 (TRS) rotate2d(uv - pivot - offset) / scale
+// + pivot. rotate2d turns by -rotate degrees (mx_rotate_vector2.glsl).
+std::array<float, 6> place2dAffine(GfVec2f pivot, GfVec2f scale, float degrees, GfVec2f offset, int order) {
+    const double radians = degrees * 3.14159265358979323846 / 180, c = std::cos(radians), s = std::sin(radians);
+    const auto rotate = [&](GfVec2f p) { return GfVec2f(float(c * p[0] + s * p[1]), float(-s * p[0] + c * p[1])); };
+    const auto divide = [&](GfVec2f p) { return GfVec2f(p[0] / scale[0], p[1] / scale[1]); };
+    return uvAffineOf([&](GfVec2f p) {
+        p -= pivot;
+        return (order ? divide(rotate(p - offset)) : rotate(divide(p)) - offset) + pivot;
+    });
 }
 
 // What drives a shader input: an image, with the nodes between them folded into value = texel * scale + bias (and a
@@ -276,6 +291,25 @@ private:
             const char* driven = connection(node, "in1") ? "in1" : "in2";
             affine(vec4(param(node, driven[2] == '1' ? "in2" : "in1")), GfVec4f(0));
             upstream(driven);
+        } else if (starts("ND_mix_") && type.find("shader") == std::string::npos && !TfStringEndsWith(type, "df") &&
+                   int(!!connection(node, "fg")) + !!connection(node, "bg") + !!connection(node, "mix") == 1) {
+            // bg + (fg - bg) * mix, UE's Lerp (Interchange's MaterialX: A = bg, B = fg, Alpha = mix): an affine of
+            // the one input a texture drives. Unauthored inputs are 0.
+            const auto input = [&](const char* name) {
+                const auto v = param(node, name);
+                return v.IsEmpty() ? GfVec4f(0) : vec4(v);
+            };
+            const auto fg = input("fg"), bg = input("bg"), mix = input("mix");
+            if (connection(node, "mix")) {
+                affine(fg - bg, bg);
+                upstream("mix");
+            } else if (connection(node, "fg")) {
+                affine(mix, mul(bg, GfVec4f(1) - mix));
+                upstream("fg");
+            } else {
+                affine(GfVec4f(1) - mix, mul(fg, mix));
+                upstream("bg");
+            }
         } else
             data_.warnings.push_back(TfStringPrintf(
                 "MaterialX node %s is not translated; inputs it drives use their constant", type.c_str()));
@@ -293,8 +327,12 @@ private:
         if (node->second.nodeTypeId == TfToken("UsdTransform2d"))
             out = uvAffine(value(param(node->second, "scale"), GfVec2f(1)), value(param(node->second, "rotation"), 0.f),
                            value(param(node->second, "translation"), GfVec2f(0)));
-        else if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_place2d"))
-            data_.warnings.push_back("MaterialX place2d is not translated; textures use their mesh UVs");
+        else if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_place2d")) {
+            const auto& place = node->second;
+            out = place2dAffine(value(param(place, "pivot"), GfVec2f(0)), value(param(place, "scale"), GfVec2f(1)),
+                                value(param(place, "rotate"), 0.f), value(param(place, "offset"), GfVec2f(0)),
+                                value(param(place, "operationorder"), 0));
+        }
         return true;
     }
     // The UV set an image reads: its st / texcoord reader's primvar, also through a UsdTransform2d; 0 unconnected.
@@ -309,7 +347,8 @@ private:
                 data_.warnings.push_back("materials read up to 4 UV primvars; textures reading others use the first");
                 return 0;
             }
-            st = connection(node->second, "in");  // UsdTransform2d
+            st = connection(node->second, "in");                 // UsdTransform2d
+            if (!st) st = connection(node->second, "texcoord");  // MaterialX place2d
         }
         return 0;
     }

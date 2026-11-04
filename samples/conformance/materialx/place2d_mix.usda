@@ -1,0 +1,261 @@
+#usda 1.0
+(
+    doc = """MaterialX place2d and mix, as UE's Interchange MaterialX imports them. place2d (stdlib NG_place2d_vector2, SRT)
+reads (uv - pivot) / scale, rotated, minus offset, plus pivot: the red | blue texture (periodic) offset by (0.5, 0) shows
+blue | red (top), and scaled by (2, 1) shows its red half across the quad (bottom). mix is bg + (fg - bg) * mix (UE's
+Lerp): the texture mixed half and half with a green bg shows red + green | blue + green (middle)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "MaterialX",
+ "feature": "place2d, mix",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "no MaterialX node left untranslated",
+   "log": "not translated",
+   "present": false
+  },
+  {
+   "name": "offset left blue",
+   "color": {
+    "region": [
+     -2.6,
+     2.4,
+     -1.4,
+     3.6
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "offset right red",
+   "color": {
+    "region": [
+     1.4,
+     2.4,
+     2.6,
+     3.6
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "mix left red and green",
+   "color": {
+    "region": [
+     -2.6,
+     -0.6,
+     -1.4,
+     0.6
+    ]
+   },
+   "rgb": [
+    0.475,
+    0.475,
+    0.05
+   ]
+  },
+  {
+   "name": "mix right blue and green",
+   "color": {
+    "region": [
+     1.4,
+     -0.6,
+     2.6,
+     0.6
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.475,
+    0.475
+   ]
+  },
+  {
+   "name": "scaled left red",
+   "color": {
+    "region": [
+     -2.6,
+     -3.6,
+     -1.4,
+     -2.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "scaled right red",
+   "color": {
+    "region": [
+     1.4,
+     -3.6,
+     2.6,
+     -2.4
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Offset"
+{
+    token outputs:mtlx:surface.connect = </Offset/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Offset/image.outputs:out>
+        token outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:texcoord.connect = </Offset/place.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "place"
+    {
+        uniform token info:id = "ND_place2d_vector2"
+        float2 inputs:texcoord.connect = </Offset/uv.outputs:out>
+        float2 inputs:offset = (0.5, 0)
+        float2 outputs:out
+    }
+
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "Mixed"
+{
+    token outputs:mtlx:surface.connect = </Mixed/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Mixed/mix.outputs:out>
+        token outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:texcoord.connect = </Mixed/uv.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "mix"
+    {
+        uniform token info:id = "ND_mix_color3"
+        color3f inputs:fg.connect = </Mixed/image.outputs:out>
+        color3f inputs:bg = (0, 1, 0)
+        float inputs:mix = 0.5
+        color3f outputs:out
+    }
+
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "Scaled"
+{
+    token outputs:mtlx:surface.connect = </Scaled/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Scaled/image.outputs:out>
+        token outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:texcoord.connect = </Scaled/place.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "place"
+    {
+        uniform token info:id = "ND_place2d_vector2"
+        float2 inputs:texcoord.connect = </Scaled/uv.outputs:out>
+        float2 inputs:scale = (2, 1)
+        float2 outputs:out
+    }
+
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Mesh "OffsetQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, 2, 0), (4, 2, 0), (4, 4, 0), (-4, 4, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Offset>
+}
+def Mesh "MixedQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, -1, 0), (4, -1, 0), (4, 1, 0), (-4, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Mixed>
+}
+def Mesh "ScaledQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, -4, 0), (4, -4, 0), (4, -2, 0), (-4, -2, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Scaled>
+}

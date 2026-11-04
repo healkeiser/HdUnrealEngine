@@ -31,7 +31,7 @@ def shader(stage, path, identity):
 
 def material(procedural=True, path="/Looks/M"):
     """A standard_surface whose base colour is a constant, or a mix of red and blue driven by place2d'd UVs through
-    a multi-output separate2 (no render-time translation for either node).
+    a multi-output separate2 (no render-time translation for separate2).
     """
     stage = Usd.Stage.CreateInMemory()
     result = UsdShade.Material.Define(stage, path)
@@ -109,8 +109,23 @@ class NeedsImportTests(unittest.TestCase):
                 )
             )
         )
+        # mix is an affine of the one input a node drives (constant fg / bg / mix otherwise).
+        self.assertFalse(
+            needs_import(self.graph(("ND_mix_color3", {"fg": {"node": "/N1"}})))
+        )
         self.assertTrue(needs_import(self.graph(("ND_mix_color3", {}))))
-        self.assertTrue(needs_import(self.graph(("ND_place2d_vector2", {}))))
+        self.assertTrue(
+            needs_import(
+                self.graph(
+                    (
+                        "ND_mix_color3",
+                        {"fg": {"node": "/N1"}, "bg": {"node": "/N2"}},
+                    )
+                )
+            )
+        )
+        self.assertTrue(needs_import(self.graph(("ND_mix_bsdf", {}))))
+        self.assertFalse(needs_import(self.graph(("ND_place2d_vector2", {}))))
         self.assertTrue(
             needs_import(
                 self.graph(
