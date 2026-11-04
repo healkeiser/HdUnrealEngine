@@ -36,5 +36,8 @@ if ($Suite -in 'houdini', 'all') {
     $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
     & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
     if ($LASTEXITCODE) { throw 'husk prepared-material tests failed.' }
+    # Streamed scene uploads (a batch per mesh) render as the whole-scene upload.
+    & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_streaming.py') @HuskArguments
+    if ($LASTEXITCODE) { throw 'husk streaming test failed.' }
 }
 Write-Output "Suite $Suite passed."

@@ -74,6 +74,13 @@ struct HdUEMotionSamples {
     }
 };
 struct HdUEMeshData {
+    // Moves are noexcept so vectors of meshes move them when they grow: MSVC's std::map (masks) has a throwing move
+    // constructor, which made every reallocation copy the geometry arrays.
+    HdUEMeshData() = default;
+    HdUEMeshData(const HdUEMeshData&) = default;
+    HdUEMeshData(HdUEMeshData&&) noexcept = default;
+    HdUEMeshData& operator=(const HdUEMeshData&) = default;
+    HdUEMeshData& operator=(HdUEMeshData&&) noexcept = default;
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
     float assetFrame = 0;  // primvars:unreal:volume:frame: an animated Sparse Volume Texture's frame (UE's Frame)
     // Indexed triangles: three indices per triangle into the per-vertex arrays (points, normals, uv, colors, masks).
@@ -145,6 +152,7 @@ struct HdUEMeshData {
     bool released = false;
     uint32_t releasedTriangles = 0;
 };
+static_assert(std::is_nothrow_move_constructible_v<HdUEMeshData>);
 // Whether an instanced mesh's sheared instances are baked into its companion mesh (HdUEShearedId): only for a generic
 // mesh (a cooked asset has no vertices here), and not when the companion's arrays would pass UE's int32 element counts
 // (Scene.cpp: positions, UV sets, indices); those instances then render without shear. Evaluated at Sync, where the

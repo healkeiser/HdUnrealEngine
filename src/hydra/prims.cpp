@@ -435,6 +435,8 @@ std::vector<GfMatrix4d> HdUEInstancePlacements(HdSceneDelegate* delegate, const 
 // Cumulative mesh Sync time (all Hydra threads), reported with each scene submit by HDUE_TRACE_TIMING.
 std::atomic<int64_t> meshSyncMicroseconds{0};
 std::atomic<int> meshSyncs{0};
+// Time Sync threads waited for the state lock before storing their parts, summed over threads.
+std::atomic<int64_t> meshLockWaitMicroseconds{0};
 struct MeshSyncTimer {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     ~MeshSyncTimer() {
@@ -729,7 +731,12 @@ public:
             TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
             return;
         }
+        // Hashed before the lock: the parts' arrays are final here (the shear companion only splits instances).
+        for (auto& part : parts) part.geometryHash = HdUEGeometryHash(part);
+        const auto lockStart = std::chrono::steady_clock::now();
         std::unique_lock lock(state->mutex);
+        meshLockWaitMicroseconds +=
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - lockStart).count();
         if (displayColor) {
             const auto previous = state->materials.find(displayColor->id);
             if (previous == state->materials.end() || previous->second.color != displayColor->color ||
@@ -749,7 +756,6 @@ public:
             const bool revived = previous == state->meshes.end() && state->erasedMeshes.count(part.id);
             if (revived) previous = state->erasedMeshes.find(part.id);
             const auto missing = revived ? state->erasedMeshes.end() : state->meshes.end();
-            part.geometryHash = HdUEGeometryHash(part);
             if (previous != missing && previous->second.geometryHash == part.geometryHash)
                 part.pickMesh = previous->second.pickMesh;
             // Pick structures are built on the first pick (HdUERenderDelegate pick): building a BVH for every mesh
@@ -1782,8 +1788,9 @@ HdSprim* HdUECreateActor(const SdfPath& id, HdUEActorData::Kind kind) {
     return new Actor(id, kind);
 }
 // Mesh Sync totals since the last call (HDUE_TRACE_TIMING).
-void HdUETakeMeshSyncStats(double& milliseconds, int& count) {
+void HdUETakeMeshSyncStats(double& milliseconds, int& count, double& lockWaitMilliseconds) {
     milliseconds = meshSyncMicroseconds.exchange(0) / 1000.0;
+    lockWaitMilliseconds = meshLockWaitMicroseconds.exchange(0) / 1000.0;
     count = meshSyncs.exchange(0);
 }
 PXR_NAMESPACE_CLOSE_SCOPE
