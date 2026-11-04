@@ -323,14 +323,13 @@ assert notice.evalAsString().startswith(
 moving = next(
     p
     for p in alone.parms()
-    if p.parmTemplate().label() == "Moving Screen Percentage"
+    if p.parmTemplate().label() == "Directional Resolution Bias"
 )
-moving.set(moving.eval() + 10)
+moving.set(moving.eval() + 1)
 assert notice.evalAsString().startswith(
     "3 changed settings hidden in Advanced: "
 ) and (
-    "Moving Screen Percentage (Rendering > Anti-Aliasing)"
-    in notice.evalAsString()
+    "Directional Resolution Bias (Lighting > Shadows)" in notice.evalAsString()
 ), notice.evalAsString()
 alone.parm("hdue_showhidden").pressButton()
 assert alone.evalParm("hdue_show") == 1 and notice.evalAsString() == ""
