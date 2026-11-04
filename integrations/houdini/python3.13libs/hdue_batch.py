@@ -137,7 +137,9 @@ class _Libraries:
         live = self.live
         records = collect(
             stage, time, self.materialx.bound_entries
-        ) + materialx_records(self.materialx.missing, time)
+        ) + materialx_records(
+            self.materialx.missing, time, self.materialx.missing_graphs
+        )
         deadline = clock.monotonic() + 1800
         while live.request(
             records, self.substrate_base + list(live.entries.values())

@@ -87,8 +87,16 @@ def validate_mask(mesh, name, time):
 
 
 def resolve(stage, entries, time):
+    from cooperative import run
+
+    return run(resolve_steps(stage, entries, time))
+
+
+def resolve_steps(stage, entries, time):
+    """resolve() as a cooperative walk (cooperative.Job): yields between prims."""
     bindings, diagnostics = {}, []
     for prim in stage.Traverse():
+        yield
         if not prim.IsA(UsdGeom.Mesh):
             continue
         mesh = UsdGeom.Mesh(prim)

@@ -21,8 +21,16 @@ from substrate_textures import prepare as prepare_textures
 
 
 def collect(stage, time, entries):
+    from cooperative import run
+
+    return run(collect_steps(stage, time, entries))
+
+
+def collect_steps(stage, time, entries):
+    """collect() as a cooperative walk (cooperative.Job): yields between prims."""
     records = []
     for prim in stage.Traverse():
+        yield
         if not prim.IsA(UsdShade.Material) or not prim.GetAttribute(
             "unreal:substrate:version"
         ):

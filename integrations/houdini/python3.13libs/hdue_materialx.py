@@ -31,6 +31,17 @@ class PreparedMaterials(OfflineView):
             self.published_error = key
 
     def sync(self, stage, time, file, session, api, substrate_file=None):
+        from cooperative import run
+
+        return run(
+            self.sync_steps(stage, time, file, session, api, substrate_file)
+        )
+
+    def sync_steps(self, stage, time, file, session, api, substrate_file=None):
+        """sync() as a cooperative walk (cooperative.Job): the host advances it a few milliseconds per timer tick, so
+        a large stage (thousands of materials) never holds Houdini's UI thread. Returns whether it applied new
+        settings.
+        """
         identity = None
         if file:
             path = Path(hou.expandString(file)).resolve()
@@ -70,7 +81,7 @@ class PreparedMaterials(OfflineView):
         self._dataModel.stage = stage
         self._dataModel.currentFrame = time
         self._renderer = session
-        from prepared_materials import sync
+        from prepared_materials import sync_steps
         from substrate_library import SubstrateLibrary
 
         substrate_identity = None
@@ -99,14 +110,20 @@ class PreparedMaterials(OfflineView):
 
         try:
             self.settings.update(
-                sync(stage, time, self.library, self.substrate, self)
+                (
+                    yield from sync_steps(
+                        stage, time, self.library, self.substrate, self
+                    )
+                )
             )
             if self.live:
                 # MaterialX graphs hdUE cannot translate at render time: they render translated while UE's importer
                 # prepares them in the background.
-                from live_materials import materialx_records
+                from live_materials import materialx_records_steps
 
-                records = materialx_records(self.library.missing, time)
+                records = yield from materialx_records_steps(
+                    self.library.missing, time, self.library.missing_graphs
+                )
                 if records:
                     self.live.request(records, known())
                 else:
@@ -116,12 +133,20 @@ class PreparedMaterials(OfflineView):
 
             message = str(error)
             if self.live and isinstance(error, NeedsPreparation):
-                from live_materials import materialx_records
-                from prepare_substrate import collect
+                from live_materials import materialx_records_steps
+                from prepare_substrate import collect_steps
 
-                records = collect(
-                    stage, time, self.library.bound_entries
-                ) + materialx_records(self.library.missing, time)
+                records = (
+                    yield from collect_steps(
+                        stage, time, self.library.bound_entries
+                    )
+                ) + (
+                    yield from materialx_records_steps(
+                        self.library.missing,
+                        time,
+                        self.library.missing_graphs,
+                    )
+                )
                 message = self.live.request(records, known()) or message
             self.publish_error(session, api, message)
             raise ValueError(message) from error

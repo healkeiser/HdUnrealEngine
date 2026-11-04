@@ -117,6 +117,9 @@ class MaterialXLibrary:
         self.bound_entries = {}
         self.prepared = {}
         self.missing = []
+        self.missing_graphs = (
+            {}
+        )  # path -> graph of each missing material, for its preparation record
         self.preparation_error = None
         self.preparation_exception = None
         self.owned = set()
@@ -221,8 +224,14 @@ class MaterialXLibrary:
         return entry, self._values(entry, path, stage, time)
 
     def sync(self):
+        from cooperative import run
+
+        return run(self.sync_steps())
+
+    def sync_steps(self):
+        """sync() as a cooperative walk (cooperative.Job): yields between materials."""
         try:
-            self._sync()
+            yield from self._sync_steps()
             self.preparation_error = self.preparation_exception = None
             return True
         except ValueError as error:
@@ -230,7 +239,7 @@ class MaterialXLibrary:
             self.preparation_exception = error
             return False
 
-    def _sync(self):
+    def _sync_steps(self):
         model = self.controller._dataModel
         view = self.controller._stageView
         if not model.stage or view._renderer is None:
@@ -249,8 +258,9 @@ class MaterialXLibrary:
         for path in self.owned:
             asset_map.pop(path, None)
             overrides.pop(path, None)
-        owned, bindings, bound_entries, missing = set(), [], {}, []
+        owned, bindings, bound_entries, missing, graphs = set(), [], {}, [], {}
         for prim in model.stage.Traverse():
+            yield
             if not prim.IsA(UsdShade.Material):
                 continue
             output = UsdShade.Material(prim).GetSurfaceOutput("mtlx")
@@ -278,6 +288,7 @@ class MaterialXLibrary:
                 )
                 if not entry:
                     missing.append(UsdShade.Material(prim))
+                    graphs[path] = graph
                     continue
             elif not entry:
                 shader = UsdShade.Shader(connection[0].GetPrim())
@@ -343,10 +354,11 @@ class MaterialXLibrary:
             view.SetRendererSetting("nativeMaterialParameters", overrides)
         self.owned, self.bindings = owned, bindings
         self.bound_entries, self.missing = bound_entries, missing
-        from surface_effects import resolve
+        self.missing_graphs = graphs
+        from surface_effects import resolve_steps
 
         try:
-            effects, self.surface_diagnostics = resolve(
+            effects, self.surface_diagnostics = yield from resolve_steps(
                 model.stage, bound_entries, model.currentFrame
             )
         except ValueError as error:

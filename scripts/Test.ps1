@@ -10,7 +10,7 @@ if ($Suite -in 'unit', 'all') {
     & uv run --python 3.11 (Join-Path $TaskRoot 'tests\test_repository_scope.py')
     if ($LASTEXITCODE) { throw 'Repository scope failed.' }
     & (Join-Path $TaskRoot 'tests\local_paths.ps1')
-    foreach ($Test in 'live_materials_test', 'materialx_live_test', 'scene_space_test', 'substrate_graph_test', 'surface_effects_test', 'asset_controls_test') {
+    foreach ($Test in 'live_materials_test', 'materialx_live_test', 'materialx_textures_cache_test', 'scene_space_test', 'substrate_graph_test', 'surface_effects_test', 'asset_controls_test') {
         & uv run --python 3.11 --with usd-core --with numpy --with MaterialX==1.39.4 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }

@@ -51,6 +51,12 @@ class SubstrateLibrary:
         self.diagnostics = []
 
     def sync(self, stage, time, base_entries, settings):
+        from cooperative import run
+
+        return run(self.sync_steps(stage, time, base_entries, settings))
+
+    def sync_steps(self, stage, time, base_entries, settings):
+        """sync() as a cooperative walk (cooperative.Job): yields between prims."""
         assets = dict(settings.get("nativeMaterialAssets", {}))
         overrides = dict(settings.get("nativeMaterialParameters", {}))
         for path in self.owned:
@@ -59,6 +65,7 @@ class SubstrateLibrary:
         bound = {}
         owned = set()
         for prim in stage.Traverse():
+            yield
             if not prim.IsA(UsdShade.Material) or not prim.GetAttribute(
                 "unreal:substrate:version"
             ):
@@ -143,7 +150,9 @@ class SubstrateLibrary:
             used(data["entry"])
         effects = dict(settings.get("surfaceEffects", {}))
         diagnostics = []
-        for prim in stage.Traverse():
+        # Meshes bound to a Substrate graph's material: none to look for without one.
+        for prim in stage.Traverse() if bound else ():
+            yield
             if not prim.IsA(UsdGeom.Mesh):
                 continue
             targets = [prim] + [

@@ -33,20 +33,33 @@ def identity(item):
 _REPORTED = set()
 
 
-def materialx_records(materials, time):
+def materialx_records(materials, time, graphs=None):
     """Job records for MaterialX materials hdUE cannot translate at render time (MaterialXLibrary.missing). One that
     cannot be prepared (an image embedded in a Houdini asset, ...) keeps its render-time translation; its reason is
-    printed once.
+    printed once. graphs: the materials' graphs by path, as the library read them (MaterialXLibrary.missing_graphs).
     """
+    from cooperative import run
+
+    return run(materialx_records_steps(materials, time, graphs))
+
+
+def materialx_records_steps(materials, time, graphs=None):
+    """materialx_records() as a cooperative walk (cooperative.Job): yields between materials."""
     import sys
 
     from export_usd_materialx import record
     from usd_materialx_graph import request_key
 
-    records = []
+    records, identities = [], {}
     for material in materials:
+        yield
         try:
-            item = record(material, time)
+            item = record(
+                material,
+                time,
+                graph=(graphs or {}).get(str(material.GetPath())),
+                identities=identities,
+            )
         except ValueError as error:
             message = f"hdUE: {material.GetPath()} keeps its render-time translation: {error}"
             if message not in _REPORTED:

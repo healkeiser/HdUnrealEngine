@@ -213,8 +213,16 @@ def prepare_stage(stage, key="viewport"):
     Returns {uri: file} for the delegate, which reads these paths through the host (hdue_set_viewport_textures).
     Images are exported raw: the delegate converts colour inputs from scene_linear as for any other EXR.
     """
+    from cooperative import run
+
+    return run(prepare_stage_steps(stage, key))
+
+
+def prepare_stage_steps(stage, key="viewport"):
+    """prepare_stage() as a cooperative walk (cooperative.Job): yields between prims."""
     files = {}
     for prim in Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies()):
+        yield
         if not (prim.IsA(UsdShade.Shader) or prim.HasAPI(UsdLux.LightAPI)):
             continue
         for input_ in UsdShade.ConnectableAPI(prim).GetInputs():

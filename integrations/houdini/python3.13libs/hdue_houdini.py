@@ -102,6 +102,12 @@ class Host:
         self.stage_listener = None
         self.materials_dirty = self.textures_dirty = True
         self.materials_animated = False
+        # The stage walks run as cooperative jobs (cooperative.Job), a few milliseconds per tick: material
+        # preparation, and the scene's asset overrides and op: textures. A change during a job is picked up by the
+        # next one, once it has finished and applied its result.
+        self.material_job = None
+        self.scene_job = None
+        self.progress_shown = 0.0
         self.viewer = None
         self.last_options = None
         self.options_key = None
@@ -130,6 +136,10 @@ class Host:
             return
         self.watched_stage = stage
         self.materials_dirty = self.textures_dirty = self.assets_dirty = True
+        for job in (self.material_job, self.scene_job):
+            if job:
+                job.close()
+        self.material_job = self.scene_job = None
         self.stage_listener = Tf.Notice.Register(
             Usd.Notice.ObjectsChanged, self.stage_changed, stage
         )
@@ -138,32 +148,21 @@ class Host:
         # Houdini composes LOP stages on worker threads, where the sender arrives as None ("Tf Python Exception" in
         # the Log Viewer, one per stage edit, from GetPrimAtPath on None); the notice keeps its stage.
         stage = notice.GetStage()
-        # Asset overrides follow unreal:asset and unreal:surface:* opinions, material bindings, instancing and the
-        # stage's units and up axis (root metadata).
-        if not self.assets_dirty and (
-            notice.GetResyncedPaths()
-            or any(
-                path.IsAbsoluteRootPath()
-                or "unreal:" in path.name
-                or "material:binding" in path.name
-                or (
-                    path.IsPrimPath()
-                    and "instanceable" in notice.GetChangedFields(path)
-                )
-                for path in notice.GetChangedInfoOnlyPaths()
-            )
-        ):
-            self.assets_dirty = True
-        if self.materials_dirty and self.textures_dirty:
-            return
-        if any(
-            _shading_change(stage, path, False)
-            for path in notice.GetResyncedPaths()
-        ) or any(
-            _shading_change(stage, path, True)
-            for path in notice.GetChangedInfoOnlyPaths()
-        ):
-            self.materials_dirty = self.textures_dirty = True
+        # Each walk restarts only for what it reads (_changes): a light, a camera or a transform edit (playback,
+        # Houdini's free camera) starts none of them.
+        kinds = set()
+        for path in notice.GetResyncedPaths():
+            kinds |= _changes(stage, path, None)
+            if len(kinds) == 3:
+                break
+        else:
+            for path in notice.GetChangedInfoOnlyPaths():
+                kinds |= _changes(stage, path, notice.GetChangedFields(path))
+                if len(kinds) == 3:
+                    break
+        self.materials_dirty |= "materials" in kinds
+        self.textures_dirty |= "textures" in kinds
+        self.assets_dirty |= "assets" in kinds
 
     def write_state(self, error=None):
         # Diagnostics for tests and support only (HDUE_HOUDINI_LOG_DIR): no file write every 2 s otherwise.
@@ -237,12 +236,15 @@ class Host:
                             self.options_key = key
                             self.libraries = libraries(stage, node)
                             self.z_up = UsdGeom.GetStageUpAxis(stage) == "Z"
-                        self.sync_scene(state["session"], any(self.libraries))
-                        # Material preparation walks the stage and hashes embedded textures: only after a change.
+                        # Never read a stage Houdini is cooking: this timer also fires during cooks.
+                        cooking = _display_cooking()
                         self.watch_stage(stage)
-                        # Preparation reads materials and wet opinions at the current frame: redo it per frame only if they are animated.
-                        if self.materials_dirty:
-                            self.materials_animated = _materials_animated(stage)
+                        if not cooking:
+                            self.sync_scene(
+                                state["session"], any(self.libraries)
+                            )
+                        # Preparation reads materials and wet opinions at the current frame: redo it per frame only
+                        # if they are animated (the last walk says).
                         materials_key = (
                             state["session"],
                             values,
@@ -250,45 +252,38 @@ class Host:
                             hou.frame() if self.materials_animated else None,
                         )
                         # Live Substrate preparation also needs a sync once an edit settles or its preparation ends.
-                        if state["session"] and (
-                            self.materials_dirty
-                            or materials_key != self.last_materials
-                            or self.live_preparation.due()
+                        if (
+                            state["session"]
+                            and self.material_job is None
+                            and not cooking
+                            and (
+                                self.materials_dirty
+                                or materials_key != self.last_materials
+                                or self.live_preparation.due()
+                            )
                         ):
                             self.last_materials = materials_key
                             self.materials_dirty = False
-                            try:
-                                preview = node and node.parm(
-                                    "hdue_wet_mask_preview"
-                                )
-                                self.prepared_materials.settings[
-                                    "wetMaskPreview"
-                                ] = (bool(preview.eval()) if preview else False)
-                                # Read when materials sync, not part of their key: a sync of its own when the
-                                # switch flips raced the wet-surface geometry upload ("Obsolete wet geometry
-                                # revision" in hdue_live_materials_test).
-                                self.live_preparation.enabled = auto_prepare(
-                                    stage, node
-                                )
-                                changed = self.prepared_materials.sync(
-                                    stage,
-                                    Usd.TimeCode(hou.frame()),
-                                    self.libraries[0],
-                                    state["session"],
-                                    self.api,
-                                    self.libraries[1],
-                                )
-                                if changed:
-                                    scene_viewer().curViewport().draw()
-                                if self.material_error:
-                                    hou.ui.setStatusMessage(
-                                        "hdUE: material preparation is valid; rendering resumed."
-                                    )
-                                self.material_error = None
-                            except (ValueError, OSError, hou.Error) as error:
-                                self.material_problem(
-                                    str(error), state["session"]
-                                )
+                            preview = node and node.parm(
+                                "hdue_wet_mask_preview"
+                            )
+                            self.prepared_materials.settings[
+                                "wetMaskPreview"
+                            ] = (bool(preview.eval()) if preview else False)
+                            # Read when materials sync, not part of their key: a sync of its own when the switch
+                            # flips raced the wet-surface geometry upload ("Obsolete wet geometry revision" in
+                            # hdue_live_materials_test).
+                            self.live_preparation.enabled = auto_prepare(
+                                stage, node
+                            )
+                            from cooperative import Job
+
+                            self.material_job = Job(
+                                self.material_steps(stage, state["session"]),
+                                "preparing materials",
+                            )
+                        if self.material_job and not cooking:
+                            self.advance_materials(state["session"])
                         # Hydra brings the render settings, units and time; Houdini sends no up axis.
                         axis = (state["session"], self.z_up)
                         if axis != self.last_options and self.api.up_axis(
@@ -358,36 +353,130 @@ class Host:
             if self.running:
                 self.timer.start(16)
 
+    def material_steps(self, stage, session):
+        """Material preparation as one cooperative walk: whether materials are animated, then the prepared
+        materials' sync. Returns (animated, applied new settings).
+        """
+        animated = yield from _materials_animated_steps(stage)
+        changed = yield from self.prepared_materials.sync_steps(
+            stage,
+            Usd.TimeCode(hou.frame()),
+            self.libraries[0],
+            session,
+            self.api,
+            self.libraries[1],
+        )
+        return animated, changed
+
+    def advance_materials(self, session):
+        job = self.material_job
+        try:
+            finished = job.advance(MATERIAL_BUDGET)
+        except RuntimeError as failure:
+            if _expired(failure):
+                # An edit removed a prim the walk held: walk the new stage.
+                self.material_job, self.materials_dirty = None, True
+                return
+            self.material_job = None
+            self.end_progress(job)
+            self.material_problem(str(failure), session)
+            return
+        except (ValueError, OSError, hou.Error) as error:
+            self.material_job = None
+            self.end_progress(job)
+            self.material_problem(str(error), session)
+            return
+        if not finished:
+            self.show_progress(job)
+            return
+        self.material_job = None
+        self.end_progress(job)
+        self.materials_animated, changed = job.result
+        if changed:
+            scene_viewer().curViewport().draw()
+        if self.material_error:
+            hou.ui.setStatusMessage(
+                "hdUE: material preparation is valid; rendering resumed."
+            )
+        self.material_error = None
+
+    def show_progress(self, job):
+        """Houdini's status bar while a walk takes long (a large stage), refreshed twice a second."""
+        if job.elapsed() > 1 and time.monotonic() - self.progress_shown > 0.5:
+            self.progress_shown = time.monotonic()
+            hou.ui.setStatusMessage(
+                f"hdUE: {job.label}: {job.units:,} prims read, {job.elapsed():.0f} s"
+            )
+
+    def end_progress(self, job):
+        if self.progress_shown and job.elapsed() > 1:
+            hou.ui.setStatusMessage(
+                f"hdUE: {job.label}: done in {job.elapsed():.0f} s"
+            )
+        self.progress_shown = 0.0
+
+    def scene_steps(self, network, display, stage, materials, assets, textures):
+        """The asset overrides and the op: textures, as one cooperative walk. Returns (redraw, texture files or
+        None when not walked).
+        """
+        from hdue_op_textures import prepare_stage_steps
+
+        redraw = False
+        if assets and display:
+            redraw = yield from self.assets.sync_steps(
+                network, display, stage, materials
+            )
+        files = (yield from prepare_stage_steps(stage)) if textures else None
+        return redraw, files
+
     def sync_scene(self, session, materials=False):
         """What the delegate cannot read from USD by itself, kept out of the LOP graph: images of op:/opdef: texture
-        paths (exported here, outside any cook) and bounds meshes for unreal:asset prims (viewport overrides).
+        paths (exported here, outside any cook) and bounds meshes for unreal:asset prims (viewport overrides). Runs as
+        a cooperative job (scene_steps); the caller does not call it while Houdini cooks the viewed stage.
         """
-        from hdue_op_textures import cache, prepare_stage
+        from cooperative import Job
+        from hdue_op_textures import cache
 
         viewer = scene_viewer()
         redraw = False
         try:
             stage = viewer.stage()
             network = viewer.pwd()
-            if self.assets_dirty or (network, materials) != self.assets_network:
+            assets = (
+                self.assets_dirty or (network, materials) != self.assets_network
+            )
+            textures = self.textures_dirty or cache().dirty("viewport")
+            if self.scene_job is None and (assets or textures):
                 display = (
                     network.displayNode()
                     if isinstance(network, hou.LopNetwork)
                     else None
                 )
-                # Never cook from here: this timer also fires while Houdini cooks (a re-entrant cook fails with
-                # "Infinite recursion in evaluation"). The viewed stage is already composed.
-                if display and display.needsToCook():
-                    return
-                if display:
-                    redraw = self.assets.sync(
-                        network, display, stage, materials
-                    )
-                self.assets_dirty = False
+                self.assets_dirty = self.textures_dirty = False
                 self.assets_network = (network, materials)
-            if self.textures_dirty or cache().dirty("viewport"):
-                self.textures_dirty = False
-                self.texture_files = prepare_stage(stage)
+                self.scene_job = Job(
+                    self.scene_steps(
+                        network, display, stage, materials, assets, textures
+                    ),
+                    "reading the scene",
+                )
+            if self.scene_job:
+                job = self.scene_job
+                try:
+                    finished = job.advance(SCENE_BUDGET)
+                except RuntimeError as failure:
+                    if not _expired(failure):
+                        raise
+                    # An edit removed a prim the walk held: walk the new stage.
+                    self.scene_job = None
+                    self.assets_dirty = self.textures_dirty = True
+                    return
+                if finished:
+                    self.scene_job = None
+                    job_redraw, files = job.result
+                    redraw = job_redraw
+                    if files is not None:
+                        self.texture_files = files
             if (
                 session
                 and (session, self.texture_files) != self.pushed_textures
@@ -397,6 +486,7 @@ class Host:
                 redraw = True
             error = None
         except (hou.Error, ValueError, RuntimeError) as failure:
+            self.scene_job = None
             error = str(failure)
         if error and error != self.texture_error:
             _report(error)
@@ -502,39 +592,130 @@ def start():
 
 RENDER_ROOT = Sdf.Path("/Render")
 VIEWER_CAMERA = Sdf.Path("/__HoudiniFreeCamera__")
-SHADING_PROPERTIES = ("material:binding", "unreal:surface:wet:")
+SHADING_PROPERTIES = (
+    "material:binding",
+    "unreal:surface:wet:",
+    "unreal:substrate:",
+)
+ASSET_PROPERTIES = ("unreal:asset", "unreal:surface:")
+# Per timer tick (16 ms), the time the host's walks may hold Houdini's UI thread.
+MATERIAL_BUDGET = 0.008
+SCENE_BUDGET = 0.004
+# A resynced subtree larger than this is taken to change everything rather than read on a notice.
+CHANGE_SCAN_LIMIT = 4096
+ALL_CHANGES = frozenset(("materials", "textures", "assets"))
 
 
-def _shading_change(stage, path, info_only):
-    """Whether a changed path can change prepared materials or op: textures. Houdini rewrites its free viewport camera
-    on every camera move, and cameras and transforms change every frame of playback: only shading prims, bindings and
-    wet opinions count for value changes; any structure change outside the render settings does.
+def _prim_changes(prim):
+    """What a prim's presence changes: prepared materials (shading prims, bindings, wet and Substrate opinions), op:
+    textures (shaders and lights read images) and asset overrides (asset prims, unreal:surface:*, instancing).
+    """
+    kinds = set()
+    if prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.NodeGraph):
+        kinds |= {"materials", "textures", "assets"}
+    elif prim.IsA(UsdShade.Shader):
+        kinds |= {"materials", "textures"}
+    elif prim.HasAPI(UsdLux.LightAPI):
+        kinds.add("textures")
+    if prim.IsInstance():
+        kinds.add("assets")
+    for name in prim.GetPropertyNames():
+        if name.startswith(SHADING_PROPERTIES):
+            kinds |= {"materials", "assets"}
+        elif name.startswith(ASSET_PROPERTIES):
+            kinds.add("assets")
+    return kinds
+
+
+def _changes(stage, path, fields):
+    """The walks a changed path restarts (stage_changed): fields is None for a resync (the path's subtree was
+    recomposed), else the changed fields of an info-only change. Houdini rewrites its free viewport camera on every
+    camera move, and cameras, lights and transforms change every frame of playback: those restart nothing.
     """
     if path.HasPrefix(RENDER_ROOT) or path.HasPrefix(VIEWER_CAMERA):
+        return set()
+    if path.IsAbsoluteRootPath():
+        # Root metadata: units and up axis, which the asset overrides' bounds follow; a root resync is everything.
+        return set(ALL_CHANGES) if fields is None else {"assets"}
+    if path.IsPropertyPath():
+        name = path.name
+        prim = stage.GetPrimAtPath(path.GetPrimPath())
+        kinds = set()
+        if name.startswith(SHADING_PROPERTIES):
+            kinds |= {"materials", "assets"}
+        elif name.startswith(ASSET_PROPERTIES):
+            kinds.add("assets")
+        if prim and (
+            prim.IsA(UsdShade.Material)
+            or prim.IsA(UsdShade.Shader)
+            or prim.IsA(UsdShade.NodeGraph)
+        ):
+            kinds |= {"materials", "textures"}
+        elif prim and prim.HasAPI(UsdLux.LightAPI) and "texture" in name:
+            kinds.add("textures")
+        return kinds
+    prim = stage.GetPrimAtPath(path)
+    if fields is not None:
+        # Prim metadata: instancing, and API schemas (a light or binding API applied).
+        kinds = {"assets"} if "instanceable" in fields else set()
+        if prim and "apiSchemas" in fields:
+            kinds |= _prim_changes(prim)
+        return kinds
+    if not prim:
+        return set(ALL_CHANGES)  # removed: what it held is unknown now
+    kinds = set()
+    for index, descendant in enumerate(
+        Usd.PrimRange(prim, Usd.TraverseInstanceProxies())
+    ):
+        if index >= CHANGE_SCAN_LIMIT:
+            return set(ALL_CHANGES)
+        kinds |= _prim_changes(descendant)
+        if kinds == ALL_CHANGES:
+            break
+    return kinds
+
+
+def _expired(failure):
+    """Whether a walk's error is USD's for a prim an edit removed while the walk held it (a later walk reads the new
+    stage), not an error of the scene.
+    """
+    return "expired" in str(failure)
+
+
+def _display_cooking():
+    """Whether Houdini has yet to cook the viewed LOP network's display node: the timer fires during cooks, and a
+    stage being cooked must not be read (nor cooked from here: "Infinite recursion in evaluation").
+    """
+    try:
+        network = scene_viewer().pwd()
+        display = (
+            network.displayNode()
+            if isinstance(network, hou.LopNetwork)
+            else None
+        )
+        return bool(display and display.needsToCook())
+    except (hou.Error, AttributeError):
         return False
-    if not info_only:
-        return True
-    if path.IsPropertyPath() and path.name.startswith(SHADING_PROPERTIES):
-        return True
-    prim = stage.GetPrimAtPath(path.GetPrimPath())
-    return bool(prim) and (
-        prim.IsA(UsdShade.Material)
-        or prim.IsA(UsdShade.Shader)
-        or prim.IsA(UsdShade.NodeGraph)
-        or prim.HasAPI(UsdLux.LightAPI)
-    )
 
 
-def _materials_animated(stage):
-    """Whether a material, shader or hdUE wet opinion has time samples."""
-    return any(
-        attr.ValueMightBeTimeVarying()
-        for prim in stage.Traverse()
-        for attr in prim.GetAttributes()
-        if prim.IsA(UsdShade.Material)
-        or prim.IsA(UsdShade.Shader)
-        or attr.GetName().startswith("unreal:surface:wet:")
-    )
+def _materials_animated_steps(stage):
+    """Whether a material, shader or hdUE wet opinion has time samples, as a cooperative walk (cooperative.Job). Only
+    those attributes are read: every attribute of every mesh (points, normals, primvars) was most of the walk.
+    """
+    for prim in stage.Traverse():
+        yield
+        if prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.Shader):
+            attributes = prim.GetAttributes()
+        else:
+            attributes = prim.GetAuthoredPropertiesInNamespace(
+                ["unreal", "surface", "wet"]
+            )
+        if any(
+            isinstance(attr, Usd.Attribute) and attr.ValueMightBeTimeVarying()
+            for attr in attributes
+        ):
+            return True
+    return False
 
 
 def _settings_values(settings):
@@ -770,6 +951,14 @@ class NativeAssets:
 
     def sync(self, network, display, stage, materials=False):
         """Re-author when the viewed stage's asset prims change; True if the overrides changed."""
+        from cooperative import run
+
+        return run(self.sync_steps(network, display, stage, materials))
+
+    def sync_steps(self, network, display, stage, materials=False):
+        """sync() as a cooperative walk (cooperative.Job): yields between prims. The overrides are authored at its
+        end, in one change block.
+        """
         if stage is None:
             return False
         refs = {}
@@ -782,6 +971,7 @@ class NativeAssets:
         # instance comes back, and the two alternate on every tick (a scene upload per tick, no converged frame).
         made_editable = [Sdf.Path(path) for path in authored]
         for prim in Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies()):
+            yield
             attr = prim.GetAttribute("unreal:asset")
             asset = attr.Get() if attr else None
             if asset:

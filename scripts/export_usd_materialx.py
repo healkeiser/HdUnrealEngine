@@ -10,7 +10,7 @@ import json
 import re
 from pathlib import Path
 
-from materialx_textures import file_identity, udim_tiles
+from materialx_textures import file_identity, resolved, udim_tiles
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import graph_data
 
@@ -81,7 +81,7 @@ def texture_path(stage, item, time, embedded=None):
                 return str(file), dict(pattern=pattern, tiles=tiles)
         return str(file), None
     if Path(raw).is_absolute():
-        pattern = str(Path(raw).resolve())
+        pattern = resolved(raw)
     else:
         attr = stage.GetAttributeAtPath(item["attribute"])
         layer = next(
@@ -105,7 +105,7 @@ def texture_path(stage, item, time, embedded=None):
                     f"UDIM requires a filesystem USD layer: {item['attribute']}"
                 )
             anchored = Path(layer.realPath).parent / raw
-        pattern = str(anchored.resolve())
+        pattern = resolved(anchored)
     tiles = {str(k): v for k, v in udim_tiles(pattern).items()}
     return pattern, dict(pattern=pattern, tiles=tiles)
 
@@ -132,9 +132,16 @@ def inline_materials(stage):
         yield material
 
 
-def record(material, time=Usd.TimeCode.Default(), embedded=None, graph=None):
+def record(
+    material,
+    time=Usd.TimeCode.Default(),
+    embedded=None,
+    graph=None,
+    identities=None,
+):
     """What write() needs of one material, read on the host that has the stage: its graph and its images resolved to
-    files (UDIM sets with their tiles), with the files' hashes.
+    files (UDIM sets with their tiles), with the files' identities (materialx_textures.file_identity). identities: a
+    walk's memo of them, shared by the materials it records (one file serves many).
     """
     stage = material.GetPrim().GetStage()
     graph = graph or graph_data(material, time)
@@ -148,10 +155,17 @@ def record(material, time=Usd.TimeCode.Default(), embedded=None, graph=None):
             for source_file in (
                 list(tiles["tiles"].values()) if tiles else [filename]
             ):
-                texture = Path(source_file)
-                if not texture.is_file():
-                    raise ValueError(f"Texture is missing: {texture}")
-                dependencies[str(texture)] = file_identity(texture)
+                key = str(source_file)
+                identity = (
+                    identities.get(key) if identities is not None else None
+                )
+                if identity is None:
+                    if not Path(key).is_file():
+                        raise ValueError(f"Texture is missing: {key}")
+                    identity = file_identity(key)
+                    if identities is not None:
+                        identities[key] = identity
+                dependencies[key] = identity
             textures[item["attribute"]] = [filename, tiles]
     return dict(
         material=str(material.GetPrim().GetPath()),
