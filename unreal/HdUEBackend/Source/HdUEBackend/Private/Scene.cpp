@@ -72,7 +72,8 @@ FHdueScene::~FHdueScene() {
     // their Nanite builds hold the task workers, and UE shutting down under them crashed in a readback copy pass.
     for (const auto& [Key, Pending] : PendingStatic) Pending.Task.Wait();
     for (const FPendingStatic& Retired : RetiredBuilds) Retired.Task.Wait();
-    for (const auto& Build : TextureBuilds) Build->Task.Wait();
+    for (const auto& Build : TextureBuilds)
+        if (Build->Task.IsValid()) Build->Task.Wait();
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
@@ -1052,6 +1053,24 @@ void BindTextureSlot(UMaterialInstanceDynamic& Instance, int32 Slot, const HdueT
                                          FLinearColor(Texture.wrap[0] == HDUE_WRAP_BLACK ? 1.f : 0.f,
                                                       Texture.wrap[1] == HDUE_WRAP_BLACK ? 1.f : 0.f, 0, 0));
 }
+// Memory a background texture build needs, after UE's estimate for a texture build (TextureBuildUtilities.cpp,
+// GetBuildRequiredMemoryEstimate): per pixel the source, a float RGBA mip chain (16 bytes, 4/3 for the mips) and the
+// encoder's working memory, about 48 bytes, plus 1 MB. The size comes from the image header (read for the virtual
+// texture choice, VirtualMaterial); a UDIM set builds all its tiles at once (PrepareVirtualTexture), and its tiles,
+// whose headers this thread does not read, count a pixel per byte of file (more than PNG and EXR compress to).
+int64 TextureBuildMemory(const FString& File) {
+    constexpr int64 BytesPerPixel = 48;
+    int64 Pixels = 0;
+    if (IsUdim(File)) {
+        for (const auto& [Tile, Path] : HdueUdimTiles(File))
+            Pixels += FMath::Max<int64>(0, IFileManager::Get().FileSize(*Path));
+    } else {
+        const FIntPoint Size = ImageSize(File);
+        Pixels = int64(Size.X) * Size.Y;
+        if (!Pixels) Pixels = FMath::Max<int64>(0, IFileManager::Get().FileSize(*File));
+    }
+    return Pixels * BytesPerPixel + 1024 * 1024;
+}
 // A texture entry's build settings, without its texture or data: what a background build works on.
 FHdueScene::FPreviewTexture TextureSettings(const FHdueScene::FPreviewTexture& Entry) {
     FHdueScene::FPreviewTexture Settings;
@@ -1510,22 +1529,36 @@ static TAutoConsoleVariable<int32> CVarFirstPassMemory(
 // UE's Editor.AsyncAssetCompilationMaxMemoryUsage for hdUE's background mesh builds (UE's applies to the editor only).
 static TAutoConsoleVariable<int32> CVarMeshBuildMaxMemoryUsage(
     TEXT("r.HdUE.MeshBuildMaxMemoryUsage"), 0,
-    TEXT("Interactive hosts: 0 - background mesh builds start while system memory is available; N - keep their "
-         "estimated "
-         "memory under N GB."));
+    TEXT("Interactive hosts: 0 - background mesh and texture builds start while system memory is available; N - keep "
+         "their estimated memory under N GB."));
 
 // Interactive hosts: binds background texture builds (Apply) into the inputs waiting for them, and into those inputs'
 // one-sided twins and wet surface copies, which copied the material before the texture was there. UE restarts path
 // tracing on the parameter change (UMaterialInstance's parameter update). At most 8 ms of it per tick.
 void FHdueScene::TickTextures() {
     if (TextureBuilds.IsEmpty()) return;
+    // Queued builds start while their memory fits, as the mesh builds do (TickConversions); one always runs. Launching
+    // every file at once, beside the mesh builds, ended NVIDIA's Da Vinci Workshop at a 38 GB job memory limit.
+    int64 Available = AvailableBuildMemory();
+    TextureBuilds.RemoveAll([&](const TSharedPtr<FTextureBuild>& Build) {
+        return !Build->Task.IsValid() && Build->Epoch != TextureEpoch;  // queued before a scene reset
+    });
+    for (const TSharedPtr<FTextureBuild>& Build : TextureBuilds) {
+        if (Build->Task.IsValid()) continue;
+        if (ReservedMemory && Build->Memory > Available) break;
+        Available -= Build->Memory;
+        ReservedMemory += Build->Memory;
+        Build->Task =
+            UE::Tasks::Launch(TEXT("HdueTexture"), MoveTemp(Build->Work), UE::Tasks::ETaskPriority::BackgroundNormal);
+    }
     const double Start = FPlatformTime::Seconds();
     TMultiMap<const UMaterialInterface*, UMaterialInstanceDynamic*> Copies;
     bool CopiesGathered = false;
     for (int32 Index = 0; Index < TextureBuilds.Num() && FPlatformTime::Seconds() - Start < 0.008; ++Index) {
         const TSharedPtr<FTextureBuild> Build = TextureBuilds[Index];
-        if (!Build->Task.IsCompleted()) continue;
+        if (!Build->Task.IsValid() || !Build->Task.IsCompleted()) continue;  // queued, or still building
         TextureBuilds.RemoveAt(Index--);
+        ReservedMemory -= Build->Memory;
         if (Build->Epoch != TextureEpoch) continue;  // the scene was reset meanwhile
         for (int32 Variant = 0; Variant < Build->Keys.Num(); ++Variant) {
             const FString& Key = Build->Keys[Variant];
@@ -1567,6 +1600,16 @@ void FHdueScene::TickTextures() {
         }
     }
 }
+// Memory for more background builds (meshes and textures): the available physical and virtual memory less 64 MB and
+// what started builds reserve, within r.HdUE.MeshBuildMaxMemoryUsage.
+int64 FHdueScene::AvailableBuildMemory() const {
+    const FPlatformMemoryStats Stats = FPlatformMemory::GetStats();
+    int64 Available = int64(FMath::Min(Stats.AvailablePhysical, Stats.AvailableVirtual)) - 64 * 1024 * 1024;
+    Available -= ReservedMemory;
+    if (const int64 Limit = int64(CVarMeshBuildMaxMemoryUsage.GetValueOnGameThread()) << 30)
+        Available = FMath::Min(Available, Limit - ReservedMemory);
+    return Available;
+}
 void FHdueScene::TickConversions() {
     TickTextures();
     // Builds start while their memory fits, as UE's editor schedules asset builds (FMemoryBoundQueuedThreadPoolWrapper,
@@ -1580,11 +1623,7 @@ void FHdueScene::TickConversions() {
         return true;
     });
     if (PendingStatic.Num()) {
-        const FPlatformMemoryStats Stats = FPlatformMemory::GetStats();
-        int64 Available = int64(FMath::Min(Stats.AvailablePhysical, Stats.AvailableVirtual)) - 64 * 1024 * 1024;
-        Available -= ReservedMemory;
-        if (const int64 Limit = int64(CVarMeshBuildMaxMemoryUsage.GetValueOnGameThread()) << 30)
-            Available = FMath::Min(Available, Limit - ReservedMemory);
+        int64 Available = AvailableBuildMemory();
         for (auto& [Key, Pending] : PendingStatic) {
             if (Pending.Task.IsValid()) continue;
             if (ReservedMemory && Pending.Memory > Available) break;  // one build always runs
@@ -1830,23 +1869,24 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 // Apply, and the Hydra Sync waiting on it held Houdini's UI, for 208 s on NVIDIA's Da Vinci Workshop
                 // with an empty virtual texture cache. Their inputs draw the material's constants until TickTextures
                 // binds each texture in.
+                // They queue until their memory fits (TickTextures), with the background mesh builds.
                 for (const auto& [File, Keys] : Work) {
                     auto Build = MakeShared<FTextureBuild>();
                     Build->File = File;
                     Build->Keys = Keys;
                     Build->Epoch = TextureEpoch;
+                    Build->Memory = TextureBuildMemory(File);
                     for (const FString& Key : Keys) {
                         Build->Entries.Add(TextureSettings(PreviewTextures[Key]));
                         ++PendingTextures.FindOrAdd(Key);
                     }
-                    Build->Task = UE::Tasks::Launch(
-                        TEXT("HdueTexture"),
-                        [Build, LOD] {
-                            TArray<FPreviewTexture*> Entries;
-                            for (FPreviewTexture& Entry : Build->Entries) Entries.Add(&Entry);
-                            BuildTextureFile(Build->File, Entries, LOD);
-                        },
-                        UE::Tasks::ETaskPriority::BackgroundNormal);
+                    // The build outlives its task: TextureBuilds holds it until TickTextures sees the task done, and
+                    // the destructor waits for running tasks.
+                    Build->Work = [Raw = &Build.Get(), LOD] {
+                        TArray<FPreviewTexture*> Entries;
+                        for (FPreviewTexture& Entry : Raw->Entries) Entries.Add(&Entry);
+                        BuildTextureFile(Raw->File, Entries, LOD);
+                    };
                     TextureBuilds.Add(MoveTemp(Build));
                 }
             } else {

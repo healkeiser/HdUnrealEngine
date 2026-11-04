@@ -143,8 +143,10 @@ private:
         FString File;
         TArray<FString> Keys;             // its variants
         TArray<FPreviewTexture> Entries;  // per variant: the settings, then the built data
-        uint64 Epoch = 0;                 // TextureEpoch at launch: a reset scene drops it
-        UE::Tasks::FTask Task;
+        uint64 Epoch = 0;                 // TextureEpoch when queued: a reset scene drops it
+        int64 Memory = 0;                 // estimated (TextureBuildMemory), reserved while it runs
+        TUniqueFunction<void()> Work;     // the build, moved into Task when its memory fits (TickTextures)
+        UE::Tasks::FTask Task;            // invalid while queued
     };
     TArray<TSharedPtr<FTextureBuild>> TextureBuilds;
     TMap<FString, int32> PendingTextures;  // texture key -> builds in flight that produce it
@@ -158,6 +160,7 @@ private:
     TMultiMap<FString, FTextureSlot> TextureSlots;  // by texture key
     uint64 TextureEpoch = 0;
     void TickTextures();
+    int64 AvailableBuildMemory() const;
     double TextureSeconds = 0;
     int32 TextureImports = 0;                                       // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials;  // replaced last Apply; released next Apply
