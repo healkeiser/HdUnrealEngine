@@ -10,7 +10,7 @@ import json
 import re
 from pathlib import Path
 
-from materialx_textures import udim_tiles
+from materialx_textures import file_identity, udim_tiles
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import graph_data
 
@@ -151,9 +151,7 @@ def record(material, time=Usd.TimeCode.Default(), embedded=None, graph=None):
                 texture = Path(source_file)
                 if not texture.is_file():
                     raise ValueError(f"Texture is missing: {texture}")
-                dependencies[str(texture)] = hashlib.sha256(
-                    texture.read_bytes()
-                ).hexdigest()
+                dependencies[str(texture)] = file_identity(texture)
             textures[item["attribute"]] = [filename, tiles]
     return dict(
         material=str(material.GetPrim().GetPath()),

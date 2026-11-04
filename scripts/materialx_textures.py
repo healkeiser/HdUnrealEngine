@@ -48,3 +48,24 @@ def validate_texture_sets(sets):
             raise ValueError(
                 f"UDIM tile membership changed; prepare/import/cook again: {record['pattern']}"
             )
+
+
+def file_identity(path):
+    """A texture dependency's identity: its size and modification time, as hdUE's texture caches key files
+    (Scene.cpp CachePath). Hashing the bytes read every texture on Houdini's UI thread: NVIDIA's Da Vinci Workshop
+    converted to MaterialX reads 60 GB of tiles, and Houdini stopped responding for minutes on each load.
+    """
+    stat = Path(path).stat()
+    return f"stat:{stat.st_size}:{stat.st_mtime_ns}"
+
+
+def file_unchanged(path, expected):
+    """Whether a recorded dependency still holds: a file_identity, or a SHA-256 of the bytes (older records)."""
+    path = Path(path)
+    if not path.is_file():
+        return False
+    if expected.startswith("stat:"):
+        return file_identity(path) == expected
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest() == expected

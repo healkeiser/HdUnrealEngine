@@ -4,11 +4,10 @@
 """Attach original USD attribute/graph identities to a native UE registry."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
-from materialx_textures import validate_texture_sets
+from materialx_textures import file_unchanged, validate_texture_sets
 
 # graph_signature is JSON-only, but its module also uses pxr for graph reads.
 from usd_materialx_graph import graph_signature
@@ -20,7 +19,7 @@ def bind(export_file, library_file, output):
     validate_texture_sets(export.get("texture_sets", []))
     entries = {p["material"]: p for p in export["materials"]}
     for file, expected in export["dependencies"].items():
-        if hashlib.sha256(Path(file).read_bytes()).hexdigest() != expected:
+        if not file_unchanged(file, expected):
             raise ValueError(
                 f"USD export dependency changed; prepare again: {file}"
             )

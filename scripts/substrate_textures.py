@@ -5,7 +5,7 @@ import json
 import shutil
 from pathlib import Path
 
-from materialx_textures import udim_tiles, validate_texture_sets
+from materialx_textures import file_unchanged, udim_tiles, validate_texture_sets
 from pxr import Sdf
 
 
@@ -110,11 +110,7 @@ def prepare(graph, folder, destination):
 def validate_dependencies(data):
     validate_texture_sets(data.get("texture_sets", []))
     for file, expected in data.get("dependencies", {}).items():
-        path = Path(file)
-        if (
-            not path.is_file()
-            or hashlib.sha256(path.read_bytes()).hexdigest() != expected
-        ):
+        if not file_unchanged(file, expected):
             raise ValueError(
                 "Substrate texture changed; prepare/cook/stage again: " + file
             )
