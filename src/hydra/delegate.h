@@ -4,6 +4,7 @@
 #include "picking.h"
 #include "placement.h"
 #include "pxr/pxr.h"
+#include <chrono>
 #include <condition_variable>
 #include "pxr/base/arch/hash.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -339,6 +340,14 @@ struct HdUEState : HdRenderParam {
         return stage;
     }
     mutable std::mutex stageMutex;
+    // Load progress lines (GetRenderStats): when each counter's current run started and where it stood, for its ETA.
+    struct LoadEta {
+        std::chrono::steady_clock::time_point start;
+        uint32_t done = 0;
+        bool active = false;
+    };
+    std::mutex etaMutex;
+    LoadEta textureEta, meshEta;
     std::string stage = "Starting Unreal Engine";
     std::mutex cameraMutex;  // guards cameraMotion (camera Sync runs on Houdini's thread, without the state lock)
     std::set<std::string> dirtyVolumes, dirtyActors, dirtyGrooms;

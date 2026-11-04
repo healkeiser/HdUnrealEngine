@@ -2,7 +2,12 @@
 #include "Async/ParallelFor.h"
 #include "Engine/Texture.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/SecureHash.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
 #include "UDIMUtilities.h"
 #include "VT/VirtualTextureBuildSettings.h"
 #include "VT/VirtualTextureBuiltData.h"  // Engine/Private (HdUEBackend.Build.cs)
@@ -31,7 +36,78 @@ TMap<int32, FString> HdueUdimTiles(const FString& Pattern) {
     return Tiles;
 }
 
+// UploadingVirtualTexture.cpp (Apply-ResidencyPatch.ps1): where chunks without bulk data stream from.
+extern ENGINE_API FString GHdueVirtualTextureChunkDirectory;
+
 namespace {
+// Built chunks are written to disk once and streamed from there, as the editor streams built chunks from its VT DDC
+// cache (FVirtualTextureChunkDDCCache), so a set never stays in memory: NVIDIA's Da Vinci Workshop reads 62 gigapixels
+// of UDIM tiles. One file per chunk, named by its hash, and a manifest per set (its layout and chunk hashes), keyed by
+// its sources and build choices, so a reload skips decoding. HDUE_VIRTUAL_TEXTURE_CACHE moves the cache from
+// %LOCALAPPDATA%/hdUE/VirtualTextureCache. ponytail: never evicted; delete the folder to reclaim space.
+constexpr uint32 ManifestVersion = 1;
+const FString& CacheDirectory() {
+    static const FString Directory = [] {
+        FString Path = FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_VIRTUAL_TEXTURE_CACHE"));
+        if (Path.IsEmpty())
+            Path = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")), TEXT("hdUE"),
+                                   TEXT("VirtualTextureCache"));
+        if (!IFileManager::Get().MakeDirectory(*Path, true)) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: cannot create the virtual texture cache %s; virtual textures stay in memory."), *Path);
+            Path.Reset();
+        }
+        GHdueVirtualTextureChunkDirectory = Path;  // before any chunk of it can stream
+        return Path;
+    }();
+    return Directory;
+}
+// A manifest also names the project's tile size and border, which lay out its chunks (r.VT.TileSize,
+// r.VT.TileBorderSize).
+FString ManifestPath(const FString& Key) {
+    FVirtualTextureBuildSettings Settings;
+    Settings.Init();
+    return CacheDirectory() /
+           FString::Printf(TEXT("vt_%s_%d_%d.manifest"), *Key, Settings.TileSize, Settings.TileBorderSize);
+}
+// The chunk's file, written once (another task may write the same chunk: a private file, then moved into place).
+bool WriteChunk(const TArray<uint8>& Bytes, FSHAHash& Hash) {
+    FSHA1::HashBuffer(Bytes.GetData(), Bytes.Num(), Hash.Hash);
+    const FString Path = CacheDirectory() / Hash.ToString();
+    if (IFileManager::Get().FileSize(*Path) == Bytes.Num()) return true;
+    const FString Temporary = FPaths::CreateTempFilename(*CacheDirectory(), TEXT("chunk"));
+    if (!FFileHelper::SaveArrayToFile(Bytes, *Temporary)) return false;
+    if (!IFileManager::Get().Move(*Path, *Temporary, false, false, false, true))
+        IFileManager::Get().Delete(*Temporary, false, false, true);
+    return IFileManager::Get().FileSize(*Path) == Bytes.Num();
+}
+// The set's platform data, its chunks' hashes instead of their bytes, both ways.
+void SerializeManifest(FArchive& Ar, FTexturePlatformData& Platform, FVirtualTextureBuiltData& Data) {
+    uint32 Version = ManifestVersion;
+    uint8 Format = uint8(Platform.PixelFormat), Layer = uint8(Data.LayerTypes[0]);
+    int32 SizeX = Platform.SizeX, SizeY = Platform.SizeY, Chunks = Data.Chunks.Num();
+    Ar << Version << SizeX << SizeY << Format << Data.NumLayers << Data.NumMips << Data.Width << Data.Height
+       << Data.WidthInBlocks << Data.HeightInBlocks << Data.TileSize << Data.TileBorderSize << Layer
+       << Data.LayerFallbackColors[0] << Data.TileDataOffsetPerLayer << Data.BaseOffsetPerMip << Data.ChunkIndexPerMip
+       << Data.TileOffsetData << Chunks;
+    if (Ar.IsLoading()) {
+        if (Version != ManifestVersion || Chunks < 0 || Chunks > 4096) {
+            Ar.SetError();
+            return;
+        }
+        Platform.SizeX = SizeX;
+        Platform.SizeY = SizeY;
+        Platform.PixelFormat = EPixelFormat(Format);
+        Data.LayerTypes[0] = EPixelFormat(Layer);
+        Data.Chunks.SetNum(Chunks);
+    }
+    for (FVirtualTextureDataChunk& Chunk : Data.Chunks) {
+        uint8 Codec = uint8(Chunk.CodecType[0]);
+        Ar << Chunk.SizeInBytes << Chunk.CodecPayloadSize << Chunk.CodecPayloadOffset[0] << Codec << Chunk.BulkDataHash;
+        Chunk.CodecType[0] = EVirtualTextureCodec(Codec);
+    }
+}
+
 // VirtualTextureDataBuilder.cpp FPixelDataRectangle::ApplyBorderMode.
 int32 BorderTexel(int32 X, int32 Size, TextureAddress Mode) {
     if (Mode == TA_Clamp) return FMath::Clamp(X, 0, Size - 1);
@@ -69,9 +145,26 @@ struct FBlock {
 };
 }  // namespace
 
+TUniquePtr<FTexturePlatformData> HdueLoadVirtualTexture(const FString& Key) {
+    if (CacheDirectory().IsEmpty()) return nullptr;
+    TArray<uint8> Bytes;
+    if (!FFileHelper::LoadFileToArray(Bytes, *ManifestPath(Key), FILEREAD_Silent)) return nullptr;
+    auto Platform = MakeUnique<FTexturePlatformData>();
+    auto* Data = new FVirtualTextureBuiltData;
+    Platform->VTData = Data;
+    FMemoryReader Reader(Bytes);
+    SerializeManifest(Reader, *Platform, *Data);
+    if (Reader.IsError() || !Data->IsInitialized()) return nullptr;
+    for (const FVirtualTextureDataChunk& Chunk : Data->Chunks)
+        if (IFileManager::Get().FileSize(*(CacheDirectory() / Chunk.BulkDataHash.ToString())) != Chunk.SizeInBytes)
+            return nullptr;  // a chunk file deleted with the cache
+    Platform->SetNumSlices(1);
+    return Platform;
+}
+
 TUniquePtr<FTexturePlatformData> HdueBuildVirtualTexture(TArray<FHdueVirtualTextureBlock>&& Sources,
                                                          const FHdueVirtualTextureCodec& Codec, const uint8 Address[2],
-                                                         FString& Error) {
+                                                         const FString& Key, FString& Error) {
     check(Sources.Num() > 0);
     FVirtualTextureBuildSettings Settings;
     Settings.Init();  // the project's r.VT.TileSize and r.VT.TileBorderSize, as UE's texture build reads them
@@ -209,7 +302,7 @@ TUniquePtr<FTexturePlatformData> HdueBuildVirtualTexture(TArray<FHdueVirtualText
         int32 Mip;
     };
     TArray<FTileRef> InChunk;
-    bool TooLarge = false;
+    bool TooLarge = false, Cached = true;
     const auto Push = [&]() {
         const int64 Size = sizeof(FVirtualTextureChunkHeader) + InChunk.Num() * TileBytes;
         if (Size >= MAX_uint32) {  // the built data's offsets are 32-bit
@@ -222,16 +315,21 @@ TUniquePtr<FTexturePlatformData> HdueBuildVirtualTexture(TArray<FHdueVirtualText
         Chunk.CodecType[0] = EVirtualTextureCodec::RawGPU;
         Chunk.CodecPayloadOffset[0] = sizeof(FVirtualTextureChunkHeader);
         Chunk.CodecPayloadSize = sizeof(FVirtualTextureChunkHeader);
-        Chunk.BulkData.Lock(LOCK_READ_WRITE);
-        auto* Bytes = static_cast<uint8*>(Chunk.BulkData.Realloc(Size));
-        FMemory::Memzero(Bytes, sizeof(FVirtualTextureChunkHeader));
+        TArray<uint8> Bytes;
+        Bytes.SetNumZeroed(Size);
         int64 Offset = sizeof(FVirtualTextureChunkHeader);
         for (const FTileRef& Tile : InChunk) {
             if (Data->BaseOffsetPerMip[Tile.Mip] == ~0u) Data->BaseOffsetPerMip[Tile.Mip] = uint32(Offset);
-            FMemory::Memcpy(Bytes + Offset, Tile.Payload->GetData(), TileBytes);
+            FMemory::Memcpy(Bytes.GetData() + Offset, Tile.Payload->GetData(), TileBytes);
             Offset += TileBytes;
         }
-        Chunk.BulkData.Unlock();
+        // Without a cache (no writable folder) the chunk stays in memory and streams from there.
+        if (CacheDirectory().IsEmpty() || !WriteChunk(Bytes, Chunk.BulkDataHash)) {
+            Cached = false;
+            Chunk.BulkData.Lock(LOCK_READ_WRITE);
+            FMemory::Memcpy(Chunk.BulkData.Realloc(Size), Bytes.GetData(), Size);
+            Chunk.BulkData.Unlock();
+        }
         InChunk.Reset();
     };
     const uint32 MinTilesPerChunk = FMath::Square(FMath::DivideAndRoundUp<uint32>(1024u, TileSize));
@@ -301,5 +399,14 @@ TUniquePtr<FTexturePlatformData> HdueBuildVirtualTexture(TArray<FHdueVirtualText
     Platform->PixelFormat = Codec.Format;
     Platform->SetNumSlices(1);
     Platform->VTData = Data;
+    if (Cached && !Key.IsEmpty()) {
+        TArray<uint8> Manifest;
+        FMemoryWriter Writer(Manifest);
+        SerializeManifest(Writer, *Platform, *Data);
+        const FString Temporary = FPaths::CreateTempFilename(*CacheDirectory(), TEXT("manifest"));
+        if (FFileHelper::SaveArrayToFile(Manifest, *Temporary) &&
+            !IFileManager::Get().Move(*ManifestPath(Key), *Temporary, true, false, false, true))
+            IFileManager::Get().Delete(*Temporary, false, false, true);
+    }
     return Platform;
 }

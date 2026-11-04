@@ -23,9 +23,12 @@ struct FHdueVirtualTextureCodec {
 };
 
 // UE's streaming virtual texture data for Blocks (FVirtualTextureDataBuilder's layout: blocks with mip biases, a mip
-// tail block shared by all blocks, bordered tiles in Morton order, raw GPU chunks kept in memory), as platform data of
-// a UTexture2D with VirtualTextureStreaming. Address is the texture's TextureAddress on u and v. Null, with Error, when
-// UE's virtual textures cannot hold the set.
+// tail block shared by all blocks, bordered tiles in Morton order, raw GPU chunks streamed from hdUE's chunk cache on
+// disk), as platform data of a UTexture2D with VirtualTextureStreaming. Address is the texture's TextureAddress on u
+// and v. Key, when not empty, names the set's manifest in the cache (its sources and build choices) for
+// HdueLoadVirtualTexture. Null, with Error, when UE's virtual textures cannot hold the set.
 TUniquePtr<FTexturePlatformData> HdueBuildVirtualTexture(TArray<FHdueVirtualTextureBlock>&& Blocks,
                                                          const FHdueVirtualTextureCodec& Codec, const uint8 Address[2],
-                                                         FString& Error);
+                                                         const FString& Key, FString& Error);
+// The platform data a build with this Key cached, or null (none, or a chunk file missing).
+TUniquePtr<FTexturePlatformData> HdueLoadVirtualTexture(const FString& Key);

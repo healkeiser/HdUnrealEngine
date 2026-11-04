@@ -2309,6 +2309,13 @@ HdueResult HDUE_CALL GetResidencyStatus(HdueSession Handle, HdueResidencyStatus*
     Status->struct_size = sizeof(*Status);
     return HDUE_OK;
 }
+// Any thread: the counters are atomics, read while the owner thread uploads.
+HdueResult HDUE_CALL GetLoadStatus(HdueLoadStatus* Status) {
+    if (!Sized(Status)) return HDUE_INVALID_ARGUMENT;
+    *Status = {sizeof(*Status),         GHdueLoad.TexturesTotal,      GHdueLoad.TexturesDone,   GHdueLoad.VirtualBuilt,
+               GHdueLoad.VirtualCached, GHdueLoad.MeshBuildsLaunched, GHdueLoad.MeshBuildsDone, 0};
+    return HDUE_OK;
+}
 HdueResult HDUE_CALL UpsertAsset(HdueSession Handle, const HdueAssetDesc* Desc) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc)) return HDUE_INVALID_ARGUMENT;
@@ -2436,7 +2443,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .upsert_local_fog_volume = UpsertLocalFogVolume,
             .upsert_groom = UpsertGroom,
             .upsert_post_process_volume = UpsertPostProcessVolume,
-            .upsert_decal = UpsertDecal};
+            .upsert_decal = UpsertDecal,
+            .get_load_status = GetLoadStatus};
     return HDUE_OK;
 }
 #endif

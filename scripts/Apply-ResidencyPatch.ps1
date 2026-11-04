@@ -180,3 +180,14 @@ Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Pri
     -Label 'runtime virtual texture patch' -Marker 'hdUE: runtime-built' -Edits @(, @(
     "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if WITH_EDITOR`n",
     "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if 1`t// hdUE: runtime-built virtual textures (UdimTexture.cpp) stream from memory outside the editor too`n"))
+# Runtime-built virtual textures stream from disk as the editor's do: there, a built chunk without file-backed bulk data
+# is read through the file cache from its file in the VT DDC cache (MakeChunkAvailable). Outside the editor, a chunk
+# without bulk data is read from hdUE's chunk cache (VirtualTextureBuild.cpp writes one file per chunk, named by its
+# BulkDataHash); cooked chunks have bulk data and stream from their package as before.
+$ReadData = 'FVTDataAndStatus FUploadingVirtualTexture::ReadData(FGraphEventArray& OutCompletionEvents, uint32 ChunkIndex, size_t Offset, size_t Size, EVTRequestPagePriority Priority)'
+Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Private\VT\UploadingVirtualTexture.cpp') `
+    -Label 'virtual texture chunk cache patch' -Marker 'hdUE: chunk files' -Edits @(
+    @($ReadData, "// hdUE: chunk files of runtime-built virtual textures, <directory>/<BulkDataHash>; empty: none.`nENGINE_API FString GHdueVirtualTextureChunkDirectory;`n`n$ReadData"),
+    @("#else // WITH_EDITOR`n`t`tChunkOffsetInFile = BulkData.GetBulkDataOffsetInFile();",
+        "#else // WITH_EDITOR`n`t`tif (BulkData.GetBulkDataSize() == 0 && !GHdueVirtualTextureChunkDirectory.IsEmpty())`n`t`t{`n`t`t`tChunkFileName = GHdueVirtualTextureChunkDirectory / Chunk.BulkDataHash.ToString();`n`t`t`tChunkSource = EChunkSource::File;`n`t`t}`n`t`telse`n`t`t{`n`t`tChunkOffsetInFile = BulkData.GetBulkDataOffsetInFile();"),
+    @("`t`tChunkSource = EChunkSource::BulkData;`n#endif // !WITH_EDITOR", "`t`tChunkSource = EChunkSource::BulkData;`n`t`t}`n#endif // !WITH_EDITOR"))

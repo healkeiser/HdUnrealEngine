@@ -1584,6 +1584,7 @@ bool submitBatch(HdUEState& state, uint64_t meshBudget, bool stream = false,
     packet.stream = stream;
     packet.points = std::move(points);
     packet.instances = std::move(instances);
+    size_t left = 0;
     {
         std::lock_guard lock(state.mutex);
         try {
@@ -1592,13 +1593,15 @@ bool submitBatch(HdUEState& state, uint64_t meshBudget, bool stream = false,
             packet.giveBack(state);
             throw;
         }
+        left = state.dirtyMeshes.size();
     }
     trace("hdUE scene prepare: %.1f ms under the state lock\n",
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     HdueSurfaceStatus surface{sizeof(HdueSurfaceStatus)};
     if (!packet.meshes.empty() || !packet.materials.empty())
         state.setStage("Uploading scene: " + std::to_string(packet.meshes.size()) + " meshes, " +
-                       std::to_string(packet.materials.size()) + " materials");
+                       std::to_string(packet.materials.size()) + " materials" +
+                       (left ? " (" + std::to_string(left) + " meshes after this batch)" : std::string()));
     try {
         sendScene(state, packet);
         if (packet.surfaceUpdate) {
@@ -3049,6 +3052,18 @@ public:
                     // unreal:tonemapper, and unreal:cvar:<console variable, ':' for '.'> (USD attribute names cannot
                     // hold dots), and unreal:debugView. With the tonemapper on, the camera exposure goes in before it
                     // rather than onto display values.
+                    applyMotion(s, 0);
+                    // Motion blur needs a shutter, sub-frames and something moving.
+                    const int samples = std::max(1, s.setting<int>("motionSamples", 16));
+                    // UsdRenderSettings disableMotionBlur (and the deprecated instantaneousShutter) close the shutter.
+                    const bool shutter = pass->camera && pass->shutterClose > pass->shutterOpen &&
+                                         !s.setting<bool>("disableMotionBlur", false) &&
+                                         !s.setting<bool>("instantaneousShutter", false);
+                    const bool moving = cameraMotion.has_value() || s.locked([&] {
+                        return std::any_of(s.meshes.begin(), s.meshes.end(),
+                                           [](const auto& entry) { return entry.second.moving(); });
+                    });
+                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
                     // The tone-mapped beauty is display-linear. It is still converted to scene_linear's primaries
@@ -3126,6 +3141,15 @@ public:
                             continue;
                         values.push_back(HdUESettingText(value));  // texture settings: an image file or a cooked path
                     }
+                    // UE's MotionBlurAmount is the shutter's fraction of a frame (Movie Render Queue,
+                    // MovieGraphCoreTimeStep.cpp: open for FrameTimePerOutputFrame * MotionBlurAmount, split over its
+                    // temporal samples). Unless authored, it follows the USD camera's shutter (frames), 0 with the
+                    // shutter closed, and is split over hdUE's sub-frames as over MRQ's temporal samples.
+                    if (std::find(names.begin(), names.end(), "MotionBlurAmount") == names.end()) {
+                        names.push_back("MotionBlurAmount");
+                        values.push_back(TfStringify(
+                            shutter ? std::min(1.0, pass->shutterClose - pass->shutterOpen) / subframes_ : 0.0));
+                    }
                     if (tonemapper) {
                         // UE's own physical camera exposure (ISO, shutter, aperture) stays off unless the scene asks
                         // for it.
@@ -3166,18 +3190,6 @@ public:
                     s.backend->require(s.backend->api().set_post_process(s.session, &desc), "set_post_process");
                 }
                 if (needsRequest) {
-                    applyMotion(s, 0);
-                    // Motion blur needs a shutter, sub-frames and something moving.
-                    const int samples = std::max(1, s.setting<int>("motionSamples", 16));
-                    // UsdRenderSettings disableMotionBlur (and the deprecated instantaneousShutter) close the shutter.
-                    const bool shutter = pass->camera && pass->shutterClose > pass->shutterOpen &&
-                                         !s.setting<bool>("disableMotionBlur", false) &&
-                                         !s.setting<bool>("instantaneousShutter", false);
-                    const bool moving = cameraMotion.has_value() || s.locked([&] {
-                        return std::any_of(s.meshes.begin(), s.meshes.end(),
-                                           [](const auto& entry) { return entry.second.moving(); });
-                    });
-                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     subframe_ = 0;
                     subframeSamples_ = 0;
                     accum_.clear();
@@ -3915,6 +3927,38 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         ++state_->revision;
     }
 }
+namespace {
+// Scene loading progress under the viewport's progress bar: texture files prepared, virtual textures built or read
+// from hdUE's cache, background mesh builds, each with a time left from its rate since it started. The backend counts
+// from any thread, so this reads while UE's thread is busy uploading.
+std::string loadProgress(HdUEState& state) {
+    HdueLoadStatus load{sizeof(load)};
+    if (!state.backend || state.backend->api().get_load_status(&load) != HDUE_OK) return {};
+    const auto now = std::chrono::steady_clock::now();
+    std::lock_guard lock(state.etaMutex);
+    const auto line = [&](HdUEState::LoadEta& eta, uint32_t done, uint32_t total, const std::string& what) {
+        if (done >= total) {
+            eta.active = false;
+            return std::string();
+        }
+        if (!eta.active) eta = {now, done, true};
+        std::string text = "\n" + what + ": " + std::to_string(done) + "/" + std::to_string(total);
+        const double seconds = std::chrono::duration<double>(now - eta.start).count();
+        if (done > eta.done && seconds > 2) {
+            const double rest = (total - done) * seconds / (done - eta.done);
+            text += rest < 90 ? ", about " + std::to_string(int(rest) + 1) + " s left"
+                              : ", about " + std::to_string(int(rest / 60) + 1) + " min left";
+        }
+        return text;
+    };
+    std::string textures = "Textures";
+    if (load.virtual_built + load.virtual_cached)
+        textures += " (virtual: " + std::to_string(load.virtual_built) + " built, " +
+                    std::to_string(load.virtual_cached) + " from cache)";
+    return line(state.textureEta, load.textures_done, load.textures_total, textures) +
+           line(state.meshEta, load.mesh_builds_done, load.mesh_builds_launched, "Mesh builds");
+}
+}  // namespace
 VtDictionary HdUERenderDelegate::GetRenderStats() const {
     auto& host = selfHost();
     if (host.continuous && host.worker.joinable()) {
@@ -3949,6 +3993,11 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
         // The last refresh's progress is stale while UE starts or uploads.
         if (!error.empty() || stage != "Rendering")
             stats["renderProgressAnnotation"] = VtValue(!error.empty() ? "Error: " + error : stage);
+        if (error.empty())
+            if (const auto load = loadProgress(*state_); !load.empty())
+                if (const auto it = stats.find("renderProgressAnnotation");
+                    it != stats.end() && it->second.IsHolding<std::string>())
+                    stats["renderProgressAnnotation"] = VtValue(it->second.UncheckedGet<std::string>() + load);
         return stats;
     }
     VtDictionary stats;
@@ -4001,6 +4050,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         progress += "\nVirtual textures: " + std::to_string(residency.resident_pages) + "/" +
                     std::to_string(residency.required_pages) + " pages";
     if (state.nativeAssets.loading) progress += "\nLoading " + std::to_string(state.nativeAssets.loading) + " assets";
+    if (!selfHost().continuous) progress += loadProgress(state);  // Houdini's UI adds it in GetRenderStats
     char frameTimes[96];
     std::snprintf(frameTimes, sizeof(frameTimes), "\nLast frame: %.0f ms, readback %.0f ms",
                   state.lastFrame.request_to_frame_ms, state.lastFrame.readback_ms);

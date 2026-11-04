@@ -15,6 +15,9 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "ImageUtils.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Async/ParallelFor.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
@@ -39,6 +42,9 @@
 #include "UObject/Package.h"
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
+#include "DeviceProfiles/DeviceProfile.h"
+#include "DeviceProfiles/DeviceProfileManager.h"
+#include "Engine/TextureLODSettings.h"
 #include "Hash/Blake3.h"
 #include "Hash/CityHash.h"
 #include "Misc/FileHelper.h"
@@ -55,6 +61,8 @@
 #include "UDIMUtilities.h"
 #include "VirtualTextureBuild.h"
 #include <atomic>
+
+FHdueLoadCounters GHdueLoad;
 
 FHdueScene::FHdueScene(UWorld* InWorld, bool InInteractive)
     : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld), Interactive(InInteractive) {}
@@ -165,6 +173,7 @@ void FHdueScene::ForgetPending(const FString& Id) {
     }
     FPendingStatic Pending;
     PendingStatic.RemoveAndCopyValue(Key, Pending);
+    ++GHdueLoad.MeshBuildsDone;  // dropped: no longer waited for
     QuickMemory -= Pending.QuickMemory;
     if (!Pending.Task.IsValid()) {
         ++QueuedDropped;
@@ -668,9 +677,47 @@ void CompressMip(const FImage& Mip, EPixelFormat Format, const FHdueScene::FPrev
             CompressBlocksBC7(&Surface, Blocks, &Settings);
     });
 }
+// The top mips UE's cooker strips from a world texture (TextureLODSettings.cpp CalculateLODBias, as a cook evaluates
+// it: the World group's LODBias plus r.GlobalTextureLODBias, the level kept clamped to the group's
+// MinLODSize..MaxLODSize; a virtual texture takes LODBias_VT and MaxLODSize_VT instead, and no minimum). A cooked
+// texture already lacks them, so UE's runtime skips both terms; hdUE builds its platform data at runtime and strips
+// them itself. Read on the game thread when a batch starts: as in UE, a change applies to textures built after.
+struct FCookLODBias {
+    int32 Bias = 0, MinLOD = 0, MaxLOD = 30, BiasVT = 0, MaxLODVT = 0;
+    static FCookLODBias Current() {
+        FCookLODBias Out;
+        if (const UDeviceProfile* Profile = UDeviceProfileManager::Get().GetActiveProfile())
+            if (const UTextureLODSettings* Settings = Profile->GetTextureLODSettings()) {
+                const FTextureLODGroup& Group = Settings->GetTextureLODGroup(TEXTUREGROUP_World);
+                Out.Bias = Group.LODBias;
+                Out.MinLOD = FMath::CeilLogTwo(FMath::Max(Group.MinLODSize, 1));
+                Out.MaxLOD = FMath::CeilLogTwo(FMath::Max(Group.MaxLODSize, 1));
+                Out.BiasVT = Group.LODBias_VT;
+                Out.MaxLODVT = Group.MaxLODSize_VT > 0 ? FMath::CeilLogTwo(Group.MaxLODSize_VT) : 0;
+            }
+        static const IConsoleVariable* Global =
+            IConsoleManager::Get().FindConsoleVariable(TEXT("r.GlobalTextureLODBias"));
+        if (Global) {
+            Out.Bias += Global->GetInt();
+            Out.BiasVT += Global->GetInt();
+        }
+        return Out;
+    }
+    int32 Strip(int32 Width, int32 Height) const {
+        const int32 Top = FImageCoreUtils::GetMipCountFromDimensions(Width, Height, 0, false) - 1;
+        return Top - FMath::Clamp(FMath::Clamp(Top - Bias, MinLOD, MaxLOD), 0, Top);
+    }
+    // A virtual texture's whole size (its UDIM blocks side by side).
+    int32 StripVirtual(int32 Width, int32 Height) const {
+        const int32 Top = FImageCoreUtils::GetMipCountFromDimensions(Width, Height, 0, false) - 1;
+        return Top - FMath::Clamp(FMath::Clamp(Top - BiasVT, 0, MaxLODVT ? MaxLODVT : Top), 0, Top);
+    }
+    FString Key() const { return FString::Printf(TEXT("|lod %d %d %d"), Bias, MinLOD, MaxLOD); }
+};
 // A texture's mipped (and, for 8-bit images, block-compressed) platform data, on a worker thread. BC needs whole 4x4
 // blocks at the top level; other sizes and float images (EXR/HDR) stay uncompressed.
-TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPreviewTexture& Texture, bool SRGB) {
+TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPreviewTexture& Texture, bool SRGB,
+                                                const FCookLODBias& LOD) {
     if (!ERawImageFormat::IsHDR(Image.Format) && Image.Format != ERawImageFormat::BGRA8) {  // grey, 16-bit
         FImage Converted;
         Image.CopyTo(Converted, ERawImageFormat::BGRA8, Image.GammaSpace);
@@ -679,6 +726,7 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
     TArray<FImage> Chain = MipChain(MoveTemp(Image));
     if (Texture.Coverage > 0.f && Chain[0].Format == ERawImageFormat::BGRA8)  // ponytail: float cutouts keep plain mips
         ScaleAlphaCoverage(Chain, Texture.Read, Texture.Coverage);
+    Chain.RemoveAt(0, LOD.Strip(Chain[0].SizeX, Chain[0].SizeY));
     const bool Compress = Chain[0].Format == ERawImageFormat::BGRA8 && Chain[0].SizeX % 4 == 0 &&
                           Chain[0].SizeY % 4 == 0 && BlockCompression();
     auto Data = MakeUnique<FTexturePlatformData>();
@@ -708,7 +756,7 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
 // the materials read: reloading a scene skips decoding its images, most of a texture load.
 // ponytail: never evicted; delete the folder to reclaim space.
 constexpr int32 CacheVersion = 2;
-FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB) {
+FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB, const FCookLODBias& LOD) {
     static const FString Root = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
                                                 TEXT("hdUE"), TEXT("TextureCache"));
     const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
@@ -717,7 +765,8 @@ FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Textur
         FString::Printf(TEXT("%s|%lld|%lld|%d|%d|%d|%d"), *FPaths::ConvertRelativePathToFull(File),
                         Stat.ModificationTime.GetTicks(), Stat.FileSize, SRGB, Texture.Read, Texture.Vector,
                         CacheVersion) +
-        (Texture.Coverage > 0.f ? FString::Printf(TEXT("|coverage up %g"), Texture.Coverage) : FString());
+        (Texture.Coverage > 0.f ? FString::Printf(TEXT("|coverage up %g"), Texture.Coverage) : FString()) +
+        (LOD.Bias ? LOD.Key() : FString());  // keys of unbiased textures stay as they were
     return Root / FString::Printf(TEXT("%016llx.bin"),
                                   CityHash64(reinterpret_cast<const char*>(*Key), Key.Len() * sizeof(TCHAR)));
 }
@@ -767,10 +816,10 @@ void WriteCache(const FString& Path, FTexturePlatformData& Data) {
 }
 bool IsUdim(const FString& File) { return File.Contains(TEXT("<UDIM>")); }
 // A virtual texture of File's UDIM tiles, or of File alone (one block) for the other textures of a UDIM material, with
-// the 2D textures' decoding, mips, alpha coverage and block formats. ponytail: not in the texture cache; rebuilt on
-// each load.
+// the 2D textures' decoding, mips, alpha coverage and block formats. Built once into hdUE's virtual texture cache
+// (VirtualTextureBuild.cpp): a set already built from the same tiles and choices loads from there undecoded.
 TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdueScene::FPreviewTexture& Texture,
-                                                       FString& Error) {
+                                                       const FCookLODBias& LOD, FString& Error) {
     TMap<int32, FString> Found;
     if (IsUdim(File))
         Found = HdueUdimTiles(File);
@@ -780,6 +829,23 @@ TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdu
     if (Tiles.IsEmpty()) {
         Error = TEXT("no UDIM tile on disk");
         return nullptr;
+    }
+    FString Source = FString::Printf(TEXT("%d|%d|%d|%d|%g|%d|%d|%d|%d|%d"), CacheVersion, Texture.Read, Texture.Vector,
+                                     Texture.SRGB, Texture.Coverage, Texture.Address[0], Texture.Address[1],
+                                     BlockCompression(), LOD.BiasVT, LOD.MaxLODVT);
+    for (const auto& [Index, Path] : Tiles) {
+        const FFileStatData Stat = IFileManager::Get().GetStatData(*Path);
+        Source += FString::Printf(TEXT("|%d|%s|%lld|%lld"), Index, *FPaths::ConvertRelativePathToFull(Path),
+                                  Stat.ModificationTime.GetTicks(), Stat.FileSize);
+    }
+    const FString Key = FString::Printf(
+        TEXT("%016llx"), CityHash64(reinterpret_cast<const char*>(*Source), Source.Len() * sizeof(TCHAR)));
+    if (auto Cached = HdueLoadVirtualTexture(Key)) {
+        // The repacked channels (BC4/BC5) the materials read, as the build chose them.
+        if (!IsBlockCompressedFormat(Cached->PixelFormat) || BlockFormat(Texture) == Cached->PixelFormat) {
+            ++GHdueLoad.VirtualCached;
+            return Cached;
+        }
     }
     TArray<FHdueVirtualTextureBlock> Blocks;
     Blocks.SetNum(Tiles.Num());
@@ -792,6 +858,23 @@ TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdu
         Error = TEXT("cannot read ") + Tiles[Unread].Value;
         return nullptr;
     }
+    // The cook's stripped top mips: every tile halved as often, at load, so the full-resolution tiles never stay.
+    int32 Columns = 1, Rows = 1, Width = 1, Height = 1;
+    for (const auto& Block : Blocks) {
+        Columns = FMath::Max(Columns, Block.X + 1);
+        Rows = FMath::Max(Rows, Block.Y + 1);
+        Width = FMath::Max(Width, Block.Image.SizeX);
+        Height = FMath::Max(Height, Block.Image.SizeY);
+    }
+    const int32 Strip = LOD.StripVirtual(Width * Columns, Height * Rows);
+    ParallelFor(Blocks.Num(), [&](int32 Index) {
+        FImage& Image = Blocks[Index].Image;
+        for (int32 Level = 0; Level < Strip && (Image.SizeX > 1 || Image.SizeY > 1); ++Level) {
+            FImage Next(FMath::Max(1, Image.SizeX / 2), FMath::Max(1, Image.SizeY / 2), Image.Format, Image.GammaSpace);
+            HalveImage(Image, Next);
+            Image = MoveTemp(Next);
+        }
+    });
     // One format for every tile, as UE converts a UDIM set's mismatched images (InterchangeTextureFactory.cpp): half
     // floats if any tile is HDR, BGRA8 otherwise.
     const bool Float =
@@ -817,7 +900,9 @@ TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdu
         else
             FMemory::Memcpy(Out, Tile.RawData.GetData(), Tile.RawData.Num());
     };
-    return HdueBuildVirtualTexture(MoveTemp(Blocks), Codec, Texture.Address, Error);
+    auto Built = HdueBuildVirtualTexture(MoveTemp(Blocks), Codec, Texture.Address, Key, Error);
+    if (Built) ++GHdueLoad.VirtualBuilt;
+    return Built;
 }
 // sourceColorSpace decides sRGB decoding of 8-bit texels; auto leaves it to the slot (colour or data).
 bool TextureSRGB(const HdueTextureDesc& Texture, int32 Slot) {
@@ -846,11 +931,57 @@ float CoverageThreshold(const HdueMaterialDesc& Desc, int32 Slot) {
 TextureAddress TextureWrap(const HdueTextureDesc& Texture, int32 Axis) {
     return IsUdim(UTF8_TO_TCHAR(Texture.file)) ? TA_Wrap : TextureWrap(Texture.wrap[Axis]);
 }
+// An image's size from its header (the first 256 KB: PNG and JPEG headers come first), or 0 x 0 when that is not enough
+// to tell (EXR, op: images), cached per file.
+FIntPoint ImageSize(const FString& File) {
+    static FCriticalSection Lock;
+    static TMap<FString, FIntPoint> Sizes;
+    {
+        FScopeLock Scope(&Lock);
+        if (const FIntPoint* Known = Sizes.Find(File)) return *Known;
+    }
+    FIntPoint Size(0, 0);
+    if (TUniquePtr<FArchive> In{IFileManager::Get().CreateFileReader(*File, FILEREAD_Silent)}) {
+        TArray<uint8> Head;
+        Head.SetNumUninitialized(int32(FMath::Min<int64>(In->TotalSize(), 256 * 1024)));
+        In->Serialize(Head.GetData(), Head.Num());
+        IImageWrapperModule& Module = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+        const EImageFormat Format = Module.DetectImageFormat(Head.GetData(), Head.Num());
+        if (Format == EImageFormat::PNG || Format == EImageFormat::JPEG)
+            if (const TSharedPtr<IImageWrapper> Wrapper = Module.CreateImageWrapper(Format);
+                Wrapper && Wrapper->SetCompressed(Head.GetData(), Head.Num()))
+                Size = FIntPoint(int32(Wrapper->GetWidth()), int32(Wrapper->GetHeight()));
+    }
+    FScopeLock Scope(&Lock);
+    Sizes.Add(File, Size);
+    return Size;
+}
 // A material with a UDIM texture draws on a VT parent, every texture of it virtual: UE's USD import does the same (its
-// VT reference material, UniversalMaterialSchemaHandler.cpp), as a material's sampler is virtual or not.
+// VT reference material, UniversalMaterialSchemaHandler.cpp), as a material's sampler is virtual or not. With
+// r.VT.EnableAutoImport, so does one with a texture of at least AutoVTSize x AutoVTSize texels (4096, UE's Texture
+// Import setting), as UE's texture import makes such textures virtual (TextureImportSettings.cpp,
+// ShouldTextureBeVirtualByAutoImportSize): its textures then stream from hdUE's virtual texture cache on disk instead
+// of staying whole in memory. hdUE reads AutoVTSize from the engine ini
+// ([/Script/TextureUtilitiesCommon.TextureImportSettings]), where UE reads it from the editor's, which runtime builds
+// do not load.
 bool VirtualMaterial(const HdueMaterialDesc& Desc) {
     for (const auto& Texture : Desc.textures)
         if (Texture.file && IsUdim(UTF8_TO_TCHAR(Texture.file))) return true;
+    static const IConsoleVariable* AutoImport =
+        IConsoleManager::Get().FindConsoleVariable(TEXT("r.VT.EnableAutoImport"));
+    if (!AutoImport || !AutoImport->GetInt()) return false;
+    static const int64 AutoSize = [] {
+        int32 Value = 4096;
+        GConfig->GetInt(TEXT("/Script/TextureUtilitiesCommon.TextureImportSettings"), TEXT("AutoVTSize"), Value,
+                        GEngineIni);
+        return int64(Value);
+    }();
+    if (AutoSize <= 0) return false;
+    for (const auto& Texture : Desc.textures)
+        if (Texture.file && *Texture.file) {
+            const FIntPoint Size = ImageSize(UTF8_TO_TCHAR(Texture.file));
+            if (int64(Size.X) * Size.Y >= AutoSize * AutoSize) return true;
+        }
     return false;
 }
 // One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), the clip value its
@@ -1357,6 +1488,7 @@ void FHdueScene::TickConversions() {
                 Components.Add(Component);
         }
         const TSharedPtr<FConversion> Conversion = It.Value().Task.GetResult();
+        ++GHdueLoad.MeshBuildsDone;
         if (!Components.Num()) {
             It.RemoveCurrent();
             continue;
@@ -1561,25 +1693,28 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         if (Files.Num()) {
             const double PrepareStart = FPlatformTime::Seconds();
             const TArray<TPair<FString, TArray<FString>>> Work = Files.Array();
+            const FCookLODBias LOD = FCookLODBias::Current();
+            GHdueLoad.TexturesTotal += uint32(Work.Num());
             ParallelFor(Work.Num(), [&](int32 Index) {
+                ON_SCOPE_EXIT { ++GHdueLoad.TexturesDone; };
                 FImage Image;
                 const TArray<FString>& Keys = Work[Index].Value;
                 for (int32 Variant = 0; Variant < Keys.Num(); ++Variant) {
                     FPreviewTexture& Entry = PreviewTextures[Keys[Variant]];
                     if (Entry.Virtual) {
                         FString VirtualError;
-                        Entry.Pending = PrepareVirtualTexture(Work[Index].Key, Entry, VirtualError);
+                        Entry.Pending = PrepareVirtualTexture(Work[Index].Key, Entry, LOD, VirtualError);
                         if (!Entry.Pending)
                             UE_LOG(LogTemp, Warning, TEXT("hdUE virtual texture %s: %s."), *Work[Index].Key,
                                    *VirtualError);
                         continue;
                     }
                     const bool SRGB = Entry.SRGB;
-                    const FString Cache = CachePath(Work[Index].Key, Entry, SRGB);
+                    const FString Cache = CachePath(Work[Index].Key, Entry, SRGB, LOD);
                     if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
                     if (!Image.RawData.Num() && !FImageUtils::LoadImage(*Work[Index].Key, Image)) return;
                     const bool Last = Variant + 1 == Keys.Num();
-                    Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB);
+                    Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB, LOD);
                     if (!Cache.IsEmpty() && IsBlockCompressedFormat(Entry.Pending->PixelFormat))
                         WriteCache(Cache, *Entry.Pending);
                 }
@@ -1970,6 +2105,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                                          Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
                                          Copy->Indices.GetAllocatedSize();
                     PendingStatic.Add(Key, {Copy, 7 * Source, {}, Translucent[Index], {Id}, Built, FirstPass[Index]});
+                    ++GHdueLoad.MeshBuildsLaunched;
                     PendingKeys.Add(Id, Key);
                 }
             } else

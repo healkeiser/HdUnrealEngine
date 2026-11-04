@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 21u
+#define HDUE_ABI_VERSION 22u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -358,6 +358,18 @@ typedef struct HdueResidencyOptions {
     uint32_t maximum_pages; /* 0: use physical pool capacity; otherwise also enforce this total budget. */
     double timeout_seconds; /* Positive, preparation only. Default 120 seconds. */
 } HdueResidencyOptions;
+/* get_load_status (ABI 22): progress of scene loading in this process, counted since initialize; any thread, while
+ * the owner thread is busy uploading. Texture files the uploads prepared out of those they started, virtual textures
+ * built and read from hdUE's cache, background mesh builds (interactive sessions' Nanite conversions) launched and
+ * finished. */
+typedef struct HdueLoadStatus {
+    uint32_t struct_size;
+    uint32_t textures_total, textures_done;
+    uint32_t virtual_built, virtual_cached;
+    uint32_t mesh_builds_launched, mesh_builds_done;
+    uint32_t reserved;
+} HdueLoadStatus;
+
 typedef struct HdueResidencyStatus {
     uint32_t struct_size;
     uint32_t phase;
@@ -710,6 +722,9 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* upsert_post_process_volume)(HdueSession session, const HduePostProcessVolumeDesc* volume);
 
     HdueResult(HDUE_CALL* upsert_decal)(HdueSession session, const HdueDecalDesc* decal);
+
+    /* Any thread. */
+    HdueResult(HDUE_CALL* get_load_status)(HdueLoadStatus* status);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */

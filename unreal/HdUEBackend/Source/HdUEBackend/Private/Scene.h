@@ -1,4 +1,12 @@
 #pragma once
+#include "CoreMinimal.h"
+#include <atomic>
+// Scene loading progress, process-wide (get_load_status reads them from any thread).
+struct FHdueLoadCounters {
+    std::atomic<uint32> TexturesTotal{0}, TexturesDone{0}, VirtualBuilt{0}, VirtualCached{0}, MeshBuildsLaunched{0},
+        MeshBuildsDone{0};
+};
+extern FHdueLoadCounters GHdueLoad;
 #include "ImageCore.h"
 #include "Engine/Texture.h"
 #include "Tasks/Task.h"
