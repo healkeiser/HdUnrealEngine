@@ -174,6 +174,33 @@
                 parmtag { "usdvaluetype" "float" }
                 disablewhen R"({ xn__unrealcvarrScreenPercentage_control_2xbeb == block } { xn__unrealcvarrScreenPercentage_control_2xbeb == none })"
             }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe", "Lower Resolution While Moving", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrHdUEInteractiveResolution_pzbebe"
+                label   "Lower Resolution While Moving"
+                type    toggle
+                size    1
+                default { 1 }
+                help    "Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe == block } { xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe", "Moving Screen Percentage", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrHdUEInteractiveScreenPercentage_h9bebe"
+                label   "Moving Screen Percentage"
+                type    float
+                size    1
+                default { 50 }
+                range   { 10! 100! }
+                help    "Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe == block } { xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+            }
             HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSEnable_control_6sbebde", "NVIDIA DLSS", "{ xn__unrealrenderMode_41a != realtime }")
             parm {
                 name    "xn__unrealcvarrNGXDLSSEnable_5fbebde"
@@ -199,35 +226,6 @@
                 parmtag { "spare_category" "Anti-Aliasing" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealcvarrHdUEDLSSRayReconstruction_control_qdcebee == block } { xn__unrealcvarrHdUEDLSSRayReconstruction_control_qdcebee == none })"
-                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
-                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
-            }
-            HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe", "Lower Resolution While Moving", "{ xn__unrealrenderMode_41a != realtime }")
-            parm {
-                name    "xn__unrealcvarrHdUEInteractiveResolution_pzbebe"
-                label   "Lower Resolution While Moving"
-                type    toggle
-                size    1
-                default { 1 }
-                help    "Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide)."
-                parmtag { "spare_category" "Anti-Aliasing" }
-                parmtag { "usdvaluetype" "bool" }
-                disablewhen R"({ xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe == block } { xn__unrealcvarrHdUEInteractiveResolution_control_qdcebe == none })"
-                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
-                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
-            }
-            HDUE_CONTROL_HIDE("xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe", "Moving Screen Percentage", "{ xn__unrealrenderMode_41a != realtime }")
-            parm {
-                name    "xn__unrealcvarrHdUEInteractiveScreenPercentage_h9bebe"
-                label   "Moving Screen Percentage"
-                type    float
-                size    1
-                default { 50 }
-                range   { 10! 100! }
-                help    "Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide)."
-                parmtag { "spare_category" "Anti-Aliasing" }
-                parmtag { "usdvaluetype" "float" }
-                disablewhen R"({ xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe == block } { xn__unrealcvarrHdUEInteractiveScreenPercentage_control_incebe == none })"
                 hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }

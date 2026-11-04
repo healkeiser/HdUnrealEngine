@@ -560,8 +560,13 @@ CVARS = [
 ]
 # Console variables UE's editor shows outside the console, so Essential: the scalability groups (Settings > Engine
 # Scalability Settings, sg.*), the Project Settings ones without AdvancedDisplay (read from RendererSettings.h) and
-# r.ScreenPercentage (the scalability panel's Resolution Scale).
-ESSENTIAL_CVARS = ("r.ScreenPercentage",)
+# r.ScreenPercentage (the scalability panel's Resolution Scale), and beside it the viewport's resolution while moving,
+# as UE's editor viewport shows its own screen percentage in its menu (Screen Percentage) rather than in a panel.
+ESSENTIAL_CVARS = (
+    "r.ScreenPercentage",
+    "r.HdUE.InteractiveResolution",
+    "r.HdUE.InteractiveScreenPercentage",
+)
 
 DEBUG_VIEWS = [
     ("off", "Lit"),
