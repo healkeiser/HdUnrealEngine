@@ -106,6 +106,7 @@ class Host:
         # preparation, and the scene's asset overrides and op: textures. A change during a job is picked up by the
         # next one, once it has finished and applied its result.
         self.material_job = None
+        self.material_job_session = 0  # the session its walk applies to
         self.scene_job = None
         self.progress_shown = 0.0
         self.viewer = None
@@ -282,6 +283,7 @@ class Host:
                                 self.material_steps(stage, state["session"]),
                                 "preparing materials",
                             )
+                            self.material_job_session = state["session"]
                         if self.material_job and not cooking:
                             self.advance_materials(state["session"])
                         # Hydra brings the render settings, units and time; Houdini sends no up axis.
@@ -370,6 +372,14 @@ class Host:
 
     def advance_materials(self, session):
         job = self.material_job
+        if session != self.material_job_session:
+            # Houdini recreated its renderer during the walk (it does after the first frame of a large stage): the
+            # walk would apply to a session that is gone (HDUE_INVALID_STATE, "viewport materials failed (-4)"). The
+            # material key holds the session, so the next tick walks again for the new one.
+            job.close()
+            self.material_job = None
+            self.end_progress(job)
+            return
         try:
             finished = job.advance(MATERIAL_BUDGET)
         except RuntimeError as failure:

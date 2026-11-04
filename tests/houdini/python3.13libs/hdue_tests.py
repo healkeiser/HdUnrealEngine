@@ -22,6 +22,7 @@ MODULES = {
     "parity": "hdue_parity_test",
     "shared-builds": "hdue_shared_build_test",
     "heavy": "hdue_heavy_test",
+    "recreation": "hdue_recreation_test",
 }
 
 

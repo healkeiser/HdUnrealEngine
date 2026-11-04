@@ -36,6 +36,10 @@ Write-Output "Verified Solaris post-process defaults: $RunOutput\postprocess"
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory (Join-Path $RunOutput 'shared-builds') -TestKind shared-builds -TimeoutSeconds $TimeoutSeconds
 if (-not (Get-Content -LiteralPath (Join-Path $RunOutput 'shared-builds\verified.json') -Raw | ConvertFrom-Json).shared_builds) { throw "Shared build test failed: $RunOutput\shared-builds" }
 Write-Output "Verified Solaris shared mesh builds: $RunOutput\shared-builds"
+# Houdini recreates its renderer while a material walk runs: the walk is dropped, the new session gets its materials.
+& (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory (Join-Path $RunOutput 'recreation') -TestKind recreation -TimeoutSeconds $TimeoutSeconds
+if (-not (Get-Content -LiteralPath (Join-Path $RunOutput 'recreation\verified.json') -Raw | ConvertFrom-Json).passed) { throw "Renderer recreation test failed: $RunOutput\recreation" }
+Write-Output "Verified renderer recreation during a material walk: $RunOutput\recreation"
 # Selection highlight and click picking: a Y-up metre stage (cube, mesh, instancer, points, curves) in the free view,
 # and the Z-up Cornell box through its camera (render buffers of another size than the viewport).
 foreach ($Case in @(
