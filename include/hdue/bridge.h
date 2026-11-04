@@ -355,8 +355,8 @@ typedef struct HdueMaterialStats {
 enum { HDUE_RESIDENCY_IDLE, HDUE_RESIDENCY_PREPARING, HDUE_RESIDENCY_READY, HDUE_RESIDENCY_FAILED };
 typedef struct HdueResidencyOptions {
     uint32_t struct_size;
-    uint32_t maximum_pages; /* 0: use physical pool capacity; otherwise also enforce this total budget. */
-    double timeout_seconds; /* Positive, preparation only. Default 120 seconds. */
+    uint32_t maximum_pages; /* 0: no budget; otherwise the warm-up fails once its pools allocate more pages. */
+    double timeout_seconds; /* Positive. Default 120 seconds: the Path Tracer then starts with the resident pages. */
 } HdueResidencyOptions;
 /* get_load_status (ABI 22): progress of scene loading in this process, counted since initialize; any thread, while
  * the owner thread is busy uploading. Texture files the uploads prepared out of those they started, virtual textures
@@ -370,6 +370,10 @@ typedef struct HdueLoadStatus {
     uint32_t reserved;
 } HdueLoadStatus;
 
+/* get_residency_status: the Path Tracer's virtual texture warm-up, path-traced draws whose VT feedback brings in the
+ * pages the view samples; accumulation restarts once they settle (READY). required_pages: the capacity of the physical
+ * pools the scene's virtual textures use; resident_pages and ready_mappings: their allocated and mapped pages;
+ * locked_tiles and required_mappings: 0 (nothing is locked). */
 typedef struct HdueResidencyStatus {
     uint32_t struct_size;
     uint32_t phase;

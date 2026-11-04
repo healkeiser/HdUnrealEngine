@@ -41,7 +41,7 @@ $Complete = switch ($Check) {
         $R.passed -and $R.normal_and_udim_verified -and $R.frames.Count -eq 21 -and $R.normal_comparisons.Count -eq 8 -and
         $R.udim_checks.Count -eq 16 -and $R.udim_normal_checks.Count -eq 6
     }
-    residency { $R.passed -and $R.residency_verified -and $R.frames.Count -eq 6 -and $R.failures.Count -eq 3 }
+    residency { $R.passed -and $R.residency_verified -and $R.frames.Count -eq 6 -and $R.failures.Count -eq 1 }
     opacity { $R.passed -and $R.opacity_verified -and $R.targets.Count -eq 13 -and $R.comparisons.Count -eq 26 -and $R.frames.Count -eq 84 -and $R.usd_unchanged }
     glass {
         $R.passed -and $R.glass_verified -and $R.targets.Count -eq 5 -and $R.frames.Count -eq 64 -and $R.comparisons.Count -eq 10 -and

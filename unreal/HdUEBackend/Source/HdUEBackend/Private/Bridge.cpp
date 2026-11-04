@@ -192,7 +192,6 @@ struct FSession {
     HdueResidencyOptions ResidencyOptions{sizeof(HdueResidencyOptions), 0, 120.0};
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
     bool Preparing = false;
-    bool ResidencyFailed = false;
     // unreal:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
     EViewModeIndex DebugView = VMI_Lit;
     FName FSceneView::* DebugMember = nullptr;
@@ -368,12 +367,8 @@ bool HasRayTracing() {
 #endif
 }
 void ReleaseResidency(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
-    if (auto Residency = Session->Residency) {
-        ENQUEUE_RENDER_COMMAND(HdueReleaseResidency)([Residency](FRHICommandListImmediate&) { Residency->Release(); });
-        Session->Residency.Reset();
-    }
+    Session->Residency.Reset();  // queued Update commands hold their own reference
     Session->Preparing = false;
-    Session->ResidencyFailed = false;
 }
 
 HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
@@ -1212,10 +1207,12 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     Canvas.Flush_GameThread();
     if (!ReadBack && !Sharing) return;
     const auto State = Aov ? Session->AovViewState : Session->ViewState;  // a lighting component accumulates there
+    // The virtual texture warm-up's samples are discarded when it is ready (Tick): none are reported.
+    const bool WarmUp = Session->Preparing;
     ENQUEUE_RENDER_COMMAND(HdueCopyColor)(
-        [Session, Job, Resource, State, PathTracing, ReadBack](FRHICommandListImmediate& Commands) {
+        [Session, Job, Resource, State, PathTracing, WarmUp, ReadBack](FRHICommandListImmediate& Commands) {
 #if RHI_RAYTRACING
-            Job->Samples = PathTracing ? State->GetPathTracingSampleIndex() : 0;
+            Job->Samples = PathTracing && !WarmUp ? State->GetPathTracingSampleIndex() : 0;
 #endif
             if (Job->Shared.enabled)
                 HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot,
@@ -1236,18 +1233,14 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
     // Lighting components render as the beauty (path traced too), into the AOV slot.
     const bool Aov = Request.aov != HDUE_AOV_COLOR;
-    const bool PathTracing =
-        Request.mode == HDUE_PATH_TRACED && !Session->Preparing && (!Aov || LightingComponents(Request));
+    // While Preparing, the Path Tracer's draws are its virtual texture warm-up (FHdueVirtualTextureResidency).
+    const bool PathTracing = Request.mode == HDUE_PATH_TRACED && (!Aov || LightingComponents(Request));
     FString IdError;
     if (!Session->Scene->SetIdMode(Request.aov == HDUE_AOV_PRIM_ID       ? 1
                                    : Request.aov == HDUE_AOV_INSTANCE_ID ? 2
                                                                          : 0,
                                    IdError))
         UE_LOG(LogTemp, Error, TEXT("hdUE: %s"), *IdError);
-    if (Session->Preparing) {
-        const auto Residency = Session->Residency;
-        ENQUEUE_RENDER_COMMAND(HduePrepareResidency)([Residency](FRHICommandListImmediate&) { Residency->Update(); });
-    }
     // Interactive realtime navigation renders at r.HdUE.InteractiveScreenPercentage (50), upsampled by the
     // anti-aliasing method, until requests stop for 250 ms; realtime beauty frames otherwise use r.ScreenPercentage
     // (100).
@@ -1260,6 +1253,11 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
     // frames that can (adding latency).
     if (IsInteractive() && Session->InFlight.Num() >= FSession::ReadbackSlots) return;
+    if (Session->Preparing) {
+        const auto Residency = Session->Residency;
+        ENQUEUE_RENDER_COMMAND(HduePrepareResidency)(
+            [Residency](FRHICommandListImmediate& Commands) { Residency->Update(Commands); });
+    }
     // Debug views replace the realtime beauty only, as UE's viewport View Mode menu does.
     const EViewModeIndex ViewMode = !Aov && Request.mode == HDUE_REALTIME ? Session->DebugView : VMI_Lit;
     auto* Resource = Session->Target->GameThread_GetRenderTargetResource();
@@ -1276,6 +1274,12 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     // shadows.
     Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
     Family.ViewMode = ViewMode;
+    // As Movie Render Queue's renders (MoviePipelineImagePassBase.cpp): the virtual texture pages the feedback asks for
+    // are produced in the frame that reads it, so the Path Tracer's warm-up settles in a few draws.
+    Family.bOverrideVirtualTextureThrottle = PathTracing;
+    // The warm-up's feedback from every pixel (Movie Render Queue's VirtualTextureFeedbackFactor override), not one per
+    // r.VT.FeedbackFactor tile, so one draw requests every page the view samples.
+    if (Session->Preparing) Family.VirtualTextureFeedbackFactor = 1;
     AddView(Family, *Session, PathTracing, Aov);
     // Moving frames keep full-resolution buffers (UE's dynamic resolution: the upper bound is the largest fraction);
     // other frames bound at their own fraction, as UE's game viewport does with r.ScreenPercentage. DLSS picks its
@@ -1287,10 +1291,10 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
         new FLegacyScreenPercentageDriver(Family, ScreenFraction, FullBuffers ? 1.0f : ScreenFraction));
     if (!IsInteractive() && (!PathTracing || !Session->Draws)) {
         // Movie Render Queue's flush before each frame: the textures this view uses at full resolution, and pending
-        // virtual texture tiles (the Path Tracer prepares its own residency).
+        // virtual texture tiles.
         IStreamingManager::Get().UpdateResourceStreaming(Runtime.World->GetDeltaSeconds(), true);
         IStreamingManager::Get().BlockTillAllRequestsFinished();
-        if (!PathTracing && UseVirtualTexturing(GMaxRHIShaderPlatform)) {
+        if (UseVirtualTexturing(GMaxRHIShaderPlatform)) {
             ENQUEUE_RENDER_COMMAND(HdueLoadVirtualTextureTiles)(
                 [Module = &Renderer(),
                  FeatureLevel = Runtime.World->GetFeatureLevel()](FRHICommandListImmediate& Commands) {
@@ -1458,12 +1462,6 @@ HdueResult HDUE_CALL Tick() {
         if (Status.phase == HDUE_RESIDENCY_FAILED) {
             // Keep the UI and last preview alive; a newer request can recover.
             Runtime.Error = UTF8_TO_TCHAR(Status.message);
-            if (!Session->ResidencyFailed) {
-                const auto Residency = Session->Residency;
-                ENQUEUE_RENDER_COMMAND(HdueFailedResidency)(
-                    [Residency](FRHICommandListImmediate&) { Residency->Release(); });
-                Session->ResidencyFailed = true;
-            }
             return HDUE_OK;
         }
         if (Status.phase == HDUE_RESIDENCY_READY) {

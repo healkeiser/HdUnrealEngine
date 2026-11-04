@@ -477,11 +477,9 @@ class Launcher(Usdviewq.Launcher):
                 if stats.get("vtResidencyPhase") == 1:
                     self.residency_preparing = True
                     self.controller.statusMessage(
-                        "hdUE: UDIM準備中 — ページ {}/{}、割り当て {}/{}（Path Tracer 0 samples）".format(
+                        "hdUE: UDIM準備中 — ページ {}/{}（Path Tracer 0 samples）".format(
                             stats.get("vtResidentPages", 0),
                             stats.get("vtRequiredPages", 0),
-                            stats.get("vtReadyMappings", 0),
-                            stats.get("vtRequiredMappings", 0),
                         )
                     )
                 elif self.residency_preparing and not error:

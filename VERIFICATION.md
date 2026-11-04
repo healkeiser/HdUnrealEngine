@@ -89,7 +89,7 @@ These checks establish binding and converged finite images; they do not assert p
 
 Synthetic normal/UDIM tests cover raw normals, strength, texture replacement, tile coordinates, malformed/missing tiles, dependency hashes, and material parameter compatibility.
 
-`Test-Usdview.ps1 -Check residency` keeps Path Tracer at zero samples until all required pages and mappings are ready. It checks capacity/timeout failures, lock release, recovery, edits during preparation, mode changes, and delegate re-creation. The generated large fixture requires 10,922 pages/mappings; insufficient capacity must fail without accumulating low-resolution images.
+`Test-Usdview.ps1 -Check residency` (on the 4 x 4K UDIM fixture of `git show de97ace^:scripts/generate_residency_stage.py`, run with hython) checks the Path Tracer's virtual texture warm-up: no samples are reported while it runs, no tile is locked, a page budget fails without samples and recovers, a timeout starts the Path Tracer with the resident pages, an edit during the warm-up starts a new one, and realtime mode and delegate re-creation end it. A close-up of the fixture's colour tiles (mip 0) renders the same detail in the Path Tracer as in realtime (standard deviation of the high-pass luminance 0.0752 in both).
 
 ## Reference-safe sample
 

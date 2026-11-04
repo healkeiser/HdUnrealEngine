@@ -81,22 +81,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 45 ms | 1.99 s | 8.08 s | 49.70 s | 178x / 4x | 0.93 / 1.01 |
-| Glossy materials | 47 ms | 2.01 s | 5.88 s | 30.30 s | 124x / 3x | 1.03 / 1.22 |
-| Depth of field | 48 ms | 2.01 s | 8.40 s | 51.03 s | 174x / 4x | 0.93 / 1.01 |
-| Motion blur | 49 ms | 2.16 s | 7.92 s | 50.24 s | 162x / 4x | 0.97 / 1.01 |
-| Subdivision surfaces | 47 ms | 1.98 s | 7.60 s | 48.27 s | 161x / 4x | 0.93 / 1.01 |
-| Instances, points, curves | 47 ms | 2.03 s | 7.63 s | 50.05 s | 161x / 4x | 0.95 / 1.04 |
-| Volumes (OpenVDB) | 49 ms | 4.00 s | 8.21 s | 58.66 s | 169x / 2x | 1.05 / 1.32 |
-| IES profile | 46 ms | 2.03 s | 9.81 s | 68.45 s | 212x / 5x | 1.04 / 1.09 |
-| Light linking | 48 ms | 1.98 s | 9.74 s | 64.69 s | 205x / 5x | 0.95 / 1.00 |
-| Clearcoat | 49 ms | 2.15 s | 6.34 s | 37.10 s | 130x / 3x | 0.96 / 1.01 |
-| Render region | 33 ms | 2.28 s | 2.33 s | 13.71 s | 70x / 1x | 0.95 / 1.04 |
-| Lens shift | 46 ms | 1.99 s | 5.63 s | 34.78 s | 124x / 3x | 0.93 / 1.03 |
-| Orthographic camera | 46 ms | 2.02 s | 7.23 s | 44.68 s | 158x / 4x | 0.83 / 1.05 |
-| Camera exposure | 48 ms | 2.02 s | 8.98 s | 57.14 s | 188x / 4x | 0.93 / 1.01 |
-| Unreal post-processing | 49 ms | 2.03 s | 7.77 s | 47.66 s | 159x / 4x | n/a |
-| **All 15** | **697 ms** | **32.66 s** | **111.57 s** | **706.49 s** | **160x / 3x** | |
+| Global illumination | 63 ms | 2.66 s | 8.08 s | 49.70 s | 129x / 3x | 0.97 / 1.01 |
+| Glossy materials | 61 ms | 2.56 s | 5.88 s | 30.30 s | 96x / 2x | 1.06 / 1.22 |
+| Depth of field | 68 ms | 2.60 s | 8.40 s | 51.03 s | 124x / 3x | 0.97 / 1.01 |
+| Motion blur | 62 ms | 2.61 s | 7.92 s | 50.24 s | 127x / 3x | 0.98 / 1.01 |
+| Subdivision surfaces | 63 ms | 3.08 s | 7.60 s | 48.27 s | 120x / 2x | 0.97 / 1.01 |
+| Instances, points, curves | 61 ms | 2.92 s | 7.63 s | 50.05 s | 124x / 3x | 0.99 / 1.04 |
+| Volumes (OpenVDB) | 59 ms | 4.06 s | 8.21 s | 58.66 s | 138x / 2x | 1.10 / 1.32 |
+| IES profile | 60 ms | 2.34 s | 9.81 s | 68.45 s | 165x / 4x | 1.05 / 1.09 |
+| Light linking | 62 ms | 2.64 s | 9.74 s | 64.69 s | 158x / 4x | 0.99 / 1.00 |
+| Clearcoat | 62 ms | 2.31 s | 6.34 s | 37.10 s | 102x / 3x | 0.99 / 1.01 |
+| Render region | 41 ms | 2.61 s | 2.33 s | 13.71 s | 56x / 1x | 0.98 / 1.04 |
+| Lens shift | 63 ms | 2.40 s | 5.63 s | 34.78 s | 89x / 2x | 0.97 / 1.03 |
+| Orthographic camera | 55 ms | 2.20 s | 7.23 s | 44.68 s | 131x / 3x | 0.85 / 1.05 |
+| Camera exposure | 56 ms | 2.26 s | 8.98 s | 57.14 s | 161x / 4x | 0.97 / 1.01 |
+| Unreal post-processing | 60 ms | 2.26 s | 7.77 s | 47.66 s | 130x / 3x | n/a |
+| **All 15** | **897 ms** | **39.52 s** | **111.57 s** | **706.49 s** | **124x / 3x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -186,7 +186,7 @@ hdUE runs a stock Unreal Engine 5.8.4 built from source, with these changes to t
 
 | Change | Why |
 |---|---|
-| `VirtualTextureSystem.h`: one `friend` declaration (`scripts/Apply-ResidencyPatch.ps1`) | The Path Tracer waits until every virtual-texture page it needs is loaded; UE's public API cannot report that. |
+| `VirtualTextureSystem.h`: one `friend` declaration (`scripts/Apply-ResidencyPatch.ps1`) | The Path Tracer's virtual texture warm-up reads the page pools of the scene's textures; UE's public API does not expose them. |
 | `NaniteDisplace.cpp`: an editor-only guard around one displacement-texture read (same script) | So Nanite meshes can be built at runtime, outside the editor. |
 | `ShaderLibraryInstance.cpp`: a second cache check, under the lock, before creating a shader (same script) | Two threads creating the same shader at startup read its code twice and waited for it ([building](docs/building.md#bundled-pso-cache)). |
 | `MeshCards.cpp` compiles two of UE's private source files (`MeshRepresentationCommon.cpp`, `MeshCardRepresentationUtilities.cpp`) into the backend | To build Lumen cards for meshes created at runtime; the editor normally builds them on import. |
