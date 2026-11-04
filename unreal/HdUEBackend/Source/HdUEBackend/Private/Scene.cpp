@@ -72,6 +72,7 @@ FHdueScene::~FHdueScene() {
     // their Nanite builds hold the task workers, and UE shutting down under them crashed in a readback copy pass.
     for (const auto& [Key, Pending] : PendingStatic) Pending.Task.Wait();
     for (const FPendingStatic& Retired : RetiredBuilds) Retired.Task.Wait();
+    for (const auto& Build : TextureBuilds) Build->Task.Wait();
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
 }
@@ -993,6 +994,76 @@ FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Sl
 }
 // Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
 bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
+// One file's texture variants (Apply), on a worker: a virtual texture's chunks, or the image decoded once and each
+// variant mipped and block-compressed (or read from the texture cache) into its Pending platform data.
+void BuildTextureFile(const FString& File, TArrayView<FHdueScene::FPreviewTexture* const> Entries,
+                      const FCookLODBias& LOD) {
+    ON_SCOPE_EXIT { ++GHdueLoad.TexturesDone; };
+    FImage Image;
+    for (int32 Variant = 0; Variant < Entries.Num(); ++Variant) {
+        FHdueScene::FPreviewTexture& Entry = *Entries[Variant];
+        if (Entry.Virtual) {
+            FString VirtualError;
+            Entry.Pending = PrepareVirtualTexture(File, Entry, LOD, VirtualError);
+            if (!Entry.Pending) UE_LOG(LogTemp, Warning, TEXT("hdUE virtual texture %s: %s."), *File, *VirtualError);
+            continue;
+        }
+        const bool SRGB = Entry.SRGB;
+        const FString Cache = CachePath(File, Entry, SRGB, LOD);
+        if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
+        if (!Image.RawData.Num() && !FImageUtils::LoadImage(*File, Image)) return;
+        const bool Last = Variant + 1 == Entries.Num();
+        Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB, LOD);
+        if (!Cache.IsEmpty() && IsBlockCompressedFormat(Entry.Pending->PixelFormat)) WriteCache(Cache, *Entry.Pending);
+    }
+}
+const TCHAR* const SlotNames[HDUE_TEXTURE_SLOT_COUNT] = {
+    TEXT("BaseColor"),    TEXT("Emissive"),     TEXT("Metallic"),  TEXT("Roughness"), TEXT("Opacity"),
+    TEXT("Normal"),       TEXT("Displacement"), TEXT("Occlusion"), TEXT("Clearcoat"), TEXT("ClearcoatRoughness"),
+    TEXT("SpecularColor")};
+// A Preview Surface parent's input: its texture (scale, bias and channel mask in the texture's stored channels), or
+// without one its constant.
+void BindTextureSlot(UMaterialInstanceDynamic& Instance, int32 Slot, const HdueTextureDesc& Texture, bool Udim,
+                     const FHdueScene::FPreviewTexture* Image, const FLinearColor& Constant) {
+    const FString Name = SlotNames[Slot];
+    if (!Image) {
+        Instance.SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(0, 0, 0, 0));
+        Instance.SetVectorParameterValue(*(Name + TEXT("Bias")), Constant);
+        return;
+    }
+    // A repacked texture (BC4/BC5) stores the channels this input reads first.
+    const auto Stored = [&](const float* Value) {
+        if (Image->Channels.IsEmpty()) return FLinearColor(Value[0], Value[1], Value[2], Value[3]);
+        float Packed[4] = {};
+        for (int32 Channel = 0; Channel < Image->Channels.Num(); ++Channel)
+            Packed[Channel] = Value[Image->Channels[Channel]];
+        return FLinearColor(Packed[0], Packed[1], Packed[2], Packed[3]);
+    };
+    Instance.SetTextureParameterValue(*(Name + TEXT("Texture")), Image->Texture.Get());
+    Instance.SetVectorParameterValue(*(Name + TEXT("Scale")), Stored(Texture.scale));
+    Instance.SetVectorParameterValue(*(Name + TEXT("Bias")), Stored(Texture.bias));
+    Instance.SetVectorParameterValue(*(Name + TEXT("Mask")), Stored(Texture.channel_mask));
+    FLinearColor Set(0, 0, 0, 0);
+    Set.Component(FMath::Min<uint32>(Texture.uv_set, 3)) = 1;
+    Instance.SetVectorParameterValue(*(Name + TEXT("UVSet")), Set);
+    // A UDIM set is the whole UV plane's texture: it is not masked outside [0,1].
+    if ((Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK) && !Udim)
+        Instance.SetVectorParameterValue(*(Name + TEXT("Black")),
+                                         FLinearColor(Texture.wrap[0] == HDUE_WRAP_BLACK ? 1.f : 0.f,
+                                                      Texture.wrap[1] == HDUE_WRAP_BLACK ? 1.f : 0.f, 0, 0));
+}
+// A texture entry's build settings, without its texture or data: what a background build works on.
+FHdueScene::FPreviewTexture TextureSettings(const FHdueScene::FPreviewTexture& Entry) {
+    FHdueScene::FPreviewTexture Settings;
+    Settings.Read = Entry.Read;
+    Settings.Vector = Entry.Vector;
+    Settings.SRGB = Entry.SRGB;
+    Settings.Address[0] = Entry.Address[0];
+    Settings.Address[1] = Entry.Address[1];
+    Settings.Coverage = Entry.Coverage;
+    Settings.Virtual = Entry.Virtual;
+    return Settings;
+}
 }  // namespace
 // A texture Apply prepared, created on this thread (UObjects and render resources need it) on first use.
 const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key, FString& Error) {
@@ -1443,7 +1514,61 @@ static TAutoConsoleVariable<int32> CVarMeshBuildMaxMemoryUsage(
          "estimated "
          "memory under N GB."));
 
+// Interactive hosts: binds background texture builds (Apply) into the inputs waiting for them, and into those inputs'
+// one-sided twins and wet surface copies, which copied the material before the texture was there. UE restarts path
+// tracing on the parameter change (UMaterialInstance's parameter update). At most 8 ms of it per tick.
+void FHdueScene::TickTextures() {
+    if (TextureBuilds.IsEmpty()) return;
+    const double Start = FPlatformTime::Seconds();
+    TMultiMap<const UMaterialInterface*, UMaterialInstanceDynamic*> Copies;
+    bool CopiesGathered = false;
+    for (int32 Index = 0; Index < TextureBuilds.Num() && FPlatformTime::Seconds() - Start < 0.008; ++Index) {
+        const TSharedPtr<FTextureBuild> Build = TextureBuilds[Index];
+        if (!Build->Task.IsCompleted()) continue;
+        TextureBuilds.RemoveAt(Index--);
+        if (Build->Epoch != TextureEpoch) continue;  // the scene was reset meanwhile
+        for (int32 Variant = 0; Variant < Build->Keys.Num(); ++Variant) {
+            const FString& Key = Build->Keys[Variant];
+            FPreviewTexture& Built = Build->Entries[Variant];
+            if (int32* Count = PendingTextures.Find(Key); Count && --*Count <= 0) PendingTextures.Remove(Key);
+            FPreviewTexture* Entry = PreviewTextures.Find(Key);
+            // A later batch's inputs read channels this build left out: its own build replaces this one.
+            if (!Entry || (Built.Read | Entry->Read) != Built.Read || (Entry->Vector && !Built.Vector)) continue;
+            if (Built.Pending) {
+                Entry->Channels = Built.Channels;
+                Entry->Pending = MoveTemp(Built.Pending);
+            }
+            if (PendingTextures.Contains(Key)) continue;
+            FString Error;
+            const FPreviewTexture* Image = PreviewTexture(Key, Error);
+            TArray<FTextureSlot> Slots;
+            TextureSlots.MultiFind(Key, Slots);
+            TextureSlots.Remove(Key);
+            if (!Image) {
+                UE_LOG(LogTemp, Warning, TEXT("hdUE: %s; %d inputs stay untextured."), *Error, Slots.Num());
+                continue;
+            }
+            if (!CopiesGathered) {
+                CopiesGathered = true;
+                for (const auto& [Id, Twin] : OneSided)
+                    if (auto* Copy = Cast<UMaterialInstanceDynamic>(Twin.Material.Get())) Copies.Add(Twin.Base, Copy);
+                for (const auto& [Id, Wet] : WetBindings)
+                    if (Wet->Material) Copies.Add(Wet->Base, Wet->Material.Get());
+            }
+            for (const FTextureSlot& Slot : Slots) {
+                UMaterialInstanceDynamic* Instance = Slot.Instance.Get();
+                if (!Instance) continue;
+                BindTextureSlot(*Instance, Slot.Slot, Slot.Texture, Slot.Udim, Image, FLinearColor());
+                TArray<UMaterialInstanceDynamic*> Dependent;
+                Copies.MultiFind(Instance, Dependent);
+                for (UMaterialInstanceDynamic* Copy : Dependent)
+                    BindTextureSlot(*Copy, Slot.Slot, Slot.Texture, Slot.Udim, Image, FLinearColor());
+            }
+        }
+    }
+}
 void FHdueScene::TickConversions() {
+    TickTextures();
     // Builds start while their memory fits, as UE's editor schedules asset builds (FMemoryBoundQueuedThreadPoolWrapper,
     // AssetCompilingManager.cpp, editor-only): an estimate of 7 times the source mesh (UStaticMesh::
     // GetBuildRequiredMemoryEstimate, StaticMesh.cpp) against the available physical and virtual memory less 64 MB,
@@ -1645,6 +1770,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         OneSided.Empty();
         Materials.Empty();
         PreviewTextures.Empty();
+        // Builds still running finish unused (TickTextures drops them by their epoch).
+        ++TextureEpoch;
+        PendingTextures.Empty();
+        TextureSlots.Empty();
         PrimIds.Empty();
         for (const auto& Entry : Volumes)
             if (IsValid(Entry.Value.Actor)) World->DestroyActor(Entry.Value.Actor);
@@ -1661,10 +1790,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     TextureImports = 0;
     double PrepareSeconds = 0;
     {
-        // Decode, mip and block-compress this batch's new textures on all cores: decoding them one by one on this
-        // thread took most of a large scene's load (111 Sponza textures, ~19 s), and uncompressed they held ~9 GB.
-        // PreviewTexture creates the UTexture2Ds on this thread. A texture is rebuilt when inputs read channels its
-        // BC4/BC5 repacking left out.
+        // This batch's new textures, built on workers (below); PreviewTexture creates the UTexture2Ds on this thread.
+        // A texture is rebuilt when inputs read channels its BC4/BC5 repacking left out.
         TMap<FString, TArray<FString>> Files;  // each file's variants to build (sRGB decoding, wrap), by key
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
@@ -1680,7 +1807,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 for (int32 Channel = 0; Channel < 4; ++Channel)
                     if (!Vector && Texture.channel_mask[Channel] != 0.f) Read |= 1 << Channel;
                 FPreviewTexture& Entry = PreviewTextures.FindOrAdd(Key);
-                if (Entry.Texture && (Entry.Read | Read) == Entry.Read && (Entry.Vector || !Vector)) continue;
+                if ((Entry.Texture || PendingTextures.Contains(Key)) && (Entry.Read | Read) == Entry.Read &&
+                    (Entry.Vector || !Vector))
+                    continue;
                 Entry.Read |= Read;
                 Entry.Vector |= Vector;
                 Entry.SRGB = TextureSRGB(Texture, Slot);
@@ -1695,30 +1824,41 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             const TArray<TPair<FString, TArray<FString>>> Work = Files.Array();
             const FCookLODBias LOD = FCookLODBias::Current();
             GHdueLoad.TexturesTotal += uint32(Work.Num());
-            ParallelFor(Work.Num(), [&](int32 Index) {
-                ON_SCOPE_EXIT { ++GHdueLoad.TexturesDone; };
-                FImage Image;
-                const TArray<FString>& Keys = Work[Index].Value;
-                for (int32 Variant = 0; Variant < Keys.Num(); ++Variant) {
-                    FPreviewTexture& Entry = PreviewTextures[Keys[Variant]];
-                    if (Entry.Virtual) {
-                        FString VirtualError;
-                        Entry.Pending = PrepareVirtualTexture(Work[Index].Key, Entry, LOD, VirtualError);
-                        if (!Entry.Pending)
-                            UE_LOG(LogTemp, Warning, TEXT("hdUE virtual texture %s: %s."), *Work[Index].Key,
-                                   *VirtualError);
-                        continue;
+            if (Interactive) {
+                // Interactive hosts build each file in the background, as UE's editor compiles textures
+                // asynchronously (FTextureCompilingManager) and draws a default meanwhile: building them here held
+                // Apply, and the Hydra Sync waiting on it held Houdini's UI, for 208 s on NVIDIA's Da Vinci Workshop
+                // with an empty virtual texture cache. Their inputs draw the material's constants until TickTextures
+                // binds each texture in.
+                for (const auto& [File, Keys] : Work) {
+                    auto Build = MakeShared<FTextureBuild>();
+                    Build->File = File;
+                    Build->Keys = Keys;
+                    Build->Epoch = TextureEpoch;
+                    for (const FString& Key : Keys) {
+                        Build->Entries.Add(TextureSettings(PreviewTextures[Key]));
+                        ++PendingTextures.FindOrAdd(Key);
                     }
-                    const bool SRGB = Entry.SRGB;
-                    const FString Cache = CachePath(Work[Index].Key, Entry, SRGB, LOD);
-                    if (!Cache.IsEmpty() && (Entry.Pending = ReadCache(Cache, Entry))) continue;
-                    if (!Image.RawData.Num() && !FImageUtils::LoadImage(*Work[Index].Key, Image)) return;
-                    const bool Last = Variant + 1 == Keys.Num();
-                    Entry.Pending = PrepareTexture(Last ? MoveTemp(Image) : FImage(Image), Entry, SRGB, LOD);
-                    if (!Cache.IsEmpty() && IsBlockCompressedFormat(Entry.Pending->PixelFormat))
-                        WriteCache(Cache, *Entry.Pending);
+                    Build->Task = UE::Tasks::Launch(
+                        TEXT("HdueTexture"),
+                        [Build, LOD] {
+                            TArray<FPreviewTexture*> Entries;
+                            for (FPreviewTexture& Entry : Build->Entries) Entries.Add(&Entry);
+                            BuildTextureFile(Build->File, Entries, LOD);
+                        },
+                        UE::Tasks::ETaskPriority::BackgroundNormal);
+                    TextureBuilds.Add(MoveTemp(Build));
                 }
-            });
+            } else {
+                // Decode, mip and block-compress this batch's new textures on all cores: decoding them one by one on
+                // this thread took most of a large scene's load (111 Sponza textures, ~19 s), and uncompressed they
+                // held ~9 GB.
+                ParallelFor(Work.Num(), [&](int32 Index) {
+                    TArray<FPreviewTexture*> Entries;
+                    for (const FString& Key : Work[Index].Value) Entries.Add(&PreviewTextures[Key]);
+                    BuildTextureFile(Work[Index].Key, Entries, LOD);
+                });
+            }
             PrepareSeconds = FPlatformTime::Seconds() - PrepareStart;
         }
     }
@@ -1775,11 +1915,6 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 nullptr, *FString::Printf(TEXT("/Game/HdUE/%s.%s"), *ParentName, *ParentName));
             if (Parent) {
                 auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
-                static const TCHAR* Slots[HDUE_TEXTURE_SLOT_COUNT] = {
-                    TEXT("BaseColor"),          TEXT("Emissive"),     TEXT("Metallic"),
-                    TEXT("Roughness"),          TEXT("Opacity"),      TEXT("Normal"),
-                    TEXT("Displacement"),       TEXT("Occlusion"),    TEXT("Clearcoat"),
-                    TEXT("ClearcoatRoughness"), TEXT("SpecularColor")};
                 const FLinearColor Constants[HDUE_TEXTURE_SLOT_COUNT] = {
                     FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], 1),
                     FLinearColor(Desc.emissive_color[0], Desc.emissive_color[1], Desc.emissive_color[2], 0),
@@ -1794,47 +1929,27 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     FLinearColor(Desc.specular_color[0], Desc.specular_color[1], Desc.specular_color[2], 1)};
                 for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                     const auto& Texture = Desc.textures[Slot];
-                    const FString Name = Slots[Slot];
                     // A texture that cannot be read leaves its input untextured, with a warning, instead of failing
                     // every material of the batch. ponytail: the input's constant, not UsdUVTexture's fallback; carry
-                    // it if needed.
+                    // it if needed. One still building (Interactive) draws the constant until TickTextures binds it.
                     const FPreviewTexture* Image = nullptr;
+                    const bool Udim = HasTexture(Slot) && IsUdim(UTF8_TO_TCHAR(Texture.file));
                     if (HasTexture(Slot)) {
+                        const FString Key = TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot,
+                                                       CoverageThreshold(Desc, Slot), Virtual);
                         FString TextureError;
-                        Image = PreviewTexture(TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot,
-                                                          CoverageThreshold(Desc, Slot), Virtual),
-                                               TextureError);
-                        if (!Image)
+                        if (PendingTextures.Contains(Key)) {
+                            FTextureSlot& Waiting = TextureSlots.Add(Key);
+                            Waiting.Instance = Instance;
+                            Waiting.Slot = Slot;
+                            Waiting.Texture = Texture;
+                            Waiting.Texture.file = nullptr;  // the batch's strings do not outlive Apply
+                            Waiting.Udim = Udim;
+                        } else if (!(Image = PreviewTexture(Key, TextureError)))
                             UE_LOG(LogTemp, Warning, TEXT("hdUE material %s: %s; %s stays untextured."),
-                                   UTF8_TO_TCHAR(Desc.id), *TextureError, *Name);
+                                   UTF8_TO_TCHAR(Desc.id), *TextureError, SlotNames[Slot]);
                     }
-                    if (!Image) {
-                        Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), FLinearColor(0, 0, 0, 0));
-                        Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Constants[Slot]);
-                        continue;
-                    }
-                    // A repacked texture (BC4/BC5) stores the channels this input reads first.
-                    const auto Stored = [&](const float* Value) {
-                        if (Image->Channels.IsEmpty()) return FLinearColor(Value[0], Value[1], Value[2], Value[3]);
-                        float Packed[4] = {};
-                        for (int32 Channel = 0; Channel < Image->Channels.Num(); ++Channel)
-                            Packed[Channel] = Value[Image->Channels[Channel]];
-                        return FLinearColor(Packed[0], Packed[1], Packed[2], Packed[3]);
-                    };
-                    Instance->SetTextureParameterValue(*(Name + TEXT("Texture")), Image->Texture.Get());
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Scale")), Stored(Texture.scale));
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Bias")), Stored(Texture.bias));
-                    Instance->SetVectorParameterValue(*(Name + TEXT("Mask")), Stored(Texture.channel_mask));
-                    FLinearColor Set(0, 0, 0, 0);
-                    Set.Component(FMath::Min<uint32>(Texture.uv_set, 3)) = 1;
-                    Instance->SetVectorParameterValue(*(Name + TEXT("UVSet")), Set);
-                    // A UDIM set is the whole UV plane's texture: it is not masked outside [0,1].
-                    if ((Texture.wrap[0] == HDUE_WRAP_BLACK || Texture.wrap[1] == HDUE_WRAP_BLACK) &&
-                        !IsUdim(UTF8_TO_TCHAR(Texture.file)))
-                        Instance->SetVectorParameterValue(
-                            *(Name + TEXT("Black")),
-                            FLinearColor(Texture.wrap[0] == HDUE_WRAP_BLACK ? 1.f : 0.f,
-                                         Texture.wrap[1] == HDUE_WRAP_BLACK ? 1.f : 0.f, 0, 0));
+                    BindTextureSlot(*Instance, Slot, Texture, Udim, Image, Constants[Slot]);
                 }
                 static const float Identity[6] = {1, 0, 0, 0, 1, 0};
                 const bool Unset = Algo::AllOf(Desc.uv_transform, [](float Value) { return Value == 0.f; });

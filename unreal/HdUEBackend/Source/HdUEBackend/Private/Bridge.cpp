@@ -1106,7 +1106,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         if (Logged != Request.generation) {
             Logged = Request.generation;
             UE_LOG(LogTemp, Log, TEXT("hdUE request %llu waits for %u %s"), Request.generation, Compiling,
-                   IsInteractive() ? TEXT("mesh builds") : TEXT("PSO compilations"));
+                   IsInteractive() ? TEXT("mesh and texture builds") : TEXT("PSO compilations"));
         }
     }
     Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;

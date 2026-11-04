@@ -80,9 +80,9 @@ public:
     ~FHdueScene();
     bool Apply(const HdueSceneBatch& Batch, FString& Error);
     void TickConversions();
-    // Interactive hosts: background builds not yet swapped in. Their meshes draw a first-pass mesh or nothing, so
-    // frames do not converge while there are any.
-    uint32 PendingConversions() const { return uint32(PendingStatic.Num()); }
+    // Interactive hosts: background mesh builds not yet swapped in, and textures still building. Their meshes draw a
+    // first-pass mesh or nothing, their inputs a constant, so frames do not converge while there are any.
+    uint32 PendingConversions() const { return uint32(PendingStatic.Num() + PendingTextures.Num()); }
     void UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up);
     HdueResult SetMaterialParameters(const HdueMaterialUpdate& Update, FString& Error);
     HdueResult GetMaterialStats(const char* Id, HdueMaterialStats& Stats, FString& Error);
@@ -137,6 +137,27 @@ private:
     // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits
     // matter.
     TMap<FString, FPreviewTexture> PreviewTextures;
+    // Interactive hosts: one file's background texture build (Apply), on settings copied from PreviewTextures (which
+    // Apply may grow meanwhile); TickTextures moves the results in.
+    struct FTextureBuild {
+        FString File;
+        TArray<FString> Keys;             // its variants
+        TArray<FPreviewTexture> Entries;  // per variant: the settings, then the built data
+        uint64 Epoch = 0;                 // TextureEpoch at launch: a reset scene drops it
+        UE::Tasks::FTask Task;
+    };
+    TArray<TSharedPtr<FTextureBuild>> TextureBuilds;
+    TMap<FString, int32> PendingTextures;  // texture key -> builds in flight that produce it
+    // An input drawing its constant until its texture is built: the material instance, and the slot's settings.
+    struct FTextureSlot {
+        TWeakObjectPtr<UMaterialInstanceDynamic> Instance;
+        int32 Slot = 0;
+        HdueTextureDesc Texture{};  // file cleared
+        bool Udim = false;
+    };
+    TMultiMap<FString, FTextureSlot> TextureSlots;  // by texture key
+    uint64 TextureEpoch = 0;
+    void TickTextures();
     double TextureSeconds = 0;
     int32 TextureImports = 0;                                       // per Apply, for its timing log
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials;  // replaced last Apply; released next Apply
