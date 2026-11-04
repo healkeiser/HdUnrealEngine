@@ -500,11 +500,18 @@ struct ScenePacket {
     std::deque<std::vector<int32_t>> ids;
     std::deque<std::vector<HdueMaterialParameter>> parameters;
     std::deque<std::vector<const char*>> strings;
-    const char* own(std::string value) { return text.emplace_back(std::move(value)).c_str(); }
+    // Thread-safe: convertDeferred's workers own their meshes' arrays at once (a deque keeps its elements in place).
+    const char* own(std::string value) {
+        std::lock_guard lock(ownMutex);
+        return text.emplace_back(std::move(value)).c_str();
+    }
     template <class T, class Store>
     const T* own(Store& store, std::vector<T> values) {
-        return values.empty() ? nullptr : store.emplace_back(std::move(values)).data();
+        if (values.empty()) return nullptr;
+        std::lock_guard lock(ownMutex);
+        return store.emplace_back(std::move(values)).data();
     }
+    std::mutex ownMutex;
     // What this upload covers; Sync may dirty more meanwhile, for the next upload.
     std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyActors, dirtyGrooms,
         removedIds;
@@ -852,10 +859,14 @@ bool editable(const HdUEState& state, const HdUEMeshData& data) {
            (data.bakedInstances && data.moving());
 }
 // A generic mesh's upload descriptor from its arrays (points: the stored ones, or a motion blur sub-frame's; diced: its
-// displaced form). Reads no state: deferred meshes convert without the state lock (convertDeferred).
-void convertMesh(const MeshConversion& conversion, const HdUEMeshData& data, const std::vector<GfVec3f>& points,
-                 const std::optional<HdUEDicedMesh>& diced, const std::vector<GfMatrix4d>* subFrameInstances,
-                 const std::string& nativeAsset, bool visible, bool editable, ScenePacket& packet) {
+// displaced form), its arrays owned by the packet; nullopt when it has nothing to draw. Reads no state and only owns
+// into the packet: deferred meshes convert on workers without the state lock (convertDeferred), and addMesh adds the
+// result.
+std::optional<HdueMeshDesc> convertMesh(const MeshConversion& conversion, const HdUEMeshData& data,
+                                        const std::vector<GfVec3f>& points, const std::optional<HdUEDicedMesh>& diced,
+                                        const std::vector<GfMatrix4d>* subFrameInstances,
+                                        const std::string& nativeAsset, bool visible, bool editable,
+                                        ScenePacket& packet) {
     // Vertices are local: the actor's transform or each instance matrix carries the placement. A shearing
     // transform, which a UE transform cannot hold, is baked into the vertices of a generic mesh.
     const bool baked = !data.instanced && nativeAsset.empty() && HdUEShears(data.transform);
@@ -872,10 +883,7 @@ void convertMesh(const MeshConversion& conversion, const HdUEMeshData& data, con
             area = GfCross(vertices[data.indices[t + 1]] - vertices[data.indices[t]],
                            vertices[data.indices[t + 2]] - vertices[data.indices[t]])
                        .GetLengthSq() > 0;
-    if (!area) {
-        packet.removed.push_back(packet.own(data.id));
-        return;
-    }
+    if (!area) return std::nullopt;
     // UV sets one after another (HdueMeshDesc uv_set_count).
     std::vector<const std::vector<GfVec2f>*> sets;
     if (diced)
@@ -1005,10 +1013,19 @@ void convertMesh(const MeshConversion& conversion, const HdUEMeshData& data, con
     if (conversion.cullBackface && !data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
     for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
     if (!baked) rowMajor(conversion.inverse * data.transform * conversion.basis, desc.transform);
-    if (nativeAsset.empty()) packet.genericMeshes.push_back(data.id);
-    packet.meshes.push_back(desc);
+    return desc;
+}
+// A converted mesh into the packet, or its removal when it has nothing to draw (UE's Nanite builder asserts on it).
+void addMesh(ScenePacket& packet, const std::string& id, const std::string& nativeAsset,
+             const std::optional<HdueMeshDesc>& desc) {
+    if (!desc) {
+        packet.removed.push_back(packet.own(id));
+        return;
+    }
+    if (nativeAsset.empty()) packet.genericMeshes.push_back(id);
+    packet.meshes.push_back(*desc);
     if (HdUETraceScene())
-        TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc.id, desc.material_id, desc.vertex_count);
+        TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc->id, desc->material_id, desc->vertex_count);
 }
 bool releasable(const HdUEState& state, const HdUEMeshData& m);
 // Moves a mesh's arrays into `to`, a copy of the rest of it, and leaves the mesh released (HdUEReleaseGeometry).
@@ -1102,10 +1119,11 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         const auto moved = packet.points.find(id);
         const auto& points = moved != packet.points.end() ? moved->second : data.points;
         const auto subFrame = packet.instances.find(id);
-        convertMesh(packet.conversion, data, points,
-                    nativeAsset.empty() ? displaced(state, data, points) : std::nullopt,
-                    subFrame != packet.instances.end() ? &subFrame->second : nullptr, nativeAsset, visible,
-                    editable(state, data), packet);
+        addMesh(packet, id, nativeAsset,
+                convertMesh(packet.conversion, data, points,
+                            nativeAsset.empty() ? displaced(state, data, points) : std::nullopt,
+                            subFrame != packet.instances.end() ? &subFrame->second : nullptr, nativeAsset, visible,
+                            editable(state, data), packet));
     }
 }
 // Light linking on UE's three lighting channels: each lightLink collection gets a channel. Unlinked lights keep every
@@ -1512,12 +1530,21 @@ void prepareScene(HdUEState& state, ScenePacket& packet, uint64_t meshBudget) {
     for (const auto& id : packet.removedIds) packet.removed.push_back(packet.own(id));
 }
 // Without the state lock: the deferred meshes' descriptors, each mesh's arrays freed once converted.
+// Meshes convert on all cores: one after another (each vertex loop parallel), a 1 GB streaming batch of NVIDIA's Da
+// Vinci Workshop took 1.1 to 1.5 s, while the Hydra Sync threads past the stream cap waited for it. Added in order, so
+// the packet does not depend on the scheduling.
 void convertDeferred(ScenePacket& packet) {
-    for (auto& deferred : packet.deferred) {
-        convertMesh(packet.conversion, deferred.mesh, deferred.mesh.points, std::nullopt, nullptr, deferred.nativeAsset,
-                    deferred.visible, false, packet);
-        HdUEReleaseGeometry(deferred.mesh);
-    }
+    std::vector<std::optional<HdueMeshDesc>> descs(packet.deferred.size());
+    WorkParallelForN(packet.deferred.size(), [&](size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i) {
+            auto& deferred = packet.deferred[i];
+            descs[i] = convertMesh(packet.conversion, deferred.mesh, deferred.mesh.points, std::nullopt, nullptr,
+                                   deferred.nativeAsset, deferred.visible, false, packet);
+            HdUEReleaseGeometry(deferred.mesh);
+        }
+    });
+    for (size_t i = 0; i < descs.size(); ++i)
+        addMesh(packet, packet.deferred[i].mesh.id, packet.deferred[i].nativeAsset, descs[i]);
 }
 // Without the state lock: only the backend and the packet (the UE thread owns the session).
 void sendScene(const HdUEState& state, ScenePacket& packet) {
@@ -2811,6 +2838,14 @@ public:
                 return;
             }
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
+                // Houdini's viewport: a bound buffer Hydra has not created yet, or released after this Execute was
+                // posted (Houdini recreates them), leaves this pass nothing to draw into; the next Execute has the
+                // new ones. Failing the session for it was the references test's intermittent "missing buffer". husk
+                // keeps its buffers for the render, so there a missing one fails the frame instead of waiting.
+                if (!buffer && selfHost().continuous &&
+                    std::any_of(pass->buffers.begin(), pass->buffers.end(),
+                                [](const HdRenderBuffer* b) { return !HdUERenderBuffer::alive(b); }))
+                    return;
                 std::string bindings;
                 for (const auto& aov : pass->aovs)
                     bindings += " " + aov.aovName.GetString() + ":" + aov.renderBufferId.GetString();
