@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Unreal main menu. Houdini reads MainMenuCommon.xml from every HOUDINI_MENU_PATH folder, which defaults to
+     HOUDINI_PATH: the package's hpath and Launch-Houdini.ps1 both put this folder there. The actions are hdue_menu's;
+     hdue_menu.run defers each one until the menu has closed. -->
+<mainMenu>
+  <menuBar>
+    <subMenu id="hdue_menu">
+      <label>Unreal</label>
+      <insertBefore>windows_menu</insertBefore>
+
+      <scriptItem id="h.hdue_use_viewport">
+        <label>Use Unreal Engine in the Viewport</label>
+        <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("use_viewport")]]></scriptCode>
+      </scriptItem>
+      <subMenu id="hdue_render_mode_menu">
+        <label>Render Mode</label>
+        <scriptItem id="h.hdue_mode_realtime">
+          <label>Realtime</label>
+          <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("set_mode", "realtime")]]></scriptCode>
+        </scriptItem>
+        <scriptItem id="h.hdue_mode_pathtraced">
+          <label>Path Traced</label>
+          <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("set_mode", "pathtraced")]]></scriptCode>
+        </scriptItem>
+      </subMenu>
+      <scriptItem id="h.hdue_create_render_settings">
+        <label>Create hdUE Render Settings</label>
+        <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("create_render_settings")]]></scriptCode>
+      </scriptItem>
+
+      <separatorItem/>
+
+      <subMenu id="hdue_caches_menu">
+        <label>Caches</label>
+        <scriptItem id="h.hdue_cache_sizes">
+          <label>Show Cache Sizes</label>
+          <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("show_cache_sizes")]]></scriptCode>
+        </scriptItem>
+        <separatorItem/>
+        <subMenu id="hdue_cache_texture_menu">
+          <label>Texture Cache</label>
+          <scriptItem id="h.hdue_cache_texture_open">
+            <label>Open Folder</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_cache", "texture")]]></scriptCode>
+          </scriptItem>
+          <scriptItem id="h.hdue_cache_texture_clear">
+            <label>Clear...</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("clear_caches", "texture")]]></scriptCode>
+          </scriptItem>
+        </subMenu>
+        <subMenu id="hdue_cache_virtual_texture_menu">
+          <label>Virtual Texture Cache</label>
+          <scriptItem id="h.hdue_cache_virtual_texture_open">
+            <label>Open Folder</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_cache", "virtual_texture")]]></scriptCode>
+          </scriptItem>
+          <scriptItem id="h.hdue_cache_virtual_texture_clear">
+            <label>Clear...</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("clear_caches", "virtual_texture")]]></scriptCode>
+          </scriptItem>
+        </subMenu>
+        <subMenu id="hdue_cache_nanite_menu">
+          <label>Nanite Cache</label>
+          <scriptItem id="h.hdue_cache_nanite_open">
+            <label>Open Folder</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_cache", "nanite")]]></scriptCode>
+          </scriptItem>
+          <scriptItem id="h.hdue_cache_nanite_clear">
+            <label>Clear...</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("clear_caches", "nanite")]]></scriptCode>
+          </scriptItem>
+        </subMenu>
+        <subMenu id="hdue_cache_ocio_menu">
+          <label>OCIO Texture Cache</label>
+          <scriptItem id="h.hdue_cache_ocio_open">
+            <label>Open Folder</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_cache", "ocio")]]></scriptCode>
+          </scriptItem>
+          <scriptItem id="h.hdue_cache_ocio_clear">
+            <label>Clear...</label>
+            <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("clear_caches", "ocio")]]></scriptCode>
+          </scriptItem>
+        </subMenu>
+        <separatorItem/>
+        <scriptItem id="h.hdue_cache_clear_all">
+          <label>Clear All hdUE Caches...</label>
+          <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("clear_caches")]]></scriptCode>
+        </scriptItem>
+      </subMenu>
+
+      <separatorItem/>
+
+      <scriptItem id="h.hdue_open_logs">
+        <label>Open Unreal Engine Logs</label>
+        <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_logs")]]></scriptCode>
+      </scriptItem>
+      <scriptItem id="h.hdue_open_docs">
+        <label>Documentation</label>
+        <scriptCode><![CDATA[import hdue_menu; hdue_menu.run("open_docs")]]></scriptCode>
+      </scriptItem>
+    </subMenu>
+  </menuBar>
+</mainMenu>

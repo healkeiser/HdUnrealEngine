@@ -14,6 +14,9 @@ if ($Suite -in 'unit', 'all') {
         & uv run --python 3.11 --with usd-core --with numpy --with MaterialX==1.39.4 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }
+    # Houdini 22's Python (shutil.rmtree's onexc needs 3.12); no hou needed.
+    & uv run --python 3.13 python (Join-Path $TaskRoot 'tests\houdini_menu_test.py')
+    if ($LASTEXITCODE) { throw 'houdini_menu_test failed.' }
     # The committed gallery: every scene's brightness within its band, every linked image present.
     & uv run --python 3.11 python (Join-Path $PSScriptRoot 'check_gallery.py')
     if ($LASTEXITCODE) { throw 'Gallery check failed.' }
