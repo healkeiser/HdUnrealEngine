@@ -12,12 +12,14 @@ New-Item -ItemType Directory -Force -Path $Run | Out-Null
 $Settings = Join-Path $Run 'settings.json'
 & python (Join-Path $PSScriptRoot 'generate_render_settings.py') --defaults-json $Settings
 if ($LASTEXITCODE) { throw 'Generating the default settings failed.' }
-$Project = (Get-Content -Raw -LiteralPath $RuntimeConfig | ConvertFrom-Json).runtime_project
-if (-not [IO.Path]::IsPathRooted($Project)) { $Project = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($RuntimeConfig))) $Project }
-$Log = Join-Path (Split-Path -Parent $Project) 'Saved\Logs\HdUEBackend.log'
+# The run's own UE log (-ABSLOG): UE writes HdUEBackend_2.log, _3, ... when another process still holds HdUEBackend.log,
+# so the default name can hold an older run.
+$Log = Join-Path $Run 'ue.log'
+$PreviousArguments = $env:HDUE_UE_ARGS
+$env:HDUE_UE_ARGS = ("$PreviousArguments -ABSLOG=`"$Log`"").Trim()
 $Arguments = @{RuntimeConfig = $RuntimeConfig; RendererSettings = $Settings; OutputDirectory = (Join-Path $Run 'render'); Mode = 'both'; Cycles = 1 }
 if ($InputUsd) { $Arguments.InputUsd = $InputUsd }
-& (Join-Path $PSScriptRoot 'Test-Hydra.ps1') @Arguments
+try { & (Join-Path $PSScriptRoot 'Test-Hydra.ps1') @Arguments } finally { $env:HDUE_UE_ARGS = $PreviousArguments }
 $Lines = Get-Content -LiteralPath $Log
 $Skipped = @($Lines | Select-String 'hdUE: (post-process setting|console variable) .* skipped')
 $Skipped | ForEach-Object { Write-Host $_.Line }
