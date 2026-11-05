@@ -22,6 +22,15 @@ def read(path: Path) -> np.ndarray:
         ).reshape(height, width, 3) * abs(scale)
 
 
+def write(path, image):
+    """A float image (rows top-down; 3 channels, or 2D for one) as little-endian PFM, whose rows run bottom-up."""
+    height, width = image.shape[:2]
+    header = f"{'PF' if image.ndim == 3 else 'Pf'}\n{width} {height}\n-1.0\n"
+    with Path(path).open("wb") as output:
+        output.write(header.encode("ascii"))
+        output.write(np.ascontiguousarray(image[::-1], dtype="<f4").tobytes())
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("reference", type=Path)

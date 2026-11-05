@@ -179,7 +179,7 @@ class Viewport:
         self.runtime.check(code, "viewport up axis")
         return True
 
-    def pixels(self, status, require_converged=True):
+    def pixels(self, status):
         if not status["frame"]["frame_id"]:
             return None
         f = Frame()
@@ -188,9 +188,7 @@ class Viewport:
         if code == 1:
             return None
         self.runtime.check(code, "poll image")
-        if f.generation != status["generation"] or (
-            require_converged and not f.converged
-        ):
+        if f.generation != status["generation"] or not f.converged:
             return None
         pixels = (C.c_float * (f.required_bytes // 4))()
         code = self.copy(

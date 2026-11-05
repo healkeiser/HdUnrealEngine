@@ -109,7 +109,6 @@ class Host:
         self.material_job_session = 0  # the session its walk applies to
         self.scene_job = None
         self.progress_shown = 0.0
-        self.viewer = None
         self.last_options = None
         self.options_key = None
         self.libraries = (None, None)
@@ -218,12 +217,7 @@ class Host:
                     try:
                         stage = scene_viewer().stage()
                         if not stage:
-                            network = scene_viewer().pwd()
-                            display = (
-                                network.displayNode()
-                                if isinstance(network, hou.LopNetwork)
-                                else scene_viewer().currentNode()
-                            )
+                            display = viewer_display(scene_viewer(), True)
                             if display and display.errors():
                                 raise ValueError("; ".join(display.errors()))
                     except (hou.Error, ValueError, RuntimeError) as error:
@@ -295,37 +289,11 @@ class Host:
                             scene_viewer().curViewport().draw()
             if self.assets.authored:
                 # The bounds meshes serve hdUE only; other renderers get the scene as authored.
-                viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
-                if viewer is None or viewer.currentHydraRenderer() not in (
-                    LABEL,
-                    PLUGIN,
-                ):
+                if not _hdue_selected():
                     try:
                         self.assets.clear()
                     except hou.Error:
                         _report(traceback.format_exc())
-            if self.viewer:
-                if state["error"]:
-                    self.viewer.status.setText(state["error"])
-                elif not state["active"]:
-                    self.viewer.status.setText(
-                        "Select Unreal Engine in Solaris to resume"
-                    )
-            if (
-                self.viewer
-                and self.viewer.isVisible()
-                and state["active"]
-                and state["frame"]["frame_id"]
-            ):
-                key = (
-                    state["session"],
-                    state["generation"],
-                    state["frame"]["frame_id"],
-                )
-                if key != self.viewer.last_frame:
-                    data = self.api.pixels(state, require_converged=False)
-                    if data:
-                        self.viewer.present(state, *data)
             if time.monotonic() - self.last_state > 2:
                 self.last_state = time.monotonic()
                 self.write_state()
@@ -347,13 +315,13 @@ class Host:
                 hou.ui.setStatusMessage(message, hou.severityType.Error)
             except BaseException:
                 pass
-            if self.viewer:
-                self.viewer.status.setText(_failure.splitlines()[-1])
             self.write_state(_failure)
             _report(_failure)
         finally:
             if self.running:
-                self.timer.start(16)
+                # Frames and walks need the 16 ms tick only while a viewer renders with hdUE or a walk is pending.
+                busy = self.scene_job or self.material_job or _hdue_selected()
+                self.timer.start(16 if busy else 250)
 
     def material_steps(self, stage, session):
         """Material preparation as one cooperative walk: whether materials are animated, then the prepared
@@ -391,7 +359,9 @@ class Host:
             self.end_progress(job)
             self.material_problem(str(failure), session)
             return
-        except (ValueError, OSError, hou.Error) as error:
+        except (
+            Exception
+        ) as error:  # any error: a finished job with no result would fail every later tick
             self.material_job = None
             self.end_progress(job)
             self.material_problem(str(error), session)
@@ -457,11 +427,7 @@ class Host:
             )
             textures = self.textures_dirty or cache().dirty("viewport")
             if self.scene_job is None and (assets or textures):
-                display = (
-                    network.displayNode()
-                    if isinstance(network, hou.LopNetwork)
-                    else None
-                )
+                display = viewer_display(viewer)
                 self.assets_dirty = self.textures_dirty = False
                 self.assets_network = (network, materials)
                 self.scene_job = Job(
@@ -495,7 +461,9 @@ class Host:
                 self.pushed_textures = (session, dict(self.texture_files))
                 redraw = True
             error = None
-        except (hou.Error, ValueError, RuntimeError) as failure:
+        except (
+            Exception
+        ) as failure:  # any error: a finished job with no result would fail every later tick
             self.scene_job = None
             error = str(failure)
         if error and error != self.texture_error:
@@ -514,8 +482,6 @@ class Host:
         except BaseException:
             _report(traceback.format_exc())
         self.live_preparation.close()
-        if self.viewer:
-            self.viewer.hide()
         self.runtime.close()
         # UE outlives individual viewports on hdUE's thread; end it with Houdini (one UE lifetime per process). The
         # live session ends with UE, and the delegate stops rendering viewports that still draw.
@@ -531,15 +497,21 @@ class Host:
         self.write_state()
 
 
+def _hdue_viewer():
+    """The Scene Viewer rendering with hdUE (the first one, if several), or None."""
+    for tab in hou.ui.paneTabs():
+        try:
+            if isinstance(
+                tab, hou.SceneViewer
+            ) and tab.currentHydraRenderer() in (LABEL, PLUGIN):
+                return tab
+        except (hou.Error, TypeError):  # TypeError: a viewer outside LOPs
+            pass
+    return None
+
+
 def _hdue_selected():
-    try:
-        return any(
-            isinstance(tab, hou.SceneViewer)
-            and tab.currentHydraRenderer() in (LABEL, PLUGIN)
-            for tab in hou.ui.paneTabs()
-        )
-    except (hou.Error, TypeError):  # TypeError: a viewer outside LOPs
-        return False
+    return _hdue_viewer() is not None
 
 
 def start_when_selected():
@@ -697,12 +669,7 @@ def _display_cooking():
     stage being cooked must not be read (nor cooked from here: "Infinite recursion in evaluation").
     """
     try:
-        network = scene_viewer().pwd()
-        display = (
-            network.displayNode()
-            if isinstance(network, hou.LopNetwork)
-            else None
-        )
+        display = viewer_display(scene_viewer())
         return bool(display and display.needsToCook())
     except (hou.Error, AttributeError):
         return False
@@ -751,8 +718,17 @@ def _stage_key(values):
     )
 
 
+def viewer_display(viewer, current=False):
+    """The display node of the viewer's LOP network; outside LOPs, the viewer's current node if current, else None."""
+    network = viewer.pwd()
+    if isinstance(network, hou.LopNetwork):
+        return network.displayNode()
+    return viewer.currentNode() if current else None
+
+
 def scene_viewer():
-    viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+    """The Scene Viewer hdUE serves: the one rendering with hdUE, else the first one."""
+    viewer = _hdue_viewer() or hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
     if viewer is None:
         raise RuntimeError("Open a Scene Viewer pane for Solaris")
     return viewer
@@ -814,34 +790,14 @@ def activate():
     names = viewer.hydraRenderers()
     _note("Available Solaris renderers: " + repr(names))
     viewer.setHydraRenderer(LABEL if LABEL in names else PLUGIN)
-    if os.environ.get("HDUE_HOUDINI_IMAGE_VIEWER") == "1":
-        show_viewer()
     return viewer
 
 
-def show_viewer():
-    if not _host:
-        start()
-    if not _host or _failure:
-        raise RuntimeError(_failure or "UE not ready")
-    if _host.viewer is None:
-        from hdue_viewer import Viewer
-
-        _host.viewer = Viewer(_host)
-    _host.viewer.show()
-    return _host.viewer
-
-
 def current_settings_node():
-    viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+    viewer = _hdue_viewer() or hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
     if viewer is None:
         return None
-    network = viewer.pwd()
-    node = (
-        network.displayNode()
-        if isinstance(network, hou.LopNetwork)
-        else viewer.currentNode()
-    )
+    node = viewer_display(viewer, True)
     # hdue_wet_mask_preview exists only on the hdUE_settings subnet.
     while node and not node.parm("hdue_wet_mask_preview"):
         inputs = node.inputs()
@@ -1253,12 +1209,7 @@ def set_mode(mode):
 def set_render_setting(prefix, value):
     """Author an unreal:* setting on the displayed chain's Render Settings LOP, adding one if there is none."""
     viewer = scene_viewer()
-    network = viewer.pwd()
-    display = (
-        network.displayNode()
-        if isinstance(network, hou.LopNetwork)
-        else viewer.currentNode()
-    )
+    display = viewer_display(viewer, True)
     node = display
     while node and node.type().name() not in RENDER_SETTINGS_TYPES:
         inputs = node.inputs()

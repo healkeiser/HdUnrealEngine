@@ -177,6 +177,14 @@ struct Triangulated {
     const T& at(size_t corner, size_t point) const { return values[perCorner ? corner : point]; }
     bool same(size_t a, size_t b) const { return !perCorner || values[a] == values[b]; }  // corners of one point
 };
+// A wet mask's samples on a subdivided mesh, whose triangulated topology is the refined one; unchanged otherwise, or
+// when the count does not fit the coarse mesh (HdUEExpandWetMask reports it).
+VtValue refinedMask(const VtValue& raw, HdInterpolation domain, const HdUESubdivision* subdivision) {
+    if (subdivision && raw.IsHolding<VtFloatArray>())
+        if (auto refined = subdivision->refine(raw.UncheckedGet<VtFloatArray>(), domain); !refined.empty())
+            return VtValue(std::move(refined));
+    return raw;
+}
 // computed: the primvar's ExtComputation value (vertex), which replaces the authored one.
 template <class T>
 Triangulated<T> triangulated(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name, size_t pointCount,
@@ -513,7 +521,9 @@ public:
                             [&](const std::string& id) { return state->meshes.count(id); })) {
                 for (const auto& id : emitted_) {
                     auto& part = state->meshes[id];
-                    const bool shown = part.visible != visible, moved = !shown && HdUEPlacedOnly(part, transform);
+                    // A purpose edit shows or hides the mesh as a visibility edit does (HdUEState::shown).
+                    const bool shown = part.visible != visible || part.renderTag != renderTag,
+                               moved = !shown && HdUEPlacedOnly(part, transform);
                     const bool changed = part.transform != transform || shown;
                     part.transform = transform;
                     part.visible = visible;
@@ -621,8 +631,8 @@ public:
         std::map<std::string, std::vector<float>> masks;  // per corner
         for (const auto& name : maskNames) {
             const TfToken token(name);
-            const auto raw = delegate->Get(GetId(), token);
             const auto domain = interpolation(delegate, GetId(), token);
+            const auto raw = refinedMask(delegate->Get(GetId(), token), domain, subdivision.get());
             try {
                 masks[name] = HdUEExpandWetMask(raw, domain, points.size(), topology, triangles, parameters, util);
             } catch (const std::invalid_argument& error) {
@@ -772,8 +782,9 @@ public:
                  previous->second.geometryHash != part.geometryHash ||
                  (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
-                 previous->second.sceneAsset != part.sceneAsset || previous->second.assetFrame != part.assetFrame ||
-                 previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
+                 previous->second.renderTag != part.renderTag || previous->second.sceneAsset != part.sceneAsset ||
+                 previous->second.assetFrame != part.assetFrame || previous->second.instanced != part.instanced ||
+                 previous->second.instances != part.instances ||
                  previous->second.instanceColors != part.instanceColors ||
                  previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;
@@ -854,10 +865,11 @@ public:
         for (const auto& name : needed) {
             std::vector<float> values;
             std::string error;
+            const auto domain = interpolation(delegate, GetId(), TfToken(name));
             try {
-                values = HdUEExpandWetMask(delegate->Get(GetId(), TfToken(name)),
-                                           interpolation(delegate, GetId(), TfToken(name)), shape.points.size(),
-                                           shape.topology, shape.triangles, shape.parameters, util);
+                values = HdUEExpandWetMask(
+                    refinedMask(delegate->Get(GetId(), TfToken(name)), domain, shape.subdivision.get()), domain,
+                    shape.points.size(), shape.topology, shape.triangles, shape.parameters, util);
             } catch (const std::invalid_argument& e) {
                 error = name + ": " + e.what();
             }
@@ -897,26 +909,38 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
         mesh.material = material.id;
         const auto previous = state.materials.find(material.id);
         if (previous == state.materials.end() || previous->second.color != material.color ||
-            previous->second.opacity != material.opacity || previous->second.vertexColor != material.vertexColor) {
+            previous->second.opacity != material.opacity || previous->second.emissive != material.emissive ||
+            previous->second.vertexColor != material.vertexColor) {
             state.materials[material.id] = material;
             state.dirtyMaterials.insert(material.id);
         }
     }
     HdUEStoreShearCompanion(state, mesh);
-    const auto previous = state.meshes.find(mesh.id);
+    // A prim Houdini deleted and re-created (a Hydra rebuild) is compared with its last data, as Mesh::Sync does.
+    auto previous = state.meshes.find(mesh.id);
+    const bool revived = previous == state.meshes.end() && state.erasedMeshes.count(mesh.id);
+    if (revived) previous = state.erasedMeshes.find(mesh.id);
+    const auto missing = revived ? state.erasedMeshes.end() : state.meshes.end();
     mesh.geometryHash = HdUEGeometryHash(mesh);
-    const bool sameGeometry = previous != state.meshes.end() && previous->second.geometryHash == mesh.geometryHash;
-    const bool changed = !sameGeometry || state.fullUploads.count(mesh.id) ||
+    const bool sameGeometry = previous != missing && previous->second.geometryHash == mesh.geometryHash;
+    // unreal:groom just turned off: the groom goes (its removal stays queued) and the tubes upload.
+    const bool wasGroom = state.grooms.erase(mesh.id) > 0;
+    state.dirtyGrooms.erase(mesh.id);
+    const bool changed = !sameGeometry || wasGroom || state.fullUploads.count(mesh.id) ||
                          previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
-                         previous->second.visible != mesh.visible || previous->second.instanced != mesh.instanced ||
-                         previous->second.instances != mesh.instances ||
+                         previous->second.visible != mesh.visible || previous->second.renderTag != mesh.renderTag ||
+                         previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
                          previous->second.instanceColors != mesh.instanceColors;
     mesh.pickMesh = sameGeometry ? previous->second.pickMesh : nullptr;  // built on first pick
-    const bool relinked = previous != state.meshes.end() && previous->second.categories != mesh.categories;
+    const bool relinked = previous != missing && previous->second.categories != mesh.categories;
     const auto key = mesh.id;
     state.meshes[key] = std::move(mesh);
+    state.erasedMeshes.erase(key);
     state.fullUploads.erase(key);
-    state.removed.erase(key);
+    if (wasGroom)
+        state.removed.insert(key);  // the backend applies removals before the batch's meshes
+    else
+        state.removed.erase(key);
     state.repull.erase(state.meshes[key].sourceId);
     if (changed) {
         state.dirtyMeshes.insert(key);
@@ -1274,11 +1298,12 @@ public:
             hair.id = mesh.id;
             hair.visible = mesh.visible;
             hair.localToWorld = mesh.transform;
-            if (state->locked([&] { return state->meshes.count(hair.id) > 0; }))
-                state->erase(hair.id);  // its tubes, when unreal:groom was just turned on
+            const bool hadTubes = state->locked([&] { return state->meshes.count(hair.id) > 0; });
+            if (hadTubes) state->erase(hair.id);  // its tubes, when unreal:groom was just turned on
             std::lock_guard lock(state->mutex);
             if (const auto old = state->grooms.find(hair.id); old != state->grooms.end() && old->second == hair) return;
-            state->removed.erase(hair.id);
+            // The tubes' removal stays queued: the backend applies removals before the batch's grooms.
+            if (!hadTubes) state->removed.erase(hair.id);
             state->grooms[hair.id] = std::move(hair);
             state->dirtyGrooms.insert(mesh.id);
             ++state->revision;
@@ -1576,17 +1601,7 @@ public:
             viewerVisible_ = data.visible;
         }
         const auto old = state->lights.find(data.id);
-        if (old != state->lights.end() && old->second.transform == data.transform &&
-            old->second.texture == data.texture && old->second.color == data.color &&
-            old->second.intensity == data.intensity && old->second.visible == data.visible &&
-            old->second.type == data.type && old->second.width == data.width && old->second.height == data.height &&
-            old->second.length == data.length && old->second.flags == data.flags &&
-            old->second.diffuse == data.diffuse && old->second.specular == data.specular &&
-            old->second.angle == data.angle && old->second.coneAngle == data.coneAngle &&
-            old->second.coneSoftness == data.coneSoftness && old->second.textureFormat == data.textureFormat &&
-            old->second.ies == data.ies && old->second.iesAngleScale == data.iesAngleScale &&
-            old->second.iesNormalize == data.iesNormalize && old->second.lightLink == data.lightLink &&
-            old->second.shadowLink == data.shadowLink) {
+        if (old != state->lights.end() && old->second == data) {
             *bits = Clean;
             return;
         }

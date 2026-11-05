@@ -23,7 +23,7 @@ if (-not $RuntimeConfig) {
     $ActiveConfig = Join-Path $TaskRoot 'out\project-assets\active-houdini.json'
     $RuntimeConfig = Get-HdUELocalPath -Key runtime_config -Optional
     if (-not $RuntimeConfig -and (Test-Path -LiteralPath $ActiveConfig)) { $RuntimeConfig = $ActiveConfig }
-    if (-not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Run Update-HoudiniRuntime.ps1 or specify an updated -RuntimeConfig with the depth extension.' }
+    if (-not $RuntimeConfig -or -not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Run Update-HoudiniRuntime.ps1 or specify an updated -RuntimeConfig with the depth extension.' }
 }
 if (-not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Specify a prepared -RuntimeConfig.' }
 if ($HipFile) {

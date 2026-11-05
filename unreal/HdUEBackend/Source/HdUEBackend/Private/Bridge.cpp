@@ -548,7 +548,6 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
     if (!ValidSession(Handle)) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     ReleaseResidency(Session);
-    HdueSharedFrames::Reset();
     for (auto& [Prefix, Component] : Session->SceneComponents)
         if (Component.Actor.IsValid()) Component.Actor->Destroy();
     for (const auto& Placed : Session->PlacedActors)
@@ -563,6 +562,8 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
             for (auto& R : Pair) R.Reset();
     });
     FlushRenderingCommands();
+    // After the flush: a queued frame's BeginFrame would otherwise create a new shared ring for this ended session.
+    HdueSharedFrames::Reset();
     Session->InFlight.Reset();
     Session->ViewState->Destroy();
     Session->ViewState = nullptr;
@@ -790,15 +791,15 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
                              Request->mode == HDUE_REALTIME && Previous.aov == Request->aov;
     if (Aov) {
         // A lighting component starts from no history, as each Path Tracer beauty request does.
+        // No flush: FSceneViewState::Destroy defers the delete to a render command (SceneOcclusion.cpp), after the
+        // commands already queued with this state. A flush here stalled every edit's request on the render thread.
         if (Session->AovViewState && LightingComponents(*Request)) {
-            FlushRenderingCommands();
             Session->AovViewState->Destroy();
             Session->AovViewState = nullptr;
         }
         if (!Session->AovViewState)
             Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     } else if (!KeepHistory) {
-        FlushRenderingCommands();
         Session->ViewState->Destroy();
         Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
     }
@@ -2354,6 +2355,7 @@ HdueResult HDUE_CALL RemoveAsset(HdueSession Handle, const char* Id) {
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Id) return HDUE_INVALID_ARGUMENT;
     Runtime.Session->Scene->Assets.Remove(UTF8_TO_TCHAR(Id));
+    Runtime.Session->DecalMaterials.Remove(UTF8_TO_TCHAR(Id));
     if (TWeakObjectPtr<AActor> Placed;
         Runtime.Session->PlacedActors.RemoveAndCopyValue(UTF8_TO_TCHAR(Id), Placed) && Placed.IsValid())
         Placed->Destroy();

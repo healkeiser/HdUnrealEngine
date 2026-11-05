@@ -9,9 +9,9 @@ import time
 
 import hdefereval
 import hdue_houdini as integration
+from compare_pfm import write as write_pfm
 from hdue_houdini_test import Test as ViewportTest
 from hdue_houdini_test import flipbook
-from hdue_viewer import write_pfm
 
 _test = None
 

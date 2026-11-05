@@ -170,7 +170,7 @@ int32 UHdUEInspectAssetsCommandlet::Main(const FString& Params) {
     FString Json;
     const auto Writer = TJsonWriterFactory<>::Create(&Json);
     FJsonSerializer::Serialize(Root, Writer);
-    if (!FFileHelper::SaveStringToFile(Json, *Output)) return 3;
+    if (!FFileHelper::SaveStringToFile(Json, *Output, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)) return 3;
     UE_LOG(LogTemp, Display, TEXT("hdUE inspected %d assets; level actors=%d meshes=%d lights=%d partitioned=%d"),
            Assets.Num(), Actors, Meshes, Lights, World->IsPartitionedWorld());
     return 0;

@@ -10,7 +10,12 @@ import json
 import re
 from pathlib import Path
 
-from materialx_textures import file_identity, resolved, udim_tiles
+from materialx_textures import (
+    file_identity,
+    resolved,
+    udim_tile_name,
+    udim_tiles,
+)
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import graph_data
 
@@ -67,7 +72,7 @@ def texture_path(stage, item, time, embedded=None):
         if not value.get("resolved"):
             raise ValueError(f"Texture is unresolved: {item['attribute']}")
         file = Path(value["resolved"]).resolve()
-        match = re.fullmatch(r"(.+[._])\d{4}(\.[^.]+)", file.name)
+        match = udim_tile_name(file.name)
         if match:
             pattern = str(file.parent / (match[1] + "<UDIM>" + match[2]))
             try:

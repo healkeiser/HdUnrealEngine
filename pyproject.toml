@@ -33,7 +33,6 @@ ignore = [
 # Tests keep handles and values that document what each step returns.
 "*_test.py" = ["F841", "B007", "E712"]
 "tests/**" = ["F841"]
-"scripts/asset_proxy.py" = ["E712"]  # the attribute may hold a non-bool
 "integrations/**" = ["B007"]
 "scripts/render_gallery.py" = ["B007"]
 

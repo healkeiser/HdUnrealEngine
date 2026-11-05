@@ -86,10 +86,36 @@ class LiveTests(unittest.TestCase):
             broken = job("V5_missing", "d", STALE_AGE + 60, package=False)
             unused = job("V6_unused", "e", UNUSED_AGE + 60)
             recent_replaced = job("V7_replaced_recently", "a", 60)
-            removed = set(clean(project, now=now))
-            self.assertEqual(removed, {orphan, replaced, broken, unused})
-            for path in (kept, fresh_orphan, recent_replaced):
+            # The editor project's packages of each job: kept while the runtime job exists or the job is recent.
+            editor = root / "editor/Content"
+
+            def editor_job(name, age):
+                folder = editor / "HdUE/Live/P1" / name
+                folder.mkdir(parents=True)
+                os.utime(folder, (now - age, now - age))
+                return folder
+
+            editor_kept = editor_job("V1_current", STALE_AGE + 60)
+            editor_running = editor_job("V8_running", 60)
+            editor_gone = editor_job("V9_gone", STALE_AGE + 60)
+            editor_twin_removed = editor_job("V3_orphan", STALE_AGE + 60)
+            removed = set(clean(project, now=now, editor_content=editor))
+            self.assertEqual(
+                removed, {orphan, replaced, broken, unused, editor_gone}
+            )
+            for path in (
+                kept,
+                fresh_orphan,
+                recent_replaced,
+                editor_kept,
+                editor_running,
+            ):
                 self.assertTrue(path.is_dir(), path)
+            # Its runtime twin was removed by this pass: the next pass removes it.
+            self.assertIn(
+                editor_twin_removed,
+                set(clean(project, now=now, editor_content=editor)),
+            )
 
     def test_published_jobs_count_as_prepared(self):
         # A job published by an earlier process (prepare_substrate.publish) is known to the next one, unless its

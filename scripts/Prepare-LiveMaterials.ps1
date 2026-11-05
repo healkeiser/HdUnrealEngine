@@ -35,6 +35,8 @@ try {
         # A batch render's job has no mask-preview graphs (prepare_substrate.export_records).
         foreach ($File in @($Manifest.file, $Manifest.preview)) { if ($File) { $File + '|' + [IO.Path]::ChangeExtension($File, '.receipt.json') } }
     }
+    # Two Builder materials with one graph share its export: compile it once.
+    $Lines = @($Lines | Select-Object -Unique)
     $List = Join-Path $RunOutput 'graphs.txt'
     [IO.File]::WriteAllLines($List, [string[]]@($Lines), [Text.UTF8Encoding]::new($false))
     $MaterialX = @()

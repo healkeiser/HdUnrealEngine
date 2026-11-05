@@ -286,13 +286,12 @@ def publish(folder, runtime_project, destination):
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + ".incoming-" + uuid.uuid4().hex)
     shutil.copytree(source, temporary)
+    # The job's library next to its packages, in the same rename: later processes on this runtime load it
+    # (live_materials.published), so a graph is prepared once per runtime, not once per process.
+    (temporary / LIBRARY_NAME).write_text(
+        json.dumps(library, indent=2), encoding="utf-8"
+    )
     temporary.rename(target)
-    # The job's library next to its packages: later processes on this runtime load it (live_materials.published), so
-    # a graph is prepared once per runtime, not once per process.
-    shared = target / LIBRARY_NAME
-    pending = shared.with_name(shared.name + ".incoming-" + uuid.uuid4().hex)
-    pending.write_text(json.dumps(library, indent=2), encoding="utf-8")
-    pending.rename(shared)
     (folder / "published.json").write_text(
         json.dumps(
             dict(

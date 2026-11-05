@@ -9,7 +9,7 @@ import traceback
 import hdue_houdini as integration
 import hou
 import numpy as np
-from hdue_viewer import write_pfm
+from compare_pfm import write as write_pfm
 from PySide6 import QtCore
 
 _test = None

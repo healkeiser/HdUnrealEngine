@@ -6,6 +6,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $TaskRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 if ($Suite -in 'unit', 'all') {
     & uv run --python 3.11 (Join-Path $TaskRoot 'tests\test_repository_scope.py')
     if ($LASTEXITCODE) { throw 'Repository scope failed.' }
@@ -29,9 +30,13 @@ if ($Suite -in 'houdini', 'all') {
     & (Join-Path $PSScriptRoot 'Test-Houdini.ps1') -RuntimeConfig $RuntimeConfig
     & (Join-Path $PSScriptRoot 'Test-HoudiniOpTextures.ps1') -RuntimeConfig $RuntimeConfig
     # hdUE's create/edit prim LOPs (hython, no GPU).
-    if ($RuntimeConfig) { $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($RuntimeConfig) }
-    & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\houdini_prim_lops.py')
-    if ($LASTEXITCODE) { throw 'Prim LOP tests failed.' }
+    $Previous = @{ HDUE_RUNTIME_CONFIG = $env:HDUE_RUNTIME_CONFIG }
+    try {
+        if ($RuntimeConfig) { $env:HDUE_RUNTIME_CONFIG = [IO.Path]::GetFullPath($RuntimeConfig) }
+        & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\houdini_prim_lops.py')
+        if ($LASTEXITCODE) { throw 'Prim LOP tests failed.' }
+    }
+    finally { Restore-HdUEEnvironment -Snapshot $Previous }  # the caller's shell keeps its own profile
     # Prepared materials in husk (decal, volume and MaterialX libraries, a stale graph failing the frame).
     $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
     & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments

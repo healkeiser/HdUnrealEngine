@@ -9,8 +9,7 @@
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
-// Name of the scene_linear colour space, and whether converting to it is needed.
-const std::string& HdUESceneLinearName();
+// Whether converting to the scene_linear colour space is needed.
 bool HdUESceneLinearIsRec709();
 // Linear Rec.709 RGBA pixels (UE's output) to scene_linear, in place.
 void HdUEToSceneLinear(std::vector<float>& rgba);

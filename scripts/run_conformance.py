@@ -288,7 +288,9 @@ def run_scene(name, path, spec, mode, env, timeout):
     loaded = {}
     for frame in range(1, frames + 1):
         loaded[frame] = frame_images(out, frame)
-    if error and not any(loaded.values()):
+    if error and not any(
+        len(f) > 1 for f in loaded.values()
+    ):  # more than METADATA
         entry["error"] = error
         return entry
     for check in spec["checks"]:
@@ -420,9 +422,11 @@ def main():
     args = parser.parse_args()
     args.houdini = args.houdini or local_path("houdini_root")
     args.build = args.build or local_path("houdini_build_root")
-    args.runtime_config = args.runtime_config or Path(
-        os.environ.get("HDUE_RUNTIME_CONFIG")
-        or ROOT / ".local" / "runtime-houdini.json"
+    args.runtime_config = args.runtime_config or local_path("runtime_config")
+    # husk runs in each scene's output folder: relative paths would resolve there.
+    args.houdini, args.build, args.runtime_config = (
+        Path(p).resolve()
+        for p in (args.houdini, args.build, args.runtime_config)
     )
     env = environment(args)
     report_path = OUT / "report.json"
@@ -455,9 +459,10 @@ def main():
             if "error" in entry:
                 print(f"    ERROR {entry['error']}", flush=True)
             OUT.mkdir(parents=True, exist_ok=True)
-            report_path.write_text(
-                json.dumps(report, indent=1), encoding="utf-8"
-            )
+            # Atomic, so an interrupted run leaves the previous report readable.
+            pending = report_path.with_suffix(f".{os.getpid()}.tmp")
+            pending.write_text(json.dumps(report, indent=1), encoding="utf-8")
+            os.replace(pending, report_path)
     print(
         f"{failures} failing runs, {time.perf_counter() - start:.0f} s; report: {report_path}"
     )

@@ -180,12 +180,8 @@ def set_mode(mode):
 def create_render_settings():
     """An hdUE Render Settings LOP after the Scene Viewer's displayed LOP, as hdue_houdini.set_render_setting adds one."""
     import hdue_houdini
-    import hou
 
-    network = hdue_houdini.scene_viewer().pwd()
-    display = (
-        network.displayNode() if isinstance(network, hou.LopNetwork) else None
-    )
+    display = hdue_houdini.viewer_display(hdue_houdini.scene_viewer())
     if not display:
         raise RuntimeError("Display a LOP network in the Scene Viewer")
     node = hdue_houdini.render_settings_node(display)

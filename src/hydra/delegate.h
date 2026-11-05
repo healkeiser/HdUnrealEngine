@@ -24,6 +24,7 @@
 #include <atomic>
 #include <set>
 #include <mutex>
+#include <tuple>
 #include <vector>
 
 #ifdef HDUE_HYDRA_EXPORTS
@@ -263,6 +264,7 @@ struct HdUETextureData {
     uint32_t wrap[2] = {HDUE_WRAP_REPEAT, HDUE_WRAP_REPEAT};
     uint32_t encoding = HDUE_TEXTURE_ENCODING_AUTO;
     uint32_t uvSet = 0;  // index into the material's UV primvars (HdUEMaterialPrimvars)
+    bool operator==(const HdUETextureData&) const = default;
 };
 // op: (Houdini COP) and opdef: (embedded HDA) images exist only inside the host, which exports them and maps each
 // path to its file (render setting opTextures). Materials and lights keep these paths; they are resolved when packed.
@@ -288,6 +290,7 @@ struct HdUEMaterialData {
     // What the translation skipped, warned at upload (HdUEWarnMaterial) only when no cooked asset renders instead:
     // a batch host maps cooked assets after Sync.
     std::vector<std::string> warnings;
+    bool operator==(const HdUEMaterialData&) const = default;
 };
 // Warns, once per message, what a material's translation skipped.
 void HdUEWarnMaterial(const HdUEMaterialData& data);
@@ -316,6 +319,7 @@ struct HdUELightData {
     uint32_t flags = HDUE_LIGHT_SHADOWS | HDUE_LIGHT_BACKGROUND | HDUE_LIGHT_MEGALIGHTS,
              textureFormat = HDUE_ENVIRONMENT_AUTOMATIC;
     bool visible = true, viewer = false;
+    bool operator==(const HdUELightData&) const = default;
 };
 struct HdUEState : HdRenderParam {
     std::mutex mutex;
@@ -414,6 +418,10 @@ struct HdUEState : HdRenderParam {
     uint64_t generation = 0;
     uint64_t submittedRequestSettingsRevision = 0;
     uint64_t publishedFrames = 0, sceneSubmissions = 0, coalescedCameraUpdates = 0;
+    // The last set_post_process (UE thread only): session, names, values, materials, tonemapper mode, exposure stops.
+    std::tuple<HdueSession, std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, int32_t,
+               float>
+        postProcessSent;
     uint64_t staleFrameRetries = 0;
     uint64_t submittedMeshes = 0, submittedMaterials = 0, materialParameterUpdates = 0;
     uint64_t gpuLocalMemoryBytes = 0;
@@ -538,6 +546,7 @@ private:
     uint32_t width_ = 0, height_ = 0, maps_ = 0;
     HdFormat format_ = HdFormatFloat32Vec4;
     bool converged_ = false, multiSampled_ = false, sizeWarned_ = false;
+    bool spareWanted_ = false;  // takeSpare was called: publish keeps the float image (else it would hold a frame)
     std::string allocationError_;
     std::shared_ptr<std::vector<uint8_t>> pixels_, pinned_;  // in format_
     std::vector<uint8_t> spareBytes_;  // the replaced frame's storage, reused unless a Map still holds it

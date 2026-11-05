@@ -766,7 +766,7 @@ int32 CompileGraph(const FString& File, const FString& Report, bool WaitForShade
     if (!Root->TryGetObjectField(TEXT("graph"), GraphPtr) || (*GraphPtr)->GetIntegerField(TEXT("version")) != 1)
         return 2;
     auto Graph = *GraphPtr;
-    if (!Root->HasField(TEXT("compiler")) || Root->GetIntegerField(TEXT("compiler")) != 3 ||
+    if (!Root->HasField(TEXT("compiler")) || Root->GetIntegerField(TEXT("compiler")) != HdUESubstrateCompilerVersion ||
         !Root->HasTypedField<EJson::Array>(TEXT("parameters")))
         return 2;
     const FString Asset = Root->GetStringField(TEXT("asset"));
@@ -853,7 +853,7 @@ int32 CompileGraph(const FString& File, const FString& Report, bool WaitForShade
     auto Result = MakeShared<FJsonObject>();
     Result->SetNumberField(TEXT("version"), 1);
     Result->SetStringField(TEXT("asset"), Material->GetPathName());
-    Result->SetNumberField(TEXT("compiler"), 3);  // 3: ID switch (IdSwitch.h)
+    Result->SetNumberField(TEXT("compiler"), HdUESubstrateCompilerVersion);
     Result->SetBoolField(TEXT("id_switch"), IdSwitch);
     Result->SetStringField(TEXT("domain"), Volume ? TEXT("volume") : Decal ? TEXT("decal") : TEXT("surface"));
     Result->SetNumberField(TEXT("automatic_parameters"), Compiler.LiveBuilt.Num());

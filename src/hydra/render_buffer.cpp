@@ -92,22 +92,32 @@ void HdUERenderBuffer::_Deallocate() {
     converged_ = false;
 }
 void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pixels, size_t sourceChannels) {
-    std::lock_guard lock(mutex_);
-    const size_t channels = HdGetComponentCount(format_), bytes = HdDataSizeOfFormat(format_);
+    // The conversion runs without the lock: the host's UI thread asks this buffer for its size and image every redraw.
+    uint32_t width, height;
+    HdFormat format;
+    std::vector<uint8_t> out;
+    {
+        std::lock_guard lock(mutex_);
+        width = width_;
+        height = height_;
+        format = format_;
+        out.swap(spareBytes_);
+    }
+    const size_t channels = HdGetComponentCount(format), bytes = HdDataSizeOfFormat(format);
     if (!sourceChannels) sourceChannels = channels;
-    if (frame.width != width_ || frame.height != height_ ||
-        pixels.size() != size_t(width_) * height_ * sourceChannels) {
+    if (frame.width != width || frame.height != height || pixels.size() != size_t(width) * height * sourceChannels) {
+        std::lock_guard lock(mutex_);
         if (!sizeWarned_)
             TF_WARN("hdUE: %s receives a %ux%u image with %zu channels for its %ux%u buffer; frame dropped",
-                    GetId().GetText(), frame.width, frame.height, sourceChannels, width_, height_);
+                    GetId().GetText(), frame.width, frame.height, sourceChannels, width, height);
         sizeWarned_ = true;
         return;
     }
     // A buffer allocated with other channels than hdUE renders (a color3f beauty, the UsdRenderVar default; an RGBA
     // albedo): copy the common channels, fill the rest (alpha 1).
     if (sourceChannels != channels) {
-        std::vector<float> converted(size_t(width_) * height_ * channels);
-        WorkParallelForN(size_t(width_) * height_, [&](size_t begin, size_t end) {
+        std::vector<float> converted(size_t(width) * height * channels);
+        WorkParallelForN(size_t(width) * height, [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i)
                 for (size_t c = 0; c < channels; ++c)
                     converted[i * channels + c] = c < sourceChannels ? pixels[i * sourceChannels + c]
@@ -116,32 +126,33 @@ void HdUERenderBuffer::publish(const HdueFrameInfo& frame, std::vector<float> pi
         });
         pixels.swap(converted);
     }
-    sizeWarned_ = false;
-    std::vector<uint8_t> out;
-    out.swap(spareBytes_);
-    out.resize(size_t(width_) * height_ * bytes);
+    out.resize(size_t(width) * height * bytes);
     // UE's C ABI is top-down; Hydra/Hdx CPU AOVs use a lower-left origin. Flip while encoding, one pass.
-    const bool half = HdGetComponentFormat(format_) == HdFormatFloat16;
-    const size_t row = size_t(width_) * channels;
-    WorkParallelForN(height_, [&](size_t begin, size_t end) {
+    const bool half = HdGetComponentFormat(format) == HdFormatFloat16;
+    const size_t row = size_t(width) * channels;
+    WorkParallelForN(height, [&](size_t begin, size_t end) {
         for (size_t y = begin; y < end; ++y) {
             const float* source = pixels.data() + y * row;
-            uint8_t* target = out.data() + (height_ - 1 - y) * row * (bytes / channels);
+            uint8_t* target = out.data() + (height - 1 - y) * row * (bytes / channels);
             if (half)
                 for (size_t i = 0; i < row; ++i) reinterpret_cast<GfHalf*>(target)[i] = GfHalf(source[i]);
             else
                 std::memcpy(target, source, row * sizeof(float));
         }
     });
+    std::lock_guard lock(mutex_);
+    if (width_ != width || height_ != height || format_ != format) return;  // reallocated meanwhile: stale frame
+    sizeWarned_ = false;
     if (pixels_ && pixels_.use_count() == 1) spareBytes_.swap(*pixels_);
     pixels_ = std::make_shared<std::vector<uint8_t>>(std::move(out));
-    spare_ = std::move(pixels);
+    if (spareWanted_) spare_ = std::move(pixels);
     converged_ = frame.converged != 0;
 }
 std::vector<float> HdUERenderBuffer::takeSpare(size_t size) {
     std::vector<float> spare;
     {
         std::lock_guard lock(mutex_);
+        spareWanted_ = true;
         spare.swap(spare_);
     }
     spare.resize(size);

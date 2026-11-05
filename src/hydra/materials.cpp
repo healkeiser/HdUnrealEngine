@@ -612,6 +612,12 @@ public:
                               m.uvTransform);
         };
         const auto previous = state->materials.find(data.id);
+        // A re-sync with nothing changed (Houdini re-syncs on unrelated edits) neither re-imports the material in UE
+        // nor touches its meshes (update_meshes).
+        if (previous != state->materials.end() && previous->second == data) {
+            *bits = Clean;
+            return;
+        }
         if (displacement(previous == state->materials.end() ? HdUEMaterialData() : previous->second) !=
             displacement(data))
             for (const auto& [id, mesh] : state->meshes)

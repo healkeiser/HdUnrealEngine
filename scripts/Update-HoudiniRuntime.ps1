@@ -50,6 +50,7 @@ $Config.backend_dll = $Destination
 # while Set-Content had truncated the file read half a profile.
 function Write-Profile([string]$Path) {
     $Pending = "$Path.pending"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null  # a side profile's new folder
     $Config | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Pending -Encoding utf8
     Move-Item -LiteralPath $Pending -Destination $Path -Force
 }

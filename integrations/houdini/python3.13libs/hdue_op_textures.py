@@ -174,9 +174,13 @@ class Cache:
         for uri in self.bindings.get(key, ()):
             try:
                 if uri.startswith("opdef:"):
-                    if uri not in self.entries or self.entries[uri][
-                        "stamp"
-                    ] != opdef_stamp(uri):
+                    stamp = opdef_stamp(
+                        uri
+                    )  # first: an unresolvable uri raises
+                    if (
+                        uri not in self.entries
+                        or self.entries[uri]["stamp"] != stamp
+                    ):
                         return True
                     continue
                 node, _ = _source(uri)
@@ -189,7 +193,17 @@ class Cache:
                     ):
                         return True
             except (ValueError, hou.Error):
-                return True
+                # Unresolvable now: changed only if it resolved at the last export. Still unresolvable as then: clean,
+                # or every tick would restart the stage walk that reports it.
+                known = [
+                    k
+                    for k in (uri, (uri, False), (uri, True))
+                    if k in self.entries
+                ]
+                for k in known:
+                    del self.entries[k]
+                if known:
+                    return True
         return False
 
 

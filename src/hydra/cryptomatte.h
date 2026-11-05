@@ -52,21 +52,25 @@ inline float HdUECryptomatteFloat(uint32_t hash) {
 // One pixel's Cryptomatte ranks from the ids its samples hit (0: nothing): (id, coverage) pairs, most coverage first
 // (ties: lower id), each sample covering 1 / count of the pixel (a box filter). Writes 2 * ranks floats, (0, 0) past
 // the ids present; layer NN of a Cryptomatte holds ranks 2NN and 2NN + 1 as RGBA.
+// At most kMaxSamples ids per pixel: called per pixel, so its hits stay on the stack.
 inline void HdUECryptomatteRanks(const uint32_t* ids, size_t count, float* out, size_t ranks) {
-    std::vector<std::pair<uint32_t, uint32_t>> hits;  // (id, samples)
+    constexpr size_t kMaxSamples = 64;
+    std::pair<uint32_t, uint32_t> hits[kMaxSamples];  // (id, samples)
+    size_t used = 0;
+    count = std::min(count, kMaxSamples);
     for (size_t i = 0; i < count; ++i) {
         if (!ids[i]) continue;
-        auto it = std::find_if(hits.begin(), hits.end(), [&](const auto& hit) { return hit.first == ids[i]; });
-        if (it == hits.end())
-            hits.emplace_back(ids[i], 1);
+        auto* it = std::find_if(hits, hits + used, [&](const auto& hit) { return hit.first == ids[i]; });
+        if (it == hits + used)
+            hits[used++] = {ids[i], 1};
         else
             ++it->second;
     }
-    std::sort(hits.begin(), hits.end(), [](const auto& a, const auto& b) {
+    std::sort(hits, hits + used, [](const auto& a, const auto& b) {
         return a.second != b.second ? a.second > b.second : a.first < b.first;
     });
     for (size_t r = 0; r < ranks; ++r) {
-        out[2 * r] = r < hits.size() ? HdUECryptomatteFloat(hits[r].first) : 0.f;
-        out[2 * r + 1] = r < hits.size() ? float(hits[r].second) / float(count) : 0.f;
+        out[2 * r] = r < used ? HdUECryptomatteFloat(hits[r].first) : 0.f;
+        out[2 * r + 1] = r < used ? float(hits[r].second) / float(count) : 0.f;
     }
 }

@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import OpenImageIO as oiio
+from local_paths import local_path
 
 ROOT = Path(__file__).resolve().parent.parent
 CORNELL = ROOT / "samples" / "cornell"
@@ -97,8 +98,8 @@ SETS = {  # out folder, images folder, README markers
 
 
 def dev_environment():
-    profile = ROOT / ".local" / "runtime-houdini.json"
-    build = ROOT / "build" / "houdini"
+    profile = local_path("runtime_config")
+    build = local_path("houdini_build_root")
     os.environ["HOUDINI_PATH"] = f'{ROOT / "integrations" / "houdini"};&'
     os.environ["PXR_PLUGINPATH_NAME"] = str(build / "resources")
     os.environ["HDUE_HOUDINI_ENABLE"] = "1"

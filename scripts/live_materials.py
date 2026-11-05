@@ -153,11 +153,12 @@ def used(entry):
             pass
 
 
-def clean(runtime_project, log_directory=None, now=None):
+def clean(runtime_project, log_directory=None, now=None, editor_content=None):
     """Removes, from the runtime's live content, what no process needs: interrupted publishes, jobs without a library
     (crashed, or published before libraries were kept) or no longer usable, jobs a newer job fully replaces, and jobs
-    unused for UNUSED_AGE; from log_directory, worker folders older than WORKER_AGE. Files a running UE holds open
-    stay (the next clean() retries). Returns the removed paths.
+    unused for UNUSED_AGE; from log_directory, worker folders older than WORKER_AGE; from editor_content (the editor
+    project's Content, where the worker saves each job's packages before cooking them), jobs older than STALE_AGE whose
+    runtime job is gone. Files a running UE holds open stay (the next clean() retries). Returns the removed paths.
     """
     now = time.time() if now is None else now
     content = Path(runtime_project).resolve().parent / "Content"
@@ -179,6 +180,20 @@ def clean(runtime_project, log_directory=None, now=None):
             removed.append(path)
 
     live = content / "HdUE/Live"
+    if editor_content:
+        # A later job may compile on a published job's material (base_asset), so an editor job lives as long as its
+        # runtime twin. Left there, the full content cooks (/Game/HdUE is always cooked) would ship them too.
+        editor_live = Path(editor_content) / "HdUE/Live"
+        for folder in editor_live.glob("*/*"):
+            if (
+                folder.is_dir()
+                and not (live / folder.relative_to(editor_live)).exists()
+                and age(folder) > STALE_AGE
+            ):
+                remove(folder)
+        for process in editor_live.glob("*"):
+            if process.is_dir() and not any(process.iterdir()):
+                remove(process)
     if not live.is_dir():
         return removed
     for path in live.glob("**/*.incoming-*"):
@@ -255,7 +270,11 @@ class LivePreparation:
         # What earlier processes left behind, in the background: start-up does not wait for it.
         def clean_quietly():
             try:
-                clean(self.runtime_project, log_directory)
+                clean(
+                    self.runtime_project,
+                    log_directory,
+                    editor_content=self.root / "unreal/HdUEBackend/Content",
+                )
             except (
                 OSError
             ):  # a clean-up never disturbs preparation; the next process retries

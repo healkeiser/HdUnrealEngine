@@ -145,7 +145,7 @@ bool FHdueScene::NaniteFits(const FString& Id, const Nanite::FResources* Nanite)
     return true;
 }
 void FHdueScene::Remove(const FString& Id) {
-    NaniteFits(Id, nullptr);  // returns its root pages
+    // Root pages are counted per shared mesh key, returned once UE destroys the shared mesh (the SharedMeshes sweep).
     Lighting->Remove(Id);
     RemoveVolume(Id);
     if (FGroom* Groom = Grooms.Find(Id)) {
@@ -939,13 +939,15 @@ TextureAddress TextureWrap(const HdueTextureDesc& Texture, int32 Axis) {
     return IsUdim(UTF8_TO_TCHAR(Texture.file)) ? TA_Wrap : TextureWrap(Texture.wrap[Axis]);
 }
 // An image's size from its header (the first 256 KB: PNG and JPEG headers come first), or 0 x 0 when that is not enough
-// to tell (EXR, op: images), cached per file.
+// to tell (EXR, op: images), cached per file version: a COP export rewrites the same path at another size.
 FIntPoint ImageSize(const FString& File) {
     static FCriticalSection Lock;
     static TMap<FString, FIntPoint> Sizes;
+    const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
+    const FString Key = FString::Printf(TEXT("%s|%lld|%lld"), *File, Stat.ModificationTime.GetTicks(), Stat.FileSize);
     {
         FScopeLock Scope(&Lock);
-        if (const FIntPoint* Known = Sizes.Find(File)) return *Known;
+        if (const FIntPoint* Known = Sizes.Find(Key)) return *Known;
     }
     FIntPoint Size(0, 0);
     if (TUniquePtr<FArchive> In{IFileManager::Get().CreateFileReader(*File, FILEREAD_Silent)}) {
@@ -960,7 +962,7 @@ FIntPoint ImageSize(const FString& File) {
                 Size = FIntPoint(int32(Wrapper->GetWidth()), int32(Wrapper->GetHeight()));
     }
     FScopeLock Scope(&Lock);
-    Sizes.Add(File, Size);
+    Sizes.Add(Key, Size);
     return Size;
 }
 // A material with a UDIM texture draws on a VT parent, every texture of it virtual: UE's USD import does the same (its

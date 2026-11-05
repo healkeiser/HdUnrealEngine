@@ -67,16 +67,16 @@ function Copy-Tree([string]$From, [string]$To) {
     & robocopy $From $To @args /NFL /NDL /NJH /NJS | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Copy failed: $From" }
 }
-# Same relative layout as the repository, so hdue_houdini.ROOT and its imports keep working.
-Copy-Tree (Join-Path $TaskRoot 'integrations\houdini') (Join-Path $Package 'integrations\houdini') /E /XD __pycache__
 # Only the scripts/ modules the integration imports, found by following its imports.
 $Modules = & uv run --quiet --python 3.13 (Join-Path $PSScriptRoot 'runtime_modules.py')
 if ($LASTEXITCODE) { throw 'Cannot list the runtime modules.' }
 Copy-Tree (Join-Path $TaskRoot 'scripts') (Join-Path $Package 'scripts') @($Modules)
-# Tracked samples only: samples/sponza/intel, samples/jungle_ruins/intel and samples/hdris are local downloads (~12 GB).
-$Samples = & git -C $TaskRoot ls-files -- samples
-if ($LASTEXITCODE) { throw 'Cannot list the tracked samples.' }
-foreach ($File in $Samples) {
+# Tracked files only, in the repository's layout (hdue_houdini.ROOT and its imports keep working): git describe --dirty
+# ignores untracked files, so a stray HDA backup must not ride along. samples/sponza/intel, samples/jungle_ruins/intel
+# and samples/hdris are local downloads (~12 GB).
+$Tracked = & git -C $TaskRoot ls-files -- integrations/houdini samples
+if ($LASTEXITCODE) { throw 'Cannot list the tracked files.' }
+foreach ($File in $Tracked) {
     $Target = Join-Path $Package $File
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
     Copy-Item -LiteralPath (Join-Path $TaskRoot $File) -Destination $Target

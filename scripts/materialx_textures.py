@@ -48,6 +48,13 @@ def udim_tiles(pattern):
     return dict(tiles)
 
 
+def udim_tile_name(name):
+    """A tile file's name split around its four-digit tile number (UE's BaseName.####.ext / BaseName_####.ext): a match
+    whose groups are the prefix and suffix, or None.
+    """
+    return re.fullmatch(r"(.+[._])\d{4}(\.[^.]+)", name)
+
+
 def _udim_tiles(pattern):
     path = Path(pattern)
     # Matches UE 5.8's BaseName.####.ext / BaseName_####.ext naming rule.

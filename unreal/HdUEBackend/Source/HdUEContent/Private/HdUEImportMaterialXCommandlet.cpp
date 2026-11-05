@@ -172,6 +172,7 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
     auto Dependencies = MakeShared<FJsonObject>();
     TSet<UTexture*> PreparedTextures;
     int32 TextureSourceErrors = 0;
+    int32 TextureSaveErrors = 0;
     const auto PrepareTexture = [&](UTexture* Texture) {
         if (!Texture || PreparedTextures.Contains(Texture)) return;
         PreparedTextures.Add(Texture);
@@ -207,7 +208,7 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
         if (Texture->AssetImportData)
             for (const FString& File : Texture->AssetImportData->ExtractFilenames())
                 Dependencies->SetStringField(File, FileHash(File));
-        SaveImported(Texture);
+        if (!SaveImported(Texture)) ++TextureSaveErrors;
     };
     Dependencies->SetStringField(Source, SourceHash);
     int32 MaterialCount = 0;
@@ -217,11 +218,8 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
         Entry->SetStringField(TEXT("name"), Object->GetName());
         Entry->SetStringField(TEXT("asset"), Object->GetPathName());
         Entry->SetStringField(TEXT("class"), Object->GetClass()->GetName());
-        if (auto* Texture = Cast<UTexture>(Object); Texture && Texture->AssetImportData) {
-            PrepareTexture(Texture);
-            for (const FString& File : Texture->AssetImportData->ExtractFilenames())
-                Dependencies->SetStringField(File, FileHash(File));
-        }
+        // PrepareTexture records the texture's source files and saves it.
+        if (auto* Texture = Cast<UTexture>(Object)) PrepareTexture(Texture);
         if (auto* Interface = Cast<UMaterialInterface>(Object)) {
             UMaterial* Material = Interface->GetMaterial();
             if (!Material || !Material->HasSubstrateFrontMaterialConnected()) {
@@ -272,13 +270,9 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
             for (const auto& P : Info) {
                 UTexture* Value = nullptr;
                 Interface->GetTextureParameterValue(P, Value);
-                PrepareTexture(Value);
                 // Interchange may reuse a previously imported texture without
-                // returning it in Objects. Keep those source dependencies too.
-                if (Value && Value->AssetImportData) {
-                    for (const FString& File : Value->AssetImportData->ExtractFilenames())
-                        Dependencies->SetStringField(File, FileHash(File));
-                }
+                // returning it in Objects: preparing it records its sources too.
+                PrepareTexture(Value);
                 auto Field = MakeShared<FJsonObject>();
                 Field->SetStringField(TEXT("name"), P.Name.ToString());
                 Field->SetStringField(TEXT("type"), TEXT("texture"));
@@ -314,12 +308,16 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
                 Entry->SetObjectField(TEXT("surface_effects"), Effects);
             }
         }
-        if (!SaveImported(Object)) return 5;
+        if (!Cast<UTexture>(Object) && !SaveImported(Object)) return 5;
         Assets.Add(MakeShared<FJsonValueObject>(Entry));
     }
     if (!MaterialCount) {
         UE_LOG(LogTemp, Error, TEXT("MaterialX import generated no materials."));
         return 6;
+    }
+    if (TextureSaveErrors) {
+        UE_LOG(LogTemp, Error, TEXT("%d imported textures could not be saved."), TextureSaveErrors);
+        return 5;
     }
     if (TextureSourceErrors) {
         UE_LOG(LogTemp, Error, TEXT("UDIM source files do not match imported texture blocks."));

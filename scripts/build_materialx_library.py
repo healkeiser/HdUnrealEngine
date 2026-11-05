@@ -6,11 +6,10 @@
 import argparse
 import hashlib
 import json
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from materialx_textures import udim_tiles
+from materialx_textures import udim_tile_name, udim_tiles
 
 
 def file_values(root):
@@ -41,28 +40,20 @@ def build(reports, destination):
                 "MaterialX import was not performed with Substrate Adaptive GBuffer"
             )
         source = Path(report["source"]).resolve()
-        if (
-            report.get("source_sha1")
-            != hashlib.sha1(source.read_bytes()).hexdigest()
-        ):
+        source_bytes = source.read_bytes()  # read once: both digests
+        if report.get("source_sha1") != hashlib.sha1(source_bytes).hexdigest():
             raise ValueError(
                 f"Import receipt is stale; import MaterialX again: {source}"
             )
         for name, expected in report["dependencies_sha1"].items():
             file = Path(name).resolve()
-            if (
-                not file.is_file()
-                or hashlib.sha1(file.read_bytes()).hexdigest() != expected
-            ):
+            data = file.read_bytes() if file.is_file() else None
+            if data is None or hashlib.sha1(data).hexdigest() != expected:
                 raise ValueError(
                     f"Imported texture/source changed; import again: {file}"
                 )
-            dependencies[str(file)] = hashlib.sha256(
-                file.read_bytes()
-            ).hexdigest()
-        dependencies[str(source)] = hashlib.sha256(
-            source.read_bytes()
-        ).hexdigest()
+            dependencies[str(file)] = hashlib.sha256(data).hexdigest()
+        dependencies[str(source)] = hashlib.sha256(source_bytes).hexdigest()
         root = ET.fromstring(
             source.read_text(encoding="utf-8-sig").replace(
                 "<UDIM>", "&lt;UDIM&gt;"
@@ -90,9 +81,7 @@ def build(reports, destination):
                                 f"UE UDIM blocks need power-of-two dimensions and a common aspect ratio: {p['name']}"
                             )
                     first_file = Path(p["source_files"][0]).resolve()
-                    match = re.fullmatch(
-                        r"(.+[._])\d{4}(\.[^.]+)", first_file.name
-                    )
+                    match = udim_tile_name(first_file.name)
                     if not match:
                         raise ValueError(
                             f"Cannot identify imported UDIM source set: {p['name']}"

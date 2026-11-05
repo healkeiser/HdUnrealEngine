@@ -15,6 +15,8 @@ namespace OCIO = OCIO_NAMESPACE;
 #include <functional>
 #include <mutex>
 #include <set>
+#include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -102,7 +104,6 @@ const ColorManagement& management() {
     return result;
 }
 }  // namespace
-const std::string& HdUESceneLinearName() { return management().sceneLinear; }
 bool HdUESceneLinearIsRec709() { return management().identity; }
 void HdUEToSceneLinear(std::vector<float>& rgba) {
 #if defined(HDUE_HOUDINI)
@@ -203,7 +204,22 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
                                          pixel * spec.width);
             processor->apply(pixels);
         }
-        if (read && image.write(cached.string(), OIIO::TypeDesc::HALF)) return true;
+        // Written beside, then renamed: another process (husk on a farm node) shares the folder and must never read a
+        // half-written file.
+        const auto pending = cached.parent_path() /
+                             (cached.stem().string() + "." +
+                              std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()) ^
+                                             uint64_t(std::chrono::steady_clock::now().time_since_epoch().count())) +
+                              ".pending.exr");
+        if (read && image.write(pending.string(), OIIO::TypeDesc::HALF)) {
+            std::error_code renamed;
+            std::filesystem::rename(pending, cached, renamed);
+            if (!renamed || std::filesystem::exists(cached, missing)) {  // another process won the race: same image
+                std::filesystem::remove(pending, missing);
+                return true;
+            }
+        }
+        std::filesystem::remove(pending, missing);
         TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", source.c_str(), from.c_str());
         return false;
     };

@@ -37,6 +37,8 @@ def local_path(key):
         return (file.parent / value).resolve()
     if key == "houdini_build_root":
         return ROOT / "build/houdini"
+    if key == "runtime_config":  # Update-HoudiniRuntime.ps1's default profile
+        return ROOT / ".local/runtime-houdini.json"
     raise SystemExit(
         f"Configure {key} in .local/paths.json or set {VARIABLES[key]}."
     )

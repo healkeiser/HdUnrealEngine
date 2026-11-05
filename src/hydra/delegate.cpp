@@ -2013,16 +2013,18 @@ class Pass final : public HdRenderPass {
     std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs_;
 #if defined(HDUE_HOUDINI)
     // Houdini's GL viewport takes every frame from the backend's shared GPU ring (gpu_frames.h); the CPU buffers then
-    // receive only converged frames, for Map (the Python viewer, scripts). The CPU path stays for what it computes
+    // receive only converged frames, for Map (scripts, tests). The CPU path stays for what it computes
     // after readback: motion blur sub-frame averaging and a non-identity OCIO scene_linear.
     HdueGpuOptions gpuOptions_{};
     HdUERenderBuffer* gpuBuffers_[2] = {};
     uint64_t gpuFrame_ = 0;
+    bool gpuUnsupported_ = false;  // UE refused shared frames once: never configured again (it did, every Execute)
     void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth) {
         const auto frames = s.locked([&] { return s.gpuFrames; });
         const auto& api = s.backend->api();
         HdueGpuOptions options{sizeof(options)};
-        options.enabled = frames && !frames->failed() && subframes_ <= 1 && HdUESceneLinearIsRec709();
+        options.enabled =
+            frames && !frames->failed() && !gpuUnsupported_ && subframes_ <= 1 && HdUESceneLinearIsRec709();
         options.depth = depth != nullptr;
         options.color_scale = s.exposed() ? lens_[3] : 1.f;  // camera exposure, as the CPU path applies it
         options.depth_scale = float(1 / centimetersPerUnit_);
@@ -2030,6 +2032,7 @@ class Pass final : public HdRenderPass {
             gpuBuffers_[1] != depth) {
             if (api.configure_gpu_frames(s.session, &options) != HDUE_OK && options.enabled) {  // not a D3D12 runtime
                 options.enabled = 0;
+                gpuUnsupported_ = true;
                 s.backend->require(api.configure_gpu_frames(s.session, &options), "configure_gpu_frames");
             }
             for (auto* bound : {&buffer, depth})
@@ -2053,13 +2056,14 @@ class Pass final : public HdRenderPass {
             buffer.setResource(nullptr);
             if (depth) depth->setResource(nullptr);
             gpuOptions_.enabled = 0;
+            gpuUnsupported_ = true;
             return;
         }
         if (polled != HDUE_PENDING) s.backend->require(polled, "poll_gpu_frame");
         // The host redraws the viewport when publishedFrames changes.
         if (polled == HDUE_OK && frame.frame_id != gpuFrame_) {
             gpuFrame_ = frame.frame_id;
-            ++s.publishedFrames;
+            s.locked([&] { ++s.publishedFrames; });
         }
     }
 #endif
@@ -2192,16 +2196,19 @@ class Pass final : public HdRenderPass {
                     entry[1] = TfStringEndsWith(mesh.material, ".displayColor") ? std::string() : mesh.material;
             }
         });
-        std::set<int32_t> seen(cryptoSamples_.begin(), cryptoSamples_.end());
+        // The manifests list the prims the samples hit: a flag per known prim ID (16 samples per pixel; a std::set
+        // of them took about a second per 1080p frame).
+        std::vector<uint8_t> seen(names.empty() ? 0 : size_t(std::max(0, names.rbegin()->first)) + 1);
+        for (const int32_t id : cryptoSamples_)
+            if (id >= 0 && size_t(id) < seen.size()) seen[size_t(id)] = 1;
         std::unordered_map<int32_t, std::array<uint32_t, 2>> hashes;
         std::map<std::string, uint32_t> manifests[2];
-        for (const int32_t id : seen) {
-            const auto it = names.find(id);
-            if (it == names.end()) continue;
+        for (const auto& [id, entry] : names) {
+            if (id < 0 || !seen[size_t(id)]) continue;
             for (int kind = 0; kind < 2; ++kind)
-                if (!it->second[kind].empty()) {
-                    hashes[id][kind] = HdUECryptomatteHash(it->second[kind]);
-                    manifests[kind][it->second[kind]] = hashes[id][kind];
+                if (!entry[kind].empty()) {
+                    hashes[id][kind] = HdUECryptomatteHash(entry[kind]);
+                    manifests[kind][entry[kind]] = hashes[id][kind];
                 }
         }
         size_t layers[2] = {0, 0};
@@ -2698,9 +2705,14 @@ public:
                     else
                         aovs.emplace_back(target, pathTraced && row->pathTraced ? row->pathTraced : row->aov);
                 }
-                // "No prim" everywhere, so Houdini never reads stale IDs.
+                // "No prim" everywhere, so Houdini never reads stale IDs: a buffer the last settled view rendered holds
+                // that view's converged IDs until cleared.
                 if (skipped)
-                    if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
+                    if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) {
+                        if (std::any_of(aovs_.begin(), aovs_.end(), [&](const auto& a) { return a.first == target; }))
+                            target->invalidate();
+                        clear(*target);
+                    }
             }
             if (!bufferVars.empty()) aovs.emplace_back(bufferVars.front().target, HDUE_AOV_BUFFERS);
             // Cryptomatte: kCryptomatteSamples primId passes, each shifted by a sub-pixel offset of a 4 x 4 grid, as
@@ -2788,18 +2800,21 @@ public:
                 desc.width = buffer->GetWidth();
                 desc.height = buffer->GetHeight();
                 s.backend->require(s.backend->api().create_session(&desc, &s.session), "create_session");
-                s.width = desc.width;
-                s.height = desc.height;
-                s.firstBatch = true;
-                s.geometryRevisions.clear();
-                s.surfaceStatus = {sizeof(HdueSurfaceStatus)};
+                // Under the lock: Hydra's Sync threads insert into these maps meanwhile.
+                s.locked([&] {
+                    s.width = desc.width;
+                    s.height = desc.height;
+                    s.firstBatch = true;
+                    s.geometryRevisions.clear();
+                    s.surfaceStatus = {sizeof(HdueSurfaceStatus)};
+                    for (const auto& [id, data] : s.meshes) s.dirtyMeshes.insert(id);
+                    for (const auto& [id, data] : s.materials) s.dirtyMaterials.insert(id);
+                    for (const auto& [id, data] : s.lights) s.dirtyLights.insert(id);
+                });
                 depthEnabled_ = false;
 #if defined(HDUE_HOUDINI)
                 gpuOptions_ = {};
 #endif
-                for (const auto& [id, data] : s.meshes) s.dirtyMeshes.insert(id);
-                for (const auto& [id, data] : s.materials) s.dirtyMaterials.insert(id);
-                for (const auto& [id, data] : s.lights) s.dirtyLights.insert(id);
                 changed = true;
             }
             if ((depth || cameraDepth) && !depthEnabled_) {
@@ -2815,7 +2830,7 @@ public:
                 const bool lightsChanged = assets.lights != s.submittedNativeLights;
                 s.nativeAssets = assets;
                 if (assets.loading) {
-                    s.error.clear();
+                    s.locked([&] { s.error.clear(); });  // diagnostics read it under the lock
                     s.assetRequestPending = true;
                     converged_ = false;
                     return;
@@ -3005,8 +3020,10 @@ public:
                         for (auto* extra : extraBeauties_) extra->publish(frame, pixels, 4);
                         buffer->publish(frame, std::move(pixels), 4);
                         publishMs = ms(publishStart, Clock::now());
-                        ++s.publishedFrames;
-                        s.lastFrame = frame;
+                        s.locked([&] {  // hdue_get_viewport_status reads both under the lock
+                            ++s.publishedFrames;
+                            s.lastFrame = frame;
+                        });
                         lastFrame_ = frame.frame_id;
                     }
                 }
@@ -3097,10 +3114,11 @@ public:
                     const bool shutter = pass->camera && pass->shutterClose > pass->shutterOpen &&
                                          !s.setting<bool>("disableMotionBlur", false) &&
                                          !s.setting<bool>("instantaneousShutter", false);
-                    const bool moving = cameraMotion.has_value() || s.locked([&] {
-                        return std::any_of(s.meshes.begin(), s.meshes.end(),
-                                           [](const auto& entry) { return entry.second.moving(); });
-                    });
+                    // Without a shutter nothing blurs: no scan of every mesh under the lock on each camera move.
+                    const bool moving = shutter && (cameraMotion.has_value() || s.locked([&] {
+                                            return std::any_of(s.meshes.begin(), s.meshes.end(),
+                                                               [](const auto& entry) { return entry.second.moving(); });
+                                        }));
                     subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
@@ -3210,17 +3228,24 @@ public:
                         valuePtrs.push_back(values[i].c_str());
                     }
                     for (const auto& m : materials) materialPtrs.push_back(m.c_str());
-                    const HduePostProcessDesc desc{sizeof(HduePostProcessDesc),
-                                                   namePtrs.data(),
-                                                   valuePtrs.data(),
-                                                   uint32_t(names.size()),
-                                                   materialPtrs.data(),
-                                                   uint32_t(materials.size()),
-                                                   tonemapper ? (toneCurve ? 1 : 2) : 0,
-                                                   tonemapper
-                                                       ? std::log2(std::max(lens[3], 1e-6f))
-                                                       : 0.f};  // the USD camera exposure adds to AutoExposureBias
-                    s.backend->require(s.backend->api().set_post_process(s.session, &desc), "set_post_process");
+                    const int32_t tonemapMode = tonemapper ? (toneCurve ? 1 : 2) : 0;
+                    const float exposureStops = tonemapper ? std::log2(std::max(lens[3], 1e-6f)) : 0.f;
+                    // Sent only when it changed: the backend re-imports every property and recaptures the sky, which
+                    // a camera move (most requests in the viewport) never changes.
+                    auto sent = std::make_tuple(s.session, names, values, materials, tonemapMode, exposureStops);
+                    if (sent != s.postProcessSent) {
+                        const HduePostProcessDesc desc{
+                            sizeof(HduePostProcessDesc),
+                            namePtrs.data(),
+                            valuePtrs.data(),
+                            uint32_t(names.size()),
+                            materialPtrs.data(),
+                            uint32_t(materials.size()),
+                            tonemapMode,
+                            exposureStops};  // the USD camera exposure adds to AutoExposureBias
+                        s.backend->require(s.backend->api().set_post_process(s.session, &desc), "set_post_process");
+                        s.postProcessSent = std::move(sent);
+                    }
                 }
                 if (needsRequest) {
                     subframe_ = 0;
@@ -3250,7 +3275,7 @@ public:
                     if (!needsRequest) {
                         subframeDue_ = true;
                         converged_ = false;
-                        s.error.clear();
+                        s.locked([&] { s.error.clear(); });  // diagnostics read it under the lock
                         return;
                     }  // retry the sub-frame
                     s.assetRequestPending = true;
@@ -3260,7 +3285,7 @@ public:
                     for (auto* extra : extraBeauties_) extra->invalidate();
                     for (auto* d : {depth, cameraDepth})
                         if (d) d->invalidate();
-                    s.error.clear();
+                    s.locked([&] { s.error.clear(); });  // diagnostics read it under the lock
                     return;
                 }
                 s.backend->require(requested, "request_render");
