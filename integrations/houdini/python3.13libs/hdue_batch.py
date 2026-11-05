@@ -127,19 +127,15 @@ class _Libraries:
         """
         import time as clock
 
-        from live_materials import materialx_records
-        from prepare_substrate import collect
+        from cooperative import run
+        from live_materials import records_steps
 
         if self.live is None:
             raise ValueError(
                 "Material preparation needs the runtime profile (HDUE_RUNTIME_CONFIG)"
             )
         live = self.live
-        records = collect(
-            stage, time, self.materialx.bound_entries
-        ) + materialx_records(
-            self.materialx.missing, time, self.materialx.missing_graphs
-        )
+        records = run(records_steps(stage, time, self.materialx))
         deadline = clock.monotonic() + 1800
         while live.request(
             records, self.substrate_base + list(live.entries.values())

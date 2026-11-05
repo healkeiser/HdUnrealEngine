@@ -117,6 +117,13 @@ TfToken uvPrimvar(const HdMaterialNode2& node) {
     return node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? token(param(node, "geomprop")) : TfToken();
 }
 // The UV primvars a material reads, in node order: its meshes' UV sets 0, 1, ...
+TfTokenVector uvPrimvars(const HdMaterialNetwork2& network);
+std::pair<TfTokenVector, TfToken> primvarNames(const HdMaterialNetwork2& network) {
+    std::pair<TfTokenVector, TfToken> names{uvPrimvars(network), TfToken()};
+    for (const auto& [path, node] : network.nodes)
+        if (names.second.IsEmpty()) names.second = colorPrimvar(node);
+    return names;
+}
 TfTokenVector uvPrimvars(const HdMaterialNetwork2& network) {
     TfTokenVector names;
     for (const auto& [path, node] : network.nodes)
@@ -597,6 +604,7 @@ public:
         data.id = GetId().GetString();
         const auto net = network(delegate, GetId());
         readDisplacement(net, data);
+        std::tie(data.uvPrimvars, data.colorPrimvar) = primvarNames(net);
         const auto* shader = surface(net);
         const bool translated = !shader || readSurface(net, *shader, data);
         auto* state = static_cast<HdUEState*>(param);
@@ -622,6 +630,14 @@ public:
             displacement(data))
             for (const auto& [id, mesh] : state->meshes)
                 if (mesh.material == data.id) state->dirtyMeshes.insert(id);
+        // Its meshes read other primvars now: their UVs or colours come again from Hydra (HdUERepullMeshes).
+        if (previous != state->materials.end() &&
+            (previous->second.uvPrimvars != data.uvPrimvars || previous->second.colorPrimvar != data.colorPrimvar))
+            for (const auto& [id, mesh] : state->meshes)
+                if (mesh.material == data.id) {
+                    state->fullUploads.insert(id);
+                    state->repull.insert(mesh.sourceId);
+                }
         state->materials[data.id] = data;
         state->dirtyMaterials.insert(data.id);
         ++state->revision;
@@ -636,15 +652,17 @@ void HdUEWarnMaterial(const HdUEMaterialData& data) {
 }
 
 // The UV primvars a material reads (its meshes' UV sets, uvPrimvars) and the vec3 primvar it reads as vertex colours
-// (displayColor, Cd, ...); empty when none.
-std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, const SdfPath& material) {
-    std::pair<TfTokenVector, TfToken> names;
-    if (material.IsEmpty()) return names;
-    const auto net = network(delegate, material);
-    names.first = uvPrimvars(net);
-    for (const auto& [path, node] : net.nodes)
-        if (names.second.IsEmpty()) names.second = colorPrimvar(node);
-    return names;
+// (displayColor, Cd, ...); empty when none. From its Sync when it has one (sprims sync before rprims): fetching and
+// converting the network on every mesh's Sync did it once per mesh, 5,000 times for a material on 5,000 meshes.
+std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, HdUEState& state,
+                                                       const SdfPath& material) {
+    if (material.IsEmpty()) return {};
+    {
+        std::lock_guard lock(state.mutex);
+        if (const auto it = state.materials.find(material.GetString()); it != state.materials.end())
+            return {it->second.uvPrimvars, it->second.colorPrimvar};
+    }
+    return primvarNames(network(delegate, material));
 }
 HdSprim* HdUECreateMaterial(const SdfPath& id) { return new Material(id); }
 PXR_NAMESPACE_CLOSE_SCOPE

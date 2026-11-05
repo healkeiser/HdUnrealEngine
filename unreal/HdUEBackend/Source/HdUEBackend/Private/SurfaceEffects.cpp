@@ -10,6 +10,44 @@
 #include "UDynamicMesh.h"
 #include "RHI.h"
 
+namespace {
+// A mesh's primary colours per triangle corner, and back: the wet mask takes them over (VertexColor.R).
+TArray<FVector4f> CornerColors(const UE::Geometry::FDynamicMesh3& Mesh) {
+    TArray<FVector4f> Corners;
+    const auto* Colors = Mesh.Attributes() ? Mesh.Attributes()->PrimaryColors() : nullptr;
+    if (!Colors) return Corners;
+    Corners.Reserve(Mesh.TriangleCount() * 3);
+    for (int32 T : Mesh.TriangleIndicesItr()) {
+        const auto Elements = Colors->GetTriangle(T);
+        for (int C = 0; C < 3; ++C)
+            Corners.Add(Colors->IsElement(Elements[C]) ? Colors->GetElement(Elements[C]) : FVector4f(1.f));
+    }
+    return Corners;
+}
+void SetCornerColors(UDynamicMeshComponent& Component, const TFunctionRef<FVector4f(int32 T, int C)> Color) {
+    using namespace UE::Geometry;
+    auto& Mesh = Component.GetDynamicMesh()->GetMeshRef();
+    Mesh.Attributes()->EnablePrimaryColors();
+    auto* Colors = Mesh.Attributes()->PrimaryColors();
+    Colors->ClearElements();
+    for (int32 T : Mesh.TriangleIndicesItr()) {
+        FIndex3i Elements;
+        for (int C = 0; C < 3; ++C) Elements[C] = Colors->AppendElement(Color(T, C));
+        Colors->SetTriangle(T, Elements);
+    }
+    Component.FastNotifyColorsUpdated();
+}
+// Puts a binding's saved mesh colours back, if the mesh is still the geometry (revision) they were taken from.
+void RestoreColors(UDynamicMeshComponent& Component, TArray<FVector4f>& Saved, bool SameGeometry) {
+    if (Saved.IsEmpty()) return;
+    if (SameGeometry && Saved.Num() == Component.GetDynamicMesh()->GetMeshRef().TriangleCount() * 3) {
+        int32 Corner = 0;
+        SetCornerColors(Component, [&](int32, int) { return Saved[Corner++]; });
+    }
+    Saved.Empty();
+}
+}  // namespace
+
 bool FHdueScene::SurfaceReady() const { return SurfaceFence.IsFenceComplete(); }
 HdueSurfaceStatus FHdueScene::SurfaceStatus() const {
     return {sizeof(HdueSurfaceStatus),
@@ -73,6 +111,7 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
             return HDUE_INVALID_ARGUMENT;
         }
         auto New = MakeShared<FWet>();
+        const auto* Old = WetBindings.Find(Id);
         if (D.mask_count) {
             New->Mask.Reserve(D.mask_count);
             for (uint32 V = 0; V < D.mask_count; ++V) {
@@ -84,6 +123,7 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
             }
         }
         New->Revision = D.geometry_revision;
+        if (Old && (*Old)->Revision == New->Revision) New->Colors = (*Old)->Colors;  // the mesh's, saved before
         const auto* Base = Materials.Find(MeshMaterials.FindRef(Id));
         if (!Base) {
             Error = TEXT("Wet base material not found: ") + Id;
@@ -116,7 +156,6 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
             Error = TEXT("Water slab was simplified; prepare a base graph with room for another closure: ") + Id;
             return HDUE_NOT_SUPPORTED;
         }
-        const auto* Old = WetBindings.Find(Id);
         const bool Reuse = Old && (*Old)->Base == New->Base && (*Old)->Asset == New->Asset;
         New->Material.Reset(Reuse ? (*Old)->Material.Get() : UMaterialInstanceDynamic::Create(Parent, World));
         const bool Upload = D.mask_count && (!Old || (*Old)->Revision != New->Revision || (*Old)->Mask != New->Mask);
@@ -126,10 +165,14 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
     for (const auto& P : Prepared) Kept.Add(P.Id);
     for (const auto& Old : WetBindings)
         if (!Kept.Contains(Old.Key)) {
-            if (auto* Actor = Actors.FindRef(Old.Key); IsValid(Actor))
+            if (auto* Actor = Actors.FindRef(Old.Key); IsValid(Actor)) {
                 if (auto* Component = Actor->FindComponentByClass<UMeshComponent>())
                     if (auto* Base = MeshMaterial(Old.Key); Base && Component->GetMaterial(0) != Base)
                         Component->SetMaterial(0, Base);
+                if (auto* Dynamic = Actor->FindComponentByClass<UDynamicMeshComponent>())
+                    RestoreColors(*Dynamic, Old.Value->Colors,
+                                  Old.Value->Revision == GeometryRevisions.FindRef(Old.Key));
+            }
         }
     WetBindings.Empty();
     for (auto& P : Prepared) {
@@ -145,22 +188,16 @@ HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Erro
             Instance->SetScalarParameterValue(TEXT("HdUE_WetRoughness"), FMath::Clamp(P.Roughness, 0.f, 1.f));
             Instance->SetScalarParameterValue(TEXT("HdUE_WetUseMask"), P.Wet->Mask.IsEmpty() ? 0.f : 1.f);
         }
+        if (P.Wet->Mask.IsEmpty()) RestoreColors(*P.Component, P.Wet->Colors, true);  // no mask any more
         if (P.UploadMask) {
             using namespace UE::Geometry;
-            auto& Mesh = P.Component->GetDynamicMesh()->GetMeshRef();
-            Mesh.Attributes()->EnablePrimaryColors();
-            auto* Colors = Mesh.Attributes()->PrimaryColors();
-            Colors->ClearElements();
+            const auto& Mesh = P.Component->GetDynamicMesh()->GetMeshRef();
+            if (P.Wet->Colors.IsEmpty()) P.Wet->Colors = CornerColors(Mesh);
             const FNonManifoldMappingSupport Sources(Mesh);
-            for (int32 T : Mesh.TriangleIndicesItr()) {
-                auto Vertices = Mesh.GetTriangle(T);
-                FIndex3i Elements;
-                for (int C = 0; C < 3; ++C)
-                    Elements[C] = Colors->AppendElement(
-                        FVector4f(P.Wet->Mask[Sources.GetOriginalNonManifoldVertexID(Vertices[C])], 0.f, 0.f, 1.f));
-                Colors->SetTriangle(T, Elements);
-            }
-            P.Component->FastNotifyColorsUpdated();
+            SetCornerColors(*P.Component, [&](int32 T, int C) {
+                return FVector4f(P.Wet->Mask[Sources.GetOriginalNonManifoldVertexID(Mesh.GetTriangle(T)[C])], 0.f, 0.f,
+                                 1.f);
+            });
             ++MaskUploads;
             MaskBytes += P.Wet->Mask.Num() * sizeof(float);
         }

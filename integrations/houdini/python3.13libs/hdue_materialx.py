@@ -133,20 +133,9 @@ class PreparedMaterials(OfflineView):
 
             message = str(error)
             if self.live and isinstance(error, NeedsPreparation):
-                from live_materials import materialx_records_steps
-                from prepare_substrate import collect_steps
+                from live_materials import records_steps
 
-                records = (
-                    yield from collect_steps(
-                        stage, time, self.library.bound_entries
-                    )
-                ) + (
-                    yield from materialx_records_steps(
-                        self.library.missing,
-                        time,
-                        self.library.missing_graphs,
-                    )
-                )
+                records = yield from records_steps(stage, time, self.library)
                 message = self.live.request(records, known()) or message
             self.publish_error(session, api, message)
             raise ValueError(message) from error

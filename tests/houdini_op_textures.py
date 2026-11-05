@@ -186,6 +186,37 @@ class OpTextures(unittest.TestCase):
             path, textures.cache().resolve("op:" + color.path(), True)
         )
 
+    def test_embedded_opdef_stamp(self):
+        # An embedded definition's section is hashed only after a change: its modification time has whole seconds, so
+        # an edit within the same second still changes the stamp, and a settled section is not read again.
+        import time
+
+        subnet = hou.node("/obj").createNode("geo").createNode("subnet")
+        definition = (
+            subnet.createDigitalAsset(
+                name="hdue_stamp_probe",
+                hda_file_name="Embedded",
+                description="probe",
+            )
+            .type()
+            .definition()
+        )
+        definition.addSection("img.png", b"A" * 100)
+        uri = "opdef:/Sop/hdue_stamp_probe?img.png"
+        first = textures.opdef_stamp(uri)
+        definition.sections()["img.png"].setContents(b"B" * 100)
+        edited = textures.opdef_stamp(uri)
+        self.assertNotEqual(first, edited)
+        time.sleep(2.5)
+        reads = []
+        read = hou.readBinaryFile
+        hou.readBinaryFile = lambda u: (reads.append(u), read(u))[1]
+        try:
+            self.assertEqual(textures.opdef_stamp(uri), edited)
+        finally:
+            hou.readBinaryFile = read
+        self.assertEqual(reads, [])
+
     def test_copernicus_output_port_and_raw_values(self):
         obj, color, output, source = fixture("op_ports")
         split = color.parent().createNode("channelsplit", "split")

@@ -192,6 +192,8 @@ UE starts once per process. Later delegates (the next viewport, husk `--restart-
   - PSOs: none bundled (`docs/building.md`, "PSOs"). UE's own PSO disk cache is off (`r.D3D12.PSO.DiskCache=0` in the log); the NVIDIA driver keeps its own shader cache (*inferred*).
   - Converted OCIO textures: `%TEMP%\hdue_ocio`, entries unused for a week removed (`color_management.h`).
   - Nanite builds: `Saved\NaniteCache` (`BuildNanite`, `Scene.cpp`), keyed by the builder's version and the mesh's content, entries unused for a week removed.
+  - Block-compressed textures: `%LOCALAPPDATA%\hdUE\TextureCache` (`CachePath`, `Scene.cpp`), entries unused for a week removed.
+  - Virtual textures: `%LOCALAPPDATA%\hdUE\VirtualTextureCache` (`VirtualTextureBuild.cpp`), manifests unused for a week removed with the chunks no other manifest names (a day's grace for chunks a running build has not named yet).
   - UE's `Saved` (`Logs`, `Config`): under the runtime project, or under `HDUE_USER_DIR` when set.
   - Houdini's host: its log directory (above) and exported `op:` texture images, removed on shutdown (`docs/houdini.md`).
 

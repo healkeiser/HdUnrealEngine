@@ -33,18 +33,25 @@ def identity(item):
 _REPORTED = set()
 
 
-def materialx_records(materials, time, graphs=None):
-    """Job records for MaterialX materials hdUE cannot translate at render time (MaterialXLibrary.missing). One that
-    cannot be prepared (an image embedded in a Houdini asset, ...) keeps its render-time translation; its reason is
-    printed once. graphs: the materials' graphs by path, as the library read them (MaterialXLibrary.missing_graphs).
+def records_steps(stage, time, library):
+    """A live job's records for a stage (cooperative.Job walk): its Substrate Builder graphs on library's bound
+    entries, and the MaterialX graphs the library cannot translate at render time (MaterialXLibrary.missing).
     """
-    from cooperative import run
+    from prepare_substrate import collect_steps
 
-    return run(materialx_records_steps(materials, time, graphs))
+    substrate = yield from collect_steps(stage, time, library.bound_entries)
+    materialx = yield from materialx_records_steps(
+        library.missing, time, library.missing_graphs
+    )
+    return substrate + materialx
 
 
 def materialx_records_steps(materials, time, graphs=None):
-    """materialx_records() as a cooperative walk (cooperative.Job): yields between materials."""
+    """Job records for MaterialX materials hdUE cannot translate at render time (MaterialXLibrary.missing), as a
+    cooperative walk (cooperative.Job). One that cannot be prepared (an image embedded in a Houdini asset, ...) keeps
+    its render-time translation; its reason is printed once. graphs: the materials' graphs by path, as the library
+    read them (MaterialXLibrary.missing_graphs).
+    """
     import sys
 
     from export_usd_materialx import record

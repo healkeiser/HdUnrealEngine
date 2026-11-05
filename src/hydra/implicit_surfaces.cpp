@@ -58,6 +58,7 @@
 #include <algorithm>
 #include <iostream>
 #include <optional>
+#include <memory>
 #include <mutex>
 #include <set>
 PXR_NAMESPACE_OPEN_SCOPE
@@ -814,8 +815,14 @@ public:
     }
     HdSceneIndexPrim GetPrim(const SdfPath& path) const override {
         auto prim = _GetInputSceneIndex()->GetPrim(path);
-        std::lock_guard lock(mutex_);
-        if (prim.dataSource && eval_ && HdPrimTypeIsGprim(prim.primType) && !eval_->Match(path))
+        if (!prim.dataSource || !HdPrimTypeIsGprim(prim.primType)) return prim;
+        // Matched outside the lock: every Sync thread's every Get comes through here.
+        std::shared_ptr<const HdCollectionExpressionEvaluator> eval;
+        {
+            std::lock_guard lock(mutex_);
+            eval = eval_;
+        }
+        if (eval && !eval->Match(path))
             prim.dataSource = HdContainerDataSourceEditor(prim.dataSource)
                                   .Set(HdVisibilitySchema::GetDefaultLocator(),
                                        HdVisibilitySchema::Builder()
@@ -865,7 +872,7 @@ private:
         const bool changed = pass != pass_ || expression != expression_;
         pass_ = pass;
         expression_ = expression;
-        eval_ = std::move(eval);
+        eval_ = eval ? std::make_shared<const HdCollectionExpressionEvaluator>(std::move(*eval)) : nullptr;
         return changed;
     }
     void dirtyAll() {
@@ -877,7 +884,7 @@ private:
     mutable std::mutex mutex_;
     SdfPath pass_;
     SdfPathExpression expression_;
-    std::optional<HdCollectionExpressionEvaluator> eval_;
+    std::shared_ptr<const HdCollectionExpressionEvaluator> eval_;
 };
 class HdUE_RenderPassVisibilitySceneIndexPlugin final : public HdSceneIndexPlugin {
 protected:

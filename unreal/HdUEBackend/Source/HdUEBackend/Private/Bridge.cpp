@@ -173,7 +173,7 @@ struct FSession {
     UTextureRenderTarget2D* Target = nullptr;  // Rooted until DestroySession.
     FSceneViewStateInterface* ViewState = nullptr;
     HdueRenderRequest Request{};
-    bool HasRequest = false;
+    std::atomic<bool> HasRequest{false};  // read by the poll and copy calls on the host's threads
     bool CameraCut = true;
     uint32 Draws = 0, FullResDraws = 0;
     double LastReadback = 0;  // when the last draw was read back; intermediate draws skip it
@@ -196,6 +196,7 @@ struct FSession {
     bool Preparing = false;
     bool CompileWait = false;  // an offline draw of this request waited for PSOs or render proxies (RenderAndReadBack)
     bool RestartNext = false;  // the next Draw restarts the accumulation (RestartAccumulation) before its view
+    uint64 ProxiesReady = 0;   // the request generation whose render proxies were all found created (PendingProxies)
     // unreal:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
     EViewModeIndex DebugView = VMI_Lit;
     FName FSceneView::* DebugMember = nullptr;
@@ -314,6 +315,7 @@ struct FRuntime {
     bool Interactive = false;  // HDUE_INIT_INTERACTIVE: a viewport (Houdini). Otherwise offline frames (husk).
     FString Error;
     UWorld* World = nullptr;
+    std::atomic<bool> WorldReady{false};  // World and its Scene exist: GetStatus reads it from any thread
     uint64 NextSession = 1;
     uint64 NextFrame = 1;
     TSharedPtr<FSession, ESPMode::ThreadSafe> Session;
@@ -383,7 +385,7 @@ HdueResult HDUE_CALL GetStatus(HdueStatus* Status) {
     HdueStatus Result{};
     Result.struct_size = sizeof(Result);
     Result.state = Runtime.State;
-    Result.world_ready = Runtime.World && Runtime.World->Scene;
+    Result.world_ready = Runtime.WorldReady;  // not Runtime.World: Shutdown destroys it on the owner thread
     // Not GDynamicRHI alone: it is set before the RHI finishes initializing, when a host thread polling a booting UE
     // reached ray-tracing queries that assert on an uninitialized RHI.
     Result.rhi_ready = GDynamicRHI && GRHIGlobals.IsRHIInitialized && !GUsingNullRHI;
@@ -487,6 +489,7 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
         return Fail(HDUE_ENGINE_ERROR,
                     TEXT("No game World/Scene after UELibrary initialization. Cook and stage the test map first."));
     }
+    Runtime.WorldReady = true;
     // Only the explicit offscreen view family should render our world.
     if (GEngine->GameViewport) GEngine->GameViewport->bDisableWorldRendering = true;
     // The renderer draws its warnings (Lumen pre-exposure, missing features, ...) into the frame unless these are off;
@@ -810,14 +813,17 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     Session->CameraCut = Aov ? !AovNextFrame : !KeepHistory;
     // That next frame continues the history as Movie Render Queue does after its warm-up: one draw (its default
     // temporal sample count). The warm-up frames run on a sequence's first frame.
-    Session->Request = *Request;
-    if (NextFrame && KeepHistory) Session->Request.warmup_frames = 1;
-    if (!Aov) Session->BeautyRequest = *Request;
+    {
+        FScopeLock Lock(&Session->FrameMutex);  // the poll and copy calls read them from the host's threads
+        Session->Request = *Request;
+        if (NextFrame && KeepHistory) Session->Request.warmup_frames = 1;
+        if (!Aov) Session->BeautyRequest = *Request;
+        Session->HasRequest = true;
+    }
     UpdateLensDistortion(*Session);
     Session->Scene->UpdateCameraLights(Eye, Target, Up);
     Session->Draws = 0;
     Session->FullResDraws = 0;
-    Session->HasRequest = true;
     Session->RequestedAt = FPlatformTime::Seconds();
     Runtime.Error.Empty();
     if (Request->mode == HDUE_PATH_TRACED) {
@@ -1104,7 +1110,10 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         Compiling = Session->Scene->PendingConversions();
     else {
         Compiling = FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
-        if (!Compiling) Compiling = PendingProxies();
+        // Scanned until found done once per request: nothing registers components within one, and the scan walks
+        // every primitive component on each of a Path Tracer frame's draws.
+        if (!Compiling && Session->ProxiesReady != Request.generation)
+            if (!(Compiling = PendingProxies())) Session->ProxiesReady = Request.generation;
         if (Compiling)
             Session->CompileWait = true;
         else if (Session->CompileWait) {
@@ -2236,6 +2245,7 @@ HdueResult HDUE_CALL Shutdown() {
     if (CheckOwner() != HDUE_OK) return HDUE_WRONG_THREAD;
     if (Runtime.State == HDUE_STATE_STOPPED || Runtime.State == HDUE_STATE_COLD) return HDUE_INVALID_STATE;
     if (Runtime.Session) DestroySession(Runtime.Session->Handle);
+    Runtime.WorldReady = false;
     Runtime.World = nullptr;
     if (Runtime.EngineStarted) UELibrary_Shutdown();
     Runtime.EngineStarted = false;

@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import tempfile
+import time
 from pathlib import Path
 
 import hou
@@ -38,17 +39,31 @@ def _source(uri, validate=False):
     return node, output
 
 
+_EMBEDDED = {}  # uri: ((section modification time, size), digest)
+
+
 def opdef_stamp(uri):
     """Changes when an opdef: image can have changed: its HDA library file on disk. Embedded definitions (no file)
-    fall back to hashing the bytes.
+    hash the bytes, but only when the section changed: its modification time is in whole seconds (Houdini 22), so a
+    section edited in the last two seconds is hashed again; an older one keeps its digest (this ran every tick).
     """
-    node_type = hou.nodeType(uri[len("opdef:") :].split("?", 1)[0].strip("/"))
+    name, _, section_name = uri[len("opdef:") :].partition("?")
+    node_type = hou.nodeType(name.strip("/"))
     definition = node_type.definition() if node_type else None
     path = definition.libraryFilePath() if definition else ""
-    if not os.path.isfile(path):
+    if os.path.isfile(path):
+        stat = os.stat(path)
+        return path, stat.st_mtime_ns, stat.st_size
+    section = definition.sections().get(section_name) if definition else None
+    if section is None:
         return hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()
-    stat = os.stat(path)
-    return path, stat.st_mtime_ns, stat.st_size
+    key = (section.modificationTime(), section.size())
+    cached = _EMBEDDED.get(uri)
+    if cached and cached[0] == key and time.time() - key[0] > 2:
+        return cached[1]
+    digest = hashlib.sha256(hou.readBinaryFile(uri)).hexdigest()
+    _EMBEDDED[uri] = (key, digest)
+    return digest
 
 
 class Cache:

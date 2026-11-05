@@ -47,8 +47,39 @@ namespace {
 // cache (FVirtualTextureChunkDDCCache), so a set never stays in memory: NVIDIA's Da Vinci Workshop reads 62 gigapixels
 // of UDIM tiles. One file per chunk, named by its hash, and a manifest per set (its layout and chunk hashes), keyed by
 // its sources and build choices, so a reload skips decoding. HDUE_VIRTUAL_TEXTURE_CACHE moves the cache from
-// %LOCALAPPDATA%/hdUE/VirtualTextureCache. ponytail: never evicted; delete the folder to reclaim space.
+// %LOCALAPPDATA%/hdUE/VirtualTextureCache. A manifest unused for a week goes when a process first uses the cache (a
+// load counts as a use), and with it the chunks no other manifest names.
 constexpr uint32 ManifestVersion = 1;
+void SerializeManifest(FArchive& Ar, FTexturePlatformData& Platform, FVirtualTextureBuiltData& Data);
+// shortcut: a session streaming a set for over a week can lose its chunks to another process's eviction; touch the
+// manifest per request if sessions run that long.
+void Evict(const FString& Directory) {
+    const FDateTime Now = FDateTime::UtcNow();
+    auto& Files = IFileManager::Get();
+    TArray<FString> Manifests, Chunks;
+    Files.FindFiles(Manifests, *(Directory / TEXT("*.manifest")), true, false);
+    TSet<FString> Named;
+    for (const FString& Name : Manifests) {
+        const FString Path = Directory / Name;
+        if (Now - Files.GetTimeStamp(*Path) > FTimespan::FromDays(7)) {
+            Files.Delete(*Path, false, false, true);
+            continue;
+        }
+        TArray<uint8> Bytes;
+        if (!FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) continue;
+        FTexturePlatformData Platform;
+        FVirtualTextureBuiltData Data;
+        FMemoryReader Reader(Bytes);
+        SerializeManifest(Reader, Platform, Data);
+        for (const FVirtualTextureDataChunk& Chunk : Data.Chunks) Named.Add(Chunk.BulkDataHash.ToString());
+    }
+    // A day's grace: another process writes a set's chunks before its manifest.
+    Files.FindFiles(Chunks, *(Directory / TEXT("*")), true, false);
+    for (const FString& Name : Chunks)
+        if (!Name.EndsWith(TEXT(".manifest")) && !Named.Contains(Name) &&
+            Now - Files.GetTimeStamp(*(Directory / Name)) > FTimespan::FromDays(1))
+            Files.Delete(*(Directory / Name), false, false, true);
+}
 const FString& CacheDirectory() {
     static const FString Directory = [] {
         FString Path = FPlatformMisc::GetEnvironmentVariable(TEXT("HDUE_VIRTUAL_TEXTURE_CACHE"));
@@ -59,7 +90,8 @@ const FString& CacheDirectory() {
             UE_LOG(LogTemp, Warning,
                    TEXT("hdUE: cannot create the virtual texture cache %s; virtual textures stay in memory."), *Path);
             Path.Reset();
-        }
+        } else
+            Evict(Path);
 #if !WITH_EDITOR
         GHdueVirtualTextureChunkDirectory = Path;  // before any chunk of it can stream
 #endif
@@ -162,7 +194,8 @@ TUniquePtr<FTexturePlatformData> HdueLoadVirtualTexture(const FString& Key) {
     if (Reader.IsError() || !Data->IsInitialized()) return nullptr;
     for (const FVirtualTextureDataChunk& Chunk : Data->Chunks)
         if (IFileManager::Get().FileSize(*(CacheDirectory() / Chunk.BulkDataHash.ToString())) != Chunk.SizeInBytes)
-            return nullptr;  // a chunk file deleted with the cache
+            return nullptr;                                                     // a chunk file deleted with the cache
+    IFileManager::Get().SetTimeStamp(*ManifestPath(Key), FDateTime::UtcNow());  // a load counts as a use (Evict)
     Platform->SetNumSlices(1);
     return Platform;
 }

@@ -46,6 +46,7 @@ bool HdUEGpuFrames::supported() {
 bool HdUEGpuFrames::import(HdueGpuFrame& frame) {
     freeImports();
     ring_ = frame.ring;
+    context_ = wglGetCurrentContext();
     uint8_t luid[GL_LUID_SIZE_EXT] = {};
     glGetUnsignedBytevEXT(GL_DEVICE_LUID_EXT, luid);
     bool ok = std::memcmp(luid, frame.adapter_luid, sizeof(luid)) == 0;
@@ -169,13 +170,15 @@ void HdUEGpuFrames::free(bool now) {
 void HdUEGpuFrames::release(bool last) {
     if (released_) return;
     released_ = true;
-    if (last && wglGetCurrentContext()) {
-        freeRetired(true);
-        free(true);
+    // With the context they were made in current (the viewport destroying its delegate), they go now: waiting for the
+    // next hdUE frame held them (and UE's shared textures) for good once the viewport switched to another renderer.
+    if (const auto current = wglGetCurrentContext(); current && (last || current == context_)) {
+        freeRetired(last);
+        free(last);
         return;
     }
-    // Without a current context nothing may free GL objects: they wait for the next delegate's frame. After UE has
-    // shut down no delegate draws again, and GL frees them with the context when Houdini exits.
+    // Without that context nothing may free GL objects: they wait for the next delegate's frame. After UE has shut down
+    // no delegate draws again, and GL frees them with the context when Houdini exits.
     std::lock_guard lock(retiredMutex);
     retired.push_back(shared_from_this());
 }

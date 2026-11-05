@@ -64,9 +64,14 @@ if ($SetDefault) {
 }
 # Hashed DLLs that no profile names any more go (253 MB each); one a running Houdini or husk has loaded stays until a
 # later run.
-# The profiles read are the default ones and those beside -OutputConfig (a side profile can live anywhere); the DLL
+# The profiles read are the default ones, those beside -OutputConfig, and every profile staged into this runtime before
+# (profiles.txt beside the DLLs: a side profile can live anywhere, and staging another one deleted its DLL); the DLL
 # just staged always stays.
-$ProfileFolders = @((Join-Path $TaskRoot '.local\*.json'), (Join-Path $TaskRoot 'out\project-assets\*.json'), (Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($OutputConfig))) '*.json'))
+$Index = Join-Path (Split-Path -Parent $Destination) 'profiles.txt'
+$Staged = @(if (Test-Path -LiteralPath $Index) { Get-Content -LiteralPath $Index }) + [IO.Path]::GetFullPath($OutputConfig) |
+    Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Sort-Object -Unique
+[IO.File]::WriteAllLines($Index, [string[]]@($Staged), [Text.UTF8Encoding]::new($false))
+$ProfileFolders = @((Join-Path $TaskRoot '.local\*.json'), (Join-Path $TaskRoot 'out\project-assets\*.json'), (Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($OutputConfig))) '*.json')) + $Staged
 $Named = @([IO.Path]::GetFullPath($Destination)) + @(Get-ChildItem -Path $ProfileFolders -ErrorAction SilentlyContinue |
         ForEach-Object { try { (Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json).backend_dll } catch { $null } } |
         Where-Object { $_ } | ForEach-Object { [IO.Path]::GetFullPath($_) })

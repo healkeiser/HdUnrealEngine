@@ -25,8 +25,9 @@ public:
     // viewport, as through a camera, left the highlight out).
     VtValue color(uint32_t width, uint32_t height, bool converged);
     VtValue depth() const { return depthCopied_ ? VtValue(depthTexture_) : VtValue(); }
-    // GL thread, before the delegate goes: its GL objects are freed by the next delegate's frame or, when `last` (UE
-    // has shut down, so no delegate draws again), at once. Later calls return empty.
+    // GL thread, before the delegate goes: its GL objects are freed at once with the context they were made in current
+    // (or any context when `last`: UE has shut down, so no delegate draws again), else by the next delegate's frame.
+    // Later calls return empty.
     void release(bool last);
 
 private:
@@ -42,7 +43,8 @@ private:
     std::atomic<bool> failed_{false};
     // GL thread only.
     bool checked_ = false, released_ = false, depthCopied_ = false;
-    uint64_t ring_ = 0;  // ring the GL objects below were imported from
+    uint64_t ring_ = 0;        // ring the GL objects below were imported from
+    void* context_ = nullptr;  // the GL context (HGLRC) they were imported in
     struct Imported {
         unsigned memory = 0, texture = 0;
     };

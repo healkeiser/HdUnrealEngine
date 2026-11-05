@@ -64,6 +64,8 @@ The package adds an **Unreal** menu to Houdini's main menu bar (`integrations/ho
   | Nanite | UE's `Saved\NaniteCache` (under `HDUE_USER_DIR`, else the runtime project) | Nanite builds (`Scene.cpp`) |
   | OCIO texture | `%TEMP%\hdue_ocio` | OCIO-converted textures (`color_management.cpp`) |
 
+  Each process removes entries unused for a week when it first uses a cache; clearing one here reclaims the space at once.
+
   Clearing asks first, with each folder and its size, and keeps the folders. It is refused once UE runs in the session (after hdUE was selected in a viewport), since UE streams virtual textures from their cache files for as long as it runs: restart Houdini and clear before selecting hdUE. Files another process holds open (husk, another Houdini) are kept and listed.
 - **Open Unreal Engine Logs** opens UE's `Saved\Logs` folder.
 - **Documentation** opens this page on GitHub.

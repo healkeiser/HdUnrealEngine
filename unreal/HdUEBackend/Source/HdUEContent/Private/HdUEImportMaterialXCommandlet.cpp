@@ -55,6 +55,8 @@ FString FileHash(const FString& File) {
     FSHA1::HashBuffer(Bytes.GetData(), Bytes.Num(), Hash.Hash);
     return Hash.ToString().ToLower();
 }
+// A change to these corrections (or the ID switch) changes what a graph imports to: bump IMPORT_VERSION in
+// scripts/usd_materialx_graph.py with it, so live materials prepared before are prepared again.
 int32 CorrectNormalScale(UMaterial* Material) {
     // Interchange uses FlattenNormal's lerp-to-(0,0,1). MaterialX instead
     // scales XY and normalizes, keeping the decoded Z component unchanged.

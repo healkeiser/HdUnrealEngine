@@ -287,6 +287,9 @@ struct HdUEMaterialData {
     std::array<float, 6> uvTransform{1, 0, 0, 0, 1, 0};
     std::array<HdUETextureData, HDUE_TEXTURE_SLOT_COUNT> textures;
     bool vertexColor = false;  // HDUE_MATERIAL_VERTEX_COLOR
+    // The primvars it reads as UV sets, in order, and as vertex colours: what its meshes upload (HdUEMaterialPrimvars).
+    TfTokenVector uvPrimvars;
+    TfToken colorPrimvar;
     // What the translation skipped, warned at upload (HdUEWarnMaterial) only when no cooked asset renders instead:
     // a batch host maps cooked assets after Sync.
     std::vector<std::string> warnings;
@@ -297,6 +300,8 @@ void HdUEWarnMaterial(const HdUEMaterialData& data);
 // A setting's value as the backend reads UE properties from text: USD booleans as True/False, asset paths resolved,
 // everything else as USD prints it (vectors as "(x, y, z)", which fill a UE struct's fields in order).
 std::string HdUESettingText(const VtValue& value);
+// Render delegates created so far (prims.cpp): caches keyed by a delegate's address check it.
+extern std::atomic<uint64_t> HdUEDelegateCount;
 // The stage UsdImaging populates hdUE from (implicit_surfaces.cpp), or null before population.
 UsdStageRefPtr HdUEBatchStage();
 // A cooked asset's bounds in UE centimetres, from the runtime profile's asset catalog (Prepare-ProjectAssets.ps1);
@@ -400,6 +405,8 @@ struct HdUEState : HdRenderParam {
     std::mutex statsMutex;
     VtDictionary stats;
     std::atomic<bool> statsPending{false};
+    std::atomic<int64_t> statsRefreshed{0};  // steady-clock ticks of the last queued refresh (GetRenderStats)
+    std::string printedError;                // the last error husk printed (renderStats), printed once
     // The last Cryptomatte layers' metadata, for the render stats husk writes into images (UsdRenderers.json); guarded
     // by mutex.
     VtDictionary cryptomatte;

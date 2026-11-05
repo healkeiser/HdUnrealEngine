@@ -88,8 +88,9 @@ Copy-Item -LiteralPath (Join-Path $Build 'resources\plugInfo.json'), (Join-Path 
 # Only the backend DLL the profile names; per-run state (Saved) and other hashed backends stay out. So do the smoke
 # test, import libraries and the Vulkan debug layers: debugging aids, not part of the product. The Agility SDK copy
 # (D3D12) never loads: D3D12 reads D3D12SDKPath from the executable only, and husk/Houdini don't export it.
+# profiles.txt is Update-HoudiniRuntime.ps1's local index of staged profiles.
 $RuntimeTarget = Join-Path $Package 'runtime\Windows'
-Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate D3D12 /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp VkLayer_*
+Copy-Tree $RuntimeRoot $RuntimeTarget /E /XD Saved DerivedDataCache Intermediate D3D12 /XF HdUEBackend*.dll HdUEBackend*.pdb hdue_backend_smoke.exe *.lib *.exp VkLayer_* profiles.txt
 $BinTarget = Join-Path $RuntimeTarget ([IO.Path]::GetRelativePath($RuntimeRoot, (Split-Path $BackendDll)))
 Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
 # Houdini's own tbb12.dll is loaded first: every staged DLL must still find its imports there.

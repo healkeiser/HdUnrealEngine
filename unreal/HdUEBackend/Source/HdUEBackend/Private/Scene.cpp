@@ -157,6 +157,7 @@ void FHdueScene::Remove(const FString& Id) {
         Actors.Remove(Id);
     }
     Materials.Remove(Id);
+    MaterialTextures.Remove(Id);
     OneSided.Remove(Id);
     MeshMaterials.Remove(Id);
     SingleSided.Remove(Id);
@@ -760,12 +761,20 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
     return Data;
 }
 // Block-compressed textures cached in %LOCALAPPDATA%/hdUE/TextureCache, keyed by the file, its time and size, and what
-// the materials read: reloading a scene skips decoding its images, most of a texture load.
-// ponytail: never evicted; delete the folder to reclaim space.
+// the materials read: reloading a scene skips decoding its images, most of a texture load. Entries unused for a week go
+// when a process first uses the cache, as the Nanite cache's do (a hit counts as a use).
 constexpr int32 CacheVersion = 2;
 FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB, const FCookLODBias& LOD) {
-    static const FString Root = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
-                                                TEXT("hdUE"), TEXT("TextureCache"));
+    static const FString Root = [] {
+        const FString Folder = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
+                                               TEXT("hdUE"), TEXT("TextureCache"));
+        TArray<FString> Files;
+        IFileManager::Get().FindFiles(Files, *(Folder / TEXT("*")), true, false);  // entries and abandoned temporaries
+        for (const FString& Name : Files)
+            if (FDateTime::UtcNow() - IFileManager::Get().GetTimeStamp(*(Folder / Name)) > FTimespan::FromDays(7))
+                IFileManager::Get().Delete(*(Folder / Name), false, false, true);
+        return Folder;
+    }();
     const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
     if (!Stat.bIsValid) return FString();
     const FString Key =
@@ -800,7 +809,10 @@ TUniquePtr<FTexturePlatformData> ReadCache(const FString& Path, FHdueScene::FPre
         In->Serialize(Mip->BulkData.Realloc(Size), Size);
         Mip->BulkData.Unlock();
     }
-    return In->IsError() || Data->Mips.IsEmpty() ? nullptr : MoveTemp(Data);
+    if (In->IsError() || Data->Mips.IsEmpty()) return nullptr;
+    In.Reset();
+    IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
+    return Data;
 }
 void WriteCache(const FString& Path, FTexturePlatformData& Data) {
     const FString Temporary =
@@ -1848,6 +1860,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         OneSided.Empty();
         Materials.Empty();
         PreviewTextures.Empty();
+        MaterialTextures.Empty();
         // Builds still running finish unused (TickTextures drops them by their epoch).
         ++TextureEpoch;
         PendingTextures.Empty();
@@ -1873,6 +1886,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         TMap<FString, TArray<FString>> Files;  // each file's variants to build (sRGB decoding, wrap), by key
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
+            TArray<FString>* Used = Desc.id ? &MaterialTextures.FindOrAdd(UTF8_TO_TCHAR(Desc.id)) : nullptr;
+            if (Used) Used->Reset();
             if (Desc.native_asset && *Desc.native_asset) continue;
             const bool Virtual = VirtualMaterial(Desc);
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
@@ -1884,6 +1899,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 uint8 Read = 0;
                 for (int32 Channel = 0; Channel < 4; ++Channel)
                     if (!Vector && Texture.channel_mask[Channel] != 0.f) Read |= 1 << Channel;
+                if (Used) Used->AddUnique(Key);
                 FPreviewTexture& Entry = PreviewTextures.FindOrAdd(Key);
                 if ((Entry.Texture || PendingTextures.Contains(Key)) && (Entry.Read | Read) == Entry.Read &&
                     (Entry.Vector || !Vector))
@@ -1896,6 +1912,16 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 for (int32 Axis = 0; Axis < 2; ++Axis) Entry.Address[Axis] = uint8(TextureWrap(Texture, Axis));
                 Files.FindOrAdd(File).AddUnique(Key);
             }
+        }
+        // Textures no material uses any more go (look-dev cycling through images kept every one resident); one a
+        // material still binds stays alive through it. Not those a build or a slot still waits for.
+        {
+            TSet<FString> Bound;
+            for (const auto& [Id, Keys] : MaterialTextures) Bound.Append(Keys);
+            for (auto It = PreviewTextures.CreateIterator(); It; ++It)
+                if (!Bound.Contains(It.Key()) && !PendingTextures.Contains(It.Key()) &&
+                    !TextureSlots.Contains(It.Key()))
+                    It.RemoveCurrent();
         }
         if (Files.Num()) {
             const double PrepareStart = FPlatformTime::Seconds();

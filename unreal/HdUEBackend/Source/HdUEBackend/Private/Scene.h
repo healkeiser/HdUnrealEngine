@@ -137,9 +137,10 @@ private:
     };
     TMap<FString, FGroom> Grooms;  // upsert_groom, by id
     int32 IdMode = 0;
-    // ponytail: keyed by path and colour space, released only on scene reset; key on file time if live texture edits
-    // matter.
+    // Keyed by path and colour space; an entry no material uses goes at the next Apply (MaterialTextures). shortcut: a
+    // file rewritten at the same path keeps its old texture; key on file time if live texture edits matter.
     TMap<FString, FPreviewTexture> PreviewTextures;
+    TMap<FString, TArray<FString>> MaterialTextures;  // each generated material's PreviewTextures keys
     // Interactive hosts: one file's background texture build (Apply), on settings copied from PreviewTextures (which
     // Apply may grow meanwhile); TickTextures moves the results in.
     struct FTextureBuild {
@@ -214,6 +215,9 @@ private:
         TStrongObjectPtr<UMaterialInstanceDynamic> Material;
         TArray<float> Mask;
         uint64 Revision = 0;
+        // The mesh's own vertex colours (displayColor, a colour primvar) per triangle corner, kept while the mask
+        // occupies them, so the base material reads them again when the mask goes.
+        TArray<FVector4f> Colors;
     };
     TMap<FString, TSharedPtr<FWet>> WetBindings;
     TMap<FString, uint64> GeometryRevisions;

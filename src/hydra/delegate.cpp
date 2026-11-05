@@ -2140,7 +2140,14 @@ class Pass final : public HdRenderPass {
         std::vector<std::vector<float>> copies;
         for (const auto& var : bufferVars_) {
             const auto index = std::find(names.begin(), names.end(), var.row->buffer) - names.begin();
-            if (size_t(index) == names.size()) names.push_back(var.row->buffer);
+            if (size_t(index) < names.size()) {  // a second var of one buffer: copied once
+                copies.push_back(
+                    copies[std::find_if(bufferVars_.begin(), bufferVars_.end(),
+                                        [&](const BufferVar& v) { return v.row->buffer == var.row->buffer; }) -
+                           bufferVars_.begin()]);
+                continue;
+            }
+            names.push_back(var.row->buffer);
             std::vector<float> rgba(size_t(frame.required_bytes / sizeof(float)));
             const auto copied = s.backend->api().copy_aov_buffer(s.session, frame.frame_id, uint32_t(index),
                                                                  rgba.data(), frame.required_bytes);
@@ -3037,9 +3044,15 @@ public:
                 if (polled == HDUE_OK && aovFrame.generation == s.aovGeneration && aovFrame.converged &&
                     aovSlot_ < aovs_.size()) {
                     const auto aovStart = Clock::now();
-                    std::vector<float> pixels(size_t(aovFrame.required_bytes / sizeof(float)));
-                    const auto copied = s.backend->api().copy_frame(s.session, aovFrame.frame_id, pixels.data(),
-                                                                    aovFrame.required_bytes);
+                    // The priming frame is discarded, and the buffers pass reads its buffers (copy_aov_buffer, which
+                    // finds a stale frame itself): neither needs the frame's own pixels.
+                    std::vector<float> pixels;
+                    HdueResult copied = HDUE_OK;
+                    if (!velocityPriming_ && aovs_[aovSlot_].second != HDUE_AOV_BUFFERS) {
+                        pixels.resize(size_t(aovFrame.required_bytes / sizeof(float)));
+                        copied = s.backend->api().copy_frame(s.session, aovFrame.frame_id, pixels.data(),
+                                                             aovFrame.required_bytes);
+                    }
                     aovMs = ms(aovStart, Clock::now());
                     if (copied == HDUE_STALE_FRAME)
                         ++s.staleFrameRetries;
@@ -3450,6 +3463,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
       registry_(std::make_shared<HdResourceRegistry>()) {
+    ++HdUEDelegateCount;
     if (processName() == L"husk.exe") static HdUEBatchWarnings warnings;
     // Before the backend DLL loads: UE changes the working directory while it loads and starts.
     const auto hostDirectory = std::filesystem::current_path();
@@ -4017,7 +4031,12 @@ VtDictionary HdUERenderDelegate::GetRenderStats() const {
     if (host.continuous && host.worker.joinable()) {
         // Answer from the last refresh and queue the next: a synchronous call waited out whole UE ticks (seconds while
         // loading) on Houdini's UI thread.
-        if (!state_->statsPending.exchange(true)) {
+        // At most ten refreshes a second: Houdini asks on every redraw, and each refresh walks the scene under the
+        // state lock that Sync threads wait on.
+        const auto now = std::chrono::steady_clock::now().time_since_epoch();
+        if (now - std::chrono::steady_clock::duration(state_->statsRefreshed) >= std::chrono::milliseconds(100) &&
+            !state_->statsPending.exchange(true)) {
+            state_->statsRefreshed = now.count();
             host.post([state = state_] {
                 VtDictionary fresh;
                 try {
@@ -4093,7 +4112,9 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
             if (!light.viewer && active(light)) ++sceneLights;
     const auto error = residency.phase == HDUE_RESIDENCY_FAILED ? std::string(residency.message) : state.error;
     // husk prints only the exit code: say why.
-    if (!error.empty() && !selfHost().continuous) std::fprintf(stderr, "hdUE error: %s\n", error.c_str());
+    if (!error.empty() && !selfHost().continuous && error != state.printedError)
+        std::fprintf(stderr, "hdUE error: %s\n", error.c_str());
+    state.printedError = error;  // once per message: husk asks for its stats many times a frame
     // Houdini shows these under the viewport's progress bar and in its render stats; husk -V5 prints the second.
     const auto spp = state.samplesPerPixel();
     std::string progress =

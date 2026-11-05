@@ -5,6 +5,7 @@
 #include "pxr/imaging/hd/basisCurves.h"
 #include "pxr/imaging/hd/volume.h"
 #include "pxr/imaging/hd/field.h"
+#include <atomic>
 #include <mutex>
 #include <optional>
 #if defined(HDUE_HOUDINI)
@@ -49,8 +50,9 @@
 #include "pxr/base/gf/rotation.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate,
+std::pair<TfTokenVector, TfToken> HdUEMaterialPrimvars(HdSceneDelegate* delegate, HdUEState& state,
                                                        const SdfPath& material);  // materials.cpp
+std::atomic<uint64_t> HdUEDelegateCount{0};
 namespace {
 // HDUE_TRACE_SCENE: running totals of the mesh data Hydra sync stores in the delegate's state (its own copy of the
 // scene, triangulated, a vertex per distinct corner), every 250 meshes.
@@ -78,12 +80,12 @@ struct CleanBits {
 // The mesh's UV sets and colour primvar: from its own binding, else from its GeomSubsets' bindings; else st, and
 // displayColor when nothing is bound (a bound material reads colours only through a primvar reader). ponytail: one list
 // of UV sets and one colour per mesh; per-subset sets if assets mix them.
-std::pair<TfTokenVector, TfToken> meshPrimvars(HdSceneDelegate* delegate, const SdfPath& material,
+std::pair<TfTokenVector, TfToken> meshPrimvars(HdSceneDelegate* delegate, HdUEState& state, const SdfPath& material,
                                                const HdMeshTopology& topology) {
-    auto names = HdUEMaterialPrimvars(delegate, material);
+    auto names = HdUEMaterialPrimvars(delegate, state, material);
     for (const auto& subset : topology.GetGeomSubsets())
         if (names.first.empty() || names.second.IsEmpty()) {
-            const auto [uv, color] = HdUEMaterialPrimvars(delegate, subset.materialId);
+            const auto [uv, color] = HdUEMaterialPrimvars(delegate, state, subset.materialId);
             if (names.first.empty()) names.first = uv;
             if (names.second.IsEmpty()) names.second = color;
         }
@@ -102,11 +104,30 @@ VtValue primvar(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& nam
     const auto it = computed.find(name);
     return it == computed.end() ? delegate->Get(id, name) : it->second;
 }
+// A primvar's interpolation. A Sync asks for many primvars of one prim: the descriptors of all six interpolations are
+// read once per prim and scene state (any edit bumps the change tracker's version), per thread.
 HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, const TfToken& name) {
-    for (int i = 0; i < HdInterpolationCount; ++i)
-        for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i)))
-            if (p.name == name) return HdInterpolation(i);
-    return HdInterpolationConstant;
+    thread_local struct {
+        HdSceneDelegate* delegate = nullptr;
+        SdfPath id;
+        unsigned version = 0;
+        uint64_t delegates = 0;  // HdUEDelegateCount: a new render delegate may reuse an old one's address
+        std::unordered_map<TfToken, HdInterpolation, TfToken::HashFunctor> domains;
+    } cache;
+    const unsigned version = delegate->GetRenderIndex().GetChangeTracker().GetSceneStateVersion();
+    const uint64_t delegates = HdUEDelegateCount;
+    if (cache.delegate != delegate || cache.id != id || cache.version != version || cache.delegates != delegates) {
+        cache.delegates = delegates;
+        cache.delegate = delegate;
+        cache.id = id;
+        cache.version = version;
+        cache.domains.clear();
+        for (int i = 0; i < HdInterpolationCount; ++i)
+            for (const auto& p : delegate->GetPrimvarDescriptors(id, HdInterpolation(i)))
+                cache.domains.emplace(p.name, HdInterpolation(i));  // the first interpolation naming it, as before
+    }
+    const auto it = cache.domains.find(name);
+    return it == cache.domains.end() ? HdInterpolationConstant : it->second;
 }
 // The material of a prim without a bound one (mesh, points, curves): its displayColor, or white times its vertex
 // colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
@@ -117,6 +138,17 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 // colour temperature) on the mesh prim itself. UE's USD importer ignores MeshLightAPI; UE lights a scene from emissive
 // surfaces (Lumen, Path Tracer), so the mesh emits that radiance from its display-colour material. Zero when the
 // mesh is not a light. ponytail: normalize, materialSyncMode and the bound material's own emission are ignored.
+// A UsdLux light's colour in linear Rec.709 with its blackbody temperature applied, and its intensity times
+// 2^exposure: lights and MeshLightAPI meshes alike. get(name) is the parameter's value, empty when unset.
+template <class Get>
+std::pair<GfVec3f, float> HdUELightRadiance(const Get& get) {
+    auto color = HdUEFromSceneLinear(value(get("color"), GfVec3f(1)));
+    if (value(get("enableColorTemperature"), false)) {
+        const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(value(get("colorTemperature"), 6500.f));
+        for (int c = 0; c < 3; ++c) color[c] *= temperature[c];
+    }
+    return {color, value(get("intensity"), 1.f) * std::exp2(value(get("exposure"), 0.f))};
+}
 GfVec3f HdUEMeshLightEmission(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto source = delegate->GetRenderIndex().GetTerminalSceneIndex()->GetPrim(id).dataSource;
     const auto isLight =
@@ -127,24 +159,19 @@ GfVec3f HdUEMeshLightEmission(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto nodes = HdMaterialSchema::GetFromParent(source).GetMaterialNetwork().GetNodes();
     for (const auto& name : nodes.GetNames()) {
         const auto parameters = nodes.Get(name).GetParameters();
-        const auto get = [&](const char* parameter, auto fallback) {
-            using T = decltype(fallback);
-            const auto value = parameters.Get(TfToken(parameter)).GetValue();
-            const auto v = value ? value->GetValue(0) : VtValue();
-            return v.IsHolding<T>() ? v.UncheckedGet<T>() : fallback;
-        };
         if (!parameters.Get(TfToken("intensity")).GetValue() && !parameters.Get(TfToken("exposure")).GetValue())
             continue;
-        auto color = HdUEFromSceneLinear(get("color", GfVec3f(1)));
-        if (get("enableColorTemperature", false)) {
-            const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(get("colorTemperature", 6500.f));
-            for (int c = 0; c < 3; ++c) color[c] *= temperature[c];
-        }
-        return color * get("intensity", 1.f) * std::exp2(get("exposure", 0.f));
+        const auto [color, intensity] = HdUELightRadiance([&](const char* parameter) {
+            const auto value = parameters.Get(TfToken(parameter)).GetValue();
+            return value ? value->GetValue(0) : VtValue();
+        });
+        return color * intensity;
     }
     return GfVec3f(1);  // a light without parameters: UsdLux's fallback intensity 1
 }
-HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh) {
+// emission: HdUEMeshLightEmission, which the caller has already computed.
+HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh,
+                                      const GfVec3f& emission) {
     HdUEMaterialData material;
     material.id = mesh.id + ".displayColor";
     const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
@@ -158,7 +185,7 @@ HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& 
             TF_WARN("Varying displayOpacity is unsupported at %s; using its first value", id.GetText());
         if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
     }
-    material.emissive = HdUEMeshLightEmission(delegate, id);
+    material.emissive = emission;
     return material;
 }
 // Varying colors only: a uniform displayColor stays the material's constant color.
@@ -272,9 +299,15 @@ double HdUEFramesPerSecond(const HdUEState& state) {
 }
 // Instance transforms as hdEmbree composes them (HdUEInstanceTransform), then nested instancers apply after (child *
 // parent). Masked instances (invisibleIds, inactiveIds) are already absent from GetInstanceIndices.
+// Bumped by every instancer Sync: memoized placements (Instancer::ComputeInstanceTransforms) older than it are stale.
+std::atomic<uint64_t> instancerEpoch{1};
 class Instancer final : public HdInstancer {
     std::map<TfToken, VtValue> primvars_;
     bool visible_ = true;
+    // Placements per prototype at an epoch: each nested prototype's Sync asks its parents for theirs several times
+    // (placements, velocities, accelerations, colours, motion samples).
+    mutable std::mutex placementsMutex_;
+    mutable std::map<SdfPath, std::pair<uint64_t, VtMatrix4dArray>> placements_;
     VtValue primvar(const TfToken& name) const {
         const auto it = primvars_.find(name);
         return it == primvars_.end() ? VtValue() : it->second;
@@ -310,6 +343,7 @@ class Instancer final : public HdInstancer {
 public:
     Instancer(HdSceneDelegate* delegate, const SdfPath& id) : HdInstancer(delegate, id) {}
     void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
+        ++instancerEpoch;
         _UpdateInstancer(delegate, bits);
         if (*bits & HdChangeTracker::DirtyVisibility) visible_ = delegate->GetVisible(GetId());
         if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId())) {
@@ -402,6 +436,22 @@ public:
     VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype,
                                               const std::map<TfToken, VtValue>* sampled = nullptr) const {
         if (!visible_) return {};
+        const uint64_t epoch = instancerEpoch;
+        if (!sampled) {
+            std::lock_guard lock(placementsMutex_);
+            if (const auto it = placements_.find(prototype); it != placements_.end() && it->second.first == epoch)
+                return it->second.second;  // shared, copy on write
+        }
+        auto result = placements(prototype, sampled);
+        if (!sampled) {
+            std::lock_guard lock(placementsMutex_);
+            placements_[prototype] = {epoch, result};
+        }
+        return result;
+    }
+
+private:
+    VtMatrix4dArray placements(const SdfPath& prototype, const std::map<TfToken, VtValue>* sampled) const {
         const auto at = [&](const TfToken& name) {
             const auto found = sampled ? sampled->find(name) : std::map<TfToken, VtValue>::const_iterator();
             return sampled && found != sampled->end() ? found->second : primvar(name);
@@ -469,11 +519,11 @@ class Mesh final : public HdMesh {
     // subdiv tags and the indices of their face-varying UVs and colours (authored normals do not apply to them), then
     // triangulated. Sync and the wet-mask refresh compute it from the scene delegate: kept per prim for the refresh, it
     // held about 16 bytes per triangle of every mesh whether or not a mask was ever used.
-    Shape triangulate(HdSceneDelegate* delegate, const HdUEState& state, bool asset, VtVec3fArray points) const {
+    Shape triangulate(HdSceneDelegate* delegate, HdUEState& state, bool asset, VtVec3fArray points) const {
         Shape shape;
         shape.topology = delegate->GetMeshTopology(GetId());
         std::tie(shape.uvNames, shape.colorName) =
-            meshPrimvars(delegate, delegate->GetMaterialId(GetId()), shape.topology);
+            meshPrimvars(delegate, state, delegate->GetMaterialId(GetId()), shape.topology);
         // primvars:unreal:subdivisionLevel on the prim or an ancestor (a constant primvar) overrides the render
         // setting.
         if (const int level = asset ? 0
@@ -731,9 +781,9 @@ public:
         // Geometry and the unbound display-color material are prepared before taking the state lock, which the UE
         // thread's scene upload and every other Sync wait on.
         std::optional<HdUEMaterialData> displayColor;
-        if ((mesh.material.empty() || HdUEMeshLightEmission(delegate, GetId()) != GfVec3f(0)) &&
-            mesh.sceneAsset.empty())
-            mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh)).id;
+        const auto emission = HdUEMeshLightEmission(delegate, GetId());
+        if ((mesh.material.empty() || emission != GfVec3f(0)) && mesh.sceneAsset.empty())
+            mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh, emission)).id;
         std::vector<HdUEMeshData> parts;
         try {
             parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters);
@@ -837,34 +887,38 @@ public:
         // A renderer-setting edit does not change a scene-index data source.
         // Some hosts therefore do not run Rprim Sync for a new mask selector.
         // Fetch only that primvar from the synchronized Hydra delegate, triangulated as Sync triangulated the mesh
-        // and mapped through the parts' source corners.
-        std::lock_guard lock(state.mutex);
-        const auto& bindings = *state.wetBindings;
+        // and mapped through the parts' source corners. The triangulation (OpenSubdiv refinement, delegate reads) runs
+        // without the state lock, which Sync threads and the upload wait on.
         std::set<std::string> needed;
-        for (const auto& id : emitted_) {
-            const auto part = state.meshes.find(id);
-            if (part == state.meshes.end()) continue;
-            const auto name = HdUEWetValue<std::string>(HdUEWetSettings(bindings, part->second), "maskPrimvar", "");
-            if (name.empty() || part->second.masks.count(name) || part->second.maskErrors.count(name)) continue;
-            if (part->second.released) {
-                // No arrays to map the mask onto: the render pass re-pulls the mesh, whose next Sync reads its masks
-                // and uploads it in full.
-                state.fullUploads.insert(id);
-                state.repull.insert(part->second.sourceId);
-                ++state.revision;
-            } else
-                needed.insert(name);
+        bool asset = false;
+        {
+            std::lock_guard lock(state.mutex);
+            const auto& bindings = *state.wetBindings;
+            for (const auto& id : emitted_) {
+                const auto part = state.meshes.find(id);
+                if (part == state.meshes.end()) continue;
+                const auto name = HdUEWetValue<std::string>(HdUEWetSettings(bindings, part->second), "maskPrimvar", "");
+                if (name.empty() || part->second.masks.count(name) || part->second.maskErrors.count(name)) continue;
+                if (part->second.released) {
+                    // No arrays to map the mask onto: the render pass re-pulls the mesh, whose next Sync reads its
+                    // masks and uploads it in full.
+                    state.fullUploads.insert(id);
+                    state.repull.insert(part->second.sourceId);
+                    ++state.revision;
+                } else
+                    needed.insert(name);
+            }
+            if (needed.empty()) return;
+            const auto first = state.meshes.find(*emitted_.begin());
+            asset = first != state.meshes.end() && !first->second.sceneAsset.empty();
         }
-        if (needed.empty()) return;
-        const auto first = state.meshes.find(*emitted_.begin());
-        const bool asset = first != state.meshes.end() && !first->second.sceneAsset.empty();
         const auto shape = triangulate(
             delegate, state, asset,
             value(primvar(delegate, GetId(), HdTokens->points, computedPrimvars(delegate, GetId())), VtVec3fArray()));
         HdMeshUtil util(&shape.topology, GetId());
+        std::map<std::string, std::pair<std::vector<float>, std::string>> results;  // values per corner, or an error
         for (const auto& name : needed) {
-            std::vector<float> values;
-            std::string error;
+            auto& [values, error] = results[name];
             const auto domain = interpolation(delegate, GetId(), TfToken(name));
             try {
                 values = HdUEExpandWetMask(
@@ -873,20 +927,25 @@ public:
             } catch (const std::invalid_argument& e) {
                 error = name + ": " + e.what();
             }
+        }
+        std::lock_guard lock(state.mutex);
+        for (const auto& [name, result] : results)
             for (const auto& id : emitted_) {
                 auto part = state.meshes.find(id);
                 if (part == state.meshes.end()) continue;
-                if (!error.empty())
-                    part->second.maskErrors[name] = error;
-                else {
-                    auto& mask = part->second.masks[name];
-                    mask.clear();
-                    mask.reserve(part->second.points.size());
-                    for (size_t i = 0; i < part->second.points.size(); ++i)
-                        mask.push_back(values.at(part->second.sourceCorners[i]));
+                if (!result.second.empty()) {
+                    part->second.maskErrors[name] = result.second;
+                    continue;
                 }
+                // A Sync that stored the mesh meanwhile read its masks itself.
+                const auto& corners = part->second.sourceCorners;
+                if (part->second.masks.count(name) ||
+                    std::any_of(corners.begin(), corners.end(), [&](auto c) { return c >= result.first.size(); }))
+                    continue;
+                auto& mask = part->second.masks[name];
+                mask.reserve(part->second.points.size());
+                for (size_t i = 0; i < part->second.points.size(); ++i) mask.push_back(result.first[corners[i]]);
             }
-        }
     }
     void Finalize(HdRenderParam* param) override {
         auto* state = static_cast<HdUEState*>(param);
@@ -905,7 +964,7 @@ protected:
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
     std::lock_guard lock(state.mutex);
     if (mesh.material.empty()) {
-        const auto material = displayColorMaterial(delegate, id, mesh);
+        const auto material = displayColorMaterial(delegate, id, mesh, HdUEMeshLightEmission(delegate, id));
         mesh.material = material.id;
         const auto previous = state.materials.find(material.id);
         if (previous == state.materials.end() || previous->second.color != material.color ||
@@ -1511,12 +1570,7 @@ public:
         const auto applicationLight = get("params");
         data.viewer = applicationLight.IsHolding<GlfSimpleLight>() &&
                       !applicationLight.UncheckedGet<GlfSimpleLight>().IsDomeLight();
-        data.color = HdUEFromSceneLinear(value(get("color"), data.color));
-        data.intensity = value(get("intensity"), 1.f) * std::exp2(value(get("exposure"), 0.f));
-        if (value(get("enableColorTemperature"), false)) {
-            const auto temperature = UsdLuxBlackbodyTemperatureAsRgb(value(get("colorTemperature"), 6500.f));
-            for (int c = 0; c < 3; ++c) data.color[c] *= temperature[c];
-        }
+        std::tie(data.color, data.intensity) = HdUELightRadiance(get);
         if (value(get("normalize"), false)) data.flags |= HDUE_LIGHT_NORMALIZE;
         if (!value(get("shadow:enable"), true)) data.flags &= ~HDUE_LIGHT_SHADOWS;
         if (value(get("treatAsPoint"), false)) data.flags |= HDUE_LIGHT_POINT;

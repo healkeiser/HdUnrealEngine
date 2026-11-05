@@ -238,6 +238,13 @@ def structure_key(graph):
     return graph_signature(_masked(graph, "/M"))
 
 
+# What UE's import makes of a graph besides the graph itself: hdUE's corrections after Interchange
+# (HdUEImportMaterialXCommandlet.cpp). Bump it with them: published live materials of another version stop matching
+# and age out (live_materials.clean).
+IMPORT_VERSION = 1
+
+
 def request_key(graph):
     """The exact identity of a graph to prepare, values included, independent of the material's path."""
-    return graph_signature(rebase_graph(graph, graph["material"], "/M"))
+    signature = graph_signature(rebase_graph(graph, graph["material"], "/M"))
+    return hashlib.sha256(f"{IMPORT_VERSION}:{signature}".encode()).hexdigest()
