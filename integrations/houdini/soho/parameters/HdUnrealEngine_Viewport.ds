@@ -25,8 +25,8 @@
             label "Warmup Frames"
             type int
             size 1
-            default { 32 }
-            range { 0! 256 }
+            default { 64 }
+            range { 1! 256 }
             help "Realtime frames before a frame counts as converged."
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
@@ -37,8 +37,8 @@
             label "Path Tracer Samples"
             type int
             size 1
-            default { 64 }
-            range { 1! 4096 }
+            default { 2048 }
+            range { 1! 65536 }
             parmtag { "spare_category" "Rendering" }
             parmtag { "uiscope" "viewport" }
             hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
@@ -48,7 +48,7 @@
             label "Denoiser"
             type string
             size 1
-            default { "off" }
+            default { "oidn" }
             menu { "off" "Off" "oidn" "Open Image Denoise" }
             help "Denoises the converged Path Tracer image."
             parmtag { "spare_category" "Rendering" }

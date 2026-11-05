@@ -134,6 +134,12 @@ REALTIME = (
     "Rendering|Anti-Aliasing|r.AntiAliasingMethod",
     "Rendering|Anti-Aliasing|r.NGX.DLSS.Enable",
     "Rendering|Anti-Aliasing|r.HdUE.DLSS.RayReconstruction",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.Preset",
+    "Rendering|Anti-Aliasing|r.NGX.DLSSRR.Preset",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.AutoExposure",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.ExposureScale",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.EnableAlphaUpscaling",
+    "Rendering|Anti-Aliasing|r.NGX.DLSS.Reflections.TemporalAA",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveResolution",
     "Rendering|Anti-Aliasing|r.HdUE.InteractiveScreenPercentage",
     "Rendering|View Mode",
@@ -397,6 +403,97 @@ CVARS = [
             help="NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen "
             "reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and "
             "restores them. Needs NVIDIA DLSS on. Realtime mode only.",
+        ),
+    ),
+    # The DLSS plugin's own console variables, with its defaults and the presets its settings UI lists
+    # (DLSSUpscaler.cpp, DLSSDenoiser.cpp; EDLSSPreset and EDLSSRRPreset in DLSSSettings.h).
+    (
+        "r.NGX.DLSS.Preset",
+        "DLSS Preset",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            type="int32",
+            default=0,
+            menu=[
+                (0, "Default"),
+                (6, "Preset F"),
+                (10, "Preset J"),
+                (11, "Preset K"),
+                (12, "Preset L"),
+                (13, "Preset M"),
+            ],
+            help="DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, "
+            "Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only.",
+        ),
+    ),
+    (
+        "r.NGX.DLSSRR.Preset",
+        "Ray Reconstruction Preset",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            type="int32",
+            default=0,
+            menu=[
+                (0, "Default"),
+                (4, "Preset D"),
+                (5, "Preset E"),
+                (6, "Preset F"),
+            ],
+            help="DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default "
+            "RR2 model. Realtime mode only.",
+        ),
+    ),
+    (
+        "r.NGX.DLSS.AutoExposure",
+        "DLSS Auto Exposure",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            kind="toggle",
+            type="int32",
+            default=1,
+            help="DLSS computes its own exposure for its inputs; off passes UE's exposure, which in some cases "
+            "reduces artifacts. Realtime mode only.",
+        ),
+    ),
+    (
+        "r.NGX.DLSS.ExposureScale",
+        "DLSS Exposure Scale",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            type="float",
+            default=1.0,
+            range=(0, 1, True),
+            help="Scale of the exposure DLSS receives. Realtime mode only.",
+        ),
+    ),
+    (
+        "r.NGX.DLSS.EnableAlphaUpscaling",
+        "DLSS Alpha Upscaling",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            type="int32",
+            default=-1,
+            menu=[(-1, "From Propagate Alpha"), (0, "Off"), (1, "On")],
+            help="Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime "
+            "enables. Realtime mode only.",
+        ),
+    ),
+    (
+        "r.NGX.DLSS.Reflections.TemporalAA",
+        "DLSS Reflections Temporal AA",
+        "Rendering|Anti-Aliasing",
+        False,
+        dict(
+            kind="toggle",
+            type="int32",
+            default=1,
+            help="A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Realtime mode "
+            "only.",
         ),
     ),
     (

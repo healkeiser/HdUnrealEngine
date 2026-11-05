@@ -229,6 +229,94 @@
                 hidewhen "{ xn__unrealrenderMode_41a != realtime }"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSPreset_control_6sbebde", "DLSS Preset", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSPreset_5fbebde"
+                label   "DLSS Preset"
+                type    int
+                size    1
+                default { 0 }
+                menu { "0" "Default" "6" "Preset F" "10" "Preset J" "11" "Preset K" "12" "Preset L" "13" "Preset M" }
+                help    "DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only. Console variable r.NGX.DLSS.Preset (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSPreset_control_6sbebde == block } { xn__unrealcvarrNGXDLSSPreset_control_6sbebde == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSRRPreset_control_gwbebdg", "Ray Reconstruction Preset", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSRRPreset_fjbebdg"
+                label   "Ray Reconstruction Preset"
+                type    int
+                size    1
+                default { 0 }
+                menu { "0" "Default" "4" "Preset D" "5" "Preset E" "6" "Preset F" }
+                help    "DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default RR2 model. Realtime mode only. Console variable r.NGX.DLSSRR.Preset (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSRRPreset_control_gwbebdg == block } { xn__unrealcvarrNGXDLSSRRPreset_control_gwbebdg == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSAutoExposure_control_y2bebde", "DLSS Auto Exposure", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSAutoExposure_xpbebde"
+                label   "DLSS Auto Exposure"
+                type    toggle
+                size    1
+                default { 1 }
+                help    "DLSS computes its own exposure for its inputs; off passes UE's exposure, which in some cases reduces artifacts. Realtime mode only. Console variable r.NGX.DLSS.AutoExposure (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSAutoExposure_control_y2bebde == block } { xn__unrealcvarrNGXDLSSAutoExposure_control_y2bebde == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSExposureScale_control_l4bebde", "DLSS Exposure Scale", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSExposureScale_krbebde"
+                label   "DLSS Exposure Scale"
+                type    float
+                size    1
+                default { 1 }
+                range   { 0! 1! }
+                help    "Scale of the exposure DLSS receives. Realtime mode only. Console variable r.NGX.DLSS.ExposureScale (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "float" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSExposureScale_control_l4bebde == block } { xn__unrealcvarrNGXDLSSExposureScale_control_l4bebde == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_control_zgcebde", "DLSS Alpha Upscaling", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_y2bebde"
+                label   "DLSS Alpha Upscaling"
+                type    int
+                size    1
+                default { -1 }
+                menu { "-1" "From Propagate Alpha" "0" "Off" "1" "On" }
+                help    "Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime enables. Realtime mode only. Console variable r.NGX.DLSS.EnableAlphaUpscaling (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_control_zgcebde == block } { xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_control_zgcebde == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrNGXDLSSReflectionsTemporalAA_control_micebdel", "DLSS Reflections Temporal AA", "{ xn__unrealrenderMode_41a != realtime }")
+            parm {
+                name    "xn__unrealcvarrNGXDLSSReflectionsTemporalAA_l4bebdel"
+                label   "DLSS Reflections Temporal AA"
+                type    toggle
+                size    1
+                default { 1 }
+                help    "A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Realtime mode only. Console variable r.NGX.DLSS.Reflections.TemporalAA (process-wide)."
+                parmtag { "spare_category" "Anti-Aliasing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealcvarrNGXDLSSReflectionsTemporalAA_control_micebdel == block } { xn__unrealcvarrNGXDLSSReflectionsTemporalAA_control_micebdel == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != realtime }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
         }
 
         groupcollapsible {
