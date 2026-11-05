@@ -1213,7 +1213,7 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     packet.autoLight = state.setting<bool>("autoViewerLight", false) && !sceneLights && !packet.cameraLights &&
                        !state.nativeAssets.lights;
     const double units = state.setting<double>("metersPerUnit", .01) * 100;
-    const auto domeResolution = uint32_t(state.setting<int>("domeResolution", 512));
+    const auto domeResolution = uint32_t(state.setting<int>("domeResolution", 128));
     const auto extend = [&](const LightDesc& legacy, const HdUELightData* source) {
         HdueLight light{};
         light.struct_size = sizeof(light);
@@ -2771,7 +2771,7 @@ public:
                     if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
             }
             const bool denoising = s.setting<std::string>("renderMode", "realtime") == "pathtraced" &&
-                                   TfStringToLower(s.setting<std::string>("denoiser", "off")) == "oidn";
+                                   TfStringToLower(s.setting<std::string>("denoiser", "oidn")) == "oidn";
             if (denoising && buffer && buffer->GetWidth()) {
                 // A bound albedo or normal var serves as the guide only in OIDN's layout (3 floats per pixel, topDown);
                 // a var of another format (color4h, ...) keeps its own buffer and the guide renders internally too.
@@ -3842,18 +3842,18 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
 // the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
     return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
-            {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(64)},
+            {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(2048)},
             {"Warmup frames", TfToken("warmupFrames"), VtValue(64)},
             {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
             {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
-            {"Environment cube resolution", TfToken("domeResolution"), VtValue(512)},
+            {"Environment cube resolution", TfToken("domeResolution"), VtValue(128)},
             {"Scene lights", TfToken("sceneLightsEnabled"), VtValue(true)},
             {"Viewer light without scene lights", TfToken("autoViewerLight"), VtValue(false)},
             {"Motion blur", TfToken("motionBlur"), VtValue(true)},
             {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
             {"Subdivision level", TfToken("subdivisionLevel"), VtValue(0)},
             {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
-            {"Denoiser", TfToken("denoiser"), VtValue(std::string("off"))},
+            {"Denoiser", TfToken("denoiser"), VtValue(std::string("oidn"))},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
             {"Cull Backface", TfToken("cullBackface"), VtValue(true)},

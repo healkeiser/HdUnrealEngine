@@ -151,7 +151,7 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 | | Offline (husk, hython) | Interactive (Houdini's UI) |
 | --- | --- | --- |
 | Scalability | Cinematic, keeping the resolution quality; `r.Streaming.FullyLoadUsedTextures=1`, `r.D3D12.GPUTimeout=0`, faster Lumen surface cache updates (`Initialize`) | project defaults |
-| PSOs | a draw does not count towards convergence while PSOs compile (observed: "hdUE request 1 waits for 2996 PSO compilations") | not waited for; `r.PSOPrecache.ProxyCreationStrategy=2` draws the default material meanwhile |
+| PSOs | a draw does not count towards convergence while PSOs compile (observed: "hdUE request 1 waits for 2996 PSO compilations") | not waited for; meshes appear when their PSOs are ready (UE's `r.PSOPrecache.ProxyCreationStrategy` 1) |
 | Texture streaming | `BlockTillAllRequestsFinished` and pending virtual texture tiles before the frame | not waited for |
 | Lumen cards and Nanite | built inline in `ApplyScene` | the mesh shows first, `UE::Tasks` build cards and Nanite, `TickConversions` swaps them in |
 | Resolution while moving | full | `r.HdUE.InteractiveScreenPercentage` (50) until requests stop for 250 ms |

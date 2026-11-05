@@ -229,12 +229,6 @@ HDUE_DEFAULTS = {
         "EReflectionMethod::Lumen",
         "Overrides unreal:lumenEnabled.",
     ),
-    "LumenFrontLayerTranslucencyReflections": (True, None),
-    "TranslucencyType": (
-        "ETranslucencyType::RayTraced",
-        "Raster lights translucent layers behind the front one from Lumen's coarse Radiance Cache, which can show the "
-        "sky through walls.",
-    ),
     "PathTracingMaxBounces": (
         None,
         "Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, "
@@ -544,6 +538,13 @@ CVARS = [
         dict(kind="toggle"),
     ),
     (
+        "r.RayTracing.Nanite.Mode",
+        "Nanite Ray Tracing",
+        "Engine Quality|Ray Tracing",
+        False,
+        dict(menu=[(0, "Fallback Mesh"), (1, "Streamed Out Mesh")]),
+    ),
+    (
         "r.PathTracing.ApproximateCaustics",
         "Approximate Caustics",
         "Rendering|Path Tracing",
@@ -637,7 +638,8 @@ HDUE = [
         "Path Tracer Samples",
         "",
         "int",
-        64,
+        # UE's FPostProcessSettings::PathTracingSamplesPerPixel (Scene.cpp).
+        2048,
         "Samples per pixel. Divided between motion-blur sub-frames.",
         range=(1, 65536, True, True),
         category="Rendering",
@@ -665,7 +667,9 @@ HDUE = [
         "Denoiser",
         "",
         "menu",
-        "off",
+        # On, as UE's FPostProcessSettings::PathTracingEnableDenoiser (Scene.cpp); OIDN stands in for UE's denoiser
+        # plugin, which the runtime does not have.
+        "oidn",
         "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), "
         "guided by albedo and normal passes. AOVs and Lumen are unaffected.",
         menu=[("off", "Off"), ("oidn", "Open Image Denoise")],
@@ -800,7 +804,8 @@ HDUE = [
         "Environment Cube Resolution",
         "Lighting|Dome and Viewer Lights",
         "intmenu",
-        512,
+        # UE's USkyLightComponent::CubemapResolution (SkyLightComponent.cpp).
+        128,
         "Face size of the cubemap dome lights are baked into, for lighting, reflections and the background.",
         menu=[(v, str(v)) for v in (32, 64, 128, 256, 512, 1024, 2048)],
         category="Lighting",

@@ -47,6 +47,8 @@ def Scope "Render"
         rel products = [</Render/Beauty>, </Render/Ids>]
         int unreal:samplesPerPixel = 16
         int unreal:warmupFrames = 8
+        # The checks measure the renderer's own samples; denoising 16 samples moves coverage and brightness.
+        token unreal:denoiser = "off"
         token unreal:renderMode = "realtime"
     }
 

@@ -69,7 +69,7 @@
         label   "Path Tracer Samples"
         type    int
         size    1
-        default { 64 }
+        default { 2048 }
         range   { 1! 65536! }
         help    "Samples per pixel. Divided between motion-blur sub-frames."
         parmtag { "spare_category" "Rendering" }
@@ -99,7 +99,7 @@
         label   "Denoiser"
         type    string
         size    1
-        default { "off" }
+        default { "oidn" }
         menu { "off" "Off" "oidn" "Open Image Denoise" }
         help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. AOVs and Lumen are unaffected."
         parmtag { "spare_category" "Rendering" }
@@ -2936,7 +2936,7 @@
                     label   "High Quality Translucency Reflections"
                     type    toggle
                     size    1
-                    default { 1 }
+                    default { 0 }
                     help    "Whether to use high quality mirror reflections on the front layer of translucent surfaces. Other layers will use the lower quality Radiance Cache method that can only produce glossy reflections. Increases GPU cost when enabled."
                     parmtag { "spare_category" "Reflections|Lumen Reflections" }
                     parmtag { "usdvaluetype" "bool" }
@@ -3199,7 +3199,7 @@
                 label   "Environment Cube Resolution"
                 type    int
                 size    1
-                default { 512 }
+                default { 128 }
                 menu { "32" "32" "64" "64" "128" "128" "256" "256" "512" "512" "1024" "1024" "2048" "2048" }
                 help    "Face size of the cubemap dome lights are baked into, for lighting, reflections and the background."
                 parmtag { "spare_category" "Lighting" }
@@ -5090,9 +5090,9 @@
                 label   "Translucency Method"
                 type    string
                 size    1
-                default { "ETranslucencyType::RayTraced" }
+                default { "ETranslucencyType::Raster" }
                 menu { "ETranslucencyType::Raster" "Raster" "ETranslucencyType::RayTraced" "Ray Traced" }
-                help    "Sets the translucency type. Raster lights translucent layers behind the front one from Lumen's coarse Radiance Cache, which can show the sky through walls."
+                help    "Sets the translucency type"
                 parmtag { "spare_category" "Rendering Features|Translucency" }
                 parmtag { "usdvaluetype" "token" }
                 disablewhen R"({ xn__unrealpostProcessTranslucencyType_control_u7bl == block } { xn__unrealpostProcessTranslucencyType_control_u7bl == none })"
@@ -5518,6 +5518,20 @@
                 parmtag { "spare_category" "Ray Tracing" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealcvarrRayTracingEnable_control_2xbebk == block } { xn__unrealcvarrRayTracingEnable_control_2xbebk == none })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL("xn__unrealcvarrRayTracingNaniteMode_control_l4bebkg", "Nanite Ray Tracing")
+            parm {
+                name    "xn__unrealcvarrRayTracingNaniteMode_krbebkg"
+                label   "Nanite Ray Tracing"
+                type    int
+                size    1
+                default { 0 }
+                menu { "0" "Fallback Mesh" "1" "Streamed Out Mesh" }
+                help    "0 - fallback mesh (default); 1 - streamed out mesh; 2 - use CLAS; Console variable r.RayTracing.Nanite.Mode (process-wide)."
+                parmtag { "spare_category" "Ray Tracing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrRayTracingNaniteMode_control_l4bebkg == block } { xn__unrealcvarrRayTracingNaniteMode_control_l4bebkg == none })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
         }

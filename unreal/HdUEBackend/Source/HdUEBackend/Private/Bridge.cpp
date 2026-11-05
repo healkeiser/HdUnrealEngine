@@ -19,6 +19,8 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "UObject/UObjectIterator.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/LocalFogVolumeComponent.h"
 #include "Components/BoxComponent.h"
@@ -192,6 +194,8 @@ struct FSession {
     HdueResidencyOptions ResidencyOptions{sizeof(HdueResidencyOptions), 0, 120.0};
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
     bool Preparing = false;
+    bool CompileWait = false;  // an offline draw of this request waited for PSOs or render proxies (RenderAndReadBack)
+    bool RestartNext = false;  // the next Draw restarts the accumulation (RestartAccumulation) before its view
     // unreal:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
     EViewModeIndex DebugView = VMI_Lit;
     FName FSceneView::* DebugMember = nullptr;
@@ -894,21 +898,6 @@ void ApplyPostProcess(FSceneView& View, const FSceneViewInitOptions& Options, FS
     // on auto exposure (two identical Sponza renders with it differed by 7%).
     Settings.AutoExposureMethod = AEM_Manual;
     Settings.AutoExposureBias = 0;
-    Settings.LumenFrontLayerTranslucencyReflections = true;
-    // UE's Ray Traced translucency (5.6+): its reflections and refractions trace every layer. Raster translucency
-    // lights the layers behind the front one from the Lumen Radiance Cache, whose probes are about a metre apart
-    // (r.Lumen.ScreenProbeGather.RadianceCache.ClipmapWorldExtent 2500, GridResolution 48), so glass inside a room read
-    // the sky through the walls (ForwardLightingCommon.ush: "Fallback to unshadowed skylight"): a bottle in a closed,
-    // dome-lit room was 18 times as bright as the Path Tracer's. UE falls back to raster without ray tracing.
-    Settings.TranslucencyType = ETranslucencyType::RayTraced;
-    if (!IsInteractive()) {
-        // Offline frames use Lumen's final-frame quality (UE's defaults are game quality); authored values override it.
-        Settings.LumenFinalGatherQuality = FMath::Max(Settings.LumenFinalGatherQuality, 2.f);
-        Settings.LumenSceneLightingQuality = FMath::Max(Settings.LumenSceneLightingQuality, 2.f);
-        Settings.LumenSceneDetail = FMath::Max(Settings.LumenSceneDetail, 2.f);
-        // Ray lighting stays UE's: the project's r.Lumen.HardwareRayTracing.LightingMode (surface cache), which
-        // neither Cinematic scalability nor Movie Render Queue changes. Authored LumenRayLightingMode still wins.
-    }
     // Post-process volumes blend over hdUE's defaults above. What the request decides (render mode, samples, lighting
     // components, the USD camera's depth of field) applies after them, and the render settings last: Movie Render
     // Queue blends a world's volumes before the camera's settings (MoviePipelineUtils.cpp, DoPostProcessBlend).
@@ -1087,36 +1076,72 @@ void AddView(FSceneViewFamily& Family, FSession& Session, bool PathTracing, bool
 }
 
 // Renders the family and queues what reads it back: the host's shared ring, and the CPU readback when a slot is free.
+// Restarts the session's accumulation with new view states, so nothing drawn before (a warm-up, a frame missing meshes)
+// becomes Path Tracer samples or realtime history.
+void RestartAccumulation(FSession& Session) {
+    FlushRenderingCommands();
+    Session.ViewState->Destroy();
+    Session.ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+    if (Session.AovViewState && Session.Request.aov != HDUE_AOV_COLOR) {
+        Session.AovViewState->Destroy();
+        Session.AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
+    }
+    Session.Draws = 0;
+    Session.FullResDraws = 0;
+    Session.CameraCut = true;
+}
+// Registered primitives still waiting for their render proxy: with UE's r.PSOPrecache.ProxyCreationStrategy (1, delay
+// until precached), a component whose PSOs compile gets its proxy only after they finish
+// (UPrimitiveComponent::IsPSOPrecaching), when its render state is recreated at the end of a frame.
+uint32 PendingProxies() {
+    uint32 Count = 0;
+    for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+        if (It->GetWorld() == Runtime.World && It->IsRegistered() &&
+            (It->IsPSOPrecaching() || It->IsRenderStateDirty()))
+            ++Count;
+    return Count;
+}
 void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, FSceneViewFamily& Family,
                        FTextureRenderTargetResource* Resource, bool PathTracing, bool Aov, bool Moving,
                        float ScreenFraction) {
     const auto& Request = Session->Request;
     FCanvas Canvas(Resource, nullptr, Runtime.World, Runtime.World->GetFeatureLevel());
+    // Offline frames (husk) wait for PSO compilation and for the render proxies UE delays meanwhile
+    // (r.PSOPrecache.ProxyCreationStrategy 1): nothing else would stop a frame without those meshes from converging.
+    // The draw that finds them done does not count either: the next Draw restarts the accumulation before its view, so
+    // no sample drawn without them counts.
+    // Interactive frames wait for the background mesh builds (FHdueScene::PendingConversions): until they swap in,
+    // meshes draw a first pass without Lumen cards or nothing, and the viewport stops drawing once a frame converges.
+    uint32 Compiling = 0;
+    if (IsInteractive())
+        Compiling = Session->Scene->PendingConversions();
+    else {
+        Compiling = FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
+        if (!Compiling) Compiling = PendingProxies();
+        if (Compiling)
+            Session->CompileWait = true;
+        else if (Session->CompileWait) {
+            Session->CompileWait = false;
+            Session->RestartNext = true;
+            Compiling = 1;
+        }
+    }
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
-    // Offline frames (husk) wait for PSO compilation: r.PSOPrecache.ProxyCreationStrategy=2 draws meshes whose PSOs
-    // are still compiling with the default material, and nothing else would stop such a frame from converging.
-    // Interactive frames wait for the background mesh builds (FHdueScene::PendingConversions): until they swap in,
-    // meshes draw a first pass without Lumen cards or nothing, and the viewport stops drawing once a frame converges.
-    const uint32 Compiling = IsInteractive() ? Session->Scene->PendingConversions()
-                                             : FShaderPipelineCache::NumPrecompilesRemaining() +
-                                                   PipelineStateCache::NumActivePrecacheRequests();
     if (Compiling) {
         static uint64 Logged = 0;
         if (Logged != Request.generation) {
             Logged = Request.generation;
             UE_LOG(LogTemp, Log, TEXT("hdUE request %llu waits for %u %s"), Request.generation, Compiling,
-                   IsInteractive() ? *Session->Scene->DescribePending() : TEXT("PSO compilations"));
+                   IsInteractive() ? *Session->Scene->DescribePending() : TEXT("PSO compilations or render proxies"));
         }
     }
     Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;
     Job->Started = FPlatformTime::Seconds();
     Job->Request = Request;
     Job->RequestedAt = Session->RequestedAt;
-    Job->Preparing =
-        Session->Preparing ||
-        Compiling;  // ponytail: Path Tracer samples drawn meanwhile still count; restart its accumulation if that shows
+    Job->Preparing = Session->Preparing || Compiling;
     // Reading back every warmup frame or sample serializes the GPU with a full-frame CPU copy. Read back the one that
     // should converge and, for the Path Tracer, the first draw (an immediate preview) and at most every 250 ms.
     const double Now = FPlatformTime::Seconds();
@@ -1229,6 +1254,10 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
 }
 
 void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
+    if (Session->RestartNext) {
+        Session->RestartNext = false;
+        RestartAccumulation(*Session);
+    }
     const auto& Request = Session->Request;
     // GBuffer AOVs are rasterized without GI, path tracing or anything that alters values.
     // Lighting components render as the beauty (path traced too), into the AOV slot.
@@ -1467,17 +1496,8 @@ HdueResult HDUE_CALL Tick() {
         if (Status.phase == HDUE_RESIDENCY_READY) {
             // Pending preview readback completed, including VT GPU uploads. Start
             // with a new view state so no preview/history can become PT samples.
-            FlushRenderingCommands();
-            Session->ViewState->Destroy();
-            Session->ViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
-            if (Session->AovViewState && Session->Request.aov != HDUE_AOV_COLOR) {
-                Session->AovViewState->Destroy();
-                Session->AovViewState = Renderer().AllocateViewState(Runtime.World->GetFeatureLevel());
-            }
+            RestartAccumulation(*Session);
             Session->Preparing = false;
-            Session->Draws = 0;
-            Session->FullResDraws = 0;
-            Session->CameraCut = true;
         }
     }
     {

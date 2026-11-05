@@ -468,7 +468,7 @@ struct HdUEState : HdRenderParam {
     }
     // Path Tracer samples, capped while interactive so tumbling and playback keep up (all samples once still).
     int samplesPerPixel() const {
-        const int samples = std::max(1, setting<int>("samplesPerPixel", 64));
+        const int samples = std::max(1, setting<int>("samplesPerPixel", 2048));
         return interactive() ? std::min(samples, 8) : samples;  // ponytail: fixed cap; a setting if users ask
     }
     // unreal:debugView, which replaces the realtime beauty only.
