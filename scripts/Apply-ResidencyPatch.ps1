@@ -82,9 +82,7 @@ Edit-EngineSource -Path $CullRaster -Label 'Nanite binning patch' -Marker 'hdUE:
         "CommonBinBuildParameters.InTotalPrevDrawClusters`t= GraphBuilder.CreateSRV((RenderFlags & NANITE_RENDER_FLAG_HAS_PREV_DRAW_DATA) ? TotalPrevDrawClustersBuffer : GSystemTextures.GetDefaultStructuredBuffer(GraphBuilder, 8));`t// hdUE: as AddPass_Rasterize"))
 # The rect light texture atlas's add and filter passes (FRectLightAtlasVS with FRectAtlasAddTexturePS or
 # FRectAtlasFilterTexturePS) compiled their PSOs on the render thread at the first textured rect light: UE has no
-# precache for them, and the cook drops them from the bundled PSO cache (ShaderPipelineCacheToolsCommandlet does not
-# list FRectLightAtlasVS among the shaders usable with an empty vertex declaration). They are precached at startup
-# through a global PSO collector, as LightRendering.cpp precaches the deferred light PSOs.
+# precache for them. They are precached at startup through a global PSO collector, as LightRendering.cpp precaches the deferred light PSOs.
 $RectCollector = @'
 IMPLEMENT_GLOBAL_SHADER(FRectAtlasFilterTexturePS, "/Engine/Private/RectLightAtlas.usf", "MainPS", SF_Pixel);
 

@@ -6,7 +6,7 @@
 
 - `unreal/HdUEBackend/Source/**` (excluding Intermediate/Saved/Binaries), `HdUEBackend.uproject`, `Config/*.ini`
 - `include/hdue/*.h`, `src/client/*`
-- `scripts/Setup-Engine.ps1`, `Build-Backend.ps1`, `Stage-Runtime.ps1`, `Apply-ResidencyPatch.ps1`, `Record-PipelineCache.ps1`, `Prepare-Content.ps1`, `Package-Houdini.ps1`, `packaging/houdini/*`
+- `scripts/Setup-Engine.ps1`, `Build-Backend.ps1`, `Stage-Runtime.ps1`, `Apply-ResidencyPatch.ps1`, `Prepare-Content.ps1`, `Package-Houdini.ps1`, `packaging/houdini/*`
 - The built release folder `out/package/hdUE-v0.2.0-houdini22.0-win64/` and the public GitHub release `v0.2.0`. `gh release view` shows `hdUE-v0.2.0-houdini22.0-win64.zip`, 954,596,768 bytes, uploaded 2026-10-29.
 
 **How claims were checked:**
@@ -58,7 +58,7 @@
 | UE-15 | Low | AOVs are separate rasterized re-renders with no Object ID/Cryptomatte and no Path Tracer AOVs. UE ships an Object ID (Cryptomatte) pass in `MoviePipelineMaskRenderPass`. | M |
 | UE-16 | Low | 8192 px cap, and no high-resolution tiling. | M |
 | UE-17 | Low | Lifecycle is built on undocumented UELibrary behaviour: a game-thread-id swap at static destruction, no re-initialization, and the API is documented only for 4.27. | S |
-| UE-18 | Low | Content is cooked by the launcher editor (CL 58902052) and run by a source build (CL 0). The PSO cache works only because `GameVersion` is pinned. | S |
+| UE-18 | Low | Content is cooked by the launcher editor (CL 58902052) and run by a source build (CL 0). Nothing version-dependent remains since the bundled PSO cache (and its `GameVersion` pin) was removed. | S |
 
 ---
 
@@ -465,7 +465,6 @@ Document the profile in `docs/rendering.md`.
 
 - Content is cooked with the launcher editor (`Prepare-Content.ps1:11-16`; `editor_root` points to the launcher editor installation, Build.version CL 58902052).
 - The runtime is the source build (CL 0).
-- `DefaultGame.ini:21` pins `GameVersion=1` so the PSO cache is not rejected.
 
 **Impact.** The two builds are the same 5.8.4 release, so this works today. A launcher hotfix (5.8.5) would silently mismatch the cooked shader bytecode and the runtime.
 
@@ -483,7 +482,6 @@ Document the profile in `docs/rendering.md`.
 - **Reference DOF** for the Path Tracer (`PathTracingEnableReferenceDOF`, `Bridge.cpp:568`). Path Tracer bounces are raised for refractive scenes (`Bridge.cpp:559`).
 - **Runtime BC compression and texture creation.** ISPCTexComp compression (`Scene.cpp:258-273`). Discardable bulk data handed to the RHI, with no CPU copy kept (`Scene.cpp:385-395`).
 - **Static render data built directly** instead of through `BuildFromMeshDescriptions` (`Scene.cpp:515-555`), with the measured reason documented. Nanite, card and tangent builds run on `UE::Tasks` workers, swapped one per frame (`Scene.cpp:877-884`). Nanite only draws opaque and masked materials and translucent ones are excluded (`Scene.cpp:570-571`), matching the Nanite doc ("supports materials that have their Blend Mode set to Opaque and Masked").
-- **Bundled PSO cache** with stable keys, compiled on workers from startup (`DefaultEngine.ini:44`, `docs/building.md`). This matches Epic's advice that global/post passes are not covered by precaching (PSO Precaching doc).
 - **UObject lifetime.** Long-lived UObjects are pinned with `TStrongObjectPtr` / `AddToRoot`, and render commands are drained before release (`Bridge.cpp:332-347`). Nothing calls `CollectGarbage` from the host thread.
 - **Owner-thread enforcement** on every mutating ABI call (`CheckOwner`/`CheckReady`, `Bridge.cpp:201-208`). Frame reads elsewhere go through a mutex.
 - **`static_assert` pinning the engine version** (`Bridge.cpp:58-60`), and every engine patch insertion point validated (`Apply-ResidencyPatch.ps1:5-6, 12, 22`).

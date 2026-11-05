@@ -115,7 +115,7 @@ husk, realtime and Path Tracer (177-178 threads once UE is up; 60 two seconds af
 | `RHIThread`, `RHISubmissionThread`, `RHIInterruptThread` | 1 each | backend | D3D12 command translation, submission, GPU completion |
 | `Foreground Worker #0-1`, `Background Worker #0-27` | 2 + 28 | backend | UE's task scheduler (`ParallelFor`, `UE::Tasks`) |
 | `Foreground Worker (Standby #0-1)`, `Background Worker (Standby #0-15)` | 2 + 16 | backend | its standby workers |
-| `PSOPrecompilePool #0-23` | 24 | backend | PSO compilation (bundled PSO cache and precache requests); 12-15 s of CPU during startup in each run |
+| `PSOPrecompilePool #0-23` | 24 | backend | PSO compilation (UE's runtime PSO precache requests) |
 | `IOThreadPool #0-3`, `BackgroundThreadPool #0-1`, `IoDispatcher`, `FAsyncLoadingThread` | 4 + 2 + 1 + 1 | backend | UE's I/O and package loading |
 | `OutputDeviceRedirector`, `FAsyncWriter_HdUEBackend` | 1 each | backend | log fan-out and the log file writer |
 | `CrashReportingThread`, `FHeartBeatThread`, `RTHeartBeat 0`, `FMediaTicker`, `FMessageBus.DefaultBus.Router`, `ScreenSaverInhibitor` | 1 each | backend | UE's crash handler, hang detectors and engine services |
@@ -189,7 +189,7 @@ UE starts once per process. Later delegates (the next viewport, husk `--restart-
 - **CPU frame buffers.** The backend keeps the newest beauty frame, depth, guides and AOV pixels as float arrays under `FrameMutex`, recycled through spare buffers; `copy_frame` copies into the caller's buffer. The delegate's render buffers hold their own copy for `Map()`.
 - **On disk.**
   - Shaders: the cooked shader archives in `<runtime>\HdUEBackend\Content` and `GlobalShaderCache-PCD3D_SM6.bin`; nothing is compiled at run time.
-  - PSOs: the bundled PSO cache in `Content\PipelineCaches` (`docs/building.md`, observed: "enqueued 150 tasks for precompile"). UE's own PSO disk cache is off (`r.D3D12.PSO.DiskCache=0` in the log); the NVIDIA driver keeps its own shader cache (*inferred*).
+  - PSOs: none bundled (`docs/building.md`, "PSOs"). UE's own PSO disk cache is off (`r.D3D12.PSO.DiskCache=0` in the log); the NVIDIA driver keeps its own shader cache (*inferred*).
   - Converted OCIO textures: `%TEMP%\hdue_ocio`, entries unused for a week removed (`color_management.h`).
   - Nanite builds: `Saved\NaniteCache` (`BuildNanite`, `Scene.cpp`), keyed by the builder's version and the mesh's content, entries unused for a week removed.
   - UE's `Saved` (`Logs`, `Config`): under the runtime project, or under `HDUE_USER_DIR` when set.

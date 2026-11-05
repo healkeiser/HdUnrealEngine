@@ -81,22 +81,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 63 ms | 2.66 s | 8.08 s | 49.70 s | 129x / 3x | 0.97 / 1.01 |
-| Glossy materials | 61 ms | 2.56 s | 5.88 s | 30.30 s | 96x / 2x | 1.06 / 1.22 |
-| Depth of field | 68 ms | 2.60 s | 8.40 s | 51.03 s | 124x / 3x | 0.97 / 1.01 |
-| Motion blur | 62 ms | 2.61 s | 7.92 s | 50.24 s | 127x / 3x | 0.98 / 1.01 |
-| Subdivision surfaces | 63 ms | 3.08 s | 7.60 s | 48.27 s | 120x / 2x | 0.97 / 1.01 |
-| Instances, points, curves | 61 ms | 2.92 s | 7.63 s | 50.05 s | 124x / 3x | 0.99 / 1.04 |
-| Volumes (OpenVDB) | 59 ms | 4.06 s | 8.21 s | 58.66 s | 138x / 2x | 1.10 / 1.32 |
-| IES profile | 60 ms | 2.34 s | 9.81 s | 68.45 s | 165x / 4x | 1.05 / 1.09 |
-| Light linking | 62 ms | 2.64 s | 9.74 s | 64.69 s | 158x / 4x | 0.99 / 1.00 |
-| Clearcoat | 62 ms | 2.31 s | 6.34 s | 37.10 s | 102x / 3x | 0.99 / 1.01 |
-| Render region | 41 ms | 2.61 s | 2.33 s | 13.71 s | 56x / 1x | 0.98 / 1.04 |
-| Lens shift | 63 ms | 2.40 s | 5.63 s | 34.78 s | 89x / 2x | 0.97 / 1.03 |
-| Orthographic camera | 55 ms | 2.20 s | 7.23 s | 44.68 s | 131x / 3x | 0.85 / 1.05 |
-| Camera exposure | 56 ms | 2.26 s | 8.98 s | 57.14 s | 161x / 4x | 0.97 / 1.01 |
-| Unreal post-processing | 60 ms | 2.26 s | 7.77 s | 47.66 s | 130x / 3x | n/a |
-| **All 15** | **897 ms** | **39.52 s** | **111.57 s** | **706.49 s** | **124x / 3x** | |
+| Global illumination | 50 ms | 2.02 s | 8.08 s | 49.70 s | 163x / 4x | 0.97 / 1.01 |
+| Glossy materials | 62 ms | 2.56 s | 5.88 s | 30.30 s | 95x / 2x | 1.06 / 1.22 |
+| Depth of field | 62 ms | 2.35 s | 8.40 s | 51.03 s | 136x / 4x | 0.97 / 1.01 |
+| Motion blur | 64 ms | 2.39 s | 7.92 s | 50.24 s | 124x / 3x | 0.98 / 1.01 |
+| Subdivision surfaces | 62 ms | 2.57 s | 7.60 s | 48.27 s | 122x / 3x | 0.97 / 1.01 |
+| Instances, points, curves | 64 ms | 2.95 s | 7.63 s | 50.05 s | 119x / 3x | 0.99 / 1.04 |
+| Volumes (OpenVDB) | 62 ms | 4.17 s | 8.21 s | 58.66 s | 131x / 2x | 1.10 / 1.32 |
+| IES profile | 59 ms | 2.51 s | 9.81 s | 68.45 s | 167x / 4x | 1.05 / 1.09 |
+| Light linking | 60 ms | 2.52 s | 9.74 s | 64.69 s | 163x / 4x | 0.99 / 1.00 |
+| Clearcoat | 62 ms | 2.58 s | 6.34 s | 37.10 s | 103x / 2x | 0.99 / 1.01 |
+| Render region | 43 ms | 2.34 s | 2.33 s | 13.71 s | 55x / 1x | 0.98 / 1.04 |
+| Lens shift | 57 ms | 2.39 s | 5.63 s | 34.78 s | 99x / 2x | 0.97 / 1.03 |
+| Orthographic camera | 58 ms | 3.39 s | 7.23 s | 44.68 s | 125x / 2x | 0.85 / 1.05 |
+| Camera exposure | 59 ms | 2.92 s | 8.98 s | 57.14 s | 151x / 3x | 0.97 / 1.01 |
+| Unreal post-processing | 60 ms | 2.40 s | 7.77 s | 47.66 s | 128x / 3x | n/a |
+| **All 15** | **884 ms** | **40.07 s** | **111.57 s** | **706.49 s** | **126x / 3x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -156,7 +156,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 | Area | What you get | Not yet |
 |------|--------------|---------|
 | **Houdini** | Solaris viewport renderer, husk, USD Render ROP, Render Gallery, Live Render LOP; hdUE Render Settings, Standard Render Vars and Render Products LOPs (`hdue::hduerendersettings::1.0`, ...) under TAB > Rendering > hdUE, with Output Picture on top as on Karma's; an **Unreal Engine** tab on Render Settings, Render Geometry Settings and Light LOPs; an hdUE Substrate Material Builder TAB tool; progress and stats in the viewport and in husk (`-V`); selection highlight; installable package | Houdini versions other than 22.0 |
-| **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames (a moved mesh keeps its uploaded geometry), Nanite for meshes and instancer prototypes (millions of instances), a bundled PSO cache, about 0.25 s per simple 1080p Lumen frame | |
+| **Speed** | One UE per husk process for the whole frame range, only changed prims resent between frames (a moved mesh keeps its uploaded geometry), Nanite for meshes and instancer prototypes (millions of instances), about 0.25 s per simple 1080p Lumen frame | |
 | **Geometry** | Meshes and GeomSubsets, implicit prims (Cube, Sphere, ...), Points, BasisCurves (widths per vertex, curve or segment; pinned; ribbons with normals), PointInstancers (nested, `protoIndices`, masks, half and float orientations, per-instance primvars on bound materials, instanced volumes) and native instancing, UsdSkel skinning, purposes, `displayColor` per face/vertex/point/curve/instance, Catmull-Clark and Loop subdivision (OpenSubdiv, uniform, with creases, corners and face-varying UVs), `doubleSided` honoured as in UE's USD importer (`unreal:cullBackface = 0` renders both sides, as Karma) | Adaptive subdivision and adaptive displacement, varying `displayOpacity`, shear in instances (warned) |
 | **Volumes** | OpenVDB files, unsaved SOP volumes (`op:` paths, VDB and Houdini volumes), `.bgeo.sc` written by the USD Render ROP; `density` field, emission from another field (`primvars:unreal:emissionField`, UE's BlackBody), shadows in both modes | Volume materials, frustum grids |
 | **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); several UV sets per mesh; primvar readers; true displacement (Preview Surface and MaterialX, diced on the CPU so the Path Tracer sees it); MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts, refracting transmission); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals), vector displacement |
