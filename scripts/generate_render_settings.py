@@ -641,6 +641,74 @@ CVARS = [
         dict(menu=[(0, "Fallback Mesh"), (1, "Streamed Out Mesh")]),
     ),
     (
+        "r.PathTracing.Denoiser.Name",
+        "Denoiser Plugin",
+        "Rendering|Path Tracing",
+        False,
+        dict(menu=[("NNEDenoiser", "NNE Denoiser"), ("OptiX", "NVIDIA OptiX")]),
+    ),
+    # The denoiser plugins' own settings, with their defaults (NNEDenoiserViewExtension.cpp, NNEDenoiserSettings.cpp;
+    # OptiXDenoise Plugin.cpp, with the runtime's tile size, DefaultEngine.ini).
+    (
+        "NNEDenoiser.Asset",
+        "NNE Denoiser Model",
+        "Rendering|Path Tracing",
+        False,
+        dict(
+            type="int32",
+            default=0,
+            menu=[
+                (0, "Project Default (Balanced, Alpha)"),
+                (1, "Fast"),
+                (2, "Balanced"),
+                (3, "High Quality"),
+                (4, "Fast, Alpha"),
+                (5, "Balanced, Alpha"),
+                (6, "High Quality, Alpha"),
+            ],
+            help="Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without "
+            "the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings).",
+        ),
+    ),
+    (
+        "NNEDenoiser.Runtime.Type",
+        "NNE Denoiser Runtime",
+        "Rendering|Path Tracing",
+        False,
+        dict(
+            type="int32",
+            default=2,
+            menu=[(0, "CPU"), (1, "GPU"), (2, "RDG")],
+            help="Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, "
+            "the default), GPU or CPU.",
+        ),
+    ),
+    (
+        "r.OptixDenoise.TileWidth",
+        "OptiX Tile Width",
+        "Rendering|Path Tracing",
+        False,
+        dict(
+            type="int32",
+            default=0,
+            range=(0, 4096, True, False),
+            help="Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 "
+            "tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0.",
+        ),
+    ),
+    (
+        "r.OptixDenoise.TileHeight",
+        "OptiX Tile Height",
+        "Rendering|Path Tracing",
+        False,
+        dict(
+            type="int32",
+            default=0,
+            range=(0, 4096, True, False),
+            help="Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width).",
+        ),
+    ),
+    (
         "r.PathTracing.ApproximateCaustics",
         "Approximate Caustics",
         "Rendering|Path Tracing",
@@ -663,6 +731,7 @@ ESSENTIAL_CVARS = (
     "r.ScreenPercentage",
     "r.HdUE.InteractiveResolution",
     "r.HdUE.InteractiveScreenPercentage",
+    "r.PathTracing.Denoiser.Name",
 )
 
 DEBUG_VIEWS = [
@@ -1927,6 +1996,9 @@ def console_settings(engine_root):
         default = options.get("default", configured.get(name, default))
         if options.get("kind") == "toggle" or type_name == "bool":
             kind, value = "toggle", [str(default).lower() not in ("0", "false")]
+        elif type_name == "FString":
+            kind = "menu" if options.get("menu") else "string"
+            value = [str(default).strip().strip('"')]
         elif options.get("menu"):
             kind, value = "intmenu", [int(float(default))]
         elif type_name in ("int32", "int"):
@@ -1960,7 +2032,13 @@ def console_settings(engine_root):
                 viewport=viewport,
                 cvar=name,
                 declared_default=(
-                    None if "default" in options else float(value[0])
+                    None
+                    if "default" in options
+                    else (
+                        value[0]
+                        if kind in ("menu", "string")
+                        else float(value[0])
+                    )
                 ),
             )
         )

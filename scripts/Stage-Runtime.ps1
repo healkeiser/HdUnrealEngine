@@ -17,6 +17,14 @@ New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 # UE's AgilitySDK module stages the Agility SDK in D3D12\x64, but D3D12 only reads D3D12SDKVersion/D3D12SDKPath from
 # the executable (husk.exe, houdinifx.exe), so the OS D3D12Core.dll is used and this copy never loads.
 Remove-Item -LiteralPath (Join-Path $Bin 'D3D12') -Recurse -Force -ErrorAction SilentlyContinue
+# UE's OptiX denoiser loads OptiXDenoiseBase.dll and its CUDA kernels (OptiXDenoiserFunctionList.ptx) from its
+# plugin's Source folder (OptiXDenoise Plugin.cpp, StartupModule), which its OptiXDenoiseBase.Build.cs never stages
+# (no RuntimeDependencies): without the kernels every CUDA launch failed and the denoised image stayed black.
+$OptiX = 'Engine\Plugins\Experimental\OptiXDenoise\Source\ThirdParty\OptiXDenoiseBase\lib'
+New-Item -ItemType Directory -Force -Path (Join-Path $Runtime $OptiX) | Out-Null
+foreach ($File in 'OptiXDenoiseBase.dll', 'OptiXDenoiserFunctionList.ptx') {
+    Copy-Item -LiteralPath (Join-Path $EngineRoot "$OptiX\$File") -Destination (Join-Path $Runtime $OptiX)
+}
 $HostBuild = Join-Path $TaskRoot 'build'
 $Smoke = Join-Path $HostBuild 'Release\hdue_backend_smoke.exe'
 if (-not (Test-Path -LiteralPath $Smoke)) {

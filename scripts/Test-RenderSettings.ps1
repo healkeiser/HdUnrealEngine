@@ -29,7 +29,8 @@ foreach ($Variable in $Declared.PSObject.Properties) {
     if (-not $Set) { $Wrong += "$($Variable.Name): never set"; continue }
     $Was = $Set.Matches[0].Groups[1].Value
     if ($Was -match '^(true|false)$') { $Was = [int]($Was -eq 'true') }
-    if ([double]$Was -ne [double]$Variable.Value) { $Wrong += "$($Variable.Name): generated default $($Variable.Value), UE had $Was" }
+    $Differs = if ($Variable.Value -is [string]) { $Was -ne $Variable.Value } else { [double]$Was -ne [double]$Variable.Value }
+    if ($Differs) { $Wrong += "$($Variable.Name): generated default $($Variable.Value), UE had $Was" }
 }
 $Wrong | ForEach-Object { Write-Host $_ }
 $Count = ((Get-Content -Raw -LiteralPath $Settings | ConvertFrom-Json).settings.PSObject.Properties | Measure-Object).Count

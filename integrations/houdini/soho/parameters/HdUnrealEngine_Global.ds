@@ -390,6 +390,80 @@
                 disablewhen R"({ xn__unrealpostProcessPathTracingEnableDenoiser_control_incl == block } { xn__unrealpostProcessPathTracingEnableDenoiser_control_incl == none })"
                 hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
             }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrPathTracingDenoiserName_control_h9bebli", "Denoiser Plugin", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealcvarrPathTracingDenoiserName_gwbebli"
+                label   "Denoiser Plugin"
+                type    string
+                size    1
+                default { "NNEDenoiser" }
+                menu { "NNEDenoiser" "NNE Denoiser" "OptiX" "NVIDIA OptiX" }
+                help    "Set the spatial denoiser name. It is the corresponding name registered by a denoiser plugin Any registered denoiser should be able to denoise a single frame spatially. Console variable r.PathTracing.Denoiser.Name (process-wide)."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "token" }
+                disablewhen R"({ xn__unrealcvarrPathTracingDenoiserName_control_h9bebli == block } { xn__unrealcvarrPathTracingDenoiserName_control_h9bebli == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarNNEDenoiserAsset_control_gwbel", "NNE Denoiser Model", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealcvarNNEDenoiserAsset_fjbel"
+                label   "NNE Denoiser Model"
+                type    int
+                size    1
+                default { 0 }
+                menu { "0" "Project Default (Balanced, Alpha)" "1" "Fast" "2" "Balanced" "3" "High Quality" "4" "Fast, Alpha" "5" "Balanced, Alpha" "6" "High Quality, Alpha" }
+                help    "Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide)."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarNNEDenoiserAsset_control_gwbel == block } { xn__unrealcvarNNEDenoiserAsset_control_gwbel == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarNNEDenoiserRuntimeType_control_75belh", "NNE Denoiser Runtime", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealcvarNNEDenoiserRuntimeType_6sbelh"
+                label   "NNE Denoiser Runtime"
+                type    int
+                size    1
+                default { 2 }
+                menu { "0" "CPU" "1" "GPU" "2" "RDG" }
+                help    "Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, the default), GPU or CPU. Console variable NNEDenoiser.Runtime.Type (process-wide)."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarNNEDenoiserRuntimeType_control_75belh == block } { xn__unrealcvarNNEDenoiserRuntimeType_control_75belh == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrOptixDenoiseTileWidth_control_75bebm", "OptiX Tile Width", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealcvarrOptixDenoiseTileWidth_6sbebm"
+                label   "OptiX Tile Width"
+                type    int
+                size    1
+                default { 0 }
+                range   { 0! 4096 }
+                help    "Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0. Console variable r.OptixDenoise.TileWidth (process-wide)."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrOptixDenoiseTileWidth_control_75bebm == block } { xn__unrealcvarrOptixDenoiseTileWidth_control_75bebm == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
+            HDUE_CONTROL_HIDE("xn__unrealcvarrOptixDenoiseTileHeight_control_u7bebm", "OptiX Tile Height", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealcvarrOptixDenoiseTileHeight_tubebm"
+                label   "OptiX Tile Height"
+                type    int
+                size    1
+                default { 0 }
+                range   { 0! 4096 }
+                help    "Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width). Console variable r.OptixDenoise.TileHeight (process-wide)."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealcvarrOptixDenoiseTileHeight_control_u7bebm == block } { xn__unrealcvarrOptixDenoiseTileHeight_control_u7bebm == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
             HDUE_CONTROL_HIDE("xn__unrealcvarrPathTracingApproximateCaustics_control_vlcebl", "Approximate Caustics", "{ xn__unrealrenderMode_41a != pathtraced }")
             parm {
                 name    "xn__unrealcvarrPathTracingApproximateCaustics_u7bebl"
