@@ -227,6 +227,8 @@ Both differ from Karma and Storm.
 - publish it under a separate AOV name.
 At minimum, warn in the viewport HUD.
 
+**Resolution (2026-11-05).** UE owns the look: the tone-mapped beauty is sRGB-encoded and taken through the inverse of the config's default display and view (`color_management.cpp`, `HdUEDisplayToSceneLinear`), so that view reproduces UE's pixels. Houdini's default view inverts to the primaries conversion alone. The once-per-session warning is gone.
+
 ## COL-02 — Light textures bypass OCIO (Medium)
 
 **What we do.** Material colour textures go through `HdUELinearRec709Texture` (`materials.cpp:92`, `delegate.cpp:432`). Light textures call `textureFile(state, source->texture)` without the `sceneLinear` flag (`delegate.cpp:576`), and `Lighting.cpp:101-106` loads them as-is.

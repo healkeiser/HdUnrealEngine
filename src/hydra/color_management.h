@@ -14,6 +14,9 @@ const std::string& HdUESceneLinearName();
 bool HdUESceneLinearIsRec709();
 // Linear Rec.709 RGBA pixels (UE's output) to scene_linear, in place.
 void HdUEToSceneLinear(std::vector<float>& rgba);
+// UE's tone-mapped RGBA pixels (display-linear Rec.709) to scene_linear through the inverse of the config's default
+// display and view, in place: that view then shows UE's image as UE does, whatever the config.
+void HdUEDisplayToSceneLinear(std::vector<float>& rgba);
 // A scene_linear colour (authored in USD) to linear Rec.709 for UE.
 GfVec3f HdUEFromSceneLinear(const GfVec3f& color);
 // Texture colour-space names (UsdUVTexture sourceColorSpace, MaterialX colorspace): raw data, and sRGB-encoded

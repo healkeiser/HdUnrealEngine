@@ -10,6 +10,7 @@
 #include <chrono>
 namespace OCIO = OCIO_NAMESPACE;
 #endif
+#include <cmath>
 #include <filesystem>
 #include <functional>
 #include <mutex>
@@ -28,8 +29,55 @@ struct ColorManagement {
 #if defined(HDUE_HOUDINI)
     OCIO::ConstConfigRcPtr config;  // null: no colour management (disabled, or not relatable to linear Rec.709)
     OCIO::ConstCPUProcessorRcPtr toScene, fromScene;
+    OCIO::ConstCPUProcessorRcPtr fromDisplay;  // null: the default view shows scene_linear untouched (toScene does)
 #endif
 };
+#if defined(HDUE_HOUDINI)
+// UE's tone-mapped image is display-referred: UE owns the look. Its sRGB code values go through the inverse of the
+// config's default display and view, so that view shows UE's pixels unchanged (ACES and AgX views would otherwise
+// tone-map them a second time). Houdini's default view (Un-tone-mapped, an sRGB encode) inverts to toScene itself, so
+// that case stays null and costs nothing per frame.
+OCIO::ConstCPUProcessorRcPtr displayProcessor(const OCIO::ConstConfigRcPtr& config, const char* scene,
+                                              const OCIO::ConstCPUProcessorRcPtr& toScene) {
+    const char* display = config->getDefaultDisplay();
+    const char* view = config->getDefaultView(display);
+    if (!display || !*display || !view || !*view) return nullptr;
+    const auto group = OCIO::GroupTransform::Create();
+    // UE encodes its tone curve for an sRGB monitor (piecewise sRGB, r.HDR.Display.OutputDevice 0).
+    const auto encode = OCIO::ExponentWithLinearTransform::Create();
+    encode->setGamma({2.4, 2.4, 2.4, 1.0});
+    encode->setOffset({0.055, 0.055, 0.055, 0.0});
+    encode->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+    group->appendTransform(encode);
+    const auto inverse = OCIO::DisplayViewTransform::Create();
+    inverse->setSrc(scene);
+    inverse->setDisplay(display);
+    inverse->setView(view);
+    inverse->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+    group->appendTransform(inverse);
+    auto processor = config->getProcessor(group)->getDefaultCPUProcessor();
+    // OCIO does not fold an encode and its inverse into a no-op: compare with toScene on a ramp instead.
+    for (int i = 0; i <= 16; ++i) {
+        const float v = i / 16.f;
+        float a[3] = {v, v * 0.5f, v * 0.25f}, b[3] = {v, v * 0.5f, v * 0.25f};
+        processor->applyRGB(a);
+        toScene->applyRGB(b);
+        for (int c = 0; c < 3; ++c)
+            if (std::abs(a[c] - b[c]) > 1e-4f) return processor;
+    }
+    return nullptr;
+}
+void applyRows(const OCIO::ConstCPUProcessorRcPtr& processor, std::vector<float>& rgba) {
+    // Rows of 16k pixels in parallel: one thread took 10-30 ms per 1080p frame.
+    const size_t pixels = rgba.size() / 4, chunk = 16384;
+    WorkParallelForN((pixels + chunk - 1) / chunk, [&](size_t begin, size_t end) {
+        for (size_t c = begin; c < end; ++c) {
+            OCIO::PackedImageDesc image(rgba.data() + c * chunk * 4, long(std::min(chunk, pixels - c * chunk)), 1, 4);
+            processor->apply(image);
+        }
+    });
+}
+#endif
 const ColorManagement& management() {
     static ColorManagement result;
     static std::once_flag once;
@@ -47,6 +95,7 @@ const ColorManagement& management() {
                                    ->getDefaultCPUProcessor();
             result.identity = result.toScene->isNoOp();
             result.config = config;
+            result.fromDisplay = displayProcessor(config, scene->getName(), result.toScene);
         } catch (const OCIO::Exception& error) {
             TF_WARN("hdUE: OCIO colour management disabled (output stays linear Rec.709): %s", error.what());
         }
@@ -61,14 +110,16 @@ void HdUEToSceneLinear(std::vector<float>& rgba) {
 #if defined(HDUE_HOUDINI)
     const auto& m = management();
     if (m.identity || rgba.size() < 4) return;
-    // Rows of 16k pixels in parallel: one thread took 10-30 ms per 1080p frame.
-    const size_t pixels = rgba.size() / 4, chunk = 16384;
-    WorkParallelForN((pixels + chunk - 1) / chunk, [&](size_t begin, size_t end) {
-        for (size_t c = begin; c < end; ++c) {
-            OCIO::PackedImageDesc image(rgba.data() + c * chunk * 4, long(std::min(chunk, pixels - c * chunk)), 1, 4);
-            m.toScene->apply(image);
-        }
-    });
+    applyRows(m.toScene, rgba);
+#else
+    (void)rgba;
+#endif
+}
+void HdUEDisplayToSceneLinear(std::vector<float>& rgba) {
+#if defined(HDUE_HOUDINI)
+    const auto& m = management();
+    if (!m.fromDisplay) return HdUEToSceneLinear(rgba);
+    if (rgba.size() >= 4) applyRows(m.fromDisplay, rgba);
 #else
     (void)rgba;
 #endif

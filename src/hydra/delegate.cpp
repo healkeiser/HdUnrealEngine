@@ -2999,9 +2999,12 @@ public:
                                 pixels[i + 2] *= lens_[3];
                             }
                         const auto publishStart = Clock::now();
-                        // UE renders linear Rec.709 (tone-mapped: display-linear); hosts expect the OCIO scene_linear
-                        // role.
-                        HdUEToSceneLinear(pixels);
+                        // UE renders linear Rec.709; hosts expect the OCIO scene_linear role. A tone-mapped image is
+                        // display-referred: UE owns its look, so it goes through the default view's inverse.
+                        if (s.toneMapped())
+                            HdUEDisplayToSceneLinear(pixels);
+                        else
+                            HdUEToSceneLinear(pixels);
                         for (auto* extra : extraBeauties_) extra->publish(frame, pixels, 4);
                         buffer->publish(frame, std::move(pixels), 4);
                         publishMs = ms(publishStart, Clock::now());
@@ -3104,16 +3107,6 @@ public:
                     subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
-                    // The tone-mapped beauty is display-linear. It is still converted to scene_linear's primaries
-                    // (only a matrix), so an un-tone-mapped view shows UE's image in any config; ACES or AgX views
-                    // would apply a second tone curve.
-                    static std::once_flag displayReferred;
-                    if (s.setting<bool>("tonemapper", false))
-                        std::call_once(displayReferred, [] {
-                            TF_WARN(
-                                "hdUE: with the Unreal tonemapper on, the beauty is UE's display-referred image; "
-                                "view it with an un-tone-mapped view (not ACES or AgX, which tone-map it again)");
-                        });
                     // unreal:heightFog places UE's Exponential Height Fog (volumetric fog included),
                     // unreal:heightFog:<UExponentialHeightFogComponent property> sets it, and unreal:heightFogHeight
                     // (scene units along the up axis) is where its density is FogDensity.
