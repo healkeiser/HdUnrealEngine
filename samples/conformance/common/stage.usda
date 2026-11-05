@@ -48,7 +48,7 @@ def Scope "Render"
         int unreal:samplesPerPixel = 16
         int unreal:warmupFrames = 8
         # The checks measure the renderer's own samples; denoising 16 samples moves coverage and brightness.
-        token unreal:denoiser = "off"
+        bool unreal:postProcess:PathTracingEnableDenoiser = 0
         token unreal:renderMode = "realtime"
     }
 

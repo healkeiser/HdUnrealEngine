@@ -93,20 +93,6 @@
         disablewhen R"({ xn__unrealwarmupFrames_control_fjb == block } { xn__unrealwarmupFrames_control_fjb == none })"
         hidewhen "{ xn__unrealrenderMode_41a != realtime }"
     }
-    HDUE_CONTROL_HIDE("xn__unrealdenoiser_control_wcb", "Denoiser", "{ xn__unrealrenderMode_41a != pathtraced }")
-    parm {
-        name    "xn__unrealdenoiser_vya"
-        label   "Denoiser"
-        type    string
-        size    1
-        default { "oidn" }
-        menu { "off" "Off" "oidn" "Open Image Denoise" }
-        help    "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), guided by albedo and normal passes. AOVs and Lumen are unaffected."
-        parmtag { "spare_category" "Rendering" }
-        parmtag { "usdvaluetype" "token" }
-        disablewhen R"({ xn__unrealdenoiser_control_wcb == block } { xn__unrealdenoiser_control_wcb == none })"
-        hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
-    }
     HDUE_CONTROL("xn__unrealtonemapper_control_5fb", "Unreal Tonemapper")
     parm {
         name    "xn__unrealtonemapper_41a"
@@ -389,6 +375,19 @@
                 parmtag { "spare_category" "Path Tracing" }
                 parmtag { "usdvaluetype" "bool" }
                 disablewhen R"({ xn__unrealpostProcessPathTracingEnableReferenceAtmosphere_control_f5cl == block } { xn__unrealpostProcessPathTracingEnableReferenceAtmosphere_control_f5cl == none })"
+                hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
+            }
+            HDUE_CONTROL_HIDE("xn__unrealpostProcessPathTracingEnableDenoiser_control_incl", "Denoiser", "{ xn__unrealrenderMode_41a != pathtraced }")
+            parm {
+                name    "xn__unrealpostProcessPathTracingEnableDenoiser_h9bl"
+                label   "Denoiser"
+                type    toggle
+                size    1
+                default { 1 }
+                help    "Run the currently loaded denoiser plugin on the last sample to remove noise from the output. Has no effect if a plug-in is not loaded."
+                parmtag { "spare_category" "Path Tracing" }
+                parmtag { "usdvaluetype" "bool" }
+                disablewhen R"({ xn__unrealpostProcessPathTracingEnableDenoiser_control_incl == block } { xn__unrealpostProcessPathTracingEnableDenoiser_control_incl == none })"
                 hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
             }
             HDUE_CONTROL_HIDE("xn__unrealcvarrPathTracingApproximateCaustics_control_vlcebl", "Approximate Caustics", "{ xn__unrealrenderMode_41a != pathtraced }")

@@ -5,6 +5,18 @@
 namespace hdue {
 Backend::Backend(const std::filesystem::path& dll) {
     const auto absolute = std::filesystem::absolute(dll);
+    // UE's NNEDenoiser runs on NNERuntimeORT, which loads onnxruntime.dll after the backend, and onnxruntime.dll loads
+    // DirectML.dll (a delay-load import) when the denoiser first runs. Windows detaches DLLs in the reverse order they
+    // were initialized, so they detached first when the host exited with UE running (husk), and their teardown ran
+    // against threads ExitProcess had already ended: husk never exited, or failed fast (0xC0000409) after a denoised
+    // frame. Loaded first, they detach after the backend, whose exit handler ends the process (Bridge.cpp,
+    // Initialize).
+    const auto runtime = absolute.parent_path().parent_path().parent_path().parent_path();
+    const auto onnxRuntime =
+        runtime / "Engine/Plugins/NNE/NNERuntimeORT/Binaries/ThirdParty/Onnxruntime/Win64/onnxruntime.dll";
+    if (std::filesystem::exists(onnxRuntime))
+        LoadLibraryExW(onnxRuntime.c_str(), nullptr,
+                       LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     module_ =
         LoadLibraryExW(absolute.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     if (!module_) throw std::runtime_error("Cannot load backend DLL, Win32 error " + std::to_string(GetLastError()));

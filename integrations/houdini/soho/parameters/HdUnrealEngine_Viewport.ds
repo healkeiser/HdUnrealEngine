@@ -44,18 +44,6 @@
             hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
         }
         parm {
-            name "xn__unrealdenoiser_vya"
-            label "Denoiser"
-            type string
-            size 1
-            default { "oidn" }
-            menu { "off" "Off" "oidn" "Open Image Denoise" }
-            help "Denoises the converged Path Tracer image."
-            parmtag { "spare_category" "Rendering" }
-            parmtag { "uiscope" "viewport" }
-            hidewhen "{ xn__unrealrenderMode_41a != pathtraced }"
-        }
-        parm {
             name "xn__unrealdebugView_i0a"
             label "Debug View"
             type string

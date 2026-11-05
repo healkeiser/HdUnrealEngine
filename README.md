@@ -81,22 +81,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 50 ms | 2.02 s | 8.08 s | 49.70 s | 163x / 4x | 0.97 / 1.01 |
-| Glossy materials | 62 ms | 2.56 s | 5.88 s | 30.30 s | 95x / 2x | 1.06 / 1.22 |
-| Depth of field | 62 ms | 2.35 s | 8.40 s | 51.03 s | 136x / 4x | 0.97 / 1.01 |
-| Motion blur | 64 ms | 2.39 s | 7.92 s | 50.24 s | 124x / 3x | 0.98 / 1.01 |
-| Subdivision surfaces | 62 ms | 2.57 s | 7.60 s | 48.27 s | 122x / 3x | 0.97 / 1.01 |
-| Instances, points, curves | 64 ms | 2.95 s | 7.63 s | 50.05 s | 119x / 3x | 0.99 / 1.04 |
-| Volumes (OpenVDB) | 62 ms | 4.17 s | 8.21 s | 58.66 s | 131x / 2x | 1.10 / 1.32 |
-| IES profile | 59 ms | 2.51 s | 9.81 s | 68.45 s | 167x / 4x | 1.05 / 1.09 |
-| Light linking | 60 ms | 2.52 s | 9.74 s | 64.69 s | 163x / 4x | 0.99 / 1.00 |
-| Clearcoat | 62 ms | 2.58 s | 6.34 s | 37.10 s | 103x / 2x | 0.99 / 1.01 |
-| Render region | 43 ms | 2.34 s | 2.33 s | 13.71 s | 55x / 1x | 0.98 / 1.04 |
-| Lens shift | 57 ms | 2.39 s | 5.63 s | 34.78 s | 99x / 2x | 0.97 / 1.03 |
-| Orthographic camera | 58 ms | 3.39 s | 7.23 s | 44.68 s | 125x / 2x | 0.85 / 1.05 |
-| Camera exposure | 59 ms | 2.92 s | 8.98 s | 57.14 s | 151x / 3x | 0.97 / 1.01 |
-| Unreal post-processing | 60 ms | 2.40 s | 7.77 s | 47.66 s | 128x / 3x | n/a |
-| **All 15** | **884 ms** | **40.07 s** | **111.57 s** | **706.49 s** | **126x / 3x** | |
+| Global illumination | 52 ms | 2.61 s | 8.08 s | 49.70 s | 156x / 3x | 0.98 / 1.01 |
+| Glossy materials | 52 ms | 2.57 s | 5.88 s | 30.30 s | 112x / 2x | 1.06 / 1.22 |
+| Depth of field | 56 ms | 2.73 s | 8.40 s | 51.03 s | 149x / 3x | 0.98 / 1.01 |
+| Motion blur | 57 ms | 2.71 s | 7.92 s | 50.24 s | 138x / 3x | 0.98 / 1.01 |
+| Subdivision surfaces | 56 ms | 2.66 s | 7.60 s | 48.27 s | 136x / 3x | 0.98 / 1.01 |
+| Instances, points, curves | 54 ms | 2.61 s | 7.63 s | 50.05 s | 143x / 3x | 0.98 / 1.03 |
+| Volumes (OpenVDB) | 58 ms | 4.03 s | 8.21 s | 58.66 s | 143x / 2x | 1.10 / 1.31 |
+| IES profile | 55 ms | 2.22 s | 9.81 s | 68.45 s | 179x / 4x | 1.02 / 1.09 |
+| Light linking | 54 ms | 2.64 s | 9.74 s | 64.69 s | 182x / 4x | 0.99 / 1.00 |
+| Clearcoat | 56 ms | 2.27 s | 6.34 s | 37.10 s | 114x / 3x | 0.99 / 1.00 |
+| Render region | 39 ms | 2.55 s | 2.33 s | 13.71 s | 59x / 1x | 0.98 / 1.04 |
+| Lens shift | 52 ms | 2.64 s | 5.63 s | 34.78 s | 109x / 2x | 0.97 / 1.03 |
+| Orthographic camera | 55 ms | 2.60 s | 7.23 s | 44.68 s | 132x / 3x | 0.85 / 1.04 |
+| Camera exposure | 54 ms | 2.65 s | 8.98 s | 57.14 s | 167x / 3x | 0.97 / 1.01 |
+| Unreal post-processing | 57 ms | 2.68 s | 7.77 s | 47.66 s | 136x / 3x | n/a |
+| **All 15** | **806 ms** | **40.19 s** | **111.57 s** | **706.49 s** | **138x / 3x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -132,7 +132,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 ### Sponza
 
 <!-- sponza:start -->
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. The gallery renders without hdUE’s optional Open Image Denoise (Houdini build), so its Path Tracer image shows more noise than Karma at the same sample count. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. hdUE's Path Tracer image is denoised by UE's default denoiser (NNEDenoiser, PathTracingEnableDenoiser on); Karma's is not. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
 - **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 256 samples per pixel, up to 32 bounces.
@@ -145,7 +145,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main view | 93 ms | 14.45 s | 42.19 s | 474.65 s | 453x / 3x | 0.88 / 0.94 |
+| Main view | 107 ms | 6.97 s | 42.19 s | 474.65 s | 393x / 6x | 0.92 / 1.06 |
 
 ![Main view: `/root/PhysCamera001`, levelled as in Intel's Render_Main_A, exposure +4.5 stops as authored; sun and sky fitted to Intel's renders.](docs/images/gallery/sponza/PhysCamera001.png)
 <!-- sponza:end -->
@@ -162,7 +162,7 @@ Regenerate with `hython scripts/render_gallery.py --set sponza`.
 | **Materials** | UsdPreviewSurface with every texture input, cutouts, clearcoat, wrap modes and per-texture colour spaces (OCIO); several UV sets per mesh; primvar readers; true displacement (Preview Surface and MaterialX, diced on the CPU so the Path Tracer sees it); MaterialX Standard Surface and OpenPBR at runtime (images, subsurface, sheen, thin-walled, cutouts, refracting transmission); prepared MaterialX and Substrate; COP textures | Arbitrary MaterialX node graphs at runtime (mix, procedurals), vector displacement |
 | **Lights** | Distant, sphere, rect, disk, cylinder, dome (HDRI, `poleAxis`), UsdLux units, spot cones, IES profiles (`normalize`, `angleScale`), light and shadow linking (up to three linked collections, UE's lighting channels), Virtual Shadow Maps, UE light properties (`unreal:light:*`), light functions from an image (`unreal:lightFunction:texture`) | Portals, volume lights, UsdLux light filters, shadow colour, `shadow:distance`/`falloff` (warned) |
 | **Camera** | Perspective, orthographic, lens shift, depth of field (`disableDepthOfField`), exposure, motion blur (transforms, camera, deforming meshes, point and instance `velocities`, `accelerations` and `angularVelocities`, `motion:blurScale`), render regions, husk tiles, overscan, pixel aspect ratio, `includedPurposes`, material binding purposes, UE lens distortion (`unreal:lensDistortion:*`) | A finite far clip |
-| **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, every UE buffer visualization as an AOV (albedo, normal, roughness, metallic, specular, occlusion, AO, subsurface colour, ...), lighting components under Karma's names (diffuse, glossy reflection, emission, volume; direct, indirect, combined), Cryptomatte (object and material, with manifest), `primId`, `instanceId`, multi-frame EXR, Open Image Denoise for the Path Tracer with its albedo and normal guides, motion vectors (`velocity`, as Movie Render Queue writes them) | Deep output |
+| **Output** | Beauty (`C`, `Ci`, `C.*[LO]`, RGB or RGBA), depth, `cameraDepth`, every UE buffer visualization as an AOV (albedo, normal, roughness, metallic, specular, occlusion, AO, subsurface colour, ...), lighting components under Karma's names (diffuse, glossy reflection, emission, volume; direct, indirect, combined), Cryptomatte (object and material, with manifest), `primId`, `instanceId`, multi-frame EXR, the Path Tracer denoised by UE's NNEDenoiser, motion vectors (`velocity`, as Movie Render Queue writes them) | Deep output |
 | **Post-processing** | UE tonemapper, bloom, grading, vignette, grain, any `FPostProcessSettings` property, post-process materials (beauty only, opt-in) | |
 
 <!-- HOW IT WORKS -->

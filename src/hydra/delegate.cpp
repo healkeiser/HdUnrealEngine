@@ -58,7 +58,6 @@
 #include <thread>
 #include <atomic>
 #if defined(HDUE_HOUDINI)
-#include <OpenImageDenoise/oidn.hpp>
 #endif
 #include <windows.h>
 #include "pxr/imaging/hgi/hgi.h"
@@ -2012,24 +2011,18 @@ class Pass final : public HdRenderPass {
     std::unique_ptr<HdUERenderBuffer> internalColor_;  // beauty target when no color AOV is bound
     HdueRenderRequest beautyRequest_{};
     std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs_;
-    // unreal:denoiser = oidn: the converged Path Tracer beauty waits for albedo and normal guides, then Open Image
-    // Denoise (Houdini's, GPU when available) replaces it. Guides render as AOVs, internally when not bound.
-    std::unique_ptr<HdUERenderBuffer> guideAlbedo_, guideNormal_;
-    std::vector<float> beautyPixels_;  // top-down RGBA of the converged beauty, before denoising
-    HdueFrameInfo beautyFrame_{};
-    std::atomic<bool> denoisePending_{false};
 #if defined(HDUE_HOUDINI)
     // Houdini's GL viewport takes every frame from the backend's shared GPU ring (gpu_frames.h); the CPU buffers then
     // receive only converged frames, for Map (the Python viewer, scripts). The CPU path stays for what it computes
-    // after readback: motion blur sub-frame averaging, the denoiser and a non-identity OCIO scene_linear.
+    // after readback: motion blur sub-frame averaging and a non-identity OCIO scene_linear.
     HdueGpuOptions gpuOptions_{};
     HdUERenderBuffer* gpuBuffers_[2] = {};
     uint64_t gpuFrame_ = 0;
-    void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth, bool denoising) {
+    void syncGpuFrames(HdUEState& s, HdUERenderBuffer& buffer, HdUERenderBuffer* depth) {
         const auto frames = s.locked([&] { return s.gpuFrames; });
         const auto& api = s.backend->api();
         HdueGpuOptions options{sizeof(options)};
-        options.enabled = frames && !frames->failed() && subframes_ <= 1 && !denoising && HdUESceneLinearIsRec709();
+        options.enabled = frames && !frames->failed() && subframes_ <= 1 && HdUESceneLinearIsRec709();
         options.depth = depth != nullptr;
         options.color_scale = s.exposed() ? lens_[3] : 1.f;  // camera exposure, as the CPU path applies it
         options.depth_scale = float(1 / centimetersPerUnit_);
@@ -2070,67 +2063,6 @@ class Pass final : public HdRenderPass {
         }
     }
 #endif
-    static std::vector<float> topDown(HdUERenderBuffer& buffer, size_t channels) {
-        std::vector<float> out;
-        const auto* data = static_cast<const float*>(buffer.Map());
-        if (!data) return out;
-        const size_t width = buffer.GetWidth(), height = buffer.GetHeight(), row = width * channels;
-        out.resize(row * height);
-        for (size_t y = 0; y < height; ++y) std::copy_n(data + (height - 1 - y) * row, row, out.begin() + y * row);
-        buffer.Unmap();
-        return out;
-    }
-    void denoise(HdUERenderBuffer& beauty) {
-#if defined(HDUE_HOUDINI)
-        HdUERenderBuffer *albedo = nullptr, *normal = nullptr;
-        for (const auto& [target, id] : aovs_) {
-            if (target->GetFormat() != HdFormatFloat32Vec3) continue;  // topDown reads 3 floats per pixel
-            if (id == HDUE_AOV_ALBEDO) albedo = target;
-            if (id == HDUE_AOV_NORMAL) normal = target;
-        }
-        const auto albedoPixels = albedo ? topDown(*albedo, 3) : std::vector<float>();
-        const auto normalPixels = normal ? topDown(*normal, 3) : std::vector<float>();
-        const size_t width = beautyFrame_.width, height = beautyFrame_.height, count = width * height;
-        static oidn::DeviceRef device = [] {
-            auto d = oidn::newDevice();
-            d.commit();
-            return d;
-        }();
-        auto color = device.newBuffer(count * 4 * sizeof(float)), output = device.newBuffer(count * 4 * sizeof(float));
-        color.write(0, count * 4 * sizeof(float), beautyPixels_.data());
-        auto filter = device.newFilter("RT");
-        filter.setImage("color", color, oidn::Format::Float3, width, height, 0, 4 * sizeof(float));
-        filter.setImage("output", output, oidn::Format::Float3, width, height, 0, 4 * sizeof(float));
-        oidn::BufferRef albedoBuffer, normalBuffer;
-        if (albedoPixels.size() == count * 3) {
-            albedoBuffer = device.newBuffer(count * 3 * sizeof(float));
-            albedoBuffer.write(0, count * 3 * sizeof(float), albedoPixels.data());
-            filter.setImage("albedo", albedoBuffer, oidn::Format::Float3, width, height);
-            if (normalPixels.size() == count * 3) {
-                normalBuffer = device.newBuffer(count * 3 * sizeof(float));
-                normalBuffer.write(0, count * 3 * sizeof(float), normalPixels.data());
-                filter.setImage("normal", normalBuffer, oidn::Format::Float3, width, height);
-            }
-            // The guides are the Path Tracer's own albedo and normal (averages of its samples), not prefiltered.
-            filter.set("cleanAux", false);
-        }
-        filter.set("hdr", true);
-        filter.commit();
-        filter.execute();
-        const char* message = nullptr;
-        if (device.getError(message) != oidn::Error::None)
-            throw std::runtime_error(std::string("Open Image Denoise: ") + (message ? message : "error"));
-        std::vector<float> pixels(count * 4);
-        output.read(0, count * 4 * sizeof(float), pixels.data());
-        for (size_t i = 0; i < count; ++i) pixels[i * 4 + 3] = beautyPixels_[i * 4 + 3];
-        HdUEToSceneLinear(pixels);  // OCIO scene_linear (ACEScg in ACES pipelines)
-        for (auto* extra : extraBeauties_) extra->publish(beautyFrame_, pixels, 4);
-        beauty.publish(beautyFrame_, std::move(pixels), 4);
-#else
-        for (auto* extra : extraBeauties_) extra->publish(beautyFrame_, beautyPixels_, 4);
-        beauty.publish(beautyFrame_, beautyPixels_, 4);  // the standalone build has no denoiser
-#endif
-    }
     size_t aovSlot_ = 0;
     bool aovInFlight_ = false;
     // Motion vectors: the buffers pass first renders the frame before (unpublished), so UE's velocity buffer holds the
@@ -2343,7 +2275,7 @@ public:
         if (const auto error = state_->setting<std::string>("wetValidationError", ""); !error.empty())
             return converged_ && state_->locked([&] { return state_->error == error; });  // the UE thread writes it
         if (!state_->setting<bool>("materialGraphValid", true)) return true;
-        return converged_ && aovsDone_ && !denoisePending_ && settingsVersion_ == state_->requestSettingsRevision &&
+        return converged_ && aovsDone_ && settingsVersion_ == state_->requestSettingsRevision &&
                state_->submittedRevision == state_->revision && state_->locked([&] { return state_->repull.empty(); });
     }
     // What Execute reads from Hydra's render pass state, copied on the calling thread: Houdini reuses that object for
@@ -2770,27 +2702,6 @@ public:
                 if (skipped)
                     if (auto* target = dynamic_cast<HdUERenderBuffer*>(renderBuffer)) clear(*target);
             }
-            const bool denoising = s.setting<std::string>("renderMode", "realtime") == "pathtraced" &&
-                                   TfStringToLower(s.setting<std::string>("denoiser", "oidn")) == "oidn";
-            if (denoising && buffer && buffer->GetWidth()) {
-                // A bound albedo or normal var serves as the guide only in OIDN's layout (3 floats per pixel, topDown);
-                // a var of another format (color4h, ...) keeps its own buffer and the guide renders internally too.
-                const auto guide = [&](std::unique_ptr<HdUERenderBuffer>& owned, uint32_t id, const char* path) {
-                    if (std::any_of(aovs.begin(), aovs.end(), [&](const auto& aov) {
-                            return aov.second == id && aov.first->GetFormat() == HdFormatFloat32Vec3;
-                        }))
-                        return;
-                    if (!owned || owned->GetWidth() != buffer->GetWidth() ||
-                        owned->GetHeight() != buffer->GetHeight()) {
-                        owned = std::make_unique<HdUERenderBuffer>(SdfPath(path));
-                        owned->Allocate(GfVec3i(int(buffer->GetWidth()), int(buffer->GetHeight()), 1),
-                                        HdFormatFloat32Vec3, false);
-                    }
-                    aovs.emplace_back(owned.get(), id);
-                };
-                guide(guideAlbedo_, HDUE_AOV_ALBEDO, "/__hdUE/denoiseAlbedo");
-                guide(guideNormal_, HDUE_AOV_NORMAL, "/__hdUE/denoiseNormal");
-            }
             if (!bufferVars.empty()) aovs.emplace_back(bufferVars.front().target, HDUE_AOV_BUFFERS);
             // Cryptomatte: kCryptomatteSamples primId passes, each shifted by a sub-pixel offset of a 4 x 4 grid, as
             // MRQ's Object ID pass accumulates its spatial samples; their ids' share of each pixel is the coverage.
@@ -3087,11 +2998,6 @@ public:
                                 pixels[i + 1] *= lens_[3];
                                 pixels[i + 2] *= lens_[3];
                             }
-                        if (denoising && frame.converged) {
-                            beautyPixels_ = pixels;
-                            beautyFrame_ = frame;
-                            denoisePending_ = true;
-                        }
                         const auto publishStart = Clock::now();
                         // UE renders linear Rec.709 (tone-mapped: display-linear); hosts expect the OCIO scene_linear
                         // role.
@@ -3385,7 +3291,6 @@ public:
                     aovInFlight_ = false;
                     velocityPriming_ = velocityPrimed_ = false;
                     aovsDone_ = aovs_.empty();
-                    denoisePending_ = false;
                     for (const auto& [aovBuffer, id] : aovs_) aovBuffer->invalidate();
                     for (const auto& var : cryptoVars_) var.target->invalidate();
                     for (const auto& var : bufferVars_) var.target->invalidate();
@@ -3459,13 +3364,9 @@ public:
                     }
                 }
             }
-            if (denoisePending_ && aovsDone_) {
-                denoise(*buffer);
-                denoisePending_ = false;
-            }
 #if defined(HDUE_HOUDINI)
             const auto gpuStart = Clock::now();
-            syncGpuFrames(s, *buffer, depth, denoising);
+            syncGpuFrames(s, *buffer, depth);
             if (const double gpuMs = ms(gpuStart, Clock::now()); gpuMs > 50)
                 trace("hdUE slow GPU frame sync: %.1f ms\n", gpuMs);
 #endif
@@ -3853,7 +3754,6 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
             {"Subdivision level", TfToken("subdivisionLevel"), VtValue(0)},
             {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
-            {"Denoiser", TfToken("denoiser"), VtValue(std::string("oidn"))},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
             {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
@@ -4006,9 +3906,9 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         key == TfToken("lumenEnabled") || key == TfToken("timeSeconds") || key == TfToken("motionBlur") ||
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
         key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
-        key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("denoiser") ||
-        key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
-        TfStringStartsWith(key.GetString(), "heightFog") || TfStringStartsWith(key.GetString(), "skyAtmosphere") ||
+        key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("debugView") ||
+        key == TfToken("viewportIdAovs") || TfStringStartsWith(key.GetString(), "heightFog") ||
+        TfStringStartsWith(key.GetString(), "skyAtmosphere") ||
         TfStringStartsWith(key.GetString(), "volumetricCloud") || TfStringStartsWith(key.GetString(), "postProcess:") ||
         TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;

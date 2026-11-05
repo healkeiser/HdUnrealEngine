@@ -470,21 +470,6 @@ HdueResult HDUE_CALL Initialize(const HdueInitDesc* Desc) {
     const int Code = UELibrary_InitW(reinterpret_cast<HINSTANCE>(Desc->instance_handle),
                                      reinterpret_cast<HWND>(Desc->window_handle), *Command);
     Runtime.EngineStarted = Code == 0;
-    // A host that exits with UE still running (husk, hython: ExitProcess ends UE's thread) detaches this DLL with UE
-    // live, and UE's static destructors then wait on threads that no longer exist (60 s per exit in Test builds) before
-    // the delegate's exit handler ends the process. A handler registered after UE's statics runs before their
-    // destructors, so this one ends the process first, with the exit code it already has. After hdue_shutdown_ue
-    // (Shutdown), UE tears down normally.
-    static bool ExitHandler = false;
-    if (Runtime.EngineStarted && !ExitHandler) {
-        ExitHandler = true;
-        std::atexit([] {
-            if (!Runtime.EngineStarted) return;
-            DWORD ExitCode = 0;
-            ::GetExitCodeProcess(::GetCurrentProcess(), &ExitCode);
-            ::TerminateProcess(::GetCurrentProcess(), ExitCode);
-        });
-    }
     // UELibrary's return value alone does not validate LaunchWindowsStartup.
     if (Code != 0 || !GEngine || !GDynamicRHI || GUsingNullRHI) {
         Runtime.State = HDUE_STATE_FAILED;
@@ -1222,6 +1207,16 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
             if (const auto Extension = Dlss->GetDLSSUpscalerViewExtension())
                 Family.ViewExtensions.Add(Extension.ToSharedRef());
 #endif
+    // The engine's and plugins' active view extensions, set up as Movie Render Queue sets them up
+    // (MoviePipelineImagePassBase.cpp): UE's Path Tracer denoisers (NNEDenoiser registers its denoiser from its view
+    // extension, NNEDenoiserViewExtension.cpp) and any other plugin's pass run only through them.
+    for (const auto& Extension :
+         GEngine->ViewExtensions->GatherActiveExtensions(FSceneViewExtensionContext(Runtime.World->Scene)))
+        Family.ViewExtensions.AddUnique(Extension);
+    for (const auto& Extension : Family.ViewExtensions) Extension->SetupViewFamily(Family);
+    for (const FSceneView* View : Family.Views)
+        for (const auto& Extension : Family.ViewExtensions)
+            Extension->SetupView(Family, *const_cast<FSceneView*>(View));
     if (Sharing) {
         const uint32 Width = Session->Width, Height = Session->Height;
         ENQUEUE_RENDER_COMMAND(HdueSharedSlot)([Job, Width, Height](FRHICommandListImmediate& Commands) {
@@ -2418,6 +2413,23 @@ HdueResult HDUE_CALL ResizeSession(HdueSession Handle, uint32 Width, uint32 Heig
     return HDUE_OK;
 }
 }  // namespace
+
+// A host that exits with UE still running (husk, hython: ExitProcess ends UE's threads) detaches this DLL with UE live.
+// UE's static destructors would then run against threads and GPU state that no longer exist: they waited 60 s per exit
+// in Test builds, and UE's Path Tracer denoiser registry (FDenoiserManager, a function-local static created when
+// NNEDenoiser registers at the first frame) released its ONNX Runtime session into DirectML and D3D12, where NVIDIA's
+// driver faulted and DirectML aborted (0xC0000409). The CRT calls DllMain before it runs this DLL's exit table
+// (dll_dllmain.cpp, dllmain_dispatch), however late a static was created, so the process ends here, with the exit code
+// ExitProcess already set. Reserved is non-null only for process exit. After hdue_shutdown_ue (Shutdown), UE tears down
+// normally.
+extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD Reason, LPVOID Reserved) {
+    if (Reason == DLL_PROCESS_DETACH && Reserved && Runtime.EngineStarted) {
+        DWORD ExitCode = 0;
+        ::GetExitCodeProcess(::GetCurrentProcess(), &ExitCode);
+        ::TerminateProcess(::GetCurrentProcess(), ExitCode);
+    }
+    return 1;  // TRUE
+}
 
 extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint32_t Capacity, HdueApi* Api) {
     if (!Api || Capacity < sizeof(HdueApi)) return HDUE_BUFFER_TOO_SMALL;

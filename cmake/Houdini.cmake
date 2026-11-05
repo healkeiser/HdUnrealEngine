@@ -21,7 +21,6 @@ target_link_libraries(hdue_hdk INTERFACE Houdini HoudiniThirdParty
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_glf.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/libpxr_cameraUtil.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/openvdb_sesi.lib"
-    "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageDenoise.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenColorIO_sidefx.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageIO_sidefx.lib"
     "${HDUE_HOUDINI_ROOT}/custom/houdini/dsolib/OpenImageIO_Util_sidefx.lib")

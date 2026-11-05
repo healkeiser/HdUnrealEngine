@@ -215,7 +215,6 @@ JOINS = (
 SKIP = {
     "WeightedBlendables": "unreal:postProcessMaterials adds post-process materials",
     "PathTracingSamplesPerPixel": "unreal:samplesPerPixel sets the Path Tracer samples and convergence",
-    "PathTracingEnableDenoiser": "the runtime has no UE denoiser plugin; unreal:denoiser denoises with OIDN",
 }
 SKIP_CATEGORIES = ("Lens|Mobile Depth of Field",)  # mobile renderer only
 # Defaults hdUE sets per view before the authored settings apply (Bridge.cpp Draw), with a note for the help.
@@ -715,7 +714,7 @@ def hdue(name, label, place, kind, default, help_text, **options):
     )
 
 
-# hdUE's own settings. Essential: the render mode, samples, warmup, denoiser, tonemapper, motion blur and Lumen;
+# hdUE's own settings. Essential: the render mode, samples, warmup, tonemapper, motion blur and Lumen;
 # the rest Advanced. Ranges lock what the delegate clamps (samples and warmup at least 1).
 HDUE = [
     hdue(
@@ -758,20 +757,6 @@ HDUE = [
         category="Rendering",
         uiscope=True,
         mode="realtime",
-    ),
-    hdue(
-        "denoiser",
-        "Denoiser",
-        "",
-        "menu",
-        # On, as UE's FPostProcessSettings::PathTracingEnableDenoiser (Scene.cpp); OIDN stands in for UE's denoiser
-        # plugin, which the runtime does not have.
-        "oidn",
-        "Denoises the converged Path Tracer image with Houdini's Open Image Denoise (on the GPU when available), "
-        "guided by albedo and normal passes. AOVs and Lumen are unaffected.",
-        menu=[("off", "Off"), ("oidn", "Open Image Denoise")],
-        category="Rendering",
-        mode="pathtraced",
     ),
     hdue(
         "tonemapper",
