@@ -45,7 +45,7 @@ Second round (larger features, `801456f` to `4679bb4`):
 
 - **Framing:** HYD-05/HOU-08 (data window, crops, husk tiles, overscan, pixel aspect).
 - **Lights:** LGT-04 (light and shadow linking through UE's three lighting channels; limits documented), LGT-06 (dome `poleAxis`), LGT-08 (IES `angleScale`), LGT-09/HYD-18 (warnings for shadow color, filters, plugin lights). IES on Z-up stages: a 90-degree spot rendered wrong in UE's Path Tracer; sphere lights become spots only below 90 degrees (1.013x Karma).
-- **Materials and color:** MAT-02, MAT-03, MAT-04 (coat lobe on the layered parent), COL-01 (UE owns the tone-mapped look: the inverse of the config's default view, 2026-11-05), COL-03; unbound `displayColor` matched to Karma's default surface (1.07x, was 2.78x). C ABI 9, lighting extension 3.
+- **Materials and color:** MAT-02, MAT-03, MAT-04 (coat lobe on the layered parent), COL-01 (UE's tone curve off when the OCIO view does the display, as UE does; `unreal:disableToneCurve`, 2026-11-05), COL-03; unbound `displayColor` matched to Karma's default surface (1.07x, was 2.78x). C ABI 9, lighting extension 3.
 - **Parity:** HOU-02 in part (render settings through Hydra, the options side channel removed, cooked libraries as `hdUE:materialxLibrary`/`hdUE:substrateLibrary`, husk warns about `op:` images and missing cooked libraries), HOU-15 (`houdini:interactive`), HOU-16, ALT-01, ALT-03, ALT-17.
 - **Lumen gap (LGT-02):** husk passed no stage units, so metre scenes reached UE at 1 cm per unit and Lumen built no surface-cache cards. Fixed, plus offline hit lighting: Cornell Lumen 0.66x -> 0.76x Karma (0.85x at 128 warmup frames).
 

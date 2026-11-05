@@ -231,6 +231,7 @@ struct FSession {
     // upsert_decal: each decal's material instance, which set_material_parameters also reaches by the decal's id.
     TMap<FString, TWeakObjectPtr<UMaterialInstanceDynamic>> DecalMaterials;
     bool Tonemapper = false;
+    bool ToneCurve = true;  // tonemapper 2: Movie Render Queue's Disable Tone Curve
     float ExposureStops = 0;
     // AOV requests use their own view state and frame slot (hdue/bridge.h); Frame/Pixels/depth
     // and the beauty's Lumen or Path Tracer history belong to BeautyRequest.
@@ -1295,8 +1296,10 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
                                               Request.mode == HDUE_PATH_TRACED ? 0.0f : 1.0f / 60)));
     // The tonemapper writes its tone curve as linear Rec.709, as UE does for float back buffers (SceneView.cpp) and
     // Movie Render Queue renders: into a float target it would otherwise apply gamma 2.2 and then sRGB, crushing the
-    // shadows.
-    Family.SceneCaptureSource = SCS_FinalToneCurveHDR;
+    // shadows. Without the tone curve (Movie Render Queue's Disable Tone Curve, MoviePipelineRendering.cpp) the
+    // tonemapper pass still grades, blooms and vignettes, and writes linear values.
+    Family.SceneCaptureSource =
+        Session->Tonemapper && !Session->ToneCurve && !Aov ? SCS_FinalColorHDR : SCS_FinalToneCurveHDR;
     Family.ViewMode = ViewMode;
     // As Movie Render Queue's renders (MoviePipelineImagePassBase.cpp): the virtual texture pages the feedback asks for
     // are produced in the frame that reads it, so the Path Tracer's warm-up settles in a few draws.
@@ -2038,6 +2041,7 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
     Session->PostProcess = MoveTemp(Settings);
     Session->PostProcessMaterials = MoveTemp(Materials);
     Session->Tonemapper = Desc->tonemapper != 0;
+    Session->ToneCurve = Desc->tonemapper != 2;
     Session->ExposureStops = Desc->exposure_stops;
     return HDUE_OK;
 }

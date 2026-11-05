@@ -428,15 +428,15 @@ typedef struct HdueMeshTransform {
  * materials are cooked post-process material paths added as blendables with weight 1.
  * tonemapper 0 keeps the beauty linear (default); 1 runs UE's tonemapper, bloom, grading, vignette,
  * grain and lens effects, and the beauty becomes UE's tone-mapped image as display-linear Rec.709 (what UE's sRGB
- * output decodes to). exposure_stops (the host camera's exposure) adds to AutoExposureBias.
- * Names containing a dot set that console variable instead (process-wide, e.g. r.ScreenPercentage, sg.ShadowQuality;
- * True/False become 1/0); a variable dropped from a later set gets back the value it had before hdUE set it.
- * HeightFog True places one UE Exponential Height Fog in the scene (beauty and AOVs alike; absent or False removes it),
- * and HeightFog:<UExponentialHeightFogComponent property> sets its properties as above (RelativeLocation "0 0 Z" its
- * height in UE centimeters; FColor properties take linear R G B[ A] stored as sRGB). The fog is rebuilt only when
- * these change, so volumetric fog keeps its history.
- * Unknown names and unparsable values are skipped with a warning in the UE log. Replaces the
- * previous set; applies to the next request. */
+ * output decodes to); 2 runs them without the film curve, as Movie Render Queue's Disable Tone Curve
+ * (SCS_FinalColorHDR): the beauty stays scene-linear Rec.709. exposure_stops (the host camera's exposure) adds to
+ * AutoExposureBias. Names containing a dot set that console variable instead (process-wide, e.g. r.ScreenPercentage,
+ * sg.ShadowQuality; True/False become 1/0); a variable dropped from a later set gets back the value it had before hdUE
+ * set it. HeightFog True places one UE Exponential Height Fog in the scene (beauty and AOVs alike; absent or False
+ * removes it), and HeightFog:<UExponentialHeightFogComponent property> sets its properties as above (RelativeLocation
+ * "0 0 Z" its height in UE centimeters; FColor properties take linear R G B[ A] stored as sRGB). The fog is rebuilt
+ * only when these change, so volumetric fog keeps its history. Unknown names and unparsable values are skipped with a
+ * warning in the UE log. Replaces the previous set; applies to the next request. */
 typedef struct HduePostProcessDesc {
     uint32_t struct_size;
     const char* const* names;

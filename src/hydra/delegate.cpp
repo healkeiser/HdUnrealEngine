@@ -2999,12 +2999,9 @@ public:
                                 pixels[i + 2] *= lens_[3];
                             }
                         const auto publishStart = Clock::now();
-                        // UE renders linear Rec.709; hosts expect the OCIO scene_linear role. A tone-mapped image is
-                        // display-referred: UE owns its look, so it goes through the default view's inverse.
-                        if (s.toneMapped())
-                            HdUEDisplayToSceneLinear(pixels);
-                        else
-                            HdUEToSceneLinear(pixels);
+                        // UE renders linear Rec.709 (with the tone curve: display-linear); hosts expect the OCIO
+                        // scene_linear role.
+                        HdUEToSceneLinear(pixels);
                         for (auto* extra : extraBeauties_) extra->publish(frame, pixels, 4);
                         buffer->publish(frame, std::move(pixels), 4);
                         publishMs = ms(publishStart, Clock::now());
@@ -3107,6 +3104,11 @@ public:
                     subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
+                    // Movie Render Queue's Disable Tone Curve: UE's post-processing without its film curve, linear.
+                    // UE forces it when OCIO does the display (MoviePipelineColorSetting.cpp), as an ACES or AgX
+                    // default view does here.
+                    const bool toneCurve =
+                        tonemapper && !s.setting<bool>("disableToneCurve", false) && !HdUEViewTransformsDisplay();
                     // unreal:heightFog places UE's Exponential Height Fog (volumetric fog included),
                     // unreal:heightFog:<UExponentialHeightFogComponent property> sets it, and unreal:heightFogHeight
                     // (scene units along the up axis) is where its density is FogDensity.
@@ -3214,7 +3216,7 @@ public:
                                                    uint32_t(names.size()),
                                                    materialPtrs.data(),
                                                    uint32_t(materials.size()),
-                                                   tonemapper ? 1 : 0,
+                                                   tonemapper ? (toneCurve ? 1 : 2) : 0,
                                                    tonemapper
                                                        ? std::log2(std::max(lens[3], 1e-6f))
                                                        : 0.f};  // the USD camera exposure adds to AutoExposureBias
@@ -3747,6 +3749,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
             {"Subdivision level", TfToken("subdivisionLevel"), VtValue(0)},
             {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
+            {"Disable tone curve", TfToken("disableToneCurve"), VtValue(false)},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
             {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
@@ -3899,9 +3902,9 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         key == TfToken("lumenEnabled") || key == TfToken("timeSeconds") || key == TfToken("motionBlur") ||
         key == TfToken("motionSamples") || key == TfToken("framesPerSecond") || key == TfToken("disableMotionBlur") ||
         key == TfToken("instantaneousShutter") || key == TfToken("disableDepthOfField") ||
-        key == TfToken("tonemapper") || key == TfToken("postProcessMaterials") || key == TfToken("debugView") ||
-        key == TfToken("viewportIdAovs") || TfStringStartsWith(key.GetString(), "heightFog") ||
-        TfStringStartsWith(key.GetString(), "skyAtmosphere") ||
+        key == TfToken("tonemapper") || key == TfToken("disableToneCurve") || key == TfToken("postProcessMaterials") ||
+        key == TfToken("debugView") || key == TfToken("viewportIdAovs") ||
+        TfStringStartsWith(key.GetString(), "heightFog") || TfStringStartsWith(key.GetString(), "skyAtmosphere") ||
         TfStringStartsWith(key.GetString(), "volumetricCloud") || TfStringStartsWith(key.GetString(), "postProcess:") ||
         TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;

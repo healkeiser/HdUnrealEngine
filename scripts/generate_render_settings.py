@@ -833,8 +833,21 @@ HDUE = [
         "",
         "toggle",
         False,
-        "Run UE's tonemapper, bloom, colour grading, vignette and grain. The beauty becomes UE's tone-mapped image "
-        "(display-linear): view it with the default sRGB view, not Raw or ACES.",
+        "Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone curve, the beauty becomes UE's "
+        "tone-mapped image (display-linear): view it with an sRGB view that only encodes (Houdini's Un-tone-mapped), "
+        "not Raw.",
+        category="Post-Processing",
+    ),
+    hdue(
+        "disableToneCurve",
+        "Disable Tone Curve",
+        "",
+        "toggle",
+        False,
+        "Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blooms, vignettes and adds grain, "
+        "without UE's film curve, so the beauty stays scene-linear for the OCIO view. Forced on, as UE forces it when "
+        "OpenColorIO does the display, when the OCIO config's default view is a display transform of its own (ACES, "
+        "AgX).",
         category="Post-Processing",
     ),
     hdue(

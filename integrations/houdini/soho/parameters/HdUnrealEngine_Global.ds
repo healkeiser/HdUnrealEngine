@@ -100,10 +100,22 @@
         type    toggle
         size    1
         default { 0 }
-        help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. The beauty becomes UE's tone-mapped image (display-linear): view it with the default sRGB view, not Raw or ACES."
+        help    "Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone curve, the beauty becomes UE's tone-mapped image (display-linear): view it with an sRGB view that only encodes (Houdini's Un-tone-mapped), not Raw."
         parmtag { "spare_category" "Post-Processing" }
         parmtag { "usdvaluetype" "bool" }
         disablewhen R"({ xn__unrealtonemapper_control_5fb == block } { xn__unrealtonemapper_control_5fb == none })"
+    }
+    HDUE_CONTROL("xn__unrealdisableToneCurve_control_xpb", "Disable Tone Curve")
+    parm {
+        name    "xn__unrealdisableToneCurve_wcb"
+        label   "Disable Tone Curve"
+        type    toggle
+        size    1
+        default { 0 }
+        help    "Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blooms, vignettes and adds grain, without UE's film curve, so the beauty stays scene-linear for the OCIO view. Forced on, as UE forces it when OpenColorIO does the display, when the OCIO config's default view is a display transform of its own (ACES, AgX)."
+        parmtag { "spare_category" "Post-Processing" }
+        parmtag { "usdvaluetype" "bool" }
+        disablewhen R"({ xn__unrealdisableToneCurve_control_xpb == block } { xn__unrealdisableToneCurve_control_xpb == none })"
     }
     HDUE_CONTROL("xn__unrealpostProcessAutoExposureBias_control_u7bl", "Exposure Compensation")
     parm {

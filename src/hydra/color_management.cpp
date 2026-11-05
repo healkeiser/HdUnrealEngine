@@ -29,21 +29,19 @@ struct ColorManagement {
 #if defined(HDUE_HOUDINI)
     OCIO::ConstConfigRcPtr config;  // null: no colour management (disabled, or not relatable to linear Rec.709)
     OCIO::ConstCPUProcessorRcPtr toScene, fromScene;
-    OCIO::ConstCPUProcessorRcPtr fromDisplay;  // null: the default view shows scene_linear untouched (toScene does)
+    bool viewTransforms = false;  // the default view does more than encode scene_linear for the display
 #endif
 };
 #if defined(HDUE_HOUDINI)
-// UE's tone-mapped image is display-referred: UE owns the look. Its sRGB code values go through the inverse of the
-// config's default display and view, so that view shows UE's pixels unchanged (ACES and AgX views would otherwise
-// tone-map them a second time). Houdini's default view (Un-tone-mapped, an sRGB encode) inverts to toScene itself, so
-// that case stays null and costs nothing per frame.
-OCIO::ConstCPUProcessorRcPtr displayProcessor(const OCIO::ConstConfigRcPtr& config, const char* scene,
-                                              const OCIO::ConstCPUProcessorRcPtr& toScene) {
+// Whether the config's default display and view is a display transform of its own (ACES, AgX) rather than an sRGB
+// encode of scene_linear (Houdini's default, Un-tone-mapped): an sRGB-encoded ramp taken back through that view's
+// inverse lands on toScene's result only for the encode.
+bool viewTransforms(const OCIO::ConstConfigRcPtr& config, const char* scene,
+                    const OCIO::ConstCPUProcessorRcPtr& toScene) {
     const char* display = config->getDefaultDisplay();
     const char* view = config->getDefaultView(display);
-    if (!display || !*display || !view || !*view) return nullptr;
+    if (!display || !*display || !view || !*view) return false;
     const auto group = OCIO::GroupTransform::Create();
-    // UE encodes its tone curve for an sRGB monitor (piecewise sRGB, r.HDR.Display.OutputDevice 0).
     const auto encode = OCIO::ExponentWithLinearTransform::Create();
     encode->setGamma({2.4, 2.4, 2.4, 1.0});
     encode->setOffset({0.055, 0.055, 0.055, 0.0});
@@ -55,7 +53,7 @@ OCIO::ConstCPUProcessorRcPtr displayProcessor(const OCIO::ConstConfigRcPtr& conf
     inverse->setView(view);
     inverse->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
     group->appendTransform(inverse);
-    auto processor = config->getProcessor(group)->getDefaultCPUProcessor();
+    const auto processor = config->getProcessor(group)->getDefaultCPUProcessor();
     // OCIO does not fold an encode and its inverse into a no-op: compare with toScene on a ramp instead.
     for (int i = 0; i <= 16; ++i) {
         const float v = i / 16.f;
@@ -63,9 +61,9 @@ OCIO::ConstCPUProcessorRcPtr displayProcessor(const OCIO::ConstConfigRcPtr& conf
         processor->applyRGB(a);
         toScene->applyRGB(b);
         for (int c = 0; c < 3; ++c)
-            if (std::abs(a[c] - b[c]) > 1e-4f) return processor;
+            if (std::abs(a[c] - b[c]) > 1e-4f) return true;
     }
-    return nullptr;
+    return false;
 }
 void applyRows(const OCIO::ConstCPUProcessorRcPtr& processor, std::vector<float>& rgba) {
     // Rows of 16k pixels in parallel: one thread took 10-30 ms per 1080p frame.
@@ -95,7 +93,7 @@ const ColorManagement& management() {
                                    ->getDefaultCPUProcessor();
             result.identity = result.toScene->isNoOp();
             result.config = config;
-            result.fromDisplay = displayProcessor(config, scene->getName(), result.toScene);
+            result.viewTransforms = viewTransforms(config, scene->getName(), result.toScene);
         } catch (const OCIO::Exception& error) {
             TF_WARN("hdUE: OCIO colour management disabled (output stays linear Rec.709): %s", error.what());
         }
@@ -115,13 +113,11 @@ void HdUEToSceneLinear(std::vector<float>& rgba) {
     (void)rgba;
 #endif
 }
-void HdUEDisplayToSceneLinear(std::vector<float>& rgba) {
+bool HdUEViewTransformsDisplay() {
 #if defined(HDUE_HOUDINI)
-    const auto& m = management();
-    if (!m.fromDisplay) return HdUEToSceneLinear(rgba);
-    if (rgba.size() >= 4) applyRows(m.fromDisplay, rgba);
+    return management().viewTransforms;
 #else
-    (void)rgba;
+    return false;
 #endif
 }
 GfVec3f HdUEFromSceneLinear(const GfVec3f& color) {
