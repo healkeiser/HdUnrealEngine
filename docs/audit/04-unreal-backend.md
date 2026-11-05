@@ -47,7 +47,7 @@
 | UE-04 | High | Motion-blur sub-frames in the Path Tracer reuse the identical random sequence: locked seed and a fresh ViewState per sub-frame. Static regions then get spp/N worth of noise, not spp. | S |
 | UE-05 | High | Offline frames can count as "converged" while PSOs are still compiling. `r.PSOPrecache.ProxyCreationStrategy=2` draws those proxies with the default material, and nothing waits for precache or bundled-cache completion. | S |
 | UE-06 | Medium | No equivalent of MRQ "Game Overrides" for husk: no Cinematic scalability, no texture-streaming flush, no VT tile flush, no `r.D3D12.GPUTimeout 0`. | S |
-| UE-07 | Medium | UE's path-tracer denoiser is forced off on every request (`r.PathTracing.Denoiser 0`) and no denoiser plugin is enabled. The documented "UE OIDN plugin left the image unchanged" conclusion is probably caused by this. Epic's default NNE denoiser was not evaluated. | S |
+| UE-07 | Medium | Fixed (2026-11-05): the Path Tracer denoises with UE's NNEDenoiser (default) or OptiX; hdUE's OIDN step is removed. Was: UE's path-tracer denoiser forced off on every request (`r.PathTracing.Denoiser 0`) and no denoiser plugin enabled. | S |
 | UE-08 | Medium | Lumen final-frame quality is left at game defaults: Final Gather, Scene Detail, Scene Lighting Quality and Hit Lighting are not raised for offline. Generated meshes get a fixed 12 Lumen cards. Lumen reaches 0.54–0.83× of Karma brightness in the gallery. | S |
 | UE-09 | Medium | The released backend is a Development build. Epic positions Shipping (or Test) for release. | S |
 | UE-10 | Medium | The engine patch adds a friend to a private VT header. The public `RequestVirtualTextureTiles` / `LoadPendingVirtualTextureTiles`, which MRQ itself uses, may cover most of the need. | M |
@@ -279,6 +279,8 @@ Document the profile in `docs/rendering.md`.
 - Re-test OIDN, OptiX and NNE at 1080p and 4K, then update `docs/rendering.md:145`.
 - Keep Houdini OIDN as the alternative.
 
+**Resolution (2026-11-05).** `NNEDenoiser` and `OptiXDenoise` are enabled in `HdUEBackend.uproject`; `PathTracingEnableDenoiser` defaults to 1 as in UE and `r.PathTracing.Denoiser.Name` picks the plugin (Render Settings). The backend gathers UE's active view extensions as Movie Render Queue does, which NNEDenoiser needs. hdUE's Houdini-only OIDN step was removed rather than kept: UE's denoisers run in every host ([rendering](../rendering.md)).
+
 ## UE-08 — Lumen final-frame quality left at game defaults — Medium
 
 **What we do**
@@ -358,7 +360,7 @@ Document the profile in `docs/rendering.md`.
 
 **Impact.** Interactive Nanite meshes and native Nanite assets get lower-resolution sun shadows, with cascade transitions, compared to UE's reference look.
 
-**Recommendation.** Enable VSM in `DefaultEngine.ini` for realtime mode, then re-record the PSO cache (`Record-PipelineCache.ps1`). Keep the `hdUE:cvar` override for opting out.
+**Recommendation.** Enable VSM in `DefaultEngine.ini` for realtime mode, (done, UE-11; the bundled PSO cache this asked to re-record was removed on 2026-11-05). Keep the `hdUE:cvar` override for opting out.
 
 ## UE-12 — IES brightness — Medium
 
@@ -489,7 +491,7 @@ Document the profile in `docs/rendering.md`.
 
 ## UE features we should leverage
 
-1. **NNE Denoiser** (`Plugins/NNE/NNEDenoiser`). Epic's default Path Tracer denoiser, GPU, with a spatial-temporal mode. Replaces the Houdini-only OIDN path for all hosts (UE-07).
+1. **NNE Denoiser** (`Plugins/NNE/NNEDenoiser`). Epic's default Path Tracer denoiser, GPU, with a spatial-temporal mode. Replaces the Houdini-only OIDN path for all hosts (UE-07). Done 2026-11-05, with OptiX as the alternative.
 2. **`View->PathTracerSeedOffset`.** The MRG mechanism for decorrelating sample sets (UE-04).
 3. **MRQ Game Overrides as a recipe**: cinematic `sg.*`, texture streaming off, `r.D3D12.GPUTimeout 0`, `LoadPendingVirtualTextureTiles` (UE-06). The code is a fixed list of cvars in `MoviePipelineGameOverrideSetting.cpp:78-259`.
 4. **Public VT tile APIs** in `RendererInterface.h:370-386`, instead of the friend-class engine patch (UE-10).

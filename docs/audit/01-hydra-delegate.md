@@ -56,7 +56,7 @@ Branch `feature/package` at `e8fe1f4`. Read-only review of `src/hydra/*`, `src/h
   - Looks up buffers through `GetRenderIndex()->GetBprim(...)` (`delegate.cpp:1094, 1152`).
   - `dynamic_cast`s the bound buffer pointers (`delegate.cpp:1108-1118`), and keeps them across calls in `aovs_` and `gpuBuffers_` (`delegate.cpp:845, 857`).
 - `executeOnce` calls `HdUERefreshWetMasks` (`delegate.cpp:1198`). That function calls `index->GetRprim`, `GetSceneDelegateForRprim`, `delegate->Get(...)`, and reads `Mesh::emitted_` and `maskTopology_` (`prims.cpp:428-456, 877-888`). `Mesh::Sync` writes those same members on Houdini's threads (`prims.cpp:278, 425`).
-- `IsConverged()` runs on Houdini's thread. It reads `aovs_`, `aovsDone_`, `denoisePending_` and the `revision` counters without a lock (`delegate.cpp:977-983`), while the UE thread reassigns `aovs_` (`delegate.cpp:1142`).
+- `IsConverged()` runs on Houdini's thread. It reads `aovs_`, `aovsDone_` and the `revision` counters without a lock (`delegate.cpp:977-983`), while the UE thread reassigns `aovs_` (`delegate.cpp:1142`).
 - `DestroyBprim` is a plain `delete` (`delegate.cpp:1634`). `HdUERenderBuffer` has no hand-off with the UE thread.
 
 **What the reference says**
@@ -77,7 +77,7 @@ Branch `feature/package` at `e8fe1f4`. Read-only review of `src/hydra/*`, `src/h
 - **Buffer lifetime.** Hold buffers through a ref-counted handle, or have `HdUERenderBuffer::_Deallocate` and its destructor post to the UE thread and wait until no Execute references them.
 - **Pump.** Reset `latestPass_` and stop the pump in `CreateBprim` and `DestroyBprim`.
 - **Wet masks.** Move `HdUERefreshWetMasks` out of `executeOnce` into `CommitResources` or `_Execute`, which run on the Hydra thread.
-- **Shared fields.** Make `aovsDone_` and `denoisePending_` atomics, and publish an "AOVs pending" flag instead of reading `aovs_` from `IsConverged`.
+- **Shared fields.** Make `aovsDone_` atomic, and publish an "AOVs pending" flag instead of reading `aovs_` from `IsConverged`.
 
 ## HYD-02 Render tags (purpose) and the collection are ignored
 
@@ -426,7 +426,7 @@ Send the far clip, and apply clip planes as a material clip or a UE `ClipPlane`.
 **What we do**
 
 - **Descriptors.** `GetRenderSettingDescriptors` lists `renderMode`, `samplesPerPixel`, `warmupFrames`, `lumenEnabled`, `viewerLightIntensity` and `domeResolution` (`delegate.cpp:1675-1680`).
-  - The code reads about 20 more keys: `motionBlur`, `motionSamples`, `subdivisionLevel`, `tonemapper`, `denoiser`, `debugView`, `postProcess:*`, `cvar:*`, `sceneLightsEnabled` and others (`delegate.cpp:1744-1770`).
+  - The code reads about 20 more keys: `motionBlur`, `motionSamples`, `subdivisionLevel`, `tonemapper`, `debugView`, `postProcess:*`, `cvar:*`, `sceneLightsEnabled` and others (`delegate.cpp:1744-1770`).
 - **Namespace.** The `hdUE:` prefix is stripped before storing (`delegate.cpp:1490-1491, 1694`). As a result, `HdRenderDelegate::GetRenderSetting("hdUE:x")` returns empty.
 - **Standard keys.** `HdRenderSettingsTokens` (`convergedSamplesPerPixel`, `enableSceneLights`, `enableSceneMaterials`, `enableShadows`, `enableInteractive`) are not honoured.
 - **API overrides.**
