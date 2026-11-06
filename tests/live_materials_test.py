@@ -46,7 +46,8 @@ class LiveTests(unittest.TestCase):
         from prepare_substrate import LIBRARY_NAME
 
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # clean() resolves the project path; CI's temporary folder is an 8.3 short name (RUNNER~1).
+            root = Path(folder).resolve()
             project = root / "runtime/HdUEBackend.uproject"
             project.parent.mkdir(parents=True)
             project.write_text("{}")

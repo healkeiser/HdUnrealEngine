@@ -188,8 +188,8 @@ Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Renderer\P
 # cooked bulk data is never loaded, so cooked virtual textures stream from disk as before.
 Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\Engine\Private\VT\UploadingVirtualTexture.cpp') `
     -Label 'runtime virtual texture patch' -Marker 'hdUE: runtime-built' -Edits @(, @(
-    "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if WITH_EDITOR`n",
-    "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if 1`t// hdUE: runtime-built virtual textures (UdimTexture.cpp) stream from memory outside the editor too`n"))
+        "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if WITH_EDITOR`n",
+        "`tFByteBulkData& BulkData = Chunk.BulkData;`n#if 1`t// hdUE: runtime-built virtual textures (UdimTexture.cpp) stream from memory outside the editor too`n"))
 # Runtime-built virtual textures stream from disk as the editor's do: there, a built chunk without file-backed bulk data
 # is read through the file cache from its file in the VT DDC cache (MakeChunkAvailable). Outside the editor, a chunk
 # without bulk data is read from hdUE's chunk cache (VirtualTextureBuild.cpp writes one file per chunk, named by its
