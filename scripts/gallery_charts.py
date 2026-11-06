@@ -325,8 +325,13 @@ def save(fig, name, t):
 
 
 def main():
+    # The SVG names its fonts (svg.fonttype none): the generic sans-serif last, or a viewer without Segoe UI or DejaVu
+    # Sans (GitHub on macOS, Linux) draws the text in its default serif.
     plt.rcParams.update(
-        {"font.family": ["Segoe UI", "DejaVu Sans"], "svg.fonttype": "none"}
+        {
+            "font.family": ["Segoe UI", "DejaVu Sans", "sans-serif"],
+            "svg.fonttype": "none",
+        }
     )
     data = rows()
     IMAGES.mkdir(parents=True, exist_ok=True)

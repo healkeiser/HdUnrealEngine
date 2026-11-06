@@ -153,6 +153,18 @@ $Fixed = (
 ) -join "`n"
 Edit-EngineSource -Path (Join-Path $EngineRoot 'Engine\Source\Runtime\RenderCore\Private\ShaderLibrary\ShaderLibraryInstance.cpp') `
     -Label 'shader creation race patch' -Marker 'hdUE: the reference taken under the lock' -Edits @(, @($Anchor, $Fixed))
+# A sky light (or reflection capture) of 512 texels filters its top mip with GGX at roughness 2^(-7/1.2) (FilterPS,
+# ComputeReflectionCaptureRoughnessFromMip; 1024 and up copy it, roughness under 0.01). ImportanceSampleGGX
+# (MonteCarlo.ush) takes SinTheta = sqrt(1 - CosTheta^2) unclamped, and with a2 = Roughness^4 near 1e-7 the GPU's
+# CosTheta lands above 1 for 5 of the 32 samples: SinTheta is NaN while L.z stays 1, so each passes NoL > 0 and reads the
+# cube in a NaN direction (one face; the up face here). A dome lit everything 5/32 with the colour around its pole
+# (samples/conformance/lux/dome_latlong). A NaN half vector is the CosTheta = 1 limit: H = (0, 0, 1). Patched in FilterPS
+# rather than MonteCarlo.ush, which material shaders include (every cooked material would change).
+foreach ($Root in @($EngineRoot, $EditorRoot) | Where-Object { $_ } | Select-Object -Unique) {
+    Edit-EngineSource -Path (Join-Path $Root 'Engine\Shaders\Private\ReflectionEnvironmentShaders.usf') -Label 'cube filter NaN patch' `
+        -Marker 'hdUE: CosTheta above 1' -Edits @(, @("`t`t`tfloat3 H = ImportanceSampleGGX( E, Pow4(Roughness) ).xyz;",
+            "`t`t`tfloat3 H = ImportanceSampleGGX( E, Pow4(Roughness) ).xyz;`n`t`t`tif (any(isnan(H))) H = float3(0, 0, 1);`t// hdUE: CosTheta above 1 (NaN SinTheta) is the H = N limit"))
+}
 # Rough refraction (DistortionRendering.cpp) samples the scene behind a refracting surface from a copy of scene colour
 # made by CopySceneColorDepthTexturePS into a PF_FloatR11G11B10 mip chain. The copy writes alpha 1 and the format holds
 # none, so with r.PostProcessing.PropagateAlpha (scene colour alpha is 1 - coverage) every pixel seen through glass read
