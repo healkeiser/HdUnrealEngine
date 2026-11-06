@@ -8,7 +8,7 @@
  },
  "values": [
   {
-   "caption": "4 spp",
+   "caption": "4",
    "set": {
     "/Render/Settings": [
      "int unreal:samplesPerPixel = 4"
@@ -16,7 +16,7 @@
    }
   },
   {
-   "caption": "16 spp",
+   "caption": "16",
    "set": {
     "/Render/Settings": [
      "int unreal:samplesPerPixel = 16"
@@ -24,7 +24,7 @@
    }
   },
   {
-   "caption": "64 spp",
+   "caption": "64",
    "set": {
     "/Render/Settings": [
      "int unreal:samplesPerPixel = 64"
@@ -32,7 +32,7 @@
    }
   },
   {
-   "caption": "256 spp",
+   "caption": "256",
    "set": {
     "/Render/Settings": [
      "int unreal:samplesPerPixel = 256"
@@ -40,7 +40,7 @@
    }
   },
   {
-   "caption": "1024 spp",
+   "caption": "1024",
    "set": {
     "/Render/Settings": [
      "int unreal:samplesPerPixel = 1024"

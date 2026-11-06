@@ -1,0 +1,23 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/sun": [
+     "bool inputs:normalize = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/sun": [
+     "bool inputs:normalize = 1"
+    ]
+   }
+  }
+ ]
+}

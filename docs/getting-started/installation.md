@@ -1,6 +1,28 @@
-# Installing on another machine
+# Installation
 
-Like HtoA, Redshift or V-Ray, hdUE ships as one relocatable folder plus a Houdini package file. On the build machine:
+hdUE ships as one folder plus a Houdini package file, the way HtoA or Redshift install. You build the folder once on a machine with the Unreal Engine source, then copy it to each workstation or render node.
+
+!!! warning "Unreal Engine licensees only"
+    The package contains Unreal Engine Developer modules, which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows sharing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio, or with other Unreal Engine licensees. Never publish it as a public download. There is no prebuilt download for this reason: you build your own package.
+
+## Requirements
+
+On each machine that renders:
+
+| Requirement | Value |
+| --- | --- |
+| Operating system | Windows 10 or 11, x64 |
+| Houdini | 22.0, the build the package was compiled against or a later 22.0 build |
+| GPU | DirectX 12 with hardware ray tracing |
+| Runtime libraries | Microsoft Visual C++ 2015-2022 x64 redistributable (Houdini installs it) |
+
+The workstations need no Unreal Engine, Visual Studio or OpenUSD.
+
+On the machine that builds the package, you need the Unreal Engine 5.8.4 source and the toolchain listed in [Building from source](../building.md).
+
+## Building the package
+
+Run these from the root of the hdUE checkout, after a first build as described in [Building from source](../building.md):
 
 ```powershell
 .\scripts\Build-Backend.ps1 -Configuration Test
@@ -8,12 +30,73 @@ Like HtoA, Redshift or V-Ray, hdUE ships as one relocatable folder plus a Houdin
 .\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly
 ```
 
-Packages ship UE's Test configuration: Shipping's optimizations with the console commands and stats hdUE's `unreal:cvar:` settings rely on (Epic's Build Configurations); Development, which keeps `check()` asserts and debug tooling, stays for work and CI. `Package-Houdini.ps1` refuses a profile whose backend is not the current Test build.
+1. `Build-Backend.ps1 -Configuration Test` builds Unreal Engine in Epic's Test configuration: Shipping's optimizations, with the console variables that hdUE's `unreal:cvar:*` settings need.
+2. `Update-HoudiniRuntime.ps1` stages that build into a runtime profile.
+3. `Package-Houdini.ps1` writes the package. `-UnrealLicenseesOnly` confirms the distribution terms above; the script refuses to run without it.
 
-This writes `out\package\hdUE-<version>-houdini<build>-win64` (for example `hdUE-v0.2.0-houdini22.0.368-win64`; about 1.2 GB unpacked, 0.9 GB zipped) and the matching `.zip`, plus `...-symbols.zip` with the delegate and backend PDBs, which stay out of the package: keep it with the release to symbolise crash dumps. `<version>` is `git describe`; the script refuses a tree with uncommitted changes, or a delegate built from another commit, unless `-AllowDirty` is passed. The delegate's file properties (Details tab) show the same version and the Houdini build it was compiled against. The folder holds the delegate (`plugin\`), the Solaris integration, the Python helpers, the samples, the staged UE runtime (`runtime\`), a `runtime.json` with paths relative to itself, the hdUE version and the Houdini build, and the license terms: `LICENSE` (hdUE, MIT), `LICENSE-PACKAGE.txt` (end-user terms for the Unreal Engine runtime), `THIRD_PARTY_NOTICES.md` and `licenses\` (the engine's `Engine/Source/ThirdParty/Licenses`). The smoke test, import libraries, the Vulkan debug layers and the DirectX Agility SDK copy UE stages (`D3D12\`, which never loads under Houdini; `docs/architecture.md`) are left out.
+The script also refuses to package when:
 
-The backend links Unreal Engine Developer modules (`bBuildDeveloperTools` in `HdUEBackend.Target.cs`, for runtime Nanite and Lumen cards), which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows distributing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio or to other Unreal Engine licensees, never as a public download. `Package-Houdini.ps1` refuses to run without `-UnrealLicenseesOnly` while the target enables Developer tools.
+- the profile's backend is not the current Test build;
+- the checkout has uncommitted changes;
+- the Houdini delegate was built from another commit (run `.\scripts\Build-Houdini.ps1` first).
 
-On the target machine (Houdini 22.0, Windows x64, a DirectX 12 GPU with hardware ray tracing; no UE, Visual Studio or OpenUSD needed), unzip the folder anywhere; it may be shared and read-only, since UE writes its shader cache and logs per user (`HDUE_USER_DIR`, `$HOUDINI_USER_PREF_DIR/hdUE`) and the host logs under `$HOUDINI_TEMP_DIR/hdUE`. Then run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json` (Windows only, loaded once, enabled from the Houdini build the delegate was compiled against up to the last 22.0 build), which sets `HDUE_VERSION`, `HDUE_HOUDINI_ENABLE`, `HDUE_USER_DIR` and `HDUE_RUNTIME_CONFIG`, appends the plugin to `PXR_PLUGINPATH_NAME`, and adds the integration to `HOUDINI_PATH`. For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. Houdini, hython and husk all pick it up. SideFX only guarantees the HDK ABI within one daily build: in any other 22.0 build, the delegate prints `hdUE warning: hdUE was built against Houdini 22.0.<build> but runs in ...` when it starts; rebuild the package for that build if rendering then crashes or misbehaves.
+The result is in `out\package\`:
 
-The package's `uiready.py` runs alongside Houdini's own (Houdini runs every `uiready.py` on its path). It only watches the Scene Viewers: hdUE's Python host, which prepares materials and `op:` images, starts the first time a viewer selects hdUE, so sessions that never use hdUE load nothing.
+| File | Contents |
+| --- | --- |
+| `hdUE-<version>-houdini<build>-win64\` | The package folder, about 1.2 GB. For example `hdUE-v0.2.0-houdini22.0.368-win64`. |
+| `hdUE-<version>-houdini<build>-win64.zip` | The same folder zipped, about 0.9 GB. |
+| `hdUE-<version>-houdini<build>-win64-symbols.zip` | Debug symbols. Keep it with the release to read crash dumps; do not ship it. |
+
+`<version>` is the checkout's `git describe`. The delegate DLL's file properties (Details tab) show the same version and the Houdini build it was compiled for.
+
+## Installing on a workstation
+
+1. Unzip the package folder where it will stay. A shared, read-only network folder works: each user's logs and shader cache go to their own Houdini preferences folder.
+2. Close Houdini.
+3. Double-click `Install.cmd` in the package folder.
+4. Start Houdini.
+
+`Install.cmd` writes one file, `Documents\houdini22.0\packages\hdUE.json` (or under `HOUDINI_USER_PREF_DIR` when you set it). Houdini, hython and husk all read it at startup. It sets the variables listed in [Environment variables](environment-variables.md) and adds the Solaris integration to `HOUDINI_PATH`.
+
+If you move the folder, run `Install.cmd` again.
+
+### Studio-wide install
+
+Write the package file into a shared package folder instead of each user's Documents:
+
+```powershell
+.\Install.ps1 -PackagesDirectory \\server\houdini\packages
+```
+
+Point every machine's `HOUDINI_PACKAGE_DIR` at that folder.
+
+## Checking that it works
+
+1. In a Solaris Scene Viewer, open the renderer menu. **Unreal Engine** is listed.
+2. Pick it. The first time in a session, Unreal Engine starts inside Houdini; the viewport shows the scene a few seconds later.
+3. In a terminal, run:
+
+    ```powershell
+    husk --renderer "Unreal Engine" -o check.exr "$env:HDUE\samples\cornell\cornell.usda"
+    ```
+
+    husk writes `check.exr`, the Cornell box at 512 x 512.
+
+Then follow [Your first render](first-render.md).
+
+## Uninstalling
+
+1. Run `Uninstall.cmd` in the package folder. It deletes `hdUE.json` and nothing else.
+2. Delete the package folder.
+
+For a studio install, pass the same folder: `.\Uninstall.ps1 -PackagesDirectory \\server\houdini\packages`.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| **Unreal Engine** is missing from the renderer menu. | Houdini did not load `hdUE.json`: it is missing, or this Houdini is older than the build the package was compiled for. | Run `Install.cmd` again and restart Houdini. Check that your Houdini build is at least the one in the package name. |
+| `Incomplete hdUE package: ... is missing.` when you run `Install.cmd`. | The folder was partly copied or unzipped. | Unzip the whole package again. |
+| `hdUE warning: hdUE was built against Houdini 22.0.<build> but runs in Houdini 22.0.<other build>` | SideFX guarantees binary compatibility only within one Houdini build. | Nothing to do if renders work. If rendering crashes or misbehaves, build a package for this Houdini build. |
+| The viewport stays empty after you pick Unreal Engine. | Unreal Engine failed to start. | Open **Unreal > Open Unreal Engine Logs** and read the newest log. |

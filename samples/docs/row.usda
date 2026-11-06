@@ -197,9 +197,10 @@ over "scene"
 
     def Camera "camera"
     {
-        float focalLength = 50
-        float horizontalAperture = 36
-        float verticalAperture = 20.25
+        # USD lens values are tenths of a scene unit: in this metre stage, 50 mm is 0.5.
+        float focalLength = 0.5
+        float horizontalAperture = 0.36
+        float verticalAperture = 0.2025
         float2 clippingRange = (0.05, 1000)
         float focusDistance = 6.0
         float fStop = 0

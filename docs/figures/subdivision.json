@@ -8,7 +8,7 @@
  },
  "values": [
   {
-   "caption": "Level 0",
+   "caption": "0 (default)",
    "set": {
     "/Render/Settings": [
      "int unreal:subdivisionLevel = 0"
@@ -16,7 +16,7 @@
    }
   },
   {
-   "caption": "Level 1",
+   "caption": "1",
    "set": {
     "/Render/Settings": [
      "int unreal:subdivisionLevel = 1"
@@ -24,7 +24,7 @@
    }
   },
   {
-   "caption": "Level 2",
+   "caption": "2",
    "set": {
     "/Render/Settings": [
      "int unreal:subdivisionLevel = 2"
@@ -32,7 +32,7 @@
    }
   },
   {
-   "caption": "Level 3",
+   "caption": "3",
    "set": {
     "/Render/Settings": [
      "int unreal:subdivisionLevel = 3"

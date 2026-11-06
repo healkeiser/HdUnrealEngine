@@ -1,0 +1,31 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Final Gather Quality 0.25",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenFinalGatherQuality = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "Final Gather Quality 1 (default)",
+   "set": {}
+  },
+  {
+   "caption": "Final Gather Quality 2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenFinalGatherQuality = 2"
+    ]
+   }
+  }
+ ]
+}

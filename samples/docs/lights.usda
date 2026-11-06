@@ -80,7 +80,7 @@ over "scene"
     {
         float inputs:radius = 0.05
         float inputs:intensity = 1
-        float inputs:exposure = 6
+        float inputs:exposure = 11
         float inputs:shaping:cone:angle = 25
         float inputs:shaping:cone:softness = 0.2
         double3 xformOp:translate = (0, 3, 0.5)
@@ -102,9 +102,10 @@ over "scene"
 
     def Camera "camera"
     {
-        float focalLength = 40
-        float horizontalAperture = 36
-        float verticalAperture = 20.25
+        # USD lens values are tenths of a scene unit: in this metre stage, 40 mm is 0.4.
+        float focalLength = 0.4
+        float horizontalAperture = 0.36
+        float verticalAperture = 0.2025
         float2 clippingRange = (0.05, 1000)
         double3 xformOp:translate = (0, 1.2, 3.8)
         float3 xformOp:rotateXYZ = (-11.889, 0.0, 0)

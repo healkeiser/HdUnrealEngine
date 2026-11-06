@@ -181,8 +181,15 @@ def main():
         encoding="utf-8",
         newline="\n",
     )
+    failed = []
     for name in args.only or specs:
-        render(name, specs[name])
+        try:
+            render(name, specs[name])
+        except RuntimeError as error:  # one broken figure must not stop the others
+            print(f"{name} FAILED: {str(error)[:500]}", flush=True)
+            failed.append(name)
+    if failed:
+        raise SystemExit(f"failed figures: {failed}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,84 @@
 # Nanite
 
-Meshes from the native asset catalog render with Nanite when their cooked asset has Nanite data (`unreal:requireNanite` enforces it). Static meshes hdUE builds from Hydra, and instancer prototypes, become Nanite meshes too. Batch renders (husk) build Nanite data and Lumen cards before the first frame; interactive hosts (Houdini's viewport, which start UE with `HDUE_INIT_INTERACTIVE`) first draw regular static meshes, build both on worker threads, then swap each mesh, one per frame. Those first-pass meshes are full resolution, so they are made smallest first only while their estimated GPU memory stays under `r.HdUE.InteractiveFirstPassMemory` (2,048 MB; Windows also charges a process's D3D12 allocations to its commit); the other meshes appear when their build is swapped in, as UE draws no static mesh while it compiles (`UStaticMeshComponent::ShouldCreateRenderState`). Copies of a mesh in later uploads draw its first pass too. The viewport keeps drawing while builds are pending and converges once the last one is in. A mesh's root page stays on the GPU and its other pages stream from system memory when the view needs them, as UE streams a cooked mesh's pages from disk (UE's non-editor streaming reads only cooked files, so `Apply-ResidencyPatch.ps1` compiles in the editor's path for pages in memory; [building](../building.md)). The pool is UE's (`r.Nanite.Streaming.StreamingPoolSize`, 512 MB), and a view whose unique geometry overcommits it draws Nanite's coarser clusters, as UE does (`r.Nanite.Streaming.QualityScale.*`): 16 grids of 1M triangles in a 512-pixel frame differ from fully resident pages by 0.6% of the mean brightness at 512 MB and match them (within run-to-run noise) at 1,900 MB. A Nanite mesh's LOD 0, which draws where Nanite does not and which ray tracing (Lumen's, the Path Tracer) traces, is the Nanite builder's fallback mesh, as UE's static mesh build makes it (`BuildNanite`, `StaticMeshBuilder.cpp`), at UE's default relative error (Fallback Target Auto: `r.Nanite.Builder.FallbackTargetAutoRelativeError`, 1); a mesh that ends up without Nanite (a translucent material, a full root page pool) keeps all its triangles. Identical meshes share one static mesh, as UE's USD importer shares one asset between identical prims (`UUsdAssetCache3`, keyed by a hash of the mesh, `USDGeomMeshTranslator.cpp`). Animated or edited meshes stay dynamic. `HDUE_NANITE=0` turns Nanite off.
+Nanite is UE's virtualized geometry: it draws each mesh with about as many triangles as the image has pixels, whatever the mesh's own count. hdUE turns the static meshes of your stage into Nanite meshes, so scenes of hundreds of millions of triangles render in Realtime.
 
-Building Nanite data is most of a scene's mesh conversion, so builds are cached across processes, as UE's derived data cache keeps a static mesh's (`FStaticMeshRenderData::Cache`, `StaticMesh.cpp`): one file per mesh in `Saved/NaniteCache` (under the runtime project, or `HDUE_USER_DIR`), keyed by the Nanite builder's version, the fallback's relative error and the mesh's vertices and triangles, its streaming pages and fallback mesh appended after the resources, and removed after a week unused. UE's cache itself does not run in a cooked runtime such as hdUE's (`GetCache()` creates none where `RequiresCookedData()`, `DerivedDataCacheModule.cpp`; cooked games get their derived data from the cook, and these meshes only exist at render time). 450 meshes of 9,800 triangles: 10.5 s to build, 0.7 s from the cache (75 MB), the same image. UE keeps all of a scene's Nanite root pages in one GPU buffer of at most 2 GB on NVIDIA (4 GB on AMD) less its 512 MB streaming pool, and ends the process when one more does not fit; each mesh keeps one root page there, so it holds tens of thousands of meshes; hdUE stops attaching Nanite data at 90% of that pool and renders the remaining meshes as regular static meshes, with a warning in UE's log. In Houdini's viewport the card and Nanite builds start while their memory fits, as UE's editor schedules asset builds (`FMemoryBoundQueuedThreadPoolWrapper`, `AssetCompilingManager.cpp`): each is estimated at 7 times its mesh data (`UStaticMesh::GetBuildRequiredMemoryEstimate`) and holds that until its mesh is swapped in. `r.HdUE.MeshBuildMaxMemoryUsage` (GB, 0 by default) caps them below the available memory, as UE's `Editor.AsyncAssetCompilationMaxMemoryUsage` does. In a Windows job with a memory limit (a farm container), the available memory is the job's: the runtime sets UE's `memory.WindowsPlatformMemoryUseContainerMemory`.
+SideFX's shader ball lit, then in UE's Nanite views: each colour is one triangle, then one cluster of triangles.
 
-This sets the scale hdUE renders from Hydra geometry. NVIDIA's Da Vinci Workshop (617M triangles, 6,750 meshes, of which 1,700 distinct) renders under husk at 960 x 540 in the realtime mode with a job memory peak of 22 GB: 11 minutes with an empty Nanite cache (3.6 GB written), 2 minutes from it (see [architecture](../architecture.md#memory-gpu-and-disk)). Its lights are bright (exposure 1 to 7 on intensities of 100 to 2,000) and its camera authors no exposure, so the image needs an exposure of its own. In Houdini's viewport, in render purpose, it converges in about 3.5 minutes with a job memory peak of 30 to 33 GB. UE's own runtime USD import of the shot passed 62 GB, and its editor import crashes on one of the scene's UDIM textures. Cooked UE static meshes referenced through `unreal:asset` ([cooked native assets](../materials.md#cooked-native-assets)) keep their geometry out of the host: their pages stream from their cooked files, as in a UE project.
+<div class="hdue-figure" data-figure="nanite-views"></div>
+
+## When hdUE uses Nanite
+
+You do not turn Nanite on: hdUE builds Nanite data for every mesh that can have it.
+
+| Mesh | Nanite |
+| --- | --- |
+| Static meshes from your stage | yes |
+| Instancer prototypes (PointInstancer, native instancing) | yes |
+| Cooked UE meshes (**Native Asset**) with Nanite data | yes |
+| Meshes with a translucent material | no, as in UE |
+| Animated or edited meshes (deforming points, in the viewport while you edit) | no: they stay regular meshes |
+| Meshes with a wet surface | no |
+
+Identical meshes share one Nanite mesh, as UE's USD importer shares one asset between identical prims.
+
+**Batch renders** (husk, the USD Render ROP) build all Nanite data before the first frame.
+
+**Houdini's viewport** draws regular meshes first, builds Nanite data in the background, then swaps each mesh, one per frame. The viewport keeps drawing meanwhile and settles once the last mesh is in. On large scenes some meshes appear only when their build is swapped in: hdUE draws the regular meshes first only while they fit in 2 GB of GPU memory.
+
+## Nanite settings
+
+These are UE console variables, on **hdUE Render Settings** > Engine Quality tab (**Show: Advanced**).
+
+| Parameter | Default | What it does |
+| --- | --- | --- |
+| **Nanite** ([`unreal:cvar:r:Nanite`](../reference/render-settings/engine-quality.md#unreal-cvar-r-nanite)) | On | Draws Nanite meshes with Nanite. Off, UE draws their fallback meshes |
+| **Max Pixels per Edge** ([`unreal:cvar:r:Nanite:MaxPixelsPerEdge`](../reference/render-settings/engine-quality.md#unreal-cvar-r-nanite-maxpixelsperedge)) | 1 | The triangle edge length Nanite aims for, in pixels (Realtime only) |
+| **Nanite Ray Tracing** ([`unreal:cvar:r:RayTracing:Nanite:Mode`](../reference/render-settings/engine-quality.md#unreal-cvar-r-raytracing-nanite-mode)) | Fallback Mesh (0) | What ray tracing sees: the fallback mesh (0) or the full Nanite geometry streamed for the view (1) |
+| **Require Nanite** ([`unreal:requireNanite`](../reference/render-settings/rendering.md#unreal-requirenanite)) | Off | Cooked native meshes must render with Nanite |
+
+## Max Pixels per Edge
+
+**Max Pixels per Edge** (`unreal:cvar:r:Nanite:MaxPixelsPerEdge`) · Default 1 · Range 0.25 to 8
+
+Higher values draw fewer, larger triangles: faster, with coarser silhouettes. The Path Tracer does not use it.
+
+<div class="hdue-figure" data-figure="nanite-pixels-per-edge"></div>
+
+## Ray tracing and fallback meshes
+
+Nanite draws the rasterized image. Ray tracing (Lumen's reflections and the Path Tracer) traces each mesh's **fallback mesh** instead: a simplified copy UE's Nanite builder makes, at UE's default error (Fallback Target Auto). On most meshes the difference does not show. On thin geometry, such as foliage, the fallback is thinner and sparser in the Path Tracer and in Lumen's reflections.
+
+Set **Nanite Ray Tracing** to 1 to trace the full Nanite geometry streamed for the view. It costs time: Intel Sponza's tree took 65 s instead of 25 s for a 256-sample husk frame, load included.
+
+## Cost and memory
+
+Building Nanite data is most of a scene's load time. hdUE caches each build on disk, as UE's derived data cache does for its static meshes:
+
+- The cache is `Saved/NaniteCache` under the runtime project, or under `HDUE_USER_DIR` when it is set.
+- A cache entry not used for a week is removed.
+- 450 meshes of 9,800 triangles: 10.5 s to build, 0.7 s from the cache (75 MB on disk).
+- NVIDIA's Da Vinci Workshop (617 million triangles, 6,750 meshes): 11 minutes in husk with an empty cache (3.6 GB written), 2 minutes from it, with a peak of 22 GB of memory.
+
+On the GPU, each Nanite mesh keeps one root page resident; the rest stream in from system memory when the view needs them, into UE's 512 MB streaming pool (`r.Nanite.Streaming.StreamingPoolSize`). When a view needs more than the pool holds, Nanite draws coarser clusters, as UE does. The root pages share one GPU buffer of at most 2 GB on NVIDIA (4 GB on AMD), less the streaming pool: tens of thousands of meshes. Near that limit, hdUE renders the remaining meshes as regular static meshes and writes a warning to the UE log.
+
+In Houdini's viewport, background builds start only while their memory fits. The console variable `r.HdUE.MeshBuildMaxMemoryUsage` (in GB, default 0: all available memory) caps them lower; author it as `int unreal:cvar:r:HdUE:MeshBuildMaxMemoryUsage` on the render settings. In a Windows job with a memory limit, such as a farm container, the job's limit counts as the available memory.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| First husk frame takes minutes | Nanite data is being built; the cache is empty | Render again: later renders read the cache. Keep `Saved/NaniteCache` on the farm, or point `HDUE_USER_DIR` at a shared disk |
+| Meshes pop in one by one in the viewport | Nanite builds are swapped in as they finish | Wait for the viewport to settle |
+| Foliage looks thinner in the Path Tracer than in Realtime | Ray tracing sees the fallback mesh | Set **Nanite Ray Tracing** to 1 |
+| Some meshes render without Nanite on a huge scene; the UE log warns | The root page buffer is nearly full | Merge small distinct meshes: each distinct mesh keeps a root page, while identical meshes share one |
+| Distant detail looks soft on a huge scene | The view's geometry overflows the streaming pool, so Nanite draws coarser clusters | Render at a lower resolution, or reduce unique geometry |
+| A translucent mesh is not in the Nanite views | Translucent materials do not use Nanite, as in UE | Expected |
+| Viewport runs out of memory while loading | Too many background builds at once | Set `unreal:cvar:r:HdUE:MeshBuildMaxMemoryUsage` to a few GB |
+
+To check which meshes are Nanite, set **Debug View** (`unreal:debugView`) to **Nanite: Mask**: see [Debug views](../rendering/debug-views.md).
+
+To render without Nanite, for comparison, set the environment variable `HDUE_NANITE=0` before starting Houdini or husk.
+
+## Unreal Engine and Karma
+
+hdUE builds Nanite meshes with UE's own Nanite builder and settings, as UE's static mesh build does, and ray traces their fallback meshes as UE does by default. Karma has no Nanite: it renders every triangle of the mesh.

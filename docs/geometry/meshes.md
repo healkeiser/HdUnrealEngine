@@ -1,23 +1,105 @@
 # Geometry
 
-Generic Hydra translation supports meshes, cameras, materials, and distant, sphere, rect, disk, cylinder, and dome lights.
+hdUE renders the geometry of your USD stage as UE geometry: meshes, curves and hair, points, instancers and implicit shapes. This page says what each prim type becomes in UE and which USD attributes it reads.
 
-Meshes reach UE indexed: the triangle corners of a point share one vertex unless a face-varying normal, UV, color or wet mask differs between them, so UE holds about as many vertices as the USD mesh has points. A mesh UE cannot take (more than about 715 million vertices, or broken indices) is skipped with a warning naming it in the UE log; the rest of the scene still loads.
+| USD prim | Renders in UE as |
+| --- | --- |
+| Mesh | a static mesh, Nanite where it can be ([Nanite](nanite.md)) |
+| Mesh with `catmullClark` or `loop` scheme | a refined mesh at the [subdivision level](subdivision.md) |
+| Cube, Sphere, Cone, Cylinder, Capsule, Plane | a mesh |
+| BasisCurves | tubes, or UE hair strands |
+| NurbsCurves, NurbsPatch | the evaluated curve or surface |
+| Points | one sphere per point |
+| PointInstancer, instanceable references | instanced static meshes |
+| Volume | a UE Heterogeneous Volume ([Volumes](../environment/volumes.md)) |
+| HermiteCurves | not rendered; a warning names the prim |
 
-Material-binding GeomSubsets partition triangles by their original USD face while preserving UVs, normals, transforms, visibility, and picking paths. Unassigned faces retain the mesh material; overlapping or invalid material subsets are rejected. Subset edits and removals update the generated meshes.
+## Meshes
 
-Meshes follow USD's `doubleSided`, as UE's USD importer does: single-sided meshes draw a one-sided twin of their material and cull their back faces. `unreal:cullBackface = 0` renders every mesh on both sides, as Karma does (its `karma:object:cull_backface` defaults to off). Karma's per-object `karma:object:cull_backface` primvar is not read; `doubleSided` is the per-mesh switch.
+Meshes keep their points, face-varying UVs, normals and colours. A mesh hdUE cannot convert (broken indices, or more than about 715 million vertices) is skipped with a warning naming it in the UE log; the rest of the scene renders.
 
-Missing or zero normals are generated from area-weighted vertex adjacency before subset partitioning, so material boundaries share the same shading normals. Authored normals are retained. Author explicit face-varying normals or split vertices where hard edges are required; normal generation does not apply subdivision creases.
+**Normals.** Authored normals are kept (`primvars:normals` wins over `normals`). Missing normals are generated smooth, so faces that share a point share its normal. For hard edges, author face-varying normals or split the points. Subdivision meshes ignore authored normals, as USD specifies.
 
-Hydra instancers (USD PointInstancers, including nested ones) are translated: each prototype mesh is built once as a runtime static mesh, or uses its native cooked asset, and drawn through one instanced static mesh component with per-instance transforms composed as in hdEmbree. Preview Surface and ID materials are cooked with instanced-static-mesh usage; prepared MaterialX or Substrate materials need that usage too before they render on instances. Instanceable references (USD native instancing) reach the delegate as Hydra instancers too, in Solaris as elsewhere. Instances hidden by `invisibleIds` or deactivated by `inactiveIds` are not drawn (Hydra leaves them out of the instance indices), `orientations` (half) and `orientationsf` (float) are normalized as `UsdGeomPointInstancer` does, an instance-rate primvar that a bound Preview Surface's base colour reads through a primvar reader colours each instance (as an unbound prototype's `displayColor` does), and volumes under an instancer are drawn once per instance (sharing one density grid on the Hydra side). UE instances are `FTransform`s, which hold no shear, so instances whose transform shears (a rotated prototype under a non-uniform instance scale) are baked into the vertices of one companion mesh per prototype, as a sheared mesh outside an instancer is; the others stay UE instances ([instancer/shear](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/conformance/instancer/shear.usda)). With motion blur, the companion is baked again per sub-frame. A prototype with a native cooked asset has no vertices to bake, so its sheared instances render without shear, with a warning.
+**Materials on faces.** A GeomSubset of family `materialBind` binds a material to some faces. Faces in no subset keep the mesh's material. Overlapping or invalid subsets are rejected.
 
-Implicit Cube, Sphere, Cone, Cylinder, Capsule and Plane prims are converted to meshes by Hydra's implicit-surface scene index (`HdUE_ImplicitSurfaceSceneIndexPlugin`), as for hdEmbree.
+**Holes, orientation, concave polygons.** `holeIndices`, `orientation = "leftHanded"` and concave n-gons render as authored.
 
-Points render as one shared sphere instanced per point, sized by `widths` (0.1 when unauthored). BasisCurves render as six-sided tubes with flat end caps on open curves: linear curves follow their vertices, cubic Bezier, B-spline and Catmull-Rom curves are evaluated in their basis, and `widths` set the diameter (0.01 when unauthored). Points and curves under a PointInstancer are drawn once per instance.
+## Double-sided meshes
 
-**Hair.** BasisCurves with the constant primvar `primvars:unreal:groom = 1` (Hydra passes curves their primvars, not other attributes; **Hair Strands** on the Unreal Engine tab of Render Geometry Settings LOPs, on the curves or an ancestor) render as UE hair strands instead of tubes: hdUE builds the groom asset UE's importer would make, with UE's own groom builder, from the evaluated curve points and per-point `widths`: one group, guides generated from every strand (no simulation), drawn by a groom component with UE's default hair material, in realtime and in the Path Tracer (its strand geometry). Instanced grooms and hair colour, root UV and per-strand attributes are not translated yet.
+**Cull Backface** (`unreal:cullBackface`) · Default On
 
-Mesh UVs come from the primvar that the bound material's `UsdPrimvarReader_float2` reads (`varname`, such as `st`, or `map1` from 3ds Max exports), or from `st` when the material names none. Each texture reads the UV set its own `st` input names (also through a `UsdTransform2d`): the mesh carries every UV primvar its material reads, up to four, chosen through its own binding (else its first bound GeomSubset's). The UV transform is still one per material, from the first textured input.
+A mesh with `doubleSided = false` (USD's default) renders its front faces only, as UE's USD importer imports it. A mesh with `doubleSided = true` renders both sides, each lit as a front face. To render every mesh on both sides, as Karma does, turn **Cull Backface** off (hdUE Render Settings > Rendering tab, **Show: Advanced**). See [Cull Backface](../reference/render-settings/rendering.md#unreal-cullbackface).
 
-Unbound geometry uses `displayColor`/`displayOpacity`. A `displayColor` that varies (uniform, vertex or face-varying on meshes, per point on Points, per vertex or per curve on BasisCurves, per instance on a PointInstancer, from the nearest of nested instancers that authors it) is multiplied into `M_PreviewSurface` as vertex colors or per-instance custom data. Dynamic mesh vertex colors are stored in 8 bits, so very dark colors band slightly. Varying `displayOpacity`, and colors on meshes that also carry a wet-surface mask (the mask reuses the vertex colors), are not translated. The unbound default is a Preview Surface (roughness 0.5) whose base colour is `displayColor`, as UE's USD importer draws unbound prims (its `DisplayColor` reference material feeds the vertex colour straight into Base Color); a prim with no `displayColor` is white, the vertex colour UE's importer gives it (Karma draws such prims grey).
+!!! tip
+    A plane, a leaf or a single wall that vanishes from one side is single-sided. Author `doubleSided = true` on the mesh, or turn off **Cull Backface**.
+
+Karma's per-object `karma:object:cull_backface` is not read: `doubleSided` is the per-mesh switch.
+
+## Implicit shapes
+
+Cube, Sphere, Cone, Cylinder, Capsule and Plane prims, including the `Cylinder_1` and `Capsule_1` forms with separate top and bottom radii, are converted to meshes by Hydra. Hydra's sphere is a coarse Catmull-Clark cage, so it looks faceted at **Subdivision Level** 0: set it to 2 or more for round spheres.
+
+## Curves
+
+BasisCurves render as six-sided tubes, with flat caps on open curves.
+
+- Linear curves follow their points. Cubic Bezier, B-spline and Catmull-Rom curves follow their basis. Periodic curves close.
+- `widths` sets the diameter, per curve or per point. Unauthored, the width is 0.01.
+- `displayColor` per point or per curve colours them when no material is bound.
+
+## Hair
+
+Curves render as UE hair strands when you turn on **Hair Strands** (`primvars:unreal:groom`, Render Geometry Settings LOP > Unreal Engine tab) on the curves or an ancestor.
+
+hdUE builds a UE groom with UE's own groom builder from the curves' points and per-point `widths`: one group, guides from every strand, no simulation, with UE's default hair material. It renders in Realtime and in the Path Tracer.
+
+Not yet translated: instanced grooms, hair colour, root UVs and per-strand attributes.
+
+## Points
+
+Points render as one sphere per point, sized by `widths` (the diameter; 0.1 when unauthored). Per-point `displayColor` colours them.
+
+## Instancing
+
+PointInstancers, nested PointInstancers and instanceable references (USD native instancing) render as UE instanced static meshes: each prototype is built once and drawn once per instance.
+
+| PointInstancer attribute | Read |
+| --- | --- |
+| `protoIndices`, `positions`, `orientations`, `orientationsf`, `scales` | yes |
+| `invisibleIds`, `inactiveIds` | yes: those instances are not drawn |
+| `velocities`, `accelerations`, `angularVelocities` | yes, for motion blur |
+| instance-rate primvars, such as `displayColor` | yes: each instance gets its colour |
+
+Points, curves and volumes under an instancer are drawn once per instance too.
+
+UE instances cannot shear. An instance whose transform shears (a rotated prototype under a non-uniform scale) renders as a separate mesh with its points transformed; the others stay UE instances. A prototype that is a cooked UE mesh (**Native Asset**) cannot be transformed that way, so its sheared instances render without shear, with a warning.
+
+## Primvars
+
+**UVs.** A mesh's UVs come from the primvar its material's texture reads (the `varname` of a UsdPrimvarReader, such as `st`, or `map1` from a 3ds Max export), else from `st`. A mesh carries up to four UV sets, one per primvar its material reads.
+
+**Display colour.** Geometry with no material renders with a Preview Surface (roughness 0.5) whose base colour is `displayColor`, as UE's USD importer draws unbound prims. A prim with no `displayColor` renders white, as in UE's importer. A `displayColor` that varies (per face, point, vertex, curve or instance) is applied as vertex or instance colours. Mesh vertex colours are stored in 8 bits, so very dark colours band slightly.
+
+Not translated: varying `displayOpacity`, and colours on meshes that also carry a wet surface mask.
+
+## Visibility and purpose
+
+- `visibility = "invisible"` hides a prim and its children.
+- **Purpose.** Final renders include the purposes listed in the render settings prim's `includedPurposes`, by default `default` and `render`. Proxy and guide geometry does not render.
+- `renderVisibility` and `guideVisibility` (UsdGeomVisibilityAPI) are followed.
+- A `model:drawMode` of `bounds` or `cards` replaces the model with its box or cards, as UE's USD importer does.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| A wall or plane disappears from one side | The mesh is single-sided | Set `doubleSided`, or turn off **Cull Backface** |
+| A prim is missing; the UE log names it | The mesh has broken indices or is too large | Fix or split the mesh |
+| Hard edges look smooth | No authored normals: hdUE generates smooth ones | Author face-varying normals, or split the points |
+| Unbound geometry is white, not grey as in Karma | No `displayColor`: hdUE uses white, as UE's importer does | Author `displayColor`, or bind a material |
+| Proxy geometry renders, or render geometry is missing | The render settings prim's `includedPurposes` | Set `includedPurposes` to `default` and `render` |
+| Curves render as tubes, not hair | **Hair Strands** is off | Turn it on on the curves or an ancestor |
+
+## Unreal Engine and Karma
+
+hdUE follows UE's USD importer: single-sided meshes are culled, unbound prims are white with their display colour, and draw modes apply. Karma renders both sides of every mesh by default and draws unbound prims grey. Turn off **Cull Backface** to match Karma's double-sided default.

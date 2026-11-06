@@ -1,0 +1,35 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:SceneFringeIntensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:SceneFringeIntensity = 2"
+    ]
+   }
+  },
+  {
+   "caption": "5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:SceneFringeIntensity = 5"
+    ]
+   }
+  }
+ ]
+}

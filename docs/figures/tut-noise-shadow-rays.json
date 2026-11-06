@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float inputs:angle = 5"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Directional Soft Shadow Rays 1",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Directional Soft Shadow Rays 8 (default)",
+   "set": {}
+  }
+ ]
+}

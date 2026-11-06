@@ -25,6 +25,14 @@ nav = [
     { "Your first render" = "getting-started/first-render.md" },
     { "Environment variables" = "getting-started/environment-variables.md" },
   ] },
+  { "Tutorials" = [
+    "tutorials/index.md",
+    { "Lighting a room" = "tutorials/lighting-a-room.md" },
+    { "Lumen or the Path Tracer" = "tutorials/lumen-or-path-tracer.md" },
+    { "Removing noise" = "tutorials/removing-noise.md" },
+    { "Exposure and tone" = "tutorials/exposure-and-tone.md" },
+    { "Depth of field and motion blur" = "tutorials/depth-of-field-and-motion-blur.md" },
+  ] },
   { "Houdini" = [
     "houdini/index.md",
     { "Solaris viewport" = "houdini/viewport.md" },
@@ -88,6 +96,14 @@ nav = [
     { "Architecture" = "architecture.md" },
     { "Building from source" = "building.md" },
     { "Writing the user guide" = "developer/writing-docs.md" },
+    { "Internals" = [
+      { "Rendering" = "developer/internals/rendering.md" },
+      { "Post-processing and AOVs" = "developer/internals/post-processing-and-aovs.md" },
+      { "Materials" = "developer/internals/materials.md" },
+      { "Substrate Builder" = "developer/internals/substrate-builder.md" },
+      { "Wet surfaces" = "developer/internals/wet-surfaces.md" },
+      { "Geometry" = "developer/internals/geometry.md" },
+    ] },
   ] },
 ]
 

@@ -8,7 +8,7 @@
  },
  "values": [
   {
-   "caption": "Motion blur off",
+   "caption": "Off",
    "set": {
     "/Render/Settings": [
      "bool unreal:motionBlur = 0"
@@ -16,12 +16,8 @@
    }
   },
   {
-   "caption": "Motion blur on",
-   "set": {
-    "/Render/Settings": [
-     "bool unreal:motionBlur = 1"
-    ]
-   }
+   "caption": "On (default)",
+   "set": {}
   }
  ]
 }

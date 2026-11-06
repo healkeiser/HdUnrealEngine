@@ -4915,7 +4915,7 @@
                 type    int
                 size    1
                 default { 4 }
-                menu { "2" "2" "4" "4" "8" "8" "16" "16" }
+                menu { "1" "1" "2" "2" "4" "4" }
                 help    "Number of samples per downsampled pixel for the opaque lighting pass. Final number of samples depends also on the downsampling mode. Supported values: 1, 2 and 4. Console variable r.MegaLights.NumSamplesPerPixel (process-wide)."
                 parmtag { "spare_category" "MegaLights" }
                 parmtag { "usdvaluetype" "int" }

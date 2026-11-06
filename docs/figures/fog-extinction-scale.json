@@ -1,0 +1,31 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0.3",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogExtinctionScale = 0.3"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogExtinctionScale = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogExtinctionScale = 4"
+    ]
+   }
+  }
+ ]
+}

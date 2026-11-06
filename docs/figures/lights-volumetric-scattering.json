@@ -1,0 +1,31 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0.25",
+   "set": {
+    "/scene/spot": [
+     "float unreal:light:VolumetricScatteringIntensity = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/scene/spot": [
+     "float unreal:light:VolumetricScatteringIntensity = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/scene/spot": [
+     "float unreal:light:VolumetricScatteringIntensity = 4"
+    ]
+   }
+  }
+ ]
+}

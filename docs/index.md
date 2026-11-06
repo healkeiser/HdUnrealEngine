@@ -12,6 +12,7 @@ hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means
 
 - **[Installation](getting-started/installation.md)**: build the package, install it, check it loads.
 - **[Your first render](getting-started/first-render.md)**: the viewport, the render settings, husk.
+- **[Tutorials](tutorials/index.md)**: lighting a room, removing noise, Lumen or the Path Tracer, exposure, depth of field.
 - **[Render settings](rendering/render-settings.md)**: Realtime and Path Tracer, samples, warmup, profiles.
 - **[Render settings reference](reference/render-settings/index.md)**: every `unreal:*` setting with its default and UE's tooltip.
 
@@ -22,6 +23,7 @@ hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means
 | Section | What it covers |
 |---|---|
 | [Getting started](getting-started/installation.md) | Requirements, installing the package, a first render, environment variables |
+| [Tutorials](tutorials/index.md) | Step-by-step results: lighting a room, removing noise, choosing Lumen or the Path Tracer, exposure and tone, depth of field and motion blur |
 | [Houdini](houdini/index.md) | The Solaris viewport and its Unreal menu, husk, Live Render, Substrate materials |
 | [Render output](output/aovs.md) | AOVs, Cryptomatte, alpha |
 | [Rendering](rendering/render-settings.md) | Render modes, denoising, motion blur, colour management, post-processing, engine quality, debug views |

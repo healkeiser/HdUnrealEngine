@@ -1,0 +1,43 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Lit (default)",
+   "set": {}
+  },
+  {
+   "caption": "Unlit",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"unlit\""
+    ]
+   }
+  },
+  {
+   "caption": "Lighting Only",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"lightingOnly\""
+    ]
+   }
+  },
+  {
+   "caption": "Detail Lighting",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"detailLighting\""
+    ]
+   }
+  },
+  {
+   "caption": "Reflections",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"reflections\""
+    ]
+   }
+  }
+ ]
+}

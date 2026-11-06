@@ -1,26 +1,114 @@
-# Rendering to disk with husk
+# Rendering with husk
 
-husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), and ticks it from the render pass. UE allows one lifetime per process, so it stays until the process exits: husk `--restart-delegate` creates its next delegates on the same UE.
+husk is Houdini's command-line USD renderer. With hdUE installed, `husk --renderer "Unreal Engine"` renders a USD file with Unreal Engine, using the render settings saved in the file. The USD Render ROP runs husk the same way, so the viewport, the ROP and a farm render the same image.
+
+## Command lines
+
+Render frames 1 to 24 of a USD file:
 
 ```powershell
 husk --renderer "Unreal Engine" -f 1 -n 24 -o render.$F4.exr scene.usd
 ```
 
-Render settings' data window (`dataWindowNDC`: crops and overscan), `pixelAspectRatio` and husk's tiling (`--tile-count`, `--tile-index`, `--autotile`) are honoured: each render covers only its data window (see [Cameras](../cameras.md)).
+| Option | What it does |
+| --- | --- |
+| `--renderer "Unreal Engine"` | Renders with hdUE. |
+| `-f 1` | First frame. |
+| `-n 24` | Number of frames. |
+| `-o render.$F4.exr` | Output image, overriding the render products' names. |
+| `--settings /Render/rendersettings` | The render settings prim, when the file holds several. |
+| `-V 3` | Prints progress as it renders (see [Progress](#progress-and-logs)). |
+| `--tile-count 2 2 --tile-index 0` | Renders one tile of a 2 x 2 grid. |
 
-From a source checkout without the package, set the environment first:
+Relative output paths resolve from the folder you run husk in, as with other renderers.
 
-```powershell
-$env:HOUDINI_PATH = "$PWD\integrations\houdini;&"
-$env:PXR_PLUGINPATH_NAME = "$PWD\build\houdini\resources"
-$env:HDUE_HOUDINI_ENABLE = '1'
-$env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
-```
+### From Houdini
 
-UE renders offscreen (`-RenderOffscreen`), in husk, Live Render, the Solaris viewport and usdview alike: it opens no window. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging. UE's log is written in full to `HdUEBackend\Saved\Logs` (under `HDUE_USER_DIR` when set); the host's console (husk's output, Houdini's Log Viewer) gets every UE warning and error, each warning once, and every PSO precache miss (`HDUE_UE_ARGS=-stdout` echoes every line). The hdUE host in Houdini's UI writes its progress to `integration.log` in its log directory and prints only problems. The in-Houdini tests (`Launch-Houdini.ps1 -TestKind`) save what Houdini's Log Viewer received, from every `hou.logging` source, to `log-viewer.json` and `log-viewer.txt` in the run's log directory.
+1. Add a **USD Render ROP** LOP after your render settings, or a USD Render node in `/out`.
+2. Set **Render Delegate** to **Unreal Engine**.
+3. Turn on **Render All Frames with a Single Process**.
+4. Click **Render to Disk**.
 
-UE starts once per husk process, and Hydra resends only what changes between frames, so render a frame range in one husk call (and give farm tasks chunks of frames) rather than one process per frame. As Movie Render Queue renders a shot, only the first frame of a range warms up (the default 32 frames); each later frame keeps UE's temporal history (TSR, Lumen, eye adaptation), whatever moved or changed, and draws once, so a light switched between frames catches up over the next few frames, as in UE (render a cut as its own husk call, or with `--restart-delegate`). On an RTX 4090, a 2560x1440 Lumen frame of Intel's Sponza with an animated camera and sun then takes about 0.3 s, of which about 0.2 s is husk writing the float EXR, after about 30 s of startup per process (UE, and building the scene's meshes). The EXR is husk's: a half-float beauty (render var `dataType` and `driver:parameters:aov:format` `color4h`) is the cheaper product, while the compression barely matters. Measured on the Cornell box at 2560x1440, per frame of a sequence: float ZIP 269 ms (9.4 MB), float uncompressed 257 ms, half ZIP 195 ms (5.2 MB), half uncompressed 194 ms, half PIZ 249 ms; hdUE's part is about 70 ms of each (the draw, and a readback that waits for the GPU's frame), husk's procedural scripts nothing. hdUE's readback stays float: half floats would save it a few milliseconds of conversion and copying, and husk cannot start the next frame before it has this one's pixels, so a readback cannot overlap the next draw. Nanite builds are cached across processes ([Nanite](../geometry/nanite.md)), so a scene's second husk run skips most of the mesh building. Realtime mode (`unreal:renderMode = realtime`) is meant for final frames too; heavier scenes cost more, mostly on the GPU. When husk owns UE, the delegate ticks it continuously instead of once per husk poll, and only the converged realtime draw is read back from the GPU (the Path Tracer also reads back its first draw and one per 250 ms, for progress and husk snapshots).
+Step 3 matters: each husk process starts Unreal Engine once. See [Frame ranges](#frame-ranges-and-farms).
 
-husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate's `percentDone` stat: Path Tracer samples, or 100 once the realtime warmup converges. The delegate's `renderProgressAnnotation` (UE startup or upload stage, with the meshes left after the batch being uploaded; Path Tracer samples or realtime warmup; texture files prepared, virtual textures built and read from the cache, and background mesh builds, each with the time left at its rate so far; virtual texture pages and native assets still loading) shows under the viewport's progress bar, and `renderStatsAnnotation` (scene counts, last frame time) in its render stats. husk's verbose callback, `python3.13libs/hdue_stats.py`, prints the progress at `-V 3` and above, the frame time at the end of each frame, and the stats annotation at `-V 5`. Render vars hdUE does not render (light path expressions other than the beauty, `C.*[LO]` or `C.*`; primvar vars) receive their clear value with a warning. If none of the requested render vars is one hdUE renders, or the frame fails, the delegate reports `huskErrorStatus`, so husk exits with a non-zero code for farm managers.
+## Frame ranges and farms
 
-A USD Render ROP passes its environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers. Unsaved SOP volumes are written next to the USD file by the ROP and render from there.
+Unreal Engine starts once per husk process, and stays until the process exits. Between frames, husk sends only what changed. Render a frame range in one husk call, and give farm tasks chunks of frames, not one frame each.
+
+On an RTX 4090, measured on scenes of this repository:
+
+| Scene | Startup per process | Per frame after the first |
+| --- | --- | --- |
+| Cornell box, 512 x 512, Realtime | about 3 s | about 50 ms |
+| Intel's Sponza, 2560 x 1440, Realtime, animated camera and sun | about 30 s (UE and the scene's meshes) | about 0.3 s, of which 0.2 s is husk writing the float EXR |
+
+[Nanite](../geometry/nanite.md) builds are cached on disk across processes, so the second husk run of a scene skips most of its mesh building.
+
+### Realtime sequences
+
+In Realtime, husk renders a frame range the way Movie Render Queue renders a shot:
+
+1. The first frame renders **Warmup Frames** (`unreal:warmupFrames`, default 64) frames, so Lumen, anti-aliasing and eye adaptation settle.
+2. Each later frame draws once and keeps that temporal history.
+
+A sudden change between frames, such as a light switched on, therefore catches up over the next few frames, as in Unreal Engine. Render each cut as its own husk call, or pass husk's `--restart-delegate <n>`, which restarts the renderer every n frames; each restart warms up again.
+
+### Farm setup
+
+Each render node needs the hdUE package installed ([Installation](../getting-started/installation.md)), a Houdini 22.0 build the package supports, and a DirectX 12 GPU with hardware ray tracing.
+
+## Render products and AOVs
+
+husk writes every render product of the render settings. Use hdUE's LOPs to author them:
+
+- **hdUE Render Settings**: **Output Picture** and one toggle per AOV on its Image Output tab.
+- **hdUE Standard Render Vars**: the beauty, depth, normals, lighting components, IDs and Cryptomatte, each with its precision.
+- **hdUE Render Products**: several output images, each with its render vars.
+
+See [AOVs](../output/aovs.md#aovs-in-houdini) for what each AOV holds and costs, and [Alpha](../output/alpha.md) for the alpha channel.
+
+husk also honours the render settings' data window (crops and overscan), the pixel aspect ratio and husk's tiling (`--tile-count`, `--tile-index`, `--autotile`): each render covers only its window ([Cameras](../cameras.md)). A single render is at most 16384 pixels a side; render larger images in tiles.
+
+### Output format
+
+The EXR is husk's. Writing it costs more than the compression choice. Measured on the Cornell box at 2560 x 1440, per frame of a sequence:
+
+| Beauty format | Compression | Time per frame | File size |
+| --- | --- | ---: | ---: |
+| Float (`color4f`) | ZIP | 269 ms | 9.4 MB |
+| Float | none | 257 ms | |
+| Half (`color4h`) | ZIP | 195 ms | 5.2 MB |
+| Half | none | 194 ms | |
+| Half | PIZ | 249 ms | |
+
+hdUE's part is about 70 ms of each; the rest is husk. For a cheaper beauty, set the beauty render var's `dataType` and `driver:parameters:aov:format` to `color4h`.
+
+## Progress and logs
+
+| husk verbosity | Prints |
+| --- | --- |
+| `-V 2` | Each frame's start, and its render time at the end. |
+| `-V 3` | Progress while rendering: Path Tracer samples or Realtime warmup, Unreal Engine startup, scene upload, textures and mesh builds with the time left. |
+| `-V 5` | Also the scene statistics after each frame. |
+
+husk's output also shows every Unreal Engine warning and error, each warning once. For every line of Unreal Engine's log, set `HDUE_UE_ARGS=-stdout`. The full log is in `Saved\Logs` under `HDUE_USER_DIR` ([Environment variables](../getting-started/environment-variables.md)).
+
+## Exit codes and failures
+
+husk exits with a non-zero code when a frame fails, so a farm manager marks the task as failed. That happens when:
+
+- Unreal Engine fails to render the frame;
+- none of the requested render vars is one hdUE renders;
+- a material the frame needs could not be prepared ([Substrate materials](substrate-materials.md)).
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| An AOV is empty (its clear value), with a warning in husk's output. | hdUE does not render that render var: a light path expression other than the beauty's, or a primvar. | Use an AOV from the [AOV table](../output/aovs.md). |
+| `Resolution ... is outside 1..16384, the largest texture this GPU's RHI renders` | The image is larger than Unreal Engine's largest render target. | Render in tiles: `--autotile --tile-count 2 2`. |
+| `hdUE warning: hdUE was built against Houdini ...` | The render node runs another Houdini 22.0 build than the package's. | See [Installation](../getting-started/installation.md#troubleshooting). |
+| Each frame takes several seconds longer than expected. | One husk process per frame: Unreal Engine starts each time. | Render frame ranges per process (see [Frame ranges](#frame-ranges-and-farms)). |
+
+## Unreal Engine and Karma
+
+- Command lines are Karma's with `--renderer "Unreal Engine"`; the same USD file can hold both renderers' settings.
+- In Realtime, sequence frames reuse their history as Movie Render Queue does; Karma renders each frame independently.

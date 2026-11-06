@@ -1,0 +1,31 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 warmup frames",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 1"
+    ]
+   }
+  },
+  {
+   "caption": "8 warmup frames",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 8"
+    ]
+   }
+  },
+  {
+   "caption": "64 warmup frames (default)",
+   "set": {}
+  }
+ ]
+}

@@ -85,10 +85,9 @@ Number of samples per downsampled pixel for the opaque lighting pass. Final numb
 
 | Value | Label |
 |---|---|
+| `1` | 1 |
 | `2` | 2 |
 | `4` | 4 |
-| `8` | 8 |
-| `16` | 16 |
 
 #### Default Shadow Method { #unreal-cvar-r-megalights-defaultshadowmethod }
 

@@ -8,7 +8,7 @@
  },
  "values": [
   {
-   "caption": "Denoiser off",
+   "caption": "Off",
    "set": {
     "/Render/Settings": [
      "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
@@ -16,8 +16,16 @@
    }
   },
   {
-   "caption": "Denoiser on (NNEDenoiser)",
+   "caption": "NNE Denoiser (default)",
    "set": {}
+  },
+  {
+   "caption": "NVIDIA OptiX",
+   "set": {
+    "/Render/Settings": [
+     "string unreal:cvar:r:PathTracing:Denoiser:Name = \"OptiX\""
+    ]
+   }
   }
  ]
 }

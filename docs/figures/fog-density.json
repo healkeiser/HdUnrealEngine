@@ -1,22 +1,10 @@
 {
- "scene": "cornell/variants/height_fog.usda",
- "display": "linear",
- "base": {
-  "/Render/Settings": [
-   "token unreal:renderMode = \"realtime\""
-  ]
- },
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "base": {},
  "values": [
   {
-   "caption": "Density 0",
-   "set": {
-    "/Render/Settings": [
-     "float unreal:heightFog:FogDensity = 0"
-    ]
-   }
-  },
-  {
-   "caption": "Density 0.02",
+   "caption": "0.02 (default)",
    "set": {
     "/Render/Settings": [
      "float unreal:heightFog:FogDensity = 0.02"
@@ -24,18 +12,18 @@
    }
   },
   {
-   "caption": "Density 0.5",
+   "caption": "0.3",
    "set": {
     "/Render/Settings": [
-     "float unreal:heightFog:FogDensity = 0.5"
+     "float unreal:heightFog:FogDensity = 0.3"
     ]
    }
   },
   {
-   "caption": "Density 2",
+   "caption": "1",
    "set": {
     "/Render/Settings": [
-     "float unreal:heightFog:FogDensity = 2"
+     "float unreal:heightFog:FogDensity = 1"
     ]
    }
   }

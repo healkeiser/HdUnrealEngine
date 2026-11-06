@@ -617,7 +617,7 @@ CVARS = [
         "Samples per Pixel",
         "Rendering Features|MegaLights",
         False,
-        dict(menu=[(2, "2"), (4, "4"), (8, "8"), (16, "16")]),
+        dict(menu=[(1, "1"), (2, "2"), (4, "4")]),  # UE: "Supported values: 1, 2 and 4"
     ),
     (
         "r.MegaLights.DefaultShadowMethod",

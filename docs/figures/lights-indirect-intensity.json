@@ -1,0 +1,31 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0",
+   "set": {
+    "/scene/sun": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/scene/sun": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/scene/sun": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ]
+   }
+  }
+ ]
+}

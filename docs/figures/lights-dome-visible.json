@@ -1,0 +1,23 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/scene/sky": [
+     "bool unreal:visibleBackground = 1"
+    ]
+   }
+  },
+  {
+   "caption": "0",
+   "set": {
+    "/scene/sky": [
+     "bool unreal:visibleBackground = 0"
+    ]
+   }
+  }
+ ]
+}

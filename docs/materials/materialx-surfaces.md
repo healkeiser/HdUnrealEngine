@@ -1,35 +1,139 @@
 # MaterialX surfaces
 
-hdUE asks Hydra for the `mtlx` render context before the universal one, so a material with a MaterialX surface output renders from its MaterialX graph, and one with only `outputs:surface` from its UsdPreviewSurface. MaterialX graphs are read directly at render time, with no preparation, cook or shader compile; the [prepared MaterialX library](../materials.md#materialx-and-substrate) still takes precedence for materials it maps, and stays the route for graphs this mapping cannot express.
+hdUE renders MaterialX **Standard Surface** and **OpenPBR Surface** materials, the surfaces of Karma's and Houdini's MaterialX builders. It translates them at render time onto UE's own Standard Surface material functions, the ones UE's Interchange uses to import MaterialX, so edits show immediately, with no compile.
 
-Surfaces: `ND_standard_surface_surfaceshader`, `ND_open_pbr_surface_surfaceshader` and `ND_UsdPreviewSurface_surfaceshader` (read like `UsdPreviewSurface`). Each input is a constant, or an image reached through these nodes:
+The figures on this page use the shader ball (`samples/docs/lookdev.usda`) in Realtime with a Standard Surface shader. Below: Preview Surface, then Standard Surface with transmission, subsurface and sheen.
 
-| Node | Translation |
+<div class="hdue-figure" data-figure="materials-models"></div>
+
+## Using it in Solaris
+
+1. In a **Material Library** LOP, create a **Karma Material Builder** (or a MaterialX subnet) holding a **MaterialX Standard Surface** or **MaterialX OpenPBR Surface**.
+2. Wire textures with **MaterialX Image** nodes, as below.
+3. Assign the material. A material with both a MaterialX output and a Preview Surface output renders from its MaterialX graph.
+
+If a graph uses a node outside the list below, UE's MaterialX importer prepares it in the background ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)). Until it is ready, that input renders at its constant value, with a warning naming the node.
+
+## Base
+
+| Standard Surface | OpenPBR | Default | In UE |
+| --- | --- | --- | --- |
+| **Base** `base` × **Base Color** `base_color` | `base_weight` × `base_color` | 1 × (0.8, 0.8, 0.8) | Base colour |
+| **Metalness** `metalness` | `base_metalness` | 0 | Metalness, as Preview Surface **Metallic** |
+
+`diffuse_roughness` is not translated.
+
+## Specular
+
+| Standard Surface | OpenPBR | Default | In UE |
+| --- | --- | --- | --- |
+| **Specular** `specular` × **Specular Color** `specular_color` | | 1 × (1, 1, 1) | Specular tint, on materials with coat, sheen or subsurface |
+| **Specular Roughness** `specular_roughness` | `specular_roughness` | 0.2 | Roughness |
+| **Specular IOR** `specular_IOR` | `specular_ior` | 1.5 | Dielectric reflectance, as Preview Surface **IOR** |
+
+Anisotropy is not translated.
+
+## Transmission
+
+**Transmission** · `transmission` (OpenPBR `transmission_weight`) · default 0
+
+Above 0, the surface refracts: hdUE uses UE's translucent Standard Surface material, as Interchange imports a transmissive MaterialX surface, in Realtime and in the Path Tracer. `transmission_color` tints the light passing through and `transmission_depth` (scene units) is the distance at which it reaches that colour. See [Opacity and glass](opacity-and-glass.md) for the settings, figures and recipes.
+
+## Subsurface
+
+**Subsurface** · `subsurface` (OpenPBR `subsurface_weight`) · default 0
+
+Light enters the surface, scatters and exits nearby: skin, wax, marble, milk. hdUE renders it as Substrate subsurface scattering.
+
+<div class="hdue-figure" data-figure="materialx-surfaces-subsurface"></div>
+
+| Standard Surface | OpenPBR | Default | What it does |
+| --- | --- | --- | --- |
+| `subsurface_color` | `subsurface_color` | (1, 1, 1) | Colour of the scattered light |
+| `subsurface_radius` | `subsurface_radius_scale` | (1, 1, 1) | Relative scattering distance per channel: red furthest for skin |
+| `subsurface_scale` | `subsurface_radius` | 1 | Scattering distance, in scene units |
+
+**Subsurface Scale** multiplies **Subsurface Radius** into a mean free path in scene units. In a stage in metres, the default 1 is a metre of scattering: the object looks like jelly. A 9 cm shader ball wants about 0.02.
+
+<div class="hdue-figure" data-figure="materialx-surfaces-subsurface-scale"></div>
+
+## Sheen
+
+**Sheen** · `sheen` (OpenPBR `fuzz_weight`) · default 0
+
+A soft, bright rim at grazing angles, from fibres: velvet, felt, dust. hdUE renders it as Substrate fuzz. `sheen_color` (default (1, 1, 1)) tints it and `sheen_roughness` (default 0.3) widens it.
+
+<div class="hdue-figure" data-figure="materialx-surfaces-sheen"></div>
+
+## Coat
+
+**Coat** · `coat` (OpenPBR `coat_weight`) · default 0
+
+A clear layer over the base: varnish, car paint, lacquer. `coat_roughness` (default 0.1) is its own roughness; `coat_color` (default (1, 1, 1)) tints what is under it.
+
+<div class="hdue-figure" data-figure="materialx-surfaces-coat"></div>
+
+`coat_IOR` and `coat_normal` are not translated: the coat's IOR is 1.5.
+
+## Emission
+
+**Emission** × **Emission Color** · `emission` × `emission_color` (OpenPBR `emission_luminance` × `emission_color`) · default 0 × (1, 1, 1)
+
+Emitted light, as Preview Surface **Emissive Color**. OpenPBR's `emission_luminance` is used as a plain multiplier, not in nits.
+
+## Geometry
+
+| Standard Surface | OpenPBR | Default | In UE |
+| --- | --- | --- | --- |
+| **Opacity** `opacity` | `geometry_opacity` | 1 | A cutout (UE's Masked blend mode) at 0.3333, UE's default clip value, when it is a texture or a constant below 1 |
+| **Thin Walled** `thin_walled` | `geometry_thin_walled` | off | A thin two-sided shell that lets its subsurface colour through: leaves, paper, curtains |
+| **Normal** `normal` | `geometry_normal` | | Tangent-space normal map, through a **MaterialX Normal Map** node |
+
+A Standard Surface with **Transmission** above 0 is see-through instead of cut out. See [Opacity and glass](opacity-and-glass.md).
+
+## Nodes hdUE translates
+
+Each surface input is a constant or reaches an image through these nodes. Anything else is imported by UE.
+
+| Node | What hdUE does |
 | --- | --- |
-| `ND_image_*`, `ND_tiledimage_*` (`uvtiling`, `uvoffset`), `UsdUVTexture` | The texture, with its `colorspace` / `sourceColorSpace` and address modes, as for Preview Surface |
-| `ND_geompropvalue_vector2`, `UsdPrimvarReader_float2` | Selects the texture's UV set (`geomprop` / `varname`, such as `map1`) |
-| `ND_extract_*` | Selects a channel (alpha cutouts: `ND_image_color4` → `ND_extract_color4` index 3) |
-| `ND_convert_*`, `ND_dot_*` | Passed through |
-| `ND_normalmap*` | Tangent-space decode, with its `scale` on XY |
-| `ND_multiply_*` by a constant | Scales the texture or constant |
-| `ND_constant_*` | Its value |
+| **MaterialX Image**, **Tiled Image** (`uvtiling`, `uvoffset`), **USD UV Texture** | The texture, with its colour space and address modes |
+| **Texture Coordinate**, **Geometry Property Value** (vector2), **USD Primvar Reader** | Selects the UV set (`st`, `map1`, ...) |
+| **Place 2D**, **USD Transform 2D** | Transforms the UVs of the image it feeds |
+| **Geometry Property Value** (color3, vector3) | Reads a vertex colour primvar |
+| **Extract** | Picks one channel (alpha for cutouts: Image color4 → Extract index 3) |
+| **Normal Map** | Tangent-space decode, with its `scale` |
+| **Multiply** by a constant | Scales the texture |
+| **Mix** with one of `fg`, `bg`, `mix` connected | Offsets and scales that input |
+| **Convert**, **Dot**, **Constant** | Passed through, or the value |
 
-A graph with any other node (`ND_mix_*`, `ND_place2d_*`, procedurals, ...), or another surface, is prepared through UE's MaterialX importer ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)) and renders translated until then: that node leaves the input at its constant, reported once as a warning. A multiply of two nodes is such a node too. Textured weights (`base`, `sheen`, `subsurface`, ...) also use their constant.
+Texture colour spaces follow the image's `colorspace`: `srgb_texture` decodes sRGB, `lin_rec709` and `raw` read linear.
 
-| standard_surface (OpenPBR) | In UE |
+## Recipes
+
+How to get these looks on a Standard Surface. Inputs not listed stay at their default.
+
+| Look | Inputs |
 | --- | --- |
-| `base` × `base_color` (`base_weight` × `base_color`) | Base colour |
-| `metalness` (`base_metalness`), `specular_roughness`, `specular_IOR` (`specular_ior`) | As Preview Surface `metallic`, `roughness`, `ior` |
-| `specular` × `specular_color` | Specular tint (layered parents) |
-| `coat` (`coat_weight`), `coat_roughness`, `coat_color` | Clear coat; `coat_color` tints it on the layered parents only |
-| `sheen`, `sheen_color`, `sheen_roughness` (`fuzz_*`) | Substrate fuzz |
-| `subsurface`, `subsurface_color`, `subsurface_radius` × `subsurface_scale` (`subsurface_weight`, `subsurface_color`, `subsurface_radius_scale` × `subsurface_radius`) | Substrate subsurface scattering, mean free path in scene units |
-| `thin_walled` (`geometry_thin_walled`) | Thin two-sided shell that transmits its subsurface colour (cloth, leaves) |
-| `emission` × `emission_color` (`emission_luminance` × `emission_color`) | Emission (OpenPBR's luminance is used as a plain weight) |
-| `opacity` (`geometry_opacity`) | As UE's Interchange imports MaterialX: an image, or a constant below 1, is a cutout (masked) at UMaterial's default clip value 0.3333; a standard_surface with `transmission` is see-through instead (OpenPBR's `geometry_opacity` stays the cutout). The MaterialX spec, and Karma, render opacity as fractional coverage with no threshold, so moving a scene between them calls for material adjustments: Lumen reads the cutout from mipmaps, where thin foliage averages below the clip and would thin with distance. hdUE therefore scales the mips of every texture that drives a cutout (MaterialX opacity, UsdPreviewSurface with `opacityThreshold`) to keep its alpha coverage at the clip value, as UE's "scale mips for alpha coverage" texture setting does, with three fixes to UE's algorithm (`ComputeAlphaScale` in `TextureCompressorModule.cpp`): each level's scale is measured on that level rather than the previous one, the closest tested scale is kept rather than an untested midpoint, and a level is only ever scaled up. A 9x-distant thin-branch card keeps 0.42 of its near coverage (plain mips 0.05, UE's version less than plain); the Path Tracer reads the top mip and is unaffected |
-| `transmission` (`transmission_weight`), `transmission_color`, `transmission_depth` | Refraction, as UE's Interchange imports a transmissive MaterialX surface: the translucent Standard Surface parents (UE's `Substrate-StandardSurface-Translucent` function, coloured transmittance, the material's Refraction from the function's IOR output, Index Of Refraction method, per-pixel lighting), in realtime and in the Path Tracer, which refracts only with that method. Ignored with an OpenPBR `geometry_opacity` cutout |
-| `normal` (`geometry_normal`) | Tangent-space normal map |
+| Skin | `base_color` (0.8, 0.5, 0.4), `specular_roughness` 0.4, `subsurface` 1, `subsurface_color` (0.9, 0.45, 0.3), `subsurface_radius` (1, 0.35, 0.2), `subsurface_scale` 0.02 (a 9 cm object in metres; scale it with the object) |
+| Velvet | `base_color` (0.3, 0.05, 0.1), `specular_roughness` 0.7, `sheen` 1, `sheen_color` (1, 0.85, 0.9), `sheen_roughness` 0.3 |
+| Lacquered wood | wood texture into `base_color`, `specular_roughness` 0.5, `coat` 1, `coat_roughness` 0.05 |
+| Leaf | leaf texture into `base_color`, `subsurface` 0.5, `subsurface_color` (0.4, 0.6, 0.1), `thin_walled` on; alpha through **Extract** into `opacity` |
+| Glass | See [glass recipes](opacity-and-glass.md#recipes) |
 
-Materials with `subsurface`, `sheen` or a clear coat above 0 render with the layered Standard Surface parents: UE's own `Substrate-StandardSurface-Opaque` material function (the one UE's Interchange uses for MaterialX), fed the same texture slots, in four cooked variants (opaque or masked, solid or thin-walled; `thin_walled` is a static input of the function). Everything else, including standard_surface materials without subsurface, sheen or coat, uses the single-slab Preview Surface parents. The layered function mixes metal and dielectric slabs and layers coat and sheen vertically, so it costs several Substrate closures per pixel where Preview Surface costs one; keeping it to the materials that need it bounds that cost. In the Sponza gallery shot (960 x 540, Lumen, curtains covering about half the frame), the layered curtains cost about 1 to 2 ms per frame over the same curtains on Preview Surface (husk, 1500 realtime frames, measured twice).
+## Troubleshooting
 
-Limits: `subsurface_color` and `sheen_color` follow an image only when it is `base_color`'s (the usual authoring; their tint is kept), else they use their constant. Subsurface uses Substrate's per-material mean free path; UE subsurface profiles are not created at runtime. One UV transform per material, from the first textured input. `diffuse_roughness`, anisotropy, thin film, `coat_IOR`, `coat_normal`, `transmission_*` colours and dispersion are not translated. Transmissive materials, see-through materials and translucent sorting follow the Preview Surface translucent parent, which has no subsurface or sheen.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| An input renders flat, with a warning "MaterialX node ... is not translated" | A node outside the list, and the import is not finished or cannot run | Wait for the background import; on a machine without UE's editor, replace the node or cook the material ([cooked libraries](../materials.md#cooked-materialx-libraries)) |
+| Subsurface looks like jelly or glows through the whole object | `subsurface_scale` is in scene units: the default 1 is a metre | Lower it to the object's scattering distance |
+| A textured `base`, `sheen` or `subsurface` weight renders as its constant | Textured weights are not translated | Put the texture in the colour input instead |
+| `subsurface_color` or `sheen_color` ignores its texture | They follow a texture only when it is `base_color`'s | Use `base_color`'s texture, or let UE import the graph |
+| Leaves or foliage cut out too much or too little compared with Karma | UE cuts `opacity` at 0.3333; Karma blends fractional coverage | Adjust the alpha in the texture, or use a Preview Surface with your own **Opacity Threshold** |
+
+## Unreal Engine and Karma
+
+- hdUE follows UE's Interchange MaterialX import: the same `Substrate-StandardSurface` material functions, cutout opacity at UE's default clip value (0.3333), refraction on the translucent function.
+- Karma renders `opacity` as fractional coverage with no threshold; the MaterialX specification does too.
+- A material with coat, sheen or subsurface uses UE's layered Standard Surface function, which costs several Substrate closures per pixel. In the Sponza gallery shot (960 x 540, Lumen), layered curtains cost 1 to 2 ms per frame more than the same curtains on Preview Surface. Other Standard Surface materials cost what a Preview Surface does.
+- Subsurface uses Substrate's per-material mean free path; UE subsurface profiles are not created. One UV transform per material, from the first textured input. Thin film and dispersion are not translated.

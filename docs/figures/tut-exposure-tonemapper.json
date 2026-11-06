@@ -1,0 +1,23 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Unreal Tonemapper off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:tonemapper = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Unreal Tonemapper on",
+   "set": {}
+  }
+ ]
+}

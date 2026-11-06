@@ -1,0 +1,27 @@
+{
+ "scene": "docs/row.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/camera": [
+   "float fStop = 2"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Realtime",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"realtime\""
+    ]
+   }
+  },
+  {
+   "caption": "Path Tracer",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

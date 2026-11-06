@@ -1,18 +1,18 @@
 {
- "scene": "cornell/cornell.usda",
+ "scene": "docs/lookdev.usda",
  "display": "tonemapped",
- "base": {
-  "/Render/Settings": [
-   "token unreal:renderMode = \"realtime\""
-  ]
- },
+ "base": {},
  "values": [
   {
-   "caption": "Tonemapper off (scene-linear)",
-   "set": {}
+   "caption": "Off (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:tonemapper = 0"
+    ]
+   }
   },
   {
-   "caption": "Tonemapper on",
+   "caption": "On",
    "set": {
     "/Render/Settings": [
      "bool unreal:tonemapper = 1"

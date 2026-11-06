@@ -1,0 +1,39 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "-1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = -1"
+    ]
+   }
+  },
+  {
+   "caption": "0 (default)",
+   "set": {}
+  },
+  {
+   "caption": "+1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = 1"
+    ]
+   }
+  },
+  {
+   "caption": "+2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = 2"
+    ]
+   }
+  }
+ ]
+}

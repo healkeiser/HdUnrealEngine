@@ -188,9 +188,10 @@ over "scene"
 
     def Camera "camera"
     {
-        float focalLength = 18
-        float horizontalAperture = 36
-        float verticalAperture = 20.25
+        # USD lens values are tenths of a scene unit: in this metre stage, 18 mm is 0.18.
+        float focalLength = 0.18
+        float horizontalAperture = 0.36
+        float verticalAperture = 0.2025
         float2 clippingRange = (0.05, 1000)
         double3 xformOp:translate = (2.6, 1.5, 2.6)
         float3 xformOp:rotateXYZ = (-5.236, 41.285, 0)

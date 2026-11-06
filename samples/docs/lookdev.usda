@@ -56,6 +56,9 @@ def Scope "Render"
         token unreal:renderMode = "realtime"
         int unreal:samplesPerPixel = 256
         int unreal:subdivisionLevel = 2
+        # Ray tracing (the Path Tracer, Lumen hit lighting) traces Nanite's full-detail mesh, not UE's default
+        # coarse fallback mesh, so the shader ball stays round in the Path Tracer.
+        int unreal:cvar:r:RayTracing:Nanite:Mode = 1
         # The images show UE's tone-mapped frame, as UE's editor viewport shows it.
         bool unreal:tonemapper = 1
     }

@@ -1,0 +1,31 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "int unreal:samplesPerPixel = 4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Fast",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:NNEDenoiser:Asset = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Balanced (default)",
+   "set": {}
+  },
+  {
+   "caption": "High Quality",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:NNEDenoiser:Asset = 3"
+    ]
+   }
+  }
+ ]
+}

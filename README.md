@@ -293,6 +293,7 @@ The **[user guide](https://healkeiser.github.io/HdUnrealEngine/)** covers every 
 | Topic | Page |
 |-------|------|
 | Installing, a first render, environment variables | [Getting started](https://healkeiser.github.io/HdUnrealEngine/getting-started/installation/) |
+| Lighting a room, removing noise, Lumen or Path Tracer, exposure, depth of field | [Tutorials](https://healkeiser.github.io/HdUnrealEngine/tutorials/) |
 | Solaris viewport, husk, Live Render | [Houdini](https://healkeiser.github.io/HdUnrealEngine/houdini/) |
 | Render modes, denoising, motion blur, colour management, post-processing | [Rendering](https://healkeiser.github.io/HdUnrealEngine/rendering/render-settings/) |
 | Cameras, lights, materials, geometry, fog and sky | [Cameras](https://healkeiser.github.io/HdUnrealEngine/cameras/), [Lights](https://healkeiser.github.io/HdUnrealEngine/lights/), [Materials](https://healkeiser.github.io/HdUnrealEngine/materials/), [Geometry](https://healkeiser.github.io/HdUnrealEngine/geometry/meshes/), [Environment](https://healkeiser.github.io/HdUnrealEngine/environment/volumes/) |
@@ -305,7 +306,7 @@ The **[user guide](https://healkeiser.github.io/HdUnrealEngine/)** covers every 
 ## Environment Variables
 
 <!-- --8<-- [start:environment-variables] -->
-The package file sets the first two; the rest are for development and debugging.
+The package file sets `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` and `HDUE_USER_DIR` (and `HDUE`, `HDUE_VERSION`); the rest are for development and debugging.
 
 | Variable | Description |
 |----------|-------------|

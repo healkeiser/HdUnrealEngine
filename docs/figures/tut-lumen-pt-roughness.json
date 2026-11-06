@@ -1,0 +1,27 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ],
+  "/scene/Looks/ball/S": [
+   "float inputs:metallic = 1",
+   "float inputs:roughness = 0.55"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Max Roughness To Trace 0.4 (default)",
+   "set": {}
+  },
+  {
+   "caption": "Max Roughness To Trace 1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenMaxRoughnessToTraceReflections = 1"
+    ]
+   }
+  }
+ ]
+}

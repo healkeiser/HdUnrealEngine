@@ -1,0 +1,39 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Lumen: Lumen Scene",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"lumen:LumenScene\""
+    ]
+   }
+  },
+  {
+   "caption": "Lumen: Surface Cache",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"lumen:SurfaceCache\""
+    ]
+   }
+  },
+  {
+   "caption": "Virtual Shadow Map: Virtual Page",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"vsm:vpage\""
+    ]
+   }
+  },
+  {
+   "caption": "Light Complexity",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"lightComplexity\""
+    ]
+   }
+  }
+ ]
+}

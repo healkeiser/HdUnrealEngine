@@ -1,105 +1,111 @@
 # Solaris viewport
 
-Pick **Unreal Engine** in the viewport's renderer menu. Renderer settings are `unreal:*` attributes on a UsdRenderSettings prim, so any Render Settings LOP drives hdUE: with the delegate registered, Render Settings LOPs show them on an **Unreal Engine** tab (`integrations/houdini/soho/parameters/HdUnrealEngine_Global.ds`), laid out as UE's editor lays them out. Above the tabs: the render mode, the Path Tracer samples or the realtime warmup frames, the Unreal Tonemapper and the exposure compensation. Then a tab per UE category, each UE sub-category a collapsible section (its own sub-categories simple folders) in the order of UE's Details panel, the common ones expanded:
+The Solaris Scene Viewer renders with Unreal Engine once you pick **Unreal Engine** in its renderer menu. Unreal Engine runs inside Houdini on its own thread, so a slow frame never blocks Houdini's UI.
 
-| Tab | Sections |
+## Picking Unreal Engine
+
+1. Display a LOP network in a Scene Viewer.
+2. In the viewer's renderer menu, pick **Unreal Engine**, or choose **Unreal > Use Unreal Engine in the Viewport**.
+
+The first time in a session, Unreal Engine starts inside Houdini; the image appears a few seconds later. It then stays loaded until Houdini exits, so switching back to Unreal Engine is immediate.
+
+One Houdini session renders one hdUE image at a time: one viewport, or one [Live Render](live-render.md).
+
+Selection works as with Karma: click a prim in the viewport to select it, and Solaris outlines it. The outline appears once the view is still.
+
+## Render settings
+
+hdUE reads its settings from `unreal:*` attributes on the stage's render settings prim. You set them in three places.
+
+### hdUE Render Settings LOP
+
+**hdUE Render Settings** (TAB menu > hdUE > Rendering) is the counterpart of Karma Render Settings: one LOP with the camera, resolution, **Output Picture** and every hdUE setting. **Unreal > Create hdUE Render Settings** adds one after the displayed LOP.
+
+From top to bottom it shows:
+
+1. **Show: Essential | Advanced**. Essential shows what Unreal's editor shows by default; Advanced adds the settings UE keeps behind its Advanced expanders. Settings hidden by Essential still render. When a hidden setting differs from its default, a notice names it, with a **Show in Advanced** button.
+2. The camera and output: **Output Picture** (`$HIP/render/$HIPNAME.$OS.$F4.exr` by default), camera, resolution (up to 16384 pixels a side; render larger images in husk tiles) and pixel aspect ratio.
+3. The main settings: **Render Mode**, **Path Tracer Samples** or **Warmup Frames**, **Unreal Tonemapper** and **Exposure Compensation**. See [Above the tabs](../reference/render-settings/index.md#above-the-tabs).
+4. One tab per Unreal Engine category, in the order of UE's Details panel:
+
+| Tab | Holds |
 | --- | --- |
-| Rendering | Anti-Aliasing (method, screen percentage), Path Tracing (UE's Path Tracing category with its Lighting Components, and the Path Tracer console variables), View Mode ([debug view](../rendering/debug-views.md)), Geometry, Materials |
-| Lens | Bloom (Gaussian or Convolution, after the method), Exposure, Chromatic Aberration, Dirt Mask, Camera, Local Exposure, Lens Flares, Image Effects, Depth of Field |
-| Color Grading | Temperature, Global, Shadows, Midtones, Highlights, Misc, Film, Film Grain |
-| Lighting | Global Illumination (Lumen; Lumen Global Illumination with Hit Lighting and hardware ray tracing), Reflections (Lumen Reflections or Screen Space Reflections, after the method), Shadows, Dome and Viewer Lights |
-| Rendering Features | Post-process materials, User Flags; MegaLights, Ambient Cubemap, Ambient Occlusion, Ray Tracing Ambient Occlusion, Motion Blur (hdUE's sub-frame motion blur and UE's velocity blur), Translucency |
-| Engine Quality | Scalability, Nanite, Ray Tracing |
+| [Rendering](../reference/render-settings/rendering.md) | Anti-aliasing and screen percentage, Path Tracing, View Mode, Geometry, Materials |
+| [Lens](../reference/render-settings/lens.md) | Bloom, Exposure, Chromatic Aberration, Dirt Mask, Camera, Local Exposure, Lens Flares, Image Effects, Depth of Field |
+| [Color Grading](../reference/render-settings/color-grading.md) | Temperature, Global, Shadows, Midtones, Highlights, Misc, Film, Film Grain |
+| [Lighting](../reference/render-settings/lighting.md) | Global Illumination (Lumen), Reflections, Shadows, Dome and Viewer Lights |
+| [Fog](../reference/render-settings/fog.md) | Exponential Height Fog and Volumetric Fog |
+| [Sky](../reference/render-settings/sky.md) | Sky Atmosphere and Volumetric Cloud |
+| [Rendering Features](../reference/render-settings/rendering-features.md) | Post-process materials, MegaLights, Ambient Occlusion, Motion Blur, Translucency |
+| Image Output | Render products and one toggle per [AOV](../output/aovs.md#aovs-in-houdini) |
+| [Engine Quality](../reference/render-settings/engine-quality.md) | Scalability, Nanite, Ray Tracing |
 
-Each setting is in one place: Lumen's in Global Illumination and Reflections, motion blur in Rendering Features, the Path Tracer's in Rendering. Toggles that switch a section on (Depth of Field, MegaLights, Ray Tracing Ambient Occlusion, Motion Blur) sit in the section's header, as Karma's Motion Blur. The UE post-process properties (UE's own categories, names, ranges and order) and the console variables are generated from the engine source by `scripts/generate_render_settings.py`, with hdUE's own settings from its `HDUE` list. Ranges lock where UE clamps a property (`ClampMin`/`ClampMax`), and are only the slider's where UE gives a slider range (`UIMin`/`UIMax`); hdUE's own lock what the delegate clamps (samples from 1 to 65536, warmup frames from 1). Settings for one render mode only are hidden in the other: the Path Tracer's in realtime; Lumen, Global Illumination, Reflections, Shadows, MegaLights, ambient occlusion, the ambient cubemap, translucency, UE's velocity motion blur, the anti-aliasing method, NVIDIA DLSS and its Ray Reconstruction, the debug view, the scalability groups the Path Tracer ignores (anti-aliasing, shadows, global illumination, reflections) and the Nanite raster settings with the Path Tracer. Within shared sections, the properties UE's Path Tracer does not read are hidden with it too: the depth of field's minimum f-stop, blade count, depth blur, hair depth and barrel (it reads the focus distance, aperture, sensor, squeeze and Petzval terms), the height fog's inscattering, opacity and distance settings (it reads only Volumetric Fog's density, falloff, albedo, phase, extinction and distance), the sky atmosphere's art direction, multi-scattering factor and sample counts, and the clouds' sample counts, shadow and occlusion settings. UE's color grading values (`FVector4`, edited with UE's color wheels) are RGBA color pickers authored as `float4`, and component properties get UE's `UIMin`/`UIMax` sliders and `ClampMin`/`ClampMax` locks as post-process properties do. A struct property shows its fields, as UE's Details panel expands it: the height fog's Second Fog Data is Second Fog Density, Height Falloff and Height Offset (`unreal:heightFog:SecondFogData:FogDensity`, ...; the backend sets the field by reflection, and a `float3` `unreal:heightFog:SecondFogData` still sets all three). The Unreal tonemapper's effects are disabled while it is off, and the Translucency settings show for their translucency method only, as in UE. A hidden setting keeps its value, but a Render Settings LOP does not author it. The viewport's Display Options get the interactive subset (`HdUnrealEngine_Viewport.ds`). Light LOPs get one for the per-light `unreal:*` settings (`HdUnrealEngine_Light.ds`), Render Geometry Settings LOPs one for the per-prim `unreal:asset` ([native assets](../materials.md#cooked-native-assets)), `primvars:unreal:groom` ([hair](../geometry/meshes.md)) and `unreal:surface:wet:*` ([wet surface](../wet-surface-layer.md#usd-authoring-contract)) attributes (`HdUnrealEngine_Geometry.ds`). As with Karma's properties, each control defaults to not authoring. `hdue_houdini.set_render_setting()` edits the displayed chain's Render Settings or hdUE Render Settings LOP, adding one when there is none. See [render settings](../rendering/render-settings.md).
+Settings that one render mode ignores are hidden in that mode. For example, Lumen and Shadows are hidden with the Path Tracer, and **Path Tracer Samples** is hidden in Realtime. A hidden setting keeps its value.
 
-**hdUE Render Settings** (TAB menu > hdUE > Rendering, with the render products and vars; hdUE's scene LOPs are in hdUE > Visual Effects, as UE's Place Actors panel files fog, sky, clouds, post-processing and decals; `integrations/houdini/otls/hdue_rendersettings.hda`) is the counterpart of Karma Render Settings: one LOP with the render settings prim path, the **Output Picture** (`$HIP/render/$HIPNAME.$OS.$F4.exr` by default; above the camera, as in Karma Render Settings), camera, resolution (up to 16384 pixels a side, UE's largest render target on D3D12; larger images render in husk tiles) and pixel aspect ratio above the same tabs, plus an **Image Output** tab before Engine Quality with the render products to render and a toggle per [AOV](../output/aovs.md#aovs-in-houdini) hdUE renders. A **Show: Essential | Advanced** button strip at the top, as Redshift's, chooses how much it shows; in Essential, a notice under it counts and names the changed settings (not at their default) that only Advanced shows, e.g. "1 changed setting hidden in Advanced: Intensity (Lens > Bloom)", with a **Show in Advanced** button (it is evaluated when the parameter pane refreshes and authors nothing). Essential is what UE's editor shows by default: UE's properties without `AdvancedDisplay` (which its Details panel keeps behind each group's Advanced expander), the console variables UE shows outside the console (the Engine Scalability Settings groups, the screen percentage, and the Project Settings ones: anti-aliasing method, Lumen hardware ray tracing, shadow map method, ray traced shadows), and hdUE's main settings (render mode, samples, warmup, tonemapper, Lumen, motion blur, output, camera, resolution, AOVs). Advanced adds the rest; Essential also hides the tonemapper's effects while it is off. The strip only changes what the asset shows: what Essential hides is still authored (its internal Render Settings LOP has no strip), while settings hidden by the render mode, as in a Render Settings LOP, are not. Its second input, **Additional Render Vars**, works as Karma Render Settings': with **Import Render Vars From Second Input** (Image Output > AOVs) on, the render vars of the second input (hdUE Standard Render Vars, Render Var LOPs; its other prims are deactivated) are merged in and appended to the built-in product's ordered vars, after its own; a var at a built-in var's path is the stronger one, as in Karma's merge. Inside, the beauty render var `C` and one render var per enabled AOV under `/Render/Products/Vars` and a Render Product (`/Render/Products/renderproduct`, whose `productName` is the output picture) precede a Render Settings LOP, which carries the hdUE settings as spare parameters referencing the asset's (so it authors them also where the delegate is not registered). `scripts/build_render_settings_hda.py` builds the asset from the `.ds`: run it after `generate_render_settings.py` or any edit of the `.ds`. The three render LOPs are named as Karma's (`karmarendersettings`, `karmastandardrendervars`, `karmarenderproducts`), in the `hdue` namespace and versioned: `hdue::hduerendersettings::1.0`, `hdue::hduestandardrendervars::1.0`, `hdue::hduerenderproducts::1.0`; bump the version when a parameter is removed or renamed. `integrations/houdini/OPcustomize` aliases their earlier names (the unversioned `hdue_rendersettings`, ... and `hdue::rendersettings::1.0`, ...), so scenes saved with those load these types with their values.
+### Render Settings LOP
 
-As with Karma, render vars and products can also be authored upstream, by two more LOPs the same script builds (TAB menu > hdUE > Rendering), made of standard LOPs only:
+Houdini's own **Render Settings** LOP gets the same settings on an **Unreal Engine** tab. As with Karma's properties, each setting starts unauthored: set its control menu to author it.
 
-- **hdUE Standard Render Vars** (`hdue_standardrendervars.hda`), the counterpart of Karma Standard Render Vars: a toggle per output hdUE renders (beauty `C`, and the [AOVs](../output/aovs.md#aovs-in-houdini) below; beauty, depth and normal on by default) with its husk precision (16 or 32 bit; IDs are `int`), under a parent path (`/Render/Products/Vars`).
-- **hdUE Render Products** (`hdue_renderproducts.hda`), the counterpart of Karma Render Products: a list of render products under `/Render/Products`, each with a name, an output image and the render vars it writes (by default `/Render/Products/Vars/*`), and a **Default Camera** for all of them (empty: the render settings' camera). As in Karma's render LOPs, camera parameters list the stage's cameras and prim path parameters offer the prim picker and path menu.
+### Viewport Display Options
 
-The same script builds **hdUE Local Fog Volume** (`hdue_localfogvolume.hda`, `hdue::hduelocalfogvolume::2.0`): an `UnrealLocalFogVolume` prim, UE's Local Fog Volume, with a guide sphere showing its extent (see [Fog](../environment/fog.md)). Like Houdini's prim LOPs (Karma Sky Atmosphere, Sphere), it creates or edits its prim: **Action** chooses Create, Edit or Force Edit, Edit mode changes the `UnrealLocalFogVolume` prims matched by **Primitives**, and each property has a control menu (Set or Create, Set If Exists, Block, Do Nothing, ...). As on Houdini's prim LOPs, the controls start at Set or Create in Edit mode too, so an Edit node authors every property: **Initialize Parameters** sets them to Do Nothing and reads the prims' property values (not their transform, as Sphere's). The transform keeps Sphere's identity defaults, so an Edit node that leaves it alone does not move the prim; Uniform Scale, the radius, is 1 by default (1.0's radius was 5). Inside, its parameters drive an Edit Properties LOP, so these modes are Houdini's own; the guide is added in Create mode only. Version 1.0, which only created the prim, stays loadable for saved scenes (`hdue_localfogvolume_legacy.hda`, hidden from the TAB menu by `OPcustomize`). **hdUE Post Process Volume** (`hdue_postprocessvolume.hda`, `hdue::hduepostprocessvolume::1.0`) is built the same way for an `UnrealPostProcessVolume` prim ([post-process volumes](../rendering/post-processing.md#post-process-volumes)): UE's volume properties, then the render settings' post-process tabs, each setting's control at Do Nothing until turned on. **hdUE Height Fog**, **hdUE Sky Atmosphere** and **hdUE Volumetric Cloud** (`hdue_heightfog.hda`, `hdue_skyatmosphere.hda`, `hdue_volumetriccloud.hda`) place UE's scene components as prims ([scene prims](../environment/fog.md#scene-prims-for-fog-sky-and-clouds)), with the render settings' Fog and Sky properties. **hdUE Decal** (`hdue_decal.hda`) places UE's decal ([decals](../rendering/post-processing.md#decals)). `build_prim_lop` builds such a LOP for any generated prim type ([node plan](https://github.com/healkeiser/HdUnrealEngine/blob/main/docs/audit/node-plan.md)). The global fog, UE's Exponential Height Fog with Volumetric Fog, is on hdUE Render Settings' Fog tab.
+The viewport's Display Options get an **Unreal Engine** tab with the settings you change while working: Render Mode, Warmup Frames, Path Tracer Samples, Debug View, Motion Blur, Lumen, Light Unlit Scenes, Viewer Light Intensity, Subdivision Level, Unreal Tonemapper and the Engine Quality group (scalability, anti-aliasing, DLSS, screen percentage, hardware ray tracing, Virtual Shadow Maps).
 
-In hdUE Render Settings' Image Output tab, **Render Products** chooses the built-in product (the default, unchanged when the node is used alone), the upstream products (`/Render/** & %type:RenderProduct` by default), or both; **Import Upstream Render Vars** adds the upstream render vars to the built-in product, as Karma's *Import Render Vars From Second Input* does (hdUE takes them from the first input). Built-in vars share `/Render/Products/Vars` with hdUE Standard Render Vars' default, so an enabled built-in AOV replaces the upstream var of the same name (its format included). husk writes every product of the render settings.
+!!! note
+    Settings named `unreal:cvar:*` are Unreal Engine console variables. They apply to the whole Houdini process, so they change every hdUE render in the session until you change them back.
 
-Color and real UE depth share a frame ID and generation. Solaris receives linear axial depth in stage units with `depthstyle: linear`. Solaris tints and outlines the selected prims from hdUE's `primId` and `instanceId` AOVs (`needsselection`), and a click in the viewport selects the prim under it from the same AOVs: meshes, implicit shapes, point instancers, points and curves (`tests/houdini/selection.usda`), from the free view or through a camera. Both appear once the view settles (see Selection IDs below). The current target is one active hdUE viewport.
+### Light and geometry settings
 
-## Unreal menu
+Light LOPs get an **Unreal Engine** tab for the per-light `unreal:*` properties ([Light properties](../reference/light-properties.md)). Render Geometry Settings LOPs get one for per-prim settings: a cooked native UE asset, hair, and wet surfaces.
 
-The package adds an **Unreal** menu to Houdini's main menu bar (`integrations/houdini/MainMenuCommon.xml`, read from `HOUDINI_PATH` at startup; the actions are in `hdue_menu.py`):
+## The Unreal menu
 
-- **Use Unreal Engine in the Viewport** selects hdUE in the Scene Viewer, as picking it in the renderer menu does.
-- **Render Mode** > **Realtime** or **Path Traced** sets `unreal:renderMode` on the displayed chain's Render Settings LOP, adding an hdUE Render Settings LOP after the displayed LOP when there is none.
-- **Create hdUE Render Settings** adds an hdUE Render Settings LOP after the displayed LOP and displays it.
-- **Caches** shows the size of hdUE's disk caches, opens their folders and clears them (each one, or all):
+The package adds an **Unreal** menu to Houdini's main menu bar, before **Windows**.
 
-  | Cache | Folder | Written by |
-  | --- | --- | --- |
-  | Texture | `%LOCALAPPDATA%\hdUE\TextureCache` | block-compressed textures (`Scene.cpp`) |
-  | Virtual texture | `HDUE_VIRTUAL_TEXTURE_CACHE`, else `%LOCALAPPDATA%\hdUE\VirtualTextureCache` | UDIM virtual texture chunks and manifests (`VirtualTextureBuild.cpp`) |
-  | Nanite | UE's `Saved\NaniteCache` (under `HDUE_USER_DIR`, else the runtime project) | Nanite builds (`Scene.cpp`) |
-  | OCIO texture | `%TEMP%\hdue_ocio` | OCIO-converted textures (`color_management.cpp`) |
+| Entry | What it does |
+| --- | --- |
+| **Use Unreal Engine in the Viewport** | Picks Unreal Engine in the Scene Viewer, as the renderer menu does. |
+| **Render Mode > Realtime** / **Path Traced** | Sets **Render Mode** on the first Render Settings or hdUE Render Settings LOP above the displayed LOP. If there is none, adds an hdUE Render Settings LOP after the displayed LOP. |
+| **Create hdUE Render Settings** | Adds an hdUE Render Settings LOP after the displayed LOP and displays it. It takes the camera, render mode and samples from the stage's existing render settings, if any. |
+| **Caches > Show Cache Sizes** | Lists each hdUE disk cache with its size, file count and folder. |
+| **Caches > *cache* > Open Folder** | Opens that cache's folder. |
+| **Caches > *cache* > Clear...** | Asks, then deletes the cache's contents. |
+| **Caches > Clear All hdUE Caches...** | Asks, then deletes the contents of every cache. |
+| **Open Unreal Engine Logs** | Opens the folder of Unreal Engine's logs. |
+| **Documentation** | Opens this guide's Houdini pages in your browser. |
 
-  Each process removes entries unused for a week when it first uses a cache; clearing one here reclaims the space at once.
+### Caches
 
-  Clearing asks first, with each folder and its size, and keeps the folders. It is refused once UE runs in the session (after hdUE was selected in a viewport), since UE streams virtual textures from their cache files for as long as it runs: restart Houdini and clear before selecting hdUE. Files another process holds open (husk, another Houdini) are kept and listed.
-- **Open Unreal Engine Logs** opens UE's `Saved\Logs` folder.
-- **Documentation** opens this page on GitHub.
+hdUE keeps four disk caches so a scene's second load is faster. Each process removes entries unused for a week. Clear a cache to reclaim its space at once, or after a problem you suspect comes from stale cache data.
 
-## Performance
+| Cache | Folder | Holds |
+| --- | --- | --- |
+| Texture | `%LOCALAPPDATA%\hdUE\TextureCache` | Block-compressed textures |
+| Virtual texture | `HDUE_VIRTUAL_TEXTURE_CACHE`, else `%LOCALAPPDATA%\hdUE\VirtualTextureCache` | UDIM virtual textures |
+| Nanite | `Saved\NaniteCache` under `HDUE_USER_DIR` | [Nanite](../geometry/nanite.md) mesh builds |
+| OCIO texture | `%TEMP%\hdue_ocio` | Textures converted to the OCIO working space |
 
-In the Houdini UI, UE runs on its own thread and ticks continuously; the viewport only posts camera and scene changes and picks up finished frames, so a slow UE tick never blocks Houdini. The host redraws the viewport when a frame arrives.
+Clearing is refused once Unreal Engine has started in the session, because it reads the cache files while it runs. Restart Houdini and clear before you pick Unreal Engine. Files another process holds open (husk, another Houdini) are kept and listed.
 
-- **GPU frames.** Houdini's OpenGL viewport takes UE's frames without leaving the GPU (`include/hdue/bridge.h`, `src/hydra/gpu_frames.cpp`). UE writes each draw into a ring of three shared D3D12 textures (RGBA16F colour with straight alpha and the camera exposure applied, R32F linear depth in stage units, bottom row first) and signals a shared fence; on each redraw, GL waits for that fence on the GPU, copies the newest frame into HgiGL textures and hands them to Houdini's `HdxAovInputTask`, so nothing is read back or uploaded. A second fence tells UE when GL has finished reading a slot. The CPU render buffers then receive only converged frames (for `Map()`: the Python viewer, scripts), and once they hold the converged frame Houdini composites them instead: its selection highlight lines the CPU `primId` buffer up with a CPU colour buffer only, and looking through a camera (render buffers of another size than the viewport) it drew no highlight over GPU frames. Motion blur and an OCIO config whose `scene_linear` is not linear Rec.709 keep the CPU path, as do husk, usdview and Live Render. It needs the GL driver's `GL_EXT_memory_object_win32` and `GL_EXT_semaphore_win32` and Houdini's GL on UE's GPU; otherwise, or with `HDUE_GPU_FRAMES=0`, frames are read back as before.
+## Viewport speed
 
-- **Image resolution.** Display Options > Render > Image Resolution set to *Render Settings Prim* renders at the render settings' resolution; the viewport size is cheaper while navigating.
-- **Selection IDs.** Solaris asks for `primId` and `instanceId` for its selection highlight. Rendering them costs two raster renders per view (and two render-state rebuilds of the meshes drawn with a cooked native material, which has no ID switch), so the viewport skips them while you tumble, scrub or play and renders them once the view settles, when the highlight appears. `unreal:viewportIdAovs = 0` skips them always: selection then works from the Scene Graph Tree but is not highlighted in the hdUE image.
-- **Loading.** Textures decode, mip and compress on worker threads in the background, as UE's editor compiles textures: a material draws its inputs' constant values until each texture is built, then the texture (the viewport's progress shows the files done, the virtual textures built and read from the cache, and the time left), and the frame converges once the last one is in. A cold virtual texture cache no longer holds the upload: NVIDIA's Da Vinci Workshop's 1,196 texture files took 208 s to build, during which Houdini's UI waited. Meshes are assembled on all cores. Meshes are uploaded as static meshes (cached draw commands and static ray-tracing geometry), their render data built on all cores, and are swapped for Nanite meshes in the background, one per tick. A material edited in place into or out of translucency re-uploads the static meshes drawn with it, since translucent meshes are built without Nanite (UE's Nanite proxy re-checks its materials' blend modes when they change). Identical meshes share one background build, which goes on while copies are removed or re-added and is dropped once none is left; closing Houdini waits for the builds that are running, as UE finishes its running mesh builds at exit. Meshes with wet surface effects stay dynamic.
-- **Re-created prims.** A prim deleted and re-created with identical data (Houdini rebuilds the Hydra scene when its LOP chain changes) is not re-uploaded.
-- `HDUE_TRACE_TIMING=1` (with `HDUE_TRACE_FILE=<path>`, since Houdini's UI has no visible stderr) logs where each frame's and each scene upload's time goes.
+While you tumble, scrub or play, the viewport renders a cheaper image, then refines it once the view is still. In the Path Tracer, it renders 8 samples per pixel while you move:
 
-`HDUE_UE_ARGS` appends arguments to UE's command line, for example `-csvGpuStats -csvCaptureFrames=600` for a CSV profile in `HdUEBackend/Saved/Profiling`.
+<div class="hdue-figure" data-figure="viewport-interactive-samples"></div>
 
-## Development launcher
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| The Realtime image is soft while you move, then sharpens. | **Lower Resolution While Moving** renders at **Moving Screen Percentage** (50%) until 250 ms after the last change. | Raise [Moving Screen Percentage](../reference/render-settings/rendering.md#unreal-cvar-r-hdue-interactivescreenpercentage), or turn off [Lower Resolution While Moving](../reference/render-settings/rendering.md#unreal-cvar-r-hdue-interactiveresolution). |
+| The Path Tracer is noisy while you move. | It renders 8 samples per pixel until the view is still. | None needed: it refines to **Path Tracer Samples** once you stop. |
+| The selection outline appears late or flickers. | The outline needs two extra ID renders per view, which run only once the view is still. | Set `int unreal:viewportIdAovs = 0` on the render settings to skip them. Selection then works from the Scene Graph Tree only, without an outline. |
+| Realtime is slow at every frame. | Lumen, shadows and reflections run at Epic quality. | Lower the [Engine Quality](../reference/render-settings/engine-quality.md#unreal-cvar-sg-globalilluminationquality) groups (Shadows, Global Illumination, Reflections) from Epic (3) to High (2), or lower **Screen Percentage**. |
+| The viewport renders far more pixels than it shows. | Display Options > Render > Image Resolution is set to the render settings' resolution. | Use the viewport's size while you work. |
+| Materials first show flat colours, then their textures. | Textures decode and compress in the background. The progress line under the viewport counts the files done and the time left. | Wait; the second load of a scene reads them from the texture cache. |
+| Meshes appear a moment after the scene loads. | Meshes upload as standard meshes first, then are swapped for [Nanite](../geometry/nanite.md) meshes in the background. | Wait; Nanite builds are cached on disk, so the next session skips most of them. |
+| The viewport shows a black or stale image while husk renders fine. | Frames pass from Unreal Engine to Houdini's OpenGL viewport on the GPU, which needs the GPU driver's shared-memory extensions. | Set `HDUE_GPU_FRAMES=0` before starting Houdini to copy frames through the CPU instead. |
 
-From a source checkout, `Launch-Houdini.ps1` registers `Unreal Engine` for its process without editing the user's Houdini environment file:
+To measure where a frame's time goes, set `HDUE_TRACE_TIMING=1` and `HDUE_TRACE_FILE=<path>` before starting Houdini ([Environment variables](../getting-started/environment-variables.md)).
 
-```powershell
-.\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local/runtime.json -SetDefault
-.\scripts\Launch-Houdini.ps1 -InputUsd samples/smoke.usda -RuntimeConfig .local\runtime-houdini.json
-.\scripts\Test-Houdini.ps1
-```
+## Unreal Engine and Karma
 
-`Test-Houdini.ps1` also runs `Launch-Houdini.ps1 -TestKind shared-builds -InputUsd samples\smoke.usda`, which edits copies of identical meshes while their shared background build runs and while it waits for memory. First 40 dense meshes, ten copies of four: copies removed, every copy of a key removed, a copy rebound to a translucent material and copies re-added while the builds run. Then, with `unreal:cvar:r:HdUE:MeshBuildMaxMemoryUsage` at 1 GB, one mesh whose build is estimated over that runs alone, and the same edits go to the copies of two keys whose builds are queued behind it. The backend logs `hdUE conversions done: ...` once its builds are done: builds swapped in, launched builds dropped or shrunk by edits, the same for queued builds, generated meshes not drawing their converted mesh, and memory still reserved. Last, a material bound to the ten copies of one key has its opacity edited in place: the copies are uploaded again when it turns translucent (their mesh without Nanite) and again when it turns opaque, and not when only its colour changes. The test requires the edits to have hit running and then queued builds, every mesh converted, no memory reserved and no ensure or error in the UE log. It then closes Houdini while new builds run.
-
-`Launch-Houdini.ps1 -TestKind heavy -InputUsd <stage>` is for large scenes and is not part of `Test-Houdini.ps1`: render purpose, the first converged frame (every background build swapped in), then the camera named by `HDUE_TEST_CAMERA` until it converges again, with the times in `heavy.json`. Run it inside a Windows job memory limit and measure the process from outside; see [architecture](../architecture.md#memory-gpu-and-disk).
-
-`.local/runtime.json` names the staged runtime (`backend_dll`, `runtime_project`, both under `out/runtime/Windows/HdUEBackend`). The update script places the current depth-capable DLL under a content-hash filename and refreshes the runtime's unhashed `HdUEBackend.dll` (what `.local/runtime.json`, usdview and `Test-Backend.ps1` load; it warns if a process holds it), so every profile of the runtime passes the delegate's ABI check; `-SetDefault` records an ignored fallback profile. An explicit `-RuntimeConfig`, `HDUE_RUNTIME_CONFIG`, or the local `runtime_config` key takes priority over that fallback. Restart Houdini to change runtimes.
-
-The launcher creates a source layer, an `hdUE_settings` subnet and an hdUE Render Settings LOP (`hdUE_render_settings`, `/Render/rendersettings`, which the stage's `renderSettingsPrimPath` names). Otherwise only standard LOPs are created: `hdUE_settings` is a pass-through subnet that carries viewport-only controls (mask preview; an older scene's automatic Substrate preparation toggle, now a render setting), so the scene stays the input's USD. What changes the image is a render setting, read alike by the viewport and husk: render mode and samples, and the cooked MaterialX and Substrate libraries (**Materials** section of the Rendering tab, `unreal:materialxLibrary` and `unreal:substrateLibrary`; unset, the runtime profile's). A Cooked MaterialX library field on an older `hdUE_settings` subnet is still read when the render setting is unset. Units and up axis are not normalized: the delegate converts from the stage's `metersPerUnit` and `upAxis` (Houdini passes `stageMetersPerUnit`; the up axis comes from the host in the viewport and from husk's USD file in husk), so Z-up and centimetre scenes render as authored. If an input lost its metadata during composition, set it with a Configure Layer LOP.
-
-For an existing LOP output, replace `YOUR_OUTPUT` with a node in the current network and run this in Houdini's Python Shell:
-
-```python
-import hdefereval, hdue_houdini
-
-def connect_hdue():
-    node = hdue_houdini.settings_node(hou.node('/stage/YOUR_OUTPUT'))
-    node.setDisplayFlag(True)
-    node.setCurrent(True, clear_all_selected=True)
-    hdue_houdini.activate()
-
-hdefereval.execute_deferred(connect_hdue)
-```
-
-Whatever LOP is displayed, the host adds nothing to the graph. Instanceable references reach Hydra as native instances (instanced static meshes in UE). What the delegate cannot read from USD by itself the host supplies from outside the graph, on each change of the displayed stage: images for `op:`/`opdef:` texture paths (see below). Prims with `unreal:asset` (see [native assets](../materials.md)) need no host: the delegate makes their bounds meshes itself, as in husk. Instances stay instances, except around what the host maps by stage path, since a prototype's Hydra paths are not its stage paths: `unreal:surface:*` attributes, and MaterialX materials while a cooked MaterialX or Substrate library is set. Those instances are made non-instanceable in the LOP network's viewport overrides only, Houdini's session-only layer over the viewed stage. They are removed when switching to another renderer or closing the host, and are not part of what husk or a USD ROP sees.
-
-`Test-HoudiniReferences.ps1` checks a reference added downstream of the hdUE settings: an instanceable Reference LOP of `samples/materialx/showcase_solaris.usda` over the lighting sample, its MaterialX materials mapped to the cooked library's native assets with their textures, and a transform edit that must move the geometry in the depth image and change the realtime and Path Tracer frames. It needs the cooked library (default `out/materialx/library.json`) staged into the runtime:
-
-```powershell
-.\scripts\Import-MaterialX.ps1 -Source samples\materialx\standard_surface.mtlx,samples\materialx\open_pbr_surface.mtlx -OutputDirectory out\materialx
-.\scripts\Stage-Runtime.ps1
-.\scripts\Test-HoudiniReferences.ps1
-```
+- The renderer settings live on the same render settings prim as Karma's, so a scene can carry both.
+- hdUE's LOPs mirror Karma's: hdUE Render Settings, hdUE Standard Render Vars and hdUE Render Products work like their Karma counterparts.

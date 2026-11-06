@@ -1,0 +1,31 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogScatteringDistribution = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.2 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogScatteringDistribution = 0.2"
+    ]
+   }
+  },
+  {
+   "caption": "0.9",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogScatteringDistribution = 0.9"
+    ]
+   }
+  }
+ ]
+}

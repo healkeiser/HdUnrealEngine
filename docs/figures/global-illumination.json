@@ -1,14 +1,10 @@
 {
- "scene": "cornell/cornell.usda",
- "display": "linear",
- "base": {
-  "/Render/Settings": [
-   "token unreal:renderMode = \"realtime\""
-  ]
- },
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
  "values": [
   {
-   "caption": "No global illumination",
+   "caption": "Realtime, Method None",
    "set": {
     "/Render/Settings": [
      "token unreal:postProcess:DynamicGlobalIlluminationMethod = \"EDynamicGlobalIlluminationMethod::None\""
@@ -16,8 +12,16 @@
    }
   },
   {
-   "caption": "Lumen",
+   "caption": "Realtime, Method Lumen (default)",
    "set": {}
+  },
+  {
+   "caption": "Path Tracer, 256 samples",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
   }
  ]
 }

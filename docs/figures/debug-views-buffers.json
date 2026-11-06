@@ -1,0 +1,31 @@
+{
+ "scene": "docs/room.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Buffer: Base Color",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"buffer:BaseColor\""
+    ]
+   }
+  },
+  {
+   "caption": "Buffer: World Normal",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"buffer:WorldNormal\""
+    ]
+   }
+  },
+  {
+   "caption": "Buffer: Roughness",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"buffer:Roughness\""
+    ]
+   }
+  }
+ ]
+}

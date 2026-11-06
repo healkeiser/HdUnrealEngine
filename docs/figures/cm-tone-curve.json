@@ -1,0 +1,27 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Off (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:disableToneCurve = 0"
+    ]
+   }
+  },
+  {
+   "caption": "On",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:disableToneCurve = 1"
+    ]
+   }
+  }
+ ]
+}
