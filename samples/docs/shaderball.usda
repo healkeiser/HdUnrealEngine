@@ -1,0 +1,115 @@
+#usda 1.0
+(
+    doc = """Shader ball: SideFX's shader ball (1 m) on the checker floor under the sky and a soft key light. The guide's material figures override /scene/Looks/ball/S."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./stage.usda@]
+    # Houdini's sample assets: ${HFS} is this default unless the root layer opening this scene sets it
+    # (scripts/render_docs_images.py sets it to $HFS).
+    expressionVariables = {
+        string HFS = "C:/Program Files/Side Effects Software/Houdini 22.0.368"
+    }
+)
+
+over "scene"
+{
+    over "Looks"
+    {
+        def Material "ball"
+        {
+            token outputs:surface.connect = </scene/Looks/ball/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.8, 0.25, 0.08)
+                float inputs:roughness = 0.3
+                float inputs:metallic = 0
+                token outputs:surface
+            }
+        }
+        def Material "stand"
+        {
+            token outputs:surface.connect = </scene/Looks/stand/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.05, 0.05, 0.05)
+                float inputs:roughness = 0.4
+                token outputs:surface
+            }
+        }
+    }
+
+    def Xform "ball" (
+        prepend references = @`"${HFS}/houdini/usd/assets/shaderball/shaderball.usd"`@
+    )
+    {
+        # SideFX's shader ball, 1 m tall; the figures' material goes on its ball, the stand keeps SideFX's.
+        double3 xformOp:translate = (0, 0, 0)
+        float3 xformOp:rotateXYZ = (0, -60, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        # SideFX's MaterialX materials need preparing for UE; the demo binds UsdPreviewSurface ones.
+        over "Geometry" (prepend apiSchemas = ["MaterialBindingAPI"])
+        {
+            rel material:binding = </scene/Looks/stand>
+
+            over "PreviewSurface" (prepend apiSchemas = ["MaterialBindingAPI"])
+            {
+                rel material:binding = </scene/Looks/ball>
+            }
+
+            over "Calibration"
+            {
+                over "Stand" (prepend apiSchemas = ["MaterialBindingAPI"])
+                {
+                    rel material:binding = </scene/Looks/stand>
+                }
+                over "Core" (prepend apiSchemas = ["MaterialBindingAPI"])
+                {
+                    rel material:binding = </scene/Looks/stand>
+                }
+                over "SubsurfaceBars" (prepend apiSchemas = ["MaterialBindingAPI"])
+                {
+                    rel material:binding = </scene/Looks/stand>
+                }
+                over "EmissiveCore"
+                {
+                    over "CoreFace" (prepend apiSchemas = ["MaterialBindingAPI"])
+                    {
+                        rel material:binding = </scene/Looks/stand>
+                    }
+                }
+            }
+        }
+    }
+
+    def RectLight "key"
+    {
+        float inputs:width = 1.5
+        float inputs:height = 1.5
+        float inputs:intensity = 1
+        float inputs:exposure = 4
+        color3f inputs:color = (1, 1, 1)
+        double3 xformOp:translate = (-2.5, 3, 2.5)
+        float3 xformOp:rotateXYZ = (-35.264, -45.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "camera"
+    {
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        float2 clippingRange = (0.05, 1000)
+        double3 xformOp:translate = (0, 0.9, 4.6)
+        float3 xformOp:rotateXYZ = (-4.97, 0.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}

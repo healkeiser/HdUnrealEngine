@@ -1,0 +1,27 @@
+{
+ "scene": "cornell/variants/motion_blur.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Motion blur off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:motionBlur = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Motion blur on",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:motionBlur = 1"
+    ]
+   }
+  }
+ ]
+}

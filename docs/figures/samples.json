@@ -1,0 +1,51 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "4 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 4"
+    ]
+   }
+  },
+  {
+   "caption": "16 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 16"
+    ]
+   }
+  },
+  {
+   "caption": "64 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 64"
+    ]
+   }
+  },
+  {
+   "caption": "256 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 256"
+    ]
+   }
+  },
+  {
+   "caption": "1024 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 1024"
+    ]
+   }
+  }
+ ]
+}

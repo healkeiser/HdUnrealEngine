@@ -1,0 +1,23 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "No global illumination",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:DynamicGlobalIlluminationMethod = \"EDynamicGlobalIlluminationMethod::None\""
+    ]
+   }
+  },
+  {
+   "caption": "Lumen",
+   "set": {}
+  }
+ ]
+}

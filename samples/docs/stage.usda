@@ -1,0 +1,100 @@
+#usda 1.0
+(
+    doc = """Shared stage of the user guide's demo scenes: render settings (Realtime, UE tonemapper on, 640 x 360), a 40 m checker floor and a sky dome. Each scene sublayers it."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+)
+def Xform "scene"
+{
+    def Scope "Looks"
+    {
+        def Material "floor"
+        {
+            token outputs:surface.connect = </scene/Looks/floor/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.connect = </scene/Looks/floor/checker.outputs:rgb>
+                float inputs:roughness = 0.6
+                token outputs:surface
+            }
+            def Shader "checker"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @./textures/checker.png@
+                token inputs:sourceColorSpace = "sRGB"
+                float4 inputs:scale = (0.6, 0.6, 0.6, 1)
+                # UsdUVTexture's default wrap (useMetadata) is black outside 0-1.
+                token inputs:wrapS = "repeat"
+                token inputs:wrapT = "repeat"
+                float2 inputs:st.connect = </scene/Looks/floor/st.outputs:result>
+                float3 outputs:rgb
+            }
+            def Shader "st"
+            {
+                uniform token info:id = "UsdPrimvarReader_float2"
+                string inputs:varname = "st"
+                float2 outputs:result
+            }
+        }
+    }
+
+    def Mesh "floor" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        # 40 m square, the checker repeating every 2 m (1 m squares).
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-20, 0, 20), (20, 0, 20), (20, 0, -20), (-20, 0, -20)]
+        normal3f[] normals = [(0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0)] (interpolation = "vertex")
+        texCoord2f[] primvars:st = [(0, 0), (20, 0), (20, 20), (0, 20)] (interpolation = "vertex")
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </scene/Looks/floor>
+    }
+
+    def DomeLight "sky"
+    {
+        # Poly Haven's Kloofendal Misty Morning (Pure Sky), CC0, at 1k.
+        asset inputs:texture:file = @./textures/sky_1k.exr@
+        token inputs:texture:format = "latlong"
+        float inputs:intensity = 1
+        float inputs:exposure = 0
+    }
+}
+
+def Scope "Render"
+{
+    def RenderSettings "Settings"
+    {
+        rel camera = </scene/camera>
+        uniform int2 resolution = (640, 360)
+        rel products = </Render/Product>
+        token unreal:renderMode = "realtime"
+        int unreal:samplesPerPixel = 256
+        int unreal:subdivisionLevel = 2
+        # The images show UE's tone-mapped frame, as UE's editor viewport shows it.
+        bool unreal:tonemapper = 1
+    }
+
+    def RenderProduct "Product"
+    {
+        token productName = "docs.exr"
+        rel orderedVars = [</Render/Vars/color>]
+    }
+
+    def Scope "Vars"
+    {
+        def RenderVar "color"
+        {
+            uniform token dataType = "color4f"
+            uniform string sourceName = "C.*[LO]"
+            uniform token sourceType = "lpe"
+            string driver:parameters:aov:name = "C"
+            token driver:parameters:aov:format = "color4f"
+        }
+    }
+}

@@ -1,0 +1,43 @@
+{
+ "scene": "cornell/variants/subdivision.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Level 0",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:subdivisionLevel = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Level 1",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:subdivisionLevel = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Level 2",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:subdivisionLevel = 2"
+    ]
+   }
+  },
+  {
+   "caption": "Level 3",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:subdivisionLevel = 3"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,113 @@
+#usda 1.0
+(
+    doc = """Light study: a grey sphere and a box on the checker floor, the sky dimmed by 2 stops. One rect key light; the other light types are inactive and the guide's light figures activate them."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./stage.usda@]
+)
+
+over "scene"
+{
+    over "sky"
+    {
+        float inputs:exposure = -2
+    }
+
+    over "Looks"
+    {
+        def Material "grey"
+        {
+            token outputs:surface.connect = </scene/Looks/grey/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+                float inputs:roughness = 0.4
+                token outputs:surface
+            }
+        }
+        def Material "chrome"
+        {
+            token outputs:surface.connect = </scene/Looks/chrome/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.95, 0.95, 0.95)
+                float inputs:metallic = 1
+                float inputs:roughness = 0.05
+                token outputs:surface
+            }
+        }
+    }
+
+    def Sphere "ball" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        double radius = 0.5
+        rel material:binding = </scene/Looks/chrome>
+        double3 xformOp:translate = (-0.7, 0.5, 0)
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Cube "box" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        double size = 1
+        rel material:binding = </scene/Looks/grey>
+        double3 xformOp:translate = (0.7, 0.4, -0.2)
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (0.8, 0.8, 0.8)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def RectLight "key"
+    {
+        float inputs:width = 1
+        float inputs:height = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 4
+        color3f inputs:color = (1, 1, 1)
+        double3 xformOp:translate = (-1.5, 2.5, 1.5)
+        float3 xformOp:rotateXYZ = (-44.711, -45.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def SphereLight "spot" (active = false; prepend apiSchemas = ["ShapingAPI"])
+    {
+        float inputs:radius = 0.05
+        float inputs:intensity = 1
+        float inputs:exposure = 6
+        float inputs:shaping:cone:angle = 25
+        float inputs:shaping:cone:softness = 0.2
+        double3 xformOp:translate = (0, 3, 0.5)
+        float3 xformOp:rotateXYZ = (-80.538, 0.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def DistantLight "sun" (active = false)
+    {
+        float inputs:angle = 0.53
+        # Normalized: intensity is illuminance, not the radiance of the 0.53 degree disk.
+        bool inputs:normalize = 1
+        float inputs:intensity = 1
+        float inputs:exposure = 2
+        double3 xformOp:translate = (0, 0, 0)
+        float3 xformOp:rotateXYZ = (-47.969, 56.31, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "camera"
+    {
+        float focalLength = 40
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        float2 clippingRange = (0.05, 1000)
+        double3 xformOp:translate = (0, 1.2, 3.8)
+        float3 xformOp:rotateXYZ = (-11.889, 0.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}

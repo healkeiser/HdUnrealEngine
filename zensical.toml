@@ -87,6 +87,7 @@ nav = [
   { "Developer" = [
     { "Architecture" = "architecture.md" },
     { "Building from source" = "building.md" },
+    { "Writing the user guide" = "developer/writing-docs.md" },
   ] },
 ]
 
@@ -127,7 +128,7 @@ md_in_html = {}
 tables = {}
 toc = { permalink = true, toc_depth = 3 }
 pymdownx.details = {}
-pymdownx.superfences = {}
+pymdownx.superfences = { custom_fences = [{ name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }] }
 pymdownx.tabbed = { alternate_style = true }
 pymdownx.highlight = { anchor_linenums = true }
 pymdownx.inlinehilite = {}

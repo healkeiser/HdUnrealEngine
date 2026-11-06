@@ -1,0 +1,44 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\"",
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Intensity 0",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomIntensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Intensity 0.675",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomIntensity = 0.675"
+    ]
+   }
+  },
+  {
+   "caption": "Intensity 2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomIntensity = 2"
+    ]
+   }
+  },
+  {
+   "caption": "Intensity 8",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomIntensity = 8"
+    ]
+   }
+  }
+ ]
+}

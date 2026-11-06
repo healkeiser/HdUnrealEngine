@@ -1,16 +1,32 @@
-"""Renders the documentation's setting comparisons with hdUE through husk: one image per value of one setting, on the
-CC0 Cornell box (samples/cornell) and its feature layers, written to docs/images/settings/<figure>/<n>.jpg, and
-docs/images/settings/figures.json (each figure's captions). A page shows a figure with
-<div class="hdue-figure" data-figure="<name>"></div>: docs/assets/hdue.js draws a before/after slider for two
-values and a value scrubber for more.
+r"""Renders the user guide's figures with hdUE through husk: one image per value of a setting, from the scenes in
+samples/ (the demo scenes of samples/docs, the Cornell box), written to docs/images/settings/<figure>/<n>.jpg.
 
-    hython scripts/render_docs_images.py [--only <figure> ...] [--list]
+Each figure is docs/figures/<name>.json:
 
-Each run renders only what it is asked for; commit the images with the page that shows them.
+    {
+     "scene": "docs/shaderball.usda",          # under samples/
+     "display": "tonemapped",                 # or "linear" (a scene without UE's tonemapper: a simple display curve)
+     "base": {"/Render/Settings": ["token unreal:renderMode = \"pathtraced\""]},
+     "values": [
+      {"caption": "0 (default)", "set": {"/scene/Looks/ball/S": ["float inputs:roughness = 0"]}},
+      {"caption": "1", "set": {"/scene/key": ["(active = false)"]}}
+     ]
+    }
+
+"base" and each value's "set" map prim paths to lines authored in an `over` of that prim: property lines, or one
+"(metadata)" line for the prim's metadata. A page shows a figure with <div class="hdue-figure" data-figure="<name>">
+</div>: docs/assets/hdue.js draws a before/after slider for two values and a value scrubber for more, with the
+captions this script collects into docs/images/settings/figures.json.
+
+    hython scripts/render_docs_images.py [--only <figure> ...]     # render figures (default: all)
+    hython scripts/render_docs_images.py --preview docs/room.usda  # render one scene as is, to out/docs-images/
+
+Commit the images with the page that shows them.
 """
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -18,8 +34,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from render_gallery import (  # noqa: E402  (same husk, layers and display as the gallery)
-    CORNELL,
+from render_gallery import (  # noqa: E402  (same husk, pixels and display as the gallery)
     ROOT,
     dev_environment,
     display,
@@ -28,144 +43,58 @@ from render_gallery import (  # noqa: E402  (same husk, layers and display as th
     stage_metadata,
 )
 
+SAMPLES = ROOT / "samples"
+SPECS = ROOT / "docs" / "figures"
 OUT = ROOT / "out" / "docs-images"
 IMAGES = ROOT / "docs" / "images" / "settings"
-SETTINGS = "/Render/Settings"
-CAMERA = "/cornell_box/camera"
-REALTIME = {SETTINGS: ['token unreal:renderMode = "realtime"']}
-TONEMAPPED = {SETTINGS: ["bool unreal:tonemapper = 1"]}
-NO_DENOISER = {
-    SETTINGS: ["bool unreal:postProcess:PathTracingEnableDenoiser = 0"]
-}
 
 
-def path_tracer(samples):
-    return {SETTINGS: [f"int unreal:samplesPerPixel = {samples}"]}
+def figures():
+    return {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted(SPECS.glob("*.json"))
+    }
 
 
-# name: (layer under samples/cornell, base overrides, [(caption, overrides)], tonemapped display).
-# The Cornell box renders with the Path Tracer at 512 spp unless a base or value says otherwise.
-FIGURES = {
-    "render-mode": (
-        "cornell.usda",
-        {},
-        [("Realtime (Lumen)", REALTIME), ("Path Tracer", {})],
-        False,
-    ),
-    "samples": (
-        "cornell.usda",
-        NO_DENOISER,
-        [(f"{n} spp", path_tracer(n)) for n in (4, 16, 64, 256, 1024)],
-        False,
-    ),
-    "denoiser": (
-        "cornell.usda",
-        path_tracer(16),
-        [("Denoiser off", NO_DENOISER), ("Denoiser on (NNEDenoiser)", {})],
-        False,
-    ),
-    "warmup": (
-        "cornell.usda",
-        REALTIME,
-        [
-            (
-                f"{n} warmup frames",
-                {SETTINGS: [f"int unreal:warmupFrames = {n}"]},
-            )
-            for n in (1, 4, 16, 64)
-        ],
-        False,
-    ),
-    "global-illumination": (
-        "cornell.usda",
-        REALTIME,
-        [
-            (
-                "No global illumination",
-                {
-                    SETTINGS: [
-                        'token unreal:postProcess:DynamicGlobalIlluminationMethod = "EDynamicGlobalIlluminationMethod::None"'
-                    ]
-                },
-            ),
-            ("Lumen", {}),
-        ],
-        False,
-    ),
-    "tonemapper": (
-        "cornell.usda",
-        REALTIME,
-        [("Tonemapper off (scene-linear)", {}), ("Tonemapper on", TONEMAPPED)],
-        True,
-    ),
-    "exposure-compensation": (
-        "cornell.usda",
-        {SETTINGS: REALTIME[SETTINGS] + TONEMAPPED[SETTINGS]},
-        [
-            (
-                f"{v:+g} EV",
-                {
-                    SETTINGS: [
-                        f"float unreal:postProcess:AutoExposureBias = {v}"
-                    ]
-                },
-            )
-            for v in (-2, -1, 0, 1, 2)
-        ],
-        True,
-    ),
-    "bloom": (
-        "cornell.usda",
-        {SETTINGS: REALTIME[SETTINGS] + TONEMAPPED[SETTINGS]},
-        [
-            (
-                f"Intensity {v:g}",
-                {SETTINGS: [f"float unreal:postProcess:BloomIntensity = {v}"]},
-            )
-            for v in (0, 0.675, 2, 8)
-        ],
-        True,
-    ),
-    "depth-of-field": (
-        "variants/depth_of_field.usda",
-        REALTIME,
-        [
-            (f"f/{v:g}", {CAMERA: [f"float fStop = {v}"]})
-            for v in (1, 2, 4, 8, 16)
-        ],
-        False,
-    ),
-    "motion-blur": (
-        "variants/motion_blur.usda",
-        REALTIME,
-        [
-            ("Motion blur off", {SETTINGS: ["bool unreal:motionBlur = 0"]}),
-            ("Motion blur on", {SETTINGS: ["bool unreal:motionBlur = 1"]}),
-        ],
-        False,
-    ),
-    "subdivision": (
-        "variants/subdivision.usda",
-        REALTIME,
-        [
-            (f"Level {n}", {SETTINGS: [f"int unreal:subdivisionLevel = {n}"]})
-            for n in (0, 1, 2, 3)
-        ],
-        False,
-    ),
-    "fog-density": (
-        "variants/height_fog.usda",
-        REALTIME,
-        [
-            (
-                f"Density {v:g}",
-                {SETTINGS: [f"float unreal:heightFog:FogDensity = {v}"]},
-            )
-            for v in (0, 0.02, 0.5, 2)
-        ],
-        False,
-    ),
-}
+def overs(overrides):
+    """Nested `over` prims for {prim path: [lines]}; a "(...)" line is the prim's metadata."""
+    tree = {}
+    for path, lines in overrides.items():
+        node = tree
+        for name in path.strip("/").split("/"):
+            node = node.setdefault(name, {})
+        node.setdefault("", []).extend(lines)
+
+    def write(node, indent):
+        lines = node.get("", [])
+        text = "".join(
+            f"{indent}{line}\n" for line in lines if not line.startswith("(")
+        )
+        for name, child in node.items():
+            if name:
+                meta = " ".join(
+                    line for line in child.get("", []) if line.startswith("(")
+                )
+                text += (
+                    f'{indent}over "{name}"{" " + meta if meta else ""}\n{indent}{{\n'
+                    f'{write(child, indent + "    ")}{indent}}}\n'
+                )
+        return text
+
+    return write(tree, "")
+
+
+def root_layer(layer, overrides):
+    """A root layer over `layer` with `overrides`; it sets ${HFS} for scenes that reference Houdini's sample
+    assets (only the root layer's expression variables apply).
+    """
+    hfs = Path(os.environ["HFS"]).as_posix()
+    metadata = stage_metadata(layer)
+    return (
+        f"#usda 1.0\n(\n{metadata}"
+        f'    expressionVariables = {{\n        string HFS = "{hfs}"\n    }}\n'
+        f"    subLayers = [@{layer.as_posix()}@]\n)\n\n" + overs(overrides)
+    )
 
 
 def merge(*overrides):
@@ -176,50 +105,44 @@ def merge(*overrides):
     return out
 
 
-def overs(overrides):
-    """Nested `over` prims for {prim path: [property lines]}."""
-    tree = {}
-    for path, lines in overrides.items():
-        node = tree
-        for name in path.strip("/").split("/"):
-            node = node.setdefault(name, {})
-        node.setdefault("", []).extend(lines)
+def save(exr, target, tonemapped):
+    from PIL import Image
 
-    def write(node, indent):
-        text = "".join(f"{indent}{line}\n" for line in node.get("", []))
-        for name, child in node.items():
-            if name:
-                text += f'{indent}over "{name}"\n{indent}{{\n{write(child, indent + "    ")}{indent}}}\n'
-        return text
-
-    return write(tree, "")
+    image = (display(pixels(exr), tonemapped) * 255 + 0.5).astype(np.uint8)
+    Image.fromarray(image).save(target, quality=90, optimize=True)
 
 
-def render(name):
-    layer_name, base, values, tonemapped = FIGURES[name]
-    layer = CORNELL / layer_name
+def render(name, spec):
+    layer = SAMPLES / spec["scene"]
     work = OUT / name
     work.mkdir(parents=True, exist_ok=True)
     target = IMAGES / name
     if target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True)
-    from PIL import Image
-
-    for index, (caption, override) in enumerate(values):
+    for index, value in enumerate(spec["values"]):
         root = work / f"{index}.usda"
         root.write_text(
-            f"#usda 1.0\n(\n{stage_metadata(layer)}    subLayers = [@{layer.as_posix()}@]\n)\n\n"
-            + overs(merge(base, override)),
+            root_layer(layer, merge(spec.get("base", {}), value["set"])),
             encoding="utf-8",
         )
         exr = work / f"{index}.exr"
         seconds = husk("Unreal Engine", root, exr)
-        image = (display(pixels(exr), tonemapped) * 255 + 0.5).astype(np.uint8)
-        Image.fromarray(image).save(
-            target / f"{index}.jpg", quality=90, optimize=True
+        save(exr, target / f"{index}.jpg", spec["display"] == "tonemapped")
+        print(
+            f"{name} {index}: {value['caption']} ({seconds:.1f} s)", flush=True
         )
-        print(f"{name} {index}: {caption} ({seconds:.1f} s)", flush=True)
+
+
+def preview(scene):
+    layer = SAMPLES / scene
+    OUT.mkdir(parents=True, exist_ok=True)
+    root = OUT / f"preview_{layer.stem}.usda"
+    root.write_text(root_layer(layer, {}), encoding="utf-8")
+    exr = OUT / f"preview_{layer.stem}.exr"
+    seconds = husk("Unreal Engine", root, exr)
+    save(exr, OUT / f"preview_{layer.stem}.jpg", True)
+    print(f"{OUT / f'preview_{layer.stem}.jpg'} ({seconds:.1f} s)")
 
 
 def main():
@@ -228,36 +151,38 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--only",
-        nargs="+",
-        choices=FIGURES,
-        help="figures to render (default: all)",
+        "--only", nargs="+", help="figures to render (default: all)"
     )
     parser.add_argument(
-        "--list",
-        action="store_true",
-        help="print the figures and their captions",
+        "--preview",
+        nargs="+",
+        help="scenes under samples/ to render as they are (tone-mapped)",
     )
     args = parser.parse_args()
-    if args.list:
-        for name, (_, _, values, _) in FIGURES.items():
-            print(name + ": " + " | ".join(caption for caption, _ in values))
+    dev_environment()
+    if args.preview:
+        for scene in args.preview:
+            preview(scene)
         return
+    specs = figures()
+    unknown = set(args.only or ()) - set(specs)
+    if unknown:
+        raise SystemExit(f"unknown figures: {sorted(unknown)}")
     IMAGES.mkdir(parents=True, exist_ok=True)
     (IMAGES / "figures.json").write_text(
         json.dumps(
             {
-                name: [caption for caption, _ in f[2]]
-                for name, f in FIGURES.items()
+                name: [v["caption"] for v in spec["values"]]
+                for name, spec in specs.items()
             },
             indent=1,
         )
         + "\n",
         encoding="utf-8",
+        newline="\n",
     )
-    dev_environment()
-    for name in args.only or FIGURES:
-        render(name)
+    for name in args.only or specs:
+        render(name, specs[name])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,210 @@
+#usda 1.0
+(
+    doc = """A row of seven of SideFX's rubber toys receding from the camera, 1.2 m apart: the camera's focus distance and f-stop."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./stage.usda@]
+    # Houdini's sample assets: ${HFS} is this default unless the root layer opening this scene sets it
+    # (scripts/render_docs_images.py sets it to $HFS).
+    expressionVariables = {
+        string HFS = "C:/Program Files/Side Effects Software/Houdini 22.0.368"
+    }
+)
+
+over "scene"
+{
+    over "Looks"
+    {
+        def Material "c0"
+        {
+            token outputs:surface.connect = </scene/Looks/c0/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.8, 0.2, 0.1)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c1"
+        {
+            token outputs:surface.connect = </scene/Looks/c1/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.9, 0.7, 0.1)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c2"
+        {
+            token outputs:surface.connect = </scene/Looks/c2/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.2, 0.6, 0.2)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c3"
+        {
+            token outputs:surface.connect = </scene/Looks/c3/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.1, 0.4, 0.8)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c4"
+        {
+            token outputs:surface.connect = </scene/Looks/c4/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.5, 0.2, 0.7)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c5"
+        {
+            token outputs:surface.connect = </scene/Looks/c5/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.8, 0.8, 0.8)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+        def Material "c6"
+        {
+            token outputs:surface.connect = </scene/Looks/c6/S.outputs:surface>
+            def Shader "S"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.9, 0.4, 0.1)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+    }
+
+    def Xform "toy0" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c0> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (-0.4, 0.07, -0.0)
+        float3 xformOp:rotateXYZ = (0, 20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy1" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c1> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (0.4, 0.07, -1.2)
+        float3 xformOp:rotateXYZ = (0, -20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy2" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c2> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (-0.4, 0.07, -2.4)
+        float3 xformOp:rotateXYZ = (0, 20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy3" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c3> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (0.4, 0.07, -3.5999999999999996)
+        float3 xformOp:rotateXYZ = (0, -20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy4" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c4> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (-0.4, 0.07, -4.8)
+        float3 xformOp:rotateXYZ = (0, 20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy5" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c5> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (0.4, 0.07, -6.0)
+        float3 xformOp:rotateXYZ = (0, -20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "toy6" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        prepend references = @`"${HFS}/houdini/usd/assets/rubbertoy/rubbertoy.usd"`@
+    )
+    {
+        rel material:binding = </scene/Looks/c6> (bindMaterialAs = "strongerThanDescendants")
+        double3 xformOp:translate = (-0.4, 0.07, -7.199999999999999)
+        float3 xformOp:rotateXYZ = (0, 20, 0)
+        float3 xformOp:scale = (0.25, 0.25, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def RectLight "key"
+    {
+        float inputs:width = 2
+        float inputs:height = 2
+        float inputs:intensity = 1
+        float inputs:exposure = 4
+        color3f inputs:color = (1, 1, 1)
+        double3 xformOp:translate = (-2, 3, 1)
+        float3 xformOp:rotateXYZ = (-33.855, -26.565, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "camera"
+    {
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        float2 clippingRange = (0.05, 1000)
+        float focusDistance = 6.0
+        float fStop = 0
+        double3 xformOp:translate = (0, 0.5, 2.4)
+        float3 xformOp:rotateXYZ = (-2.237, 0.0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}

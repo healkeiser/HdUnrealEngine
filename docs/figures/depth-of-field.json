@@ -1,0 +1,51 @@
+{
+ "scene": "cornell/variants/depth_of_field.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "f/1",
+   "set": {
+    "/cornell_box/camera": [
+     "float fStop = 1"
+    ]
+   }
+  },
+  {
+   "caption": "f/2",
+   "set": {
+    "/cornell_box/camera": [
+     "float fStop = 2"
+    ]
+   }
+  },
+  {
+   "caption": "f/4",
+   "set": {
+    "/cornell_box/camera": [
+     "float fStop = 4"
+    ]
+   }
+  },
+  {
+   "caption": "f/8",
+   "set": {
+    "/cornell_box/camera": [
+     "float fStop = 8"
+    ]
+   }
+  },
+  {
+   "caption": "f/16",
+   "set": {
+    "/cornell_box/camera": [
+     "float fStop = 16"
+    ]
+   }
+  }
+ ]
+}
