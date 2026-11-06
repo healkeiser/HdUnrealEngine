@@ -28,7 +28,7 @@ The user guide is written for the artist or TD rendering with hdUE in Houdini, n
 ## Images
 
 - Every comparison is rendered by `scripts/render_docs_images.py` from a scene in `samples/`, so a rebuild refreshes it. No hand-made screenshots of renders.
-- One small scene per kind of effect, chosen so the effect reads: the shader ball for materials, the chrome ball for light shapes, the beam in fog for scattering, the row of spheres for focus, the room for global illumination, the Cornell box for render settings. Keep the camera and lighting fixed across a page.
+- One small scene per kind of effect, chosen so the effect reads: SideFX's lookdev shader ball (`docs/lookdev.usda`) for materials, SideFX's Veach planks (`docs/veach.usda`) for light size against roughness, the chrome ball and box (`docs/lights.usda`) for light types and shadows, the beam in fog (`docs/fog.usda`) for scattering, the row of rubber toys (`docs/row.usda`) for focus, the room (`docs/room.usda`) for global illumination, the Cornell box for render settings. Keep the camera and lighting fixed across a page.
 - Captions are the value only ("0.5"), with "(default)" after the default. Add the render time when the setting costs time.
 - Two values: before/after slider. Three to six: scrubber. Pick values that span the useful range, not the full numeric range.
 - Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel.
