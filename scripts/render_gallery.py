@@ -29,6 +29,8 @@ import numpy as np
 import OpenImageIO as oiio
 from local_paths import local_path
 
+# The docs site holds docs/ only: links to the rest of the repository go to GitHub.
+SOURCE = "https://github.com/healkeiser/HdUnrealEngine/blob/main/"
 ROOT = Path(__file__).resolve().parent.parent
 CORNELL = ROOT / "samples" / "cornell"
 SPONZA = ROOT / "samples" / "sponza"
@@ -784,8 +786,8 @@ def section(which, results, machine):
     if which == "cornell":
         order = [name for name, _, _ in CORNELL_SCENES if name in results]
         intro = (
-            f"Every scene is the [CC0 Cornell box](../samples/cornell/) plus one small layer from "
-            f"[samples/cornell/variants](../samples/cornell/variants), rendered with husk at {resolution}:"
+            f"Every scene is the [CC0 Cornell box]({SOURCE}samples/cornell) plus one small layer from "
+            f"[samples/cornell/variants]({SOURCE}samples/cornell/variants), rendered with husk at {resolution}:"
         )
         command = "hython scripts/render_gallery.py"
     else:
@@ -793,15 +795,15 @@ def section(which, results, machine):
         intro = (
             "[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) "
             "(Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports "
-            "UsdPreviewSurface only; [samples/sponza/materials.usda](../samples/sponza/materials.usda) gives every material a "
+            f"UsdPreviewSurface only; [samples/sponza/materials.usda]({SOURCE}samples/sponza/materials.usda) gives every material a "
             "MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, "
             "translucent leaves cut out by their alpha, glass), which hdUE and Karma render. hdUE's Path Tracer image is denoised by UE's default denoiser "
             "(NNEDenoiser, PathTracingEnableDenoiser on); Karma's is not. "
             "Ray tracing uses Nanite's fallback meshes, as in UE (r.RayTracing.Nanite.Mode 0): the tree and the "
             "curtains are simplified in the Path Tracer, and Nanite Ray Tracing (Streamed Out Mesh) traces them in full. The scene has no lights, so "
-            "[samples/sponza/lighting.usda](../samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, "
+            f"[samples/sponza/lighting.usda]({SOURCE}samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, "
             "and levels the camera as Intel's render does; "
-            "[samples/sponza/no_decals.usda](../samples/sponza/no_decals.usda) deactivates the dirt decal meshes."
+            f"[samples/sponza/no_decals.usda]({SOURCE}samples/sponza/no_decals.usda) deactivates the dirt decal meshes."
         )
         addons = sorted(
             {a for entry in results.values() for a in entry.get("addons", [])}

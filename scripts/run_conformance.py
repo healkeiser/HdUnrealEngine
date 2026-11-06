@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SCENES = ROOT / "samples" / "conformance"
 OUT = ROOT / "out" / "conformance"
 DOC = ROOT / "docs" / "conformance.md"
+# The docs site holds docs/ only: links to the scenes go to GitHub.
+SOURCE = "https://github.com/healkeiser/HdUnrealEngine/blob/main/"
 MARKERS = ("<!-- matrix:start -->", "<!-- matrix:end -->")
 MODES = ("realtime", "pathtraced")
 LUMA = np.array([0.2126, 0.7152, 0.0722])
@@ -359,7 +361,7 @@ def matrix(report, specs):
         )
         rows.append(
             f"| {spec.get('schema', '')} | {spec.get('feature', name)} | "
-            f"[{name}](../samples/conformance/{name}.usda) | {cells[0]} | {cells[1]} | "
+            f"[{name}]({SOURCE}samples/conformance/{name}.usda) | {cells[0]} | {cells[1]} | "
             f"{'; '.join(failed)} |"
         )
     return "\n".join(rows)

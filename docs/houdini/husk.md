@@ -1,0 +1,26 @@
+# Rendering to disk with husk
+
+husk and the USD Render ROP load the same delegate. When no host has started UE, the first hdUE delegate in the process starts it from the runtime profile named by `HDUE_RUNTIME_CONFIG` (`backend_dll`, `runtime_project`), and ticks it from the render pass. UE allows one lifetime per process, so it stays until the process exits: husk `--restart-delegate` creates its next delegates on the same UE.
+
+```powershell
+husk --renderer "Unreal Engine" -f 1 -n 24 -o render.$F4.exr scene.usd
+```
+
+Render settings' data window (`dataWindowNDC`: crops and overscan), `pixelAspectRatio` and husk's tiling (`--tile-count`, `--tile-index`, `--autotile`) are honoured: each render covers only its data window (see [Cameras](../cameras.md)).
+
+From a source checkout without the package, set the environment first:
+
+```powershell
+$env:HOUDINI_PATH = "$PWD\integrations\houdini;&"
+$env:PXR_PLUGINPATH_NAME = "$PWD\build\houdini\resources"
+$env:HDUE_HOUDINI_ENABLE = '1'
+$env:HDUE_RUNTIME_CONFIG = "$PWD\.local\runtime-houdini.json"
+```
+
+UE renders offscreen (`-RenderOffscreen`), in husk, Live Render, the Solaris viewport and usdview alike: it opens no window. Set `HDUE_SHOW_WINDOW=1` to get UE's window back for debugging. UE's log is written in full to `HdUEBackend\Saved\Logs` (under `HDUE_USER_DIR` when set); the host's console (husk's output, Houdini's Log Viewer) gets every UE warning and error, each warning once, and every PSO precache miss (`HDUE_UE_ARGS=-stdout` echoes every line). The hdUE host in Houdini's UI writes its progress to `integration.log` in its log directory and prints only problems. The in-Houdini tests (`Launch-Houdini.ps1 -TestKind`) save what Houdini's Log Viewer received, from every `hou.logging` source, to `log-viewer.json` and `log-viewer.txt` in the run's log directory.
+
+UE starts once per husk process, and Hydra resends only what changes between frames, so render a frame range in one husk call (and give farm tasks chunks of frames) rather than one process per frame. As Movie Render Queue renders a shot, only the first frame of a range warms up (the default 32 frames); each later frame keeps UE's temporal history (TSR, Lumen, eye adaptation), whatever moved or changed, and draws once, so a light switched between frames catches up over the next few frames, as in UE (render a cut as its own husk call, or with `--restart-delegate`). On an RTX 4090, a 2560x1440 Lumen frame of Intel's Sponza with an animated camera and sun then takes about 0.3 s, of which about 0.2 s is husk writing the float EXR, after about 30 s of startup per process (UE, and building the scene's meshes). The EXR is husk's: a half-float beauty (render var `dataType` and `driver:parameters:aov:format` `color4h`) is the cheaper product, while the compression barely matters. Measured on the Cornell box at 2560x1440, per frame of a sequence: float ZIP 269 ms (9.4 MB), float uncompressed 257 ms, half ZIP 195 ms (5.2 MB), half uncompressed 194 ms, half PIZ 249 ms; hdUE's part is about 70 ms of each (the draw, and a readback that waits for the GPU's frame), husk's procedural scripts nothing. hdUE's readback stays float: half floats would save it a few milliseconds of conversion and copying, and husk cannot start the next frame before it has this one's pixels, so a readback cannot overlap the next draw. Nanite builds are cached across processes ([Nanite](../geometry/nanite.md)), so a scene's second husk run skips most of the mesh building. Realtime mode (`unreal:renderMode = realtime`) is meant for final frames too; heavier scenes cost more, mostly on the GPU. When husk owns UE, the delegate ticks it continuously instead of once per husk poll, and only the converged realtime draw is read back from the GPU (the Path Tracer also reads back its first draw and one per 250 ms, for progress and husk snapshots).
+
+husk's progress (`-V 2` and above, and the Render Gallery) follows the delegate's `percentDone` stat: Path Tracer samples, or 100 once the realtime warmup converges. The delegate's `renderProgressAnnotation` (UE startup or upload stage, with the meshes left after the batch being uploaded; Path Tracer samples or realtime warmup; texture files prepared, virtual textures built and read from the cache, and background mesh builds, each with the time left at its rate so far; virtual texture pages and native assets still loading) shows under the viewport's progress bar, and `renderStatsAnnotation` (scene counts, last frame time) in its render stats. husk's verbose callback, `python3.13libs/hdue_stats.py`, prints the progress at `-V 3` and above, the frame time at the end of each frame, and the stats annotation at `-V 5`. Render vars hdUE does not render (light path expressions other than the beauty, `C.*[LO]` or `C.*`; primvar vars) receive their clear value with a warning. If none of the requested render vars is one hdUE renders, or the frame fails, the delegate reports `huskErrorStatus`, so husk exits with a non-zero code for farm managers.
+
+A USD Render ROP passes its environment to husk. The delegate restores husk's working directory, which loading UE changes, so relative product names resolve as with other renderers. Unsaved SOP volumes are written next to the USD file by the ROP and render from there.

@@ -68,7 +68,7 @@ This is a fork of [K240/hdUE](https://github.com/K240/hdUE). See [Credits](#cred
 The tables below give the numbers behind both charts; regenerate the charts with `uv run --with matplotlib python scripts/gallery_charts.py`.
 
 <!-- gallery:start -->
-Every scene is the [CC0 Cornell box](samples/cornell/) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
+Every scene is the [CC0 Cornell box](samples/cornell) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
 
 - **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
@@ -197,7 +197,7 @@ hdUE runs a stock Unreal Engine 5.8.4 built from source, with these changes to t
 | `ReflectionEnvironmentShaders.usf`: a NaN GGX sample direction in the cube filter becomes the lobe's centre (same script) | At 512 texels a sky light's top mip is GGX-filtered at a roughness where `ImportanceSampleGGX`'s sine came out NaN on the GPU for 5 of 32 samples, which read the cube in a NaN direction: a dome added 5/32 of the colour around its pole everywhere. |
 | `UploadingVirtualTexture.cpp`: chunks of runtime-built virtual textures read from memory or hdUE's chunk cache (same script) | Outside the editor UE reads virtual texture chunks only from cooked files; runtime UDIM textures stream from disk as the editor's do. |
 | `MeshCards.cpp` compiles two of UE's private source files (`MeshRepresentationCommon.cpp`, `MeshCardRepresentationUtilities.cpp`) into the backend | To build Lumen cards for meshes created at runtime; the editor normally builds them on import. |
-| Build settings: a monolithic UELibrary target with Developer modules, and `IS_RUNNING_GAMETHREAD_ON_EXTERNAL_THREAD` | UE runs as a DLL inside Houdini, on a thread hdUE starts; Nanite and Lumen cards need the Developer modules ([EULA note](docs/houdini.md)). |
+| Build settings: a monolithic UELibrary target with Developer modules, and `IS_RUNNING_GAMETHREAD_ON_EXTERNAL_THREAD` | UE runs as a DLL inside Houdini, on a thread hdUE starts; Nanite and Lumen cards need the Developer modules ([EULA note](docs/getting-started/installation.md)). |
 
 The script checks the engine version and each insertion point before editing anything. UELibrary, Launch and the rest of the engine are unchanged.
 
@@ -207,7 +207,7 @@ Where Unreal already has a way to do something, hdUE does it the same way: Mater
 |---|---|---|
 | Light units | UE's USD importer passes UsdLux intensity as nits unchanged, so imported rect lights render 2x and sphere lights 4x brighter than UsdLux defines | Converts to UsdLux luminance, so lights match Karma and other renderers |
 | Spot cones | Clamps spots to 89 degrees, where Lumen and the Path Tracer then light only a quarter of a downward cone | Caps cones at 88 degrees |
-| Alpha-coverage mips for cutouts | UE's algorithm corrects each mip one level late and can make thin cutouts thinner | Same idea, with three fixes: thin leaves keep their coverage at a distance ([details](docs/rendering.md#materialx-surfaces)) |
+| Alpha-coverage mips for cutouts | UE's algorithm corrects each mip one level late and can make thin cutouts thinner | Same idea, with three fixes: thin leaves keep their coverage at a distance ([details](docs/materials/materialx-surfaces.md)) |
 | Displacement | UE's Path Tracer ignores displacement | The mesh is diced and displaced on the CPU, so both Lumen and the Path Tracer see it |
 | New Nanite meshes | Their ray-tracing geometry is built on the next frame, so Lumen's first frame traced an empty scene | Builds it before the mesh is shown |
 | Camera far clip | Views use an infinite far plane | Not applied either: a finite far plane changed Lumen's lighting with nothing clipped |
@@ -270,12 +270,12 @@ Requires Houdini 22.0 on Windows x64 and a DirectX 12 GPU with hardware ray trac
 > [!NOTE]
 > There is no public binary download. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. [Build the package from source](docs/building.md) with your own Unreal Engine access.
 
-1. Build `hdUE-<version>-houdini22.0.<build>-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/houdini.md#installing-on-another-machine)).
+1. Build `hdUE-<version>-houdini22.0.<build>-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/getting-started/installation.md)).
 2. Unzip it anywhere; the folder may be shared and read-only, since UE writes its shader cache and logs per user.
 3. Run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`.
 4. Restart Houdini.
 
-For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. See [Installing on another machine](docs/houdini.md#installing-on-another-machine).
+For a studio-wide install, use `Install.ps1 -PackagesDirectory <shared HOUDINI_PACKAGE_DIR>`. `Uninstall.cmd` removes the package file. See [Installing on another machine](docs/getting-started/installation.md).
 
 <!-- USAGE -->
 ## Usage
@@ -288,18 +288,23 @@ husk --renderer "Unreal Engine" -f 1 -n 24 -o render.$F4.exr scene.usd
 
 Renderer settings live on any Render Settings LOP, on its **Unreal Engine** tab: render mode (Lumen or Path Tracer), samples, the Path Tracer's denoiser (NNEDenoiser or OptiX), DLSS, Nanite ray tracing, motion blur and motion samples, Lumen, environment resolution, and Unreal post-processing (tonemapper, bloom, grading, post-process materials). They are `unreal:*` attributes on the UsdRenderSettings prim, so files rendered on a farm carry them. Render one frame range per husk call, and give farm tasks chunks of frames: each process starts UE once.
 
+The **[user guide](https://healkeiser.github.io/HdUnrealEngine/)** covers every feature, with before/after comparisons of the main settings and a reference of every render setting generated from the engine source (its pages are also in [docs/](docs/index.md)).
+
 | Topic | Page |
 |-------|------|
-| Solaris, husk, Live Render, AOVs | [docs/houdini.md](docs/houdini.md) |
-| Render settings, geometry, cameras, motion blur, post-processing, lights, volumes | [docs/rendering.md](docs/rendering.md) |
-| MaterialX, Substrate, COP textures, cooked native assets | [docs/materials.md](docs/materials.md) |
-| Architecture and the C ABI | [docs/architecture.md](docs/architecture.md) |
-| USD conformance: what each schema attribute does in hdUE | [docs/conformance.md](docs/conformance.md) |
+| Installing, a first render, environment variables | [Getting started](https://healkeiser.github.io/HdUnrealEngine/getting-started/installation/) |
+| Solaris viewport, husk, Live Render | [Houdini](https://healkeiser.github.io/HdUnrealEngine/houdini/) |
+| Render modes, denoising, motion blur, colour management, post-processing | [Rendering](https://healkeiser.github.io/HdUnrealEngine/rendering/render-settings/) |
+| Cameras, lights, materials, geometry, fog and sky | [Cameras](https://healkeiser.github.io/HdUnrealEngine/cameras/), [Lights](https://healkeiser.github.io/HdUnrealEngine/lights/), [Materials](https://healkeiser.github.io/HdUnrealEngine/materials/), [Geometry](https://healkeiser.github.io/HdUnrealEngine/geometry/meshes/), [Environment](https://healkeiser.github.io/HdUnrealEngine/environment/volumes/) |
+| Every `unreal:*` setting with UE's defaults and tooltips | [Render settings reference](https://healkeiser.github.io/HdUnrealEngine/reference/render-settings/) |
+| USD conformance: what each schema attribute does in hdUE | [USD conformance](https://healkeiser.github.io/HdUnrealEngine/conformance/) |
+| Architecture and the C ABI | [Architecture](https://healkeiser.github.io/HdUnrealEngine/architecture/) |
 | What was measured | [VERIFICATION.md](VERIFICATION.md) |
 
 <!-- ENVIRONMENT VARIABLES -->
 ## Environment Variables
 
+<!-- --8<-- [start:environment-variables] -->
 The package file sets the first two; the rest are for development and debugging.
 
 | Variable | Description |
@@ -314,6 +319,7 @@ The package file sets the first two; the rest are for development and debugging.
 | `HDUE_TRACE_PASS` | `1` prints one line per render pass to stderr |
 | `HDUE_TRACE_SETTINGS` | `1` prints every render setting the delegate receives |
 | `HDUE_TRACE_SCENE` | `1` prints scene submissions |
+<!-- --8<-- [end:environment-variables] -->
 
 <!-- DEVELOPMENT -->
 ## Development

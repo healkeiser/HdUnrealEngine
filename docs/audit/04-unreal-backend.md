@@ -279,7 +279,7 @@ Document the profile in `docs/rendering.md`.
 - Re-test OIDN, OptiX and NNE at 1080p and 4K, then update `docs/rendering.md:145`.
 - Keep Houdini OIDN as the alternative.
 
-**Resolution (2026-11-05).** `NNEDenoiser` and `OptiXDenoise` are enabled in `HdUEBackend.uproject`; `PathTracingEnableDenoiser` defaults to 1 as in UE and `r.PathTracing.Denoiser.Name` picks the plugin (Render Settings). The backend gathers UE's active view extensions as Movie Render Queue does, which NNEDenoiser needs. hdUE's Houdini-only OIDN step was removed rather than kept: UE's denoisers run in every host ([rendering](../rendering.md)).
+**Resolution (2026-11-05).** `NNEDenoiser` and `OptiXDenoise` are enabled in `HdUEBackend.uproject`; `PathTracingEnableDenoiser` defaults to 1 as in UE and `r.PathTracing.Denoiser.Name` picks the plugin (Render Settings). The backend gathers UE's active view extensions as Movie Render Queue does, which NNEDenoiser needs. hdUE's Houdini-only OIDN step was removed rather than kept: UE's denoisers run in every host ([rendering](../rendering/render-settings.md)).
 
 ## UE-08 — Lumen final-frame quality left at game defaults — Medium
 

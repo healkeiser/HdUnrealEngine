@@ -37,3 +37,6 @@ uv.lock
 /unreal/HdUEBackend/Plugins/StreamlineNGXCommon/
 # Claude Code local settings and session state
 /.claude/
+
+# Zensical output (zensical build)
+/site/

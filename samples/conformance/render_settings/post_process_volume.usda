@@ -6,7 +6,7 @@ filling the cube from -1 to 1 of the prim's local space, blended into the view b
 Compensation -1 darkens the image. Frame 3: the same box 60 m away, past its 1 m blend radius, does nothing. Frame 4:
 that far box made unbound applies everywhere again. Frame 5: back around the camera, with a second box of higher
 priority and Exposure Compensation +1, which wins: brighter than the reference. The Unreal tonemapper is on: without it
-the beauty is scene-linear and exposure does not show (docs/rendering.md); its curve makes one stop about 0.76x and
+the beauty is scene-linear and exposure does not show (docs/rendering/post-processing.md); its curve makes one stop about 0.76x and
 1.15x here."""
     customLayerData = {
         string conformance = """{

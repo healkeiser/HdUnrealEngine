@@ -28,7 +28,7 @@ def compose(frame: Path, text: Image.Image) -> Image.Image:
     src = Image.open(frame).convert("RGB")
     top = (src.height - H) // 2
     # husk's frame as UE shows it (sRGB, Un-tone-mapped): Houdini's viewport, darker in the shadows, crushes linear
-    # values under ~0.004 in its OCIO display (docs/rendering.md, "Viewport and husk").
+    # values under ~0.004 in its OCIO display (docs/rendering/post-processing.md).
     photo = np.asarray(src.crop((0, top, W, top + H)))
     out = photo.astype(float)
     # A soft shadow under the title keeps it legible over the render.

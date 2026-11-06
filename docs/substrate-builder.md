@@ -119,7 +119,7 @@ The file parameter uses Houdini's file picker and expands variables such as `$HI
 
 An explicit `BaseName.<UDIM>.ext` or `BaseName_<UDIM>.ext` pattern imports all matching tiles. Multi-tile inputs use streaming virtual textures. Tile indices, source-block coordinates, membership, and source content are checked. A single tile must be 1001 and uses an ordinary 2D texture; a single off-origin tile is rejected. A literal numbered file remains a single 2D image. Existing virtual-texture residency checks gate Path Tracer accumulation. Direct Builder `op:` / `opdef:` image inputs require baking/exporting to image files first; the separate existing COP/MaterialX resolver does not automatically export these new nodes.
 
-The [direct texture example](../samples/substrate/textures.usda) has one mesh and one composite material. An sRGB checker drives albedo, packed raw G drives roughness, packed raw A controls the top Slab's coverage, and a raw RGB image passes through Normal Map to the base Slab. `NormalStrength` is a live Scalar Parameter. No MaterialX base library is required for this scene.
+The [direct texture example](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/substrate/textures.usda) has one mesh and one composite material. An sRGB checker drives albedo, packed raw G drives roughness, packed raw A controls the top Slab's coverage, and a raw RGB image passes through Normal Map to the base Slab. `NormalStrength` is a live Scalar Parameter. No MaterialX base library is required for this scene.
 
 ```powershell
 .\scripts\Prepare-Substrate.ps1 `
@@ -152,7 +152,7 @@ Graph signatures include operators, wiring, public parameter names, and static o
 
 Texture asset paths, color space, address mode, UV set index, and selected output sockets remain static graph inputs. Source hashes and UDIM membership are stored in the prepared library and checked when loading it. Replacing an image or changing its tile set requires preparing, cooking, and staging again; filenames are not runtime texture parameters.
 
-Automatic parameters use compiler version 2 in preparation manifests and libraries; version 3 adds the ID-pass switch ([AOVs](houdini.md#aovs)) and Nanite usage to every prepared material. Previously prepared materials must be rebuilt, cooked, and staged once to obtain the generated parameters. A library from the earlier compiler produces an explicit preparation message instead of accepting value edits that its cooked shader cannot apply. Existing USD graphs and editable VOP assets retain their graph schema version.
+Automatic parameters use compiler version 2 in preparation manifests and libraries; version 3 adds the ID-pass switch ([AOVs](output/aovs.md#aovs-in-houdini)) and Nanite usage to every prepared material. Previously prepared materials must be rebuilt, cooked, and staged once to obtain the generated parameters. A library from the earlier compiler produces an explicit preparation message instead of accepting value edits that its cooked shader cannot apply. Existing USD graphs and editable VOP assets retain their graph schema version.
 
 The generated Builder library records the graph signature, MaterialX dependency identity, cooked material, and cooked mask-preview material. It is local generated data and belongs outside Git.
 
@@ -261,7 +261,7 @@ The backend gives it what it gives `M_HdUEVolume`: the volume's `density` grid a
 
 ## Decal materials
 
-A builder whose output is a **Substrate Convert To Decal** (`hdue_substrate.create(preset="decal")`: the Slab, converted) is a decal material: it prepares into a UE material of the Deferred Decal domain, translucent (UE's DBuffer decals, which Substrate requires), whose front material is UE's `SubstrateConvertToDecal` of the surface wired to it, with Coverage as its opacity. Bound to an `UnrealDecal` prim, it is that decal's material in Houdini's viewport, husk and usdview ([decals](rendering.md#decals)).
+A builder whose output is a **Substrate Convert To Decal** (`hdue_substrate.create(preset="decal")`: the Slab, converted) is a decal material: it prepares into a UE material of the Deferred Decal domain, translucent (UE's DBuffer decals, which Substrate requires), whose front material is UE's `SubstrateConvertToDecal` of the surface wired to it, with Coverage as its opacity. Bound to an `UnrealDecal` prim, it is that decal's material in Houdini's viewport, husk and usdview ([decals](rendering/post-processing.md#decals)).
 
 ## Water coating example
 
@@ -289,16 +289,16 @@ The eight-case background-topology regression passes node addition, generated pa
 
 Implementation entry points:
 
-- [VOP network reading and authoring](../integrations/houdini/python3.13libs/hdue_substrate.py)
-- [VOP definitions and help](../scripts/build_substrate_hda.py)
-- [Material Library shader translator](../integrations/houdini/husdplugins/shadertranslators/hdue.py)
-- [Typed graph and USD contract](../scripts/substrate_graph.py)
-- [Texture resolution and preparation](../scripts/substrate_textures.py)
-- [Numerical texture/UV/UDIM render checks](../tests/substrate_texture_render.py)
-- [Background queue and variant cache](../scripts/live_materials.py)
-- [Isolated import/compile/cook worker](../scripts/Prepare-LiveMaterials.ps1)
-- [Same-process topology regression](../tests/houdini/python3.13libs/hdue_live_materials_test.py)
-- [Preparation command](../scripts/Prepare-Substrate.ps1)
-- [UE expression compiler](../unreal/HdUEBackend/Source/HdUEContent/Private/HdUESubstrateCommandlet.cpp)
-- [Runtime library resolver](../scripts/substrate_library.py)
-- [Solaris regression](../tests/houdini/python3.13libs/hdue_substrate_test.py)
+- [VOP network reading and authoring](https://github.com/healkeiser/HdUnrealEngine/blob/main/integrations/houdini/python3.13libs/hdue_substrate.py)
+- [VOP definitions and help](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/build_substrate_hda.py)
+- [Material Library shader translator](https://github.com/healkeiser/HdUnrealEngine/blob/main/integrations/houdini/husdplugins/shadertranslators/hdue.py)
+- [Typed graph and USD contract](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/substrate_graph.py)
+- [Texture resolution and preparation](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/substrate_textures.py)
+- [Numerical texture/UV/UDIM render checks](https://github.com/healkeiser/HdUnrealEngine/blob/main/tests/substrate_texture_render.py)
+- [Background queue and variant cache](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/live_materials.py)
+- [Isolated import/compile/cook worker](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/Prepare-LiveMaterials.ps1)
+- [Same-process topology regression](https://github.com/healkeiser/HdUnrealEngine/blob/main/tests/houdini/python3.13libs/hdue_live_materials_test.py)
+- [Preparation command](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/Prepare-Substrate.ps1)
+- [UE expression compiler](https://github.com/healkeiser/HdUnrealEngine/blob/main/unreal/HdUEBackend/Source/HdUEContent/Private/HdUESubstrateCommandlet.cpp)
+- [Runtime library resolver](https://github.com/healkeiser/HdUnrealEngine/blob/main/scripts/substrate_library.py)
+- [Solaris regression](https://github.com/healkeiser/HdUnrealEngine/blob/main/tests/houdini/python3.13libs/hdue_substrate_test.py)

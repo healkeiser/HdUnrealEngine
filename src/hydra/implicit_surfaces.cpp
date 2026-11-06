@@ -362,7 +362,7 @@ public:
     }
 };
 // unreal:* attributes on lights (the Unreal Engine tab of Light LOPs) and cameras (unreal:lensDistortion:*,
-// docs/rendering.md): Hydra serves them by name, but UsdImaging's light and camera adapters invalidate only their
+// docs/cameras.md): Hydra serves them by name, but UsdImaging's light and camera adapters invalidate only their
 // schemas' properties, so an edit of these alone left the prim unsynced in a live session (husk reads them once). This
 // keyless adapter (UsdImaging asks it about every property change) dirties the light or camera for them. Gprims and
 // volumes read theirs as primvars and hdUE's actor adapters invalidate their own keys, so neither needs this.

@@ -207,7 +207,7 @@ def help_page(
     summary="Renders the stage with Unreal Engine: render settings, camera, resolution, output and AOVs.",
     overview="Like Karma Render Settings, it creates the render settings prim, its render product and render vars, and "
     "makes that prim the stage's default render settings. It authors the hdUE settings changed from their "
-    "defaults; the others keep hdUE's defaults (see docs/rendering.md in the hdUE repository). In Image Output, it can also render the render products "
+    "defaults; the others keep hdUE's defaults (see docs/rendering/render-settings.md in the hdUE repository). In Image Output, it can also render the render products "
     "and add the render vars authored upstream, by hdUE Render Products and hdUE Standard Render Vars.",
 ):
     """The node's help card (wiki markup), one entry per parameter from its help text, under its tabs and sections."""
@@ -950,7 +950,7 @@ def build_standard_render_vars():
             "for hdUE Render Products or hdUE Render Settings (Image Output > Import Upstream Render Vars) to write. The beauty "
             "is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface (path traced: "
             "albedo and normal from the Path Tracer), Cryptomatte from sub-pixel ID passes "
-            "(see AOVs in docs/houdini.md in the hdUE repository).",
+            "(see docs/output/aovs.md in the hdUE repository).",
         ),
     )
 

@@ -1,7 +1,6 @@
 """Viewport/husk parity capture: the loaded stage through HDUE_TEST_CAMERA in the real Solaris viewport, tonemapper on.
 Writes the converged beauty as the delegate holds it (viewport.pfm, what husk writes for the same stage) and Houdini's
-flipbook of the viewport with its OCIO display on (viewport.png) and off (viewport-noocio.png). See docs/rendering.md,
-"Viewport and husk".
+flipbook of the viewport with its OCIO display on (viewport.png) and off (viewport-noocio.png). See docs/rendering/post-processing.md.
 """
 
 import os

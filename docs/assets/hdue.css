@@ -1,0 +1,100 @@
+/* Setting comparisons (hdue.js). */
+.hdue-figure {
+  position: relative;
+  max-width: 512px;
+  margin: 1.2em auto;
+  user-select: none;
+}
+.hdue-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* Before/after: the second image clipped to the right of the split. */
+.hdue-compare .hdue-after {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--split, 50%));
+}
+.hdue-compare .hdue-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--split, 50%);
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 4px rgb(0 0 0 / 60%);
+  pointer-events: none;
+}
+.hdue-compare .hdue-handle::after {
+  content: "\2194";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2em;
+  height: 2em;
+  line-height: 2em;
+  text-align: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #222;
+  font-size: 0.8rem;
+}
+.hdue-compare input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.hdue-label {
+  position: absolute;
+  bottom: 0.6em;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 60%);
+  color: #fff;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+.hdue-left {
+  left: 0.6em;
+}
+.hdue-right {
+  right: 0.6em;
+}
+
+/* Scrubber: stacked images, the selected one shown. */
+.hdue-scrub img {
+  display: none;
+}
+.hdue-scrub img.hdue-current {
+  display: block;
+}
+.hdue-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  margin-top: 0.5em;
+}
+.hdue-controls input {
+  flex: 1;
+  accent-color: var(--md-accent-fg-color, #2a78d6);
+}
+.hdue-controls output {
+  min-width: 9em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.hdue-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--md-default-fg-color--light, #888);
+}

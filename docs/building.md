@@ -60,7 +60,7 @@ Individual steps:
 .\scripts\Stage-Runtime.ps1     # cook and stage the runtime
 .\scripts\Build-Houdini.ps1     # Houdini delegate (no OpenUSD needed)
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly  # licensees only: see docs/houdini.md
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly  # licensees only: see docs/houdini/index.md
 ```
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
@@ -82,7 +82,7 @@ DLSS is optional and comes from NVIDIA's plugin, which is never committed: the N
 - `Plugins/DLSS`: `DLSS.uplugin`, `Source`, `Shaders`, `Config`, `Resources`, `Content`, `Binaries/ThirdParty` (the NGX DLLs) and `Binaries/Win64` (the prebuilt editor modules, which the cook loads; their `BuildId` must match `editor_root`'s).
 - `Plugins/StreamlineNGXCommon`: `StreamlineNGXCommon.uplugin`, `Source`, `Resources` and `Binaries/Win64`.
 
-The Streamline, Frame Generation, NIS and Movie Pipeline plugins are not needed. `HdUEBackend.uproject` lists both plugins as optional, and `HdUEBackend.Build.cs` links DLSS only when `Plugins/DLSS/DLSS.uplugin` exists. After adding them, run `Build-Backend.ps1`, `Prepare-Content.ps1` (the editor's cook compiles the plugin's global shaders) and `Stage-Runtime.ps1`; staging copies the NGX DLLs. [Rendering](rendering.md) describes the setting.
+The Streamline, Frame Generation, NIS and Movie Pipeline plugins are not needed. `HdUEBackend.uproject` lists both plugins as optional, and `HdUEBackend.Build.cs` links DLSS only when `Plugins/DLSS/DLSS.uplugin` exists. After adding them, run `Build-Backend.ps1`, `Prepare-Content.ps1` (the editor's cook compiles the plugin's global shaders) and `Stage-Runtime.ps1`; staging copies the NGX DLLs. [Engine quality](rendering/engine-quality.md) describes the setting.
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
@@ -103,8 +103,8 @@ GitHub runners cannot build Unreal Engine, so releases are built locally:
 1. Set `project(hdUE VERSION x.y.z)` in `CMakeLists.txt`, commit, and tag `vx.y.z` on that commit.
 2. `.\scripts\Verify.ps1 -WithUsdview` and `.\scripts\Test.ps1 -Suite all` on a clean tree.
 3. Render the gallery (`hython scripts/render_gallery.py --dev`). It fails when a scene's brightness against Karma CPU leaves its band (`scripts/check_gallery.py`, which CI also runs on the committed `docs/gallery.md`) or a Cornell hdUE render departs from its tile baseline (`tests/gallery_baselines.json`); after an intended change, check the images and store new baselines with `--bless`.
-4. `.\scripts\Build-Houdini.ps1`, `.\scripts\Build-Backend.ps1 -Configuration Test` and `.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes, a delegate built from another commit, and a backend that is not the current Test build (packages ship Test; see [houdini](houdini.md#installing-on-another-machine)).
-5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as `docs/houdini.md` describes.
+4. `.\scripts\Build-Houdini.ps1`, `.\scripts\Build-Backend.ps1 -Configuration Test` and `.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes, a delegate built from another commit, and a backend that is not the current Test build (packages ship Test; see [houdini](getting-started/installation.md)).
+5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as `docs/houdini/index.md` describes.
 
 ## Standalone rendering and usdview
 

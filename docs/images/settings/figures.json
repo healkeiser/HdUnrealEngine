@@ -1,0 +1,67 @@
+{
+ "render-mode": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "samples": [
+  "4 spp",
+  "16 spp",
+  "64 spp",
+  "256 spp",
+  "1024 spp"
+ ],
+ "denoiser": [
+  "Denoiser off",
+  "Denoiser on (NNEDenoiser)"
+ ],
+ "warmup": [
+  "1 warmup frames",
+  "4 warmup frames",
+  "16 warmup frames",
+  "64 warmup frames"
+ ],
+ "global-illumination": [
+  "No global illumination",
+  "Lumen"
+ ],
+ "tonemapper": [
+  "Tonemapper off (scene-linear)",
+  "Tonemapper on"
+ ],
+ "exposure-compensation": [
+  "-2 EV",
+  "-1 EV",
+  "+0 EV",
+  "+1 EV",
+  "+2 EV"
+ ],
+ "bloom": [
+  "Intensity 0",
+  "Intensity 0.675",
+  "Intensity 2",
+  "Intensity 8"
+ ],
+ "depth-of-field": [
+  "f/1",
+  "f/2",
+  "f/4",
+  "f/8",
+  "f/16"
+ ],
+ "motion-blur": [
+  "Motion blur off",
+  "Motion blur on"
+ ],
+ "subdivision": [
+  "Level 0",
+  "Level 1",
+  "Level 2",
+  "Level 3"
+ ],
+ "fog-density": [
+  "Density 0",
+  "Density 0.02",
+  "Density 0.5",
+  "Density 2"
+ ]
+}

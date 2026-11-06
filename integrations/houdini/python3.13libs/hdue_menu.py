@@ -11,7 +11,7 @@ import traceback
 import webbrowser
 from pathlib import Path
 
-DOCS = "https://github.com/healkeiser/HdUnrealEngine/blob/main/docs/houdini.md"
+DOCS = "https://healkeiser.github.io/HdUnrealEngine/houdini/"
 CACHE_LABELS = {
     "texture": "Texture cache",
     "virtual_texture": "Virtual texture cache",
