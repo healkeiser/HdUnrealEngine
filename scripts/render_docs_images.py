@@ -185,7 +185,9 @@ def main():
     for name in args.only or specs:
         try:
             render(name, specs[name])
-        except RuntimeError as error:  # one broken figure must not stop the others
+        except (
+            RuntimeError
+        ) as error:  # one broken figure must not stop the others
             print(f"{name} FAILED: {str(error)[:500]}", flush=True)
             failed.append(name)
     if failed:

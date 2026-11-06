@@ -617,7 +617,9 @@ CVARS = [
         "Samples per Pixel",
         "Rendering Features|MegaLights",
         False,
-        dict(menu=[(1, "1"), (2, "2"), (4, "4")]),  # UE: "Supported values: 1, 2 and 4"
+        dict(
+            menu=[(1, "1"), (2, "2"), (4, "4")]
+        ),  # UE: "Supported values: 1, 2 and 4"
     ),
     (
         "r.MegaLights.DefaultShadowMethod",
@@ -2544,7 +2546,9 @@ def write_reference(tree, lights, schema_settings):
         "UE's defaults as fallbacks. hdUE's Solaris LOPs author them.",
         "",
     ]
-    for (name, doc), settings in zip(SCHEMA_CLASSES, schema_settings, strict=True):
+    for (name, doc), settings in zip(
+        SCHEMA_CLASSES, schema_settings, strict=True
+    ):
         page += [f"## {name}", "", md_text(doc), ""]
         for setting in settings:
             page += md_setting(setting, 4)
