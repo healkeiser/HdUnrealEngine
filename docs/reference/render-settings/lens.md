@@ -6,7 +6,7 @@
 
 #### Preferred Method { #unreal-postprocess-bloommethod }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomMethod</code></dd></div><div><dt>Default</dt><dd>Standard</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomMethod_ombl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Standard</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomMethod</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomMethod_ombl</code></dd></div></dl>
 
 Preferred bloom algorithm. A different method may be used if the preferred method is not available on the target platform, e.g. due to performance limits.
 
@@ -19,7 +19,7 @@ Preferred bloom algorithm. A different method may be used if the preferred metho
 
 #### Intensity { #unreal-postprocess-bloomintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomIntensity</code></dd></div><div><dt>Default</dt><dd><code>0.675</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomIntensity_krbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.675</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomIntensity_krbl</code></dd></div></dl>
 
 Multiplier for all bloom contributions \>=0: off, 1(default), \>1 brighter
 
@@ -29,19 +29,19 @@ Multiplier for all bloom contributions \>=0: off, 1(default), \>1 brighter
 
 #### Intensity { #unreal-postprocess-bloomgaussianintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomGaussianIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomGaussianIntensity_l4bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomGaussianIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomGaussianIntensity_l4bl</code></dd></div></dl>
 
 Multiplier for Gaussian bloom contributions \>=0: off, 1(default), \>1 brighter
 
 #### Threshold { #unreal-postprocess-bloomthreshold }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomThreshold</code></dd></div><div><dt>Default</dt><dd><code>-1</code></dd></div><div><dt>Range</dt><dd>-1 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomThreshold_krbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>-1</code></dd></div><div><dt>Range</dt><dd>-1 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomThreshold</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomThreshold_krbl</code></dd></div></dl>
 
 minimum brightness the bloom starts having effect -1:all pixels affect bloom equally (physically correct, faster as a threshold pass is omitted), 0:all pixels affect bloom brights more, 1(default), \>1 brighter
 
 #### Size scale { #unreal-postprocess-bloomsizescale }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomSizeScale</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomSizeScale_krbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomSizeScale</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomSizeScale_krbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Scale for all bloom sizes
 
@@ -49,73 +49,73 @@ Scale for all bloom sizes
 
 #### #1 Size { #unreal-postprocess-bloom1size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Size</code></dd></div><div><dt>Default</dt><dd><code>0.3</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom1Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.3</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom1Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for the Bloom1 in percent of the screen width (is done in 1/2 resolution, larger values cost more performance, good for high frequency details) \>=0: can be clamped because of shader limitations
 
 #### #2 Size { #unreal-postprocess-bloom2size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Size</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom2Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom2Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for Bloom2 in percent of the screen width (is done in 1/4 resolution, larger values cost more performance) \>=0: can be clamped because of shader limitations
 
 #### #3 Size { #unreal-postprocess-bloom3size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Size</code></dd></div><div><dt>Default</dt><dd><code>2</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom3Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>2</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom3Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for Bloom3 in percent of the screen width (is done in 1/8 resolution, larger values cost more performance) \>=0: can be clamped because of shader limitations
 
 #### #4 Size { #unreal-postprocess-bloom4size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Size</code></dd></div><div><dt>Default</dt><dd><code>10</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom4Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>10</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom4Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for Bloom4 in percent of the screen width (is done in 1/16 resolution, larger values cost more performance, best for wide contributions) \>=0: can be clamped because of shader limitations
 
 #### #5 Size { #unreal-postprocess-bloom5size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Size</code></dd></div><div><dt>Default</dt><dd><code>30</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom5Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>30</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom5Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for Bloom5 in percent of the screen width (is done in 1/32 resolution, larger values cost more performance, best for wide contributions) \>=0: can be clamped because of shader limitations
 
 #### #6 Size { #unreal-postprocess-bloom6size }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Size</code></dd></div><div><dt>Default</dt><dd><code>64</code></dd></div><div><dt>Range</dt><dd>0 to 128</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom6Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>64</code></dd></div><div><dt>Range</dt><dd>0 to 128</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Size</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom6Size_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Diameter size for Bloom6 in percent of the screen width (is done in 1/64 resolution, larger values cost more performance, best for wide contributions) \>=0: can be clamped because of shader limitations
 
 #### #1 Tint { #unreal-postprocess-bloom1tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Tint</code></dd></div><div><dt>Default</dt><dd><code>0.3465, 0.3465, 0.3465</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom1Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.3465, 0.3465, 0.3465</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom1Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom1 tint color
 
 #### #2 Tint { #unreal-postprocess-bloom2tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Tint</code></dd></div><div><dt>Default</dt><dd><code>0.138, 0.138, 0.138</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom2Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.138, 0.138, 0.138</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom2Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom2 tint color
 
 #### #3 Tint { #unreal-postprocess-bloom3tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Tint</code></dd></div><div><dt>Default</dt><dd><code>0.1176, 0.1176, 0.1176</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom3Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.1176, 0.1176, 0.1176</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom3Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom3 tint color
 
 #### #4 Tint { #unreal-postprocess-bloom4tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Tint</code></dd></div><div><dt>Default</dt><dd><code>0.066, 0.066, 0.066</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom4Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.066, 0.066, 0.066</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom4Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom4 tint color
 
 #### #5 Tint { #unreal-postprocess-bloom5tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Tint</code></dd></div><div><dt>Default</dt><dd><code>0.066, 0.066, 0.066</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom5Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.066, 0.066, 0.066</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom5Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom5 tint color
 
 #### #6 Tint { #unreal-postprocess-bloom6tint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Tint</code></dd></div><div><dt>Default</dt><dd><code>0.061, 0.061, 0.061</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom6Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.061, 0.061, 0.061</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Tint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloom6Tint_1kbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Bloom6 tint color
 
@@ -123,7 +123,7 @@ Bloom6 tint color
 
 #### Intensity { #unreal-postprocess-bloomconvolutionintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionIntensity_h9bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionIntensity_h9bl</code></dd></div></dl>
 
 Multiplier for Convolution bloom contributions \>=0: off, 1(default), \>1 brighter
 
@@ -131,19 +131,19 @@ Multiplier for Convolution bloom contributions \>=0: off, 1(default), \>1 bright
 
 #### Scatter Dispersion { #unreal-postprocess-bloomconvolutionscatterdispersion }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionScatterDispersion</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionScatterDispersion_incl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 20</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionScatterDispersion</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionScatterDispersion_incl</code></dd></div></dl>
 
 Intensity multiplier on the scatter dispersion energy of the kernel. 1.0 means exactly use the same energy as the kernel scatter dispersion.
 
 #### Kernel { #unreal-postprocess-bloomconvolutiontexture }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionTexture</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionTexture_75bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionTexture</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionTexture_75bl</code></dd></div></dl>
 
 Texture to replace default convolution bloom kernel. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
 #### Scale { #unreal-postprocess-bloomconvolutionsize }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionSize</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionSize_c1bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionSize</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionSize_c1bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Relative size of the convolution kernel image compared to the minor axis of the viewport
 
@@ -151,31 +151,31 @@ Relative size of the convolution kernel image compared to the minor axis of the 
 
 #### Center { #unreal-postprocess-bloomconvolutioncenteruv }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionCenterUV</code></dd></div><div><dt>Default</dt><dd><code>0.5, 0.5</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionCenterUV_u7bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.5, 0.5</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionCenterUV</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionCenterUV_u7bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 The UV location of the center of the kernel. Should be very close to (.5,.5)
 
 #### Boost Min { #unreal-postprocess-bloomconvolutionprefiltermin }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMin</code></dd></div><div><dt>Default</dt><dd><code>7</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMin_dfcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>7</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMin</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMin_dfcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max \< Min disables
 
 #### Boost Max { #unreal-postprocess-bloomconvolutionprefiltermax }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMax</code></dd></div><div><dt>Default</dt><dd><code>15000</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMax_dfcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>15000</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMax</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMax_dfcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max \< Min disables
 
 #### Boost Mult { #unreal-postprocess-bloomconvolutionprefiltermult }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMult</code></dd></div><div><dt>Default</dt><dd><code>15</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMult_zgcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>15</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMult</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionPreFilterMult_zgcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max \< Min disables
 
 #### Buffer { #unreal-postprocess-bloomconvolutionbufferscale }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionBufferScale</code></dd></div><div><dt>Default</dt><dd><code>0.133</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionBufferScale_qdcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.133</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionBufferScale</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomConvolutionBufferScale_qdcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Implicit buffer region as a fraction of the screen size to insure the bloom does not wrap across the screen. Larger sizes have perf impact.
 
@@ -183,7 +183,7 @@ Implicit buffer region as a fraction of the screen size to insure the bloom does
 
 #### Metering Mode { #unreal-postprocess-autoexposuremethod }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMethod</code></dd></div><div><dt>Default</dt><dd>Manual</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMethod_2xbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Manual</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMethod</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMethod_2xbl</code></dd></div></dl>
 
 Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure.
 
@@ -197,25 +197,25 @@ Luminance computation method. hdUE renders with manual exposure, so the tone cur
 
 #### Apply Physical Camera Exposure { #unreal-postprocess-autoexposureapplyphysicalcameraexposure }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureApplyPhysicalCameraExposure</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureApplyPhysicalCameraExposure_9wcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Off</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureApplyPhysicalCameraExposure</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureApplyPhysicalCameraExposure_9wcl</code></dd></div></dl>
 
 Enables physical camera exposure using ShutterSpeed/ISO/Aperture.
 
 #### Exposure Compensation Curve { #unreal-postprocess-autoexposurebiascurve }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureBiasCurve</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureBiasCurve_y2bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureBiasCurve</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureBiasCurve_y2bl</code></dd></div></dl>
 
 Exposure compensation based on the scene EV100. Used to calibrate the final exposure differently depending on the average scene luminance. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
 #### Exposure Metering Mask { #unreal-postprocess-autoexposuremetermask }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMeterMask</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMeterMask_y2bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMeterMask</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMeterMask_y2bl</code></dd></div></dl>
 
 Exposure metering mask. Bright spots on the mask will have high influence on auto-exposure metering and dark spots will have low influence. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
 #### Min Brightness { #unreal-postprocess-autoexposureminbrightness }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMinBrightness</code></dd></div><div><dt>Default</dt><dd><code>0.03</code></dd></div><div><dt>Range</dt><dd>-10 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMinBrightness_h9bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.03</code></dd></div><div><dt>Range</dt><dd>-10 to 20</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMinBrightness</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMinBrightness_h9bl</code></dd></div></dl>
 
 Auto-Exposure minimum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
@@ -223,7 +223,7 @@ Auto-Exposure minimum adaptation. Eye Adaptation is disabled if Min = Max. Auto-
 
 #### Max Brightness { #unreal-postprocess-autoexposuremaxbrightness }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMaxBrightness</code></dd></div><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>-10 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMaxBrightness_h9bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>-10 to 20</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMaxBrightness</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureMaxBrightness_h9bl</code></dd></div></dl>
 
 Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
@@ -231,19 +231,19 @@ Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-
 
 #### Speed Up { #unreal-postprocess-autoexposurespeedup }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedUp</code></dd></div><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0.02 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureSpeedUp_pzbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0.02 to 20</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedUp</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureSpeedUp_pzbl</code></dd></div></dl>
 
 \>0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
 
 #### Speed Down { #unreal-postprocess-autoexposurespeeddown }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedDown</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.02 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureSpeedDown_y2bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.02 to 20</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedDown</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureSpeedDown_y2bl</code></dd></div></dl>
 
 \>0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
 
 #### Low Percent { #unreal-postprocess-autoexposurelowpercent }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureLowPercent</code></dd></div><div><dt>Default</dt><dd><code>10</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureLowPercent_l4bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>10</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureLowPercent</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureLowPercent_l4bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. \>0, \<100, good values are in the range 70 .. 80
 
@@ -251,7 +251,7 @@ The eye adaptation will adapt to a value extracted from the luminance histogram 
 
 #### High Percent { #unreal-postprocess-autoexposurehighpercent }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureHighPercent</code></dd></div><div><dt>Default</dt><dd><code>90</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureHighPercent_75bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>90</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureHighPercent</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureHighPercent_75bl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. \>0, \<100, good values are in the range 80 .. 95
 
@@ -259,13 +259,13 @@ The eye adaptation will adapt to a value extracted from the luminance histogram 
 
 #### Histogram Log Min { #unreal-postprocess-histogramlogmin }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMin</code></dd></div><div><dt>Default</dt><dd><code>-8</code></dd></div><div><dt>Range</dt><dd>-16 to 0</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessHistogramLogMin_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>-8</code></dd></div><div><dt>Range</dt><dd>-16 to 0</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMin</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessHistogramLogMin_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Histogram Min value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
 
 #### Histogram Log Max { #unreal-postprocess-histogramlogmax }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMax</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessHistogramLogMax_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMax</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessHistogramLogMax_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Histogram Max value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
 
@@ -273,7 +273,7 @@ Histogram Max value. Expressed in Log2(Luminance) or in EV100 when using ExtendD
 
 #### Intensity { #unreal-postprocess-scenefringeintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:SceneFringeIntensity</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 5</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessSceneFringeIntensity_c1bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 5</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:SceneFringeIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessSceneFringeIntensity_c1bl</code></dd></div></dl>
 
 in percent, Scene chromatic aberration / color fringe (camera imperfection) to simulate an artifact that happens in real-world lens, mostly visible in the image corners.
 
@@ -281,7 +281,7 @@ in percent, Scene chromatic aberration / color fringe (camera imperfection) to s
 
 #### Start Offset { #unreal-postprocess-chromaticaberrationstartoffset }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ChromaticAberrationStartOffset</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessChromaticAberrationStartOffset_micl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ChromaticAberrationStartOffset</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessChromaticAberrationStartOffset_micl</code></dd></div></dl>
 
 A normalized distance to the center of the framebuffer where the effect takes place.
 
@@ -291,7 +291,7 @@ A normalized distance to the center of the framebuffer where the effect takes pl
 
 #### Dirt Mask Texture { #unreal-postprocess-bloomdirtmask }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMask</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMask_xpbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMask</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMask_xpbl</code></dd></div></dl>
 
 Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
@@ -299,7 +299,7 @@ Texture that defines the dirt on the camera lens where the light of very bright 
 
 #### Dirt Mask Intensity { #unreal-postprocess-bloomdirtmaskintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskIntensity</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMaskIntensity_l4bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMaskIntensity_l4bl</code></dd></div></dl>
 
 BloomDirtMask intensity
 
@@ -307,7 +307,7 @@ BloomDirtMask intensity
 
 #### Dirt Mask Tint { #unreal-postprocess-bloomdirtmasktint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskTint</code></dd></div><div><dt>Default</dt><dd><code>0.5, 0.5, 0.5</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMaskTint_gwbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.5, 0.5, 0.5</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskTint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessBloomDirtMaskTint_gwbl</code></dd></div></dl>
 
 BloomDirtMask tint color
 
@@ -317,19 +317,19 @@ BloomDirtMask tint color
 
 #### Shutter Speed (1/s) { #unreal-postprocess-camerashutterspeed }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraShutterSpeed</code></dd></div><div><dt>Default</dt><dd><code>60</code></dd></div><div><dt>Range</dt><dd>0.01 to 8000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessCameraShutterSpeed_2xbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>60</code></dd></div><div><dt>Range</dt><dd>0.01 to 8000</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraShutterSpeed</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessCameraShutterSpeed_2xbl</code></dd></div></dl>
 
 The camera shutter in 1/seconds.
 
 #### ISO { #unreal-postprocess-cameraiso }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraISO</code></dd></div><div><dt>Default</dt><dd><code>100</code></dd></div><div><dt>Range</dt><dd>1 to 11</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessCameraISO_fjbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>100</code></dd></div><div><dt>Range</dt><dd>1 to 11</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraISO</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessCameraISO_fjbl</code></dd></div></dl>
 
 The camera sensor sensitivity in ISO.
 
 #### Aperture (F-stop) { #unreal-postprocess-depthoffieldfstop }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFstop</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>1 to 32</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldFstop_gwbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>1 to 32</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFstop</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldFstop_gwbl</code></dd></div></dl>
 
 Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
@@ -337,13 +337,13 @@ Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go dow
 
 #### Maximum Aperture (min F-stop) { #unreal-postprocess-depthoffieldminfstop }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldMinFstop</code></dd></div><div><dt>Default</dt><dd><code>1.2</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldMinFstop_c1bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1.2</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldMinFstop</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldMinFstop_c1bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Defines the maximum opening of the camera lens to control the curvature of blades of the diaphragm. Set it to 0 to get straight blades.
 
 #### Number of diaphragm blades { #unreal-postprocess-depthoffieldbladecount }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBladeCount</code></dd></div><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>4 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBladeCount_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>4 to 16</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBladeCount</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBladeCount_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Defines the number of blades of the diaphragm within the lens (between 4 and 16).
 
@@ -351,7 +351,7 @@ Defines the number of blades of the diaphragm within the lens (between 4 and 16)
 
 #### Method { #unreal-postprocess-localexposuremethod }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMethod</code></dd></div><div><dt>Default</dt><dd>Bilateral</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureMethod_pzbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Bilateral</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMethod</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureMethod_pzbl</code></dd></div></dl>
 
 Local Exposure algorithm
 
@@ -364,7 +364,7 @@ Local Exposure algorithm
 
 #### Highlight Contrast { #unreal-postprocess-localexposurehighlightcontrastscale }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightContrastScale_rqcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastScale</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightContrastScale_rqcl</code></dd></div></dl>
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
@@ -372,7 +372,7 @@ Local Exposure decomposes luminance of the frame into a base layer and a detail 
 
 #### Shadow Contrast { #unreal-postprocess-localexposureshadowcontrastscale }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowContrastScale_vlcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastScale</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowContrastScale_vlcl</code></dd></div></dl>
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
@@ -380,31 +380,31 @@ Local Exposure decomposes luminance of the frame into a base layer and a detail 
 
 #### Highlight Contrast Curve { #unreal-postprocess-localexposurehighlightcontrastcurve }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastCurve</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightContrastCurve_rqcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastCurve</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightContrastCurve_rqcl</code></dd></div></dl>
 
 Local Exposure Highlight Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
 #### Shadow Contrast Curve { #unreal-postprocess-localexposureshadowcontrastcurve }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastCurve</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowContrastCurve_vlcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastCurve</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowContrastCurve_vlcl</code></dd></div></dl>
 
 Local Exposure Shadow Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
 #### Highlight Threshold { #unreal-postprocess-localexposurehighlightthreshold }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThreshold</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightThreshold_8jcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThreshold</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightThreshold_8jcl</code></dd></div></dl>
 
 Threshold used to determine which regions of the screen are considered highlights.
 
 #### Shadow Threshold { #unreal-postprocess-localexposureshadowthreshold }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThreshold</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowThreshold_dfcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThreshold</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowThreshold_dfcl</code></dd></div></dl>
 
 Threshold used to determine which regions of the screen are considered shadows.
 
 #### Detail Strength { #unreal-postprocess-localexposuredetailstrength }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureDetailStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureDetailStrength_qdcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureDetailStrength</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureDetailStrength_qdcl</code></dd></div></dl>
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Value different than 1 will enable local exposure. This value should be set to 1 in most cases.
 
@@ -412,31 +412,31 @@ Local Exposure decomposes luminance of the frame into a base layer and a detail 
 
 #### Blurred Luminance Blend { #unreal-postprocess-localexposureblurredluminanceblend }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceBlend</code></dd></div><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureBlurredLuminanceBlend_4ocl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceBlend</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureBlurredLuminanceBlend_4ocl</code></dd></div></dl>
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Blend between bilateral filtered and blurred luminance as the base layer. Blurred luminance helps preserve image appearance and specular highlights, and reduce ringing. Good values are usually in the range 0.4 .. 0.6
 
 #### Blurred Luminance Kernel Size Percent { #unreal-postprocess-localexposureblurredluminancekernelsizepercent }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceKernelSizePercent</code></dd></div><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureBlurredLuminanceKernelSizePercent_o8cl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceKernelSizePercent</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureBlurredLuminanceKernelSizePercent_o8cl</code></dd></div></dl>
 
 Kernel size (percentage of screen) used to blur frame luminance.
 
 #### Highlight Threshold Strength { #unreal-postprocess-localexposurehighlightthresholdstrength }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThresholdStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightThresholdStrength_9wcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThresholdStrength</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureHighlightThresholdStrength_9wcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Strength of the highlight threshold.
 
 #### Shadow Threshold Strength { #unreal-postprocess-localexposureshadowthresholdstrength }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThresholdStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowThresholdStrength_escl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThresholdStrength</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureShadowThresholdStrength_escl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Strength of the shadow threshold.
 
 #### Middle Grey Bias { #unreal-postprocess-localexposuremiddlegreybias }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMiddleGreyBias</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-15 to 15</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureMiddleGreyBias_qdcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-15 to 15</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMiddleGreyBias</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLocalExposureMiddleGreyBias_qdcl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Logarithmic adjustment for the local exposure middle grey. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ...
 
@@ -444,7 +444,7 @@ Logarithmic adjustment for the local exposure middle grey. 0: no adjustment, -1:
 
 #### Intensity { #unreal-postprocess-lensflareintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareIntensity_2xbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareIntensity_2xbl</code></dd></div></dl>
 
 Brightness scale of the image cased lens flares (linear)
 
@@ -452,7 +452,7 @@ Brightness scale of the image cased lens flares (linear)
 
 #### Tint { #unreal-postprocess-lensflaretint }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareTint</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareTint_xpbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareTint</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareTint_xpbl</code></dd></div></dl>
 
 Tint color for the image based lens flares.
 
@@ -460,7 +460,7 @@ Tint color for the image based lens flares.
 
 #### BokehSize { #unreal-postprocess-lensflarebokehsize }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehSize</code></dd></div><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareBokehSize_2xbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 32</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehSize</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareBokehSize_2xbl</code></dd></div></dl>
 
 Size of the Lens Blur (in percent of the view width) that is done with the Bokeh texture (note: performance cost is radius\*radius)
 
@@ -468,13 +468,13 @@ Size of the Lens Blur (in percent of the view width) that is done with the Bokeh
 
 #### Threshold { #unreal-postprocess-lensflarethreshold }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareThreshold</code></dd></div><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>0.1 to 32</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareThreshold_2xbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>0.1 to 32</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareThreshold</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareThreshold_2xbl</code></dd></div></dl>
 
 Minimum brightness the lens flare starts having effect (this should be as high as possible to avoid the performance cost of blurring content that is too dark too see)
 
 #### BokehShape { #unreal-postprocess-lensflarebokehshape }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehShape</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareBokehShape_pzbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehShape</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLensFlareBokehShape_pzbl</code></dd></div></dl>
 
 Defines the shape of the Bokeh when the image base lens flares are blurred, cannot be blended. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
@@ -482,7 +482,7 @@ Defines the shape of the Bokeh when the image base lens flares are blurred, cann
 
 #### Vignette Intensity { #unreal-postprocess-vignetteintensity }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteIntensity</code></dd></div><div><dt>Default</dt><dd><code>0.4</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteIntensity_gwbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.4</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteIntensity</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteIntensity_gwbl</code></dd></div></dl>
 
 0..1 0=off/no vignette .. 1=strong vignette
 
@@ -490,7 +490,7 @@ Defines the shape of the Bokeh when the image base lens flares are blurred, cann
 
 #### Sharpen { #unreal-postprocess-sharpen }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Sharpen</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessSharpen_5fbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Sharpen</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessSharpen_5fbl</code></dd></div></dl>
 
 Controls the strength of image sharpening applied during tonemapping.
 
@@ -498,7 +498,7 @@ Controls the strength of image sharpening applied during tonemapping.
 
 #### Vignette Type { #unreal-postprocess-vignettetype }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteType</code></dd></div><div><dt>Default</dt><dd>Cosine Fourth Law (Default)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteType_bobl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Cosine Fourth Law (Default)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteType</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteType_bobl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 The shape type of the vignette
 
@@ -510,31 +510,31 @@ The shape type of the vignette
 
 #### Vignette Center { #unreal-postprocess-vignettecenter }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteCenter</code></dd></div><div><dt>Default</dt><dd><code>0.5, 0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteCenter_krbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.5, 0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteCenter</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteCenter_krbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Position of the vignette center in UV space.
 
 #### Vignette Color { #unreal-postprocess-vignettecolor }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteColor</code></dd></div><div><dt>Default</dt><dd><code>0, 0, 0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteColor_xpbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0, 0, 0</code></dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteColor</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteColor_xpbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Color multiplied with areas that are masked by the vignette. Default is black.
 
 #### Vignette Size { #unreal-postprocess-vignettesize }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSize</code></dd></div><div><dt>Default</dt><dd><code>1, 1</code></dd></div><div><dt>Range</dt><dd>0 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteSize_bobl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1, 1</code></dd></div><div><dt>Range</dt><dd>0 to 2</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSize</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteSize_bobl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Scale of the vignette shape in screenspace. Can be used to scale vignette anamorphically. Default is 1.
 
 #### Vignette Softness { #unreal-postprocess-vignettesoftness }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSoftness</code></dd></div><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0.001 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteSoftness_tubl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0.001 to 10</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSoftness</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteSoftness_tubl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 The softness of the transition from opaque to transparant on the edge of the vignette shape.
 
 #### Vignette Texture { #unreal-postprocess-vignettetexture }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteTexture</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteTexture_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteTexture</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessVignetteTexture_6sbl</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Defines the shape of the vignette when VignetteType is set to Texture. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
@@ -542,7 +542,7 @@ Defines the shape of the vignette when VignetteType is set to Texture. An image 
 
 #### Enabled { #unreal-postprocess-depthoffieldenabled }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldEnabled</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldEnabled_pzbl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>On</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldEnabled</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldEnabled_pzbl</code></dd></div></dl>
 
 When false, post-process depth of field will not be used. When true, DoF may be used depending on lens and scalability settings.
 
@@ -550,13 +550,13 @@ When false, post-process depth of field will not be used. When true, DoF may be 
 
 #### Sensor Width (mm) { #unreal-postprocess-depthoffieldsensorwidth }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSensorWidth</code></dd></div><div><dt>Default</dt><dd><code>24.576</code></dd></div><div><dt>Range</dt><dd>0.1 to 1000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldSensorWidth_75bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>24.576</code></dd></div><div><dt>Range</dt><dd>0.1 to 1000</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSensorWidth</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldSensorWidth_75bl</code></dd></div></dl>
 
 Width of the camera sensor to assume, in mm. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
 #### Squeeze Factor { #unreal-postprocess-depthoffieldsqueezefactor }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSqueezeFactor</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldSqueezeFactor_h9bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 2</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSqueezeFactor</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldSqueezeFactor_h9bl</code></dd></div></dl>
 
 This is the squeeze factor for the DOF, which emulates the properties of anamorphic lenses. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
@@ -564,25 +564,25 @@ This is the squeeze factor for the DOF, which emulates the properties of anamorp
 
 #### Focal Distance { #unreal-postprocess-depthoffieldfocaldistance }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFocalDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 10000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldFocalDistance_h9bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 10000</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFocalDistance</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldFocalDistance_h9bl</code></dd></div></dl>
 
 Distance in which the Depth of Field effect should be sharp, in unreal units (cm). Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
 #### Depth Blur km for 50% { #unreal-postprocess-depthoffielddepthbluramount }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurAmount</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1e-06 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldDepthBlurAmount_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1e-06 to 100</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurAmount</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldDepthBlurAmount_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 CircleDOF only: Depth blur km for 50%
 
 #### Depth Blur Radius { #unreal-postprocess-depthoffielddepthblurradius }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurRadius</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldDepthBlurRadius_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurRadius</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldDepthBlurRadius_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 CircleDOF only: Depth blur radius in pixels at 1920x
 
 #### Petzval Bokeh { #unreal-postprocess-depthoffieldpetzvalbokeh }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokeh</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-10 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalBokeh_u7bl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-10 to 10</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokeh</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalBokeh_u7bl</code></dd></div></dl>
 
 Simulate stretching in blur and bokeh. Positive values for sagittal (swirly bokeh), negative values for tangential.
 
@@ -590,42 +590,42 @@ Simulate stretching in blur and bokeh. Positive values for sagittal (swirly boke
 
 #### Petzval Bokeh Falloff { #unreal-postprocess-depthoffieldpetzvalbokehfalloff }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokehFalloff</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalBokehFalloff_8jcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokehFalloff</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalBokehFalloff_8jcl</code></dd></div></dl>
 
 How quickly does the Petzval bokeh effect increase towards the edge of the image
 
 #### Petzval Bokeh Exclusion Box { #unreal-postprocess-depthoffieldpetzvalexclusionboxextents }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxExtents</code></dd></div><div><dt>Default</dt><dd><code>0, 0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalExclusionBoxExtents_nvcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0, 0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxExtents</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalExclusionBoxExtents_nvcl</code></dd></div></dl>
 
 Box, centered on screen, around which the Petzval effect is applied.
 
 #### Petzval Bokeh Exclusion Box Radius { #unreal-postprocess-depthoffieldpetzvalexclusionboxradius }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxRadius</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalExclusionBoxRadius_0tcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxRadius</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldPetzvalExclusionBoxRadius_0tcl</code></dd></div></dl>
 
 Corner radius
 
 #### Aspect Ratio Scalar { #unreal-postprocess-depthoffieldaspectratioscalar }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldAspectRatioScalar</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldAspectRatioScalar_zgcl</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldAspectRatioScalar</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldAspectRatioScalar_zgcl</code></dd></div></dl>
 
 Amount to scale the output viewport's aspect ratio by when computing depth of field properties.
 
 #### Barrel Radius { #unreal-postprocess-depthoffieldbarrelradius }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelRadius</code></dd></div><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBarrelRadius_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelRadius</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBarrelRadius_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
 
 #### Barrel Length { #unreal-postprocess-depthoffieldbarrellength }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelLength</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 150</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBarrelLength_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 150</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelLength</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldBarrelLength_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
 
 #### Use Hair Depth { #unreal-postprocess-depthoffieldusehairdepth }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldUseHairDepth</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldUseHairDepth_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Off</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldUseHairDepth</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDepthOfFieldUseHairDepth_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 For depth of field to use the hair depth for computing circle of confusion size. Otherwise use an interpolated distance between the hair depth and the scene depth based on the hair coverage (default).

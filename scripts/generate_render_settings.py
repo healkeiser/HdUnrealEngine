@@ -2498,12 +2498,13 @@ def md_setting(setting, level):
     attribute = setting["attribute"]
     anchor = re.sub(r"[^\w-]", "-", attribute).lower()
     facts = [
-        ("USD attribute", f"`{attribute}`"),
         ("Default", md_default(setting)),
     ]
+    # The short facts first, so they line up from setting to setting; the two names after them.
     if setting.get("range"):
         lo, hi = setting["range"][:2]
         facts.append(("Range", f"{ds_number(lo)} to {ds_number(hi)}"))
+    facts.append(("USD attribute", f"`{attribute}`"))
     facts.append(("Houdini parameter", f"`{houdini_name(attribute)}`"))
     badges = []
     if setting.get("mode"):

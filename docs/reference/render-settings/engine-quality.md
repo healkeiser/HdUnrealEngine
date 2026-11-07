@@ -6,7 +6,7 @@
 
 #### View Distance { #unreal-cvar-sg-viewdistancequality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ViewDistanceQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgViewDistanceQuality_krbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ViewDistanceQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgViewDistanceQuality_krbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ViewDistanceQuality (process-wide).
 
@@ -20,7 +20,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Anti-Aliasing { #unreal-cvar-sg-antialiasingquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:AntiAliasingQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgAntiAliasingQuality_krbec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:AntiAliasingQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgAntiAliasingQuality_krbec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.AntiAliasingQuality (process-wide).
 
@@ -34,7 +34,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Shadows { #unreal-cvar-sg-shadowquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadowQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgShadowQuality_shbec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadowQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgShadowQuality_shbec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide).
 
@@ -50,7 +50,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Global Illumination { #unreal-cvar-sg-globalilluminationquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:GlobalIlluminationQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgGlobalIlluminationQuality_c1bec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:GlobalIlluminationQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgGlobalIlluminationQuality_c1bec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide).
 
@@ -66,7 +66,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Reflections { #unreal-cvar-sg-reflectionquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ReflectionQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgReflectionQuality_bobec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ReflectionQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgReflectionQuality_bobec</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ReflectionQuality (process-wide).
 
@@ -80,7 +80,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Post-Processing { #unreal-cvar-sg-postprocessquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:PostProcessQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgPostProcessQuality_xpbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:PostProcessQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgPostProcessQuality_xpbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.PostProcessQuality (process-wide).
 
@@ -94,7 +94,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Textures { #unreal-cvar-sg-texturequality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:TextureQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgTextureQuality_fjbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:TextureQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgTextureQuality_fjbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.TextureQuality (process-wide).
 
@@ -108,7 +108,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Effects { #unreal-cvar-sg-effectsquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:EffectsQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgEffectsQuality_fjbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:EffectsQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgEffectsQuality_fjbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.EffectsQuality (process-wide).
 
@@ -122,7 +122,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Foliage { #unreal-cvar-sg-foliagequality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:FoliageQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgFoliageQuality_fjbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:FoliageQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgFoliageQuality_fjbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.FoliageQuality (process-wide).
 
@@ -136,7 +136,7 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Shading { #unreal-cvar-sg-shadingquality }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadingQuality</code></dd></div><div><dt>Default</dt><dd>Epic</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgShadingQuality_fjbec</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Epic</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadingQuality</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarsgShadingQuality_fjbec</code></dd></div></dl>
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadingQuality (process-wide).
 
@@ -152,13 +152,13 @@ UE scalability group: applies the console variables of this quality level (Engin
 
 #### Nanite { #unreal-cvar-r-nanite }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNanite_r3aeb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>On</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNanite_r3aeb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Render static meshes using Nanite. Console variable r.Nanite (process-wide).
 
 #### Max Pixels per Edge { #unreal-cvar-r-nanite-maxpixelsperedge }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite:MaxPixelsPerEdge</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNaniteMaxPixelsPerEdge_tubebg</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite:MaxPixelsPerEdge</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNaniteMaxPixelsPerEdge_tubebg</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 The triangle edge length that the Nanite runtime targets, measured in pixels. Console variable r.Nanite.MaxPixelsPerEdge (process-wide).
 
@@ -168,13 +168,13 @@ The triangle edge length that the Nanite runtime targets, measured in pixels. Co
 
 #### Ray Tracing { #unreal-cvar-r-raytracing-enable }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Enable</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrRayTracingEnable_1kbebk</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>On</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Enable</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrRayTracingEnable_1kbebk</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Whether ray tracing is enabled at runtime. If r.RayTracing.EnableOnDemand is enabled, ray tracing can be toggled on/off at runtime. Otherwise this is only checked during initialization. Console variable r.RayTracing.Enable (process-wide).
 
 #### Nanite Ray Tracing { #unreal-cvar-r-raytracing-nanite-mode }
 
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Nanite:Mode</code></dd></div><div><dt>Default</dt><dd>Fallback Mesh</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrRayTracingNaniteMode_krbebkg</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd>Fallback Mesh</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Nanite:Mode</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrRayTracingNaniteMode_krbebkg</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 0 - fallback mesh (default); 1 - streamed out mesh; 2 - use CLAS; Console variable r.RayTracing.Nanite.Mode (process-wide).
 
