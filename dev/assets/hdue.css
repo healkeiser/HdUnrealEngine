@@ -342,42 +342,65 @@ html .glightbox-clean .gslide-title {
 .md-typeset .hdue-facts {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0 0.9rem;
-  align-items: flex-end;
-  width: fit-content;
-  max-width: 100%;
+  align-items: stretch;
+  width: 100%;
   box-sizing: border-box;
   margin: 0.5em 0 0.9em;
-  padding: 0.4rem 0.7rem 0.45rem;
-  overflow-x: auto;
+  overflow: hidden;
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 0.4rem;
   background-color: var(--md-code-bg-color);
-  scrollbar-width: thin;
 }
+/* One cell per fact, split by hairlines; the short ones keep their width, the two names share what is left and end
+   in an ellipsis when they do not fit (the full name is in the reference's search and in Houdini). */
 .md-typeset .hdue-facts > div {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: 0.1rem;
+  min-width: 0;
+  padding: 0.35rem 0.7rem 0.4rem;
+}
+.md-typeset .hdue-facts > div + div {
+  border-left: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .hdue-facts > div:nth-last-of-type(-n + 2) {
+  flex: 1 1 0;
 }
 .md-typeset .hdue-facts dt {
   color: var(--md-default-fg-color--lighter);
-  font-size: 0.5rem;
+  font-size: 0.48rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .md-typeset .hdue-facts dd {
   margin: 0;
-  font-size: 0.64rem;
+  overflow: hidden;
+  font-size: 0.6rem;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .md-typeset .hdue-facts code {
   padding: 0;
   font-size: 0.85em;
   background: none;
   box-shadow: none;
+}
+.md-typeset .hdue-facts .hdue-badge {
+  align-self: center;
+  margin: 0 0.6rem;
+}
+/* Each setting set off from the one before by a hairline over its heading, not the first under a category. */
+.md-typeset :is(h2, h3, h4, h5):has(+ .hdue-facts) {
+  margin-top: 1.6em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset :is(h1, h2, h3, h4):not(:has(+ .hdue-facts)) + :is(h2, h3, h4, h5):has(+ .hdue-facts) {
+  margin-top: 0.8em;
+  padding-top: 0;
+  border-top: 0;
 }
 .hdue-badge {
   flex: none;
@@ -424,6 +447,7 @@ html .glightbox-clean .gslide-title {
   padding: 0;
   overflow: visible;
   border: 0;
+  border-radius: 0;
   background: none;
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr);
@@ -432,6 +456,14 @@ html .glightbox-clean .gslide-title {
 }
 .md-typeset .hdue-param .hdue-facts > div {
   display: contents;
+}
+.md-typeset .hdue-param .hdue-facts dd {
+  overflow: visible;
+  font-size: 0.7rem;
+  white-space: normal;
+}
+.md-typeset .hdue-param .hdue-facts > div + div {
+  border-left: 0;
 }
 .md-typeset .hdue-param .hdue-badge {
   grid-column: 2;
