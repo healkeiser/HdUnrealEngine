@@ -1,0 +1,23 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Disable Tone Curve off (default)",
+   "set": {}
+  },
+  {
+   "caption": "Disable Tone Curve on",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:disableToneCurve = 1"
+    ]
+   }
+  }
+ ]
+}

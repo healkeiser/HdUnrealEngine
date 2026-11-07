@@ -1,0 +1,38 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Nanite:MaxPixelsPerEdge"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:debugView = \"nanite:Triangles\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:Nanite:MaxPixelsPerEdge = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:Nanite:MaxPixelsPerEdge = 4"
+    ]
+   }
+  },
+  {
+   "caption": "8",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:Nanite:MaxPixelsPerEdge = 8"
+    ]
+   }
+  }
+ ]
+}

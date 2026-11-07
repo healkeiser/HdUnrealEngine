@@ -1,0 +1,40 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:AmbientOcclusionRadius"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\"",
+   "token unreal:postProcess:DynamicGlobalIlluminationMethod = \"EDynamicGlobalIlluminationMethod::None\"",
+   "float unreal:postProcess:AmbientOcclusionIntensity = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "50",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AmbientOcclusionRadius = 50"
+    ]
+   }
+  },
+  {
+   "caption": "200 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AmbientOcclusionRadius = 200"
+    ]
+   }
+  },
+  {
+   "caption": "600",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AmbientOcclusionRadius = 600"
+    ]
+   }
+  }
+ ]
+}

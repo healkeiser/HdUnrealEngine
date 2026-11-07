@@ -1,0 +1,45 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "RectLight",
+   "set": {}
+  },
+  {
+   "caption": "SphereLight",
+   "set": {
+    "/scene/key": [
+     "(active = false)"
+    ],
+    "/scene/spot": [
+     "(active = true)",
+     "float inputs:shaping:cone:angle = 180"
+    ]
+   }
+  },
+  {
+   "caption": "SphereLight + ShapingAPI",
+   "set": {
+    "/scene/key": [
+     "(active = false)"
+    ],
+    "/scene/spot": [
+     "(active = true)"
+    ]
+   }
+  },
+  {
+   "caption": "DistantLight",
+   "set": {
+    "/scene/key": [
+     "(active = false)"
+    ],
+    "/scene/sun": [
+     "(active = true)"
+    ]
+   }
+  }
+ ]
+}

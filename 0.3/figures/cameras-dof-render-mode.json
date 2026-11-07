@@ -1,0 +1,27 @@
+{
+ "scene": "docs/row.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/camera": [
+   "float focalLength = 0.5",
+   "float horizontalAperture = 0.36",
+   "float verticalAperture = 0.2025",
+   "float fStop = 1.4",
+   "float focusDistance = 2.4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "realtime (default)",
+   "set": {}
+  },
+  {
+   "caption": "pathtraced",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "8",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 8"
+    ]
+   }
+  },
+  {
+   "caption": "2048 (default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 2048"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.53 (default)",
+   "set": {
+    "/scene/sun": [
+     "float inputs:angle = 0.53"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/scene/sun": [
+     "float inputs:angle = 4"
+    ]
+   }
+  },
+  {
+   "caption": "15",
+   "set": {
+    "/scene/sun": [
+     "float inputs:angle = 15"
+    ]
+   }
+  }
+ ]
+}

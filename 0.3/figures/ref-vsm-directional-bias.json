@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional"
+ ],
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "-1.5 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional = -1.5"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional = 2"
+    ]
+   }
+  }
+ ]
+}

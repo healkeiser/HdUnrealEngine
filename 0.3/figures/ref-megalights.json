@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:bMegaLights"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:bMegaLights = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:bMegaLights = 0"
+    ]
+   }
+  }
+ ]
+}

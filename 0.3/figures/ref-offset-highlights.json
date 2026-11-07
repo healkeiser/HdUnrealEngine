@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorOffsetHighlights"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0, 0, 0, 0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorOffsetHighlights = (0, 0, 0, 0)"
+    ]
+   }
+  },
+  {
+   "caption": "0, 0, 0, 0.02",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorOffsetHighlights = (0, 0, 0, 0.02)"
+    ]
+   }
+  },
+  {
+   "caption": "0, 0, 0.02, 0",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorOffsetHighlights = (0, 0, 0.02, 0)"
+    ]
+   }
+  }
+ ]
+}

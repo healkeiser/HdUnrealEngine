@@ -1,0 +1,34 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:sg:GlobalIlluminationQuality"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "Low",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:sg:GlobalIlluminationQuality = 0"
+    ]
+   }
+  },
+  {
+   "caption": "High",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:sg:GlobalIlluminationQuality = 2"
+    ]
+   }
+  },
+  {
+   "caption": "Cinematic (husk default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:cvar:sg:GlobalIlluminationQuality = 4"
+    ]
+   }
+  }
+ ]
+}
