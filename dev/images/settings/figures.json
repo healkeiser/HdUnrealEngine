@@ -69,6 +69,16 @@
   "0.2 m",
   "0.6 m"
  ],
+ "effects-age": [
+  "1 frame",
+  "3 frames",
+  "1 s",
+  "4 s"
+ ],
+ "effects-render-mode": [
+  "Realtime",
+  "Path Tracer"
+ ],
  "engine-quality-gi": [
   "Low",
   "High",

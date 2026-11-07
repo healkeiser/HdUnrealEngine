@@ -37,6 +37,9 @@
         <loc>https://healkeiser.github.io/HdUnrealEngine/latest/developer/writing-docs/</loc>
       </url>
       <url>
+        <loc>https://healkeiser.github.io/HdUnrealEngine/latest/environment/effects/</loc>
+      </url>
+      <url>
         <loc>https://healkeiser.github.io/HdUnrealEngine/latest/environment/fog/</loc>
       </url>
       <url>
@@ -140,6 +143,9 @@
       </url>
       <url>
         <loc>https://healkeiser.github.io/HdUnrealEngine/latest/reference/nodes/lop/hduestandardrendervars/</loc>
+      </url>
+      <url>
+        <loc>https://healkeiser.github.io/HdUnrealEngine/latest/reference/nodes/lop/hdueunrealasset/</loc>
       </url>
       <url>
         <loc>https://healkeiser.github.io/HdUnrealEngine/latest/reference/nodes/lop/hduevolumetriccloud/</loc>
