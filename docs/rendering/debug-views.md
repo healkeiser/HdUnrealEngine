@@ -2,7 +2,7 @@
 
 A debug view replaces the lit image with one of the view modes of UE's viewport **View Mode** menu: lighting only, a GBuffer channel, Lumen's scene, shadow map pages. Use them to find out why an image looks the way it does.
 
-The room in UE's lighting view modes.
+The Bistro in UE's lighting view modes.
 
 <div class="hdue-figure" data-figure="debug-views-modes"></div>
 

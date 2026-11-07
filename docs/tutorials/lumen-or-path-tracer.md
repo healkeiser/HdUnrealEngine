@@ -24,9 +24,9 @@ Realtime is not a preview mode: UE renders final frames with it, and so can you.
 
 ## Four scenes side by side
 
-The room (`samples/docs/room.usda`), lit only through its window: almost all the light is bounced.
+The Bistro (`samples/docs/bistro.usda`), lit by its lamps: most of the room is lit by bounced light.
 
-<div class="hdue-figure" data-figure="tut-lumen-pt-room"></div>
+<div class="hdue-figure" data-figure="tut-lumen-pt-bistro"></div>
 
 The Veach planks (`samples/docs/veach.usda`): four sphere lights of increasing size over four planks of increasing roughness.
 
@@ -73,7 +73,7 @@ The ball as rough metal (roughness 0.55), with **Max Roughness To Trace** at 0.4
 ## Bounced light
 
 1. Set **Ray Lighting Mode** to **Hit Lighting**.
-    Lumen's diffuse rays are then lit at their hit point too. See [Lighting a room](lighting-a-room.md#lumen-and-the-path-tracer) for the room in this mode.
+    Lumen's diffuse rays are then lit at their hit point too. See [Lighting an interior](lighting-an-interior.md#lumen-and-the-path-tracer) for an interior in both modes.
 2. If indirect light stays blotchy, raise **Final Gather Quality** to 2. See [Removing noise](removing-noise.md#realtime-blotches-in-indirect-light).
 3. Do not raise **Diffuse Color Boost** or **Indirect Lighting Intensity** to match the Path Tracer.
     UE's tooltip says values of Diffuse Color Boost above 1 are not physically correct; they brighten bounced light for art direction, not accuracy.

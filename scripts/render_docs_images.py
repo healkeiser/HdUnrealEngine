@@ -57,7 +57,7 @@ def figures():
 
 
 def overs(overrides):
-    """Nested `over` prims for {prim path: [lines]}; a "(...)" line is the prim's metadata."""
+    """Nested `over` prims for {prim path: [lines]}; a "(...)" line is the prim's metadata (the last one wins)."""
     tree = {}
     for path, lines in overrides.items():
         node = tree
@@ -66,14 +66,22 @@ def overs(overrides):
         node.setdefault("", []).extend(lines)
 
     def write(node, indent):
-        lines = node.get("", [])
-        text = "".join(
-            f"{indent}{line}\n" for line in lines if not line.startswith("(")
-        )
+        # The last line per property wins too: a value's "float fStop = 2.8" over the base's "float fStop = 0".
+        properties = {}
+        for line in node.get("", []):
+            if not line.startswith("("):
+                properties[line.split("=")[0].split()[-1]] = line
+        text = "".join(f"{indent}{line}\n" for line in properties.values())
         for name, child in node.items():
             if name:
-                meta = " ".join(
-                    line for line in child.get("", []) if line.startswith("(")
+                # The last metadata line wins: a value's "(active = true)" over the base's "(active = false)".
+                meta = next(
+                    (
+                        line
+                        for line in reversed(child.get("", []))
+                        if line.startswith("(")
+                    ),
+                    "",
                 )
                 text += (
                     f'{indent}over "{name}"{" " + meta if meta else ""}\n{indent}{{\n'

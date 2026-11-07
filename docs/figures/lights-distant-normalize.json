@@ -1,7 +1,14 @@
 {
- "scene": "docs/room.usda",
+ "scene": "docs/lights.usda",
  "display": "tonemapped",
- "base": {},
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
  "values": [
   {
    "caption": "0 (default)",

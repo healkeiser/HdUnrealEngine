@@ -2,7 +2,7 @@
 
 # Render settings reference
 
-Every one of the 371 render settings, in the order the Unreal Engine tab of a Render Settings LOP shows them. Each is a `unreal:*` attribute on the UsdRenderSettings prim; the Houdini parameter name is the attribute's encoded form. Unreal's settings keep UE's names, tooltips, ranges and defaults, read from the engine source. See [Render settings](../../rendering/render-settings.md) for how they reach UE.
+Every one of the 372 render settings, in the order the Unreal Engine tab of a Render Settings LOP shows them. Each is a `unreal:*` attribute on the UsdRenderSettings prim; the Houdini parameter name is the attribute's encoded form. Unreal's settings keep UE's names, tooltips, ranges and defaults, read from the engine source. See [Render settings](../../rendering/render-settings.md) for how they reach UE.
 
 ## Above the tabs
 

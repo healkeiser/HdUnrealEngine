@@ -337,6 +337,13 @@ Houdini parameter `xn__unrealrequireNanite_06a`
 
 Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). Meshes built from Hydra are unaffected.
 
+#### Nanite Triangle Threshold { #unreal-nanitetrianglethreshold }
+
+`unreal:naniteTriangleThreshold` · Default `1000000` · Range 0 to 10000000 · Advanced  
+Houdini parameter `xn__unrealnaniteTriangleThreshold_bob`
+
+Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes every mesh Nanite.
+
 #### Cull Backface { #unreal-cullbackface }
 
 `unreal:cullBackface` · Default On · Advanced  

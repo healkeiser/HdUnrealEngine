@@ -40,3 +40,7 @@ uv.lock
 
 # Zensical output (zensical build)
 /site/
+# Amazon Lumberyard Bistro (CC BY 4.0, NVIDIA ORCA): downloaded and converted locally, never committed (samples/bistro/README.md)
+/samples/bistro/download/
+/samples/bistro/source/
+/samples/bistro/usd/

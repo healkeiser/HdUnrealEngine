@@ -1,6 +1,6 @@
 # Exposure and tone
 
-The room with UE's tonemapper off (the scene-linear image, sRGB-encoded) and on.
+The Bistro with UE's tonemapper off (the scene-linear image, sRGB-encoded) and on.
 
 <div class="hdue-figure" data-figure="tut-exposure-tonemapper"></div>
 
@@ -8,9 +8,9 @@ You will choose between a scene-linear image for compositing and UE's tone-mappe
 
 ## The starting scene
 
-Use the room, `$HDUE/samples/docs/room.usda`: a sunlit interior with a wide range of brightness, from the sun patch on the floor to the shaded corners.
+Use the Bistro, `$HDUE/samples/docs/bistro.usda` (see [Lighting an interior](lighting-an-interior.md#the-starting-scene) for the download): a night interior with a wide range of brightness, from the glowing lamp shades to the dark corners.
 
-1. In `/stage`, add a **Sublayer** LOP with **File** `$HDUE/samples/docs/room.usda` and set its display flag.
+1. In `/stage`, add a **Sublayer** LOP with **File** `$HDUE/samples/docs/bistro.usda` and set its display flag.
 2. Render with **Unreal Engine** through `camera`, and choose **Unreal > Create hdUE Render Settings**.
 
 Set **Unreal Tonemapper** off on the LOP to start from the scene-linear image.
@@ -34,12 +34,12 @@ Bloom, colour grading, vignette, grain, chromatic aberration and lens flares onl
 
 **Exposure Compensation** (`unreal:postProcess:AutoExposureBias`, default 0, above the tabs) shifts the exposure in stops: +1 doubles the brightness, -1 halves it.
 
-The room at -1, 0, +1 and +2.
+The Bistro at -1, 0, +1 and +2 (the scene itself authors +1).
 
 <div class="hdue-figure" data-figure="tut-exposure-bias"></div>
 
-1. Raise **Exposure Compensation** one stop at a time until the shaded half of the room reads, then check that the sun patch keeps its detail.
-    The film curve rolls highlights off, so a stop more brightens the mid-tones more than the sun patch.
+1. Raise **Exposure Compensation** one stop at a time until the shaded corners read, then check that the lamp shades keep their detail.
+    The film curve rolls highlights off, so a stop more brightens the mid-tones more than the lamp shades.
 
 It applies with the tonemapper on. With the tonemapper off, change exposure on the camera instead (below) or in comp.
 
@@ -77,7 +77,7 @@ Comp wants scene-linear EXRs. You have two ways to get them.
 
 **Tonemapper on, tone curve off.** When the shot needs UE's bloom or grading in the render, turn on **Disable Tone Curve** (`unreal:disableToneCurve`, default off). This is Movie Render Queue's Disable Tone Curve: grading, bloom, vignette and grain still apply, without the film curve, so the beauty stays scene-linear.
 
-The room with the tonemapper on, with **Disable Tone Curve** off and on.
+The Bistro with the tonemapper on, with **Disable Tone Curve** off and on.
 
 <div class="hdue-figure" data-figure="tut-exposure-tonecurve"></div>
 

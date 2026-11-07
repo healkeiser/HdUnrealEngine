@@ -7,11 +7,8 @@
     endTimeCode = 1
     timeCodesPerSecond = 24
     renderSettingsPrimPath = "/Render/Settings"
-    # Houdini's sample scenes: ${HFS} is this default unless the root layer opening this scene sets it
-    # (scripts/render_docs_images.py sets it to $HFS).
-    expressionVariables = {
-        string HFS = "C:/Program Files/Side Effects Software/Houdini 22.0.368"
-    }
+    # Houdini's sample scenes, under ${HFS}: the root layer opening this scene sets it to Houdini's install
+    # (scripts/render_docs_images.py does).
     subLayers = [@`"${HFS}/houdini/usd/scenes/material_lookdev/standard_shader_ball.usd"`@]
 )
 
@@ -37,6 +34,25 @@ def Scope "scene"
 
 over "World"
 {
+    # Each softbox's backplane is a grey card in the plane of its rect light: the Path Tracer's shadow rays toward the
+    # light hit it, half blocking the light, and glossy surfaces reflect the cards as hard-edged grey shapes.
+    over "lights"
+    {
+        over "emitterLeft"
+        {
+            over "backplane" (active = false)
+            {
+            }
+        }
+
+        over "emitterTop"
+        {
+            over "backplane" (active = false)
+            {
+            }
+        }
+    }
+
     over "shader_ball"
     {
         over "material_surface" (prepend apiSchemas = ["MaterialBindingAPI"])
@@ -55,10 +71,9 @@ def Scope "Render"
         rel products = </Render/Product>
         token unreal:renderMode = "realtime"
         int unreal:samplesPerPixel = 256
-        int unreal:subdivisionLevel = 2
-        # Ray tracing (the Path Tracer, Lumen hit lighting) traces Nanite's full-detail mesh, not UE's default
-        # coarse fallback mesh, so the shader ball stays round in the Path Tracer.
-        int unreal:cvar:r:RayTracing:Nanite:Mode = 1
+        # Level 3: the shader ball refines to 750,000 triangles, under UE's Nanite threshold (level 4 crosses it), and
+        # its shading bands of level 2 are gone.
+        int unreal:subdivisionLevel = 3
         # The images show UE's tone-mapped frame, as UE's editor viewport shows it.
         bool unreal:tonemapper = 1
     }

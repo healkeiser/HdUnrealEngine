@@ -20,7 +20,7 @@ flowchart TD
     F -->|Grainy soft shadows| J[Soft Shadow Rays, MegaLights per light]
 ```
 
-The scenes: the Cornell box for the Path Tracer, the room (`samples/docs/room.usda`) for Lumen, the chrome ball and box (`samples/docs/lights.usda`) for shadows. All settings are on the hdUE Render Settings LOP.
+The scenes: the Cornell box for the Path Tracer, the Bistro (`samples/docs/bistro.usda`) for Lumen, the chrome ball and box (`samples/docs/lights.usda`) for shadows. All settings are on the hdUE Render Settings LOP.
 
 ## Path Tracer: grain everywhere
 
@@ -54,7 +54,7 @@ The clamp is relative to the exposure, so you do not need to change it with **Ex
 
 **Cause.** Lumen has not settled, or its final gather traces too few rays for the scene. Blotches show on surfaces lit only by bounced light: ceilings, the shaded side of a room.
 
-First check that the frame had time to settle. Room with 1, 8 and 64 **Warmup Frames**.
+First check that the frame had time to settle. The Bistro with 1, 8 and 64 **Warmup Frames**.
 
 <div class="hdue-figure" data-figure="tut-noise-lumen-warmup"></div>
 
@@ -63,7 +63,7 @@ First check that the frame had time to settle. Room with 1, 8 and 64 **Warmup Fr
 2. If blotches remain, raise **Final Gather Quality** (`unreal:postProcess:LumenFinalGatherQuality`, Lighting tab) from 1 to 2.
     It scales the rays Lumen's final gather traces. UE's tooltip: larger values reduce noise but greatly increase GPU cost.
 
-Room with **Final Gather Quality** at 0.25, 1 and 2.
+The Bistro with **Final Gather Quality** at 0.25, 1 and 2.
 
 <div class="hdue-figure" data-figure="tut-noise-lumen-quality"></div>
 

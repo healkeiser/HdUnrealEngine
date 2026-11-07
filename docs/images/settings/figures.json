@@ -115,6 +115,14 @@
   "Realtime, Method Lumen (default)",
   "Path Tracer, 256 samples"
  ],
+ "home-bistro-exterior": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "home-bistro-interior": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
  "lights-color-temperature": [
   "2700",
   "4000",
@@ -477,6 +485,34 @@
   "Unreal Tonemapper off",
   "Unreal Tonemapper on"
  ],
+ "tut-interior-final": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-interior-grade": [
+  "Neutral",
+  "Film grain 0.12, White Temp 6000 K"
+ ],
+ "tut-interior-haze": [
+  "No haze",
+  "Volumetric height fog",
+  "Fog and dust in the beam"
+ ],
+ "tut-interior-key": [
+  "Lamps only",
+  "Lamps and the key spot"
+ ],
+ "tut-interior-lens": [
+  "Pinhole (fStop 0)",
+  "f/2.8, focused at 1.37 m"
+ ],
+ "tut-interior-practicals": [
+  "Lamps only"
+ ],
+ "tut-lumen-pt-bistro": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
  "tut-lumen-pt-cornell": [
   "Realtime (Lumen)",
   "Path Tracer"
@@ -488,10 +524,6 @@
  "tut-lumen-pt-reflections": [
   "Realtime, Ray Lighting Mode Project Default",
   "Realtime, Hit Lighting for Reflections",
-  "Path Tracer"
- ],
- "tut-lumen-pt-room": [
-  "Realtime (Lumen)",
   "Path Tracer"
  ],
  "tut-lumen-pt-roughness": [
@@ -529,33 +561,6 @@
  "tut-noise-shadow-rays": [
   "Directional Soft Shadow Rays 1",
   "Directional Soft Shadow Rays 8 (default)"
- ],
- "tut-room-fill": [
-  "No fill",
-  "Fill exposure 2",
-  "Fill exposure 3",
-  "Fill exposure 4"
- ],
- "tut-room-final": [
-  "Sun, sky and window fill (Realtime)"
- ],
- "tut-room-lumen-pt": [
-  "Realtime (Lumen)",
-  "Realtime, Ray Lighting Mode Hit Lighting",
-  "Path Tracer"
- ],
- "tut-room-panel-pt": [
-  "Realtime (Lumen)",
-  "Path Tracer"
- ],
- "tut-room-panel": [
-  "Emissive 2",
-  "Emissive 4",
-  "Emissive 8"
- ],
- "tut-room-sun": [
-  "Sky only",
-  "Sun (exposure 4) and sky"
  ],
  "viewport-interactive-samples": [
   "8",

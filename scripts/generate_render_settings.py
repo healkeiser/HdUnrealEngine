@@ -892,6 +892,20 @@ HDUE = [
         advanced=True,
     ),
     hdue(
+        "naniteTriangleThreshold",
+        "Nanite Triangle Threshold",
+        "Rendering|Geometry",
+        "int",
+        1000000,
+        "Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite "
+        "Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path "
+        "Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes "
+        "every mesh Nanite.",
+        range=(0, 10000000, True, False),
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
         "cullBackface",
         "Cull Backface",
         "Rendering|Geometry",

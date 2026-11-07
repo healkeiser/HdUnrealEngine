@@ -7,11 +7,8 @@
     endTimeCode = 1
     timeCodesPerSecond = 24
     renderSettingsPrimPath = "/Render/Settings"
-    # Houdini's sample scenes: ${HFS} is this default unless the root layer opening this scene sets it
-    # (scripts/render_docs_images.py sets it to $HFS).
-    expressionVariables = {
-        string HFS = "C:/Program Files/Side Effects Software/Houdini 22.0.368"
-    }
+    # Houdini's sample scenes, under ${HFS}: the root layer opening this scene sets it to Houdini's install
+    # (scripts/render_docs_images.py does).
     subLayers = [@`"${HFS}/houdini/usd/scenes/veach_mis_planks/veach_mis_planks.usd"`@]
 )
 

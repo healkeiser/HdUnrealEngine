@@ -660,6 +660,20 @@
                 disablewhen R"({ xn__unrealrequireNanite_control_1kb == block } { xn__unrealrequireNanite_control_1kb == none })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
+            HDUE_CONTROL("xn__unrealnaniteTriangleThreshold_control_c1b", "Nanite Triangle Threshold")
+            parm {
+                name    "xn__unrealnaniteTriangleThreshold_bob"
+                label   "Nanite Triangle Threshold"
+                type    int
+                size    1
+                default { 1000000 }
+                range   { 0! 10000000 }
+                help    "Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes every mesh Nanite."
+                parmtag { "spare_category" "Geometry" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealnaniteTriangleThreshold_control_c1b == block } { xn__unrealnaniteTriangleThreshold_control_c1b == none })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
             HDUE_CONTROL("xn__unrealcullBackface_control_fjb", "Cull Backface")
             parm {
                 name    "xn__unrealcullBackface_e5a"

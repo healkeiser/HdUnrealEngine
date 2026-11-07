@@ -94,6 +94,7 @@ Not translated: varying `displayOpacity`, and colours on meshes that also carry 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | A wall or plane disappears from one side | The mesh is single-sided | Set `doubleSided`, or turn off **Cull Backface** |
+| Small points (dust, sparks, rain) show in the Path Tracer but vanish in Realtime | Each point is smaller than a pixel: the Path Tracer adds its exact share of the pixel over many samples, while Realtime draws it on one sample per frame and temporal anti-aliasing (TSR) averages it away | Make the points about a pixel wide at their distance, or render the shot with the Path Tracer |
 | A prim is missing; the UE log names it | The mesh has broken indices or is too large | Fix or split the mesh |
 | Hard edges look smooth | No authored normals: hdUE generates smooth ones | Author face-varying normals, or split the points |
 | Unbound geometry is white, not grey as in Karma | No `displayColor`: hdUE uses white, as UE's importer does | Author `displayColor`, or bind a material |

@@ -1,15 +1,11 @@
 {
- "scene": "docs/room.usda",
+ "scene": "docs/bistro.usda",
  "display": "tonemapped",
  "base": {},
  "values": [
   {
    "caption": "Realtime (Lumen)",
-   "set": {
-    "/Render/Settings": [
-     "token unreal:renderMode = \"realtime\""
-    ]
-   }
+   "set": {}
   },
   {
    "caption": "Path Tracer",

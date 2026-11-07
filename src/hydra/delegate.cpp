@@ -486,6 +486,9 @@ struct MeshConversion {
     HdUEState::Converter convert;
     GfMatrix4d basis{1}, inverse{1};
     bool requireNanite = false, cullBackface = true;
+    // UE's USD Stage Nanite Triangle Threshold: smaller meshes stay regular static meshes, which ray tracing (the Path
+    // Tracer, Lumen hit lighting) traces at full resolution rather than as Nanite's coarse fallback mesh.
+    int64_t naniteTriangleThreshold = 1000000;
 };
 // One scene upload, with copies of everything its descriptors point to. prepareScene fills it under the state lock;
 // sendScene hands it to UE without the lock, so Hydra Sync and Houdini's UI never wait for UE's apply (seconds on
@@ -1010,6 +1013,12 @@ std::optional<HdueMeshDesc> convertMesh(const MeshConversion& conversion, const 
     desc.flags = conversion.requireNanite && !nativeAsset.empty() ? HDUE_MESH_REQUIRE_NANITE : 0;
     if (editable) desc.flags |= HDUE_MESH_EDITABLE;
     if (conversion.cullBackface && !data.doubleSided) desc.flags |= HDUE_MESH_SINGLE_SIDED;
+    // Instancer prototypes stay Nanite whatever their size: without it every instance draws all its triangles
+    // (Jungle Ruins' 8.7 million instances hung the GPU), a departure from UE's USD Stage, which applies the threshold
+    // to them too.
+    if (nativeAsset.empty() && data.instances.empty() &&
+        int64_t(desc.index_count / 3) < conversion.naniteTriangleThreshold)
+        desc.flags |= HDUE_MESH_NO_NANITE;
     for (int i = 0; i < 4; ++i) desc.transform[i * 4 + i] = 1;
     if (!baked) rowMajor(conversion.inverse * data.transform * conversion.basis, desc.transform);
     return desc;
@@ -1054,7 +1063,9 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     // unreal:cullBackface = 0 renders both sides, as Karma (karma:object:cull_backface defaults to off).
     const bool cullBackface = state.setting<bool>("cullBackface", true);
     const auto inverse = basis.GetInverse();
-    packet.conversion = {state.converter(), basis, inverse, state.setting<bool>("requireNanite", false), cullBackface};
+    packet.conversion = {state.converter(), basis,
+                         inverse,           state.setting<bool>("requireNanite", false),
+                         cullBackface,      state.setting<int64_t>("naniteTriangleThreshold", 1000000)};
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
     // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
     for (const auto& id : packet.movedMeshes) {
@@ -3791,6 +3802,7 @@ HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() 
             {"Disable tone curve", TfToken("disableToneCurve"), VtValue(false)},
             {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
             {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
+            {"Nanite triangle threshold", TfToken("naniteTriangleThreshold"), VtValue(1000000)},
             {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
             {"Exponential height fog", TfToken("heightFog"), VtValue(false)},
             {"Height fog height", TfToken("heightFogHeight"), VtValue(0.0)},
@@ -3864,6 +3876,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     const double previousUnits = state_->setting<double>("metersPerUnit", 0.01);
     const std::string previousAxis = state_->setting<std::string>("upAxis", "Y");
     const bool previousNanite = state_->setting<bool>("requireNanite", false);
+    const int64_t previousThreshold = state_->setting<int64_t>("naniteTriangleThreshold", 1000000);
     const bool previousCull = state_->setting<bool>("cullBackface", true);
     const bool previousInteractive = state_->interactive();
     if (value.IsEmpty())
@@ -3973,7 +3986,9 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     const bool sceneSpaceChanged =
         (key == TfToken("metersPerUnit") && state_->setting<double>("metersPerUnit", 0.01) != previousUnits) ||
         (key == TfToken("upAxis") && state_->setting<std::string>("upAxis", "Y") != previousAxis) ||
-        (key == TfToken("requireNanite") && state_->setting<bool>("requireNanite", false) != previousNanite);
+        (key == TfToken("requireNanite") && state_->setting<bool>("requireNanite", false) != previousNanite) ||
+        (key == TfToken("naniteTriangleThreshold") &&
+         state_->setting<int64_t>("naniteTriangleThreshold", 1000000) != previousThreshold);
     if (key == TfToken("cullBackface") && state_->setting<bool>("cullBackface", true) != previousCull) {
         for (const auto& [id, v] : state_->meshes) state_->dirtyMeshes.insert(id);
         ++state_->revision;

@@ -121,6 +121,15 @@ How to get these looks on a Standard Surface. Inputs not listed stay at their de
 | Leaf | leaf texture into `base_color`, `subsurface` 0.5, `subsurface_color` (0.4, 0.6, 0.1), `thin_walled` on; alpha through **Extract** into `opacity` |
 | Glass | See [glass recipes](opacity-and-glass.md#recipes) |
 
+### Layers that need no second texture
+
+hdUE translates a MaterialX graph at render time when each input reads at most one texture. Two layers of `standard_surface` add detail within that limit:
+
+- **A wet surface:** a water film is a clear coat. `coat` 1 (or a grunge map, for puddles), `coat_IOR` 1.33, `coat_roughness` 0.03, `coat_color` (0.7, 0.7, 0.72) to darken what is under the water, as wet stone darkens. Lower the surface's own roughness too.
+- **Grime over any texture:** a coat of `coat_IOR` 1.0 reflects nothing and only tints what is under it. Feed `coat_color` from a `mix` between white and a dirt colour, driven by a grime map read in a second UV set (`geompropvalue` `uv2`): the dirt varies over the whole building instead of repeating with the texture's tile.
+
+Both are used on the Bistro street (`scripts/convert_bistro.py`).
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

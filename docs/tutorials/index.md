@@ -4,7 +4,7 @@ Each tutorial produces one result from a scene in `samples/`, with exact values 
 
 ## Lighting
 
-- [Lighting a room](lighting-a-room.md): light an interior through its window with sun, sky and a window fill, then by night with an emissive panel.
+- [Lighting an interior](lighting-an-interior.md): light the Bistro at night: practical lamps, a key light, haze and dust, the lens and a grade.
 - [Lumen or the Path Tracer](lumen-or-path-tracer.md): when to use each render mode, where Lumen differs on four scenes, and how to close the gap.
 
 ## Image quality

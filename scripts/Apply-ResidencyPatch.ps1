@@ -165,6 +165,41 @@ foreach ($Root in @($EngineRoot, $EditorRoot) | Where-Object { $_ } | Select-Obj
         -Marker 'hdUE: CosTheta above 1' -Edits @(, @("`t`t`tfloat3 H = ImportanceSampleGGX( E, Pow4(Roughness) ).xyz;",
             "`t`t`tfloat3 H = ImportanceSampleGGX( E, Pow4(Roughness) ).xyz;`n`t`t`tif (any(isnan(H))) H = float3(0, 0, 1);`t// hdUE: CosTheta above 1 (NaN SinTheta) is the H = N limit"))
 }
+# Coloured glass at transmission depth 0 rendered black in the Path Tracer. Standard Surface and OpenPBR define depth 0 as
+# a tint at the surface (no absorption inside), and UE's Substrate-StandardSurface-Translucent (MF_TransmittanceToMeanFreePath)
+# makes it a mean free path across the slab's 0.01 cm layer, which raster translucency applies as that tint. The Path
+# Tracer reads a solid glass slab's mean free path as the medium inside the object instead: it picks the refraction lobe
+# with probability max(MFP) in cm ("blend towards opaque SSS") and absorbs with 1/MFP, so a sub-millimetre MFP left a
+# black, opaque slab (UE's own MaterialX import makes the same material). A non-scattering glass slab whose MFP is under
+# 1 cm is that layer: the Path Tracer now refracts it always, without absorption inside, and tints each crossing by the
+# layer's transmittance (the authored colour), as Karma and Arnold do. The tint rides on SpecularEdgeColor, which the
+# solid glass BSDF does not read, flagged by the payload's free output bit; shadow rays get the same tint. Material
+# shaders (every path-traced material) change: the editor that cooks the runtime is patched too, then the content re-cooked.
+$Tint = 'max3(MeanFreePath.x, MeanFreePath.y, MeanFreePath.z) < 1.0 && max3(SLAB_DIFFUSEALBEDO(BSDF).x, SLAB_DIFFUSEALBEDO(BSDF).y, SLAB_DIFFUSEALBEDO(BSDF).z) < 1e-3'
+$Layer = 'MeanFreePathToTransmittance(MeanFreePath * CENTIMETER_TO_METER, SUBSTRATE_LAYER_DEFAULT_THICKNESS_CM * CENTIMETER_TO_METER)'
+$Flag = 'PATH_TRACING_PAYLOAD_OUTPUT_FLAG_UNUSED8'
+foreach ($Root in @($EngineRoot, $EditorRoot) | Where-Object { $_ } | Select-Object -Unique) {
+    $Shaders = Join-Path $Root 'Engine\Shaders\Private\PathTracing'
+    $Mix = "`t`t`t`t`t`t`t// blend towards Opaque SSS in the range of [0cm, 8cm]`n`t`t`t`t`t`t`tRefractMix = saturate(max3(MeanFreePath.x, MeanFreePath.y, MeanFreePath.z));"
+    $ShadowMix = "`t`t`t`t`t`t`t`t// blend towards Opaque SSS in the range of [0cm, 1cm]`n`t`t`t`t`t`t`t`tRefractMix = saturate(max3(MeanFreePath.x, MeanFreePath.y, MeanFreePath.z));"
+    Edit-EngineSource -Path (Join-Path $Shaders 'PathTracingMaterialHitShader.usf') -Label 'glass surface tint patch' `
+        -Marker 'hdUE: a glass layer of transmission depth 0' -Edits @(
+        @("`t`t`t`t`t`tfloat RefractMix = 0; // percentage mix of the glass lobe",
+            "`t`t`t`t`t`tfloat RefractMix = 0; // percentage mix of the glass lobe`n`t`t`t`t`t`tbool bHdueTint = false;"),
+        @($Mix, "$Mix`n`t`t`t`t`t`t`t// hdUE: a glass layer of transmission depth 0 tints the surface (Apply-ResidencyPatch.ps1)`n`t`t`t`t`t`t`tbHdueTint = $Tint;`n`t`t`t`t`t`t`tif (bHdueTint) RefractMix = 1;"),
+        @("`t`t`t`t`t`t`tPayload.MeanFreePath  = MeanFreePath;`n`t`t`t`t`t`t`t#endif",
+            "`t`t`t`t`t`t`tPayload.MeanFreePath  = MeanFreePath;`n`t`t`t`t`t`t`tPayload.Flags &= ~$Flag;`n`t`t`t`t`t`t`tif (bHdueTint)`n`t`t`t`t`t`t`t{`n`t`t`t`t`t`t`t`tPayload.SpecularEdgeColor = $Layer;`n`t`t`t`t`t`t`t`tPayload.MeanFreePath = 1e6;`n`t`t`t`t`t`t`t`tPayload.Flags |= $Flag;`n`t`t`t`t`t`t`t}`n`t`t`t`t`t`t`t#endif"),
+        @("`t`tfloat RefractMix  = 0.0;", "`t`tfloat RefractMix  = 0.0;`n`t`tfloat3 HdueTint = 1.0;"),
+        @($ShadowMix, "$ShadowMix`n`t`t`t`t`t`t`t`tif ($Tint)`n`t`t`t`t`t`t`t`t{`n`t`t`t`t`t`t`t`t`tRefractMix = 1;`n`t`t`t`t`t`t`t`t`tLocalSigmaT = 0;`n`t`t`t`t`t`t`t`t`tHdueTint = $Layer;`n`t`t`t`t`t`t`t`t}"),
+        @("`t`tconst float3 Transparency = saturate(lerp(1.0, Tr, TotalCoverage));",
+            "`t`tconst float3 Transparency = saturate(lerp(1.0, Tr * HdueTint, TotalCoverage));"))
+    Edit-EngineSource -Path (Join-Path $Shaders 'Material\PathTracingSubstrateSolidGlass.ush') -Label 'glass surface tint patch' `
+        -Marker 'hdUE: tint of a depth-0 glass layer' -Edits @(
+        @("`t`t`tResult.Weight *= Data.Fuzz.Attenuation * Payload.BSDFOpacity * Payload.WeightV;",
+            "`t`t`tResult.Weight *= Data.Fuzz.Attenuation * Payload.BSDFOpacity * Payload.WeightV;`n`t`t`tif (Payload.Flags & $Flag) Result.Weight *= Payload.SpecularEdgeColor;`t// hdUE: tint of a depth-0 glass layer"),
+        @("`t`tResult.Weight *= Payload.BSDFOpacity * Payload.WeightV * Data.Fuzz.Attenuation;",
+            "`t`tResult.Weight *= Payload.BSDFOpacity * Payload.WeightV * Data.Fuzz.Attenuation;`n`t`tif (Payload.Flags & $Flag) Result.Weight *= Payload.SpecularEdgeColor;`t// hdUE: tint of a depth-0 glass layer"))
+}
 # Rough refraction (DistortionRendering.cpp) samples the scene behind a refracting surface from a copy of scene colour
 # made by CopySceneColorDepthTexturePS into a PF_FloatR11G11B10 mip chain. The copy writes alpha 1 and the format holds
 # none, so with r.PostProcessing.PropagateAlpha (scene colour alpha is 1 - coverage) every pixel seen through glass read

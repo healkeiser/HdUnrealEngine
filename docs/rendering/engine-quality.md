@@ -31,7 +31,7 @@ UE's scalability groups, as in UE's **Engine Scalability Settings** menu. Each l
 
 The default is Epic in Houdini's viewport and Cinematic in husk and the USD Render ROP, as Movie Render Queue renders with Cinematic. The Path Tracer ignores the Anti-Aliasing, Shadows, Global Illumination and Reflections groups.
 
-**Global Illumination** in the room lit through a window. Low turns Lumen's bounce light off.
+**Global Illumination** in the Bistro, lit by its lamps. Low turns Lumen's bounce light off.
 
 <div class="hdue-figure" data-figure="engine-quality-gi"></div>
 

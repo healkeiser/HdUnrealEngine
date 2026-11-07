@@ -54,8 +54,8 @@ Light travelling through the glass reaches **Transmission Color** after **Transm
 
 <div class="hdue-figure" data-figure="opacity-and-glass-transmission-depth"></div>
 
-!!! warning
-    Leave **Transmission Depth** at 0 and the absorption distance is close to 0. The Path Tracer, which follows the glass's thickness, then absorbs almost all light in every channel of **Transmission Color** below 1; Realtime barely tints. Author a depth for coloured glass, around the object's thickness.
+!!! note
+    At **Transmission Depth** 0 (the Standard Surface default), **Transmission Color** tints the glass at its surface, without absorption inside: both render modes show the same tint whatever the object's thickness. Set a depth for the colour to deepen with thickness, as in a bottle.
 
 ## Alpha behind glass
 
@@ -83,7 +83,6 @@ How to get these looks on a MaterialX Standard Surface. Inputs not listed stay a
 | --- | --- | --- |
 | Glass shows bright rims or a flat overlay in Realtime, but looks right in the Path Tracer | **Translucency Method** is Raster | Set it to **Ray Traced** |
 | A see-through surface does not refract | It uses Preview Surface **Opacity**, which is presence | Use MaterialX **Transmission** |
-| Coloured glass is nearly black in the Path Tracer and barely tinted in Realtime | **Transmission Depth** is 0 | Set it to about the glass's thickness, in scene units |
 | Frosted glass loses its refraction above a roughness | Ray Traced translucency fades out above **Max Roughness** (0.6) | Raise **Max Roughness**, or check in the Path Tracer |
 | A prim's `displayOpacity` varies per point but renders uniform, with a warning | A material carries one opacity | Bind a material with an opacity texture |
 | Cutout foliage thins with distance in Realtime | Distant pixels read smaller mips | See [Preview Surface troubleshooting](preview-surface.md#troubleshooting) |

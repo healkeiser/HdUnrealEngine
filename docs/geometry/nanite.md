@@ -8,11 +8,12 @@ SideFX's shader ball lit, then in UE's Nanite views: each colour is one triangle
 
 ## When hdUE uses Nanite
 
-You do not turn Nanite on: hdUE builds Nanite data for every mesh that can have it.
+hdUE decides as UE's USD Stage Actor does: a mesh with at least **Nanite Triangle Threshold** triangles (`unreal:naniteTriangleThreshold`, default 1,000,000, UE's default) builds Nanite data; a smaller one stays a regular static mesh. Instancer prototypes always build Nanite: without it, every instance of a scattered prototype draws all its triangles.
 
 | Mesh | Nanite |
 | --- | --- |
-| Static meshes from your stage | yes |
+| Static meshes from your stage, at or above the threshold | yes |
+| Static meshes below the threshold | no, as in UE's USD import |
 | Instancer prototypes (PointInstancer, native instancing) | yes |
 | Cooked UE meshes (**Native Asset**) with Nanite data | yes |
 | Meshes with a translucent material | no, as in UE |
@@ -46,7 +47,7 @@ Higher values draw fewer, larger triangles: faster, with coarser silhouettes. Th
 
 ## Ray tracing and fallback meshes
 
-Nanite draws the rasterized image. Ray tracing (Lumen's reflections and the Path Tracer) traces each mesh's **fallback mesh** instead: a simplified copy UE's Nanite builder makes, at UE's default error (Fallback Target Auto). On most meshes the difference does not show. On thin geometry, such as foliage, the fallback is thinner and sparser in the Path Tracer and in Lumen's reflections.
+Nanite draws the rasterized image. Ray tracing (Lumen's reflections and the Path Tracer) traces each Nanite mesh's **fallback mesh** instead: a simplified copy UE's Nanite builder makes, at UE's default error (Fallback Target Auto). On most meshes the difference does not show. On thin geometry, such as foliage, the fallback is thinner and sparser in the Path Tracer and in Lumen's reflections.
 
 Set **Nanite Ray Tracing** to 1 to trace the full Nanite geometry streamed for the view. It costs time: Intel Sponza's tree took 65 s instead of 25 s for a 256-sample husk frame, load included.
 
@@ -69,7 +70,8 @@ In Houdini's viewport, background builds start only while their memory fits. The
 | --- | --- | --- |
 | First husk frame takes minutes | Nanite data is being built; the cache is empty | Render again: later renders read the cache. Keep `Saved/NaniteCache` on the farm, or point `HDUE_USER_DIR` at a shared disk |
 | Meshes pop in one by one in the viewport | Nanite builds are swapped in as they finish | Wait for the viewport to settle |
-| Foliage looks thinner in the Path Tracer than in Realtime | Ray tracing sees the fallback mesh | Set **Nanite Ray Tracing** to 1 |
+| A mesh looks faceted in the Path Tracer but smooth in Realtime | The mesh is Nanite (at or above **Nanite Triangle Threshold**, or an instancer prototype), and ray tracing sees its fallback mesh | Raise **Nanite Triangle Threshold** above the mesh's triangle count |
+| Foliage looks thinner in the Path Tracer than in Realtime | Ray tracing sees the fallback mesh of an instanced or very dense mesh | Set **Nanite Ray Tracing** to 1 (its normals can show faint streaks in glossy reflections) |
 | Some meshes render without Nanite on a huge scene; the UE log warns | The root page buffer is nearly full | Merge small distinct meshes: each distinct mesh keeps a root page, while identical meshes share one |
 | Distant detail looks soft on a huge scene | The view's geometry overflows the streaming pool, so Nanite draws coarser clusters | Render at a lower resolution, or reduce unique geometry |
 | A translucent mesh is not in the Nanite views | Translucent materials do not use Nanite, as in UE | Expected |
@@ -81,4 +83,4 @@ To render without Nanite, for comparison, set the environment variable `HDUE_NAN
 
 ## Unreal Engine and Karma
 
-hdUE builds Nanite meshes with UE's own Nanite builder and settings, as UE's static mesh build does, and ray traces their fallback meshes as UE does by default. Karma has no Nanite: it renders every triangle of the mesh.
+hdUE builds Nanite meshes with UE's own Nanite builder and settings, as UE's static mesh build does, for the meshes UE's USD Stage Actor would make Nanite, and ray traces their fallback meshes as UE does by default. One departure: instancer prototypes are Nanite at any size. Karma has no Nanite: it renders every triangle of the mesh.

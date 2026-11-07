@@ -24,7 +24,7 @@ Lumen approximates glossy reflections of small, bright lights. On SideFX's Veach
 
 <div class="hdue-figure" data-figure="render-settings-veach"></div>
 
-Lumen also approximates bounce light. In this room, lit only through a window, compare Realtime without global illumination, Realtime with Lumen and the Path Tracer.
+Lumen also approximates bounce light. In the Bistro, lit by its lamps, compare Realtime without global illumination, Realtime with Lumen and the Path Tracer.
 
 <div class="hdue-figure" data-figure="global-illumination"></div>
 

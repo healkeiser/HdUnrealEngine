@@ -27,7 +27,7 @@ nav = [
   ] },
   { "Tutorials" = [
     "tutorials/index.md",
-    { "Lighting a room" = "tutorials/lighting-a-room.md" },
+    { "Lighting an interior" = "tutorials/lighting-an-interior.md" },
     { "Lumen or the Path Tracer" = "tutorials/lumen-or-path-tracer.md" },
     { "Removing noise" = "tutorials/removing-noise.md" },
     { "Exposure and tone" = "tutorials/exposure-and-tone.md" },

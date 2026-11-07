@@ -2214,7 +2214,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             if (StaticGenerated(Desc)) {
                 if (Interactive && !FirstPass[Index]) return;
                 StaticData[Index] = BuildStatic(Desc, !Interactive);
-                if (NaniteMeshes && !Interactive && !Translucent[Index])  // Nanite draws opaque and masked only
+                if (NaniteMeshes && !Interactive && !Translucent[Index] &&  // Nanite draws opaque and masked only
+                    !(Desc.flags & HDUE_MESH_NO_NANITE))
                     StaticData[Index].Nanite = BuildNanite(Desc, StaticData[Index].Fallback);
             } else
                 BuiltMeshes[Index] = BuildDynamicMesh(Desc);
@@ -2320,7 +2321,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     // copy of the descriptor's arrays: done here, Nanite doubled the time to the first frame (and
                     // normal-priority Nanite tasks starved its rendering for 15 s). TickConversions starts them.
                     auto Copy = MakeShared<FNaniteSource>(Desc);
-                    Copy->Nanite = NaniteMeshes && !Translucent[Index];
+                    Copy->Nanite = NaniteMeshes && !Translucent[Index] && !(Desc.flags & HDUE_MESH_NO_NANITE);
                     const int64 Source = Copy->Positions.GetAllocatedSize() + Copy->Normals.GetAllocatedSize() +
                                          Copy->UV.GetAllocatedSize() + Copy->Colors.GetAllocatedSize() +
                                          Copy->Indices.GetAllocatedSize();

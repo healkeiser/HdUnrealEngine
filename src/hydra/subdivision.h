@@ -2,6 +2,7 @@
 #define HDUE_SUBDIVISION_H
 // Uniform OpenSubdiv refinement of catmullClark and loop meshes. Primvars of every interpolation follow the refined
 // topology, which hdUE then triangulates like any polygon mesh; GeomSubsets move to their child faces.
+#include "pxr/base/gf/vec3f.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/meshTopology.h"
 #include "pxr/imaging/pxOsd/refinerFactory.h"
@@ -127,6 +128,25 @@ public:
             for (const auto& element : src) result.push_back(element.value);
         }
         return result;
+    }
+
+    // Moves refined points (refine() of the vertex positions) onto the limit surface and returns its normals, the
+    // cross product of the limit tangents; empty where they degenerate. Uniform refinement alone leaves the points
+    // on the level's cage and its normals follow the cage's faces, which glossy reflections show as bands along the
+    // coarse faces; Storm and Karma render the limit surface.
+    std::vector<GfVec3f> limit(VtVec3fArray& points) const {
+        const auto& last = refiner_->GetLevel(level_);
+        if (int(points.size()) != last.GetNumVertices()) return {};
+        std::vector<Element<GfVec3f>> src(points.begin(), points.end()), position(src.size()), du(src.size()),
+            dv(src.size());
+        OpenSubdiv::Far::PrimvarRefiner(*refiner_).Limit(src, position, du, dv);
+        std::vector<GfVec3f> normals(points.size());
+        for (size_t i = 0; i < points.size(); ++i) {
+            points[i] = position[i].value;
+            const GfVec3f n = GfCross(du[i].value, dv[i].value);
+            normals[i] = n.GetLengthSq() > 1e-24f ? n.GetNormalized() : GfVec3f(0);
+        }
+        return normals;
     }
 
 private:

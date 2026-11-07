@@ -1,4 +1,4 @@
-"""Generate the README banner from hdUE renders of Intel's Sponza.
+r"""Generate the README banner from hdUE renders of Intel's Sponza.
 
 The render bleeds full frame under the title, set in fxhoudinimotion's banner type.
 

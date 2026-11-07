@@ -190,7 +190,7 @@ Lets objects shadow the fog, so the ball cuts a dark shaft out of the beam. It c
 
 **Indirect Lighting Intensity** · [`unreal:light:IndirectLightingIntensity`](reference/light-properties.md#unreal-light-indirectlightingintensity) · default 1
 
-Scales the light's bounced light in Realtime (Lumen); 0 removes it. Direct light is unchanged. In the room, the sun's bounce lights the walls away from the window.
+Scales the light's bounced light in Realtime (Lumen); 0 removes it. Direct light is unchanged. In the Bistro, the lamps' bounce lights the walls and ceiling.
 
 <div class="hdue-figure" data-figure="lights-indirect-intensity"></div>
 
@@ -198,7 +198,7 @@ Rect lights also take UE's barn doors: [Barn Door Angle](reference/light-propert
 
 ## Recipes
 
-**Sun and sky** (as in `samples/docs/room.usda`):
+**Sun and sky**:
 
 1. Distant Light: **Angle** 0.53, **Normalize Power** on, **Intensity** 1, **Exposure** 4.
 2. Dome Light: an HDRI sky in **Texture**, **Intensity** 1, **Exposure** 0.

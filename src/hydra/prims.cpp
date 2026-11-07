@@ -511,8 +511,9 @@ class Mesh final : public HdMesh {
         HdMeshTopology topology;
         std::unique_ptr<HdUESubdivision> subdivision;
         VtVec3iArray triangles;
-        VtIntArray parameters;  // source face per triangle
-        TfTokenVector uvNames;  // the material's UV primvars, in order
+        VtIntArray parameters;              // source face per triangle
+        std::vector<GfVec3f> limitNormals;  // a subdivision surface's limit normals per point (zero where degenerate)
+        TfTokenVector uvNames;              // the material's UV primvars, in order
         TfToken colorName;
     };
     // The mesh as hdUE draws it: catmullClark and loop meshes refined uniformly (unreal:subdivisionLevel), with their
@@ -545,6 +546,7 @@ class Mesh final : public HdMesh {
         }
         if (shape.subdivision) {
             points = shape.subdivision->refine(points, HdInterpolationVertex);
+            shape.limitNormals = shape.subdivision->limit(points);
             shape.topology = shape.subdivision->topology();
         }
         HdMeshUtil(&shape.topology, GetId()).ComputeTriangleIndices(&shape.triangles, &shape.parameters);
@@ -718,6 +720,11 @@ public:
                 TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
                 return;
             }
+        // A subdivision surface takes its limit normals, turned to the side its faces wind toward.
+        if (shape.limitNormals.size() == points.size() && smooth.size() == points.size())
+            for (size_t i = 0; i < smooth.size(); ++i)
+                if (const auto& n = shape.limitNormals[i]; n.GetLengthSq() > 0.f)
+                    smooth[i] = GfDot(n, smooth[i]) < 0.f ? -n : n;
         mesh.points.reserve(vertices);
         if (!uvSets.empty()) mesh.uvSets.resize(uvSets.size() - 1);
         mesh.normals.reserve(vertices);

@@ -1,12 +1,48 @@
 {
- "scene": "docs/room.usda",
+ "scene": "docs/bistro.usda",
  "display": "tonemapped",
  "base": {},
  "values": [
   {
    "caption": "0",
    "set": {
-    "/scene/sun": [
+    "/lamps/lamp00": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp01": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp02": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp03": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp04": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp05": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp06": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp07": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp08": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp09": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp10": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/lamps/lamp11": [
+     "float unreal:light:IndirectLightingIntensity = 0"
+    ],
+    "/atmosphere/key": [
      "float unreal:light:IndirectLightingIntensity = 0"
     ]
    }
@@ -14,7 +50,43 @@
   {
    "caption": "1 (default)",
    "set": {
-    "/scene/sun": [
+    "/lamps/lamp00": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp01": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp02": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp03": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp04": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp05": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp06": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp07": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp08": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp09": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp10": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/lamps/lamp11": [
+     "float unreal:light:IndirectLightingIntensity = 1"
+    ],
+    "/atmosphere/key": [
      "float unreal:light:IndirectLightingIntensity = 1"
     ]
    }
@@ -22,7 +94,43 @@
   {
    "caption": "4",
    "set": {
-    "/scene/sun": [
+    "/lamps/lamp00": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp01": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp02": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp03": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp04": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp05": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp06": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp07": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp08": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp09": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp10": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/lamps/lamp11": [
+     "float unreal:light:IndirectLightingIntensity = 4"
+    ],
+    "/atmosphere/key": [
      "float unreal:light:IndirectLightingIntensity = 4"
     ]
    }

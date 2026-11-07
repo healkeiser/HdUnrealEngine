@@ -53,7 +53,7 @@ Replaces the render setting for the meshes of this prim. It is a constant primva
 - Every primvar: UVs (`st`), `displayColor`, `velocities` and time-sampled `points`, of any interpolation.
 - GeomSubsets: a material bound to some faces stays on their refined faces.
 
-Authored normals are ignored, as the USD specification says for subdivision surfaces: normals come from the refined surface. Refinement is uniform; there is no adaptive or screen-space refinement. A displaced subdivision mesh is refined first, then diced further for its displacement: see [Displacement](displacement.md).
+Authored normals are ignored, as the USD specification says for subdivision surfaces. The refined vertices lie on the limit surface and take its exact normals (OpenSubdiv's limit evaluation), as Storm and Karma render it; UE's USD importer stops at the refined cage, whose normals show faint bands along the coarse faces in glossy reflections. Refinement is uniform; there is no adaptive or screen-space refinement. A displaced subdivision mesh is refined first, then diced further for its displacement: see [Displacement](displacement.md).
 
 ## Troubleshooting
 

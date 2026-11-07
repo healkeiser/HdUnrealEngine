@@ -2,7 +2,11 @@
 
 hdUE (HdUnrealEngine) is a Hydra render delegate that renders OpenUSD with Unreal Engine 5.8 inside the host process: the Houdini Solaris viewport, husk and the USD Render ROP, Live Render, usdview, or a standalone host. It renders with Lumen (Realtime) or UE's Path Tracer, from the same USD and render settings as Karma.
 
-![The Sponza atrium rendered by hdUE](images/banner.webp)
+Amazon Lumberyard Bistro (NVIDIA ORCA, CC BY 4.0) rendered by hdUE with MaterialX surfaces: inside at night, and the street outside in the rain. Drag to compare Realtime (Lumen) with UE's Path Tracer.
+
+<div class="hdue-figure" data-figure="home-bistro-interior"></div>
+
+<div class="hdue-figure" data-figure="home-bistro-exterior"></div>
 
 hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means in UE, with UE's name, range and default, and a scene renders as it would in UE's editor. Where hdUE departs from a UE default, the page says so.
 
