@@ -1,0 +1,34 @@
+{
+ "scene": "docs/effects.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/fire": [
+   "float primvars:unreal:effect:startFrame = -47"
+  ],
+  "/scene/coil": [
+   "float primvars:unreal:effect:startFrame = -47"
+  ],
+  "/scene/electricity": [
+   "float primvars:unreal:effect:startFrame = -47"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Realtime",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"realtime\""
+    ]
+   }
+  },
+  {
+   "caption": "Path Tracer",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\"",
+     "int unreal:samplesPerPixel = 256"
+    ]
+   }
+  }
+ ]
+}

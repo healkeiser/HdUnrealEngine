@@ -83,7 +83,8 @@ struct HdUEMeshData {
     HdUEMeshData& operator=(const HdUEMeshData&) = default;
     HdUEMeshData& operator=(HdUEMeshData&&) noexcept = default;
     std::string id, material, scenePath, sceneAsset, bindingPath, sourceId;
-    float assetFrame = 0;  // primvars:unreal:volume:frame: an animated Sparse Volume Texture's frame (UE's Frame)
+    float assetFrame = 0;    // primvars:unreal:volume:frame: an animated Sparse Volume Texture's frame (UE's Frame)
+    double effectStart = 0;  // primvars:unreal:effect:startFrame: the frame a Niagara System starts at
     // Indexed triangles: three indices per triangle into the per-vertex arrays (points, normals, uv, colors, masks).
     std::vector<GfVec3f> points, normals;
     std::vector<GfVec2f> uv;

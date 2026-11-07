@@ -619,6 +619,8 @@ public:
         if (!mesh.sceneAsset.empty()) {
             const VtValue frame = delegate->Get(GetId(), TfToken("unreal:volume:frame"));
             mesh.assetFrame = frame.CanCast<float>() ? VtValue::Cast<float>(frame).UncheckedGet<float>() : 0.f;
+            const VtValue start = delegate->Get(GetId(), TfToken("unreal:effect:startFrame"));
+            mesh.effectStart = start.CanCast<double>() ? VtValue::Cast<double>(start).UncheckedGet<double>() : 0.;
         }
         const auto computed = computedPrimvars(delegate, GetId());
         auto shape = triangulate(delegate, *state, !mesh.sceneAsset.empty(),
@@ -830,7 +832,7 @@ public:
             const bool onlyNativeBounds =
                 previous != missing && !part.sceneAsset.empty() && previous->second.sceneAsset == part.sceneAsset &&
                 previous->second.transform == part.transform && previous->second.visible == part.visible &&
-                previous->second.assetFrame == part.assetFrame;
+                previous->second.assetFrame == part.assetFrame && previous->second.effectStart == part.effectStart;
             const bool moved = previous != missing && HdUEPlacedOnly(previous->second, part.transform);
             // A mesh UE asked for in full (fullUploads) uploads even when nothing changed since it was released.
             const bool meshChanged =
@@ -840,8 +842,8 @@ public:
                  (previous->second.transform != part.transform && !moved) ||
                  previous->second.material != part.material || previous->second.visible != part.visible ||
                  previous->second.renderTag != part.renderTag || previous->second.sceneAsset != part.sceneAsset ||
-                 previous->second.assetFrame != part.assetFrame || previous->second.instanced != part.instanced ||
-                 previous->second.instances != part.instances ||
+                 previous->second.assetFrame != part.assetFrame || previous->second.effectStart != part.effectStart ||
+                 previous->second.instanced != part.instanced || previous->second.instances != part.instances ||
                  previous->second.instanceColors != part.instanceColors ||
                  previous->second.doubleSided != part.doubleSided);
             const auto id = part.id;

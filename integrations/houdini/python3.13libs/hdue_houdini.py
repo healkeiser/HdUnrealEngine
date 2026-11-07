@@ -863,8 +863,9 @@ def _catalog():
 
 def native_asset_menu():
     """The Native Asset field's menu (Render Geometry Settings' Unreal Engine tab): the cooked objects a prim can stand
-    for. With the profile's asset catalog (Prepare-ProjectAssets.ps1), its levels, meshes, Blueprints and Sparse Volume
-    Textures; else the staged runtime's levels and the assets named with UE's prefixes for those (SM_, SK_, BP_, SVT_).
+    for. With the profile's asset catalog (Prepare-ProjectAssets.ps1), its levels, meshes, Blueprints, Sparse Volume
+    Textures and Niagara Systems; else the staged runtime's levels and the assets named with UE's prefixes for those
+    (SM_, SK_, BP_, SVT_, NS_).
     """
     try:
         catalog = _catalog()
@@ -887,7 +888,7 @@ def native_asset_menu():
             if f.suffix == ".umap"
             or (
                 f.suffix == ".uasset"
-                and f.stem.startswith(("SM_", "SK_", "BP_", "SVT_"))
+                and f.stem.startswith(("SM_", "SK_", "BP_", "SVT_", "NS_"))
             )
         )
     return [entry for path in paths for entry in (path, path)]

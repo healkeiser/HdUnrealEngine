@@ -61,12 +61,13 @@ int32 UHdUEInspectAssetsCommandlet::Main(const FString& Params) {
         O->SetStringField(TEXT("class"), A.AssetClassPath.ToString());
         const FString C = A.AssetClassPath.GetAssetName().ToString();
         const bool Volume = C == TEXT("StaticSparseVolumeTexture") || C == TEXT("AnimatedSparseVolumeTexture");
-        O->SetStringField(TEXT("kind"), C == TEXT("World")          ? TEXT("level")
-                                        : C == TEXT("StaticMesh")   ? TEXT("static_mesh")
-                                        : C == TEXT("SkeletalMesh") ? TEXT("skeletal_mesh")
-                                        : C == TEXT("Blueprint")    ? TEXT("blueprint")
-                                        : Volume                    ? TEXT("sparse_volume")
-                                                                    : TEXT("resource"));
+        O->SetStringField(TEXT("kind"), C == TEXT("World")           ? TEXT("level")
+                                        : C == TEXT("StaticMesh")    ? TEXT("static_mesh")
+                                        : C == TEXT("SkeletalMesh")  ? TEXT("skeletal_mesh")
+                                        : C == TEXT("Blueprint")     ? TEXT("blueprint")
+                                        : Volume                     ? TEXT("sparse_volume")
+                                        : C == TEXT("NiagaraSystem") ? TEXT("effect")
+                                                                     : TEXT("resource"));
         // A Heterogeneous Volume spans its voxels from its pivot, placed by the first frame's transform (the VDB's own,
         // its units read as cm: UHeterogeneousVolumeComponent::CalcBounds); the hosts' bounds proxies read it.
         if (Volume)

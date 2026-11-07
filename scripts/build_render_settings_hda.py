@@ -1627,6 +1627,141 @@ def build_scene_components():
         )
 
 
+def build_unreal_asset():
+    """HdUE Unreal Asset: places a UE asset from a UE project on a prim. Its Import button cooks the asset into the
+    running runtime (hdue_ue_import.py, scripts/Import-UEAssets.ps1); the prim is a small box hdUE renders the asset in
+    place of, through primvars:unreal:asset (and primvars:unreal:effect:startFrame for a Niagara System).
+    """
+    import hou
+
+    name, label = f"hdue::hdueunrealasset::{VERSION}", "hdUE Unreal Asset"
+    subnet = hou.node("/stage").createNode("subnet", "hdueunrealasset")
+    inputs = subnet.indirectInputs()
+    box = subnet.createNode("cube", "placeholder")
+    box.setInput(0, inputs[0])
+    box.parm("primpath").set('`chs("../primpath")`')
+    box.parm("size").set(
+        0.2
+    )  # a handle in the viewport; hdUE renders the asset instead
+    for parm in ("tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"):
+        box.parm(parm).setExpression(f'ch("../{parm[0]}{parm[1]}")')
+    asset = subnet.createNode("attribwrangle", "asset")
+    asset.setInput(0, box)
+    asset.parm("primpattern").set('`chs("../primpath")`')
+    asset.parm("snippet").set(
+        "// Only once the runtime has the asset (Import): UE fails a frame that names an asset it lacks.\n"
+        'if (chi("../imported")) {\n'
+        '    usd_setprimvar(0, @primpath, "unreal:asset", chs("../asset"));\n'
+        '    usd_setprimvar(0, @primpath, "unreal:effect:startFrame", chf("../startframe"));\n'
+        "}\n"
+    )
+    subnet.node("output0").setInput(0, asset)
+
+    group = hou.ParmTemplateGroup()
+    project = hou.StringParmTemplate(
+        "project",
+        "UE Project",
+        1,
+        string_type=hou.stringParmType.FileReference,
+        file_type=hou.fileType.Any,
+        tags={"filechooser_pattern": "*.uproject"},
+        help="The UE project (.uproject) the asset comes from. It is not changed: its content is copied into hdUE's "
+        "UE project to cook.",
+    )
+    group.append(project)
+    group.append(
+        hou.StringParmTemplate(
+            "asset",
+            "Asset",
+            1,
+            menu_type=hou.menuType.StringReplace,
+            item_generator_script="import hdue_ue_import\n"
+            'return hdue_ue_import.asset_menu(kwargs["node"].evalParm("project"))',
+            item_generator_script_language=hou.scriptLanguage.Python,
+            script_callback="import hdue_ue_import; hdue_ue_import.sync_node(kwargs['node'])",
+            script_callback_language=hou.scriptLanguage.Python,
+            help="The asset to place, as a cooked object path (/Game/Folder/NS_Fire.NS_Fire): the menu lists the "
+            "project's levels and the assets named with UE's prefixes (SM_, SK_, BP_, SVT_, NS_).",
+        )
+    )
+    group.append(
+        hou.ButtonParmTemplate(
+            "import",
+            "Import",
+            script_callback="import hdue_ue_import; hdue_ue_import.import_from_node(kwargs['node'])",
+            script_callback_language=hou.scriptLanguage.Python,
+            help="Cooks the asset and what it uses with UE's editor in the background, about a minute for one effect, "
+            "and adds them to the running hdUE runtime: no restart. An asset the runtime already has needs none.",
+        )
+    )
+    group.append(
+        hou.ToggleParmTemplate(
+            "imported",
+            "Imported",
+            False,
+            help="On once the runtime has the asset (Import turns it on): the prim names the asset only then.",
+        )
+    )
+    group.append(
+        hou.StringParmTemplate(
+            "primpath",
+            "Primitive Path",
+            1,
+            ("/assets/$OS",),
+            help="The prim the asset renders on: a small box, which hdUE replaces with the asset.",
+        )
+    )
+    for parm, label_, default in (
+        ("t", "Translate", 0.0),
+        ("r", "Rotate", 0.0),
+        ("s", "Scale", 1.0),
+    ):
+        group.append(
+            hou.FloatParmTemplate(
+                parm,
+                label_,
+                3,
+                (default,) * 3,
+                naming_scheme=hou.parmNamingScheme.XYZW,
+                help=f"{label_} of the prim; the asset keeps UE's size (centimetres) in any stage unit.",
+            )
+        )
+    group.append(
+        hou.FloatParmTemplate(
+            "startframe",
+            "Effect Start Frame",
+            1,
+            (1.0,),
+            min=1,
+            max=240,
+            help="For a Niagara System: the frame it starts at. hdUE simulates it to the frame rendered, in steps of "
+            "one frame, as Sequencer plays a Niagara track.",
+        )
+    )
+    save(
+        subnet,
+        OTLS / "hdue_unrealasset.hda",
+        name,
+        label,
+        "HDUE_hdue",
+        group,
+        help_page(
+            group,
+            name,
+            label,
+            "HDUE_hdue",
+            "Places an asset from a UE project (a Niagara effect, a mesh, a Blueprint, a level) and imports it into "
+            "hdUE.",
+            "Choose a UE project and one of its assets, then press Import: UE's editor cooks the asset in the "
+            "background and adds it to the running hdUE runtime, without a restart. The prim is a small box hdUE "
+            "renders the asset in place of (primvars:unreal:asset). A Niagara System is simulated to the frame "
+            "rendered from Effect Start Frame. Needs UE's editor (editor_root in .local/paths.json), as hdUE's "
+            "Substrate materials do.",
+        ),
+        submenu="Scene",
+    )
+
+
 if __name__ == "__main__":
     if os.environ.get("HDUE_BUILD_HDA"):
         build()
@@ -1636,5 +1771,6 @@ if __name__ == "__main__":
         build_post_process_volume()
         build_scene_components()
         build_decal()
+        build_unreal_asset()
     else:
         relaunch()

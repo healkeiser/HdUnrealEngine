@@ -98,7 +98,7 @@ In the Path Tracer, the first frames of a scene with UDIMs are a warm-up while U
 
 ## Cooked native assets
 
-A Mesh, Xform or Scope prim with `unreal:asset` renders a cooked UE asset from the runtime project in its place: a Static Mesh, Skeletal Mesh, Actor Blueprint, Level or Sparse Volume Texture.
+A Mesh, Xform or Scope prim with `unreal:asset` renders a cooked UE asset from the runtime project in its place: a Static Mesh, Skeletal Mesh, Actor Blueprint, Level, Sparse Volume Texture or Niagara System (see [Game effects](environment/effects.md)).
 
 === "Houdini"
 

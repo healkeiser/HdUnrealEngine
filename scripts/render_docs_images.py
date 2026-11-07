@@ -168,6 +168,12 @@ def main():
     )
     args = parser.parse_args()
     dev_environment()
+    # Figures of a local download's cooked assets (the effects page's Niagara pack) render with the runtime that
+    # Prepare-ProjectAssets.ps1 prepared for it.
+    if os.environ.get("HDUE_DOCS_RUNTIME_CONFIG"):
+        os.environ["HDUE_RUNTIME_CONFIG"] = os.environ[
+            "HDUE_DOCS_RUNTIME_CONFIG"
+        ]
     if args.preview:
         for scene in args.preview:
             preview(scene)

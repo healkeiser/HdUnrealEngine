@@ -773,6 +773,9 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     if (!Session->Scene->Lighting->Ready()) return Pending(TEXT("lighting"));
     UpdateSkyCapture(*Session);  // a DomeLight added or removed since set_post_process
     FString AssetFailure;
+    // Niagara Systems simulate to the request's time first: the world ticks until they settle, then the request
+    // goes on (and the Path Tracer's world stops ticking again below).
+    Session->Scene->Assets.SetTime(Request->time_seconds);
     if (Session->Scene->Assets.Loading(AssetFailure)) return Pending(TEXT("native assets"));
     if (!AssetFailure.IsEmpty()) return Fail(HDUE_ENGINE_ERROR, *AssetFailure);
     ReleaseResidency(Session);

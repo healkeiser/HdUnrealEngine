@@ -18,6 +18,7 @@ The digital assets hdUE installs, with the help Houdini shows for them (F1 on a 
 | <img class="hdue-node-icon" src="icons/HDUE_hduerenderproperties.svg" alt=""> [hdUE Render Settings](lop/hduerendersettings.md) | Renders the stage with Unreal Engine: render settings, camera, resolution, output and AOVs. |
 | <img class="hdue-node-icon" src="icons/HDUE_hdue.svg" alt=""> [hdUE Sky Atmosphere](lop/hdueskyatmosphere.md) | Creates or edits a UE Sky Atmosphere: UE's physical sky, lit by the distant lights. |
 | <img class="hdue-node-icon" src="icons/HDUE_hduestandardrendervars.svg" alt=""> [hdUE Standard Render Vars](lop/hduestandardrendervars.md) | Creates the render vars (AOVs) hdUE renders. |
+| <img class="hdue-node-icon" src="icons/HDUE_hdue.svg" alt=""> [hdUE Unreal Asset](lop/hdueunrealasset.md) | Places an asset from a UE project (a Niagara effect, a mesh, a Blueprint, a level) and imports it into hdUE. |
 | <img class="hdue-node-icon" src="icons/HDUE_hdue.svg" alt=""> [hdUE Volumetric Cloud](lop/hduevolumetriccloud.md) | Creates or edits a UE Volumetric Cloud layer, drawn with a Sky Atmosphere. |
 
 ## Substrate Builder nodes (VOPs)

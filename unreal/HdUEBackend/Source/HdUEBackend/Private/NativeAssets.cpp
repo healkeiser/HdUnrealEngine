@@ -16,6 +16,8 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Misc/PackageName.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 FHdueNativeAssets::~FHdueNativeAssets() { Reset(); }
 void FHdueNativeAssets::Actors(const FEntry& E, TArray<AActor*>& Out) {
@@ -71,7 +73,9 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
         Error = TEXT("Use a cooked UE object path such as /Game/HdUE/SM_Nanite.SM_Nanite.");
         return HDUE_INVALID_ARGUMENT;
     }
-    if (!FMath::IsFinite(D.frame)) return HDUE_INVALID_ARGUMENT;
+    if (!FMath::IsFinite(D.frame) || !FMath::IsFinite(D.start_seconds) || !FMath::IsFinite(D.seconds_per_frame) ||
+        D.seconds_per_frame < 0)
+        return HDUE_INVALID_ARGUMENT;
     const FTransform Transform(Matrix);
     if (auto* Existing = Entries.Find(Id)) {
         auto& E = **Existing;
@@ -97,6 +101,12 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
                     }
                 }
             }
+            if (E.Kind == HDUE_ASSET_EFFECT &&
+                (E.Start != D.start_seconds || E.SecondsPerFrame != D.seconds_per_frame)) {
+                E.Start = D.start_seconds;
+                E.SecondsPerFrame = D.seconds_per_frame;
+                Seek(E);
+            }
             if (E.Level.IsValid() && VisibilityChanged) {
                 E.Level->SetShouldBeVisible(E.Visible);
                 if (E.State != HDUE_ASSET_FAILED) {
@@ -114,6 +124,8 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
     E->Transform = Transform;
     E->Visible = D.visible != 0;
     E->Frame = D.frame;
+    E->Start = D.start_seconds;
+    E->SecondsPerFrame = D.seconds_per_frame;
     E->Started = FPlatformTime::Seconds();
     auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
     const FAssetData Data = Registry.GetAssetByObjectPath(ObjectPath);
@@ -128,6 +140,12 @@ HdueResult FHdueNativeAssets::Upsert(const HdueAssetDesc& D, FString& Error) {
         E->Kind = HDUE_ASSET_ACTOR;
     else if (Class == TEXT("StaticSparseVolumeTexture") || Class == TEXT("AnimatedSparseVolumeTexture"))
         E->Kind = HDUE_ASSET_SPARSE_VOLUME;
+    else if (Class == TEXT("NiagaraSystem"))
+        E->Kind = HDUE_ASSET_EFFECT;
+    else if (!Data.IsValid() && FPackageName::DoesPackageExist(ObjectPath.GetLongPackageName()))
+        // Published into this runtime after it started (an import from a UE project, hdue_ue_import.py): the startup
+        // registry does not list it, so the loaded object says what it is (Tick).
+        E->Kind = HDUE_ASSET_UNKNOWN;
     else {
         E->State = HDUE_ASSET_FAILED;
         E->Kind = Data.IsValid() ? HDUE_ASSET_RESOURCE : HDUE_ASSET_UNKNOWN;
@@ -184,6 +202,13 @@ void FHdueNativeAssets::Tick() {
         }
         if (!E.Load || !E.Load->HasLoadCompleted()) continue;
         UObject* Asset = E.Load->GetLoadedAsset();
+        if (E.Kind == HDUE_ASSET_UNKNOWN)  // an unregistered package: its object's class decides
+            E.Kind = Cast<UNiagaraSystem>(Asset)        ? HDUE_ASSET_EFFECT
+                     : Cast<UStaticMesh>(Asset)         ? HDUE_ASSET_STATIC_MESH
+                     : Cast<USkeletalMesh>(Asset)       ? HDUE_ASSET_SKELETAL_MESH
+                     : Cast<USparseVolumeTexture>(Asset) ? HDUE_ASSET_SPARSE_VOLUME
+                     : Cast<UClass>(Asset)              ? HDUE_ASSET_ACTOR
+                                                        : HDUE_ASSET_RESOURCE;
         E.Asset.Reset(Asset);
         AActor* A = nullptr;
         if (E.Kind == HDUE_ASSET_ACTOR) {
@@ -237,6 +262,28 @@ void FHdueNativeAssets::Tick() {
                 C->RegisterComponent();
                 A->SetActorTransform(E.Transform);
             }
+        } else if (auto* System = Cast<UNiagaraSystem>(Asset); E.Kind == HDUE_ASSET_EFFECT && System) {
+            // As Sequencer drives a Niagara track (MovieSceneNiagaraSystemTrackTemplate.cpp): solo, its age set from
+            // the scene's time, simulated in steps of one frame (the display rate) and only by whole frames
+            // (frame-locked).
+            A = World->SpawnActor<AActor>();
+            auto* C = NewObject<UNiagaraComponent>(A);
+            C->SetAsset(System);
+            C->SetForceSolo(true);
+            C->SetAgeUpdateMode(ENiagaraAgeUpdateMode::DesiredAge);
+            C->SetSeekDelta(E.SecondsPerFrame > 0 ? E.SecondsPerFrame : 1.f / 24);
+            C->SetLockDesiredAgeDeltaTimeToSeekDelta(true);
+            C->SetMaxSimTime(600);  // a seek reaches its age within one tick, however far
+            C->SetCanRenderWhileSeeking(false);
+            C->SetRandomSeedOffset(0);
+            C->SetMobility(EComponentMobility::Movable);
+            A->SetRootComponent(C);
+            A->AddInstanceComponent(C);
+            C->RegisterComponent();
+            A->SetActorTransform(E.Transform);
+            C->Activate(true);
+            UE_LOG(LogTemp, Log, TEXT("hdUE effect %s: %d emitters, seek step %.4f s"), *E.Path,
+                   System->GetEmitterHandles().Num(), C->GetSeekDelta());
         }
         if (!A) {
             E.State = HDUE_ASSET_FAILED;
@@ -254,9 +301,35 @@ void FHdueNativeAssets::Tick() {
             E.Actor = A;
             A->SetActorHiddenInGame(!E.Visible);
             E.ReadyFrame = GFrameCounter + 2;
+            if (E.Kind == HDUE_ASSET_EFFECT) Seek(E);
         }
         E.Load.Reset();
     }
+}
+void FHdueNativeAssets::Seek(FEntry& E) {
+    auto* C = E.Actor.IsValid() ? E.Actor->FindComponentByClass<UNiagaraComponent>() : nullptr;
+    if (!C) return;
+    const double Step = E.SecondsPerFrame > 0 ? E.SecondsPerFrame : 1. / 24;
+    C->SetSeekDelta(float(Step));
+    // A whole number of frames: Niagara ticks floor(age / step) times, and a desired age below its own resets it. So
+    // motion blur's sub-frames (within half a frame) keep the frame's age instead of restarting the effect, and the
+    // small margin keeps float rounding from losing a tick.
+    const double Frames = FMath::Max(FMath::RoundToDouble((Time - E.Start) / Step), 0.);
+    const float Age = float((Frames + 1e-3) * Step);
+    if (Age == C->GetDesiredAge()) return;  // the same frame (a retried request, a sub-frame): the seek already ran
+    C->SetDesiredAge(Age);
+    // The component simulates to its age on its next ticks: the asset reads as loading until then, so a render waits.
+    if (E.State != HDUE_ASSET_FAILED) {
+        E.State = HDUE_ASSET_LOADING;
+        E.Started = FPlatformTime::Seconds();
+        E.ReadyFrame = 0;
+    }
+    World->SetShouldTick(true);
+}
+void FHdueNativeAssets::SetTime(double Seconds) {
+    Time = Seconds;
+    for (auto& Pair : Entries)
+        if (Pair.Value->Kind == HDUE_ASSET_EFFECT) Seek(*Pair.Value);
 }
 void FHdueNativeAssets::Stats(const FEntry& E, HdueAssetStatus& S) {
     S = {};

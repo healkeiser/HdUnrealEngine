@@ -7,7 +7,7 @@ public class HdUEBackend : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicIncludePaths.Add(Path.GetFullPath(Path.Combine(ModuleDirectory, "../../../../include")));
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
-        PrivateDependencyModuleNames.AddRange(new[] { "RHI", "RenderCore", "Renderer", "Projects", "GeometryFramework", "GeometryCore", "MeshConversion", "MeshDescription", "StaticMeshDescription", "ImageWrapper", "ImageCore", "AssetRegistry", "IESFile", "NaniteBuilder", "ImageWriteQueue", "CameraCalibrationCore", "HairStrandsCore", "TextureUtilitiesCommon" });
+        PrivateDependencyModuleNames.AddRange(new[] { "RHI", "RenderCore", "Renderer", "Projects", "GeometryFramework", "GeometryCore", "MeshConversion", "MeshDescription", "StaticMeshDescription", "ImageWrapper", "ImageCore", "AssetRegistry", "IESFile", "NaniteBuilder", "ImageWriteQueue", "CameraCalibrationCore", "HairStrandsCore", "TextureUtilitiesCommon", "Niagara" });
         // Runtime UDIM virtual textures (VirtualTextureBuild.cpp) fill UE's built virtual texture data, a private header.
         PrivateIncludePaths.Add(Path.Combine(GetModuleDirectory("Engine"), "Private"));
         // Block compression of runtime textures (ispc_texcomp.dll, delay-loaded and staged with the runtime).

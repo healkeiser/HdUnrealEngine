@@ -76,6 +76,7 @@ nav = [
     { "Volumes" = "environment/volumes.md" },
     { "Fog" = "environment/fog.md" },
     { "Sky and clouds" = "environment/sky.md" },
+    { "Game effects" = "environment/effects.md" },
   ] },
   { "Reference" = [
     { "Render settings" = [
@@ -104,6 +105,7 @@ nav = [
         { "hdUE Render Settings" = "reference/nodes/lop/hduerendersettings.md" },
         { "hdUE Sky Atmosphere" = "reference/nodes/lop/hdueskyatmosphere.md" },
         { "hdUE Standard Render Vars" = "reference/nodes/lop/hduestandardrendervars.md" },
+        { "hdUE Unreal Asset" = "reference/nodes/lop/hdueunrealasset.md" },
         { "hdUE Volumetric Cloud" = "reference/nodes/lop/hduevolumetriccloud.md" },
       ] },
       { "VOPs" = [

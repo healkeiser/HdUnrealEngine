@@ -1118,6 +1118,10 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             d.asset_path = packet.own(data.sceneAsset);
             d.visible = data.visible && state.shown(data.renderTag);
             d.frame = data.assetFrame;
+            // A Niagara System's clock is the scene's: frames of 1/fps seconds, as Sequencer's display rate.
+            const double fps = state.setting<double>("houdini:fps", 24.);
+            d.seconds_per_frame = float(1 / fps);
+            d.start_seconds = data.effectStart / fps;
             rowMajor(inverse * data.transform * basis, d.transform);
             packet.sceneAssets.push_back(d);
             packet.removed.push_back(d.id);
@@ -3482,6 +3486,14 @@ void HdUEWarnRenderingColorSpace(const VtValue& value) {
             TF_WARN("hdUE: renderingColorSpace %s is not supported; hdUE renders in linear Rec.709", space.c_str());
         });
 }
+// The request's time from Houdini's frame and frame rate (houdini:frame, houdini:fps), which Houdini's viewport sets
+// as it plays and husk passes when it creates the delegate.
+void HdUETimeFromFrame(HdUEState& state) {
+    const double frame = state.setting<double>("houdini:frame", 1.);
+    const double fps = state.setting<double>("houdini:fps", 24.);
+    if (std::isfinite(frame) && std::isfinite(fps) && fps > 0)
+        state.settings[TfToken("timeSeconds")] = VtValue(frame / fps);
+}
 HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
     : HdRenderDelegate(settings),
       state_(std::make_shared<HdUEState>()),
@@ -3502,6 +3514,8 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             if (namespaced) state_->namespaced.insert(canonical);
             state_->settings[canonical] = value;
         }
+    // husk passes its frame here, not through SetRenderSetting; without it, a host's own timeSeconds stays.
+    if (settings.count(TfToken("houdini:frame"))) HdUETimeFromFrame(*state_);
     state_->wetBindings = std::make_shared<const VtDictionary>(state_->setting<VtDictionary>("surfaceEffects", {}));
     if (const auto space = settings.find(TfToken("renderingColorSpace")); space != settings.end())
         HdUEWarnRenderingColorSpace(space->second);
@@ -3973,12 +3987,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         TfStringStartsWith(key.GetString(), "cvar:"))
         ++state_->requestSettingsRevision;
     if (key == TfToken("houdini:frame") || key == TfToken("houdini:fps")) {
-        const double frame = state_->setting<double>("houdini:frame", 1.);
-        const double fps = state_->setting<double>("houdini:fps", 24.);
-        if (std::isfinite(frame) && std::isfinite(fps) && fps > 0) {
-            state_->settings[TfToken("timeSeconds")] = VtValue(frame / fps);
-            ++state_->requestSettingsRevision;
-        }
+        HdUETimeFromFrame(*state_);
+        ++state_->requestSettingsRevision;
     }
     if (key == TfToken("subdivisionLevel") && state_->renderIndex) {
         for (const auto& id : state_->renderIndex->GetRprimIds())

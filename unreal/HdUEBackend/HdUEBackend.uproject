@@ -23,6 +23,7 @@
     { "Name": "DatasmithContent", "Enabled": true, "TargetAllowList": ["Editor"] },
     { "Name": "CameraCalibrationCore", "Enabled": true },
     { "Name": "HairStrands", "Enabled": true },
+    { "Name": "Niagara", "Enabled": true },
     { "Name": "NNEDenoiser", "Enabled": true },
     { "Name": "OptiXDenoise", "Enabled": true },
     { "Name": "DLSS", "Enabled": true, "Optional": true },

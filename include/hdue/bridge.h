@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 22u
+#define HDUE_ABI_VERSION 23u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -397,7 +397,8 @@ enum {
     HDUE_ASSET_ACTOR = 3,
     HDUE_ASSET_LEVEL = 4,
     HDUE_ASSET_RESOURCE = 5,
-    HDUE_ASSET_SPARSE_VOLUME = 6 /* A cooked Sparse Volume Texture, rendered as a Heterogeneous Volume. */
+    HDUE_ASSET_SPARSE_VOLUME = 6, /* A cooked Sparse Volume Texture, rendered as a Heterogeneous Volume. */
+    HDUE_ASSET_EFFECT = 7 /* ABI 23: a cooked Niagara System, simulated to the request's time as Sequencer does. */
 };
 enum { HDUE_ASSET_LOADING = 0, HDUE_ASSET_READY = 1, HDUE_ASSET_FAILED = 2 };
 typedef struct HdueAssetDesc {
@@ -407,7 +408,11 @@ typedef struct HdueAssetDesc {
     double transform[16];   /* Native asset cm -> UE world cm, row-major. */
     /* A Sparse Volume Texture's frame (UHeterogeneousVolumeComponent::Frame), fractional frames blend as UE's. */
     float frame;
-    uint32_t reserved;
+    /* ABI 23, a Niagara System: the scene's frame length in seconds, the step its simulation advances by (Sequencer's
+       seek delta, 1 / display rate), and the scene time it starts at. Each render request sets its age to
+       time_seconds - start_seconds; going back in time resets and re-simulates it. */
+    float seconds_per_frame;
+    double start_seconds;
 } HdueAssetDesc;
 typedef struct HdueAssetStatus {
     uint32_t struct_size, kind, state, actors, meshes, lights;
