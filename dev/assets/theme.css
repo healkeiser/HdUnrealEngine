@@ -611,6 +611,42 @@ html {
   background-color: var(--hd-raised);
 }
 
+/* On a phone the contents are a button in the other corner: the switch's twin, and a frosted card like the menus. */
+@media screen and (max-width: 59.984375em) {
+  .md-sidebar--secondary {
+    right: 0.6rem;
+    bottom: 0.6rem;
+  }
+  .md-sidebar--secondary .md-sidebar-button {
+    padding: 0.35rem;
+    border-radius: var(--hd-radius);
+    color: var(--hd-text-muted);
+    background-color: var(--hd-frame);
+    box-shadow: inset 0 0 0 1px var(--hd-line);
+    backdrop-filter: none;
+  }
+  .md-sidebar--secondary .md-sidebar-button::after {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+  .md-sidebar--secondary .md-sidebar-button:is(:hover, :focus) {
+    color: var(--hd-text-strong);
+    background-color: var(--hd-raised);
+  }
+  .md-sidebar--secondary .md-sidebar__inner {
+    bottom: 2.4rem;
+    border-radius: 0.6rem;
+    background-color: color-mix(in oklab, var(--hd-panel) 85%, transparent);
+    backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow:
+      0 0 0 1px var(--hd-line),
+      0 16px 24px -8px rgb(0 0 0 / 30%);
+  }
+  .md-sidebar--secondary .md-nav__title {
+    background-color: transparent;
+  }
+}
+
 /* A new page's text rises in after an instant navigation (hdue.js). */
 @keyframes hdue-page-in {
   from {
