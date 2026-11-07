@@ -497,9 +497,21 @@ html {
     0 0 0 1px var(--hd-line),
     0 16px 24px -8px rgb(0 0 0 / 20%);
 }
+/* The menu at the tabs' size (the theme sets the header's 0.8rem and 1.8rem rows), opening under its button rather
+   than over the site's name. */
+.md-version__list {
+  top: 1.9rem;
+  min-width: 4.5rem;
+  margin: 0 0.4rem;
+}
+.md-version__item {
+  line-height: 1.4rem;
+}
 .md-version__link {
+  padding-inline: 0.55rem;
   border-radius: var(--hd-radius);
   color: var(--hd-text);
+  font-size: 0.65rem;
   font-weight: 400;
 }
 .md-version__link:is(:hover, :focus) {
