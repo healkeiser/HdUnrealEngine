@@ -8,16 +8,25 @@ The Path Tracer at 16 samples without the denoiser, at 512 samples, and at 16 sa
 
 ```mermaid
 flowchart TD
-    A[Noisy or flickering image] --> B{Render Mode?}
+    A("fal:fa-scan-eye Noisy or flickering image") --> B{Render Mode?}
     B -->|Path Tracer| C{What kind of noise?}
-    C -->|Fine grain everywhere| D[Path Tracer Samples, Denoiser]
-    C -->|Isolated bright pixels| E[Max Path Intensity]
+    C -->|Fine grain everywhere| D("fal:fa-sliders-horizontal Path Tracer Samples, Denoiser")
+    C -->|Isolated bright pixels| E("fal:fa-flame Max Path Intensity")
     C -->|Grainy soft shadows| D
     B -->|Realtime| F{What kind of noise?}
-    F -->|Blotches in indirect light| G[Warmup Frames, Final Gather Quality]
-    F -->|Blotches in reflections| H[Lumen Scene Lighting Quality, Reflection Quality]
-    F -->|Trails behind moving objects| I[Anti-Aliasing Method, Lighting Update Speed]
-    F -->|Grainy soft shadows| J[Soft Shadow Rays, MegaLights per light]
+    F -->|Blotches in indirect light| G("fal:fa-timer Warmup Frames, Final Gather Quality")
+    F -->|Blotches in reflections| H("fal:fa-sparkles Lumen Scene Lighting Quality, Reflection Quality")
+    F -->|Trails behind moving objects| I("fal:fa-waves Anti-Aliasing Method, Lighting Update Speed")
+    F -->|Grainy soft shadows| J("fal:fa-sun-moon Soft Shadow Rays, MegaLights per light")
+
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
+
+    class A output
+    class B,C,F hdue
+    class D,E,G,H,I,J unreal
 ```
 
 The scenes: the Cornell box for the Path Tracer, the Bistro (`samples/docs/bistro.usda`) for Lumen, the chrome ball and box (`samples/docs/lights.usda`) for shadows. All settings are on the hdUE Render Settings LOP.

@@ -1,30 +1,40 @@
-# The user guide (zensical.toml, docs/) on GitHub Pages, published from main.
+# The user guide (zensical.toml, docs/) on GitHub Pages, one folder per version on the gh-pages branch (mike).
+# main publishes "dev"; a release tag vX.Y.Z publishes "X.Y", moves the "latest" alias to it and makes it the default.
+# Pages must serve the gh-pages branch (Settings > Pages > Deploy from a branch).
 name: Documentation
 on:
   push:
     branches: [main]
-    paths: [docs/**, zensical.toml, README.md, .github/workflows/docs.yml]
+    tags: ["v*"]
+    paths: [docs/**, overrides/**, zensical.toml, README.md, .github/workflows/docs.yml]
   workflow_dispatch:
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/configure-pages@v6
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.1
-      - run: uvx zensical@0.1.0 build --clean --strict
-      - uses: actions/upload-pages-artifact@v5
         with:
-          path: site
-      - uses: actions/deploy-pages@v5
-        id: deployment
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.0.1
+      # Zensical's fork of mike (not on PyPI), pinned; it imports zensical.config and runs `zensical build`.
+      - run: |
+          uv tool install zensical==0.1.0
+          uv tool install --with zensical==0.1.0 git+https://github.com/squidfunk/mike.git@2d4ad799442f4592db8ad53b179bfb33db8c69ac
+      # The strict build fails on broken links before mike publishes anything.
+      - run: zensical build --clean --strict
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages --depth=1 || true
+      - if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mike deploy --push --update-aliases "${version%.*}" latest
+          mike set-default --push latest
+      - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: mike deploy --push dev

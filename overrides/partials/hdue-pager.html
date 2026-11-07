@@ -1,0 +1,25 @@
+{#- The previous and next pages as two cards (theme.css .hdue-pager). -#}
+{% if "navigation.footer" in features and (page.previous_page or page.next_page) %}
+  {% if not (page.meta and page.meta.hide and "footer" in page.meta.hide) %}
+    <nav class="hdue-pager" aria-label="{{ lang.t('footer') }}">
+      {% if page.previous_page %}
+        <a href="{{ page.previous_page.url | url }}" class="hdue-pager__link hdue-pager__link--prev">
+          <span class="hdue-pager__direction">
+            {% include ".icons/" ~ config.theme.icon.previous ~ ".svg" %}
+            {{ lang.t("footer.previous") }}
+          </span>
+          <span class="hdue-pager__title">{{ page.previous_page.title }}</span>
+        </a>
+      {% endif %}
+      {% if page.next_page %}
+        <a href="{{ page.next_page.url | url }}" class="hdue-pager__link hdue-pager__link--next">
+          <span class="hdue-pager__direction">
+            {{ lang.t("footer.next") }}
+            {% include ".icons/" ~ config.theme.icon.next ~ ".svg" %}
+          </span>
+          <span class="hdue-pager__title">{{ page.next_page.title }}</span>
+        </a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endif %}

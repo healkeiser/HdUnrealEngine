@@ -1,0 +1,36 @@
+{#- hdUE's pages: previous and next as two cards under the text (partials/hdue-pager.html), then the copyright, which
+    a wide screen shows there instead of in the footer; the footer keeps only the copyright and the links; mike's banner
+    over a version that is not the latest. -#}
+{% extends "base.html" %}
+{% block outdated %}
+  You are reading an older version of this guide.
+  <a href="{{ '../' ~ base_url }}"><strong>Go to the latest one.</strong></a>
+{% endblock %}
+{% block content %}
+  {{ super() }}
+  {% include "partials/hdue-pager.html" %}
+  {% if config.copyright %}
+    <p class="hdue-copyright">{{ config.copyright }}</p>
+  {% endif %}
+{% endblock %}
+{#- A page with a diagram loads Mermaid before the theme does, so the theme renders with this copy: Lucide registered
+    as an icon pack (`A@{ icon: "lucide:camera" }`) and hdUE's look (assets/hdue-mermaid.js). -#}
+{% block scripts %}
+  {% if page and page.content and 'class="mermaid"' in page.content %}
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@12.1.0/dist/mermaid.min.js" integrity="sha384-EbBpjO7rlR6eqZEcG7GaPpyk9H9WrMyPWX4d3KvPYltgt8Z8l0z6R56B1qP40pR4" crossorigin="anonymous"></script>
+    <script src="{{ 'assets/hdue-mermaid.js' | url }}"></script>
+  {% endif %}
+  {{ super() }}
+{% endblock %}
+{% block footer %}
+  <footer class="md-footer">
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        {% include "partials/copyright.html" %}
+        {% if config.extra.social %}
+          {% include "partials/social.html" %}
+        {% endif %}
+      </div>
+    </div>
+  </footer>
+{% endblock %}

@@ -122,12 +122,29 @@ A disabled effect or uniform zero amount binds the original dry material. Removi
 
 ```mermaid
 flowchart LR
-    M["MaterialX source"] --> P["Editor preparation and cook"]
-    P --> V["Cooked wet variant and library"]
-    U["USD settings and float primvar"] --> H["Hydra resolution and mesh partitioning"]
-    V --> B["UE backend in the host process"]
+    M("fal:fa-file-code MaterialX source")
+    U("fal:fa-sliders-horizontal USD settings and float primvar")
+    subgraph Unreal["fal:fa-boxes Unreal Engine"]
+        P("fal:fa-hammer Editor preparation and cook")
+        V("fal:fa-droplets Cooked wet variant and library")
+        B("fal:fa-boxes UE backend in the host process")
+    end
+    H("fal:fa-package Hydra resolution and mesh partitioning")
+    R("fal:fa-image Lumen or Path Tracer color AOV")
+    M --> P --> V --> B
+    U --> H
     H -->|"Versioned C ABI"| B
-    B --> R["Lumen or Path Tracer color AOV"]
+    B --> R
+
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
+
+    class M,U host
+    class H hdue
+    class Unreal,P,V,B unreal
+    class R output
 ```
 
 The host/preparation adapter resolves the authored USD settings after reference composition and supplies an explicit effect-binding map to the delegate. Custom USD attributes are not assumed to appear automatically in `HdSceneDelegate::Get`. Each host must supply the same resolved contract through its renderer-settings or scene adapter. The delegate reads the selected mask primvar through Hydra and expands it with the geometry. A mask-name change must invalidate the relevant primvar data even when point positions are unchanged.

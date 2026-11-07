@@ -1,0 +1,852 @@
+/* hdUE's look on Zensical's modern theme: quiet greys, hairlines, the logo's violet as the one colour. The page's
+   text sits on a rounded panel framed by the header and the two sidebars, which share a darker grey. Figures are
+   hdue.css's. */
+
+/* Colours. The palette entries in zensical.toml set primary and accent to "custom", so the theme adds none of its
+   own; the scheme attribute and the primary one together outweigh the theme's scheme rules. */
+[data-md-color-scheme="default"][data-md-color-primary] {
+  --hd-frame: #f4f4f5;
+  --hd-panel: #ffffff;
+  --hd-raised: #ebebee;
+  --hd-card-hover: #fafafa;
+  --hd-line: #e4e4e7;
+  --hd-line-strong: #d4d4d8;
+  --hd-text: #27272a;
+  --hd-text-muted: #52525b;
+  --hd-text-dim: #71717a;
+  --hd-text-strong: #09090b;
+  /* Violet text at 700 in the light scheme (500 reads at 3.6:1 on white), 400 in the dark one; fills keep 600. */
+  --hd-accent: #7e22ce;
+  --hd-accent-fill: #9333ea;
+  /* Diagram classes (assets/hdue-mermaid.js): Houdini's orange, hdUE's violet, Unreal's blue, outputs' green; a
+     tint for groups, a line for groups and nodes. */
+  --hd-dg-host: #fb923c;
+  --hd-dg-host-bg: #fff7ed;
+  --hd-dg-delegate: #c084fc;
+  --hd-dg-delegate-bg: #faf5ff;
+  --hd-dg-unreal: #60a5fa;
+  --hd-dg-unreal-bg: #eff6ff;
+  --hd-dg-gpu: #4ade80;
+  --hd-dg-gpu-bg: #f0fdf4;
+}
+[data-md-color-scheme="slate"][data-md-color-primary] {
+  --hd-frame: #09090b;
+  --hd-panel: #111113;
+  --hd-raised: #1c1c20;
+  --hd-card-hover: #18181b;
+  --hd-line: #27272a;
+  --hd-line-strong: #3f3f46;
+  --hd-text: #d4d4d8;
+  --hd-text-muted: #a1a1aa;
+  --hd-text-dim: #808089;
+  --hd-text-strong: #fafafa;
+  --hd-accent: #c084fc;
+  --hd-accent-fill: #a855f7;
+  --hd-dg-host: #ea580c;
+  --hd-dg-host-bg: #1f140d;
+  --hd-dg-delegate: #a855f7;
+  --hd-dg-delegate-bg: #1a1224;
+  --hd-dg-unreal: #3b82f6;
+  --hd-dg-unreal-bg: #0f1524;
+  --hd-dg-gpu: #22c55e;
+  --hd-dg-gpu-bg: #0e1a12;
+}
+[data-md-color-scheme][data-md-color-primary] {
+  /* The tab bar's height, which the search box beside it matches. */
+  --hd-bar: 1.75rem;
+  --md-default-bg-color: var(--hd-panel);
+  --md-default-fg-color: var(--hd-text-strong);
+  --md-default-fg-color--light: var(--hd-text-muted);
+  --md-default-fg-color--lighter: var(--hd-text-dim);
+  --md-default-fg-color--lightest: var(--hd-line);
+  --md-typeset-color: var(--hd-text);
+  --md-typeset-a-color: var(--hd-accent);
+  --md-code-bg-color: var(--hd-frame);
+  --md-code-fg-color: var(--hd-text-strong);
+  --md-primary-fg-color: var(--hd-frame);
+  --md-primary-fg-color--light: var(--hd-raised);
+  --md-primary-fg-color--dark: var(--hd-frame);
+  --md-primary-bg-color: var(--hd-text-strong);
+  --md-primary-bg-color--light: var(--hd-text-muted);
+  --md-accent-fg-color: var(--hd-accent);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--hd-accent-fill) 8%, transparent);
+  --md-accent-bg-color: var(--hd-accent-fill);
+  --md-footer-bg-color: var(--hd-frame);
+  --md-footer-bg-color--dark: var(--hd-frame);
+  --md-footer-fg-color: var(--hd-text-muted);
+  --md-footer-fg-color--light: var(--hd-text-dim);
+  --md-footer-fg-color--lighter: var(--hd-text-dim);
+  --hd-radius: 6px;
+  --hd-fast: 150ms;
+  --hd-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hd-line-strong) transparent;
+}
+
+/* Headings a weight lighter than the theme's bold, in the brightest grey; the title over a hairline. */
+.md-typeset :is(h1, h2, h3, h4) {
+  color: var(--hd-text-strong);
+  letter-spacing: -0.01em;
+}
+.md-typeset h1 {
+  font-weight: 600;
+}
+.md-typeset :is(h2, h3) {
+  font-weight: 600;
+}
+.md-content__inner > h1 {
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--hd-line);
+}
+
+/* The header: the frame's grey, no shadow. The site name reads as a name, not as a page title. */
+.md-header {
+  background-color: var(--hd-frame);
+  color: var(--hd-text-strong);
+  box-shadow: none;
+}
+.md-header--shadow {
+  box-shadow: none;
+}
+.md-header__topic:first-child .md-ellipsis {
+  font-weight: 600;
+}
+.md-header__button.md-icon {
+  color: var(--hd-text-muted);
+  border-radius: var(--hd-radius);
+  opacity: 1;
+  transition:
+    color var(--hd-fast) var(--hd-ease),
+    background-color var(--hd-fast) var(--hd-ease);
+}
+.md-header__button.md-icon:is(:hover, :focus-visible) {
+  color: var(--hd-text-strong);
+  background-color: var(--hd-raised);
+}
+
+/* Search: the panel's colour on the frame, a hairline ring. */
+.md-search__button {
+  color: var(--hd-text-muted);
+  background-color: var(--hd-panel);
+  border-radius: calc(var(--hd-radius) * 1.5);
+  box-shadow: inset 0 0 0 1px var(--hd-line);
+  transition: box-shadow var(--hd-fast) var(--hd-ease);
+}
+.md-search__button:is(:hover, :focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--hd-line-strong);
+}
+
+/* The tabs: one rounded grey bar, the open tab a panel-coloured pill on a hairline that slides to the tab opened
+   (hdue.js). A bar wider than the window scrolls and fades at the edge with more. */
+.md-tabs {
+  overflow: hidden;
+  background-color: transparent;
+  color: var(--hd-text-muted);
+}
+.md-tabs__list {
+  display: flex;
+  align-items: center;
+  height: var(--hd-bar);
+  width: fit-content;
+  /* Inside its margins: a bar wider than the room scrolls itself (no scrollbar: the wheel and the edge fades do,
+     hdue.js), never the header. */
+  max-width: calc(100% - 1.2rem);
+  box-sizing: border-box;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 0.1rem;
+  margin: 0.15rem 0 0.4rem;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+  background-color: var(--hd-raised);
+}
+[dir] .md-tabs__list {
+  margin-inline: 0.6rem;
+}
+.md-tabs__item,
+.md-tabs__item--active {
+  position: relative;
+  z-index: 1;
+  height: auto;
+  padding: 0;
+  border-bottom: 0;
+}
+.md-tabs__item--active::after,
+.md-tabs__item--active::before {
+  display: none;
+}
+.md-tabs__link {
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--hd-radius);
+  color: var(--hd-text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+  opacity: 1;
+  transition:
+    color var(--hd-fast) var(--hd-ease),
+    background-color var(--hd-fast) var(--hd-ease);
+}
+.md-tabs__link:hover,
+.md-tabs__item--active .md-tabs__link {
+  color: var(--hd-text-strong);
+}
+.md-tabs__item--active .md-tabs__link,
+.hdue-tab-pill {
+  background-color: var(--hd-panel);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 6%),
+    0 0 0 1px var(--hd-line);
+}
+.md-tabs__list.hdue-glide .md-tabs__item--active .md-tabs__link {
+  background-color: transparent;
+  box-shadow: none;
+}
+.md-tabs__list.hdue-glide {
+  position: relative;
+}
+.hdue-tab-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: var(--hd-radius);
+  pointer-events: none;
+  transition-property: translate, width;
+  transition-duration: 350ms;
+  transition-timing-function: var(--hd-ease);
+}
+.md-tabs.hdue-more-right .md-tabs__list {
+  mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+}
+.md-tabs.hdue-more-left .md-tabs__list {
+  mask-image: linear-gradient(to right, transparent, #000 3rem);
+}
+.md-tabs.hdue-more-left.hdue-more-right .md-tabs__list {
+  mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent);
+}
+
+/* The menu: grey rows, darker under the pointer, the open page in violet on a raised grey. */
+.md-nav--primary .md-nav__link {
+  border-radius: var(--hd-radius);
+  color: var(--hd-text-muted);
+  transition:
+    color var(--hd-fast) var(--hd-ease),
+    background-color var(--hd-fast) var(--hd-ease);
+}
+.md-nav--primary .md-nav__link:is(:hover, :focus-visible) {
+  color: var(--hd-text-strong);
+  background-color: color-mix(in srgb, var(--hd-raised) 60%, transparent);
+}
+.md-nav--primary .md-nav__item .md-nav__link--active,
+.md-nav--primary .md-nav__item .md-nav__link--active:is(:hover, :focus-visible) {
+  color: var(--hd-accent);
+  background-color: var(--hd-raised);
+}
+.md-nav__item--section > .md-nav__link {
+  color: var(--hd-text-strong);
+}
+.md-nav--secondary .md-nav__link {
+  color: var(--hd-text-muted);
+}
+.md-nav--secondary .md-nav__link--active,
+.md-nav--secondary .md-nav__link:hover {
+  color: var(--hd-accent);
+}
+
+/* The page's buttons (view, edit, copy) and the code blocks' as plain icons, a raised grey under the pointer. */
+.md-content__button,
+.md-code__button,
+.md-clipboard {
+  color: var(--hd-text-dim);
+  background-color: transparent;
+  border-radius: var(--hd-radius);
+  transition:
+    color var(--hd-fast) var(--hd-ease),
+    background-color var(--hd-fast) var(--hd-ease);
+}
+.md-code__nav,
+:hover > .md-code__nav {
+  background-color: transparent;
+}
+.md-content__button:is(:hover, :focus-visible),
+.md-code__button:hover,
+.md-clipboard:is(:hover, :focus) {
+  color: var(--hd-text-strong);
+  background-color: var(--hd-raised);
+}
+
+/* Code on the panel: the frame's grey on a hairline. */
+.md-typeset pre > code,
+.md-typeset .highlight {
+  border-radius: 0.4rem;
+}
+.md-typeset pre > code {
+  box-shadow: inset 0 0 0 1px var(--hd-line);
+}
+.md-typeset :not(pre) > code {
+  border-radius: 0.25rem;
+  box-shadow: inset 0 0 0 1px var(--hd-line);
+}
+
+/* Tables as lists: small grey headers, hairline rows, rounded. */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--hd-line);
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+}
+.md-typeset table:not([class]) th {
+  color: var(--hd-text-muted);
+  font-weight: 500;
+  background-color: var(--hd-frame);
+}
+.md-typeset table:not([class]) td {
+  border-top-color: var(--hd-line);
+  vertical-align: middle;
+}
+.md-typeset table:not([class]) tbody tr:hover {
+  background-color: color-mix(in srgb, var(--hd-raised) 40%, transparent);
+  box-shadow: none;
+}
+
+/* Keys as small labels on a hairline chip, not raised key caps. */
+.md-typeset kbd {
+  padding: 0 0.35em;
+  color: var(--hd-text-strong);
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 500;
+  background-color: var(--hd-panel);
+  border-radius: 0.25rem;
+  box-shadow: inset 0 0 0 1px var(--hd-line-strong);
+}
+
+/* Admonitions keep the theme's tint, framed by a hairline in their own colour. */
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid color-mix(in srgb, var(--hd-admonition, #448aff) 35%, transparent);
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+.md-typeset :is(.admonition, details):is(.abstract, .summary, .tldr) {
+  --hd-admonition: #00b0ff;
+}
+.md-typeset :is(.admonition, details):is(.info, .todo) {
+  --hd-admonition: #00b8d4;
+}
+.md-typeset :is(.admonition, details):is(.tip, .hint, .important) {
+  --hd-admonition: #00bfa5;
+}
+.md-typeset :is(.admonition, details):is(.success, .check, .done) {
+  --hd-admonition: #00c853;
+}
+.md-typeset :is(.admonition, details):is(.question, .help, .faq) {
+  --hd-admonition: #64dd17;
+}
+.md-typeset :is(.admonition, details):is(.warning, .caution, .attention) {
+  --hd-admonition: #ff9100;
+}
+.md-typeset :is(.admonition, details):is(.failure, .fail, .missing) {
+  --hd-admonition: #ff5252;
+}
+.md-typeset :is(.admonition, details):is(.danger, .error) {
+  --hd-admonition: #ff1744;
+}
+.md-typeset :is(.admonition, details).bug {
+  --hd-admonition: #f50057;
+}
+.md-typeset :is(.admonition, details).example {
+  --hd-admonition: #7c4dff;
+}
+.md-typeset :is(.admonition, details):is(.quote, .cite) {
+  --hd-admonition: #9e9e9e;
+}
+
+/* Content tabs as the header's: a grey bar, the open one a pill (the theme's own sliding indicator, full height). */
+.md-typeset .tabbed-labels {
+  gap: 0.1rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0.4rem;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+  background-color: var(--hd-raised);
+  box-shadow: none;
+}
+.md-typeset .tabbed-labels > label {
+  position: relative;
+  z-index: 1;
+  padding: 0.25rem 0.6rem;
+  border: 0;
+  border-radius: var(--hd-radius);
+  color: var(--hd-text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+.md-typeset .tabbed-labels > label > [href]:first-child {
+  color: inherit;
+}
+.md-typeset .tabbed-labels > label:hover,
+.md-typeset .tabbed-set > input:checked + .tabbed-labels > label,
+.md-typeset .tabbed-labels > label.tabbed-labels__label--active {
+  color: var(--hd-text-strong);
+}
+.js .md-typeset .tabbed-labels::before {
+  top: 0.2rem;
+  bottom: 0.2rem;
+  height: auto;
+  border-radius: var(--hd-radius);
+  background: var(--hd-panel);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 6%),
+    0 0 0 1px var(--hd-line);
+}
+
+/* Cards (the home page's grids, previous and next): a hairline on the panel, a step stronger and lifted a pixel
+   under the pointer. */
+.md-typeset .grid.cards > :is(ul, ol) > li,
+.md-typeset .grid > .card,
+.hdue-pager__link {
+  border: 1px solid var(--hd-line);
+  border-radius: 0.5rem;
+  background-color: var(--hd-panel);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  transition-property: translate, box-shadow, border-color, background-color;
+  transition-duration: var(--hd-fast);
+  transition-timing-function: var(--hd-ease);
+}
+.md-typeset .grid.cards > :is(ul, ol) > li:is(:hover, :focus-within),
+.md-typeset .grid > .card:is(:hover, :focus-within),
+.hdue-pager__link:is(:hover, :focus-visible) {
+  border-color: var(--hd-line-strong);
+  background-color: var(--hd-card-hover);
+  box-shadow: 0 6px 16px -6px rgb(0 0 0 / 18%);
+  translate: 0 -1px;
+}
+
+/* Previous and next (overrides/main.html), as two cards under the text; a lone next card keeps its side. */
+.hdue-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin-top: 2.4rem;
+}
+.md-typeset .hdue-pager__link,
+.hdue-pager__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.9rem;
+  color: var(--hd-text-strong);
+  text-decoration: none;
+}
+.hdue-pager__link--next {
+  grid-column: 2;
+  align-items: flex-end;
+  text-align: right;
+}
+.hdue-pager__direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--hd-text-dim);
+  font-size: 0.65rem;
+}
+.hdue-pager__direction svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  fill: none;
+  stroke: currentcolor;
+}
+.hdue-pager__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* The contents column ends with the edit link, the repository and the copyright (overrides/partials/toc.html). */
+.hdue-toc-meta {
+  display: none;
+}
+
+/* mike's version picker: a small ghost button beside the name, its menu a frosted card. The banner over a release
+   that is not the latest is a quiet note. */
+.md-version__current {
+  top: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--hd-radius);
+  color: var(--hd-text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+.md-version__current:hover,
+.md-version:focus-within .md-version__current {
+  background-color: var(--hd-raised);
+}
+.md-version__list,
+.md-select__list {
+  padding: 0.2rem;
+  border-radius: 0.6rem;
+  background-color: color-mix(in oklab, var(--hd-panel) 80%, transparent);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow:
+    0 0 0 1px var(--hd-line),
+    0 16px 24px -8px rgb(0 0 0 / 20%);
+}
+.md-version__link {
+  border-radius: var(--hd-radius);
+  color: var(--hd-text);
+  font-weight: 400;
+}
+.md-version__link:is(:hover, :focus) {
+  color: var(--hd-text-strong);
+  background-color: var(--hd-raised);
+}
+.md-banner {
+  color: var(--hd-text-strong);
+  background-color: var(--hd-raised);
+  border-bottom: 1px solid var(--hd-line);
+}
+.md-banner a {
+  color: var(--hd-accent);
+  text-decoration: underline;
+}
+
+/* Diagrams (Mermaid, drawn by the theme in a closed shadow root: only its --md-mermaid-* variables reach inside; the
+   rest is assets/hdue-mermaid.js). Quiet nodes on the panel, grey edges, on a band like the figures'; a click shows
+   one full screen (hdue.js). */
+.md-typeset .mermaid {
+  --md-mermaid-font-family: var(--md-text-font-family), sans-serif;
+  --md-mermaid-node-bg-color: var(--hd-panel);
+  --md-mermaid-node-fg-color: var(--hd-line-strong);
+  --md-mermaid-edge-color: var(--hd-text-dim);
+  --md-mermaid-label-bg-color: var(--hd-frame);
+  --md-mermaid-label-fg-color: var(--hd-text-strong);
+  --md-mermaid-sequence-actor-bg-color: var(--hd-panel);
+  --md-mermaid-sequence-actor-border-color: var(--hd-line-strong);
+  --md-mermaid-sequence-actor-fg-color: var(--hd-text-strong);
+  --md-mermaid-sequence-actor-line-color: var(--hd-line);
+  --md-mermaid-sequence-message-line-color: var(--hd-text-dim);
+  --md-mermaid-sequence-message-fg-color: var(--hd-text-strong);
+  --md-mermaid-sequence-note-bg-color: color-mix(in srgb, var(--hd-accent-fill) 14%, transparent);
+  --md-mermaid-sequence-note-border-color: var(--hd-accent);
+  --md-mermaid-sequence-note-fg-color: var(--hd-text-strong);
+  --md-mermaid-sequence-number-bg-color: var(--hd-accent-fill);
+  --md-mermaid-sequence-number-fg-color: #fff;
+  margin: 1.2em 0;
+  padding: 1.2rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--hd-line);
+  border-radius: 0.3rem;
+  background-color: var(--hd-frame);
+  text-align: center;
+  cursor: zoom-in;
+}
+.md-typeset .mermaid:fullscreen {
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--hd-panel);
+  cursor: zoom-out;
+}
+
+/* The glossary's dotted underline, faint until pointed at. */
+.md-typeset abbr {
+  border-bottom-color: var(--hd-line-strong);
+}
+.md-typeset abbr:hover {
+  border-bottom-color: var(--hd-accent);
+}
+
+/* The footer: the frame's grey, the copyright and the links only (the pager replaces its previous and next). */
+.md-footer,
+.md-footer-meta {
+  background-color: var(--hd-frame);
+  color: var(--hd-text-dim);
+}
+.md-copyright {
+  color: var(--hd-text-dim);
+  font-size: 0.6rem;
+}
+.md-copyright__highlight {
+  color: var(--hd-text-muted);
+}
+.md-footer-meta.md-typeset a:not(:focus, :hover) {
+  color: var(--hd-text-muted);
+}
+
+/* The copyright at the panel's foot, where the footer is hidden (wide screens). */
+.hdue-copyright {
+  display: none;
+  margin-top: 1.6rem;
+  color: var(--hd-text-dim);
+  font-size: 0.6rem;
+}
+
+/* The light and dark switch, moved out of the header to the page's bottom-left corner (hdue.js). */
+.hdue-palette {
+  position: fixed;
+  z-index: 3;
+  bottom: 0.6rem;
+  left: 0.6rem;
+  display: flex;
+}
+.hdue-palette .md-header__button {
+  margin: 0;
+  padding: 0.35rem;
+  border-radius: var(--hd-radius);
+  color: var(--hd-text-muted);
+  background-color: var(--hd-frame);
+  box-shadow: inset 0 0 0 1px var(--hd-line);
+}
+.hdue-palette .md-header__button:is(:hover, :focus-visible) {
+  color: var(--hd-text-strong);
+  background-color: var(--hd-raised);
+}
+
+/* A new page's text rises in after an instant navigation (hdue.js). */
+@keyframes hdue-page-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+.md-content__inner.hdue-page-in {
+  animation: hdue-page-in 250ms var(--hd-ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-content__inner.hdue-page-in {
+    animation: none;
+  }
+  .hdue-tab-pill {
+    transition: none;
+  }
+}
+
+/* Narrower screens keep the desktop's look without its columns: the text on a rounded panel over the frame's grey,
+   the menu drawer on the frame's grey too. */
+@media screen and (max-width: 76.2344em) {
+  .md-main {
+    background-color: var(--hd-frame);
+  }
+  .md-main__inner {
+    margin-top: 0;
+    padding: 0 0.4rem 0.4rem;
+  }
+  .md-content {
+    border: 1px solid var(--hd-line);
+    border-radius: 0.6rem;
+    background-color: var(--hd-panel);
+    overflow-x: clip;
+  }
+  .md-nav--primary,
+  .md-nav--primary .md-nav,
+  .md-nav--primary .md-nav__title,
+  .md-sidebar--primary {
+    background-color: var(--hd-frame);
+  }
+  .md-nav--primary .md-nav__source {
+    background-color: var(--hd-frame);
+  }
+  .md-nav--primary .md-nav__source .md-source {
+    border-radius: 0.5rem;
+    box-shadow: inset 0 0 0 1px var(--hd-line);
+  }
+}
+
+/* The frame, where both sidebars show: the menu and the contents against the window's edges on the frame's grey,
+   the text on a rounded panel between them, its column at a reading width. */
+@media screen and (min-width: 76.25em) {
+  .md-grid {
+    max-width: none;
+  }
+  .md-main {
+    background-color: var(--hd-frame);
+  }
+  .md-main__inner {
+    margin-top: 0;
+    padding-bottom: 0.6rem;
+  }
+  .md-sidebar {
+    width: 15rem;
+  }
+  [dir] .md-tabs__list {
+    max-width: calc(100% - 15.6rem);
+    margin-inline: 15rem 0.6rem;
+  }
+  /* Search heads the menu column, beside the tabs and under the logo (the sticky header is its containing block). */
+  .md-header .md-search {
+    position: absolute;
+    top: 2.55rem;
+    left: 0.6rem;
+    width: calc(15rem - 1.2rem);
+  }
+  .md-header .md-search .md-search__button {
+    width: 100%;
+    height: var(--hd-bar);
+  }  .md-sidebar .md-sidebar__inner {
+    padding-inline: 0;
+  }
+  .md-sidebar--primary .md-sidebar__inner {
+    padding-left: 0.4rem;
+  }
+  .md-sidebar--secondary .md-sidebar__inner {
+    padding-right: 0.4rem;
+  }
+  .md-sidebar .md-nav__title {
+    background-color: var(--hd-frame);
+    box-shadow: none;
+  }
+  /* The panel stays put and its text scrolls: the window keeps the scroll (the theme follows it for "On this page"),
+     and a frame pinned over the text column draws the panel's hairline and corners, with a ring of the frame's grey
+     that hides the text beyond them. The sidebars sit above the ring. --hd-header is the header's height (hdue.js). */
+  .md-content {
+    --hd-left: 15rem;
+    --hd-right: 15rem;
+    margin: 0;
+    background-color: var(--hd-panel);
+  }
+  .md-main__inner:has(> .md-sidebar--primary[hidden]) > .md-content {
+    --hd-left: 0.6rem;
+  }
+  .md-main__inner:has(> .md-sidebar--secondary[hidden]) > .md-content {
+    --hd-right: 0.6rem;
+  }
+  .md-content::after {
+    content: "";
+    position: fixed;
+    z-index: 1;
+    top: var(--hd-header, 5rem);
+    bottom: 0.6rem;
+    left: var(--hd-left);
+    right: var(--hd-right);
+    border: 1px solid var(--hd-line);
+    border-radius: 0.6rem;
+    box-shadow: 0 0 0 100vmax var(--hd-frame);
+    pointer-events: none;
+  }
+  .md-sidebar {
+    z-index: 2;
+  }
+  /* The last line clears the frame's foot. */
+  .md-main__inner {
+    padding-bottom: 0.6rem;
+  }
+  /* The footer would sit under the ring: the panel's foot carries the copyright instead (overrides/main.html). */
+  .md-footer {
+    display: none;
+  }
+  .hdue-copyright {
+    display: block;
+  }
+  .md-content__inner,
+  .md-content > .md-path {
+    box-sizing: border-box;
+    max-width: 40rem;
+    padding-inline: 1.2rem;
+  }
+  /* The theme pins the text's margins next to a sidebar with a five-part selector; this one outweighs it. */
+  [dir] .md-content > .md-content__inner,
+  [dir] .md-main__inner > .md-sidebar:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-inline: auto;
+  }
+  /* The breadcrumb on the text's column: the theme's own margins and padding put it 1.6rem in from the title. */
+  .md-main .md-content > .md-path {
+    width: 100%;
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1rem 1.2rem 0;
+  }
+  .md-content__inner {
+    padding-bottom: 1.6rem;
+  }
+  /* The title's hairline spans the panel: its border image reaches past the column, the panel clips it. */
+  .md-content {
+    overflow-x: clip;
+  }
+  .md-content__inner > h1 {
+    border-bottom: 1px solid;
+    border-image: linear-gradient(var(--hd-line) 0 0) 0 0 1 0 / 0 0 1px 0 / 0 100vw;
+  }
+  /* The menu draws the open page's contents with the same template: the foot belongs to the right column. Its
+     links are rows like the contents' own, under a hairline. */
+  .md-sidebar--secondary .hdue-toc-meta {
+    display: flex;
+    flex-direction: column;
+    margin: 0.8rem 0.2rem 0.6rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--hd-line);
+  }
+  .hdue-toc-meta__link {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--hd-radius);
+    color: var(--md-default-fg-color--light);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    transition:
+      color var(--hd-fast) var(--hd-ease),
+      background-color var(--hd-fast) var(--hd-ease);
+  }
+  .hdue-toc-meta__link:is(:hover, :focus-visible) {
+    color: var(--hd-text-strong);
+    background-color: color-mix(in srgb, var(--hd-raised) 60%, transparent);
+  }
+  .hdue-toc-meta__link svg {
+    flex: none;
+    width: 0.8rem;
+    height: 0.8rem;
+    fill: currentcolor;
+  }
+  .hdue-toc-meta__link svg.lucide {
+    fill: none;
+    stroke: currentcolor;
+  }
+  /* The repository widget as one of these rows: its icon at the rows' size, name and facts beside it. */
+  .hdue-toc-meta__source .md-source {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--hd-radius);
+    color: var(--md-default-fg-color--light);
+    font-size: 0.65rem;
+    transition:
+      color var(--hd-fast) var(--hd-ease),
+      background-color var(--hd-fast) var(--hd-ease);
+  }
+  .hdue-toc-meta__source .md-source:is(:hover, :focus-visible) {
+    color: var(--hd-text-strong);
+    background-color: color-mix(in srgb, var(--hd-raised) 60%, transparent);
+  }
+  .hdue-toc-meta__source .md-source__icon {
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.5rem;
+  }
+  .hdue-toc-meta__source .md-source__icon svg {
+    width: 0.8rem;
+    height: 0.8rem;
+    margin: 0;
+  }
+  .hdue-toc-meta__source .md-source__repository {
+    margin: 0;
+    max-width: none;
+  }
+  /* The header keeps the logo and the name: the repository moved to the contents' foot, the light and dark switch
+     to the frame's corner (.hdue-palette). */
+  .md-header__source {
+    display: none;
+  }
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    padding-bottom: 2.4rem;
+  }
+}

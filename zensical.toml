@@ -9,7 +9,7 @@ edit_uri = "edit/main/docs/"
 docs_dir = "docs"
 site_dir = "site"
 copyright = "hdUE is MIT-licensed. Unreal Engine is a trademark of Epic Games, Inc."
-extra_css = ["assets/hdue.css"]
+extra_css = ["assets/theme.css", "assets/hdue.css"]
 extra_javascript = ["assets/hdue.js"]
 # Audit reports are dated records of the repository, not user documentation.
 exclude_docs = """
@@ -166,6 +166,8 @@ nav = [
 language = "en"
 # The hdUE icon (integrations/houdini/config/Icons/HDUE_hdue.svg): docs_dir only serves files under docs/.
 logo = "assets/logo.svg"
+# The pager cards, the contents column's foot and mike's banner (overrides/).
+custom_dir = "overrides"
 favicon = "assets/logo.svg"
 features = [
   "announce.dismiss",
@@ -191,21 +193,54 @@ features = [
   "toc.follow",
 ]
 
+# Lucide everywhere, as in the pages' own :lucide-*: icons; Lucide has no brand marks, so GitHub's comes from FontAwesome.
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+edit = "lucide/pencil"
+view = "lucide/file-code"
+top = "lucide/arrow-up"
+menu = "lucide/menu"
+search = "lucide/search"
+share = "lucide/share-2"
+close = "lucide/x"
+previous = "lucide/arrow-left"
+next = "lucide/arrow-right"
+
+[project.theme.icon.admonition]
+note = "lucide/pencil-line"
+abstract = "lucide/clipboard-list"
+info = "lucide/info"
+tip = "lucide/lightbulb"
+success = "lucide/circle-check"
+question = "lucide/circle-help"
+warning = "lucide/triangle-alert"
+failure = "lucide/circle-x"
+danger = "lucide/zap"
+bug = "lucide/bug"
+example = "lucide/flask-conical"
+quote = "lucide/quote"
+
 # Follows the system until the reader picks light or dark.
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun-moon"
 toggle.name = "Switch to light mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
@@ -220,6 +255,10 @@ link = "https://github.com/healkeiser/HdUnrealEngine"
 name = "hdUE on GitHub"
 
 # Click a page image to see it full size; the setting comparisons (hdue.js) are built after it and stay sliders.
+# Canonical links name the "latest" folder, so search engines index one copy of each page.
+[project.plugins.mike]
+canonical_version = "latest"
+
 [project.plugins.glightbox]
 skip_classes = ["hdue-node-icon"]
 

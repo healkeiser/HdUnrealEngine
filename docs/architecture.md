@@ -4,29 +4,29 @@ This page describes what hdUE adds to a process, on which threads it runs and ho
 
 ```mermaid
 flowchart LR
-    subgraph Host[" 🔶 Houdini · husk · hython · usdview "]
+    subgraph Host["fal:fa-house Houdini · husk · hython · usdview"]
         direction TB
-        H1("🧵 Host thread<br/>Hydra Sync · Execute")
-        H2("🖥️ GL viewport<br/>Solaris only")
+        H1("fal:fa-cpu Host thread<br/>Hydra Sync · Execute")
+        H2("fal:fa-monitor GL viewport<br/>Solaris only")
     end
 
-    subgraph Delegate[" ⚡ hdUE_Houdini22.dll "]
+    subgraph Delegate["fal:fa-package hdUE_Houdini22.dll"]
         direction TB
-        D1("📋 HdUEState<br/>dirty sets · scene packets")
-        D2("🧵 GameThread<br/>hdUE's own thread · tick loop")
-        D3("🖼️ Render buffers<br/>OCIO · AOVs")
+        D1("fal:fa-clipboard-list HdUEState<br/>dirty sets · scene packets")
+        D2("fal:fa-refresh-cw GameThread<br/>hdUE's own thread · tick loop")
+        D3("fal:fa-image Render buffers<br/>OCIO · AOVs")
         D1 --> D2
     end
 
-    subgraph Unreal[" 🎮 HdUEBackend-h22-‹hash›.dll · UE 5.8.4 "]
+    subgraph Unreal["fal:fa-boxes HdUEBackend-h22-‹hash›.dll · UE 5.8.4"]
         direction TB
-        U1("🌐 UELibrary<br/>World · scene · materials")
-        U2("🧵 RenderThread · RHIThread<br/>task workers · PSO pool")
-        U3("💡 Lumen · Path Tracer")
+        U1("fal:fa-globe UELibrary<br/>World · scene · materials")
+        U2("fal:fa-cpu RenderThread · RHIThread<br/>task workers · PSO pool")
+        U3("fal:fa-sun Lumen · Path Tracer")
         U1 --> U2 --> U3
     end
 
-    GPU("🟩 GPU · D3D12")
+    GPU("fal:fa-microchip GPU · D3D12")
 
     H1 -- "Hydra 2 sync" --> D1
     D2 -- "C ABI · apply · render · poll" --> U1
@@ -35,21 +35,15 @@ flowchart LR
     D3 -- "Map · GetResource" --> H1
     U2 -. "shared D3D12 textures · fences" .-> H2
 
-    classDef hostBox fill:#fff5f0,stroke:#e8c4a8,stroke-width:1px,color:#2d3748,rx:12,ry:12
-    classDef delegateBox fill:#eef6f0,stroke:#a8d5b8,stroke-width:1px,color:#2d3748,rx:12,ry:12
-    classDef unrealBox fill:#f0f4ff,stroke:#b8c9e8,stroke-width:1px,color:#2d3748,rx:12,ry:12
-    classDef hostNode fill:#fde4d0,stroke:#e0a87c,stroke-width:1px,color:#2d3748,rx:8,ry:8
-    classDef delegateNode fill:#d4edda,stroke:#82c896,stroke-width:1px,color:#2d3748,rx:8,ry:8
-    classDef unrealNode fill:#dbe4f8,stroke:#96b0dc,stroke-width:1px,color:#2d3748,rx:8,ry:8
-    classDef gpuNode fill:#e8f5e9,stroke:#66bb6a,stroke-width:1px,color:#2d3748,rx:8,ry:8
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
 
-    class Host hostBox
-    class Delegate delegateBox
-    class Unreal unrealBox
-    class H1,H2 hostNode
-    class D1,D2,D3 delegateNode
-    class U1,U2,U3 unrealNode
-    class GPU gpuNode
+    class Host,H1,H2 host
+    class Delegate,D1,D2,D3 hdue
+    class Unreal,U1,U2,U3 unreal
+    class GPU output
 ```
 
 ## Processes

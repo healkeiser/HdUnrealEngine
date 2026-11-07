@@ -35,6 +35,15 @@ The user guide is written for the artist or TD rendering with hdUE in Houdini, n
 - Scenes built in Houdini are written by scripts, so they can be rebuilt: `scripts/build_docs_box.py` (the light study's bevelled box) and `scripts/build_docs_volumes.py` (the mist volumes).
 - Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel.
 
+## Diagrams
+
+Every Mermaid diagram looks the same: `docs/assets/hdue-mermaid.js` draws it in the site's colours, and `docs/architecture.md` is the model.
+
+- Rounded nodes, `A("…")`, with a Lucide icon before the text: `"fal:fa-monitor Solaris viewport"` (`fal` is Lucide here, the prefix Mermaid reads in a label). Decisions stay diamonds, `{"…?"}`, without an icon.
+- Colour comes from four classes, never from a `style` or a colour in a `classDef`: `host` for Houdini and USD, `hdue` for the delegate, `unreal` for Unreal Engine, `output` for images and files. Declare them with `classDef host stroke-width:1px` (and the same for the others), then `class S,V host`.
+- Group by process or side in a `subgraph` with the same class and an icon in its title.
+- The site's gallery and README are rendered by scripts; a diagram is the one figure written by hand.
+
 ## Houdini node reference
 
 `docs/reference/nodes/` is generated: `hython scripts/generate_node_docs.py` turns each digital asset's help card (its Help section, written by `build_render_settings_hda.py` and `build_substrate_hda.py`, and shown by Houdini on F1) into a page like SideFX's node help, and writes its navigation into `zensical.toml`. Run it after rebuilding an asset; to change a node's page, change its builder's help text, never the generated Markdown.

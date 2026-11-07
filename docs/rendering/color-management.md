@@ -10,12 +10,22 @@ The same frame as a scene-linear beauty (Unreal Tonemapper off, the default) and
 
 ```mermaid
 flowchart LR
-    A["USD colours and textures<br/>(scene_linear, file colour spaces)"] -->|OCIO| B["UE renders<br/>linear Rec.709"]
-    B -->|"Unreal Tonemapper off (default)"| C["Beauty: scene-linear"]
-    B -->|"Tonemapper on, film curve on"| D["Beauty: UE's tone-mapped image<br/>(display-linear)"]
+    A("fal:fa-palette USD colours and textures<br/>(scene_linear, file colour spaces)") -->|OCIO| B("fal:fa-sun UE renders<br/>linear Rec.709")
+    B -->|"Unreal Tonemapper off (default)"| C("fal:fa-image Beauty: scene-linear")
+    B -->|"Tonemapper on, film curve on"| D("fal:fa-contrast Beauty: UE's tone-mapped image<br/>(display-linear)")
     B -->|"Tonemapper on, Disable Tone Curve"| C
-    C -->|OCIO| E["Houdini view / EXR<br/>in scene_linear"]
+    C -->|OCIO| E("fal:fa-monitor Houdini view / EXR<br/>in scene_linear")
     D -->|OCIO primaries only| E
+
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
+
+    class A host
+    class B unreal
+    class C,D output
+    class E host
 ```
 
 - **Colours you author** (Preview Surface diffuse and emissive colours, `displayColor`, light colours) are read as values in the config's `scene_linear` role.

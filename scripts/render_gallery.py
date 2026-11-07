@@ -544,6 +544,18 @@ def compose(which, name, entry, samples, resolution):
         entry["doc"].replace("`", ""),
         panels,
     )
+    # The docs page shows each render on its own, a band per scene (docs/gallery.md); the panel above is the README's.
+    shots = images / name
+    shots.mkdir(parents=True, exist_ok=True)
+    for image, key, _, _, tonemapped in panels:
+        pixels8 = np.round(display(image, tonemapped) * 255).astype(np.uint8)
+        buf = oiio.ImageBuf(
+            oiio.ImageSpec(pixels8.shape[1], pixels8.shape[0], 3, oiio.UINT8)
+        )
+        buf.set_pixels(oiio.ROI(), np.ascontiguousarray(pixels8))
+        buf.specmod().attribute("Compression", "jpeg:92")
+        if not buf.write(str(shots / f"{key}.jpg")):
+            raise RuntimeError(f"{shots / key}.jpg: {buf.geterror()}")
 
 
 def settings_of(layer):
@@ -777,7 +789,7 @@ def main():
 
 
 def section(which, results, machine):
-    """Summary table and image table for one set; links are relative to docs/."""
+    """Summary table and images for one set, as (docs page, README); links are relative to docs/."""
     resolution, samples = settings_of(
         CORNELL / "cornell.usda"
         if which == "cornell"
@@ -878,12 +890,49 @@ def section(which, results, machine):
     folder = (
         "images/gallery/" if which == "cornell" else "images/gallery/sponza/"
     )
-    # Each image carries its title, description and per-render details.
-    images = [
+    labels = dict((k, l) for k, l, _, _ in RENDERERS)
+
+    def shot(name, key):
+        """One render in its scene's band: the image, the renderer in its colour and its time, then its settings and
+        brightness (the resolution is the set's, given above).
+        """
+        render = results[name]["renders"][key]
+        reference = results[name]["renders"].get("karma", {}).get("luminance")
+        if key == "karma":
+            shade = "brightness reference"
+        elif reference and name != "post_processing":
+            shade = f"{render['luminance'] / reference:.2f}× brightness"
+        else:
+            shade = ""
+        settings = "64 warmup, then 1" if key == "lumen" else f"{samples} spp"
+        note = " · ".join(part for part in (settings, shade) if part)
+        return (
+            '<figure class="hdue-shot">\n'
+            f'<img src="{folder}{name}/{key}.jpg" alt="{results[name]["title"]}, {labels[key]}" loading="lazy">\n'
+            f'<figcaption><span class="hdue-renderer hdue-renderer--{key}">{labels[key]}</span>'
+            f'<span class="hdue-time">{duration(render["seconds"])}</span>'
+            f'<span class="hdue-note">{note}</span></figcaption>\n</figure>'
+        )
+
+    # A heading per scene (the page's contents list them), its description, then its renders side by side.
+    bands = [
+        f"### {results[name]['title']}\n\n{results[name]['doc']}\n\n"
+        f'<div class="hdue-band{"" if which == "cornell" else " hdue-band--wide"}">\n'
+        + "\n".join(
+            shot(name, k)
+            for k, _, _, _ in RENDERERS
+            if k in results[name]["renders"]
+        )
+        + "\n</div>"
+        for name in order
+    ]
+    # The README cannot lay out a band: it keeps one labelled panel per scene, its title and description drawn in.
+    panels = [
         f"![{results[name]['title']}: {results[name]['doc']}]({folder}{name}.png)"
         for name in order
     ]
-    return setup + "\n\n" + "\n".join(summary) + "\n\n" + "\n\n".join(images)
+    head = setup + "\n\n" + "\n".join(summary) + "\n\n"
+    return head + "\n\n".join(bands), head + "\n\n".join(panels)
 
 
 def write_docs(machine):
@@ -910,32 +959,50 @@ def write_docs(machine):
         "cornell": "Cornell box: one feature per scene",
         "sponza": "Sponza: a production-style scene",
     }
-    picture = lambda name, alt: (
-        f'<picture>\n  <source media="(prefers-color-scheme: dark)" srcset="images/gallery/chart-{name}-dark.svg">\n'
-        f'  <img src="images/gallery/chart-{name}-light.svg" alt="{alt}" width="100%">\n</picture>\n'
+    # The page's charts are drawn in the browser (docs/assets/hdue.js) from this file; the README keeps the SVG charts
+    # of scripts/gallery_charts.py, which GitHub can show.
+    data = {
+        "renderers": [{"key": k, "label": l} for k, l, _, _ in RENDERERS],
+        "sets": [
+            {
+                "title": titles[which],
+                "scenes": [
+                    {
+                        "title": entry["title"],
+                        "renders": entry["renders"],
+                        # UE's tone curve makes these display-linear: their brightness is not comparable.
+                        "compared": name != "post_processing",
+                    }
+                    for name, entry in json.loads(
+                        (out / "results.json").read_text()
+                    ).items()
+                ],
+            }
+            for which, (out, _, _) in SETS.items()
+            if which in sections
+        ],
+    }
+    (IMAGES / "gallery.json").write_text(
+        json.dumps(data, indent=1) + "\n", encoding="utf-8"
     )
     charts = (
-        picture(
-            "times", "Render time per frame per scene and renderer, log scale"
-        )
-        + "\n"
-        + picture(
-            "accuracy",
-            "Mean brightness relative to Karma CPU per scene and renderer",
-        )
+        '<div class="hdue-chart" data-chart="times" role="img" '
+        'aria-label="Render time per frame per scene and renderer, log scale"></div>\n\n'
+        '<div class="hdue-chart" data-chart="accuracy" role="img" '
+        'aria-label="Mean brightness relative to Karma CPU per scene and renderer"></div>\n'
     )
     page = (
         "# Gallery\n\n"
         + charts
-        + "\nCharts: `uv run --with matplotlib python scripts/gallery_charts.py`.\n\n"
+        + "\nPoint at a bar or a mark for its value; click a renderer in the legend to hide or show it.\n\n"
         + "\n\n".join(
-            f"## {titles[w]}\n\n{body}" for w, body in sections.items()
+            f"## {titles[w]}\n\n{body}" for w, (body, _) in sections.items()
         )
         + "\n"
     )
     (ROOT / "docs" / "gallery.md").write_text(page, encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for which, body in sections.items():
+    for which, (_, body) in sections.items():
         start, end = SETS[which][2]
         if start in readme and end in readme:
             block = body.replace("](../", "](").replace(

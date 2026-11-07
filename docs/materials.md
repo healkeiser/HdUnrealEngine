@@ -10,14 +10,23 @@ The shader ball with four material models: UsdPreviewSurface, then MaterialX Sta
 
 ```mermaid
 flowchart TD
-    M["USD Material bound to a prim"] --> Q1{"Substrate Builder graph<br/>(outputs:unreal:surface)?"}
-    Q1 -- yes --> SB["Prepared by UE's editor<br/>into a native Substrate material"]
+    M("fal:fa-palette USD Material bound to a prim") --> Q1{"Substrate Builder graph<br/>(outputs:unreal:surface)?"}
+    Q1 -- yes --> SB("fal:fa-hammer Prepared by UE's editor<br/>into a native Substrate material")
     Q1 -- no --> Q2{"MaterialX surface<br/>(outputs:mtlx:surface)?"}
     Q2 -- yes --> Q3{"Only nodes hdUE<br/>translates?"}
-    Q3 -- yes --> T["Translated at render time<br/>(no compile)"]
-    Q3 -- no --> I["Imported by UE's MaterialX importer<br/>(translated until ready)"]
-    Q2 -- no --> PS["UsdPreviewSurface<br/>translated at render time"]
-    N["unreal:asset on a prim"] --> NA["Cooked UE mesh or Blueprint<br/>with its own UE materials"]
+    Q3 -- yes --> T("fal:fa-zap Translated at render time<br/>(no compile)")
+    Q3 -- no --> I("fal:fa-download Imported by UE's MaterialX importer<br/>(translated until ready)")
+    Q2 -- no --> PS("fal:fa-zap UsdPreviewSurface<br/>translated at render time")
+    N("fal:fa-box unreal:asset on a prim") --> NA("fal:fa-boxes Cooked UE mesh or Blueprint<br/>with its own UE materials")
+
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
+
+    class M,N host
+    class Q1,Q2,Q3,T,PS hdue
+    class SB,I,NA unreal
 ```
 
 | Route | You author | Edits | Page |

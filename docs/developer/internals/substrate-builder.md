@@ -14,22 +14,44 @@ The renderer continues to use one UE instance in the host process. Shader graphs
 
 ```mermaid
 flowchart LR
-    V["Houdini VOP network"] --> A["Material Library LOP (hdUE shader translator)"]
-    A --> U["USD Material and Shader graph"]
-    U --> P["Graph validation and preparation"]
-    X["Prepared MaterialX library"] --> P
-    P --> E["UE Substrate material expressions"]
-    E --> C["Cooked materials and Builder library"]
-    U --> H["Host binding and parameter resolver"]
+    subgraph Houdini["fal:fa-house Houdini"]
+        V("fal:fa-workflow Houdini VOP network")
+        A("fal:fa-library Material Library LOP<br/>hdUE shader translator")
+        U("fal:fa-file-code USD Material and Shader graph")
+    end
+    subgraph Delegate["fal:fa-package hdUE"]
+        P("fal:fa-list-checks Graph validation and preparation")
+        H("fal:fa-link Host binding and parameter resolver")
+        Q("fal:fa-list-ordered Coalesced graph-change queue")
+        D("fal:fa-package hdUE delegate")
+    end
+    subgraph Unreal["fal:fa-boxes Unreal Engine"]
+        X("fal:fa-library Prepared MaterialX library")
+        E("fal:fa-blend UE Substrate material expressions")
+        C("fal:fa-database Cooked materials and Builder library")
+        W("fal:fa-hammer Background editor compile / cook")
+        I("fal:fa-archive Immutable packages<br/>with inline shader code")
+        B("fal:fa-boxes UE backend in the same process")
+    end
+    R("fal:fa-image Lumen / Path Tracer color AOV")
+    V --> A --> U --> P
+    X --> P
+    P --> E --> C
+    U --> H
     C --> H
-    H --> D["hdUE delegate"]
-    D --> B["UE backend in the same process"]
-    B --> R["Lumen / Path Tracer color AOV"]
-    H --> Q["Coalesced graph-change queue"]
-    Q --> W["Background editor compile / cook"]
-    W --> I["Immutable packages with inline shader code"]
-    I --> B
+    H --> D --> B --> R
+    H --> Q --> W --> I --> B
     W --> H
+
+    classDef host stroke-width:1px
+    classDef hdue stroke-width:1px
+    classDef unreal stroke-width:1px
+    classDef output stroke-width:1px
+
+    class Houdini,V,A,U host
+    class Delegate,P,H,Q,D hdue
+    class Unreal,X,E,C,W,I,B unreal
+    class R output
 ```
 
 Houdini supplies the node editor, connections, parameters, and undo. hdUE exports its own typed graph. The Builder nodes are not a VEX implementation of Substrate and do not create a Karma material.
