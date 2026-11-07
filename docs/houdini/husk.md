@@ -31,6 +31,11 @@ Relative output paths resolve from the folder you run husk in, as with other ren
 
 Step 3 matters: each husk process starts Unreal Engine once. See [Frame ranges](#frame-ranges-and-farms).
 
+![A LOP network ending in an hdUE Render Settings LOP and a USD Render ROP](../images/houdini/network.png)
+/// caption
+A USD Render ROP after the render settings, its **Render Delegate** set to **Unreal Engine**.
+///
+
 ## Frame ranges and farms
 
 Unreal Engine starts once per husk process, and stays until the process exits. Between frames, husk sends only what changed. Render a frame range in one husk call, and give farm tasks chunks of frames, not one frame each.

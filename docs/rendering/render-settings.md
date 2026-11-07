@@ -39,6 +39,11 @@ Lumen also approximates bounce light. In the Bistro, lit by its lamps, compare R
 
     Each control authors nothing until you change it, as on Karma's render settings. Settings that one render mode ignores are hidden in that mode.
 
+    ![The hdUE Render Settings LOP's parameters: Essential and Advanced, output and camera, the Unreal Engine settings and the category tabs](../images/houdini/render-settings-parameters.png)
+    /// caption
+    hdUE Render Settings: **Show: Essential | Advanced**, the output and camera, the main Unreal Engine settings, then one tab per UE category.
+    ///
+
     The viewport's **Display Options** have an **Unreal Engine** tab with the settings you change while working: render mode, samples, warmup, debug view, motion blur, Lumen, subdivision, the tonemapper and the main scalability groups. The **Unreal** menu in Houdini's main menu bar switches **Render Mode** too.
 
 === "USD"

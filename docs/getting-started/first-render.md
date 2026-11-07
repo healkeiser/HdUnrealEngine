@@ -26,9 +26,19 @@ A Sublayer LOP with no input copies the file's metadata to the stage, so the sce
 
 The viewport now renders with the Path Tracer and refines the image up to 512 samples. While you tumble, scrub or play, it uses 8 samples per pixel, then refines again once the view is still.
 
+![The Cornell box in the Solaris viewport, rendered by Unreal Engine's Path Tracer](../images/houdini/viewport-pathtraced.png)
+/// caption
+The Cornell box through `camera`, after 512 Path Tracer samples.
+///
+
 ## Switch to Realtime
 
 On the hdUE Render Settings LOP, set **Render Mode** (`unreal:renderMode`) to **Realtime (Lumen)**.
+
+![The Cornell box in the Solaris viewport, rendered by Unreal Engine with Lumen](../images/houdini/viewport-lumen.png)
+/// caption
+The same view in Realtime, after Lumen's 64 warmup frames.
+///
 
 Realtime is Unreal Engine's deferred renderer with Lumen global illumination and reflections, the renderer of a game or a Movie Render Queue shot. It is meant for final frames too. The Path Tracer is UE's reference renderer: it traces up to 32 bounces and takes about 50 times longer on this scene.
 

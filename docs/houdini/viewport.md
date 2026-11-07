@@ -2,6 +2,11 @@
 
 The Solaris Scene Viewer renders with Unreal Engine once you pick **Unreal Engine** in its renderer menu. Unreal Engine runs inside Houdini on its own thread, so a slow frame never blocks Houdini's UI.
 
+![Solaris with the Cornell box rendered by Unreal Engine's Path Tracer, the hdUE Render Settings parameters and the LOP network](../images/houdini/solaris-viewport-and-settings.png)
+/// caption
+The Scene Viewer rendering with **Unreal Engine** (Path Tracer, 512 samples), the hdUE Render Settings LOP's parameters, and the network: a Sublayer, hdUE's settings, the render settings and a USD Render ROP.
+///
+
 ## Picking Unreal Engine
 
 1. Display a LOP network in a Scene Viewer.

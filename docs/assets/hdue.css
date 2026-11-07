@@ -18,6 +18,15 @@
   background-color: var(--md-code-bg-color);
   text-align: center;
 }
+/* A captioned picture's paragraph sits inside the figure's band: one frame, not two. */
+.md-typeset figure:has(img) p:has(> img),
+.md-typeset figure:has(img) p:has(> a > img) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
 /* The theme sizes a figure to its contents, which would shrink the band back onto the picture. */
 .md-typeset figure:has(img):not(.hdue-shot) {
   width: 100%;

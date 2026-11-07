@@ -33,7 +33,7 @@ The user guide is written for the artist or TD rendering with hdUE in Houdini, n
 - Two values: before/after slider. Three to six: the picture with a strip of thumbnails (tap one, or swipe the picture). Pick values that span the useful range, not the full numeric range.
 - A figure spec that shows one setting names it: `"settings": ["unreal:postProcess:BloomIntensity"]`. `generate_render_settings.py` and `generate_node_docs.py` then show the figure under that setting in the reference and on the node pages. The reference's own figures (`docs/figures/ref-*.json`) come from one table in `scripts/generate_reference_figures.py`: add a row there, run it, render the new figure, then rerun both generators.
 - Scenes built in Houdini are written by scripts, so they can be rebuilt: `scripts/build_docs_box.py` (the light study's bevelled box) and `scripts/build_docs_volumes.py` (the mist volumes).
-- Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel.
+- Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel. They live in `docs/images/houdini/`, taken in a `Launch-Houdini.ps1 -InputUsd samples/cornell/cornell.usda` session with the window at 1920 × 1080, Unreal Engine picked in the Scene Viewer, and each pane grabbed from the screen (a floating pane for a wider parameter editor); crop out personal shelves and menus.
 
 ## Parameters and formulas
 
