@@ -3,8 +3,8 @@
     over a version that is not the latest. -#}
 {% extends "base.html" %}
 {% block outdated %}
-  You are reading an older version of this guide.
-  <a href="{{ '../' ~ base_url }}"><strong>Go to the latest one.</strong></a>
+  This is not the latest release of the guide (dev follows main).
+  <a href="{{ '../' ~ base_url }}"><strong>Go to the latest release.</strong></a>
 {% endblock %}
 {% block content %}
   {{ super() }}

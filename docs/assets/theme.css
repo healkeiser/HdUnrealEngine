@@ -518,12 +518,16 @@ html {
   color: var(--hd-text-strong);
   background-color: var(--hd-raised);
 }
-.md-banner {
+/* `.md-banner--warning` is mike's: the theme's warning colours would win at one class. */
+.md-banner,
+.md-banner.md-banner--warning {
   color: var(--hd-text-strong);
   background-color: var(--hd-raised);
   border-bottom: 1px solid var(--hd-line);
+  font-size: 0.65rem;
 }
-.md-banner a {
+.md-banner a,
+.md-banner.md-banner--warning a {
   color: var(--hd-accent);
   text-decoration: underline;
 }
