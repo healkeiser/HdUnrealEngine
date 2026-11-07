@@ -341,31 +341,46 @@ html .glightbox-clean .gslide-title {
    pages' own) as small labels over their values, with badges for where it applies. */
 .md-typeset .hdue-facts {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.4rem;
+  flex-wrap: nowrap;
+  gap: 0 0.9rem;
   align-items: flex-end;
-  margin: 0.6em 0 1em;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0.5em 0 0.9em;
+  padding: 0.4rem 0.7rem 0.45rem;
+  overflow-x: auto;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  background-color: var(--md-code-bg-color);
+  scrollbar-width: thin;
 }
 .md-typeset .hdue-facts > div {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: 0.1rem;
 }
 .md-typeset .hdue-facts dt {
   color: var(--md-default-fg-color--lighter);
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .md-typeset .hdue-facts dd {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.64rem;
+  white-space: nowrap;
 }
 .md-typeset .hdue-facts code {
+  padding: 0;
   font-size: 0.85em;
+  background: none;
+  box-shadow: none;
 }
 .hdue-badge {
+  flex: none;
   align-self: center;
   padding: 0.1rem 0.45rem;
   border-radius: 1rem;
@@ -405,6 +420,11 @@ html .glightbox-clean .gslide-title {
 }
 /* In the grid the facts stack, label beside value, so each label sits in the same column from row to row. */
 .md-typeset .hdue-param .hdue-facts {
+  width: auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: none;
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: 0.35rem 0.8rem;
