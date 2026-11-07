@@ -31,14 +31,6 @@ def graph_data(material, time=Usd.TimeCode.Default()):
     stage = material.GetPrim().GetStage()
     nodes = {}
     visiting = set()
-    for terminal in (
-        material.GetDisplacementOutput("mtlx"),
-        material.GetVolumeOutput("mtlx"),
-    ):
-        if terminal and terminal.GetAttr().GetConnections():
-            raise ValueError(
-                f"Unsupported MaterialX displacement/volume: {terminal.GetAttr().GetPath()}"
-            )
 
     def resolve(attr, seen=()):
         path = str(attr.GetPath())
@@ -57,6 +49,22 @@ def graph_data(material, time=Usd.TimeCode.Default()):
                 UsdShade.Shader
             ) and source.GetName().startswith("outputs:"):
                 shader = UsdShade.Shader(source.GetPrim())
+                # A string or file name made by a node (a constant, a primvar reader's fallback): its value, as UE's
+                # materials take file names and strings as constants. A primvar's per-prim value is not read.
+                folded = _string_source(shader, str(attr.GetTypeName()))
+                if (
+                    folded == ""
+                ):  # the node's input is unset: its default, an empty string
+                    return dict(
+                        attribute=path,
+                        type=str(attr.GetTypeName()),
+                        value="",
+                        colorspace="",
+                        trace=[path],
+                    )
+                if folded is not None:
+                    result = resolve(folded, seen + (path,))
+                    return dict(result, trace=[path] + result["trace"])
                 visit(shader)
                 return dict(
                     node=str(shader.GetPath()),
@@ -100,19 +108,48 @@ def graph_data(material, time=Usd.TimeCode.Default()):
         nodes[path] = dict(id=str(identity), inputs=inputs)
         visiting.remove(path)
 
-    output = material.GetSurfaceOutput("mtlx")
-    if not output:
+    terminals = {}
+    for key, output in (
+        ("terminal", material.GetSurfaceOutput("mtlx")),
+        ("displacement", material.GetDisplacementOutput("mtlx")),
+        ("volume", material.GetVolumeOutput("mtlx")),
+    ):
+        if output and output.GetAttr().GetConnections():
+            terminals[key] = resolve(output.GetAttr())
+            if "node" not in terminals[key]:
+                raise ValueError(
+                    f"MaterialX {key} has no shader: {material.GetPath()}"
+                )
+    if "terminal" not in terminals and "volume" not in terminals:
         raise ValueError(f"No MaterialX surface: {material.GetPath()}")
-    terminal = resolve(output.GetAttr())
-    if "node" not in terminal:
-        raise ValueError(
-            f"MaterialX surface has no shader: {material.GetPath()}"
-        )
     return dict(
         material=str(material.GetPath()),
-        terminal=terminal,
+        **terminals,
         nodes=dict(sorted(nodes.items())),
     )
+
+
+# Nodes whose string or file name output is one of their inputs: a constant's value, a primvar reader's fallback.
+_STRING_SOURCES = {
+    "ND_constant_string": "value",
+    "ND_constant_filename": "value",
+    "ND_UsdPrimvarReader_string": "fallback",
+    "ND_UsdPrimvarReader_filename": "fallback",
+    "ND_dot_string": "in",
+    "ND_dot_filename": "in",
+    "ND_geompropvalueuniform_string": "default",
+    "ND_geompropvalueuniform_filename": "default",
+}
+
+
+def _string_source(shader, type_name):
+    if type_name not in ("string", "asset", "token"):
+        return None
+    name = _STRING_SOURCES.get(str(shader.GetIdAttr().Get()))
+    if name is None:
+        return None
+    port = shader.GetInput(name)
+    return port.GetAttr() if port else ""
 
 
 def graph_signature(graph, mutable=()):
@@ -147,7 +184,9 @@ def rebase_graph(graph, old_root, new_root):
         return item
 
     data["material"] = location(data["material"])
-    data["terminal"] = port(data["terminal"])
+    for key in ("terminal", "displacement", "volume"):
+        if key in data:
+            data[key] = port(data[key])
     data["nodes"] = {
         location(path): dict(
             node, inputs={n: port(v) for n, v in node["inputs"].items()}
@@ -189,10 +228,20 @@ def needs_import(graph):
     surface it does not read), so UE's MaterialX importer must prepare it.
     """
     nodes = graph["nodes"]
+    # Volumes have no render-time translation; a displacement does when it is MaterialX's displacement node.
+    if "volume" in graph or "terminal" not in graph:
+        return True
     if not nodes[graph["terminal"]["node"]]["id"].startswith(RUNTIME_SURFACES):
         return True
+    terminals = {graph["terminal"]["node"]}
+    if "displacement" in graph:
+        terminals.add(graph["displacement"]["node"])
+        if not nodes[graph["displacement"]["node"]]["id"].startswith(
+            "ND_displacement_"
+        ):
+            return True
     for path, node in nodes.items():
-        if path == graph["terminal"]["node"]:
+        if path in terminals:
             continue
         identity = node["id"]
         if identity.startswith("ND_multiply_"):
@@ -235,13 +284,14 @@ def structure_key(graph):
     the material's path. Values the import kept as parameters can then change without a new preparation; an entry's
     usd_graph_signature checks the ones it baked in.
     """
-    return graph_signature(_masked(graph, "/M"))
+    # With IMPORT_VERSION: a published entry stores its structure, so one prepared by another version stops matching.
+    return f"{IMPORT_VERSION}:{graph_signature(_masked(graph, '/M'))}"
 
 
 # What UE's import makes of a graph besides the graph itself: hdUE's corrections after Interchange
 # (HdUEImportMaterialXCommandlet.cpp). Bump it with them: published live materials of another version stop matching
 # and age out (live_materials.clean).
-IMPORT_VERSION = 1
+IMPORT_VERSION = 3
 
 
 def request_key(graph):

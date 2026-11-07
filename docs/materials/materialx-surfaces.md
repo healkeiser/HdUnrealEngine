@@ -154,6 +154,25 @@ Each surface input is a constant or reaches an image through these nodes. Anythi
 
 Texture colour spaces follow the image's `colorspace`: `srgb_texture` decodes sRGB, `lin_rec709` and `raw` read linear.
 
+## Nodes UE imports
+
+Any other graph is imported in the background by UE's own MaterialX importer (Interchange), which reads MaterialX 1.39.4; Houdini 22 writes 1.39.5. Before the import, hdUE rewrites what UE's importer cannot read, so every node Houdini ships reaches UE except the ones in the last row:
+
+| Nodes | What hdUE writes for UE |
+| --- | --- |
+| Houdini's MaterialX 1.38 nodes (`swizzle`, `atan2` with its old inputs, ...) | MaterialX's own upgrade (`upgradeVersion`) |
+| Integer and boolean nodes (`and`, `or`, `not`, integer maths, conversions) | The same values as floats, as UE computes everything in floats |
+| Matrix nodes (`creatematrix`, `transformmatrix`, `invertmatrix`, `determinant`, `transpose`, matrix maths) | Their scalar maths, with MaterialX's column-major conventions |
+| `flake2d`, `flake3d` (MaterialX 1.39.5) | MaterialX's own flake code in a UE Custom node (`unreal/HdUEBackend/Shaders/MaterialXFlake.ush`), the same flakes for the same coordinates; a flake whose size, roughness or coverage comes from another node uses a graph of standard nodes instead (statistically the same flakes, much heavier to compile) |
+| `geompropvalue`, `primvar` readers | The UV set or vertex colour hdUE uploads for the primvar; other primvars use their fallback value |
+| `curveadjust` | Linear interpolation between the knots |
+| `frame` | The frame at 24 fps |
+| `ambientocclusion` | 1: UE's Lumen and Path Tracer occlude the lighting themselves |
+| `disney_principled`, `thin_surface`, `generalized_schlick_edf`, a lone `thin_film` | The nearest node UE imports |
+| Light shaders (`light`, `point_light`, `spot_light`, `directional_light`), `osl_set_ci`, arrays no node reads | Not imported: USD lights are UsdLux prims, and the others exist only in OSL or in no graph |
+
+`scripts/Test-MaterialXCoverage.ps1` checks this: it wires each of the 898 node definitions Houdini ships into a material, exports it, and lists what UE would not import (`-Export -One -Only ND_<name>` writes one document per node for UE's importer).
+
 ## Recipes
 
 How to get these looks on a Standard Surface. Inputs not listed stay at their default.
@@ -191,3 +210,4 @@ Both are used on the Bistro street (`scripts/convert_bistro.py`).
 - Karma renders `opacity` as fractional coverage with no threshold; the MaterialX specification does too.
 - A material with coat, sheen or subsurface uses UE's layered Standard Surface function, which costs several Substrate closures per pixel. In the Sponza gallery shot (960 x 540, Lumen), layered curtains cost 1 to 2 ms per frame more than the same curtains on Preview Surface. Other Standard Surface materials cost what a Preview Surface does.
 - Subsurface uses Substrate's per-material mean free path; UE subsurface profiles are not created. One UV transform per material, from the first textured input. Thin film and dispersion are not translated.
+- Position-based nodes (`position`, `noise3d`, `flake3d`, ...) read UE's local position in metres, as UE's importer translates `position`. hdUE uploads meshes in UE's axes, so a 3D pattern can be turned compared with Karma's: same density and size, different cells.

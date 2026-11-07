@@ -10,6 +10,7 @@ import json
 import re
 from pathlib import Path
 
+from materialx_lowering import lower, lower_flakes, lower_primvars
 from materialx_textures import (
     file_identity,
     resolved,
@@ -18,6 +19,19 @@ from materialx_textures import (
 )
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import graph_data
+
+# The node-graph categories UE 5.8's MaterialX importer translates whole instead of expanding them (CategoriesToSkip,
+# Engine/Plugins/Interchange/Runtime/Source/Import/Private/MaterialX/MaterialXUtils/MaterialXManager.cpp).
+UE_KEEP = frozenset(
+    """UsdPreviewSurface acescg_to_lin_rec709 add adobergb_to_lin_rec709 blur checkerboard
+    chiang_hair_absorption_from_color chiang_hair_roughness circle colorcorrect combine2 combine3 combine4 constant
+    contrast deon_hair_absorption_from_melanin distance divide extract fractal2d fractal3d geomcolor gltf_pbr
+    gooch_shade hsvadjust ifequal ifgreater ifgreatereq latlongimage layer lin_adobergb_to_lin_rec709
+    lin_displayp3_to_lin_rec709 line max min mix multiply noise2d noise3d normalmap open_pbr_surface overlay place2d
+    ramp ramp4 ramp_gradient randomcolor randomfloat range refract separate2 separate3 separate4
+    srgb_displayp3_to_lin_rec709 srgb_texture_to_lin_rec709 standard_surface subtract switch tiledcircles time
+    unifiednoise3d xor""".split()
+)
 
 
 def definitions():
@@ -47,6 +61,16 @@ def definitions():
         extra = mx.createDocument()
         mx.loadLibraries(["houdini"], mx.FileSearchPath(str(houdini)), extra)
         library.importLibrary(extra)
+    # The MaterialX 1.39.5 nodes Houdini 22 ships and UE's 1.39.4 lacks (generate_materialx_library.py): flake2d,
+    # flake3d as node graphs, extract of a matrix (lowered by materialx_lowering.py).
+    hdue = mx.createDocument()
+    mx.readFromXmlFile(
+        hdue,
+        str(
+            Path(__file__).resolve().parent / "materialx_library/hdue_defs.mtlx"
+        ),
+    )
+    library.importLibrary(hdue)
     return library, names
 
 
@@ -200,8 +224,9 @@ def _image_roles(graph):
 
 
 def _value_text(value):
+    # MaterialX writes arrays of vectors (vector2array: curveadjust's knots) as one flat list of numbers.
     if isinstance(value, list):
-        return ", ".join(str(v) for v in value)
+        return ", ".join(_value_text(v) for v in value)
     return str(value).lower() if isinstance(value, bool) else str(value)
 
 
@@ -236,6 +261,14 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
             path: material_name + "_n" + str(i)
             for i, path in enumerate(graph["nodes"])
         }
+        terminal = graph.get("terminal", {}).get("node")
+        # A node that is a material itself (Lama Surface's): it is the material UE imports, under the material's name.
+        if (
+            terminal
+            and library.getNodeDef(graph["nodes"][terminal]["id"]).getType()
+            == "material"
+        ):
+            names[terminal] = material_name
         exported = {}
         fields = []
         for path, node in graph["nodes"].items():
@@ -248,8 +281,10 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                 definition.getNodeString(), names[path], definition.getType()
             )
             exported[path].setNodeDefString(node["id"])
-        terminal = graph["terminal"]["node"]
-        if exported[terminal].getType() != "surfaceshader":
+        if terminal and exported[terminal].getType() not in (
+            "surfaceshader",
+            "material",
+        ):
             raise ValueError(f"Unsupported MaterialX surface: {terminal}")
 
         def output_type(item):
@@ -265,7 +300,9 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                 )
             return outputs[item["output"]]
 
-        output_type(graph["terminal"])
+        for key in ("terminal", "displacement", "volume"):
+            if key in graph:
+                output_type(graph[key])
         for path, node in graph["nodes"].items():
             definition = library.getNodeDef(node["id"])
             for input_name, item in node["inputs"].items():
@@ -299,7 +336,20 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                     raise ValueError(
                         f"Only UV set 0 is supported: {item['attribute']}"
                     )
-                if declared.getType() == "filename":
+                if (
+                    declared.getType() == "filename"
+                    and item["attribute"] not in source["textures"]
+                ):
+                    # A file name that is not a texture record (a string folded from a node): its text, or none.
+                    if not value:
+                        exported[path].removeInput(input_name)
+                        continue
+                    value = str(
+                        value.get("asset", "")
+                        if isinstance(value, dict)
+                        else value
+                    )
+                elif declared.getType() == "filename":
                     filename, tiles = source["textures"][item["attribute"]]
                     if tiles:
                         texture_sets[tiles["pattern"]] = tiles
@@ -335,15 +385,34 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                         type=declared.getType(),
                     )
                 )
-        m = doc.addNode("surfacematerial", material_name, "material")
-        m.addInput("surfaceshader", "surfaceshader").setNodeName(
-            names[terminal]
-        )
+        # Primvar readers as UE reads them: the UV sets and vertex colour hdUE uploads for this material.
+        primvar_notes = []
+        lower_primvars(doc, exported, graph["nodes"], primvar_notes)
+        # Flakes with plain inputs: markers hdUE's import replaces with MaterialX's flake code.
+        lower_flakes(doc, exported, graph["nodes"])
+        for note in sorted(set(primvar_notes)):
+            print(f"MaterialX for UE: {note}")
+        if terminal and exported[terminal].getType() == "material":
+            pass  # the terminal is the material
+        elif terminal:
+            m = doc.addNode("surfacematerial", material_name, "material")
+            m.addInput("surfaceshader", "surfaceshader").setNodeName(
+                names[terminal]
+            )
+            if "displacement" in graph:
+                m.addInput(
+                    "displacementshader", "displacementshader"
+                ).setNodeName(names[graph["displacement"]["node"]])
+        else:  # a volume material (UE's MaterialX importer makes a Volume-domain material)
+            m = doc.addNode("volumematerial", material_name, "material")
+            m.addInput("volumeshader", "volumeshader").setNodeName(
+                names[graph["volume"]["node"]]
+            )
         entries.append(
             dict(
                 material=material_name,
                 usd_material=source["material"],
-                usd_shader=terminal,
+                usd_shader=terminal or graph["volume"]["node"],
                 graph=graph,
                 fields=fields,
             )
@@ -353,15 +422,26 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
     # Houdini's nodes become the standard nodes of their node graphs. A connected input's value is dropped: MaterialX
     # ignores it, and its 1.39 validation (UE's) rejects an input with both ("too many bindings"), which Houdini's
     # generated node graphs have.
+    # So are the standard nodes UE's importer would expand itself (all node-graph nodes but those it translates
+    # whole, UE_KEEP): expanded here, the rewrites below reach their insides (integers, matrices), which UE's own
+    # expansion handed to its translator as they were (Lama's nodes crashed it).
     doc.flattenSubgraphs(
         "",
         lambda node: node.getNodeDef() is not None
-        and node.getNodeDef().getName() not in standard,
+        and (
+            node.getNodeDef().getName() not in standard
+            or node.getCategory() not in UE_KEEP
+        ),
     )
     for node in doc.getNodes():
         for port in node.getInputs():
             if port.getConnectedNode() is not None:
                 port.removeAttribute("value")
+    # The nodes UE's importer cannot translate (integers and booleans, matrices, Houdini's 1.38 nodes, frame, ...)
+    # rewritten into nodes it can (materialx_lowering.py).
+
+    for note in lower(doc, library):
+        print(f"MaterialX for UE: {note}")
     # The document alone, without the libraries it was built against (their elements carry their file's URI),
     # validated against the standard ones UE reads.
     options = mx.XmlWriteOptions()

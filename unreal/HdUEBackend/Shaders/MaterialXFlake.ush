@@ -1,0 +1,157 @@
+// MaterialX's flake2d and flake3d (libraries/stdlib/genglsl/lib/mx_flake.glsl, MaterialX 1.39.5 as Houdini 22 ships
+// it) in HLSL, with MaterialX's own hash (lib/mx_noise.glsl: Bob Jenkins' lookup3 mix), so flakes land in the same
+// cells as in Houdini. hdUE's MaterialX import calls it from a Custom expression in place of a flake node
+// (HdUEImportMaterialXCommandlet ReplaceFlakeMarkers): UE's importer has no flake node, and the node graph of
+// standard nodes it would otherwise import costs thousands of expressions per flake.
+
+uint HdUEMxRotl32(uint X, uint K) { return (X << K) | (X >> (32u - K)); }
+
+void HdUEMxBjMix(inout uint A, inout uint B, inout uint C)
+{
+	A -= C; A ^= HdUEMxRotl32(C, 4u);  C += B;
+	B -= A; B ^= HdUEMxRotl32(A, 6u);  A += C;
+	C -= B; C ^= HdUEMxRotl32(B, 8u);  B += A;
+	A -= C; A ^= HdUEMxRotl32(C, 16u); C += B;
+	B -= A; B ^= HdUEMxRotl32(A, 19u); A += C;
+	C -= B; C ^= HdUEMxRotl32(B, 4u);  B += A;
+}
+
+uint HdUEMxBjFinal(uint A, uint B, uint C)
+{
+	C ^= B; C -= HdUEMxRotl32(B, 14u);
+	A ^= C; A -= HdUEMxRotl32(C, 11u);
+	B ^= A; B -= HdUEMxRotl32(A, 25u);
+	C ^= B; C -= HdUEMxRotl32(B, 16u);
+	A ^= C; A -= HdUEMxRotl32(C, 4u);
+	B ^= A; B -= HdUEMxRotl32(A, 14u);
+	C ^= B; C -= HdUEMxRotl32(B, 24u);
+	return C;
+}
+
+// float(bits) / float(0xffffffff), as mx_bits_to_01 (the divisor rounds to 2^32 in float, as in GLSL).
+float HdUEMxBitsTo01(uint Bits) { return float(Bits) / 4294967296.0; }
+
+// mx_cell_noise_float(vec3)
+float HdUEMxCellNoise(int3 Cell)
+{
+	uint A = 0xdeadbeefu + (3u << 2u) + 13u;
+	uint B = A, C = A;
+	A += asuint(Cell.x);
+	B += asuint(Cell.y);
+	C += asuint(Cell.z);
+	return HdUEMxBitsTo01(HdUEMxBjFinal(A, B, C));
+}
+
+// mx_cell_noise_float(vec4(cell, W))
+float HdUEMxCellNoise(int3 Cell, int W)
+{
+	uint A = 0xdeadbeefu + (4u << 2u) + 13u;
+	uint B = A, C = A;
+	A += asuint(Cell.x);
+	B += asuint(Cell.y);
+	C += asuint(Cell.z);
+	HdUEMxBjMix(A, B, C);
+	A += asuint(W);
+	return HdUEMxBitsTo01(HdUEMxBjFinal(A, B, C));
+}
+
+// mx_cell_noise_vec3(vec3)
+float3 HdUEMxCellNoise3(int3 Cell)
+{
+	uint A = 0xdeadbeefu + (4u << 2u) + 13u;
+	uint B = A, C = A;
+	A += asuint(Cell.x);
+	B += asuint(Cell.y);
+	C += asuint(Cell.z);
+	HdUEMxBjMix(A, B, C);
+	return float3(HdUEMxBitsTo01(HdUEMxBjFinal(A, B, C)), HdUEMxBitsTo01(HdUEMxBjFinal(A + 1u, B, C)),
+				  HdUEMxBitsTo01(HdUEMxBjFinal(A + 2u, B, C)));
+}
+
+// mx_cell_noise_vec3(vec4(cell, W))
+float3 HdUEMxCellNoise3(int3 Cell, int W)
+{
+	uint A = 0xdeadbeefu + (5u << 2u) + 13u;
+	uint B = A, C = A;
+	A += asuint(Cell.x);
+	B += asuint(Cell.y);
+	C += asuint(Cell.z);
+	HdUEMxBjMix(A, B, C);
+	A += asuint(W);
+	return float3(HdUEMxBitsTo01(HdUEMxBjFinal(A, B, C)), HdUEMxBitsTo01(HdUEMxBjFinal(A, B + 1u, C)),
+				  HdUEMxBitsTo01(HdUEMxBjFinal(A, B + 2u, C)));
+}
+
+// mx_rotate_flake: James Arvo's fast random rotation of P.
+float3 HdUEMxRotateFlake(float3 P, float3 I)
+{
+	const float Theta = 2.0 * PI * I.x;
+	const float Phi = 2.0 * PI * I.y;
+	const float Z = I.z * 2.0;
+	const float R = sqrt(Z);
+	const float Vx = sin(Phi) * R;
+	const float Vy = cos(Phi) * R;
+	const float Vz = sqrt(2.0 - Z);
+	const float St = sin(Theta);
+	const float Ct = cos(Theta);
+	const float Sx = Vx * Ct - Vy * St;
+	const float Sy = Vx * St + Vy * Ct;
+	// GLSL's mat3(...) takes columns: m * p sums column j times p[j].
+	return float3(Vx * Sx - Ct, Vx * Sy - St, Vx * Vz) * P.x + float3(Vy * Sx + St, Vy * Sy - Ct, Vy * Vz) * P.y +
+		   float3(Vz * Sx, Vz * Sy, 1.0 - Z) * P.z;
+}
+
+// mx_flake: returns the flake normal; Id, Rand and Presence as MaterialX's outputs (Id as a float).
+float3 HdUEMaterialXFlake(float Size, float Roughness, float Coverage, float3 Position, float3 Normal, float3 Tangent,
+						  float3 Bitangent, out float Id, out float Rand, out float Presence)
+{
+	const float X = clamp(Coverage, 0.0, 1.0);
+	const float XX = X * X;
+	// mx_flake_density_to_probability: MaterialX's fit of flake density to cell probability.
+	const float Probability =
+		(-26.19771808 * XX + 26.39663835 * X) / (85.53857017 * XX * X - 102.35069432 * XX - 101.42634862 * X + 118.45082288);
+	const float Diameter = 1.5 / sqrt(3.0);
+	const float3 P = Position / Size;
+	const float3 BaseP = floor(P);
+	float FlakePriority = 0.0;
+	int3 FlakeCell = int3(0, 0, 0);
+	for (int I = -1; I < 2; ++I)
+	{
+		for (int J = -1; J < 2; ++J)
+		{
+			for (int K = -1; K < 2; ++K)
+			{
+				const float3 CellPos = BaseP + float3(I, J, K);
+				const int3 Cell = int3(floor(CellPos));
+				float3 PP = P - CellPos - 0.5;
+				if (dot(PP, PP) >= Diameter * Diameter * 3.0) continue;
+				if (HdUEMxCellNoise(Cell) > Probability) continue;
+				const float Priority = HdUEMxCellNoise(Cell, 3);
+				if (Priority < FlakePriority) continue;
+				PP = HdUEMxRotateFlake(PP, HdUEMxCellNoise3(Cell));
+				if (all(abs(PP) <= Diameter))
+				{
+					FlakePriority = Priority;
+					FlakeCell = Cell;
+				}
+			}
+		}
+	}
+	if (FlakePriority <= 0.0)
+	{
+		Id = 0.0;
+		Rand = 0.0;
+		Presence = 0.0;
+		return Normal;
+	}
+	// The flake's normal: importance-sampled from GGX with the given roughness.
+	const float3 Noise = HdUEMxCellNoise3(FlakeCell, 2);
+	Rand = Noise.z;
+	Id = floor(Rand * 16777215.0);
+	Presence = FlakePriority;
+	const float Phi = 2.0 * PI * Noise.x;
+	const float TanTheta = Roughness * Roughness * sqrt(Noise.y) / sqrt(1.0 - Noise.y);
+	const float SinTheta = TanTheta / sqrt(1.0 + TanTheta * TanTheta);
+	const float CosTheta = sqrt(1.0 - SinTheta * SinTheta);
+	return normalize(Tangent * cos(Phi) * SinTheta + Bitangent * sin(Phi) * SinTheta + Normal * CosTheta);
+}

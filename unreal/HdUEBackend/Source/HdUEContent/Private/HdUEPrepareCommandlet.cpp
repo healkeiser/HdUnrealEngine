@@ -176,10 +176,10 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
                 return true;
         return false;
     };
-    if (Material && Material->GetBlendMode() == Blend && Material->bUsedWithInstancedStaticMeshes &&
+    if (Material && Material->GetBlendMode() == Blend && Material->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes) &&
         Material->TwoSided == TwoSided &&
         HasParameter(Material, Layered ? TEXT("StandardSurfaceVersion6") : TEXT("PreviewSurfaceVersion6")) &&
-        Material->bUsedWithNanite)
+        Material->GetUsageByFlag(MATUSAGE_Nanite))
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData3Vector>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, Name, RF_Public | RF_Standalone);
@@ -515,8 +515,8 @@ UMaterial* CreateSurface(const TCHAR* Name, EBlendMode Blend, UTexture* LinearWh
     // Two-sided, and a <Name>OneSided twin that the backend draws on meshes whose doubleSided is off.
     Material->TwoSided = TwoSided;
     // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
-    Material->bUsedWithInstancedStaticMeshes = true;
-    Material->bUsedWithNanite = true;  // runtime-built Nanite meshes (Scene.cpp BuildNanite)
+    Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
+    Material->SetUsageByFlag(MATUSAGE_Nanite, true);  // runtime-built Nanite meshes (Scene.cpp BuildNanite)
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     // The Preview Surface masters carry their ID slab above; UE's standard_surface function gets its inputs switched.
     if (Layered && !HdUEAddIdSwitch(Material)) {
@@ -583,7 +583,8 @@ UMaterial* CreateIdMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEId");
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEId.M_HdUEId"), nullptr, LOAD_NoWarn);
-    if (Material && Material->HasSubstrateFrontMaterialConnected() && Material->bUsedWithInstancedStaticMeshes)
+    if (Material && Material->HasSubstrateFrontMaterialConnected() &&
+        Material->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes))
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (Expression->IsA<UMaterialExpressionPerInstanceCustomData>()) return Material;
     if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEId"), RF_Public | RF_Standalone);
@@ -596,8 +597,8 @@ UMaterial* CreateIdMaterial() {
     auto* Unlit = Add(NewObject<UMaterialExpressionSubstrateUnlitBSDF>(Material));
     Unlit->EmissiveColor.Connect(0, IdEmission(Material, Add));
     Material->GetEditorOnlyData()->FrontMaterial.Connect(0, Unlit);
-    Material->bUsedWithNanite = true;
-    Material->bUsedWithInstancedStaticMeshes = true;
+    Material->SetUsageByFlag(MATUSAGE_Nanite, true);
+    Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
     Material->TwoSided = true;
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
@@ -621,7 +622,7 @@ UMaterial* CreateVolumeMaterial() {
     const FString Path = TEXT("/Game/HdUE/M_HdUEVolume");
     UPackage* Package = CreatePackage(*Path);
     auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEVolume.M_HdUEVolume"), nullptr, LOAD_NoWarn);
-    if (Material && Material->MaterialDomain == MD_Volume && Material->bUsedWithHeterogeneousVolumes) {
+    if (Material && Material->MaterialDomain == MD_Volume && Material->GetUsageByFlag(MATUSAGE_HeterogeneousVolumes)) {
         for (const auto& Expression : Material->GetExpressionCollection().Expressions)
             if (const auto* Intensity = Cast<UMaterialExpressionScalarParameter>(Expression);
                 Intensity && Intensity->ParameterName == TEXT("EmissionIntensity"))
@@ -698,7 +699,7 @@ UMaterial* CreateVolumeMaterial() {
     Data->EmissiveColor.Connect(0, Emissive);
     Material->MaterialDomain = MD_Volume;
     Material->BlendMode = BLEND_Additive;
-    Material->bUsedWithHeterogeneousVolumes = true;
+    Material->SetUsageByFlag(MATUSAGE_HeterogeneousVolumes, true);
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
@@ -801,7 +802,8 @@ UMaterial* CreateFogParticleMaterial() {
     Data->EmissiveColor.Connect(0, Emissive);
     Material->MaterialDomain = MD_Volume;
     Material->BlendMode = BLEND_Additive;
-    Material->bUsedWithHeterogeneousVolumes = false;  // voxelized into Volumetric Fog, not ray marched on its own
+    Material->SetUsageByFlag(MATUSAGE_HeterogeneousVolumes,
+                             false);  // voxelized into Volumetric Fog, not ray marched on its own
     for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
@@ -1017,9 +1019,9 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
     UMaterial* Grey = CreatePBR(TEXT("M_ReferenceGrey"), FLinearColor(0.4f, 0.4f, 0.4f), 0.f, 0.7f);
     if (!Preview || !Translucent || !Glass || !Native || !Red || !Grey) return 3;
     for (auto* Material : {Preview, Native, Red, Grey}) {
-        if (!Material->bUsedWithNanite) {
+        if (!Material->GetUsageByFlag(MATUSAGE_Nanite)) {
             Material->PreEditChange(nullptr);
-            Material->bUsedWithNanite = true;
+            Material->SetUsageByFlag(MATUSAGE_Nanite, true);
             Material->PostEditChange();
             if (!SaveAsset(Material)) return 3;
         }

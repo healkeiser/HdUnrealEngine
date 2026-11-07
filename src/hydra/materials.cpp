@@ -106,14 +106,22 @@ struct Source {
 TfToken colorPrimvar(const HdMaterialNode2& node) {
     const auto& type = node.nodeTypeId.GetString();
     if (type == "UsdPrimvarReader_float3") return token(param(node, "varname"));
-    return TfStringStartsWith(type, "ND_geompropvalue_color3") || TfStringStartsWith(type, "ND_geompropvalue_vector3")
-               ? token(param(node, "geomprop"))
-               : TfToken();
+    // MaterialX's readers of a numeric primvar other than a 2D one (UV sets): the export to UE's importer reads them as
+    // the vertex colour too (materialx_lowering.lower_primvars), as does the render-time translation for colours.
+    for (const char* reader : {"ND_geompropvalue_", "ND_UsdPrimvarReader_"}) {
+        if (!TfStringStartsWith(type, reader)) continue;
+        const auto kind = type.substr(std::string(reader).size());
+        if (kind == "vector2" || kind == "string" || kind == "filename") return TfToken();
+        return token(param(node, TfStringStartsWith(type, "ND_geompropvalue_") ? "geomprop" : "varname"));
+    }
+    return TfToken();
 }
 // The UV primvar a coordinate reader reads (UsdPrimvarReader_float2 varname, MaterialX geompropvalue geomprop:
 // exporters name it map1, UVMap, ...); empty otherwise.
 TfToken uvPrimvar(const HdMaterialNode2& node) {
-    if (node.nodeTypeId == TfToken("UsdPrimvarReader_float2")) return token(param(node, "varname"));
+    if (node.nodeTypeId == TfToken("UsdPrimvarReader_float2") ||
+        node.nodeTypeId == TfToken("ND_UsdPrimvarReader_vector2"))
+        return token(param(node, "varname"));
     return node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? token(param(node, "geomprop")) : TfToken();
 }
 // The UV primvars a material reads, in node order: its meshes' UV sets 0, 1, ...

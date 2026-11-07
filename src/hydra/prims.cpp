@@ -218,7 +218,26 @@ Triangulated<T> triangulated(HdSceneDelegate* delegate, const SdfPath& id, const
                              const VtVec3iArray& triangles, const VtIntArray& parameters, HdMeshUtil& util, HdType type,
                              const HdUESubdivision* subdivision = nullptr, const VtValue& computed = {}) {
     VtIntArray indices;
-    const auto raw = computed.IsEmpty() ? delegate->GetIndexedPrimvar(id, name, &indices) : computed;
+    auto raw = computed.IsEmpty() ? delegate->GetIndexedPrimvar(id, name, &indices) : computed;
+    if constexpr (std::is_same_v<T, GfVec3f>) {
+        // Vertex colours from any numeric primvar a material reads (MaterialX geompropvalue of float, vector4, ...):
+        // a scalar fills the three channels, a vector4 gives its first three.
+        const auto spread = [&](const auto& values, auto convert) {
+            VtVec3fArray colors(values.size());
+            for (size_t i = 0; i < values.size(); ++i) colors[i] = convert(values[i]);
+            raw = VtValue(colors);
+        };
+        if (raw.IsHolding<VtFloatArray>())
+            spread(raw.UncheckedGet<VtFloatArray>(), [](float v) { return GfVec3f(v); });
+        else if (raw.IsHolding<VtDoubleArray>())
+            spread(raw.UncheckedGet<VtDoubleArray>(), [](double v) { return GfVec3f(float(v)); });
+        else if (raw.IsHolding<VtIntArray>())
+            spread(raw.UncheckedGet<VtIntArray>(), [](int v) { return GfVec3f(float(v)); });
+        else if (raw.IsHolding<VtVec4fArray>())
+            spread(raw.UncheckedGet<VtVec4fArray>(), [](const GfVec4f& v) { return GfVec3f(v[0], v[1], v[2]); });
+        else if (raw.IsHolding<VtVec3dArray>())
+            spread(raw.UncheckedGet<VtVec3dArray>(), [](const GfVec3d& v) { return GfVec3f(v); });
+    }
     if (!raw.IsHolding<VtArray<T>>()) return {};
     VtArray<T> array = raw.UncheckedGet<VtArray<T>>();
     const auto domain = computed.IsEmpty() ? interpolation(delegate, id, name) : HdInterpolationVertex;

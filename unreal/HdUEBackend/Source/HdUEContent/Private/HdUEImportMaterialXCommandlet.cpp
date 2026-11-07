@@ -15,6 +15,11 @@
 #include "Materials/MaterialExpressionMultiply.h"
 #include "Materials/MaterialExpressionAppendVector.h"
 #include "Materials/MaterialExpressionNormalize.h"
+#include "Materials/MaterialExpressionConstant.h"
+#include "Materials/MaterialExpressionCustom.h"
+#include "Materials/MaterialExpressionLocalPosition.h"
+#include "Materials/MaterialExpressionParameter.h"
+#include "Materials/MaterialExpressionTextureCoordinate.h"
 #include "Materials/MaterialFunctionInterface.h"
 #include "Engine/Texture.h"
 #include "Engine/Texture2D.h"
@@ -94,8 +99,8 @@ int32 CorrectNormalScale(UMaterial* Material) {
         auto* Normalize = NewObject<UMaterialExpressionNormalize>(Material);
         Normalize->VectorInput.Connect(0, Append);
         for (auto* Consumer : Expressions)
-            for (auto* Input : Consumer->GetInputsView())
-                if (Input && Input->Expression == Call) Input->Connect(0, Normalize);
+            for (FExpressionInputIterator It{Consumer}; It; ++It)
+                if (It->Expression == Call) It->Connect(0, Normalize);
         for (UMaterialExpression* Added : TArray<UMaterialExpression*>{XY, Z, Scale, Multiply, Append, Normalize})
             Material->GetExpressionCollection().AddExpression(Added);
         Material->GetExpressionCollection().RemoveExpression(Call);
@@ -126,6 +131,108 @@ int32 CorrectPlace2DRotation(UMaterial* Material) {
             Material->GetExpressionCollection().AddExpression(Turns);
             ++Count;
         }
+    }
+    return Count;
+}
+int32 ReplaceFlakeMarkers(UMaterial* Material) {
+    // UE 5.8.4's MaterialX importer has no flake2d/flake3d (MaterialX 1.39.5). hdUE's export turns a flake with plain
+    // inputs into marker constants, which Interchange imports as parameters named
+    // <node>_hdueflake_<mode>_<size>_<roughness>_<coverage>_<output>_value (scripts/materialx_lowering.py
+    // lower_flakes); this puts MaterialX's own flake code in their place (Shaders/MaterialXFlake.ush). Its inputs are
+    // what UE's importer reads for the nodedef's defaults: texcoord UV0 (TextureCoordinate 0), position Pobject (Local
+    // Position in metres, ConnectPositionInputToOutput), normal and tangent VertexNormalWS and VertexTangentWS, the
+    // bitangent their cross product (ConnectBitangentInputToOutput). The flake normal is in world space, as
+    // MaterialX's.
+    static const TCHAR* Outputs[] = {TEXT("flakenormal"), TEXT("id"), TEXT("rand"), TEXT("presence")};
+    TMap<FString, TMap<FString, UMaterialExpressionParameter*>> Flakes;
+    for (UMaterialExpression* Expression : Material->GetExpressions()) {
+        auto* Parameter = Cast<UMaterialExpressionParameter>(Expression);
+        if (!Parameter) continue;
+        const FString Name = Parameter->ParameterName.ToString();
+        int32 Output = INDEX_NONE;
+        for (int32 Index = 0; Index < UE_ARRAY_COUNT(Outputs); ++Index)
+            if (Name.EndsWith(FString::Printf(TEXT("_%s_value"), Outputs[Index]))) Output = Index;
+        if (Output == INDEX_NONE || !Name.Contains(TEXT("_hdueflake_"))) continue;
+        const FString Suffix = FString::Printf(TEXT("_%s_value"), Outputs[Output]);
+        Flakes.FindOrAdd(Name.LeftChop(Suffix.Len())).Add(Outputs[Output], Parameter);
+    }
+    TArray<UMaterialExpression*> Expressions;
+    for (UMaterialExpression* Expression : Material->GetExpressions()) Expressions.Add(Expression);
+    int32 Count = 0;
+    for (const auto& [Key, Markers] : Flakes) {
+        FString Code;
+        Key.Split(TEXT("_hdueflake_"), nullptr, &Code, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+        TArray<FString> Fields;
+        Code.ParseIntoArray(Fields, TEXT("_"));
+        if (Fields.Num() != 4) {
+            UE_LOG(LogTemp, Error, TEXT("Unreadable flake marker: %s"), *Key);
+            continue;
+        }
+        const auto Value = [&](int32 Index) { return FCString::Atod(*Fields[Index]) / 1e6; };
+        UMaterialExpression* Position;
+        if (Fields[0] == TEXT("0")) {
+            auto* UV = NewObject<UMaterialExpressionTextureCoordinate>(Material);
+            auto* Zero = NewObject<UMaterialExpressionConstant>(Material);
+            auto* Append = NewObject<UMaterialExpressionAppendVector>(Material);
+            Append->A.Connect(0, UV);
+            Append->B.Connect(0, Zero);
+            for (UMaterialExpression* Added : TArray<UMaterialExpression*>{UV, Zero, Append})
+                Material->GetExpressionCollection().AddExpression(Added);
+            Position = Append;
+        } else {
+            auto* Local = NewObject<UMaterialExpressionLocalPosition>(Material);
+            auto* Metres = NewObject<UMaterialExpressionMultiply>(Material);
+            Metres->A.Connect(0, Local);
+            Metres->ConstB = 0.01f;
+            Material->GetExpressionCollection().AddExpression(Local);
+            Material->GetExpressionCollection().AddExpression(Metres);
+            Position = Metres;
+        }
+        auto* Custom = NewObject<UMaterialExpressionCustom>(Material);
+        Custom->Description = TEXT("MaterialX flake");
+        Custom->IncludeFilePaths.Add(TEXT("/HdUE/MaterialXFlake.ush"));
+        Custom->Inputs.SetNum(1);
+        Custom->Inputs[0].InputName = TEXT("Position");
+        Custom->Inputs[0].Input.Connect(0, Position);
+        Custom->OutputType = CMOT_Float3;
+        for (const TCHAR* Name : {TEXT("Id"), TEXT("Rand"), TEXT("Presence")}) {
+            FCustomOutput& Output = Custom->AdditionalOutputs.AddDefaulted_GetRef();
+            Output.OutputName = Name;
+            Output.OutputType = CMOT_Float1;
+        }
+        Custom->Code = FString::Printf(
+            TEXT("const float3 N = Parameters.TangentToWorld[2];\n"
+                 "const float3 T = Parameters.TangentToWorld[0];\n"
+                 "return HdUEMaterialXFlake(%.9g, %.9g, %.9g, Position, N, T, cross(N, T), Id, Rand, Presence);"),
+            Value(1), Value(2), Value(3));
+        Custom->RebuildOutputs();
+        Material->GetExpressionCollection().AddExpression(Custom);
+        // Consumers of a marker read the Custom output of the same name (output 0 the normal, then Id, Rand,
+        // Presence); a vector marker's single-channel outputs (1-3: R, G, B) through a mask of the normal.
+        const auto Reconnect = [&](FExpressionInput* Input) {
+            if (!Input || !Input->Expression) return;
+            for (int32 Output = 0; Output < UE_ARRAY_COUNT(Outputs); ++Output) {
+                UMaterialExpressionParameter* const* Marker = Markers.Find(Outputs[Output]);
+                if (!Marker || Input->Expression != *Marker) continue;
+                if (Output == 0 && Input->OutputIndex > 0) {
+                    auto* Channel = NewObject<UMaterialExpressionComponentMask>(Material);
+                    Channel->Input.Connect(0, Custom);
+                    Channel->R = Input->OutputIndex == 1;
+                    Channel->G = Input->OutputIndex == 2;
+                    Channel->B = Input->OutputIndex == 3;
+                    Channel->A = false;
+                    Material->GetExpressionCollection().AddExpression(Channel);
+                    Input->Connect(0, Channel);
+                } else
+                    Input->Connect(Output, Custom);
+            }
+        };
+        for (UMaterialExpression* Consumer : Expressions)
+            for (FExpressionInputIterator It{Consumer}; It; ++It) Reconnect(It.Input);
+        for (int32 Property = 0; Property < MP_MAX; ++Property)
+            Reconnect(Material->GetExpressionInputForProperty(EMaterialProperty(Property)));
+        for (const auto& [Output, Marker] : Markers) Material->GetExpressionCollection().RemoveExpression(Marker);
+        ++Count;
     }
     return Count;
 }
@@ -229,11 +336,12 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
                 return 4;
             }
             ++MaterialCount;
-            Material->bUsedWithNanite = true;
+            Material->SetUsageByFlag(MATUSAGE_Nanite, true);
             // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
-            Material->bUsedWithInstancedStaticMeshes = true;
+            Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
             Entry->SetNumberField(TEXT("normal_scale_corrections"), CorrectNormalScale(Material));
             Entry->SetNumberField(TEXT("place2d_rotation_corrections"), CorrectPlace2DRotation(Material));
+            Entry->SetNumberField(TEXT("flakes"), ReplaceFlakeMarkers(Material));
             // ID passes switch the material to its ID emission instead of swapping it (false: it keeps the swap).
             Entry->SetBoolField(TEXT("id_switch"), HdUEAddIdSwitch(Material));
             Material->PostEditChange();
