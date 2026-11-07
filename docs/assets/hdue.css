@@ -19,8 +19,8 @@
   text-align: center;
 }
 /* A captioned picture's paragraph sits inside the figure's band: one frame, not two. */
-.md-typeset figure:has(img) p:has(> img),
-.md-typeset figure:has(img) p:has(> a > img) {
+.md-typeset figure:has(img) p:has(> img):not(:has(.hdue-node-icon)),
+.md-typeset figure:has(img) p:has(> a > img):not(:has(.hdue-node-icon)) {
   margin: 0;
   padding: 0;
   border: 0;
