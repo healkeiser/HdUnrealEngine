@@ -1,0 +1,26 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:VolumetricFogStartDistance"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogStartDistance = 0"
+    ]
+   }
+  },
+  {
+   "caption": "300",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:VolumetricFogStartDistance = 300"
+    ]
+   }
+  }
+ ]
+}

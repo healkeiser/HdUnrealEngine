@@ -1,0 +1,43 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:skyAtmosphere:SkyLuminanceFactor"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:skyAtmosphere:SkyLuminanceFactor = (1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 0.8, 0.6",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:skyAtmosphere:SkyLuminanceFactor = (1, 0.8, 0.6)"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:ScreenPercentage"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "25",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:ScreenPercentage = 25"
+    ]
+   }
+  },
+  {
+   "caption": "50",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:ScreenPercentage = 50"
+    ]
+   }
+  },
+  {
+   "caption": "100 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:cvar:r:ScreenPercentage = 100"
+    ]
+   }
+  }
+ ]
+}

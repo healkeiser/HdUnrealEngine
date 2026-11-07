@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:BloomConvolutionSize"
+ ],
+ "base": {
+  "/scene/key": [
+   "float inputs:exposure = 7"
+  ],
+  "/Render/Settings": [
+   "float unreal:postProcess:AutoExposureBias = -2.5",
+   "token unreal:postProcess:BloomMethod = \"BM_FFT\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomConvolutionSize = 0.5"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomConvolutionSize = 1"
+    ]
+   }
+  }
+ ]
+}

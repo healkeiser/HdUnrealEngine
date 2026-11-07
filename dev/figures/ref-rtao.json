@@ -1,0 +1,31 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:RayTracingAO"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\"",
+   "token unreal:postProcess:DynamicGlobalIlluminationMethod = \"EDynamicGlobalIlluminationMethod::None\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Off (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:RayTracingAO = 0"
+    ]
+   }
+  },
+  {
+   "caption": "On",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:RayTracingAO = 1"
+    ]
+   }
+  }
+ ]
+}

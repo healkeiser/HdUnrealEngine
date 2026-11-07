@@ -1,0 +1,384 @@
+{
+ "renderers": [
+  {
+   "key": "lumen",
+   "label": "hdUE Lumen"
+  },
+  {
+   "key": "pathtraced",
+   "label": "hdUE Path Tracer"
+  },
+  {
+   "key": "xpu",
+   "label": "Karma XPU"
+  },
+  {
+   "key": "karma",
+   "label": "Karma CPU"
+  }
+ ],
+ "sets": [
+  {
+   "title": "Cornell box: one feature per scene",
+   "scenes": [
+    {
+     "title": "Global illumination",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0481,
+       "luminance": 0.06017171816343239
+      },
+      "pathtraced": {
+       "seconds": 2.3448,
+       "luminance": 0.06219975823013288
+      },
+      "xpu": {
+       "seconds": 8.0825,
+       "luminance": 0.06280089584205294
+      },
+      "karma": {
+       "seconds": 49.6994,
+       "luminance": 0.06168551477258211
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Glossy materials",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0486,
+       "luminance": 0.050717836976340185
+      },
+      "pathtraced": {
+       "seconds": 2.289,
+       "luminance": 0.05795684925460628
+      },
+      "xpu": {
+       "seconds": 5.8812,
+       "luminance": 0.04879516772470665
+      },
+      "karma": {
+       "seconds": 30.2954,
+       "luminance": 0.04766269818055325
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Depth of field",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0485,
+       "luminance": 0.060069705953897164
+      },
+      "pathtraced": {
+       "seconds": 2.3562,
+       "luminance": 0.06201848540694418
+      },
+      "xpu": {
+       "seconds": 8.4011,
+       "luminance": 0.06257516046112055
+      },
+      "karma": {
+       "seconds": 51.0344,
+       "luminance": 0.06146504049560769
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Motion blur",
+     "renders": {
+      "lumen": {
+       "seconds": 0.049,
+       "luminance": 0.05821113056958091
+      },
+      "pathtraced": {
+       "seconds": 2.5292,
+       "luminance": 0.059925875166282117
+      },
+      "xpu": {
+       "seconds": 7.9204,
+       "luminance": 0.06044402035765466
+      },
+      "karma": {
+       "seconds": 50.2434,
+       "luminance": 0.059344985153257354
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Subdivision surfaces",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0465,
+       "luminance": 0.057598260473062365
+      },
+      "pathtraced": {
+       "seconds": 2.3733,
+       "luminance": 0.059652044758123565
+      },
+      "xpu": {
+       "seconds": 7.6023,
+       "luminance": 0.060128531375533735
+      },
+      "karma": {
+       "seconds": 48.2733,
+       "luminance": 0.05904249452375735
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Instances, points, curves",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0492,
+       "luminance": 0.057124181522242676
+      },
+      "pathtraced": {
+       "seconds": 2.404,
+       "luminance": 0.06009558319785101
+      },
+      "xpu": {
+       "seconds": 7.6291,
+       "luminance": 0.05916890894372976
+      },
+      "karma": {
+       "seconds": 50.0548,
+       "luminance": 0.058103730191916586
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Volumes (OpenVDB)",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0492,
+       "luminance": 0.05989483817054338
+      },
+      "pathtraced": {
+       "seconds": 4.038,
+       "luminance": 0.07156116391777209
+      },
+      "xpu": {
+       "seconds": 8.2146,
+       "luminance": 0.05538212170020271
+      },
+      "karma": {
+       "seconds": 58.659,
+       "luminance": 0.0544931196053888
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "IES profile",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0479,
+       "luminance": 0.6282899670762356
+      },
+      "pathtraced": {
+       "seconds": 1.9909,
+       "luminance": 0.6690991550635903
+      },
+      "xpu": {
+       "seconds": 9.8084,
+       "luminance": 0.6546025801641594
+      },
+      "karma": {
+       "seconds": 68.4496,
+       "luminance": 0.6143001003713355
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Lens shift",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0449,
+       "luminance": 0.047133634005059134
+      },
+      "pathtraced": {
+       "seconds": 2.2467,
+       "luminance": 0.04985946775862267
+      },
+      "xpu": {
+       "seconds": 5.6347,
+       "luminance": 0.0493007018217578
+      },
+      "karma": {
+       "seconds": 34.784,
+       "luminance": 0.048560366307148904
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Orthographic camera",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0486,
+       "luminance": 0.06219016391612063
+      },
+      "pathtraced": {
+       "seconds": 2.2872,
+       "luminance": 0.0762436636756558
+      },
+      "xpu": {
+       "seconds": 7.2345,
+       "luminance": 0.07382061514237077
+      },
+      "karma": {
+       "seconds": 44.6835,
+       "luminance": 0.07298059608626306
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Camera exposure",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0493,
+       "luminance": 0.12034006808573804
+      },
+      "pathtraced": {
+       "seconds": 2.34,
+       "luminance": 0.12439951646026576
+      },
+      "xpu": {
+       "seconds": 8.9825,
+       "luminance": 0.12563655114182876
+      },
+      "karma": {
+       "seconds": 57.1435,
+       "luminance": 0.12343382824970513
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Unreal post-processing",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0505,
+       "luminance": 0.30526842443665747
+      },
+      "pathtraced": {
+       "seconds": 2.4028,
+       "luminance": 0.3125566018846393
+      },
+      "xpu": {
+       "seconds": 7.7692,
+       "luminance": 0.06280346330726803
+      },
+      "karma": {
+       "seconds": 47.6645,
+       "luminance": 0.061685385736025694
+      }
+     },
+     "compared": false
+    },
+    {
+     "title": "Light linking",
+     "renders": {
+      "lumen": {
+       "seconds": 0.048,
+       "luminance": 0.05838515872132374
+      },
+      "pathtraced": {
+       "seconds": 2.3728,
+       "luminance": 0.059077468718670846
+      },
+      "xpu": {
+       "seconds": 9.7352,
+       "luminance": 0.06002549541403452
+      },
+      "karma": {
+       "seconds": 64.6893,
+       "luminance": 0.05907397063224538
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Clearcoat",
+     "renders": {
+      "lumen": {
+       "seconds": 0.049,
+       "luminance": 0.06466138628900744
+      },
+      "pathtraced": {
+       "seconds": 1.9681,
+       "luminance": 0.06571361935103805
+      },
+      "xpu": {
+       "seconds": 6.3431,
+       "luminance": 0.06650020491742625
+      },
+      "karma": {
+       "seconds": 37.1048,
+       "luminance": 0.06540708987547042
+      }
+     },
+     "compared": true
+    },
+    {
+     "title": "Render region",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0335,
+       "luminance": 0.019854470534261055
+      },
+      "pathtraced": {
+       "seconds": 2.2466,
+       "luminance": 0.021014600464632528
+      },
+      "xpu": {
+       "seconds": 2.332,
+       "luminance": 0.020530471240624022
+      },
+      "karma": {
+       "seconds": 13.7096,
+       "luminance": 0.020293111203145163
+      }
+     },
+     "compared": true
+    }
+   ]
+  },
+  {
+   "title": "Sponza: a production-style scene",
+   "scenes": [
+    {
+     "title": "Main view",
+     "renders": {
+      "lumen": {
+       "seconds": 0.0837,
+       "luminance": 0.07363576866337088
+      },
+      "pathtraced": {
+       "seconds": 6.6381,
+       "luminance": 0.0854603976118936
+      },
+      "xpu": {
+       "seconds": 42.19,
+       "luminance": 0.07872819025973869
+      },
+      "karma": {
+       "seconds": 474.65,
+       "luminance": 0.08063331536781496
+      }
+     },
+     "compared": true
+    }
+   ]
+  }
+ ]
+}

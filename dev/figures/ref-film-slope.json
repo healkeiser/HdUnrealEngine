@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:FilmSlope"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0.6",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmSlope = 0.6"
+    ]
+   }
+  },
+  {
+   "caption": "0.88 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmSlope = 0.88"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmSlope = 1"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,357 @@
+/* The hdUE icon, a little larger than the theme's 1.2rem; its rounded corners are in the SVG, drawn as vectors. */
+.md-header__button.md-logo img {
+  height: 1.4rem;
+}
+
+/* A picture sits at its own size, centred on a band that fills the text column: the band carries the frame, so a
+   narrow render still reaches both margins and a wide one gets an even mat. --md-code-bg-color is the theme's own
+   subtle surface, so the band follows the light and dark palettes. A paragraph holding a picture is one (the
+   lightbox wraps it in a link); the node reference's inline icons are not. */
+.md-typeset figure:has(img):not(.hdue-shot),
+.md-typeset p:has(> img):not(:has(.hdue-node-icon)),
+.md-typeset p:has(> a > img):not(:has(.hdue-node-icon)),
+.hdue-figure {
+  margin: 1.2em 0;
+  padding: 0.8rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  background-color: var(--md-code-bg-color);
+  text-align: center;
+}
+/* The theme sizes a figure to its contents, which would shrink the band back onto the picture. */
+.md-typeset figure:has(img):not(.hdue-shot) {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* A hairline of its own, or a dark render melts into the dark band. */
+.md-typeset figure:has(img):not(.hdue-shot) img,
+.md-typeset p:has(> img):not(:has(.hdue-node-icon)) > img,
+.md-typeset p:has(> a > img):not(:has(.hdue-node-icon)) img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  vertical-align: middle;
+}
+.md-typeset figure:has(img):not(.hdue-shot) figcaption {
+  max-width: none;
+  margin: 0.6rem 0 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+}
+
+/* The lightbox in the theme's colours: the page behind it, blurred, and the picture framed as on the page. */
+.glightbox-container .goverlay {
+  background: color-mix(in srgb, var(--md-default-bg-color) 88%, transparent);
+  backdrop-filter: blur(4px);
+}
+.glightbox-container .gslide-image img {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  box-shadow: var(--md-shadow-z3);
+}
+html .glightbox-clean .gslide-description {
+  background: transparent;
+}
+html .glightbox-clean .gdesc-inner {
+  padding: 0.6rem 0 0;
+  text-align: center;
+}
+html .glightbox-clean .gslide-title {
+  margin: 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+/* Setting comparisons (hdue.js): the figure is the band, the frame (a slider, a stepper's stage) the picture. */
+.hdue-figure {
+  user-select: none;
+}
+.hdue-frame,
+.hdue-stage {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  text-align: left;
+}
+.hdue-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Before/after: the second image clipped to the right of the split, a hairline and a small glass grip on it. */
+.hdue-compare .hdue-after {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--split, 50%));
+}
+.hdue-compare .hdue-after img {
+  width: 100%;
+}
+.hdue-compare .hdue-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--split, 50%);
+  width: 1px;
+  background: rgb(255 255 255 / 85%);
+  box-shadow: 0 0 3px rgb(0 0 0 / 40%);
+  pointer-events: none;
+}
+.hdue-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid rgb(255 255 255 / 85%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 18%);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
+  color: #fff;
+  transform: translate(-50%, -50%);
+  transition:
+    background-color 0.15s,
+    transform 0.15s;
+}
+.hdue-knob svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.hdue-compare:hover .hdue-knob {
+  background: rgb(255 255 255 / 32%);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+.hdue-compare:has(input:focus-visible) .hdue-knob {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+.hdue-compare input {
+  touch-action: pan-y;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.hdue-label {
+  position: absolute;
+  bottom: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.2rem;
+  background: rgb(0 0 0 / 45%);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.hdue-left {
+  left: 0.5rem;
+}
+.hdue-right {
+  right: 0.5rem;
+}
+
+/* More values: the selected image, and a strip of thumbnails (scrolls sideways when it does not fit). */
+.hdue-stage {
+  position: relative;
+  touch-action: pan-y;
+}
+.hdue-stage:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+.hdue-stage img {
+  display: none;
+}
+.hdue-stage img.hdue-current {
+  display: block;
+}
+.hdue-thumbs {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.15rem 0.1rem 0.3rem;
+  overflow-x: auto;
+  justify-content: safe center;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.hdue-thumbs button {
+  flex: 1 0 5.5em;
+  max-width: 9em;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  font: inherit;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    color 0.15s;
+}
+.hdue-thumbs button img {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.hdue-thumbs button span {
+  display: block;
+  padding: 0.25rem 0.2rem;
+}
+.hdue-thumbs button:hover {
+  border-color: var(--md-default-fg-color--lighter);
+  color: var(--md-default-fg-color);
+}
+.hdue-thumbs button:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 1px;
+}
+.hdue-thumbs button[aria-pressed="true"] {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 0 0 1px var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+  font-weight: 600;
+}
+.hdue-thumbs button[aria-pressed="true"] img,
+.hdue-thumbs button:hover img {
+  opacity: 1;
+}
+
+/* The gallery (scripts/render_gallery.py): a scene's renders side by side on one band, each captioned with its
+   renderer (the charts' colour and mark: hdUE blue, Karma orange; circle, diamond, triangle, square), its time, then
+   its settings and brightness. A wide set (Sponza) goes two by two. */
+.hdue-band {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.8em 0 1.6em;
+  padding: 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  background-color: var(--md-code-bg-color);
+}
+.hdue-band--wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media screen and (max-width: 44.9375em) {
+  .hdue-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hdue-band--wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.md-typeset .hdue-shot {
+  margin: 0;
+}
+.md-typeset .hdue-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+}
+.md-typeset .hdue-shot figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  max-width: none;
+  margin: 0.4rem 0 0;
+  font-size: 0.6rem;
+  font-style: normal;
+  line-height: 1.4;
+  text-align: left;
+}
+.hdue-renderer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+}
+.hdue-renderer::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  background-color: var(--hdue-engine);
+}
+.hdue-renderer--lumen,
+.hdue-renderer--pathtraced {
+  --hdue-engine: #3987e5;
+}
+.hdue-renderer--xpu,
+.hdue-renderer--karma {
+  --hdue-engine: #d95926;
+}
+.hdue-renderer--lumen::before {
+  border-radius: 50%;
+}
+.hdue-renderer--pathtraced::before {
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-inline: 0.07rem;
+  transform: rotate(45deg);
+}
+.hdue-renderer--xpu::before {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.hdue-time {
+  color: var(--md-default-fg-color);
+  font-variant-numeric: tabular-nums;
+}
+.hdue-note {
+  color: var(--md-default-fg-color--light);
+}
+
+/* The gallery's charts (hdue.js, Chart.js), in the page's colours on a band; the script sets each one's height. */
+.hdue-chart {
+  position: relative;
+  margin: 1.2em 0;
+  padding: 0.8rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  background-color: var(--md-code-bg-color);
+}
+
+/* Houdini node reference (scripts/generate_node_docs.py). */
+.md-typeset .hdue-node-icon {
+  width: auto;
+  height: 1.1em;
+  vertical-align: -0.12em;
+}
+.hdue-node-type {
+  margin-top: -0.8em;
+  color: var(--md-default-fg-color--light, #888);
+  font-size: 0.75rem;
+}
+.hdue-node-summary {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.md-typeset dl dt {
+  font-weight: 600;
+}

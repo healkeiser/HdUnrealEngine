@@ -1,0 +1,26 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorSaturationMidtones"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "1, 1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorSaturationMidtones = (1, 1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 1, 1, 0",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorSaturationMidtones = (1, 1, 1, 0)"
+    ]
+   }
+  }
+ ]
+}

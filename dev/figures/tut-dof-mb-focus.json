@@ -1,0 +1,34 @@
+{
+ "scene": "docs/row.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ],
+  "/scene/camera": [
+   "float fStop = 2"
+  ]
+ },
+ "values": [
+  {
+   "caption": "focusDistance 2.4",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 2.4"
+    ]
+   }
+  },
+  {
+   "caption": "focusDistance 6 (scene)",
+   "set": {}
+  },
+  {
+   "caption": "focusDistance 9.6",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 9.6"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "float unreal:heightFog:FogDensity = 0.05"
+  ]
+ },
+ "values": [
+  {
+   "caption": "height fog only",
+   "set": {}
+  },
+  {
+   "caption": "fog particles, Noise Strength 0",
+   "set": {
+    "/scene/mist": [
+     "(active = true)",
+     "float primvars:unreal:fog:noiseStrength = 0"
+    ]
+   }
+  },
+  {
+   "caption": "fog particles, Noise Strength 1",
+   "set": {
+    "/scene/mist": [
+     "(active = true)"
+    ]
+   }
+  }
+ ]
+}
