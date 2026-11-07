@@ -2,27 +2,35 @@
 
 import os
 import re
+import time
 from pathlib import Path
 
 # Directory reads, keyed by the directory's modification time: adding, removing or renaming an entry there changes
-# it, so a cached answer is never stale. A scene's materials name the same files many times (NVIDIA's Da Vinci
-# Workshop: 20,000 texture inputs, 8,000 files), and each was resolved and its UDIM folder listed again.
+# it. A scene's materials name the same files many times (NVIDIA's Da Vinci Workshop: 20,000 texture inputs, 8,000
+# files), and each was resolved and its UDIM folder listed again. Two changes within one timestamp tick leave the
+# time unchanged, so a directory modified in the last RECENT_NS is read without the cache (git's "racily clean" rule).
 _DIRECTORY_CACHE_LIMIT = 1 << 16
+_RECENT_NS = 2_000_000_000
 _udim_cache = {}
 _resolve_cache = {}
 
 
 def _directory_stamp(directory):
+    """The directory's modification time, or None when it is missing or too recent to key a cache by."""
     try:
-        return os.stat(directory).st_mtime_ns
+        stamp = os.stat(directory).st_mtime_ns
     except OSError:
         return None
+    return stamp if time.time_ns() - stamp >= _RECENT_NS else None
 
 
 def resolved(path):
     """Path(path).resolve() as a string, cached while its directory is unchanged."""
     path = str(path)
-    key = (path, _directory_stamp(os.path.dirname(path)))
+    stamp = _directory_stamp(os.path.dirname(path))
+    if stamp is None:
+        return str(Path(path).resolve())
+    key = (path, stamp)
     result = _resolve_cache.get(key)
     if result is None:
         if len(_resolve_cache) >= _DIRECTORY_CACHE_LIMIT:
@@ -33,7 +41,10 @@ def resolved(path):
 
 def udim_tiles(pattern):
     """The tiles of a UDIM pattern {index: resolved file}, cached while its directory is unchanged."""
-    key = (str(pattern), _directory_stamp(os.path.dirname(str(pattern))))
+    stamp = _directory_stamp(os.path.dirname(str(pattern)))
+    if stamp is None:
+        return _udim_tiles(pattern)
+    key = (str(pattern), stamp)
     cached = _udim_cache.get(key)
     if cached is None:
         if len(_udim_cache) >= _DIRECTORY_CACHE_LIMIT:

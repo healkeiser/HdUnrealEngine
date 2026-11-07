@@ -17,6 +17,9 @@ class DirectoryCaches(unittest.TestCase):
         (self.folder / "albedo.1001.png").write_bytes(b"")
         (self.folder / "albedo.1002.png").write_bytes(b"")
         self.pattern = str(self.folder / "albedo.<UDIM>.png")
+        # Older than the caches' recent window, so lookups are cached.
+        stamp = time.time_ns() - 10_000_000_000
+        os.utime(self.folder, ns=(stamp, stamp))
 
     def touch_folder(self):
         # A new entry changes the folder's modification time; make sure it differs from the cached one.
@@ -28,6 +31,17 @@ class DirectoryCaches(unittest.TestCase):
         (self.folder / "albedo.1011.png").write_bytes(b"")
         self.touch_folder()
         self.assertEqual(sorted(udim_tiles(self.pattern)), [1001, 1002, 1011])
+
+    def test_tile_added_in_the_same_tick_is_found(self):
+        # A folder written just now: a new entry may not change its modification time, so it is not cached.
+        folder = Path(tempfile.mkdtemp())
+        (folder / "albedo.1001.png").write_bytes(b"")
+        pattern = str(folder / "albedo.<UDIM>.png")
+        self.assertEqual(sorted(udim_tiles(pattern)), [1001])
+        stamp = os.stat(folder).st_mtime_ns
+        (folder / "albedo.1002.png").write_bytes(b"")
+        os.utime(folder, ns=(stamp, stamp))
+        self.assertEqual(sorted(udim_tiles(pattern)), [1001, 1002])
 
     def test_cached_result_is_a_copy(self):
         tiles = udim_tiles(self.pattern)
