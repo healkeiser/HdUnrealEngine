@@ -4,8 +4,7 @@
 
 #### Exponential Height Fog { #unreal-heightfog }
 
-`unreal:heightFog` · Default Off  
-Houdini parameter `xn__unrealheightFog_i0a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFog_i0a</code></dd></div></dl>
 
 Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor in a level. Turn on Volumetric Fog for lit, shadowed fog (light shafts); the Path Tracer renders the fog only with Volumetric Fog on. Lights scatter into it by their Volumetric Scattering Intensity.
 
@@ -13,8 +12,7 @@ Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog act
 
 #### Fog Height { #unreal-heightfogheight }
 
-`unreal:heightFogHeight` · Default `0` · Range -100 to 100  
-Houdini parameter `xn__unrealheightFogHeight_99a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFogHeight</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-100 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogHeight_99a</code></dd></div></dl>
 
 Height of the fog actor, in scene units along the stage's up axis: the fog's density is Fog Density there and grows below it.
 
@@ -22,8 +20,7 @@ Height of the fog actor, in scene units along the stage's up axis: the fog's den
 
 #### Fog Density { #unreal-heightfog-fogdensity }
 
-`unreal:heightFog:FogDensity` · Default `0.02` · Range 0 to 0.05  
-Houdini parameter `xn__unrealheightFogFogDensity_shbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogDensity</code></dd></div><div><dt>Default</dt><dd><code>0.02</code></dd></div><div><dt>Range</dt><dd>0 to 0.05</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFogDensity_shbj</code></dd></div></dl>
 
 Global density factor.
 
@@ -31,8 +28,7 @@ Global density factor.
 
 #### Fog Height Falloff { #unreal-heightfog-fogheightfalloff }
 
-`unreal:heightFog:FogHeightFalloff` · Default `0.2` · Range 0.001 to 2  
-Houdini parameter `xn__unrealheightFogFogHeightFalloff_krbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd><code>0.2</code></dd></div><div><dt>Range</dt><dd>0.001 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFogHeightFalloff_krbj</code></dd></div></dl>
 
 Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
@@ -40,8 +36,7 @@ Height density factor, controls how the density increases as height decreases. S
 
 #### Second Fog Density { #unreal-heightfog-secondfogdata-fogdensity }
 
-`unreal:heightFog:SecondFogData:FogDensity` · Default `0` · Range 0 to 0.05  
-Houdini parameter `xn__unrealheightFogSecondFogDataFogDensity_y2bjn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogDensity</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 0.05</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSecondFogDataFogDensity_y2bjn</code></dd></div></dl>
 
 Global density factor for this fog. Density 0 turns the second fog off.
 
@@ -49,22 +44,19 @@ Global density factor for this fog. Density 0 turns the second fog off.
 
 #### Second Fog Height Falloff { #unreal-heightfog-secondfogdata-fogheightfalloff }
 
-`unreal:heightFog:SecondFogData:FogHeightFalloff` · Default `0.2` · Range 0.001 to 2  
-Houdini parameter `xn__unrealheightFogSecondFogDataFogHeightFalloff_qdcjn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd><code>0.2</code></dd></div><div><dt>Range</dt><dd>0.001 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSecondFogDataFogHeightFalloff_qdcjn</code></dd></div></dl>
 
 Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
 #### Second Fog Height Offset { #unreal-heightfog-secondfogdata-fogheightoffset }
 
-`unreal:heightFog:SecondFogData:FogHeightOffset` · Default `0`  
-Houdini parameter `xn__unrealheightFogSecondFogDataFogHeightOffset_3bcjn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightOffset</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSecondFogDataFogHeightOffset_3bcjn</code></dd></div></dl>
 
 Height offset, relative to the actor position Z.
 
 #### Fog Inscattering Color { #unreal-heightfog-foginscatteringluminance }
 
-`unreal:heightFog:FogInscatteringLuminance` · Default `0, 0, 0` · Realtime only  
-Houdini parameter `xn__unrealheightFogFogInscatteringLuminance_l4bj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd><code>0, 0, 0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFogInscatteringLuminance_l4bj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
 
@@ -72,36 +64,31 @@ Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and th
 
 #### Sky Atmosphere Ambient Contribution Color Scale { #unreal-heightfog-skyatmosphereambientcontributioncolorscale }
 
-`unreal:heightFog:SkyAtmosphereAmbientContributionColorScale` · Default `1, 1, 1` · Realtime only  
-Houdini parameter `xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_wycj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyAtmosphereAmbientContributionColorScale</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSkyAtmosphereAmbientContributionColorScale_wycj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
-Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog\10
+Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog\>0
 
 #### Fog Max Opacity { #unreal-heightfog-fogmaxopacity }
 
-`unreal:heightFog:FogMaxOpacity` · Default `1` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealheightFogFogMaxOpacity_ombj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogMaxOpacity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFogMaxOpacity_ombj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all.
 
 #### Start Distance { #unreal-heightfog-startdistance }
 
-`unreal:heightFog:StartDistance` · Default `0` · Range 0 to 5000 · Realtime only  
-Houdini parameter `xn__unrealheightFogStartDistance_ombj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:StartDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 5000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogStartDistance_ombj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance from the camera that the fog will start, in world units.
 
 #### End Distance { #unreal-heightfog-enddistance }
 
-`unreal:heightFog:EndDistance` · Default `0` · Range 0 to 500000 · Realtime only  
-Houdini parameter `xn__unrealheightFogEndDistance_fjbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:EndDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 500000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogEndDistance_fjbj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0.
 
 #### Fog Cutoff Distance { #unreal-heightfog-fogcutoffdistance }
 
-`unreal:heightFog:FogCutoffDistance` · Default `0` · Range 100000 to 20000000 · Realtime only  
-Houdini parameter `xn__unrealheightFogFogCutoffDistance_6sbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogCutoffDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>100000 to 20000000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFogCutoffDistance_6sbj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in.
 
@@ -109,50 +96,43 @@ Scene elements past this distance will not have fog applied. This is useful for 
 
 #### Inscattering Color Cubemap { #unreal-heightfog-inscatteringcolorcubemap }
 
-`unreal:heightFog:InscatteringColorCubemap` · Default (empty) · Realtime only  
-Houdini parameter `xn__unrealheightFogInscatteringColorCubemap_l4bj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemap</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogInscatteringColorCubemap_l4bj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
 #### Sky Light Capture In-Scattering Strength { #unreal-heightfog-skylightcaptureaffectsheightfogstrength }
 
-`unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength` · Default `0` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_0tcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSkyLightCaptureAffectsHeightFogStrength_0tcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
-When \10 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
+When \>0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
 
 #### Sky Light Capture In-Scattering Roughness { #unreal-heightfog-skylightcaptureaffectsheightfogroughness }
 
-`unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness` · Default `0.15` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_nvcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness</code></dd></div><div><dt>Default</dt><dd><code>0.15</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogSkyLightCaptureAffectsHeightFogRoughness_nvcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function.
 
 #### Inscattering Color Cubemap Angle { #unreal-heightfog-inscatteringcolorcubemapangle }
 
-`unreal:heightFog:InscatteringColorCubemapAngle` · Default `0` · Range 0 to 360 · Realtime only  
-Houdini parameter `xn__unrealheightFogInscatteringColorCubemapAngle_qdcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemapAngle</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 360</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogInscatteringColorCubemapAngle_qdcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Angle to rotate the InscatteringColorCubemap around the Z axis.
 
 #### Inscattering Texture Tint { #unreal-heightfog-inscatteringtexturetint }
 
-`unreal:heightFog:InscatteringTextureTint` · Default `1, 1, 1` · Realtime only  
-Houdini parameter `xn__unrealheightFogInscatteringTextureTint_y2bj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringTextureTint</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogInscatteringTextureTint_y2bj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap.
 
 #### Fully Directional Inscattering Color Distance { #unreal-heightfog-fullydirectionalinscatteringcolordistance }
 
-`unreal:heightFog:FullyDirectionalInscatteringColorDistance` · Default `100000` · Range 1000 to 1000000 · Realtime only  
-Houdini parameter `xn__unrealheightFogFullyDirectionalInscatteringColorDistance_9wcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FullyDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd><code>100000</code></dd></div><div><dt>Range</dt><dd>1000 to 1000000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFullyDirectionalInscatteringColorDistance_9wcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color.
 
 #### Non Directional Inscattering Color Distance { #unreal-heightfog-nondirectionalinscatteringcolordistance }
 
-`unreal:heightFog:NonDirectionalInscatteringColorDistance` · Default `1000` · Range 1000 to 1000000 · Realtime only  
-Houdini parameter `xn__unrealheightFogNonDirectionalInscatteringColorDistance_0tcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:NonDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd><code>1000</code></dd></div><div><dt>Range</dt><dd>1000 to 1000000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogNonDirectionalInscatteringColorDistance_0tcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color.
 
@@ -160,22 +140,19 @@ Distance at which only the average color of InscatteringColorCubemap should be u
 
 #### Directional Inscattering Exponent { #unreal-heightfog-directionalinscatteringexponent }
 
-`unreal:heightFog:DirectionalInscatteringExponent` · Default `4` · Range 2 to 64 · Realtime only  
-Houdini parameter `xn__unrealheightFogDirectionalInscatteringExponent_zgcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringExponent</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>2 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogDirectionalInscatteringExponent_zgcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead.
 
 #### Directional Inscattering Start Distance { #unreal-heightfog-directionalinscatteringstartdistance }
 
-`unreal:heightFog:DirectionalInscatteringStartDistance` · Default `10000` · Realtime only  
-Houdini parameter `xn__unrealheightFogDirectionalInscatteringStartDistance_4ocj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringStartDistance</code></dd></div><div><dt>Default</dt><dd><code>10000</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogDirectionalInscatteringStartDistance_4ocj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
 
 #### Directional Inscattering Color { #unreal-heightfog-directionalinscatteringluminance }
 
-`unreal:heightFog:DirectionalInscatteringLuminance` · Default `0, 0, 0` · Realtime only  
-Houdini parameter `xn__unrealheightFogDirectionalInscatteringLuminance_micj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd><code>0, 0, 0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogDirectionalInscatteringLuminance_micj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
 
@@ -183,8 +160,7 @@ Controls the color of the directional inscattering, which is used to approximate
 
 #### Volumetric Fog { #unreal-heightfog-benablevolumetricfog }
 
-`unreal:heightFog:bEnableVolumetricFog` · Default Off  
-Houdini parameter `xn__unrealheightFogbEnableVolumetricFog_2xbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableVolumetricFog</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbEnableVolumetricFog_2xbj</code></dd></div></dl>
 
 Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
 
@@ -192,8 +168,7 @@ Whether to enable Volumetric fog. Scalability settings control the resolution of
 
 #### Scattering Distribution { #unreal-heightfog-volumetricfogscatteringdistribution }
 
-`unreal:heightFog:VolumetricFogScatteringDistribution` · Default `0.2` · Range -0.9 to 0.9  
-Houdini parameter `xn__unrealheightFogVolumetricFogScatteringDistribution_incj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogScatteringDistribution</code></dd></div><div><dt>Default</dt><dd><code>0.2</code></dd></div><div><dt>Range</dt><dd>-0.9 to 0.9</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogScatteringDistribution_incj</code></dd></div></dl>
 
 Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
 
@@ -201,8 +176,7 @@ Controls the scattering phase function - how much incoming light scatters in var
 
 #### Albedo { #unreal-heightfog-volumetricfogalbedo }
 
-`unreal:heightFog:VolumetricFogAlbedo` · Default `1, 1, 1`  
-Houdini parameter `xn__unrealheightFogVolumetricFogAlbedo_gwbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogAlbedo</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogAlbedo_gwbj</code></dd></div></dl>
 
 The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
 
@@ -210,8 +184,7 @@ The height fog particle reflectiveness used by volumetric fog. Water particles i
 
 #### Emissive { #unreal-heightfog-volumetricfogemissive }
 
-`unreal:heightFog:VolumetricFogEmissive` · Default `0, 0, 0` · Realtime only  
-Houdini parameter `xn__unrealheightFogVolumetricFogEmissive_pzbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogEmissive</code></dd></div><div><dt>Default</dt><dd><code>0, 0, 0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogEmissive_pzbj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
 
@@ -219,8 +192,7 @@ Light emitted by height fog. This is a density so more light is emitted the furt
 
 #### Extinction Scale { #unreal-heightfog-volumetricfogextinctionscale }
 
-`unreal:heightFog:VolumetricFogExtinctionScale` · Default `1` · Range 0.1 to 10  
-Houdini parameter `xn__unrealheightFogVolumetricFogExtinctionScale_3bcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogExtinctionScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.1 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogExtinctionScale_3bcj</code></dd></div></dl>
 
 Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
 
@@ -228,15 +200,13 @@ Scales the height fog particle extinction amount used by volumetric fog. Values 
 
 #### View Distance { #unreal-heightfog-volumetricfogdistance }
 
-`unreal:heightFog:VolumetricFogDistance` · Default `6000` · Range 1000 to 10000  
-Houdini parameter `xn__unrealheightFogVolumetricFogDistance_pzbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogDistance</code></dd></div><div><dt>Default</dt><dd><code>6000</code></dd></div><div><dt>Range</dt><dd>1000 to 10000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogDistance_pzbj</code></dd></div></dl>
 
 Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
 
 #### Start Distance { #unreal-heightfog-volumetricfogstartdistance }
 
-`unreal:heightFog:VolumetricFogStartDistance` · Default `0` · Range 0 to 5000 · Realtime only  
-Houdini parameter `xn__unrealheightFogVolumetricFogStartDistance_u7bj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogStartDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 5000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogStartDistance_u7bj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance from the camera that the volumetric fog will start, in world units.
 
@@ -244,20 +214,17 @@ Distance from the camera that the volumetric fog will start, in world units.
 
 #### Near Fade In Distance { #unreal-heightfog-volumetricfognearfadeindistance }
 
-`unreal:heightFog:VolumetricFogNearFadeInDistance` · Default `0` · Range 0 to 1000 · Realtime only  
-Houdini parameter `xn__unrealheightFogVolumetricFogNearFadeInDistance_zgcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogNearFadeInDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogNearFadeInDistance_zgcj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Distance over which volumetric fog will fade in from the start distance.
 
 #### Static Lighting Scattering Intensity { #unreal-heightfog-volumetricfogstaticlightingscatteringintensity }
 
-`unreal:heightFog:VolumetricFogStaticLightingScatteringIntensity` · Default `1` · Range 0 to 10 · Realtime only  
-Houdini parameter `xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_f5cj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogStaticLightingScatteringIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogVolumetricFogStaticLightingScatteringIntensity_f5cj</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 #### Override Light Colors With Fog Inscattering Colors { #unreal-heightfog-boverridelightcolorswithfoginscatteringcolors }
 
-`unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors` · Default Off · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_s3cj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbOverrideLightColorsWithFogInscatteringColors_s3cj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting.
 
@@ -265,36 +232,31 @@ Whether to use FogInscatteringColor for the Sky Light volumetric scattering colo
 
 #### Enable Fog Screen Space Scattering { #unreal-heightfog-benablefsss }
 
-`unreal:heightFog:bEnableFSSS` · Default Off · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogbEnableFSSS_fjbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableFSSS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbEnableFSSS_fjbj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering.
 
 #### Scene Color Scattering Amount Scale { #unreal-heightfog-fsssscenecolorscatteringamountscale }
 
-`unreal:heightFog:FSSSSceneColorScatteringAmountScale` · Default `1` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogFSSSSceneColorScatteringAmountScale_incj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFSSSSceneColorScatteringAmountScale_incj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however.
 
 #### Scene Color Scattering Amount Power { #unreal-heightfog-fsssscenecolorscatteringamountpower }
 
-`unreal:heightFog:FSSSSceneColorScatteringAmountPower` · Default `1` · Range 0 to 2 · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogFSSSSceneColorScatteringAmountPower_incj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountPower</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFSSSSceneColorScatteringAmountPower_incj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense.
 
 #### Spread Scale { #unreal-heightfog-fsssspreadscale }
 
-`unreal:heightFog:FSSSSpreadScale` · Default `0.1` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogFSSSSpreadScale_xpbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSpreadScale</code></dd></div><div><dt>Default</dt><dd><code>0.1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFSSSSpreadScale_xpbj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities.
 
 #### Blur Control { #unreal-heightfog-fsssblurcontrol }
 
-`unreal:heightFog:FSSSBlurControl` · Default `0.5` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogFSSSBlurControl_xpbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSBlurControl</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogFSSSBlurControl_xpbj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture.
 
@@ -302,28 +264,24 @@ When generating the the blurred screen space FSSS texture, this controls how muc
 
 #### Holdout { #unreal-heightfog-bholdout }
 
-`unreal:heightFog:bHoldout` · Default Off · Advanced  
-Houdini parameter `xn__unrealheightFogbHoldout_jebj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbHoldout_jebj</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
 
 #### Render In Main Pass { #unreal-heightfog-brenderinmainpass }
 
-`unreal:heightFog:bRenderInMainPass` · Default On · Advanced  
-Houdini parameter `xn__unrealheightFogbRenderInMainPass_6sbj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbRenderInMainPass_6sbj</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be rendered in the main pass (basepass, transparency)
 
 #### Visible In Reflection Captures { #unreal-heightfog-bvisibleinreflectioncaptures }
 
-`unreal:heightFog:bVisibleInReflectionCaptures` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogbVisibleInReflectionCaptures_3bcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInReflectionCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbVisibleInReflectionCaptures_3bcj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be visible in reflection captures.
 
 #### Visible In Real Time Sky Captures { #unreal-heightfog-bvisibleinrealtimeskycaptures }
 
-`unreal:heightFog:bVisibleInRealTimeSkyCaptures` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealheightFogbVisibleInRealTimeSkyCaptures_qdcj`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealheightFogbVisibleInRealTimeSkyCaptures_qdcj</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be visible in real-time sky light reflection captures.

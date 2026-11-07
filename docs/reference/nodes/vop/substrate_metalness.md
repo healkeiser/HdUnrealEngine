@@ -3,37 +3,81 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Metalness to Albedo and F0
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_metalness::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_metalness::1.3</code></dd></div></dl>
 
 Converts metalness-workflow values (base color, metallic, specular) into a Slab's diffuse albedo and F0.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Base Color
-:   Base color.
+<div class="hdue-params" markdown>
 
-Metallic
-:   Metalness, from 0 (dielectric) to 1 (metal).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
 
-Specular
-:   Specular level of dielectrics: 0.5 is F0 0.04.
+Base color.
 
-## Parameters
+</div>
+</div>
 
-Base Color
-:   Base color.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
 
-    `base_color` · Default 0.18, 0.18, 0.18
+Metalness, from 0 (dielectric) to 1 (metal).
 
-Metallic
-:   Metalness, from 0 (dielectric) to 1 (metal).
+</div>
+</div>
 
-    `metallic` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
 
-Specular
-:   Specular level of dielectrics: 0.5 is F0 0.04.
+Specular level of dielectrics: 0.5 is F0 0.04.
 
-    `specular` · Default 0.5
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
+
+Base color.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>base_color</code></dd></div><div><dt>Default</dt><dd>0.18, 0.18, 0.18</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
+
+Metalness, from 0 (dielectric) to 1 (metal).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>metallic</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
+
+Specular level of dielectrics: 0.5 is F0 0.04.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>specular</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+</div>

@@ -1,18 +1,15 @@
-// Mermaid as hdUE draws it (overrides/main.html loads this after Mermaid, before the theme). The theme calls
-// mermaid.initialize with its own settings and colours (the --md-mermaid-* variables, theme.css); this adds Inter,
-// rounded nodes, smooth edges and Lucide's icons, fetched the first time a diagram names one.
+// Mermaid as hdUE draws it. overrides/main.html loads this on every page, before the theme: `mermaid` is a stand-in
+// the theme takes for Mermaid itself. Instant navigation does not run a new page's scripts, so the first diagram the
+// theme draws, on whichever page, loads the pinned Mermaid here, with Lucide's icons and hdUE's look (Inter, rounded
+// nodes, smooth edges, the four classes' colours from theme.css) added to the theme's own settings.
 (function () {
-  if (!window.mermaid) return;
-  // Lucide, under its own name for icon nodes (A@{ icon: "lucide:camera" }) and under "fal", one of the Font Awesome
-  // prefixes Mermaid reads inside a label: "fal:fa-camera Camera" draws Lucide's camera before the text.
-  const lucide = fetch("https://cdn.jsdelivr.net/npm/@iconify-json/lucide@1.2.145/icons.json").then((r) => r.json());
-  mermaid.registerIconPacks([
-    { name: "lucide", loader: () => lucide },
-    { name: "fal", loader: () => lucide },
-  ]);
+  const MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@12.1.0/dist/mermaid.min.js";
+  const INTEGRITY = "sha384-EbBpjO7rlR6eqZEcG7GaPpyk9H9WrMyPWX4d3KvPYltgt8Z8l0z6R56B1qP40pR4";
+  const LUCIDE = "https://cdn.jsdelivr.net/npm/@iconify-json/lucide@1.2.145/icons.json";
   const CSS = `
-    .node rect, .node polygon, .node circle, .node path.basic { stroke-width: 1px; }
-    .node rect { rx: 8px; ry: 8px; }
+    /* A node's own shape is its direct child: rules on deeper rects would reach the icons in its label. */
+    .node > :is(rect, polygon, circle, path) { stroke-width: 1px; }
+    .node > rect { rx: 8px; ry: 8px; }
     .cluster rect { rx: 10px; ry: 10px; stroke-dasharray: 4 3; }
     .edgePath .path, .flowchart-link { stroke-width: 1.25px; }
     /* Edge labels: small text on the frame's grey (Mermaid's default is a light grey block in both schemes). */
@@ -40,24 +37,58 @@
     .cluster.hdue rect { fill: var(--hd-dg-delegate-bg) !important; stroke: var(--hd-dg-delegate) !important; }
     .cluster.unreal rect { fill: var(--hd-dg-unreal-bg) !important; stroke: var(--hd-dg-unreal) !important; }
     .cluster.output rect { fill: var(--hd-dg-gpu-bg) !important; stroke: var(--hd-dg-gpu) !important; }
-    .node :is(rect, path, polygon) { fill: var(--md-mermaid-node-bg-color) !important; }
-    .node.host :is(rect, path, polygon) { stroke: var(--hd-dg-host) !important; }
-    .node.hdue :is(rect, path, polygon) { stroke: var(--hd-dg-delegate) !important; }
-    .node.unreal :is(rect, path, polygon) { stroke: var(--hd-dg-unreal) !important; }
-    .node.output :is(rect, path, polygon) { fill: var(--hd-dg-gpu-bg) !important; stroke: var(--hd-dg-gpu) !important; }
+    .node > :is(rect, path, polygon) { fill: var(--md-mermaid-node-bg-color) !important; }
+    .node.host > :is(rect, path, polygon) { stroke: var(--hd-dg-host) !important; }
+    .node.hdue > :is(rect, path, polygon) { stroke: var(--hd-dg-delegate) !important; }
+    .node.unreal > :is(rect, path, polygon) { stroke: var(--hd-dg-unreal) !important; }
+    .node.output > :is(rect, path, polygon) { fill: var(--hd-dg-gpu-bg) !important; stroke: var(--hd-dg-gpu) !important; }
     .label-icon { margin-right: 0.15em; vertical-align: -0.15em; color: var(--hd-text-muted); }
+    /* Lucide draws in strokes of currentColor: the theme's node fill and line must not reach its parts. */
+    .label-icon :is(path, rect, circle, line, polyline, polygon, ellipse) {
+      fill: none !important;
+      stroke: currentColor !important;
+    }
     .host .label-icon { color: var(--hd-dg-host); }
     .hdue .label-icon { color: var(--hd-dg-delegate); }
     .unreal .label-icon { color: var(--hd-dg-unreal); }
     .output .label-icon { color: var(--hd-dg-gpu); }
     .cluster-label, .cluster .nodeLabel { color: var(--md-mermaid-label-fg-color); font-weight: 600; }
   `;
-  const initialize = mermaid.initialize.bind(mermaid);
-  mermaid.initialize = (config) =>
-    initialize({
-      ...config,
-      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-      themeCSS: `${config.themeCSS || ""}${CSS}`,
-      flowchart: { ...(config.flowchart || {}), curve: "basis", padding: 14, nodeSpacing: 36, rankSpacing: 44 },
-    });
+  let settings = {};
+  let real = null;
+  function load() {
+    real =
+      real ||
+      new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = MERMAID;
+        script.integrity = INTEGRITY;
+        script.crossOrigin = "anonymous";
+        script.onerror = reject;
+        script.onload = () => {
+          const mermaid = window.mermaid;
+          // Lucide, under its own name for icon nodes (A@{ icon: "lucide:camera" }) and under "fal", one of the Font
+          // Awesome prefixes Mermaid reads inside a label: "fal:fa-camera Camera" draws Lucide's camera before the text.
+          const lucide = fetch(LUCIDE).then((r) => r.json());
+          mermaid.registerIconPacks([
+            { name: "lucide", loader: () => lucide },
+            { name: "fal", loader: () => lucide },
+          ]);
+          mermaid.initialize({
+            ...settings,
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+            themeCSS: `${settings.themeCSS || ""}${CSS}`,
+            flowchart: { ...(settings.flowchart || {}), curve: "basis", padding: 14, nodeSpacing: 36, rankSpacing: 44 },
+          });
+          resolve(mermaid);
+        };
+        document.head.append(script);
+      });
+    return real;
+  }
+  // The theme calls initialize once, then render for each diagram (and awaits it).
+  window.mermaid = {
+    initialize: (config) => (settings = config),
+    render: async (id, text) => (await load()).render(id, text),
+  };
 })();

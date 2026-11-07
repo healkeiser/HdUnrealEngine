@@ -3,96 +3,230 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Single Layer Water
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_water::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_water::1.3</code></dd></div></dl>
 
 UE's Substrate Single Layer Water BSDF: a water surface with its medium below, rendered by UE's water pass. It must be the material's whole surface.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Base Color
-:   Color of what floats on the surface (foam), with Top Opacity.
+<div class="hdue-params" markdown>
 
-Metallic
-:   Metalness of the top material.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
 
-Specular
-:   Specular intensity.
+Color of what floats on the surface (foam), with Top Opacity.
 
-Roughness
-:   Roughness of the water surface.
+</div>
+</div>
 
-Normal
-:   Shading normal, for waves. Unconnected, the mesh normal.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted light.
+Metalness of the top material.
 
-Top Opacity
-:   Opacity of the top material (foam) over the water.
+</div>
+</div>
 
-Water Albedo
-:   Color of the light the water scatters.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
 
-Water Extinction
-:   Extinction of the water per centimetre: higher is murkier.
+Specular intensity.
 
-Water Phase G
-:   Anisotropy of the scattering, from -1 (backward) to 1 (forward).
+</div>
+</div>
 
-Color Behind Water
-:   Tint of what is seen through the water.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Roughness of the water surface.
 
-Base Color
-:   Color of what floats on the surface (foam), with Top Opacity.
+</div>
+</div>
 
-    `base_color` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Normal</div>
+<div class="hdue-param__body" markdown>
 
-Metallic
-:   Metalness of the top material.
+Shading normal, for waves. Unconnected, the mesh normal.
 
-    `metallic` · Default 0
+</div>
+</div>
 
-Specular
-:   Specular intensity.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
 
-    `specular` · Default 0.5
+Emitted light.
 
-Roughness
-:   Roughness of the water surface.
+</div>
+</div>
 
-    `roughness` · Default 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Top Opacity</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted light.
+Opacity of the top material (foam) over the water.
 
-    `emission` · Default 0, 0, 0
+</div>
+</div>
 
-Top Opacity
-:   Opacity of the top material (foam) over the water.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Albedo</div>
+<div class="hdue-param__body" markdown>
 
-    `top_opacity` · Default 0
+Color of the light the water scatters.
 
-Water Albedo
-:   Color of the light the water scatters.
+</div>
+</div>
 
-    `water_albedo` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Extinction</div>
+<div class="hdue-param__body" markdown>
 
-Water Extinction
-:   Extinction of the water per centimetre: higher is murkier.
+Extinction of the water per centimetre: higher is murkier.
 
-    `water_extinction` · Default 0, 0, 0
+</div>
+</div>
 
-Water Phase G
-:   Anisotropy of the scattering, from -1 (backward) to 1 (forward).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Phase G</div>
+<div class="hdue-param__body" markdown>
 
-    `water_phase_g` · Default 0
+Anisotropy of the scattering, from -1 (backward) to 1 (forward).
 
-Color Behind Water
-:   Tint of what is seen through the water.
+</div>
+</div>
 
-    `color_behind_water` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color Behind Water</div>
+<div class="hdue-param__body" markdown>
+
+Tint of what is seen through the water.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
+
+Color of what floats on the surface (foam), with Top Opacity.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>base_color</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
+
+Metalness of the top material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>metallic</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
+
+Specular intensity.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>specular</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Roughness of the water surface.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>roughness</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>emission</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Top Opacity</div>
+<div class="hdue-param__body" markdown>
+
+Opacity of the top material (foam) over the water.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>top_opacity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Albedo</div>
+<div class="hdue-param__body" markdown>
+
+Color of the light the water scatters.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>water_albedo</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Extinction</div>
+<div class="hdue-param__body" markdown>
+
+Extinction of the water per centimetre: higher is murkier.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>water_extinction</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Water Phase G</div>
+<div class="hdue-param__body" markdown>
+
+Anisotropy of the scattering, from -1 (backward) to 1 (forward).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>water_phase_g</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color Behind Water</div>
+<div class="hdue-param__body" markdown>
+
+Tint of what is seen through the water.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>color_behind_water</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+</div>

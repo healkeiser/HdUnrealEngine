@@ -4,15 +4,13 @@
 
 #### User Flags { #unreal-postprocess-userflags }
 
-`unreal:postProcess:UserFlags` · Default `0`  
-Houdini parameter `xn__unrealpostProcessUserFlags_fjbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:UserFlags</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessUserFlags_fjbl</code></dd></div></dl>
 
 Per-view user flags accessible in materials via TestPostVolumeUserFlag node, allowing per-view overrides of material behavior.
 
 #### Post-Process Materials { #unreal-postprocessmaterials }
 
-`unreal:postProcessMaterials` · Default (empty) · Advanced  
-Houdini parameter `xn__unrealpostProcessMaterials_fjb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcessMaterials</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMaterials_fjb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Cooked post-process material paths, separated by spaces, added as blendables to the beauty. Before Tonemapping materials work with the Unreal tonemapper off.
 
@@ -20,8 +18,7 @@ Cooked post-process material paths, separated by spaces, added as blendables to 
 
 #### Motion Blur { #unreal-motionblur }
 
-`unreal:motionBlur` · Default On  
-Houdini parameter `xn__unrealmotionBlur_41a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:motionBlur</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealmotionBlur_41a</code></dd></div></dl>
 
 Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes from the camera's fStop and focusDistance.
 
@@ -29,8 +26,7 @@ Average sub-frames over the camera shutter (shutter:open/close) when something m
 
 #### Motion Samples { #unreal-motionsamples }
 
-`unreal:motionSamples` · Default `16` · Range 1 to 64  
-Houdini parameter `xn__unrealmotionSamples_06a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:motionSamples</code></dd></div><div><dt>Default</dt><dd><code>16</code></dd></div><div><dt>Range</dt><dd>1 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealmotionSamples_06a</code></dd></div></dl>
 
 Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show discrete copies of fast objects.
 
@@ -38,8 +34,7 @@ Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided
 
 #### Amount { #unreal-postprocess-motionbluramount }
 
-`unreal:postProcess:MotionBlurAmount` · Default `0.5` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessMotionBlurAmount_tubl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurAmount</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMotionBlurAmount_tubl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Strength of motion blur, 0:off
 
@@ -47,22 +42,19 @@ Strength of motion blur, 0:off
 
 #### Max { #unreal-postprocess-motionblurmax }
 
-`unreal:postProcess:MotionBlurMax` · Default `5` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealpostProcessMotionBlurMax_xpbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurMax</code></dd></div><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMotionBlurMax_xpbl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 max distortion caused by motion blur, in percent of the screen width, 0:off
 
 #### Target FPS { #unreal-postprocess-motionblurtargetfps }
 
-`unreal:postProcess:MotionBlurTargetFPS` · Default `30` · Range 0 to 120 · Realtime only  
-Houdini parameter `xn__unrealpostProcessMotionBlurTargetFPS_pzbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurTargetFPS</code></dd></div><div><dt>Default</dt><dd><code>30</code></dd></div><div><dt>Range</dt><dd>0 to 120</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMotionBlurTargetFPS_pzbl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Defines the target FPS for motion blur. Makes motion blur independent of actual frame rate and relative to the specified target FPS instead. Higher target FPS results in shorter frames, which means shorter shutter times and less motion blur. Lower FPS means more motion blur. A value of zero makes the motion blur dependent on the actual frame rate.
 
 #### Per Object Size { #unreal-postprocess-motionblurperobjectsize }
 
-`unreal:postProcess:MotionBlurPerObjectSize` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealpostProcessMotionBlurPerObjectSize_75bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurPerObjectSize</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMotionBlurPerObjectSize_75bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The minimum projected screen radius for a primitive to be drawn in the velocity pass, percentage of screen width. smaller numbers cause more draw calls, default: 4%
 
@@ -70,8 +62,7 @@ The minimum projected screen radius for a primitive to be drawn in the velocity 
 
 #### MegaLights { #unreal-postprocess-bmegalights }
 
-`unreal:postProcess:bMegaLights` · Default On · Realtime only  
-Houdini parameter `xn__unrealpostProcessbMegaLights_ombl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:bMegaLights</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessbMegaLights_ombl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Allows forcing MegaLights on or off for this volume, regardless of the project setting for MegaLights. MegaLights will stochastically sample lights, which allows many shadow casting lights to be rendered efficiently, with a consistent and low GPU cost. When MegaLights is enabled, other direct lighting algorithms like Deferred Shading will no longer be used, and other shadowing methods like Ray Traced Shadows, Distance Field Shadows and Shadow Maps will no longer be used. MegaLights requires Hardware Ray Tracing and Shader Model 6.
 
@@ -79,15 +70,13 @@ Allows forcing MegaLights on or off for this volume, regardless of the project s
 
 #### MegaLights - High Quality Translucency { #unreal-postprocess-megalightsfrontlayertranslucency }
 
-`unreal:postProcess:MegaLightsFrontLayerTranslucency` · Default Off · Realtime only  
-Houdini parameter `xn__unrealpostProcessMegaLightsFrontLayerTranslucency_vlcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MegaLightsFrontLayerTranslucency</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessMegaLightsFrontLayerTranslucency_vlcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to use high quality direct lighting on the front layer of translucent surfaces. Other layers will use the lower quality Translucency Lighting Volume. Increases GPU cost when enabled.
 
 #### Samples per Pixel { #unreal-cvar-r-megalights-numsamplesperpixel }
 
-`unreal:cvar:r:MegaLights:NumSamplesPerPixel` · Default 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrMegaLightsNumSamplesPerPixel_l4bebk`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:MegaLights:NumSamplesPerPixel</code></dd></div><div><dt>Default</dt><dd>4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrMegaLightsNumSamplesPerPixel_l4bebk</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Number of samples per downsampled pixel for the opaque lighting pass. Final number of samples depends also on the downsampling mode. Supported values: 1, 2 and 4. Console variable r.MegaLights.NumSamplesPerPixel (process-wide).
 
@@ -99,8 +88,7 @@ Number of samples per downsampled pixel for the opaque lighting pass. Final numb
 
 #### Default Shadow Method { #unreal-cvar-r-megalights-defaultshadowmethod }
 
-`unreal:cvar:r:MegaLights:DefaultShadowMethod` · Default Ray Tracing · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrMegaLightsDefaultShadowMethod_75bebk`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:MegaLights:DefaultShadowMethod</code></dd></div><div><dt>Default</dt><dd>Ray Tracing</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrMegaLightsDefaultShadowMethod_75bebk</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 The default shadowing method for MegaLights, unless over-ridden on the light component. 0 - Ray Tracing. Preferred method, which guarantees fixed MegaLights cost and correct area shadows, but is dependent on the BVH representation quality. 1 - Virtual Shadow Maps. Has a significant per light cost, but can cast shadows directly from the Nanite geometry using rasterization. Console variable r.MegaLights.DefaultShadowMethod (process-wide).
 
@@ -113,22 +101,19 @@ The default shadowing method for MegaLights, unless over-ridden on the light com
 
 #### Tint { #unreal-postprocess-ambientcubemaptint }
 
-`unreal:postProcess:AmbientCubemapTint` · Default `1, 1, 1` · Realtime only  
-Houdini parameter `xn__unrealpostProcessAmbientCubemapTint_2xbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemapTint</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientCubemapTint_2xbl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 AmbientCubemap tint color
 
 #### Intensity { #unreal-postprocess-ambientcubemapintensity }
 
-`unreal:postProcess:AmbientCubemapIntensity` · Default `1` · Range 0 to 4 · Realtime only  
-Houdini parameter `xn__unrealpostProcessAmbientCubemapIntensity_75bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemapIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientCubemapIntensity_75bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
-To scale the Ambient cubemap brightness \1=0: off, 1(default), \11 brighter
+To scale the Ambient cubemap brightness \>=0: off, 1(default), \>1 brighter
 
 #### Cubemap Texture { #unreal-postprocess-ambientcubemap }
 
-`unreal:postProcess:AmbientCubemap` · Default (empty) · Realtime only  
-Houdini parameter `xn__unrealpostProcessAmbientCubemap_krbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemap</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientCubemap_krbl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The Ambient cubemap (Affects diffuse and specular shading), blends additively which if different from all other settings here. An image file, imported at render time (a lat-long panorama, made a cubemap as UE imports one), or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
@@ -136,8 +121,7 @@ The Ambient cubemap (Affects diffuse and specular shading), blends additively wh
 
 #### Intensity { #unreal-postprocess-ambientocclusionintensity }
 
-`unreal:postProcess:AmbientOcclusionIntensity` · Default `0.5` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionIntensity_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionIntensity</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionIntensity_h9bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 0..1 0=off/no ambient occlusion .. 1=strong ambient occlusion, defines how much it affects the non direct lighting after base pass
 
@@ -145,87 +129,75 @@ Houdini parameter `xn__unrealpostProcessAmbientOcclusionIntensity_h9bl`
 
 #### Radius { #unreal-postprocess-ambientocclusionradius }
 
-`unreal:postProcess:AmbientOcclusionRadius` · Default `200` · Range 0.1 to 500 · Realtime only  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionRadius_l4bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionRadius</code></dd></div><div><dt>Default</dt><dd><code>200</code></dd></div><div><dt>Range</dt><dd>0.1 to 500</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionRadius_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
-\10, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+\>0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
 
 <div class="hdue-figure" data-figure="ref-ssao-radius"></div>
 
 #### Static Fraction { #unreal-postprocess-ambientocclusionstaticfraction }
 
-`unreal:postProcess:AmbientOcclusionStaticFraction` · Default `1` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionStaticFraction_micl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionStaticFraction</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionStaticFraction_micl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 0..1 0=no effect on static lighting .. 1=AO affects the stat lighting, 0 is free meaning no extra rendering pass
 
 #### Radius in WorldSpace { #unreal-postprocess-ambientocclusionradiusinws }
 
-`unreal:postProcess:AmbientOcclusionRadiusInWS` · Default Off · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionRadiusInWS_3bcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionRadiusInWS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionRadiusInWS_3bcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 true: AO radius is in world space units, false: AO radius is locked the view space in 400 units
 
 #### Fade Out Distance { #unreal-postprocess-ambientocclusionfadedistance }
 
-`unreal:postProcess:AmbientOcclusionFadeDistance` · Default `8000` · Range 0 to 20000 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionFadeDistance_dfcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionFadeDistance</code></dd></div><div><dt>Default</dt><dd><code>8000</code></dd></div><div><dt>Range</dt><dd>0 to 20000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionFadeDistance_dfcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
-\10, in unreal units, at what distance the AO effect disppears in the distance (avoding artifacts and AO effects on huge object)
+\>0, in unreal units, at what distance the AO effect disppears in the distance (avoding artifacts and AO effects on huge object)
 
 #### Fade Out Radius { #unreal-postprocess-ambientocclusionfaderadius }
 
-`unreal:postProcess:AmbientOcclusionFadeRadius` · Default `5000` · Range 0 to 20000 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionFadeRadius_3bcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionFadeRadius</code></dd></div><div><dt>Default</dt><dd><code>5000</code></dd></div><div><dt>Range</dt><dd>0 to 20000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionFadeRadius_3bcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
-\10, in unreal units, how many units before AmbientOcclusionFadeOutDistance it starts fading out
+\>0, in unreal units, how many units before AmbientOcclusionFadeOutDistance it starts fading out
 
 #### Power { #unreal-postprocess-ambientocclusionpower }
 
-`unreal:postProcess:AmbientOcclusionPower` · Default `2` · Range 0.1 to 8 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionPower_y2bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionPower</code></dd></div><div><dt>Default</dt><dd><code>2</code></dd></div><div><dt>Range</dt><dd>0.1 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionPower_y2bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
-\10, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+\>0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
 
 #### Bias { #unreal-postprocess-ambientocclusionbias }
 
-`unreal:postProcess:AmbientOcclusionBias` · Default `3` · Range 0 to 10 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionBias_c1bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionBias</code></dd></div><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionBias_c1bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
-\10, in unreal units, default (3.0) works well for flat surfaces but can reduce details
+\>0, in unreal units, default (3.0) works well for flat surfaces but can reduce details
 
 #### Quality { #unreal-postprocess-ambientocclusionquality }
 
-`unreal:postProcess:AmbientOcclusionQuality` · Default `50` · Range 0 to 100 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionQuality_75bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionQuality</code></dd></div><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionQuality_75bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition
 
 #### Mip Blend { #unreal-postprocess-ambientocclusionmipblend }
 
-`unreal:postProcess:AmbientOcclusionMipBlend` · Default `0.6` · Range 0.1 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionMipBlend_u7bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipBlend</code></dd></div><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0.1 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionMipBlend_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Affects the blend over the multiple mips (lower resolution versions) , 0:fully use full resolution, 1::fully use low resolution, around 0.6 seems to be a good value
 
 #### Mip Scale { #unreal-postprocess-ambientocclusionmipscale }
 
-`unreal:postProcess:AmbientOcclusionMipScale` · Default `1.7` · Range 0.5 to 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionMipScale_u7bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipScale</code></dd></div><div><dt>Default</dt><dd><code>1.7</code></dd></div><div><dt>Range</dt><dd>0.5 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionMipScale_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Affects the radius AO radius scale over the multiple mips (lower resolution versions)
 
 #### Mip Threshold { #unreal-postprocess-ambientocclusionmipthreshold }
 
-`unreal:postProcess:AmbientOcclusionMipThreshold` · Default `0.01` · Range 0 to 0.1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionMipThreshold_dfcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipThreshold</code></dd></div><div><dt>Default</dt><dd><code>0.01</code></dd></div><div><dt>Range</dt><dd>0 to 0.1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionMipThreshold_dfcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 to tweak the bilateral upsampling when using multiple mips (lower resolution versions)
 
 #### Temporal Blend Weight { #unreal-postprocess-ambientocclusiontemporalblendweight }
 
-`unreal:postProcess:AmbientOcclusionTemporalBlendWeight` · Default `0.1` · Range 0 to 0.5 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessAmbientOcclusionTemporalBlendWeight_rqcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionTemporalBlendWeight</code></dd></div><div><dt>Default</dt><dd><code>0.1</code></dd></div><div><dt>Range</dt><dd>0 to 0.5</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAmbientOcclusionTemporalBlendWeight_rqcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 How much to blend the current frame with previous frames when using GTAO with temporal accumulation
 
@@ -233,8 +205,7 @@ How much to blend the current frame with previous frames when using GTAO with te
 
 #### Enabled { #unreal-postprocess-raytracingao }
 
-`unreal:postProcess:RayTracingAO` · Default Off · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingAO_bobl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAO</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingAO_bobl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Enables ray tracing ambient occlusion.
 
@@ -242,22 +213,19 @@ Enables ray tracing ambient occlusion.
 
 #### Samples Per Pixel { #unreal-postprocess-raytracingaosamplesperpixel }
 
-`unreal:postProcess:RayTracingAOSamplesPerPixel` · Default `1` · Range 1 to 65536 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingAOSamplesPerPixel_qdcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAOSamplesPerPixel</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 65536</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingAOSamplesPerPixel_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the samples per pixel for ray tracing ambient occlusion.
 
 #### Intensity { #unreal-postprocess-raytracingaointensity }
 
-`unreal:postProcess:RayTracingAOIntensity` · Default `1` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingAOIntensity_y2bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAOIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingAOIntensity_y2bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scalar factor on the ray-tracing ambient occlusion score.
 
 #### Radius { #unreal-postprocess-raytracingaoradius }
 
-`unreal:postProcess:RayTracingAORadius` · Default `200` · Range 0 to 10000 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingAORadius_2xbl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAORadius</code></dd></div><div><dt>Default</dt><dd><code>200</code></dd></div><div><dt>Range</dt><dd>0 to 10000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingAORadius_2xbl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Defines the world-space search radius for occlusion rays.
 
@@ -265,8 +233,7 @@ Defines the world-space search radius for occlusion rays.
 
 #### Translucency Method { #unreal-postprocess-translucencytype }
 
-`unreal:postProcess:TranslucencyType` · Default Raster · Realtime only  
-Houdini parameter `xn__unrealpostProcessTranslucencyType_tubl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:TranslucencyType</code></dd></div><div><dt>Default</dt><dd>Raster</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessTranslucencyType_tubl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the translucency type
 
@@ -279,43 +246,37 @@ Sets the translucency type
 
 #### Max Roughness { #unreal-postprocess-raytracingtranslucencymaxroughness }
 
-`unreal:postProcess:RayTracingTranslucencyMaxRoughness` · Default `0.6` · Range 0.01 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyMaxRoughness_4ocl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxRoughness</code></dd></div><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0.01 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxRoughness_4ocl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.
 
 #### Max. Refraction Rays { #unreal-postprocess-raytracingtranslucencyrefractionrays }
 
-`unreal:postProcess:RayTracingTranslucencyRefractionRays` · Default `3` · Range 0 to 50 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyRefractionRays_escl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefractionRays</code></dd></div><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 50</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyRefractionRays_escl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the maximum number of ray tracing refraction rays.
 
 #### Samples Per Pixel { #unreal-postprocess-raytracingtranslucencysamplesperpixel }
 
-`unreal:postProcess:RayTracingTranslucencySamplesPerPixel` · Default `1` · Range 1 to 65536 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencySamplesPerPixel_0tcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencySamplesPerPixel</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 65536</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencySamplesPerPixel_0tcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the samples per pixel for ray traced translucency.
 
 #### Max. Primary Hit Events { #unreal-postprocess-raytracingtranslucencymaxprimaryhitevents }
 
-`unreal:postProcess:RayTracingTranslucencyMaxPrimaryHitEvents` · Default `4` · Range 1 to 64 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyMaxPrimaryHitEvents_j0cl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxPrimaryHitEvents</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>1 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxPrimaryHitEvents_j0cl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Maximum number of hit events allowed on primary ray paths
 
 #### Max. Secondary Hit Events { #unreal-postprocess-raytracingtranslucencymaxsecondaryhitevents }
 
-`unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents` · Default `2` · Range 0 to 64 · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyMaxSecondaryHitEvents_s3cl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents</code></dd></div><div><dt>Default</dt><dd><code>2</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxSecondaryHitEvents_s3cl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Maximum number of hit events allowed on secondary ray paths
 
 #### Shadows { #unreal-postprocess-raytracingtranslucencyshadows }
 
-`unreal:postProcess:RayTracingTranslucencyShadows` · Default Hard Shadows · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyShadows_zgcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyShadows</code></dd></div><div><dt>Default</dt><dd>Hard Shadows</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyShadows_zgcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the translucency shadows type.
 
@@ -327,14 +288,12 @@ Sets the translucency shadows type.
 
 #### Refraction { #unreal-postprocess-raytracingtranslucencyrefraction }
 
-`unreal:postProcess:RayTracingTranslucencyRefraction` · Default On · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyRefraction_vlcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefraction</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyRefraction_vlcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets whether refraction should be enabled or not (if not rays will not scatter and only travel in the same direction as before the intersection event).
 
 #### Use Ray Traced Refraction { #unreal-postprocess-raytracingtranslucencyuseraytracedrefraction }
 
-`unreal:postProcess:RayTracingTranslucencyUseRayTracedRefraction` · Default Off · Realtime only  
-Houdini parameter `xn__unrealpostProcessRayTracingTranslucencyUseRayTracedRefraction_f5cl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyUseRayTracedRefraction</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyUseRayTracedRefraction_f5cl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to use ray traced refraction which currently doesn't work well with rough refraction or simulate it using a screen space effect

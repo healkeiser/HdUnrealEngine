@@ -35,6 +35,11 @@ The user guide is written for the artist or TD rendering with hdUE in Houdini, n
 - Scenes built in Houdini are written by scripts, so they can be rebuilt: `scripts/build_docs_box.py` (the light study's bevelled box) and `scripts/build_docs_volumes.py` (the mist volumes).
 - Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel.
 
+## Parameters and formulas
+
+- A page's own parameters sit in the parameter grid the node pages use: the name beside a facts strip (USD attribute, Default, Range, badges such as "Realtime only"). Copy a block from `docs/lights.md`: `<div class="hdue-params" markdown>`, one `hdue-param` per parameter, each value in `<dd markdown="span">` so code and links work. The reference and node pages write the same markup from `generate_render_settings.py` and `generate_node_docs.py`.
+- A formula is math, not prose with ×: `$\text{Intensity} \times 2^{\text{Exposure}}$` inline, or `$$ … $$` on lines of its own for one the sentence leads to. MathJax typesets it (Zensical's math setup, `pymdownx.arithmatex`).
+
 ## Diagrams
 
 Every Mermaid diagram looks the same: `docs/assets/hdue-mermaid.js` draws it in the site's colours, and `docs/architecture.md` is the model.

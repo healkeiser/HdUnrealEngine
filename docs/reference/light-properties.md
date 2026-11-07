@@ -8,8 +8,7 @@ UE light component properties hdUE reads from `unreal:light:<Property>` attribut
 
 #### Indirect Lighting Intensity { #unreal-light-indirectlightingintensity }
 
-`unreal:light:IndirectLightingIntensity` · Default `1` · Range 0 to 6  
-Houdini parameter `xn__unreallightIndirectLightingIntensity_pzbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:IndirectLightingIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 6</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightIndirectLightingIntensity_pzbf</code></dd></div></dl>
 
 Scales the indirect lighting contribution from this light. A value of 0 disables any GI from this light. Default is 1.
 
@@ -17,8 +16,7 @@ Scales the indirect lighting contribution from this light. A value of 0 disables
 
 #### Volumetric Scattering Intensity { #unreal-light-volumetricscatteringintensity }
 
-`unreal:light:VolumetricScatteringIntensity` · Default `1` · Range 0.25 to 4  
-Houdini parameter `xn__unreallightVolumetricScatteringIntensity_75bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:VolumetricScatteringIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightVolumetricScatteringIntensity_75bf</code></dd></div></dl>
 
 Intensity of the volumetric scattering from this light. This scales Intensity and LightColor.
 
@@ -26,8 +24,7 @@ Intensity of the volumetric scattering from this light. This scales Intensity an
 
 #### Cast Volumetric Shadow { #unreal-light-bcastvolumetricshadow }
 
-`unreal:light:bCastVolumetricShadow` · Default Off  
-Houdini parameter `xn__unreallightbCastVolumetricShadow_6sbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bCastVolumetricShadow</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbCastVolumetricShadow_6sbf</code></dd></div></dl>
 
 Whether the light shadows volumetric fog. Disabling this can save GPU time. Distant lights default to on (UDirectionalLightComponent). It also lets heterogeneous volumes shadow the scene in realtime.
 
@@ -35,22 +32,19 @@ Whether the light shadows volumetric fog. Disabling this can save GPU time. Dist
 
 #### Affect Translucent Lighting { #unreal-light-baffecttranslucentlighting }
 
-`unreal:light:bAffectTranslucentLighting` · Default On  
-Houdini parameter `xn__unreallightbAffectTranslucentLighting_c1bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bAffectTranslucentLighting</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbAffectTranslucentLighting_c1bf</code></dd></div></dl>
 
 Whether the light affects translucency or not. Disabling this can save GPU time when there are many small lights.
 
 #### Transmission { #unreal-light-btransmission }
 
-`unreal:light:bTransmission` · Default Off  
-Houdini parameter `xn__unreallightbTransmission_5fbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bTransmission</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbTransmission_5fbf</code></dd></div></dl>
 
 Whether light from this light transmits through surfaces with subsurface scattering profiles. Requires light to be movable.
 
 #### Cast Ray Traced Shadows { #unreal-light-castraytracedshadow }
 
-`unreal:light:CastRaytracedShadow` · Default UseProjectSetting  
-Houdini parameter `xn__unreallightCastRaytracedShadow_xpbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:CastRaytracedShadow</code></dd></div><div><dt>Default</dt><dd>UseProjectSetting</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightCastRaytracedShadow_xpbf</code></dd></div></dl>
 
 | Value | Label |
 |---|---|
@@ -60,92 +54,79 @@ Houdini parameter `xn__unreallightCastRaytracedShadow_xpbf`
 
 #### Contact Shadow Length { #unreal-light-contactshadowlength }
 
-`unreal:light:ContactShadowLength` · Default `0` · Range 0 to 0.1  
-Houdini parameter `xn__unreallightContactShadowLength_xpbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:ContactShadowLength</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 0.1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightContactShadowLength_xpbf</code></dd></div></dl>
 
 Length of screen space ray trace for sharp contact shadows. Zero is disabled.
 
 #### Contact Shadow Length In World Space Units { #unreal-light-contactshadowlengthinws }
 
-`unreal:light:ContactShadowLengthInWS` · Default Off  
-Houdini parameter `xn__unreallightContactShadowLengthInWS_gwbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:ContactShadowLengthInWS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightContactShadowLengthInWS_gwbf</code></dd></div></dl>
 
 Where Length of screen space ray trace for sharp contact shadows is in world space units or in screen space units.
 
 #### Shadow Resolution Scale { #unreal-light-shadowresolutionscale }
 
-`unreal:light:ShadowResolutionScale` · Default `1` · Range 0.125 to 8  
-Houdini parameter `xn__unreallightShadowResolutionScale_6sbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:ShadowResolutionScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.125 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightShadowResolutionScale_6sbf</code></dd></div></dl>
 
 Scales the resolution of shadowmaps used to shadow this light. By default shadowmap resolution is chosen based on screen size of the caster. Setting the scale to zero disables shadow maps, but does not disable, e.g., contact shadows. Note: shadowmap resolution is still clamped by 'r.Shadow.MaxResolution'
 
 #### Shadow Bias { #unreal-light-shadowbias }
 
-`unreal:light:ShadowBias` · Default `0.5` · Range 0 to 1  
-Houdini parameter `xn__unreallightShadowBias_99af`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:ShadowBias</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightShadowBias_99af</code></dd></div></dl>
 
 Controls how accurate self shadowing of whole scene shadows from this light are. At 0, shadows will start at the their caster surface, but there will be many self shadowing artifacts. larger values, shadows will start further from their caster, and there won't be self shadowing artifacts but object might appear to fly. around 0.5 seems to be a good tradeoff. This also affects the soft transition of shadows
 
 #### Shadow Slope Bias { #unreal-light-shadowslopebias }
 
-`unreal:light:ShadowSlopeBias` · Default `0.5` · Range 0 to 1  
-Houdini parameter `xn__unreallightShadowSlopeBias_fjbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:ShadowSlopeBias</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightShadowSlopeBias_fjbf</code></dd></div></dl>
 
 Controls how accurate self shadowing of whole scene shadows from this light are. This works in addition to shadow bias, by increasing the amount of bias depending on the slope of a surface. At 0, shadows will start at the their caster surface, but there will be many self shadowing artifacts. larger values, shadows will start further from their caster, and there won't be self shadowing artifacts but object might appear to fly. around 0.5 seems to be a good tradeoff. This also affects the soft transition of shadows
 
 #### Light Function Material { #unreal-light-lightfunctionmaterial }
 
-`unreal:light:LightFunctionMaterial` · Default (empty)  
-Houdini parameter `xn__unreallightLightFunctionMaterial_6sbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:LightFunctionMaterial</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightLightFunctionMaterial_6sbf</code></dd></div></dl>
 
 The light function material to be applied to this light. Note that only non-lightmapped lights (UseDirectLightMap=False) can have a light function. Light functions are supported within VolumetricFog, but only for Directional, Point and Spot lights. Rect lights are not supported. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
 #### Light Function Scale { #unreal-light-lightfunctionscale }
 
-`unreal:light:LightFunctionScale` · Default `1024, 1024, 1024`  
-Houdini parameter `xn__unreallightLightFunctionScale_bobf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:LightFunctionScale</code></dd></div><div><dt>Default</dt><dd><code>1024, 1024, 1024</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightLightFunctionScale_bobf</code></dd></div></dl>
 
 Scales the light function projection. X and Y scale in the directions perpendicular to the light's direction, Z scales along the light direction.
 
 #### Fade Distance { #unreal-light-lightfunctionfadedistance }
 
-`unreal:light:LightFunctionFadeDistance` · Default `100000`  
-Houdini parameter `xn__unreallightLightFunctionFadeDistance_pzbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:LightFunctionFadeDistance</code></dd></div><div><dt>Default</dt><dd><code>100000</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightLightFunctionFadeDistance_pzbf</code></dd></div></dl>
 
 Distance at which the light function should be completely faded to DisabledBrightness. This is useful for hiding aliasing from light functions applied in the distance.
 
 #### Disabled Brightness { #unreal-light-disabledbrightness }
 
-`unreal:light:DisabledBrightness` · Default `0.5` · Range 0 to 1  
-Houdini parameter `xn__unreallightDisabledBrightness_bobf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:DisabledBrightness</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightDisabledBrightness_bobf</code></dd></div></dl>
 
 Brightness factor applied to the light when the light function is specified but disabled, for example in scene captures that use SceneCapView_LitNoShadows. This should be set to the average brightness of the light function material's emissive input, which should be between 0 and 1.
 
 #### Light Shaft Bloom { #unreal-light-benablelightshaftbloom }
 
-`unreal:light:bEnableLightShaftBloom` · Default Off  
-Houdini parameter `xn__unreallightbEnableLightShaftBloom_tubf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bEnableLightShaftBloom</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbEnableLightShaftBloom_tubf</code></dd></div></dl>
 
 Whether to render light shaft bloom from this light. For directional lights, the color around the light direction will be blurred radially and added back to the scene. for point lights, the color on pixels closer than the light's SourceRadius will be blurred radially and added back to the scene.
 
 #### Bloom Scale { #unreal-light-bloomscale }
 
-`unreal:light:BloomScale` · Default `0.2` · Range 0 to 10  
-Houdini parameter `xn__unreallightBloomScale_99af`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:BloomScale</code></dd></div><div><dt>Default</dt><dd><code>0.2</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightBloomScale_99af</code></dd></div></dl>
 
 Scales the additive color.
 
 #### Bloom Threshold { #unreal-light-bloomthreshold }
 
-`unreal:light:BloomThreshold` · Default `0` · Range 0 to 4  
-Houdini parameter `xn__unreallightBloomThreshold_shbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:BloomThreshold</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightBloomThreshold_shbf</code></dd></div></dl>
 
 Scene color must be larger than this to create bloom in the light shafts.
 
 #### Bloom Tint { #unreal-light-bloomtint }
 
-`unreal:light:BloomTint` · Default `1, 1, 1`  
-Houdini parameter `xn__unreallightBloomTint_n8af`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:BloomTint</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightBloomTint_n8af</code></dd></div></dl>
 
 Multiplies against scene color to create the bloom color.
 
@@ -153,43 +134,37 @@ Multiplies against scene color to create the bloom color.
 
 #### Atmosphere Sun Light { #unreal-light-batmospheresunlight }
 
-`unreal:light:bAtmosphereSunLight` · Default On  
-Houdini parameter `xn__unreallightbAtmosphereSunLight_xpbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bAtmosphereSunLight</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbAtmosphereSunLight_xpbf</code></dd></div></dl>
 
 Whether the directional light can interact with the atmosphere, cloud and generate a visual disk. All of which compose the visual sky.
 
 #### Atmosphere Sun Light Index { #unreal-light-atmospheresunlightindex }
 
-`unreal:light:AtmosphereSunLightIndex` · Default `0` · Range 0 to 1  
-Houdini parameter `xn__unreallightAtmosphereSunLightIndex_gwbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:AtmosphereSunLightIndex</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightAtmosphereSunLightIndex_gwbf</code></dd></div></dl>
 
 Two atmosphere lights are supported. For instance: a sun and a moon, or two suns.
 
 #### Atmosphere Sun Disk Color Scale { #unreal-light-atmospheresundiskcolorscale }
 
-`unreal:light:AtmosphereSunDiskColorScale` · Default `1, 1, 1`  
-Houdini parameter `xn__unreallightAtmosphereSunDiskColorScale_y2bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:AtmosphereSunDiskColorScale</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightAtmosphereSunDiskColorScale_y2bf</code></dd></div></dl>
 
 A color multiplied with the sun disk luminance.
 
 #### Cast Shadows On Clouds { #unreal-light-bcastshadowsonclouds }
 
-`unreal:light:bCastShadowsOnClouds` · Default Off  
-Houdini parameter `xn__unreallightbCastShadowsOnClouds_krbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bCastShadowsOnClouds</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbCastShadowsOnClouds_krbf</code></dd></div></dl>
 
 Whether the light should cast any shadows from opaque meshes onto clouds. This is disabled when 'Atmosphere Sun Light Index' is set to 1.
 
 #### Cast Shadows On Atmosphere { #unreal-light-bcastshadowsonatmosphere }
 
-`unreal:light:bCastShadowsOnAtmosphere` · Default Off  
-Houdini parameter `xn__unreallightbCastShadowsOnAtmosphere_2xbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bCastShadowsOnAtmosphere</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbCastShadowsOnAtmosphere_2xbf</code></dd></div></dl>
 
 Whether the light should cast any shadows from opaque meshes onto the atmosphere.
 
 #### Cast Cloud Shadows { #unreal-light-bcastcloudshadows }
 
-`unreal:light:bCastCloudShadows` · Default Off  
-Houdini parameter `xn__unreallightbCastCloudShadows_ombf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bCastCloudShadows</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbCastCloudShadows_ombf</code></dd></div></dl>
 
 Whether the light should cast any shadows from clouds onto the atmosphere and other scene elements.
 
@@ -197,8 +172,7 @@ Whether the light should cast any shadows from clouds onto the atmosphere and ot
 
 #### Cloud Shadow Strength { #unreal-light-cloudshadowstrength }
 
-`unreal:light:CloudShadowStrength` · Default `1` · Range 0 to 1  
-Houdini parameter `xn__unreallightCloudShadowStrength_xpbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:CloudShadowStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightCloudShadowStrength_xpbf</code></dd></div></dl>
 
 The overall strength of the cloud shadow, higher value will block more light.
 
@@ -206,57 +180,49 @@ The overall strength of the cloud shadow, higher value will block more light.
 
 #### Cloud Shadow On Atmosphere Strength { #unreal-light-cloudshadowonatmospherestrength }
 
-`unreal:light:CloudShadowOnAtmosphereStrength` · Default `1` · Range 0 to 1  
-Houdini parameter `xn__unreallightCloudShadowOnAtmosphereStrength_h9bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:CloudShadowOnAtmosphereStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightCloudShadowOnAtmosphereStrength_h9bf</code></dd></div></dl>
 
 The strength of the shadow on atmosphere. Disabled when 0.
 
 #### Cloud Shadow On Surface Strength { #unreal-light-cloudshadowonsurfacestrength }
 
-`unreal:light:CloudShadowOnSurfaceStrength` · Default `1` · Range 0 to 1  
-Houdini parameter `xn__unreallightCloudShadowOnSurfaceStrength_l4bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:CloudShadowOnSurfaceStrength</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightCloudShadowOnSurfaceStrength_l4bf</code></dd></div></dl>
 
 The strength of the shadow on opaque and transparent meshes. Disabled when 0.
 
 #### Cloud Scattered Luminance Scale { #unreal-light-cloudscatteredluminancescale }
 
-`unreal:light:CloudScatteredLuminanceScale` · Default `1, 1, 1`  
-Houdini parameter `xn__unreallightCloudScatteredLuminanceScale_l4bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:CloudScatteredLuminanceScale</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightCloudScatteredLuminanceScale_l4bf</code></dd></div></dl>
 
 Scales the lights contribution when scattered in cloud participating media. This can help counter balance the fact that our multiple scattering solution is only an approximation. Setting this to 0 on the secondary atmospheric light will optimise the cloud tracing to only use a single light.
 
 #### Light Shaft Occlusion { #unreal-light-benablelightshaftocclusion }
 
-`unreal:light:bEnableLightShaftOcclusion` · Default Off  
-Houdini parameter `xn__unreallightbEnableLightShaftOcclusion_c1bf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:bEnableLightShaftOcclusion</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightbEnableLightShaftOcclusion_c1bf</code></dd></div></dl>
 
 Whether to occlude fog and atmosphere inscattering with screenspace blurred occlusion from this light.
 
 #### Occlusion Mask Darkness { #unreal-light-occlusionmaskdarkness }
 
-`unreal:light:OcclusionMaskDarkness` · Default `0.05` · Range 0 to 1  
-Houdini parameter `xn__unreallightOcclusionMaskDarkness_6sbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:OcclusionMaskDarkness</code></dd></div><div><dt>Default</dt><dd><code>0.05</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightOcclusionMaskDarkness_6sbf</code></dd></div></dl>
 
 Controls how dark the occlusion masking is, a value of 1 results in no darkening term.
 
 #### Occlusion Depth Range { #unreal-light-occlusiondepthrange }
 
-`unreal:light:OcclusionDepthRange` · Default `100000` · Range 0 to 500000  
-Houdini parameter `xn__unreallightOcclusionDepthRange_xpbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:OcclusionDepthRange</code></dd></div><div><dt>Default</dt><dd><code>100000</code></dd></div><div><dt>Range</dt><dd>0 to 500000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightOcclusionDepthRange_xpbf</code></dd></div></dl>
 
 Everything closer to the camera than this distance will occlude light shafts.
 
 #### Dynamic Shadow Distance MovableLight { #unreal-light-dynamicshadowdistancemovablelight }
 
-`unreal:light:DynamicShadowDistanceMovableLight` · Default `40000` · Range 0 to 20000  
-Houdini parameter `xn__unreallightDynamicShadowDistanceMovableLight_qdcf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:DynamicShadowDistanceMovableLight</code></dd></div><div><dt>Default</dt><dd><code>40000</code></dd></div><div><dt>Range</dt><dd>0 to 20000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightDynamicShadowDistanceMovableLight_qdcf</code></dd></div></dl>
 
 How far Cascaded Shadow Map dynamic shadows will cover for a movable light, measured from the camera. A value of 0 disables the dynamic shadow.
 
 #### Num Dynamic Shadow Cascades { #unreal-light-dynamicshadowcascades }
 
-`unreal:light:DynamicShadowCascades` · Default `4` · Range 0 to 4  
-Houdini parameter `xn__unreallightDynamicShadowCascades_6sbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:DynamicShadowCascades</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightDynamicShadowCascades_6sbf</code></dd></div></dl>
 
 Number of cascades to split the view frustum into for the whole scene dynamic shadow. More cascades result in better shadow resolution, but adds significant rendering cost.
 
@@ -264,14 +230,12 @@ Number of cascades to split the view frustum into for the whole scene dynamic sh
 
 #### Barn Door Angle { #unreal-light-barndoorangle }
 
-`unreal:light:BarnDoorAngle` · Default `88` · Range 0 to 90  
-Houdini parameter `xn__unreallightBarnDoorAngle_5fbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:BarnDoorAngle</code></dd></div><div><dt>Default</dt><dd><code>88</code></dd></div><div><dt>Range</dt><dd>0 to 90</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightBarnDoorAngle_5fbf</code></dd></div></dl>
 
 Angle of barn door attached to the light source rect.
 
 #### Barn Door Length { #unreal-light-barndoorlength }
 
-`unreal:light:BarnDoorLength` · Default `0.1` · Range 0 to 10  
-Houdini parameter `xn__unreallightBarnDoorLength_shbf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:light:BarnDoorLength</code></dd></div><div><dt>Default</dt><dd><code>0.1</code></dd></div><div><dt>Range</dt><dd>0 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallightBarnDoorLength_shbf</code></dd></div></dl>
 
 Length of barn door attached to the light source rect. hdUE shortens UE's 20 cm barn doors to 0.1 cm by default (UsdLux rect lights have none).

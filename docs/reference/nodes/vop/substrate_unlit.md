@@ -3,21 +3,41 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Unlit
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_unlit::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_unlit::1.3</code></dd></div></dl>
 
 An emissive surface without lighting.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Emission
-:   Emitted color.
+<div class="hdue-params" markdown>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted color.
+Emitted color.
 
-    `emission` · Default 0, 0, 0
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted color.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>emission</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

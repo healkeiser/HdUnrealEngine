@@ -3,24 +3,50 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Add
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_add::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_add::1.3</code></dd></div></dl>
 
 Adds two surfaces' light (Substrate Add), as for a glow over a surface.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-A
-:   First surface.
+<div class="hdue-params" markdown>
 
-B
-:   Second surface.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">A</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+First surface.
 
-Parameter Blending
-:   Blends both surfaces' parameters into one slab instead of evaluating both: cheaper, less accurate. Changing it recompiles the material.
+</div>
+</div>
 
-    `parameter_blending` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">B</div>
+<div class="hdue-param__body" markdown>
+
+Second surface.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Parameter Blending</div>
+<div class="hdue-param__body" markdown>
+
+Blends both surfaces' parameters into one slab instead of evaluating both: cheaper, less accurate. Changing it recompiles the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>parameter_blending</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>

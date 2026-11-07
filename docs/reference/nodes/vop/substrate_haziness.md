@@ -3,29 +3,61 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Haziness to Second Roughness
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_haziness::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_haziness::1.3</code></dd></div></dl>
 
 Converts a roughness and a haziness into a Slab's second roughness and its weight (a hazy gloss).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Base Roughness
-:   Roughness of the main specular lobe.
+<div class="hdue-params" markdown>
 
-Haziness
-:   Strength of the hazy second lobe.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Roughness</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Roughness of the main specular lobe.
 
-Base Roughness
-:   Roughness of the main specular lobe.
+</div>
+</div>
 
-    `base_roughness` · Default 0.1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Haziness</div>
+<div class="hdue-param__body" markdown>
 
-Haziness
-:   Strength of the hazy second lobe.
+Strength of the hazy second lobe.
 
-    `haziness` · Default 0.5
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Roughness of the main specular lobe.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>base_roughness</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Haziness</div>
+<div class="hdue-param__body" markdown>
+
+Strength of the hazy second lobe.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>haziness</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+</div>

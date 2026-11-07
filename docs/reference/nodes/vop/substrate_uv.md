@@ -3,34 +3,72 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> UV Coordinates
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_uv::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_uv::1.3</code></dd></div></dl>
 
 The mesh's UV set, scaled then offset.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Scale
-:   UV scale.
+<div class="hdue-params" markdown>
 
-Offset
-:   UV offset, added after the scale.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scale</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+UV scale.
 
-Scale
-:   UV scale.
+</div>
+</div>
 
-    `scale` · Default 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
 
-Offset
-:   UV offset, added after the scale.
+UV offset, added after the scale.
 
-    `offset` · Default 0, 0
+</div>
+</div>
 
-Index
-:   UV set. Only 0 (USD st) reaches UE.
+</div>
 
-    `index` · Default 0
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scale</div>
+<div class="hdue-param__body" markdown>
+
+UV scale.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>scale</code></dd></div><div><dt>Default</dt><dd>1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
+
+UV offset, added after the scale.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>offset</code></dd></div><div><dt>Default</dt><dd>0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Index</div>
+<div class="hdue-param__body" markdown>
+
+UV set. Only 0 (USD st) reaches UE.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>index</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

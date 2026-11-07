@@ -3,21 +3,41 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Extract Channel
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_channel::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_channel::1.3</code></dd></div></dl>
 
 Extracts one channel of an RGBA value.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Value
-:   RGBA value, usually a Texture Sample's RGBA output.
+<div class="hdue-params" markdown>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Value</div>
+<div class="hdue-param__body" markdown>
 
-Channel
-:   Channel to extract.
+RGBA value, usually a Texture Sample's RGBA output.
 
-    `channel` · Default `r` · Menu R, G, B, A
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Channel</div>
+<div class="hdue-param__body" markdown>
+
+Channel to extract.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>channel</code></dd></div><div><dt>Default</dt><dd><code>r</code></dd></div><div><dt>Menu</dt><dd>R, G, B, A</dd></div></dl>
+
+</div>
+</div>
+
+</div>

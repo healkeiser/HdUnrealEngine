@@ -3,16 +3,26 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> MaterialX Surface
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_materialx::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_materialx::1.3</code></dd></div></dl>
 
 A MaterialX material on the stage, from the prepared MaterialX library, used as a Substrate surface.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Parameters
+## Parameters { .hdue-section }
 
-Material
-:   USD path of the MaterialX material, for example /Looks/Base. One per graph.
+<div class="hdue-params" markdown>
 
-    `material` · Default `/Looks/Base`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Material</div>
+<div class="hdue-param__body" markdown>
+
+USD path of the MaterialX material, for example /Looks/Base. One per graph.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>material</code></dd></div><div><dt>Default</dt><dd><code>/Looks/Base</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>

@@ -275,6 +275,8 @@ md_in_html = {}
 tables = {}
 toc = { permalink = true, toc_depth = 3 }
 pymdownx.details = {}
+# Formulas: $...$ inline, $$...$$ as a block, typeset by MathJax on the pages that have one (assets/hdue.js).
+pymdownx.arithmatex = { generic = true }
 pymdownx.superfences = { custom_fences = [{ name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }] }
 pymdownx.tabbed = { alternate_style = true }
 pymdownx.highlight = { anchor_linenums = true }

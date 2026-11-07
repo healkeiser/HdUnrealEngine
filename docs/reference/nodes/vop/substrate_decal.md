@@ -3,24 +3,50 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Convert To Decal
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_decal::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_decal::1.3</code></dd></div></dl>
 
 A decal material for hdUE Decal prims: UE's Substrate Convert To Decal over a surface, projected onto what the decal's box covers. Wire it to the builder's output, and bind the material to the decal prim.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Surface
-:   Surface the decal paints, usually a Slab.
+<div class="hdue-params" markdown>
 
-Coverage
-:   Opacity of the decal, for example a texture's alpha.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Surface</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Surface the decal paints, usually a Slab.
 
-Coverage
-:   Opacity of the decal, for example a texture's alpha.
+</div>
+</div>
 
-    `coverage` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Coverage</div>
+<div class="hdue-param__body" markdown>
+
+Opacity of the decal, for example a texture's alpha.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Coverage</div>
+<div class="hdue-param__body" markdown>
+
+Opacity of the decal, for example a texture's alpha.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>coverage</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+</div>

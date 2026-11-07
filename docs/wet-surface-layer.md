@@ -36,25 +36,61 @@ Amount, roughness and mask edits are live: no compile. The Path Tracer restarts 
 
 ## Wet Surface
 
-**Wet Surface** · `unreal:surface:wet:enabled` · default off
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Wet Surface</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:surface:wet:enabled`</dd></div><div markdown><dt>Default</dt><dd markdown="span">off</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Turns the coating on for the prim, its GeomSubsets and the meshes below it. Set it off on a child to keep that child dry.
 
 ## Amount
 
-**Amount** · `unreal:surface:wet:amount` · default 1 · 0 to 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Amount</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:surface:wet:amount`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div><div markdown><dt>Range</dt><dd markdown="span">0 to 1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 The fraction of the surface the water covers, multiplied by the mask. It is coverage, not water depth: 0.5 is a surface half covered, not a thinner film. 0 renders the original material.
 
 ## Roughness
 
-**Roughness** · `unreal:surface:wet:roughness` · default 0.08 · 0 to 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Roughness</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:surface:wet:roughness`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.08</dd></div><div markdown><dt>Range</dt><dd markdown="span">0 to 1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Roughness of the water's surface. 0.08 is a still film; raise it for drizzled or dirty water.
 
 ## Mask Primvar
 
-**Mask Primvar** · `unreal:surface:wet:maskPrimvar` · default empty
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Mask Primvar</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:surface:wet:maskPrimvar`</dd></div><div markdown><dt>Default</dt><dd markdown="span">empty</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 The base name of a float primvar on the mesh that scales the coverage, for example `wetness` for `primvars:wetness`. Empty covers the whole surface.
 

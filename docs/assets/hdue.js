@@ -344,6 +344,40 @@
     if (!document.fullscreenElement) document.querySelectorAll(".mermaid").forEach((d) => (d.style.zoom = ""));
   });
 
+  // Formulas (pymdownx.arithmatex, generic): MathJax, as Zensical's math guide sets it up, fetched by the first page
+  // that has one and run again on each page instant navigation shows.
+  let mathjax = null;
+  function math() {
+    if (!document.querySelector(".arithmatex")) return;
+    if (!mathjax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [["\\(", "\\)"]],
+          displayMath: [["\\[", "\\]"]],
+          processEscapes: true,
+          processEnvironments: true,
+        },
+        options: { ignoreHtmlClass: ".*|", processHtmlClass: "arithmatex" },
+        startup: { typeset: false },
+      };
+      mathjax = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js";
+        script.integrity = "sha384-Wuix6BuhrWbjDBs24bXrjf4ZQ5aFeFWBuKkFekO2t8xFU0iNaLQfp2K6/1Nxveei";
+        script.crossOrigin = "anonymous";
+        script.onload = () => window.MathJax.startup.promise.then(resolve);
+        script.onerror = reject;
+        document.head.append(script);
+      });
+    }
+    mathjax.then(() => {
+      MathJax.startup.output.clearCache();
+      MathJax.typesetClear();
+      MathJax.texReset();
+      MathJax.typesetPromise();
+    });
+  }
+
   // The theme fills in the repository's stars and forks only in the widgets present at load; the contents column's
   // copy (overrides/partials/toc.html) is redrawn by each navigation, so it takes them from the header's, which stays.
   function facts() {
@@ -373,6 +407,7 @@
     build();
     charts();
     facts();
+    math();
     if (loaded) document.querySelector(".md-content__inner")?.classList.add("hdue-page-in");
     loaded = true;
   };

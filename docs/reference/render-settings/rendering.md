@@ -6,8 +6,7 @@
 
 #### Anti-Aliasing Method { #unreal-cvar-r-antialiasingmethod }
 
-`unreal:cvar:r:AntiAliasingMethod` · Default TSR · Realtime only  
-Houdini parameter `xn__unrealcvarrAntiAliasingMethod_bobeb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:AntiAliasingMethod</code></dd></div><div><dt>Default</dt><dd>TSR</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrAntiAliasingMethod_bobeb</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide).
 
@@ -22,45 +21,39 @@ Engine default (project setting) for AntiAliasingMethod is (postprocess volume/c
 
 #### Screen Percentage { #unreal-cvar-r-screenpercentage }
 
-`unreal:cvar:r:ScreenPercentage` · Default `100` · Range 10 to 200  
-Houdini parameter `xn__unrealcvarrScreenPercentage_1kbeb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:ScreenPercentage</code></dd></div><div><dt>Default</dt><dd><code>100</code></dd></div><div><dt>Range</dt><dd>10 to 200</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrScreenPercentage_1kbeb</code></dd></div></dl>
 
-To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, \10 and \1=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.\1=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
+To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, \>0 and \<=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.\<=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
 
 <div class="hdue-figure" data-figure="ref-screen-percentage"></div>
 
 #### Lower Resolution While Moving { #unreal-cvar-r-hdue-interactiveresolution }
 
-`unreal:cvar:r:HdUE:InteractiveResolution` · Default On · Realtime only  
-Houdini parameter `xn__unrealcvarrHdUEInteractiveResolution_pzbebe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:InteractiveResolution</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrHdUEInteractiveResolution_pzbebe</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide).
 
 #### Moving Screen Percentage { #unreal-cvar-r-hdue-interactivescreenpercentage }
 
-`unreal:cvar:r:HdUE:InteractiveScreenPercentage` · Default `50` · Range 10 to 100 · Realtime only  
-Houdini parameter `xn__unrealcvarrHdUEInteractiveScreenPercentage_h9bebe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:InteractiveScreenPercentage</code></dd></div><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>10 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrHdUEInteractiveScreenPercentage_h9bebe</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide).
 
 #### NVIDIA DLSS { #unreal-cvar-r-ngx-dlss-enable }
 
-`unreal:cvar:r:NGX:DLSS:Enable` · Default Off · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSEnable_5fbebde`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Enable</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSEnable_5fbebde</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the anti-aliasing method renders. Realtime mode only. Console variable r.NGX.DLSS.Enable (process-wide).
 
 #### DLSS Ray Reconstruction { #unreal-cvar-r-hdue-dlss-rayreconstruction }
 
-`unreal:cvar:r:HdUE:DLSS:RayReconstruction` · Default Off · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrHdUEDLSSRayReconstruction_pzbebee`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:DLSS:RayReconstruction</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrHdUEDLSSRayReconstruction_pzbebee</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and restores them. Needs NVIDIA DLSS on. Realtime mode only. Console variable r.HdUE.DLSS.RayReconstruction (process-wide).
 
 #### DLSS Preset { #unreal-cvar-r-ngx-dlss-preset }
 
-`unreal:cvar:r:NGX:DLSS:Preset` · Default Default · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSPreset_5fbebde`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Preset</code></dd></div><div><dt>Default</dt><dd>Default</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSPreset_5fbebde</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only. Console variable r.NGX.DLSS.Preset (process-wide).
 
@@ -75,8 +68,7 @@ DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K
 
 #### Ray Reconstruction Preset { #unreal-cvar-r-ngx-dlssrr-preset }
 
-`unreal:cvar:r:NGX:DLSSRR:Preset` · Default Default · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSRRPreset_fjbebdg`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSSRR:Preset</code></dd></div><div><dt>Default</dt><dd>Default</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSRRPreset_fjbebdg</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default RR2 model. Realtime mode only. Console variable r.NGX.DLSSRR.Preset (process-wide).
 
@@ -89,22 +81,19 @@ DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F 
 
 #### DLSS Auto Exposure { #unreal-cvar-r-ngx-dlss-autoexposure }
 
-`unreal:cvar:r:NGX:DLSS:AutoExposure` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSAutoExposure_xpbebde`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:AutoExposure</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSAutoExposure_xpbebde</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 DLSS computes its own exposure for its inputs; off passes UE's exposure, which in some cases reduces artifacts. Realtime mode only. Console variable r.NGX.DLSS.AutoExposure (process-wide).
 
 #### DLSS Exposure Scale { #unreal-cvar-r-ngx-dlss-exposurescale }
 
-`unreal:cvar:r:NGX:DLSS:ExposureScale` · Default `1` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSExposureScale_krbebde`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:ExposureScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSExposureScale_krbebde</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Scale of the exposure DLSS receives. Realtime mode only. Console variable r.NGX.DLSS.ExposureScale (process-wide).
 
 #### DLSS Alpha Upscaling { #unreal-cvar-r-ngx-dlss-enablealphaupscaling }
 
-`unreal:cvar:r:NGX:DLSS:EnableAlphaUpscaling` · Default From Propagate Alpha · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_y2bebde`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:EnableAlphaUpscaling</code></dd></div><div><dt>Default</dt><dd>From Propagate Alpha</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSEnableAlphaUpscaling_y2bebde</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime enables. Realtime mode only. Console variable r.NGX.DLSS.EnableAlphaUpscaling (process-wide).
 
@@ -116,8 +105,7 @@ Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the
 
 #### DLSS Reflections Temporal AA { #unreal-cvar-r-ngx-dlss-reflections-temporalaa }
 
-`unreal:cvar:r:NGX:DLSS:Reflections:TemporalAA` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrNGXDLSSReflectionsTemporalAA_l4bebdel`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Reflections:TemporalAA</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrNGXDLSSReflectionsTemporalAA_l4bebdel</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Realtime mode only. Console variable r.NGX.DLSS.Reflections.TemporalAA (process-wide).
 
@@ -125,8 +113,7 @@ A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Re
 
 #### Max. Bounces { #unreal-postprocess-pathtracingmaxbounces }
 
-`unreal:postProcess:PathTracingMaxBounces` · Default `32` · Range 0 to 100 · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingMaxBounces_y2bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingMaxBounces</code></dd></div><div><dt>Default</dt><dd><code>32</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingMaxBounces_y2bl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Sets the path tracing maximum bounces. Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces.
 
@@ -134,8 +121,7 @@ Sets the path tracing maximum bounces. Counts scattering events along a path: 0 
 
 #### Max Path Intensity { #unreal-postprocess-pathtracingmaxpathintensity }
 
-`unreal:postProcess:PathTracingMaxPathIntensity` · Default `24` · Range 1 to 65504 · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingMaxPathIntensity_qdcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingMaxPathIntensity</code></dd></div><div><dt>Default</dt><dd><code>24</code></dd></div><div><dt>Range</dt><dd>1 to 65504</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingMaxPathIntensity_qdcl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Sets the maximum intensity of indirect samples to reduce fireflies. Lowering this value reduces noise at the expense of accuracy. Increasing it is more accurate but may lead to more noise.
 
@@ -143,29 +129,25 @@ Sets the maximum intensity of indirect samples to reduce fireflies. Lowering thi
 
 #### Emissive Materials { #unreal-postprocess-pathtracingenableemissivematerials }
 
-`unreal:postProcess:PathTracingEnableEmissiveMaterials` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingEnableEmissiveMaterials_4ocl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableEmissiveMaterials</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingEnableEmissiveMaterials_4ocl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should emissive materials contribute to scene lighting?
 
 #### Reference Depth Of Field { #unreal-postprocess-pathtracingenablereferencedof }
 
-`unreal:postProcess:PathTracingEnableReferenceDOF` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingEnableReferenceDOF_zgcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableReferenceDOF</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingEnableReferenceDOF_zgcl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Enables a reference quality depth-of-field which replaces the post-process effect. hdUE turns it on when the USD camera has depth of field.
 
 #### Reference Atmosphere { #unreal-postprocess-pathtracingenablereferenceatmosphere }
 
-`unreal:postProcess:PathTracingEnableReferenceAtmosphere` · Default Off · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingEnableReferenceAtmosphere_escl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableReferenceAtmosphere</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingEnableReferenceAtmosphere_escl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Enables path tracing in the atmosphere instead of baking the sky atmosphere contribution into a skylight. Any skylight present in the scene will be automatically ignored when this is enabled.
 
 #### Denoiser { #unreal-postprocess-pathtracingenabledenoiser }
 
-`unreal:postProcess:PathTracingEnableDenoiser` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingEnableDenoiser_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableDenoiser</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingEnableDenoiser_h9bl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Run the currently loaded denoiser plugin on the last sample to remove noise from the output. Has no effect if a plug-in is not loaded.
 
@@ -173,8 +155,7 @@ Run the currently loaded denoiser plugin on the last sample to remove noise from
 
 #### Denoiser Plugin { #unreal-cvar-r-pathtracing-denoiser-name }
 
-`unreal:cvar:r:PathTracing:Denoiser:Name` · Default NNE Denoiser · Path Tracer only  
-Houdini parameter `xn__unrealcvarrPathTracingDenoiserName_gwbebli`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:Denoiser:Name</code></dd></div><div><dt>Default</dt><dd>NNE Denoiser</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrPathTracingDenoiserName_gwbebli</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Set the spatial denoiser name. It is the corresponding name registered by a denoiser plugin Any registered denoiser should be able to denoise a single frame spatially. Console variable r.PathTracing.Denoiser.Name (process-wide).
 
@@ -185,8 +166,7 @@ Set the spatial denoiser name. It is the corresponding name registered by a deno
 
 #### NNE Denoiser Model { #unreal-cvar-nnedenoiser-asset }
 
-`unreal:cvar:NNEDenoiser:Asset` · Default Project Default (Balanced, Alpha) · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarNNEDenoiserAsset_fjbel`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:NNEDenoiser:Asset</code></dd></div><div><dt>Default</dt><dd>Project Default (Balanced, Alpha)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarNNEDenoiserAsset_fjbel</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide).
 
@@ -204,8 +184,7 @@ Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality,
 
 #### NNE Denoiser Runtime { #unreal-cvar-nnedenoiser-runtime-type }
 
-`unreal:cvar:NNEDenoiser:Runtime:Type` · Default RDG · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarNNEDenoiserRuntimeType_6sbelh`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:NNEDenoiser:Runtime:Type</code></dd></div><div><dt>Default</dt><dd>RDG</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarNNEDenoiserRuntimeType_6sbelh</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, the default), GPU or CPU. Console variable NNEDenoiser.Runtime.Type (process-wide).
 
@@ -217,29 +196,25 @@ Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's re
 
 #### OptiX Tile Width { #unreal-cvar-r-optixdenoise-tilewidth }
 
-`unreal:cvar:r:OptixDenoise:TileWidth` · Default `0` · Range 0 to 4096 · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarrOptixDenoiseTileWidth_6sbebm`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:OptixDenoise:TileWidth</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4096</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrOptixDenoiseTileWidth_6sbebm</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0. Console variable r.OptixDenoise.TileWidth (process-wide).
 
 #### OptiX Tile Height { #unreal-cvar-r-optixdenoise-tileheight }
 
-`unreal:cvar:r:OptixDenoise:TileHeight` · Default `0` · Range 0 to 4096 · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarrOptixDenoiseTileHeight_tubebm`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:OptixDenoise:TileHeight</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 4096</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrOptixDenoiseTileHeight_tubebm</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width). Console variable r.OptixDenoise.TileHeight (process-wide).
 
 #### Approximate Caustics { #unreal-cvar-r-pathtracing-approximatecaustics }
 
-`unreal:cvar:r:PathTracing:ApproximateCaustics` · Default On · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarrPathTracingApproximateCaustics_u7bebl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:ApproximateCaustics</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrPathTracingApproximateCaustics_u7bebl</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 When true, the path tracer will approximate caustic paths to reduce noise. This reduces speckles and noise from low-roughness glass and metals. Console variable r.PathTracing.ApproximateCaustics (process-wide).
 
 #### Pixel Filter Width { #unreal-cvar-r-pathtracing-filterwidth }
 
-`unreal:cvar:r:PathTracing:FilterWidth` · Default `3` · Range 0 to 6 · Path Tracer only · Advanced  
-Houdini parameter `xn__unrealcvarrPathTracingFilterWidth_tubebl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:FilterWidth</code></dd></div><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 6</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrPathTracingFilterWidth_tubebl</code></dd></div><span class="hdue-badge">Path Tracer only</span><span class="hdue-badge">Advanced</span></dl>
 
 Sets the anti-aliasing filter width (default = 3.0 which corresponds to a gaussian with standard deviation of a 1/2 pixel) Console variable r.PathTracing.FilterWidth (process-wide).
 
@@ -247,15 +222,13 @@ Sets the anti-aliasing filter width (default = 3.0 which corresponds to a gaussi
 
 #### Emissive { #unreal-postprocess-pathtracingincludeemissive }
 
-`unreal:postProcess:PathTracingIncludeEmissive` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeEmissive_3bcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeEmissive</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeEmissive_3bcl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include directly visible emissive elements?
 
 #### Diffuse { #unreal-postprocess-pathtracingincludediffuse }
 
-`unreal:postProcess:PathTracingIncludeDiffuse` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeDiffuse_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeDiffuse</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeDiffuse_h9bl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include diffuse lighting contributions?
 
@@ -263,8 +236,7 @@ Should the render include diffuse lighting contributions?
 
 #### Indirect Diffuse { #unreal-postprocess-pathtracingincludeindirectdiffuse }
 
-`unreal:postProcess:PathTracingIncludeIndirectDiffuse` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeIndirectDiffuse_incl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectDiffuse</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeIndirectDiffuse_incl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include indirect diffuse lighting contributions?
 
@@ -272,8 +244,7 @@ Should the render include indirect diffuse lighting contributions?
 
 #### Specular { #unreal-postprocess-pathtracingincludespecular }
 
-`unreal:postProcess:PathTracingIncludeSpecular` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeSpecular_3bcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeSpecular</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeSpecular_3bcl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include specular lighting contributions?
 
@@ -281,8 +252,7 @@ Should the render include specular lighting contributions?
 
 #### Indirect Specular { #unreal-postprocess-pathtracingincludeindirectspecular }
 
-`unreal:postProcess:PathTracingIncludeIndirectSpecular` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeIndirectSpecular_4ocl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectSpecular</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeIndirectSpecular_4ocl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include indirect specular lighting contributions?
 
@@ -290,15 +260,13 @@ Should the render include indirect specular lighting contributions?
 
 #### Volume { #unreal-postprocess-pathtracingincludevolume }
 
-`unreal:postProcess:PathTracingIncludeVolume` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeVolume_u7bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeVolume</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeVolume_u7bl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include volume lighting contributions?
 
 #### Indirect Volume { #unreal-postprocess-pathtracingincludeindirectvolume }
 
-`unreal:postProcess:PathTracingIncludeIndirectVolume` · Default On · Path Tracer only  
-Houdini parameter `xn__unrealpostProcessPathTracingIncludeIndirectVolume_vlcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectVolume</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessPathTracingIncludeIndirectVolume_vlcl</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Should the render include volume lighting contributions?
 
@@ -306,8 +274,7 @@ Should the render include volume lighting contributions?
 
 #### Debug View { #unreal-debugview }
 
-`unreal:debugView` · Default Lit · Realtime only · Advanced  
-Houdini parameter `xn__unrealdebugView_i0a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:debugView</code></dd></div><div><dt>Default</dt><dd>Lit</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealdebugView_i0a</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
 
@@ -347,8 +314,7 @@ Renders one of UE's viewport view modes instead of the lit image, as its View Mo
 
 #### Subdivision Level { #unreal-subdivisionlevel }
 
-`unreal:subdivisionLevel` · Default `0` · Range 0 to 5 · Advanced  
-Houdini parameter `xn__unrealsubdivisionLevel_wcb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:subdivisionLevel</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 5</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealsubdivisionLevel_wcb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage default, renders the cage; 3 matches Karma's surfaces closely.
 
@@ -356,29 +322,25 @@ Uniform refinement of catmullClark and loop meshes; each level has 4x the faces.
 
 #### Require Nanite { #unreal-requirenanite }
 
-`unreal:requireNanite` · Default Off · Advanced  
-Houdini parameter `xn__unrealrequireNanite_06a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:requireNanite</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealrequireNanite_06a</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). Meshes built from Hydra are unaffected.
 
 #### Nanite Triangle Threshold { #unreal-nanitetrianglethreshold }
 
-`unreal:naniteTriangleThreshold` · Default `1000000` · Range 0 to 10000000 · Advanced  
-Houdini parameter `xn__unrealnaniteTriangleThreshold_bob`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:naniteTriangleThreshold</code></dd></div><div><dt>Default</dt><dd><code>1000000</code></dd></div><div><dt>Range</dt><dd>0 to 10000000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealnaniteTriangleThreshold_bob</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes every mesh Nanite.
 
 #### Cull Backface { #unreal-cullbackface }
 
-`unreal:cullBackface` · Default On · Advanced  
-Houdini parameter `xn__unrealcullBackface_e5a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cullBackface</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcullBackface_e5a</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Meshes whose USD doubleSided is off render their front faces only, as UE's USD importer does. Off, every mesh renders both sides, as in Karma.
 
 #### Stage Up Axis { #unreal-upaxis }
 
-`unreal:upAxis` · Default Y · Advanced  
-Houdini parameter `xn__unrealupAxis_mva`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:upAxis</code></dd></div><div><dt>Default</dt><dd>Y</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealupAxis_mva</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Overrides the stage's upAxis metadata.
 
@@ -391,21 +353,18 @@ Overrides the stage's upAxis metadata.
 
 #### Cooked MaterialX Library { #unreal-materialxlibrary }
 
-`unreal:materialxLibrary` · Default (empty) · Advanced  
-Houdini parameter `xn__unrealmaterialxLibrary_wcb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:materialxLibrary</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealmaterialxLibrary_wcb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: HDUE_MATERIALX_LIBRARY, else the runtime profile's materialx_library. Houdini's viewport and husk render the bound MaterialX materials as their cooked assets; a material changed since its import fails a husk frame.
 
 #### Prepared Substrate Library { #unreal-substratelibrary }
 
-`unreal:substrateLibrary` · Default (empty) · Advanced  
-Houdini parameter `xn__unrealsubstrateLibrary_wcb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:substrateLibrary</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealsubstrateLibrary_wcb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: HDUE_SUBSTRATE_LIBRARY, else the runtime profile's substrate_library. Houdini's viewport and husk render Substrate Builder materials as their prepared assets; a graph changed since its preparation fails a husk frame.
 
 #### Prepare Edited Materials { #unreal-substrateautoprepare }
 
-`unreal:substrateAutoPrepare` · Default On · Advanced  
-Houdini parameter `xn__unrealsubstrateAutoPrepare_fjb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:substrateAutoPrepare</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealsubstrateAutoPrepare_fjb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Substrate Builder materials missing from the Prepared Substrate Library, and MaterialX materials hdUE cannot translate at render time, are prepared in the background (UE's editor compiles or imports them, seconds per job) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, such a Substrate Builder material shows the library's message and fails a husk frame; such a MaterialX material renders with the inputs hdUE cannot translate at their constants.

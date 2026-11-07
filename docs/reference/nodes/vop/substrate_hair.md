@@ -3,64 +3,150 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Hair
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_hair::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_hair::1.3</code></dd></div></dl>
 
 UE's Substrate Hair BSDF, for hair cards.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Base Color
-:   Hair color.
+<div class="hdue-params" markdown>
 
-Scatter
-:   Light scattered through the hair, for light hair colors.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
 
-Specular
-:   Specular intensity.
+Hair color.
 
-Roughness
-:   Roughness of the hair's specular highlights.
+</div>
+</div>
 
-Backlit
-:   How much light coming from behind the hair shows.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scatter</div>
+<div class="hdue-param__body" markdown>
 
-Tangent
-:   Hair direction. Unconnected, the mesh tangent.
+Light scattered through the hair, for light hair colors.
 
-Emission
-:   Emitted light.
+</div>
+</div>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
 
-Base Color
-:   Hair color.
+Specular intensity.
 
-    `base_color` · Default 0, 0, 0
+</div>
+</div>
 
-Scatter
-:   Light scattered through the hair, for light hair colors.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
 
-    `scatter` · Default 0
+Roughness of the hair's specular highlights.
 
-Specular
-:   Specular intensity.
+</div>
+</div>
 
-    `specular` · Default 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Backlit</div>
+<div class="hdue-param__body" markdown>
 
-Roughness
-:   Roughness of the hair's specular highlights.
+How much light coming from behind the hair shows.
 
-    `roughness` · Default 0.5
+</div>
+</div>
 
-Backlit
-:   How much light coming from behind the hair shows.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tangent</div>
+<div class="hdue-param__body" markdown>
 
-    `backlit` · Default 0
+Hair direction. Unconnected, the mesh tangent.
 
-Emission
-:   Emitted light.
+</div>
+</div>
 
-    `emission` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Base Color</div>
+<div class="hdue-param__body" markdown>
+
+Hair color.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>base_color</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scatter</div>
+<div class="hdue-param__body" markdown>
+
+Light scattered through the hair, for light hair colors.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>scatter</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
+
+Specular intensity.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>specular</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Roughness of the hair's specular highlights.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>roughness</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Backlit</div>
+<div class="hdue-param__body" markdown>
+
+How much light coming from behind the hair shows.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>backlit</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>emission</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

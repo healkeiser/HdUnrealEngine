@@ -35,13 +35,31 @@ Anisotropy is not translated.
 
 ## Transmission
 
-**Transmission** · `transmission` (OpenPBR `transmission_weight`) · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Transmission</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`transmission` (OpenPBR `transmission_weight`)</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Above 0, the surface refracts: hdUE uses UE's translucent Standard Surface material, as Interchange imports a transmissive MaterialX surface, in Realtime and in the Path Tracer. `transmission_color` tints the light passing through and `transmission_depth` (scene units) is the distance at which it reaches that colour. See [Opacity and glass](opacity-and-glass.md) for the settings, figures and recipes.
 
 ## Subsurface
 
-**Subsurface** · `subsurface` (OpenPBR `subsurface_weight`) · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Subsurface</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`subsurface` (OpenPBR `subsurface_weight`)</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Light enters the surface, scatters and exits nearby: skin, wax, marble, milk. hdUE renders it as Substrate subsurface scattering.
 
@@ -59,7 +77,16 @@ Light enters the surface, scatters and exits nearby: skin, wax, marble, milk. hd
 
 ## Sheen
 
-**Sheen** · `sheen` (OpenPBR `fuzz_weight`) · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Sheen</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`sheen` (OpenPBR `fuzz_weight`)</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A soft, bright rim at grazing angles, from fibres: velvet, felt, dust. hdUE renders it as Substrate fuzz. `sheen_color` (default (1, 1, 1)) tints it and `sheen_roughness` (default 0.3) widens it.
 
@@ -67,7 +94,16 @@ A soft, bright rim at grazing angles, from fibres: velvet, felt, dust. hdUE rend
 
 ## Coat
 
-**Coat** · `coat` (OpenPBR `coat_weight`) · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Coat</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`coat` (OpenPBR `coat_weight`)</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A clear layer over the base: varnish, car paint, lacquer. `coat_roughness` (default 0.1) is its own roughness; `coat_color` (default (1, 1, 1)) tints what is under it.
 
@@ -77,7 +113,16 @@ A clear layer over the base: varnish, car paint, lacquer. `coat_roughness` (defa
 
 ## Emission
 
-**Emission** × **Emission Color** · `emission` × `emission_color` (OpenPBR `emission_luminance` × `emission_color`) · default 0 × (1, 1, 1)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Emission × Emission Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`emission` × `emission_color` (OpenPBR `emission_luminance` × `emission_color`)</dd></div><div markdown><dt>Default</dt><dd markdown="span">0 × (1, 1, 1)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Emitted light, as Preview Surface **Emissive Color**. OpenPBR's `emission_luminance` is used as a plain multiplier, not in nits.
 

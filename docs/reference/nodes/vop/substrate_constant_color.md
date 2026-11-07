@@ -3,16 +3,26 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Color Constant
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_constant_color::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_constant_color::1.3</code></dd></div></dl>
 
 A constant color.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Parameters
+## Parameters { .hdue-section }
 
-Value
-:   The value. Editing it updates the render without recompiling the material.
+<div class="hdue-params" markdown>
 
-    `value` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Value</div>
+<div class="hdue-param__body" markdown>
+
+The value. Editing it updates the render without recompiling the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>value</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+</div>

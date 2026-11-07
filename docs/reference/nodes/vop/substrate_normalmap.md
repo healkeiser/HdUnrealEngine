@@ -3,34 +3,72 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Normal Map
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_normalmap::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_normalmap::1.3</code></dd></div></dl>
 
 Decodes a tangent-space normal map for a Slab's Normal input.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Color
-:   Encoded normal, from a Raw Texture Sample.
+<div class="hdue-params" markdown>
 
-Strength
-:   Scales the normal's X and Y.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Encoded normal, from a Raw Texture Sample.
 
-Color
-:   Encoded normal, from a Raw Texture Sample.
+</div>
+</div>
 
-    `color` · Default 0.5, 0.5, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Strength</div>
+<div class="hdue-param__body" markdown>
 
-Strength
-:   Scales the normal's X and Y.
+Scales the normal's X and Y.
 
-    `strength` · Default 1
+</div>
+</div>
 
-Flip Green
-:   On for OpenGL (+Y) maps such as MaterialX's, off for DirectX (-Y) maps.
+</div>
 
-    `flip_green` · Default on
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color</div>
+<div class="hdue-param__body" markdown>
+
+Encoded normal, from a Raw Texture Sample.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>color</code></dd></div><div><dt>Default</dt><dd>0.5, 0.5, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Strength</div>
+<div class="hdue-param__body" markdown>
+
+Scales the normal's X and Y.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>strength</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Flip Green</div>
+<div class="hdue-param__body" markdown>
+
+On for OpenGL (+Y) maps such as MaterialX's, off for DirectX (-Y) maps.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>flip_green</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>

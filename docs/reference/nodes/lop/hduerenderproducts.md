@@ -3,47 +3,107 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hduerenderproducts.svg" alt=""> hdUE Render Products
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduerenderproducts::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduerenderproducts::1.0</code></dd></div></dl>
 
 Creates render products sharing common settings.
 { .hdue-node-summary }
 
 Like Karma Render Products, it creates render products, each writing render vars (from hdUE Standard Render Vars or Render Var LOPs upstream) to its own image. hdUE Render Settings renders them with Image Output > Render Products set to Upstream Products (or Built-in and Upstream Products).
 
-## Parameters
+## Parameters { .hdue-section }
 
-Parent Primitive Path
-:   Path of the prim under which this node creates its render products.
+<div class="hdue-params" markdown>
 
-    `parentprimpath` · Default `/Render/Products`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Parent Primitive Path</div>
+<div class="hdue-param__body" markdown>
 
-### Common Settings
+Path of the prim under which this node creates its render products.
 
-Default Camera
-:   Camera the products render through, as Karma Render Products' Default Camera. Empty: the render settings' camera.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>parentprimpath</code></dd></div><div><dt>Default</dt><dd><code>/Render/Products</code></dd></div></dl>
 
-    `camera`
+</div>
+</div>
 
-Default Ordered Render Vars
-:   Render vars (AOVs) of the input stage the products write, in this order, unless a product sets its own.
+</div>
 
-    `orderedVars` · Default `/Render/Products/Vars/*`
+### Common Settings { .hdue-tab }
 
-### Render Products
+<div class="hdue-params" markdown>
 
-#### Render Products
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Default Camera</div>
+<div class="hdue-param__body" markdown>
 
-Enable
-:   Creates this render product.
+Camera the products render through, as Karma Render Products' Default Camera. Empty: the render settings' camera.
 
-Name
-:   Name of the render product prim, under the parent primitive path.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>camera</code></dd></div></dl>
 
-Product Name
-:   Image the render product writes (husk, USD Render ROP), with one channel set per render var.
+</div>
+</div>
 
-Ordered Render Vars
-:   Writes the render vars set here instead of the default ordered render vars.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Default Ordered Render Vars</div>
+<div class="hdue-param__body" markdown>
 
-Ordered Render Vars
-:   Render vars this product writes, in this order.
+Render vars (AOVs) of the input stage the products write, in this order, unless a product sets its own.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>orderedVars</code></dd></div><div><dt>Default</dt><dd><code>/Render/Products/Vars/*</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Render Products { .hdue-tab }
+
+#### Render Products { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Enable</div>
+<div class="hdue-param__body" markdown>
+
+Creates this render product.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Name</div>
+<div class="hdue-param__body" markdown>
+
+Name of the render product prim, under the parent primitive path.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Product Name</div>
+<div class="hdue-param__body" markdown>
+
+Image the render product writes (husk, USD Render ROP), with one channel set per render var.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ordered Render Vars</div>
+<div class="hdue-param__body" markdown>
+
+Writes the render vars set here instead of the default ordered render vars.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ordered Render Vars</div>
+<div class="hdue-param__body" markdown>
+
+Render vars this product writes, in this order.
+
+</div>
+</div>
+
+</div>

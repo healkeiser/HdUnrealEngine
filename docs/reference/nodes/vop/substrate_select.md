@@ -3,32 +3,70 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Select
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_select::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_select::1.3</code></dd></div></dl>
 
 Picks one of two surfaces where Select is below or above the threshold (Substrate Select).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-A
-:   Surface where Select is below the threshold.
+<div class="hdue-params" markdown>
 
-B
-:   Surface where Select is above the threshold.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">A</div>
+<div class="hdue-param__body" markdown>
 
-Select
-:   Value compared with the threshold, for example a mask.
+Surface where Select is below the threshold.
 
-## Parameters
+</div>
+</div>
 
-Select
-:   Value compared with the threshold, for example a mask.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">B</div>
+<div class="hdue-param__body" markdown>
 
-    `select` · Default 0
+Surface where Select is above the threshold.
 
-Threshold
-:   Threshold between A and B. Changing it recompiles the material.
+</div>
+</div>
 
-    `threshold` · Default 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Select</div>
+<div class="hdue-param__body" markdown>
+
+Value compared with the threshold, for example a mask.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Select</div>
+<div class="hdue-param__body" markdown>
+
+Value compared with the threshold, for example a mask.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>select</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Threshold</div>
+<div class="hdue-param__body" markdown>
+
+Threshold between A and B. Changing it recompiles the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>threshold</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+</div>

@@ -4,8 +4,7 @@
 
 #### Sky Atmosphere { #unreal-skyatmosphere }
 
-`unreal:skyAtmosphere` · Default Off  
-Houdini parameter `xn__unrealskyAtmosphere_06a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphere_06a</code></dd></div></dl>
 
 Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a physical sky lit by the distant lights that are Atmosphere Sun Lights (UE's default for a distant light; Light LOP, Unreal Engine tab). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE needs for Lumen and its Path Tracer; a DomeLight's environment takes its place.
 
@@ -13,8 +12,7 @@ Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a 
 
 #### Volumetric Cloud { #unreal-volumetriccloud }
 
-`unreal:volumetricCloud` · Default Off  
-Houdini parameter `xn__unrealvolumetricCloud_99a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloud_99a</code></dd></div></dl>
 
 Place UE's Volumetric Cloud in the scene, with UE's default cloud material unless Material is set. Clouds need the Sky Atmosphere; the Path Tracer renders them with Reference Atmosphere on (Path Tracing).
 
@@ -24,10 +22,9 @@ Place UE's Volumetric Cloud in the scene, with UE's default cloud material unles
 
 #### Transform Mode { #unreal-skyatmosphere-transformmode }
 
-`unreal:skyAtmosphere:TransformMode` · Default PlanetTopAtAbsoluteWorldOrigin  
-Houdini parameter `xn__unrealskyAtmosphereTransformMode_6sbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransformMode</code></dd></div><div><dt>Default</dt><dd>PlanetTopAtAbsoluteWorldOrigin</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereTransformMode_6sbn</code></dd></div></dl>
 
-The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering\10.0.
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering\>0.0.
 
 | Value | Label |
 |---|---|
@@ -37,31 +34,27 @@ The ground albedo that will tint the atmosphere when the sun light will bounce o
 
 #### Ground Radius { #unreal-skyatmosphere-bottomradius }
 
-`unreal:skyAtmosphere:BottomRadius` · Default `6360` · Range 0.1 to 10000  
-Houdini parameter `xn__unrealskyAtmosphereBottomRadius_krbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:BottomRadius</code></dd></div><div><dt>Default</dt><dd><code>6360</code></dd></div><div><dt>Range</dt><dd>0.1 to 10000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereBottomRadius_krbn</code></dd></div></dl>
 
 The radius in kilometers from the center of the planet to the ground level.
 
 #### Ground Albedo { #unreal-skyatmosphere-groundalbedo }
 
-`unreal:skyAtmosphere:GroundAlbedo` · Default `0.401978, 0.401978, 0.401978`  
-Houdini parameter `xn__unrealskyAtmosphereGroundAlbedo_krbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd><code>0.401978, 0.401978, 0.401978</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereGroundAlbedo_krbn</code></dd></div></dl>
 
-The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering\10.0.
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering\>0.0.
 
 <div class="hdue-figure" data-figure="ref-ground-albedo"></div>
 
 #### Planet Radius { #unreal-volumetriccloud-planetradius }
 
-`unreal:volumetricCloud:PlanetRadius` · Default `6360` · Range 0.1 to 10000  
-Houdini parameter `xn__unrealvolumetricCloudPlanetRadius_tubp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:PlanetRadius</code></dd></div><div><dt>Default</dt><dd><code>6360</code></dd></div><div><dt>Range</dt><dd>0.1 to 10000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudPlanetRadius_tubp</code></dd></div></dl>
 
 The planet radius used when there is not SkyAtmosphere component present in the scene.
 
 #### Ground Albedo { #unreal-volumetriccloud-groundalbedo }
 
-`unreal:volumetricCloud:GroundAlbedo` · Default `0.401978, 0.401978, 0.401978`  
-Houdini parameter `xn__unrealvolumetricCloudGroundAlbedo_tubp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd><code>0.401978, 0.401978, 0.401978</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudGroundAlbedo_tubp</code></dd></div></dl>
 
 The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled.
 
@@ -69,8 +62,7 @@ The ground albedo used to light the cloud from below with respect to the sun lig
 
 #### Atmosphere Height { #unreal-skyatmosphere-atmosphereheight }
 
-`unreal:skyAtmosphere:AtmosphereHeight` · Default `60` · Range 0.1 to 200  
-Houdini parameter `xn__unrealskyAtmosphereAtmosphereHeight_2xbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AtmosphereHeight</code></dd></div><div><dt>Default</dt><dd><code>60</code></dd></div><div><dt>Range</dt><dd>0.1 to 200</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereAtmosphereHeight_2xbn</code></dd></div></dl>
 
 The height of the atmosphere layer above the ground in kilometers.
 
@@ -78,8 +70,7 @@ The height of the atmosphere layer above the ground in kilometers.
 
 #### MultiScattering { #unreal-skyatmosphere-multiscatteringfactor }
 
-`unreal:skyAtmosphere:MultiScatteringFactor` · Default `1` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereMultiScatteringFactor_75bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MultiScatteringFactor</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMultiScatteringFactor_75bn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
 
@@ -87,8 +78,7 @@ Factor applied to multiple scattering only (after the sun light has bounced arou
 
 #### Trace Sample Count Scale { #unreal-skyatmosphere-tracesamplecountscale }
 
-`unreal:skyAtmosphere:TraceSampleCountScale` · Default `1` · Range 0.25 to 8 · Realtime only · Advanced  
-Houdini parameter `xn__unrealskyAtmosphereTraceSampleCountScale_75bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TraceSampleCountScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereTraceSampleCountScale_75bn</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
 
@@ -96,8 +86,7 @@ Scale the atmosphere tracing sample count. Quality level scalability The sample 
 
 #### Rayleigh Scattering Scale { #unreal-skyatmosphere-rayleighscatteringscale }
 
-`unreal:skyAtmosphere:RayleighScatteringScale` · Default `0.0331` · Range 0 to 2  
-Houdini parameter `xn__unrealskyAtmosphereRayleighScatteringScale_h9bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScatteringScale</code></dd></div><div><dt>Default</dt><dd><code>0.0331</code></dd></div><div><dt>Range</dt><dd>0 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereRayleighScatteringScale_h9bn</code></dd></div></dl>
 
 Rayleigh scattering coefficient scale.
 
@@ -105,15 +94,13 @@ Rayleigh scattering coefficient scale.
 
 #### Rayleigh Scattering { #unreal-skyatmosphere-rayleighscattering }
 
-`unreal:skyAtmosphere:RayleighScattering` · Default `0.1752870090634441, 0.40960725075528703, 1`  
-Houdini parameter `xn__unrealskyAtmosphereRayleighScattering_c1bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScattering</code></dd></div><div><dt>Default</dt><dd><code>0.1752870090634441, 0.40960725075528703, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereRayleighScattering_c1bn</code></dd></div></dl>
 
 The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
 
 #### Rayleigh Exponential Distribution { #unreal-skyatmosphere-rayleighexponentialdistribution }
 
-`unreal:skyAtmosphere:RayleighExponentialDistribution` · Default `8` · Range 0.001 to 20  
-Houdini parameter `xn__unrealskyAtmosphereRayleighExponentialDistribution_incn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighExponentialDistribution</code></dd></div><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>0.001 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereRayleighExponentialDistribution_incn</code></dd></div></dl>
 
 The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
 
@@ -121,8 +108,7 @@ The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
 
 #### Mie Scattering Scale { #unreal-skyatmosphere-miescatteringscale }
 
-`unreal:skyAtmosphere:MieScatteringScale` · Default `0.003996` · Range 0 to 5  
-Houdini parameter `xn__unrealskyAtmosphereMieScatteringScale_c1bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScatteringScale</code></dd></div><div><dt>Default</dt><dd><code>0.003996</code></dd></div><div><dt>Range</dt><dd>0 to 5</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieScatteringScale_c1bn</code></dd></div></dl>
 
 Mie scattering coefficient scale.
 
@@ -130,15 +116,13 @@ Mie scattering coefficient scale.
 
 #### Mie Scattering { #unreal-skyatmosphere-miescattering }
 
-`unreal:skyAtmosphere:MieScattering` · Default `1, 1, 1`  
-Houdini parameter `xn__unrealskyAtmosphereMieScattering_6sbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScattering</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieScattering_6sbn</code></dd></div></dl>
 
 The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
 
 #### Mie Absorption Scale { #unreal-skyatmosphere-mieabsorptionscale }
 
-`unreal:skyAtmosphere:MieAbsorptionScale` · Default `0.000444` · Range 0 to 5  
-Houdini parameter `xn__unrealskyAtmosphereMieAbsorptionScale_c1bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorptionScale</code></dd></div><div><dt>Default</dt><dd><code>0.000444</code></dd></div><div><dt>Range</dt><dd>0 to 5</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieAbsorptionScale_c1bn</code></dd></div></dl>
 
 Mie absorption coefficient scale.
 
@@ -146,15 +130,13 @@ Mie absorption coefficient scale.
 
 #### Mie Absorption { #unreal-skyatmosphere-mieabsorption }
 
-`unreal:skyAtmosphere:MieAbsorption` · Default `1, 1, 1`  
-Houdini parameter `xn__unrealskyAtmosphereMieAbsorption_6sbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorption</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieAbsorption_6sbn</code></dd></div></dl>
 
 The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
 
 #### Mie Anisotropy { #unreal-skyatmosphere-mieanisotropy }
 
-`unreal:skyAtmosphere:MieAnisotropy` · Default `0.8` · Range 0 to 0.999  
-Houdini parameter `xn__unrealskyAtmosphereMieAnisotropy_6sbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAnisotropy</code></dd></div><div><dt>Default</dt><dd><code>0.8</code></dd></div><div><dt>Range</dt><dd>0 to 0.999</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieAnisotropy_6sbn</code></dd></div></dl>
 
 A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
 
@@ -162,8 +144,7 @@ A value of 0 mean light is uniformly scattered. A value closer to 1 means lights
 
 #### Mie Exponential Distribution { #unreal-skyatmosphere-mieexponentialdistribution }
 
-`unreal:skyAtmosphere:MieExponentialDistribution` · Default `1.2` · Range 0.001 to 10  
-Houdini parameter `xn__unrealskyAtmosphereMieExponentialDistribution_dfcn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieExponentialDistribution</code></dd></div><div><dt>Default</dt><dd><code>1.2</code></dd></div><div><dt>Range</dt><dd>0.001 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereMieExponentialDistribution_dfcn</code></dd></div></dl>
 
 The altitude in kilometer at which Mie effects are reduced to 40%.
 
@@ -171,8 +152,7 @@ The altitude in kilometer at which Mie effects are reduced to 40%.
 
 #### Absorption Scale { #unreal-skyatmosphere-otherabsorptionscale }
 
-`unreal:skyAtmosphere:OtherAbsorptionScale` · Default `0.001881` · Range 0 to 0.2  
-Houdini parameter `xn__unrealskyAtmosphereOtherAbsorptionScale_l4bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorptionScale</code></dd></div><div><dt>Default</dt><dd><code>0.001881</code></dd></div><div><dt>Range</dt><dd>0 to 0.2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereOtherAbsorptionScale_l4bn</code></dd></div></dl>
 
 Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
 
@@ -180,8 +160,7 @@ Absorption coefficients for another atmosphere layer. Density increase from 0 to
 
 #### Absorption { #unreal-skyatmosphere-otherabsorption }
 
-`unreal:skyAtmosphere:OtherAbsorption` · Default `0.34556087187666135, 1, 0.045188729399255716`  
-Houdini parameter `xn__unrealskyAtmosphereOtherAbsorption_gwbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorption</code></dd></div><div><dt>Default</dt><dd><code>0.34556087187666135, 1, 0.045188729399255716</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereOtherAbsorption_gwbn</code></dd></div></dl>
 
 Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
 
@@ -189,8 +168,7 @@ Absorption coefficients for another atmosphere layer. Density increase from 0 to
 
 #### Sky Luminance Factor { #unreal-skyatmosphere-skyluminancefactor }
 
-`unreal:skyAtmosphere:SkyLuminanceFactor` · Default `1, 1, 1` · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereSkyLuminanceFactor_c1bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyLuminanceFactor</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereSkyLuminanceFactor_c1bn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scales the luminance of pixels representing the sky. This will impact the captured sky light.
 
@@ -198,64 +176,55 @@ Scales the luminance of pixels representing the sky. This will impact the captur
 
 #### Sky And Aerial Perspective Luminance Factor { #unreal-skyatmosphere-skyandaerialperspectiveluminancefactor }
 
-`unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor` · Default `1, 1, 1` · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_wycn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereSkyAndAerialPerspectiveLuminanceFactor_wycn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.
 
 #### Aerial Perspective View Distance Scale { #unreal-skyatmosphere-aerialpespectiveviewdistancescale }
 
-`unreal:skyAtmosphere:AerialPespectiveViewDistanceScale` · Default `1` · Range 0 to 3 · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_rqcn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPespectiveViewDistanceScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 3</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereAerialPespectiveViewDistanceScale_rqcn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent).
 
 #### Height Fog Contribution { #unreal-skyatmosphere-heightfogcontribution }
 
-`unreal:skyAtmosphere:HeightFogContribution` · Default `1` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereHeightFogContribution_75bn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:HeightFogContribution</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereHeightFogContribution_75bn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true.
 
 #### Transmittance Min Light Elevation Angle { #unreal-skyatmosphere-transmittanceminlightelevationangle }
 
-`unreal:skyAtmosphere:TransmittanceMinLightElevationAngle` · Default `-90` · Range -90 to 90 · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_0tcn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransmittanceMinLightElevationAngle</code></dd></div><div><dt>Default</dt><dd><code>-90</code></dd></div><div><dt>Range</dt><dd>-90 to 90</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereTransmittanceMinLightElevationAngle_0tcn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective.
 
 #### Aerial Perspective Start Depth { #unreal-skyatmosphere-aerialperspectivestartdepth }
 
-`unreal:skyAtmosphere:AerialPerspectiveStartDepth` · Default `0.1` · Range 0.001 to 10 · Realtime only  
-Houdini parameter `xn__unrealskyAtmosphereAerialPerspectiveStartDepth_zgcn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPerspectiveStartDepth</code></dd></div><div><dt>Default</dt><dd><code>0.1</code></dd></div><div><dt>Range</dt><dd>0.001 to 10</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmosphereAerialPerspectiveStartDepth_zgcn</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test.
 
 #### Aerial Pespective Rayleigh Scattering Start Distance { #unreal-volumetriccloud-aerialpespectiverayleighscatteringstartdistance }
 
-`unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_thdp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringStartDistance_thdp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)
 
 #### Aerial Pespective Rayleigh Scattering Fade Distance { #unreal-volumetriccloud-aerialpespectiverayleighscatteringfadedistance }
 
-`unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_6fdp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudAerialPespectiveRayleighScatteringFadeDistance_6fdp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
 
 #### Aerial Pespective Mie Scattering Start Distance { #unreal-volumetriccloud-aerialpespectivemiescatteringstartdistance }
 
-`unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_o8cp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudAerialPespectiveMieScatteringStartDistance_o8cp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)
 
 #### Aerial Pespective Mie Scattering Fade Distance { #unreal-volumetriccloud-aerialpespectivemiescatteringfadedistance }
 
-`unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_16cp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudAerialPespectiveMieScatteringFadeDistance_16cp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
 
@@ -263,36 +232,31 @@ Specify the distance over which the Rayleigh scattering will linearly ramp up to
 
 #### Holdout { #unreal-skyatmosphere-bholdout }
 
-`unreal:skyAtmosphere:bHoldout` · Default Off · Advanced  
-Houdini parameter `xn__unrealskyAtmospherebHoldout_1kbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmospherebHoldout_1kbn</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
 
 #### Render In Main Pass { #unreal-skyatmosphere-brenderinmainpass }
 
-`unreal:skyAtmosphere:bRenderInMainPass` · Default On · Advanced  
-Houdini parameter `xn__unrealskyAtmospherebRenderInMainPass_pzbn`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealskyAtmospherebRenderInMainPass_pzbn</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be rendered in the main pass (basepass, transparency)
 
 #### Holdout { #unreal-volumetriccloud-bholdout }
 
-`unreal:volumetricCloud:bHoldout` · Default Off · Advanced  
-Houdini parameter `xn__unrealvolumetricCloudbHoldout_bobp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudbHoldout_bobp</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
 
 #### Render In Main Pass { #unreal-volumetriccloud-brenderinmainpass }
 
-`unreal:volumetricCloud:bRenderInMainPass` · Default On · Advanced  
-Houdini parameter `xn__unrealvolumetricCloudbRenderInMainPass_y2bp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudbRenderInMainPass_y2bp</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be rendered in the main pass (basepass, transparency)
 
 #### Visible In Real Time Sky Captures { #unreal-volumetriccloud-bvisibleinrealtimeskycaptures }
 
-`unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_incp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudbVisibleInRealTimeSkyCaptures_incp</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 If true, this component will be visible in real-time sky light reflection captures.
 
@@ -300,8 +264,7 @@ If true, this component will be visible in real-time sky light reflection captur
 
 #### Layer Bottom Altitude { #unreal-volumetriccloud-layerbottomaltitude }
 
-`unreal:volumetricCloud:LayerBottomAltitude` · Default `5` · Range 0 to 20  
-Houdini parameter `xn__unrealvolumetricCloudLayerBottomAltitude_75bp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerBottomAltitude</code></dd></div><div><dt>Default</dt><dd><code>5</code></dd></div><div><dt>Range</dt><dd>0 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudLayerBottomAltitude_75bp</code></dd></div></dl>
 
 The altitude at which the cloud layer starts. (kilometers above the ground)
 
@@ -309,8 +272,7 @@ The altitude at which the cloud layer starts. (kilometers above the ground)
 
 #### Layer Height { #unreal-volumetriccloud-layerheight }
 
-`unreal:volumetricCloud:LayerHeight` · Default `10` · Range 0.1 to 20  
-Houdini parameter `xn__unrealvolumetricCloudLayerHeight_6sbp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerHeight</code></dd></div><div><dt>Default</dt><dd><code>10</code></dd></div><div><dt>Range</dt><dd>0.1 to 20</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudLayerHeight_6sbp</code></dd></div></dl>
 
 The height of the the cloud layer. (kilometers above the layer bottom altitude)
 
@@ -318,22 +280,19 @@ The height of the the cloud layer. (kilometers above the layer bottom altitude)
 
 #### Tracing Start Max Distance { #unreal-volumetriccloud-tracingstartmaxdistance }
 
-`unreal:volumetricCloud:TracingStartMaxDistance` · Default `350` · Range 1 to 500  
-Houdini parameter `xn__unrealvolumetricCloudTracingStartMaxDistance_qdcp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartMaxDistance</code></dd></div><div><dt>Default</dt><dd><code>350</code></dd></div><div><dt>Range</dt><dd>1 to 500</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudTracingStartMaxDistance_qdcp</code></dd></div></dl>
 
 The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
 
 #### Tracing Start Distance From Camera { #unreal-volumetriccloud-tracingstartdistancefromcamera }
 
-`unreal:volumetricCloud:TracingStartDistanceFromCamera` · Default `0` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudTracingStartDistanceFromCamera_4ocp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartDistanceFromCamera</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudTracingStartDistanceFromCamera_4ocp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)
 
 #### Tracing Max Distance { #unreal-volumetriccloud-tracingmaxdistance }
 
-`unreal:volumetricCloud:TracingMaxDistance` · Default `50` · Range 0.1 to 500  
-Houdini parameter `xn__unrealvolumetricCloudTracingMaxDistance_l4bp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingMaxDistance</code></dd></div><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>0.1 to 500</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudTracingMaxDistance_l4bp</code></dd></div></dl>
 
 The maximum distance that will be traced inside the cloud layer. (kilometers)
 
@@ -341,8 +300,7 @@ The maximum distance that will be traced inside the cloud layer. (kilometers)
 
 #### Material { #unreal-volumetriccloud-material }
 
-`unreal:volumetricCloud:Material` · Default (empty)  
-Houdini parameter `xn__unrealvolumetricCloudMaterial_bobp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:Material</code></dd></div><div><dt>Default</dt><dd>(empty)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudMaterial_bobp</code></dd></div></dl>
 
 The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
@@ -350,22 +308,19 @@ The material describing the cloud volume. It must be a Volume domain material. P
 
 #### Use Per Sample Atmospheric Light Transmittance { #unreal-volumetriccloud-busepersampleatmosphericlighttransmittance }
 
-`unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance` · Default Off · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_o8cp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudbUsePerSampleAtmosphericLightTransmittance_o8cp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance.
 
 #### Sky Light Cloud Bottom Occlusion { #unreal-volumetriccloud-skylightcloudbottomocclusion }
 
-`unreal:volumetricCloud:SkyLightCloudBottomOcclusion` · Default `0.5` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_vlcp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:SkyLightCloudBottomOcclusion</code></dd></div><div><dt>Default</dt><dd><code>0.5</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudSkyLightCloudBottomOcclusion_vlcp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value.
 
 #### View Sample Count Scale { #unreal-volumetriccloud-viewsamplecountscale }
 
-`unreal:volumetricCloud:ViewSampleCountScale` · Default `1` · Range 0.05 to 8 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudViewSampleCountScale_u7bp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.05 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudViewSampleCountScale_u7bp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
 
@@ -373,35 +328,30 @@ Scale the tracing sample count in primary views. Quality level scalability CVARs
 
 #### Reflection View Sample Count Scale Value { #unreal-volumetriccloud-reflectionviewsamplecountscalevalue }
 
-`unreal:volumetricCloud:ReflectionViewSampleCountScaleValue` · Default `1` · Range 0.05 to 8 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_9wcp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.05 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudReflectionViewSampleCountScaleValue_9wcp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.
 
 #### Shadow View Sample Count Scale { #unreal-volumetriccloud-shadowviewsamplecountscale }
 
-`unreal:volumetricCloud:ShadowViewSampleCountScale` · Default `1` · Range 0.05 to 8 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudShadowViewSampleCountScale_micp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.05 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudShadowViewSampleCountScale_micp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'.
 
 #### Shadow Reflection View Sample Count Scale Value { #unreal-volumetriccloud-shadowreflectionviewsamplecountscalevalue }
 
-`unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue` · Default `1` · Range 0.05 to 8 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_16cp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.05 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudShadowReflectionViewSampleCountScaleValue_16cp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'.
 
 #### Shadow Tracing Distance { #unreal-volumetriccloud-shadowtracingdistance }
 
-`unreal:volumetricCloud:ShadowTracingDistance` · Default `15` · Range 0.01 to 50 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudShadowTracingDistance_h9bp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowTracingDistance</code></dd></div><div><dt>Default</dt><dd><code>15</code></dd></div><div><dt>Range</dt><dd>0.01 to 50</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudShadowTracingDistance_h9bp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows.
 
 #### Stop Tracing Transmittance Threshold { #unreal-volumetriccloud-stoptracingtransmittancethreshold }
 
-`unreal:volumetricCloud:StopTracingTransmittanceThreshold` · Default `0.005` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_0tcp`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:StopTracingTransmittanceThreshold</code></dd></div><div><dt>Default</dt><dd><code>0.005</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealvolumetricCloudStopTracingTransmittanceThreshold_0tcp</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance.

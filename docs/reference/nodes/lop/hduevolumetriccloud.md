@@ -3,146 +3,308 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Volumetric Cloud
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduevolumetriccloud::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduevolumetriccloud::1.0</code></dd></div></dl>
 
 Creates or edits a UE Volumetric Cloud layer, drawn with a Sky Atmosphere.
 { .hdue-node-summary }
 
 Like a Volumetric Cloud placed in a UE level, it creates or edits an UnrealVolumetricCloud prim with UE's properties; with no Material it uses UE's default cloud material. It needs a Sky Atmosphere (prim or render setting). A prim takes the place of hdUE Render Settings' Volumetric Cloud; UE draws one, the first prim by path.
 
-## Parameters
+## Parameters { .hdue-section }
 
-### Sky
+### Sky { .hdue-tab }
 
-#### Planet
+#### Planet { .hdue-folder }
 
-Planet Radius
-:   The planet radius used when there is not SkyAtmosphere component present in the scene.
+<div class="hdue-params" markdown>
 
-    `unreal:volumetricCloud:PlanetRadius` · Default 6360
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Planet Radius</div>
+<div class="hdue-param__body" markdown>
 
-Ground Albedo
-:   The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled.
+The planet radius used when there is not SkyAtmosphere component present in the scene.
 
-    `unreal:volumetricCloud:GroundAlbedo` · Default 0.401978, 0.401978, 0.401978
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:PlanetRadius</code></dd></div><div><dt>Default</dt><dd>6360</dd></div></dl>
 
-#### Art Direction
+</div>
+</div>
 
-Aerial Pespective Rayleigh Scattering Start Distance
-:   Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Albedo</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance` · Default 0
+The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled.
 
-Aerial Pespective Rayleigh Scattering Fade Distance
-:   Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd>0.401978, 0.401978, 0.401978</dd></div></dl>
 
-    `unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance` · Default 0
+</div>
+</div>
 
-Aerial Pespective Mie Scattering Start Distance
-:   Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)
+</div>
 
-    `unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance` · Default 0
+#### Art Direction { .hdue-folder }
 
-Aerial Pespective Mie Scattering Fade Distance
-:   Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+<div class="hdue-params" markdown>
 
-    `unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Rayleigh Scattering Start Distance</div>
+<div class="hdue-param__body" markdown>
 
-#### Rendering
+Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:volumetricCloud:bHoldout` · Default off
+</div>
+</div>
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Rayleigh Scattering Fade Distance</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:bRenderInMainPass` · Default on
+Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
 
-Visible In Real Time Sky Captures
-:   If true, this component will be visible in real-time sky light reflection captures.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures` · Default on
+</div>
+</div>
 
-#### Layer
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Mie Scattering Start Distance</div>
+<div class="hdue-param__body" markdown>
 
-Layer Bottom Altitude
-:   The altitude at which the cloud layer starts. (kilometers above the ground)
+Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)
 
-    `unreal:volumetricCloud:LayerBottomAltitude` · Default 5
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
+</div>
+</div>
 
-Layer Height
-:   The height of the the cloud layer. (kilometers above the layer bottom altitude)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Mie Scattering Fade Distance</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:LayerHeight` · Default 10
+Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
 
-    <div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Tracing Start Max Distance
-:   The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
+</div>
+</div>
 
-    `unreal:volumetricCloud:TracingStartMaxDistance` · Default 350
+</div>
 
-Tracing Start Distance From Camera
-:   The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)
+#### Rendering { .hdue-folder }
 
-    `unreal:volumetricCloud:TracingStartDistanceFromCamera` · Default 0
+<div class="hdue-params" markdown>
 
-Tracing Max Distance
-:   The maximum distance that will be traced inside the cloud layer. (kilometers)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:TracingMaxDistance` · Default 50
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
 
-#### Cloud Material
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Material
-:   The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+</div>
+</div>
 
-    `unreal:volumetricCloud:Material`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
 
-#### Cloud Tracing
+If true, this component will be rendered in the main pass (basepass, transparency)
 
-Use Per Sample Atmospheric Light Transmittance
-:   Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance` · Default off
+</div>
+</div>
 
-Sky Light Cloud Bottom Occlusion
-:   Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Real Time Sky Captures</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:SkyLightCloudBottomOcclusion` · Default 0.5
+If true, this component will be visible in real-time sky light reflection captures.
 
-View Sample Count Scale
-:   Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:volumetricCloud:ViewSampleCountScale` · Default 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
+</div>
 
-Reflection View Sample Count Scale Value
-:   Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.
+#### Layer { .hdue-folder }
 
-    `unreal:volumetricCloud:ReflectionViewSampleCountScaleValue` · Default 1
+<div class="hdue-params" markdown>
 
-Shadow View Sample Count Scale
-:   Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Layer Bottom Altitude</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:ShadowViewSampleCountScale` · Default 1
+The altitude at which the cloud layer starts. (kilometers above the ground)
 
-Shadow Reflection View Sample Count Scale Value
-:   Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerBottomAltitude</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
 
-    `unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue` · Default 1
+<div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
 
-Shadow Tracing Distance
-:   The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows.
+</div>
+</div>
 
-    `unreal:volumetricCloud:ShadowTracingDistance` · Default 15
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Layer Height</div>
+<div class="hdue-param__body" markdown>
 
-Stop Tracing Transmittance Threshold
-:   When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance.
+The height of the the cloud layer. (kilometers above the layer bottom altitude)
 
-    `unreal:volumetricCloud:StopTracingTransmittanceThreshold` · Default 0.005
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerHeight</code></dd></div><div><dt>Default</dt><dd>10</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Start Max Distance</div>
+<div class="hdue-param__body" markdown>
+
+The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartMaxDistance</code></dd></div><div><dt>Default</dt><dd>350</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Start Distance From Camera</div>
+<div class="hdue-param__body" markdown>
+
+The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartDistanceFromCamera</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Max Distance</div>
+<div class="hdue-param__body" markdown>
+
+The maximum distance that will be traced inside the cloud layer. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingMaxDistance</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Cloud Material { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Material</div>
+<div class="hdue-param__body" markdown>
+
+The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:Material</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Cloud Tracing { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Use Per Sample Atmospheric Light Transmittance</div>
+<div class="hdue-param__body" markdown>
+
+Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Cloud Bottom Occlusion</div>
+<div class="hdue-param__body" markdown>
+
+Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:SkyLightCloudBottomOcclusion</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">View Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Reflection View Sample Count Scale Value</div>
+<div class="hdue-param__body" markdown>
+
+Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow View Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Reflection View Sample Count Scale Value</div>
+<div class="hdue-param__body" markdown>
+
+Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Tracing Distance</div>
+<div class="hdue-param__body" markdown>
+
+The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowTracingDistance</code></dd></div><div><dt>Default</dt><dd>15</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Stop Tracing Transmittance Threshold</div>
+<div class="hdue-param__body" markdown>
+
+When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:StopTracingTransmittanceThreshold</code></dd></div><div><dt>Default</dt><dd>0.005</dd></div></dl>
+
+</div>
+</div>
+
+</div>

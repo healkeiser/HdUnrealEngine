@@ -29,21 +29,75 @@ Not supported: `GeometryLight`, `PortalLight` and `PluginLight` prims render not
 
 ## Intensity and exposure
 
-**Intensity** · `inputs:intensity` · default 1 (DistantLight: 50000)
-**Exposure** · `inputs:exposure` · default 0, stops
+<div class="hdue-params" markdown>
 
-UsdLux intensity is luminance, in nits, of the light's surface. The light's brightness is **Intensity** × 2^**Exposure**: each stop of exposure doubles it. Keep **Intensity** at 1 and set brightness with **Exposure**.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Intensity</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:intensity`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1 (DistantLight: 50000)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Exposure</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:exposure`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0, stops</dd></div></dl>
+</div>
+</div>
+
+</div>
+
+UsdLux intensity is luminance, in nits, of the light's surface. The light's brightness is
+
+$$
+\text{brightness} = \text{Intensity} \times 2^{\text{Exposure}}
+$$
+
+Each stop of exposure doubles it. Keep **Intensity** at 1 and set brightness with **Exposure**.
 
 <div class="hdue-figure" data-figure="lights-exposure"></div>
 
-A DistantLight's intensity is the luminance of its sun disk. Its illuminance is intensity × π·sin²(angle/2): a 0.53° sun at intensity 1 gives 0.000067 lux. Turn on **Normalize Power** to set the sun in lux instead.
+A DistantLight's intensity is the luminance of its sun disk. Its illuminance is
+
+$$
+E = \text{intensity} \times \pi \sin^2\left(\frac{\text{angle}}{2}\right)
+$$
+
+A 0.53° sun at intensity 1 gives 0.000067 lux. Turn on **Normalize Power** to set the sun in lux instead.
 
 ## Size and normalize
 
-**Width**, **Height** · `inputs:width`, `inputs:height` · default 1 (RectLight)
-**Radius** · `inputs:radius` · default 0.5 (SphereLight, DiskLight, CylinderLight)
-**Length** · `inputs:length` · default 1 (CylinderLight)
-**Normalize Power** · `inputs:normalize` · default off
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Width, Height</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:width`, `inputs:height`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1 (RectLight)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Radius</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:radius`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.5 (SphereLight, DiskLight, CylinderLight)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Length</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:length`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1 (CylinderLight)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Normalize Power</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:normalize`</dd></div><div markdown><dt>Default</dt><dd markdown="span">off</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A bigger light gives softer shadows and wider highlights. Without **Normalize Power**, a bigger light also emits more: twice the width and height is 4 times the light. With it on, hdUE divides the intensity by the light's area, so size changes softness only.
 
@@ -61,9 +115,30 @@ A light's size also decides how sharp its reflection is on glossy surfaces. On S
 
 ## Colour and temperature
 
-**Color** · `inputs:color` · default (1, 1, 1)
-**Enable Color Temperature** · `inputs:enableColorTemperature` · default off
-**Color Temperature** · `inputs:colorTemperature` · default 6500, kelvin
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:color`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(1, 1, 1)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Enable Color Temperature</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:enableColorTemperature`</dd></div><div markdown><dt>Default</dt><dd markdown="span">off</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Color Temperature</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:colorTemperature`</dd></div><div markdown><dt>Default</dt><dd markdown="span">6500, kelvin</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 With temperature on, the light's colour is multiplied by the colour of a black body at that temperature. 6500 K is about white; lower is warmer, higher is bluer.
 
@@ -71,14 +146,38 @@ With temperature on, the light's colour is multiplied by the colour of a black b
 
 ## Diffuse and specular
 
-**Diffuse Multiplier** · `inputs:diffuse` · default 1
-**Specular Multiplier** · `inputs:specular` · default 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Diffuse Multiplier</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:diffuse`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Specular Multiplier</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:specular`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 UE's Diffuse Scale and Specular Scale on the light. Set **Specular Multiplier** to 0 to remove a light's highlights and reflections while keeping its diffuse light. Dome lights ignore both, with a warning: UE's sky light has one environment.
 
 ## Shadows
 
-**Enable** (Shadows) · `inputs:shadow:enable` · default on
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Enable (Shadows)</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:shadow:enable`</dd></div><div markdown><dt>Default</dt><dd markdown="span">on</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Off, the light casts no shadows (UE's Cast Shadows). Shadow softness comes from the light's size. The realtime shadow method (Virtual Shadow Maps or ray-traced shadows) is a render setting: see [Shadows](reference/render-settings/lighting.md#unreal-cvar-r-shadow-virtual-enable). Per light, **Cast Ray Traced Shadows**, **Contact Shadow Length** and the shadow biases are on the Unreal Engine tab.
 
@@ -87,14 +186,29 @@ Not supported, each with a warning: **Color** (`shadow:color`: UE shadows are bl
 ## Spot lights
 
 **Spotlight** · applies `ShapingAPI` to a Sphere Light
-**Angle** · `inputs:shaping:cone:angle` · default 90, degrees
-**Softness** · `inputs:shaping:cone:softness` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Angle</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:shaping:cone:angle`</dd></div><div markdown><dt>Default</dt><dd markdown="span">90, degrees</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Softness</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:shaping:cone:softness`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A Sphere Light with a cone of 90° or less becomes a UE Spot Light, as UE's USD importer makes it. **Angle** is the half-angle of the cone (UE's Outer Cone Angle). UE's spot lights stop at 88°: wider cones up to 90° render at 88°. A sphere light with a wider cone stays a point light.
 
 <div class="hdue-figure" data-figure="lights-spot-cone"></div>
 
-**Softness** sets UE's Inner Cone Angle to Angle × (1 − Softness): 0 is a hard edge, 1 fades from the centre.
+**Softness** sets UE's Inner Cone Angle to $\text{Angle} \times (1 - \text{Softness})$: 0 is a hard edge, 1 fades from the centre.
 
 <div class="hdue-figure" data-figure="lights-spot-softness"></div>
 
@@ -103,14 +217,38 @@ Cones on rect, disk and cylinder lights are ignored, with a warning: UE spots ar
 ## IES profiles
 
 **IES** · `inputs:shaping:ies:file`
-**Normalize** · `inputs:shaping:ies:normalize` · default off
-**Angle Scale** · `inputs:shaping:ies:angleScale` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Normalize</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:shaping:ies:normalize`</dd></div><div markdown><dt>Default</dt><dd markdown="span">off</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Angle Scale</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:shaping:ies:angleScale`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 An IES file shapes a sphere, spot, rect or disk light, read with UE's IES loader and pointed along the light's −Z, as in Karma. The light is scaled by the profile's candela values, as UsdLux defines it; **Normalize** instead keeps the unshaped light's total power. **Angle Scale** stretches the profile's vertical angles with the UsdLux formula. IES profiles on distant and dome lights are ignored, with a warning.
 
 ## Distant lights and the sun
 
-**Angle** · `inputs:angle` · default 0.53, degrees
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Angle</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:angle`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.53, degrees</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 The angular diameter of the sun disk (UE's Source Angle). Larger angles give softer shadows. With **Normalize Power** on, the illuminance stays the same.
 
@@ -121,9 +259,30 @@ A distant light is UE's Atmosphere Sun Light by default, so it lights UE's [Sky 
 ## Dome lights and HDRIs
 
 **Texture** · `inputs:texture:file`
-**Format** · `inputs:texture:format` · default `automatic`
-**Pole Axis** · `poleAxis` (DomeLight_1) · default `scene`
-**Visible to Camera** · `unreal:visibleBackground` · default on (Unreal Engine tab)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Format</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:texture:format`</dd></div><div markdown><dt>Default</dt><dd markdown="span">`automatic`</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Pole Axis</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`poleAxis` (DomeLight_1)</dd></div><div markdown><dt>Default</dt><dd markdown="span">`scene`</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Visible to Camera</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:visibleBackground`</dd></div><div markdown><dt>Default</dt><dd markdown="span">on (Unreal Engine tab)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 The dome becomes UE's sky light: it lights the scene, appears in reflections and draws the background. The texture is an HDR, EXR or ordinary image in latitude-longitude layout (`latlong` or `automatic`). HDR values are read as linear Rec.709; no OCIO conversion is applied. An image that is not 2:1 is stretched over the sphere, with a warning. Several domes add up into one environment.
 
@@ -139,7 +298,7 @@ Not supported on domes: light linking, light functions, IES, the diffuse and spe
 
 ## Mesh lights
 
-A mesh with `MeshLightAPI` (Houdini's **Geometry Light** type) emits **Color** × **Intensity** × 2^**Exposure**, colour temperature included, from its surface, as UE lights a scene from emissive surfaces. **Normalize Power** and `light:materialSyncMode` are ignored. The Path Tracer lights the surroundings from emissive meshes; Lumen lights them much less from small emitters (about 1% of the Path Tracer on a test wall). Use a rect or sphere light for a small emitter that must light its surroundings in realtime.
+A mesh with `MeshLightAPI` (Houdini's **Geometry Light** type) emits $\text{Color} \times \text{Intensity} \times 2^{\text{Exposure}}$, colour temperature included, from its surface, as UE lights a scene from emissive surfaces. **Normalize Power** and `light:materialSyncMode` are ignored. The Path Tracer lights the surroundings from emissive meshes; Lumen lights them much less from small emitters (about 1% of the Path Tracer on a test wall). Use a rect or sphere light for a small emitter that must light its surroundings in realtime.
 
 ## Light linking
 
@@ -168,7 +327,16 @@ Filters a local or distant light with an image, in Realtime and in the Path Trac
 
 ## MegaLights
 
-**MegaLights** · `unreal:megaLights` · default on (Unreal Engine tab)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">MegaLights</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:megaLights`</dd></div><div markdown><dt>Default</dt><dd markdown="span">on (Unreal Engine tab)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 In Realtime, local lights are shaded by UE's MegaLights when the render setting [MegaLights](reference/render-settings/rendering-features.md#unreal-postprocess-bmegalights) is on. Off on a light, that light uses UE's regular deferred lighting. Distant lights never use MegaLights; the Path Tracer has its own lighting.
 
@@ -176,19 +344,46 @@ In Realtime, local lights are shaded by UE's MegaLights when the render setting 
 
 The Light LOP's **Unreal Engine** tab sets properties of the UE light component, by UE's names: `unreal:light:<Property>`. They apply after the UsdLux translation, so they can override it. The full list, with UE's defaults and ranges, is in [Light properties](reference/light-properties.md). The ones that change the picture most:
 
-**Volumetric Scattering Intensity** · [`unreal:light:VolumetricScatteringIntensity`](reference/light-properties.md#unreal-light-volumetricscatteringintensity) · default 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Volumetric Scattering Intensity</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">[`unreal:light:VolumetricScatteringIntensity`](reference/light-properties.md#unreal-light-volumetricscatteringintensity)</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 How much the light scatters in Volumetric Fog, as a multiplier of its intensity. It changes the beam, not the lit surfaces.
 
 <div class="hdue-figure" data-figure="lights-volumetric-scattering"></div>
 
-**Cast Volumetric Shadow** · [`unreal:light:bCastVolumetricShadow`](reference/light-properties.md#unreal-light-bcastvolumetricshadow) · default off (distant lights: on)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Cast Volumetric Shadow</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">[`unreal:light:bCastVolumetricShadow`](reference/light-properties.md#unreal-light-bcastvolumetricshadow)</dd></div><div markdown><dt>Default</dt><dd markdown="span">off (distant lights: on)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Lets objects shadow the fog, so the ball cuts a dark shaft out of the beam. It costs GPU time per light.
 
 <div class="hdue-figure" data-figure="lights-volumetric-shadow"></div>
 
-**Indirect Lighting Intensity** · [`unreal:light:IndirectLightingIntensity`](reference/light-properties.md#unreal-light-indirectlightingintensity) · default 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Indirect Lighting Intensity</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">[`unreal:light:IndirectLightingIntensity`](reference/light-properties.md#unreal-light-indirectlightingintensity)</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Scales the light's bounced light in Realtime (Lumen); 0 removes it. Direct light is unchanged. In the Bistro, the lamps' bounce lights the walls and ceiling.
 

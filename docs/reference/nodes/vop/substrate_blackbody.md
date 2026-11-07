@@ -3,21 +3,41 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Blackbody
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_blackbody::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_blackbody::1.3</code></dd></div></dl>
 
 The color of a black body at a temperature (UE's BlackBody expression), for fire and hot gases.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Temperature
-:   Temperature in kelvin.
+<div class="hdue-params" markdown>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Temperature</div>
+<div class="hdue-param__body" markdown>
 
-Temperature
-:   Temperature in kelvin.
+Temperature in kelvin.
 
-    `temperature` · Default 6500
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Temperature</div>
+<div class="hdue-param__body" markdown>
+
+Temperature in kelvin.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>temperature</code></dd></div><div><dt>Default</dt><dd>6500</dd></div></dl>
+
+</div>
+</div>
+
+</div>

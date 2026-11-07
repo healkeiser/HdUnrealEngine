@@ -3,316 +3,694 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hduestandardrendervars.svg" alt=""> hdUE Standard Render Vars
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduestandardrendervars::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduestandardrendervars::1.0</code></dd></div></dl>
 
 Creates the render vars (AOVs) hdUE renders.
 { .hdue-node-summary }
 
 Like Karma Standard Render Vars, it creates a render var prim per enabled output under the parent primitive path, for hdUE Render Products or hdUE Render Settings (Image Output > Import Upstream Render Vars) to write. The beauty is rendered as converged; the other AOVs are read from the GBuffer of the nearest opaque surface (path traced: albedo and normal from the Path Tracer), Cryptomatte from sub-pixel ID passes (see docs/output/aovs.md in the hdUE repository).
 
-## Parameters
+## Parameters { .hdue-section }
 
-Parent Primitive Path
-:   Path of the prim under which this node creates its render vars.
+<div class="hdue-params" markdown>
 
-    `parentprimpath` · Default `/Render/Products/Vars`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Parent Primitive Path</div>
+<div class="hdue-param__body" markdown>
 
-### Beauty
+Path of the prim under which this node creates its render vars.
 
-Beauty
-:   Adds the render var C. The beauty: the rendered image with alpha (color4f, sourceName color).
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>parentprimpath</code></dd></div><div><dt>Default</dt><dd><code>/Render/Products/Vars</code></dd></div></dl>
 
-    `aov_C` · Default on
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
 
-    `aov_C_format` · Default `color4h` · Menu 16 Bit, 32 Bit
+### Beauty { .hdue-tab }
 
-### Surface
+<div class="hdue-params" markdown>
 
-Albedo
-:   Adds the render var albedo. Base colour (GBuffer); path traced, the Path Tracer's albedo, averaged over its samples. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Beauty</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_albedo` · Default off
+Adds the render var C. The beauty: the rendered image with alpha (color4f, sourceName color).
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_C</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `aov_albedo_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+</div>
+</div>
 
-Normal
-:   Adds the render var normal. World-space shading normal in USD axes, normalized; path traced, the Path Tracer's, averaged over its samples. (normal3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_normal` · Default on
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_C_format</code></dd></div><div><dt>Default</dt><dd><code>color4h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_normal_format` · Default `half3` · Menu 16 Bit, 32 Bit
+</div>
+</div>
 
-Roughness
-:   Adds the render var roughness. Roughness. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+</div>
 
-    `aov_roughness` · Default off
+### Surface { .hdue-tab }
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-params" markdown>
 
-    `aov_roughness_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
 
-Metallic
-:   Adds the render var metallic. Metallic. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var albedo. Base colour (GBuffer); path traced, the Path Tracer's albedo, averaged over its samples. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_metallic` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_albedo</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_metallic_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Specular
-:   Adds the render var specular. Specular (UE's F0 scale, 0.5 for 4% reflectance). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_specular` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_albedo_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_specular_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Normal</div>
+<div class="hdue-param__body" markdown>
 
-Occlusion
-:   Adds the render var occlusion. Material ambient occlusion. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var normal. World-space shading normal in USD axes, normalized; path traced, the Path Tracer's, averaged over its samples. (normal3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_occlusion` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_normal</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_occlusion_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Ambient Occlusion
-:   Adds the render var ambientOcclusion. Screen-space ambient occlusion of the raster pass (1 unoccluded). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_ambientOcclusion` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_normal_format</code></dd></div><div><dt>Default</dt><dd><code>half3</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_ambientOcclusion_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
 
-Opacity
-:   Adds the render var opacity. UE's GBuffer opacity (subsurface and two-sided foliage data; 0 for other surfaces). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var roughness. Roughness. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_opacity` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_roughness</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_opacity_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Subsurface Color
-:   Adds the render var subsurfaceColor. Subsurface colour of subsurface shading models, else black. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_subsurfaceColor` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_roughness_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_subsurfaceColor_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
 
-Anisotropy
-:   Adds the render var anisotropy. Anisotropy. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var metallic. Metallic. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_anisotropy` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_metallic</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_anisotropy_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Tangent
-:   Adds the render var tangent. World-space tangent in USD axes, normalized. (normal3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_tangent` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_metallic_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_tangent_format` · Default `half3` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
 
-Shading Model
-:   Adds the render var shadingModel. UE's shading model, as the colour code of its Shading Model view. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var specular. Specular (UE's F0 scale, 0.5 for 4% reflectance). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_shadingModel` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_specular</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_shadingModel_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Custom Depth
-:   Adds the render var customDepth. UE's custom depth (cm); hdUE meshes do not render into it, so it is the far value. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_customDepth` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_specular_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_customDepth_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Occlusion</div>
+<div class="hdue-param__body" markdown>
 
-Custom Stencil
-:   Adds the render var customStencil. UE's custom stencil; hdUE meshes do not write it, so it is 0. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Adds the render var occlusion. Material ambient occlusion. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_customStencil` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_occlusion</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_customStencil_format` · Default `half` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Velocity
-:   Adds the render var velocity. UE's encoded screen velocity (0.5 still); the AOV pass renders one time, so it is 0.5. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_velocity` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_occlusion_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+</div>
+</div>
 
-    `aov_velocity_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ambient Occlusion</div>
+<div class="hdue-param__body" markdown>
 
-### Lighting
+Adds the render var ambientOcclusion. Screen-space ambient occlusion of the raster pass (1 unoccluded). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-Combined Diffuse
-:   Adds the render var combineddiffuse. Diffuse reflection, direct and indirect. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_ambientOcclusion</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `aov_combineddiffuse` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_combineddiffuse_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Direct Diffuse
-:   Adds the render var directdiffuse. Diffuse reflection of direct light. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_ambientOcclusion_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_directdiffuse` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Opacity</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_directdiffuse_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Adds the render var opacity. UE's GBuffer opacity (subsurface and two-sided foliage data; 0 for other surfaces). (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-Indirect Diffuse
-:   Adds the render var indirectdiffuse. Diffuse reflection of indirect light (Lumen global illumination). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_opacity</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `aov_indirectdiffuse` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_indirectdiffuse_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Combined Glossy Reflection
-:   Adds the render var combinedglossyreflection. Specular reflection (and transmission), direct and indirect. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_opacity_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_combinedglossyreflection` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Subsurface Color</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_combinedglossyreflection_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Adds the render var subsurfaceColor. Subsurface colour of subsurface shading models, else black. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-Direct Glossy Reflection
-:   Adds the render var directglossyreflection. Specular reflection of direct light. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_subsurfaceColor</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `aov_directglossyreflection` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_directglossyreflection_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Indirect Glossy Reflection
-:   Adds the render var indirectglossyreflection. Specular reflection of indirect light (Lumen reflections). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_subsurfaceColor_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_indirectglossyreflection` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Anisotropy</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_indirectglossyreflection_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Adds the render var anisotropy. Anisotropy. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-Direct Emission
-:   Adds the render var directemission. Emission seen directly. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_anisotropy</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `aov_directemission` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_directemission_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Combined Volume
-:   Adds the render var combinedvolume. Volume scattering, direct and indirect (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_anisotropy_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_combinedvolume` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tangent</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_combinedvolume_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Adds the render var tangent. World-space tangent in USD axes, normalized. (normal3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-Direct Volume
-:   Adds the render var directvolume. Volume scattering of direct light (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_tangent</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `aov_directvolume` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_directvolume_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Indirect Volume
-:   Adds the render var indirectvolume. Volume scattering of indirect light (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_tangent_format</code></dd></div><div><dt>Default</dt><dd><code>half3</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_indirectvolume` · Default off
+</div>
+</div>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shading Model</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_indirectvolume_format` · Default `color3h` · Menu 16 Bit, 32 Bit
+Adds the render var shadingModel. UE's shading model, as the colour code of its Shading Model view. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-### Utility
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_shadingModel</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Depth
-:   Adds the render var depth. Linear axial depth from the camera in stage units (float). Read back with the beauty.
+</div>
+</div>
 
-    `aov_depth` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-Precision
-:   Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-    `aov_depth_format` · Default `float` · Menu 16 Bit, 32 Bit
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_shadingModel_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-Prim ID
-:   Adds the render var primId. Hydra prim ID of the visible mesh, -1 for background. (int) An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+</div>
+</div>
 
-    `aov_primId` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Custom Depth</div>
+<div class="hdue-param__body" markdown>
 
-Instance ID
-:   Adds the render var instanceId. Hydra instance index of an instanced prototype, -1 elsewhere. (int) An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+Adds the render var customDepth. UE's custom depth (cm); hdUE meshes do not render into it, so it is the far value. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
 
-    `aov_instanceId` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customDepth</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-### Cryptomatte
+</div>
+</div>
 
-Crypto Object
-:   Adds the Cryptomatte layer CryptoObject of prim paths: the render vars CryptoObject00 to CryptoObject02 (float4, ranks 0 to 5), with coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's metadata and manifest into each image.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_CryptoObject` · Default off
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
 
-Crypto Material
-:   Adds the Cryptomatte layer CryptoMaterial of bound material paths: the render vars CryptoMaterial00 to CryptoMaterial02 (float4, ranks 0 to 5), with coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's metadata and manifest into each image.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customDepth_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
 
-    `aov_CryptoMaterial` · Default off
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Custom Stencil</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var customStencil. UE's custom stencil; hdUE meshes do not write it, so it is 0. (float) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customStencil</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customStencil_format</code></dd></div><div><dt>Default</dt><dd><code>half</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Velocity</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var velocity. UE's encoded screen velocity (0.5 still); the AOV pass renders one time, so it is 0.5. (color3f) One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_velocity</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_velocity_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Lighting { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var combineddiffuse. Diffuse reflection, direct and indirect. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combineddiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combineddiffuse_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var directdiffuse. Diffuse reflection of direct light. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directdiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directdiffuse_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var indirectdiffuse. Diffuse reflection of indirect light (Lumen global illumination). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectdiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectdiffuse_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var combinedglossyreflection. Specular reflection (and transmission), direct and indirect. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedglossyreflection_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var directglossyreflection. Specular reflection of direct light. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directglossyreflection_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var indirectglossyreflection. Specular reflection of indirect light (Lumen reflections). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectglossyreflection_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Emission</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var directemission. Emission seen directly. (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directemission</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directemission_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Volume</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var combinedvolume. Volume scattering, direct and indirect (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedvolume_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Volume</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var directvolume. Volume scattering of direct light (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directvolume_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Volume</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var indirectvolume. Volume scattering of indirect light (path traced). (color3f) The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectvolume_format</code></dd></div><div><dt>Default</dt><dd><code>color3h</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Utility { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Depth</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var depth. Linear axial depth from the camera in stage units (float). Read back with the beauty.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_depth</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Precision</div>
+<div class="hdue-param__body" markdown>
+
+Bit depth of the channels husk writes to the image (driver:parameters:aov:husk:format).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_depth_format</code></dd></div><div><dt>Default</dt><dd><code>float</code></dd></div><div><dt>Menu</dt><dd>16 Bit, 32 Bit</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Prim ID</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var primId. Hydra prim ID of the visible mesh, -1 for background. (int) An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_primId</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Instance ID</div>
+<div class="hdue-param__body" markdown>
+
+Adds the render var instanceId. Hydra instance index of an instanced prototype, -1 elsewhere. (int) An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_instanceId</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Cryptomatte { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Crypto Object</div>
+<div class="hdue-param__body" markdown>
+
+Adds the Cryptomatte layer CryptoObject of prim paths: the render vars CryptoObject00 to CryptoObject02 (float4, ranks 0 to 5), with coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's metadata and manifest into each image.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_CryptoObject</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Crypto Material</div>
+<div class="hdue-param__body" markdown>
+
+Adds the Cryptomatte layer CryptoMaterial of bound material paths: the render vars CryptoMaterial00 to CryptoMaterial02 (float4, ranks 0 to 5), with coverage from 16 sub-pixel ID passes after the beauty converges. husk writes the layer's metadata and manifest into each image.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_CryptoMaterial</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>

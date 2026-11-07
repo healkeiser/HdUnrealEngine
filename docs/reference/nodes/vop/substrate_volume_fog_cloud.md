@@ -3,27 +3,59 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Volumetric Fog Cloud
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_volume_fog_cloud::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_volume_fog_cloud::1.3</code></dd></div></dl>
 
 A volume material for Volume prims: UE's Substrate Volumetric Fog Cloud BSDF, rendered as a heterogeneous volume. Wire it to the builder's output, and bind the material to a Volume prim.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Albedo
-:   Fraction of the light the medium scatters rather than absorbs.
+<div class="hdue-params" markdown>
 
-Extinction
-:   Extinction per scene unit (absorption plus scattering), usually a Volume Field times a color. Unconnected, the density grid times the volume's extinction scale, as hdUE's default volume material.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted radiance, for example a Blackbody of a Volume Field. Unconnected, the Blackbody of the emission field primvars:unreal:emissionField names, as hdUE's default volume material.
+Fraction of the light the medium scatters rather than absorbs.
 
-## Parameters
+</div>
+</div>
 
-Albedo
-:   Fraction of the light the medium scatters rather than absorbs.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Extinction</div>
+<div class="hdue-param__body" markdown>
 
-    `albedo` · Default 0.8, 0.8, 0.8
+Extinction per scene unit (absorption plus scattering), usually a Volume Field times a color. Unconnected, the density grid times the volume's extinction scale, as hdUE's default volume material.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted radiance, for example a Blackbody of a Volume Field. Unconnected, the Blackbody of the emission field primvars:unreal:emissionField names, as hdUE's default volume material.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
+
+Fraction of the light the medium scatters rather than absorbs.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>albedo</code></dd></div><div><dt>Default</dt><dd>0.8, 0.8, 0.8</dd></div></dl>
+
+</div>
+</div>
+
+</div>

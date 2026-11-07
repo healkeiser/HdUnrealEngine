@@ -12,35 +12,104 @@ The Camera LOP takes millimetres and writes USD's units: tenths of a scene unit,
 
 ## Projection
 
-**Projection** · `projection` · default `perspective`
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Projection</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`projection`</dd></div><div markdown><dt>Default</dt><dd markdown="span">`perspective`</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 `perspective` or `orthographic`. An orthographic camera's **Horizontal Aperture** is the width of the view in tenths of a scene unit.
 
 ## Focal length and aperture
 
-**Focal Length** · `focalLength` · default 50 (tenths of a scene unit)
-**Horizontal Aperture** · `horizontalAperture` · default 20.955
-**Vertical Aperture** · `verticalAperture` · default 15.2908
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Focal Length</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`focalLength`</dd></div><div markdown><dt>Default</dt><dd markdown="span">50 (tenths of a scene unit)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Horizontal Aperture</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`horizontalAperture`</dd></div><div markdown><dt>Default</dt><dd markdown="span">20.955</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Vertical Aperture</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`verticalAperture`</dd></div><div markdown><dt>Default</dt><dd markdown="span">15.2908</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Focal length over aperture sets the field of view. The aperture is conformed to the image's aspect ratio as Karma conforms it. Focal length also sets how much depth of field blurs: a longer lens at the same f-stop blurs more.
 
 ## Lens shift
 
-**Horizontal Aperture Offset** · `horizontalApertureOffset` · default 0
-**Vertical Aperture Offset** · `verticalApertureOffset` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Horizontal Aperture Offset</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`horizontalApertureOffset`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Vertical Aperture Offset</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`verticalApertureOffset`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Shifts the image window without turning the camera, in the aperture's units. Use it to keep verticals straight in architecture shots.
 
 ## Clipping
 
-**Clipping Range** · `clippingRange` · default (1, 1000000)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Clipping Range</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`clippingRange`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(1, 1000000)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 hdUE applies the near clip. **It does not apply the far clip**: everything beyond it still renders. UE's views keep an infinite far plane, and UE's Path Tracer traces past any far plane. To hide distant geometry, deactivate it or set its visibility instead.
 
 ## Depth of field
 
-**F-Stop** · `fStop` · default 0
-**Focus Distance** · `focusDistance` · default 0, scene units
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">F-Stop</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`fStop`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Focus Distance</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`focusDistance`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0, scene units</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Depth of field is on when both are above 0. Lower f-stops blur more: each halving of the f-stop doubles the blur. Focus Distance is measured from the camera in scene units, not in tenths.
 
@@ -60,7 +129,16 @@ To render every camera in focus, turn on **Disable Depth of Field** (`disableDep
 
 ## Exposure
 
-**Exposure** · `exposure` · default 0, stops
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Exposure</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`exposure`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0, stops</dd></div></dl>
+</div>
+</div>
+
+</div>
 **Exposure F-Stop**, **Exposure ISO**, **Exposure Time** · `exposure:fStop` (1), `exposure:iso` (100), `exposure:time` (1)
 
 Each stop of **Exposure** doubles the image's brightness. hdUE combines the four attributes into one scale as USD defines it, so the exposure triplet works as on a real camera. With the **Unreal Tonemapper** on (the default), the camera's exposure adds to [Exposure Compensation](reference/render-settings/index.md#unreal-postprocess-autoexposurebias). With it off, it scales the beauty and leaves the other AOVs untouched, as Karma does.
@@ -71,8 +149,23 @@ Each stop of **Exposure** doubles the image's brightness. hdUE combines the four
 
 ## Lens distortion
 
-**K1**, **K2**, **K3**, **P1**, **P2** · `unreal:lensDistortion:K1` ... `P2` · default 0
-**Principal Point** · `unreal:lensDistortion:PrincipalPoint` · default (0.5, 0.5)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">K1, K2, K3, P1, P2</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:lensDistortion:K1` ... `P2`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Principal Point</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`unreal:lensDistortion:PrincipalPoint`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(0.5, 0.5)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 UE's spherical lens model (Brown-Conrady), the values UE's Lens Distortion component and lens files take. K1 to K3 are radial, P1 and P2 tangential, all unitless. The principal point is the distortion centre, in normalized image coordinates. The Camera LOP has no parameter for them: author them with a Python LOP or in a USD layer:
 
@@ -89,8 +182,23 @@ Distortion applies in both render modes and to every AOV except `depth`. Orthogr
 
 ## Shutter
 
-**Shutter Open** · `shutter:open` · default 0
-**Shutter Close** · `shutter:close` · default 0, frames
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Shutter Open</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`shutter:open`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Shutter Close</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`shutter:close`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0, frames</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Motion blur needs **Shutter Close** above **Shutter Open**. See [Motion blur](rendering/motion-blur.md).
 

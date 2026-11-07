@@ -3,21 +3,37 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Color Parameter
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_color::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_color::1.3</code></dd></div></dl>
 
 A named color parameter of the material, editable on the material without recompiling.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Parameters
+## Parameters { .hdue-section }
 
-Parameter Name
-:   Name of the material parameter, unique in the graph and not starting with hdUE_. Renaming it recompiles the material.
+<div class="hdue-params" markdown>
 
-    `parameter_name` · Default `Color`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Parameter Name</div>
+<div class="hdue-param__body" markdown>
 
-Value
-:   The value. Editing it updates the render without recompiling the material.
+Name of the material parameter, unique in the graph and not starting with hdUE_. Renaming it recompiles the material.
 
-    `value` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>parameter_name</code></dd></div><div><dt>Default</dt><dd><code>Color</code></dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Value</div>
+<div class="hdue-param__body" markdown>
+
+The value. Editing it updates the render without recompiling the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>value</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+</div>

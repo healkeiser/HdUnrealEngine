@@ -337,21 +337,138 @@ html .glightbox-clean .gslide-title {
   background-color: var(--md-code-bg-color);
 }
 
+/* Parameters, one look everywhere: a setting's facts (generate_render_settings.py, generate_node_docs.py and the
+   pages' own) as small labels over their values, with badges for where it applies. */
+.md-typeset .hdue-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  align-items: flex-end;
+  margin: 0.6em 0 1em;
+}
+.md-typeset .hdue-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.md-typeset .hdue-facts dt {
+  color: var(--md-default-fg-color--lighter);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.md-typeset .hdue-facts dd {
+  margin: 0;
+  font-size: 0.7rem;
+}
+.md-typeset .hdue-facts code {
+  font-size: 0.85em;
+}
+.hdue-badge {
+  align-self: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 1rem;
+  color: var(--md-accent-fg-color);
+  background-color: var(--md-accent-fg-color--transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-accent-fg-color) 30%, transparent);
+  font-size: 0.6rem;
+  font-weight: 500;
+}
+
+/* The parameter grid (SideFX's help): the name beside its help, facts and figure, row under row, framed; a tab is a
+   band across it, a folder a smaller one. */
+.md-typeset .hdue-params {
+  margin: 0.8em 0 1.6em;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+}
+.md-typeset .hdue-param {
+  display: grid;
+  grid-template-columns: minmax(6rem, 28%) minmax(0, 1fr);
+}
+.md-typeset .hdue-param + .hdue-param {
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .hdue-param__name {
+  padding: 0.7rem 0.9rem;
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+  text-align: left;
+  background-color: var(--md-code-bg-color);
+  border-right: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .hdue-param__body {
+  min-width: 0;
+  padding: 0.1rem 1rem 0.1rem 1.2rem;
+}
+/* In the grid the facts stack, label beside value, so each label sits in the same column from row to row. */
+.md-typeset .hdue-param .hdue-facts {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.35rem 0.8rem;
+  align-items: baseline;
+}
+.md-typeset .hdue-param .hdue-facts > div {
+  display: contents;
+}
+.md-typeset .hdue-param .hdue-badge {
+  grid-column: 2;
+  justify-self: start;
+}
+.md-typeset .hdue-param__body > :first-child {
+  margin-top: 0.6rem;
+}
+.md-typeset .hdue-param__body > :last-child {
+  margin-bottom: 0.6rem;
+}
+.md-typeset .hdue-param__body .hdue-figure {
+  margin: 0.8em 0;
+}
+@media screen and (max-width: 44.9375em) {
+  .md-typeset .hdue-param {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .md-typeset .hdue-param__name {
+    padding: 0.5rem 0.8rem;
+    text-align: left;
+    border-right: 0;
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  }
+}
+.md-typeset h2.hdue-section {
+  margin-top: 2em;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color--light);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* A parameter tab and its folders: plain headings over the grid, left-aligned; only the section above them has a
+   rule. */
+.md-typeset .hdue-tab {
+  margin: 1.6em 0 0.6em;
+  font-size: 0.85rem;
+}
+.md-typeset .hdue-folder {
+  margin: 1.2em 0 0.5em;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.72rem;
+}
+
 /* Houdini node reference (scripts/generate_node_docs.py). */
 .md-typeset .hdue-node-icon {
   width: auto;
   height: 1.1em;
   vertical-align: -0.12em;
 }
-.hdue-node-type {
-  margin-top: -0.8em;
-  color: var(--md-default-fg-color--light, #888);
-  font-size: 0.75rem;
-}
 .hdue-node-summary {
   font-size: 0.9rem;
   font-weight: 500;
 }
-.md-typeset dl dt {
+.md-typeset dl:not(.hdue-facts) dt {
   font-weight: 600;
 }

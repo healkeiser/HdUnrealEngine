@@ -3,29 +3,61 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Float Multiply
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_multiply::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_multiply::1.3</code></dd></div></dl>
 
 Multiplies two floats.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-A
-:   First factor.
+<div class="hdue-params" markdown>
 
-B
-:   Second factor.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">A</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+First factor.
 
-A
-:   First factor.
+</div>
+</div>
 
-    `a` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">B</div>
+<div class="hdue-param__body" markdown>
 
-B
-:   Second factor.
+Second factor.
 
-    `b` · Default 1
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">A</div>
+<div class="hdue-param__body" markdown>
+
+First factor.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>a</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">B</div>
+<div class="hdue-param__body" markdown>
+
+Second factor.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>b</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+</div>

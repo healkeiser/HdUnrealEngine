@@ -3,26 +3,52 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Float Ramp
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_float_ramp::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_float_ramp::1.3</code></dd></div></dl>
 
 Remaps a float through a ramp (a UE curve in the material's curve atlas).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Value
-:   Position on the ramp, from 0 to 1, for example a Volume Field.
+<div class="hdue-params" markdown>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Value</div>
+<div class="hdue-param__body" markdown>
 
-Value
-:   Position on the ramp, from 0 to 1, for example a Volume Field.
+Position on the ramp, from 0 to 1, for example a Volume Field.
 
-    `value` · Default 0
+</div>
+</div>
 
-Ramp
-:   The ramp. Editing it recompiles the material.
+</div>
 
-    `ramp`
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Value</div>
+<div class="hdue-param__body" markdown>
+
+Position on the ramp, from 0 to 1, for example a Volume Field.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>value</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ramp</div>
+<div class="hdue-param__body" markdown>
+
+The ramp. Editing it recompiles the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>ramp</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>

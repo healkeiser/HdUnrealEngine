@@ -16,7 +16,16 @@ Every input updates live in the viewport and the Path Tracer restarts its accumu
 
 ## Diffuse Color
 
-**Diffuse Color** · `inputs:diffuseColor` · default (0.18, 0.18, 0.18)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Diffuse Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:diffuseColor`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(0.18, 0.18, 0.18)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 The surface colour: UE's Base Color. With **Metallic** 1 it is the metal's reflectance colour instead.
 
@@ -24,7 +33,16 @@ The surface colour: UE's Base Color. With **Metallic** 1 it is the metal's refle
 
 ## Emissive Color
 
-**Emissive Color** · `inputs:emissiveColor` · default (0, 0, 0)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Emissive Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:emissiveColor`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(0, 0, 0)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Light the surface emits: UE's Emissive Color. Values above 1 are allowed and needed for a surface that reads as a light source.
 
@@ -35,8 +53,23 @@ Light the surface emits: UE's Emissive Color. Values above 1 are allowed and nee
 
 ## Use Specular Workflow and Specular Color
 
-**Use Specular Workflow** · `inputs:useSpecularWorkflow` · default 0
-**Specular Color** · `inputs:specularColor` · default (0, 0, 0)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Use Specular Workflow</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:useSpecularWorkflow`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Specular Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:specularColor`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(0, 0, 0)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 At 1, **Diffuse Color** is the diffuse colour and **Specular Color** the reflectance at normal incidence (F0), as in UE's specular reflection. **Metallic** and **IOR** are then ignored. At 0 (the metalness workflow), **Specular Color** is ignored.
 
@@ -44,7 +77,16 @@ At 1, **Diffuse Color** is the diffuse colour and **Specular Color** the reflect
 
 ## Metallic
 
-**Metallic** · `inputs:metallic` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Metallic</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:metallic`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 0 is a dielectric (plastic, wood, paint), 1 a metal. A metal has no diffuse lobe: **Diffuse Color** becomes its reflection colour. Use 0 or 1; values between are for texture transitions such as rust edges.
 
@@ -52,7 +94,16 @@ At 1, **Diffuse Color** is the diffuse colour and **Specular Color** the reflect
 
 ## Roughness
 
-**Roughness** · `inputs:roughness` · default 0.5
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Roughness</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:roughness`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.5</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Microfacet roughness of the specular reflection, UE's Roughness: 0 is a mirror, 1 fully diffuse-looking.
 
@@ -63,7 +114,16 @@ Microfacet roughness of the specular reflection, UE's Roughness: 0 is a mirror, 
 
 ## Clearcoat
 
-**Clearcoat** · `inputs:clearcoat` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Clearcoat</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:clearcoat`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A clear, white varnish layer over the surface, with an IOR of 1.5. Above 0, the material renders with UE's layered Standard Surface material: the coat is a second Substrate slab over the base, which costs more per pixel than a plain Preview Surface.
 
@@ -74,7 +134,16 @@ A clear, white varnish layer over the surface, with an IOR of 1.5. Above 0, the 
 
 ## Clearcoat Roughness
 
-**Clearcoat Roughness** · `inputs:clearcoatRoughness` · default 0.01
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Clearcoat Roughness</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:clearcoatRoughness`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.01</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Roughness of the coat alone; the base keeps **Roughness**. A rough base under a sharp coat is the usual varnished look.
 
@@ -82,7 +151,16 @@ Roughness of the coat alone; the base keeps **Roughness**. A rough base under a 
 
 ## Opacity
 
-**Opacity** · `inputs:opacity` · default 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Opacity</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:opacity`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Below 1 (with **Opacity Threshold** 0) the surface is partly present, on UE's translucent material: what is behind it shows through, unbent. Opacity scales the whole surface, its reflections and emission too, so it reads as a thin film or a ghost, not as glass. For glass that refracts, use MaterialX `transmission` ([Opacity and glass](opacity-and-glass.md)).
 
@@ -90,7 +168,16 @@ Below 1 (with **Opacity Threshold** 0) the surface is partly present, on UE's tr
 
 ## Opacity Threshold
 
-**Opacity Threshold** · `inputs:opacityThreshold` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Opacity Threshold</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:opacityThreshold`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Above 0, **Opacity** becomes a cutout mask (UE's Masked blend mode): pixels with an opacity below the threshold are removed, the rest are fully opaque. Use it with a texture's alpha for leaves, fences and decals. Here the ball's opacity is 0.4 throughout: at 0.3 it is opaque, at 0.5 it is cut out entirely.
 
@@ -98,7 +185,16 @@ Above 0, **Opacity** becomes a cutout mask (UE's Masked blend mode): pixels with
 
 ## IOR
 
-**IOR** · `inputs:ior` · default 1.5
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">IOR</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:ior`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1.5</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Index of refraction of a dielectric. It sets the reflectance facing the camera, F0 = ((ior - 1) / (ior + 1))²: 0.02 for water (1.33), 0.04 for glass and plastics (1.5), 0.17 for diamond (2.4). It does not refract. Ignored with **Use Specular Workflow** 1.
 
@@ -106,19 +202,46 @@ Index of refraction of a dielectric. It sets the reflectance facing the camera, 
 
 ## Normal
 
-**Normal** · `inputs:normal` · default (0, 0, 1)
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Normal</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:normal`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(0, 0, 1)</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 A tangent-space normal map. Read the texture with **Source Color Space** `raw`, **Scale** (2, 2, 2, 1) and **Bias** (-1, -1, -1, 0), which turn texel values from 0..1 into -1..1. The map must be OpenGL-style (+Y up), as USD specifies.
 
 ## Displacement
 
-**Displacement** · `inputs:displacement` · default 0
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Displacement</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:displacement`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Moves the surface along its normals, in scene units, before rendering, so Lumen, the Path Tracer and Nanite all see the displaced shape. A textured displacement first subdivides the mesh to about one triangle per two texels (at most about a million triangles per mesh). See [Displacement](../geometry/displacement.md).
 
 ## Occlusion
 
-**Occlusion** · `inputs:occlusion` · default 1
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Occlusion</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`inputs:occlusion`</dd></div><div markdown><dt>Default</dt><dd markdown="span">1</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Baked ambient occlusion, UE's Ambient Occlusion input: below 1 it darkens the ambient light reaching the surface. Checked in Realtime.
 

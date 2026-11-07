@@ -3,48 +3,110 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Thin Film
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_thin_film::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_thin_film::1.3</code></dd></div></dl>
 
 Iridescence of a thin film (soap bubbles, oil, coatings): F0 and F90 for a Slab (Substrate Thin-Film).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Normal
-:   Shading normal. Unconnected, the mesh normal.
+<div class="hdue-params" markdown>
 
-F0
-:   Reflectance at normal incidence of the surface under the film.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Normal</div>
+<div class="hdue-param__body" markdown>
 
-F90
-:   Reflectance at grazing angles of the surface under the film.
+Shading normal. Unconnected, the mesh normal.
 
-Thickness
-:   Film thickness in micrometres: 1 is about 1000 nm.
+</div>
+</div>
 
-Ior
-:   Index of refraction of the film.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F0</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Reflectance at normal incidence of the surface under the film.
 
-F0
-:   Reflectance at normal incidence of the surface under the film.
+</div>
+</div>
 
-    `f0` · Default 0.04, 0.04, 0.04
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F90</div>
+<div class="hdue-param__body" markdown>
 
-F90
-:   Reflectance at grazing angles of the surface under the film.
+Reflectance at grazing angles of the surface under the film.
 
-    `f90` · Default 1, 1, 1
+</div>
+</div>
 
-Thickness
-:   Film thickness in micrometres: 1 is about 1000 nm.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Thickness</div>
+<div class="hdue-param__body" markdown>
 
-    `thickness` · Default 1
+Film thickness in micrometres: 1 is about 1000 nm.
 
-Ior
-:   Index of refraction of the film.
+</div>
+</div>
 
-    `ior` · Default 1.44
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ior</div>
+<div class="hdue-param__body" markdown>
+
+Index of refraction of the film.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F0</div>
+<div class="hdue-param__body" markdown>
+
+Reflectance at normal incidence of the surface under the film.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>f0</code></dd></div><div><dt>Default</dt><dd>0.04, 0.04, 0.04</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F90</div>
+<div class="hdue-param__body" markdown>
+
+Reflectance at grazing angles of the surface under the film.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>f90</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Thickness</div>
+<div class="hdue-param__body" markdown>
+
+Film thickness in micrometres: 1 is about 1000 nm.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>thickness</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ior</div>
+<div class="hdue-param__body" markdown>
+
+Index of refraction of the film.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>ior</code></dd></div><div><dt>Default</dt><dd>1.44</dd></div></dl>
+
+</div>
+</div>
+
+</div>

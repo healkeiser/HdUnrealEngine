@@ -3,31 +3,63 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Texture Sample
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_texture::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_texture::1.3</code></dd></div></dl>
 
 Samples an image file, or UDIM tiles from a <UDIM> pattern.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Uv
-:   UV coordinates from a UV Coordinates node. Unconnected, UV set 0.
+<div class="hdue-params" markdown>
 
-## Parameters
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Uv</div>
+<div class="hdue-param__body" markdown>
 
-File
-:   Image file, or a pattern with <UDIM>. Relative paths are relative to the HIP file.
+UV coordinates from a UV Coordinates node. Unconnected, UV set 0.
 
-    `file`
+</div>
+</div>
 
-Color Space
-:   sRGB for color images, Raw for data such as roughness, masks and normal maps.
+</div>
 
-    `color_space` · Default `srgb` · Menu sRGB, Raw
+## Parameters { .hdue-section }
 
-Address
-:   How UVs outside [0, 1] sample the image.
+<div class="hdue-params" markdown>
 
-    `address` · Default `wrap` · Menu Wrap, Clamp, Mirror
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">File</div>
+<div class="hdue-param__body" markdown>
+
+Image file, or a pattern with <UDIM>. Relative paths are relative to the HIP file.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>file</code></dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color Space</div>
+<div class="hdue-param__body" markdown>
+
+sRGB for color images, Raw for data such as roughness, masks and normal maps.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>color_space</code></dd></div><div><dt>Default</dt><dd><code>srgb</code></dd></div><div><dt>Menu</dt><dd>sRGB, Raw</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Address</div>
+<div class="hdue-param__body" markdown>
+
+How UVs outside [0, 1] sample the image.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>address</code></dd></div><div><dt>Default</dt><dd><code>wrap</code></dd></div><div><dt>Menu</dt><dd>Wrap, Clamp, Mirror</dd></div></dl>
+
+</div>
+</div>
+
+</div>

@@ -3,32 +3,70 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Horizontal Mix
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_horizontal::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_horizontal::1.3</code></dd></div></dl>
 
 Mixes two surfaces side by side (Substrate horizontal mixing).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Background
-:   Surface where Mix is 0.
+<div class="hdue-params" markdown>
 
-Foreground
-:   Surface where Mix is 1.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Background</div>
+<div class="hdue-param__body" markdown>
 
-Mix
-:   Amount of the foreground, from 0 to 1.
+Surface where Mix is 0.
 
-## Parameters
+</div>
+</div>
 
-Mix
-:   Amount of the foreground, from 0 to 1.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Foreground</div>
+<div class="hdue-param__body" markdown>
 
-    `mix` · Default 0.5
+Surface where Mix is 1.
 
-Parameter Blending
-:   Blends both surfaces' parameters into one slab instead of evaluating both: cheaper, less accurate. Changing it recompiles the material.
+</div>
+</div>
 
-    `parameter_blending` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mix</div>
+<div class="hdue-param__body" markdown>
+
+Amount of the foreground, from 0 to 1.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mix</div>
+<div class="hdue-param__body" markdown>
+
+Amount of the foreground, from 0 to 1.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>mix</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Parameter Blending</div>
+<div class="hdue-param__body" markdown>
+
+Blends both surfaces' parameters into one slab instead of evaluating both: cheaper, less accurate. Changing it recompiles the material.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>parameter_blending</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>

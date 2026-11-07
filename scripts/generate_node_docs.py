@@ -92,65 +92,98 @@ def number(value):
     return f"{value:g}" if isinstance(value, float) else str(value)
 
 
+def facts_html(facts):
+    """The facts strip (docs/assets/hdue.css .hdue-facts): each fact a small label over its value."""
+    cells = "".join(
+        f"<div><dt>{label}</dt><dd>{value}</dd></div>" for label, value in facts
+    )
+    return f'<dl class="hdue-facts">{cells}</dl>'
+
+
+def code(text):
+    return f"<code>{html.escape(text)}</code>"
+
+
 def details(definition, parm):
-    """The parameter's USD attribute (or name), default and menu, from the asset's parameter template."""
+    """The parameter's USD attribute (or name), default and menu, from the asset's parameter template, as facts."""
     template = definition.parmTemplateGroup().find(parm) if parm else None
     if template is None:
-        return f"`{parm}`" if parm else ""
-    name = hou.text.decode(parm) if parm.startswith("xn__") else parm
-    parts = [f"`{name}`"]
+        return [("Parameter", code(parm))] if parm else []
+    if parm.startswith("xn__"):
+        facts = [("USD attribute", code(hou.text.decode(parm)))]
+    else:
+        facts = [("Parameter", code(parm))]
     kind = template.type()
     if kind == hou.parmTemplateType.Toggle:
-        parts.append(f"Default {'on' if template.defaultValue() else 'off'}")
+        facts.append(("Default", "On" if template.defaultValue() else "Off"))
     elif kind == hou.parmTemplateType.Menu:
         labels, items = template.menuLabels(), template.menuItems()
         if labels:
-            parts.append(f"Default {labels[template.defaultValue()]}")
-            parts.append("Menu " + ", ".join(labels))
+            facts.append(
+                ("Default", html.escape(labels[template.defaultValue()]))
+            )
+            facts.append(("Menu", html.escape(", ".join(labels))))
         elif items:
-            parts.append(f"Default {items[template.defaultValue()]}")
+            facts.append(
+                ("Default", html.escape(items[template.defaultValue()]))
+            )
     elif kind in (hou.parmTemplateType.Float, hou.parmTemplateType.Int):
         values = template.defaultValue()
         if values:
-            parts.append("Default " + ", ".join(number(v) for v in values))
+            facts.append(("Default", ", ".join(number(v) for v in values)))
     elif kind == hou.parmTemplateType.String:
         values = [v for v in template.defaultValue() if v]
         if values:
-            parts.append("Default `" + ", ".join(values) + "`")
+            facts.append(("Default", code(", ".join(values))))
         if template.menuLabels():
-            parts.append("Menu " + ", ".join(template.menuLabels()))
-    return " · ".join(parts)
+            facts.append(
+                ("Menu", html.escape(", ".join(template.menuLabels())))
+            )
+    return facts
 
 
 def section(definition, items):
-    """A section's entries as definition lists, under the headings that hold at least one entry."""
-    out, pending = [], []
+    """A section's entries as SideFX's help lays them out: a grid of rows, the name beside its help, facts and
+    figure, with the parameter tabs and folders as bands across it (docs/assets/hdue.css .hdue-params).
+    """
+    out, pending, grid = [], [], False
     for item in items:
         if item[0] == "heading":
             level = item[1]
             pending = [h for h in pending if h[0] < level] + [(level, item[2])]
             continue
+        if pending and grid:
+            out.append("</div>\n")
+            grid = False
         for level, text in pending:
-            out.append(f"{'#' * (level + 1)} {text}\n")
+            # The wiki's == Tab == is level 2, its folders below it.
+            band = "hdue-tab" if level <= 2 else "hdue-folder"
+            out.append(f"{'#' * (level + 1)} {text} {{ .{band} }}\n")
         pending = []
+        if not grid:
+            out.append('<div class="hdue-params" markdown>\n')
+            grid = True
         _, label, parm, text = item
-        meta = details(definition, parm)
-        help_text = (
-            "\n\n    ".join(paragraphs(text).split("\n\n")) if text else ""
-        )
-        entry = (
-            f"{html.escape(label)}\n:   {help_text}"
-            if help_text
-            else f"{html.escape(label)}\n:   "
-        )
-        if meta:
-            entry += f"\n\n    {meta}" if help_text else meta
+        facts = details(definition, parm)
         attribute = (
             hou.text.decode(parm) if parm and parm.startswith("xn__") else parm
         )
+        body = [paragraphs(text)] if text else []
+        if facts:
+            body.append(facts_html(facts))
         if attribute in FIGURES:
-            entry += f'\n\n    <div class="hdue-figure" data-figure="{FIGURES[attribute]}"></div>'
-        out.append(entry + "\n")
+            body.append(
+                f'<div class="hdue-figure" data-figure="{FIGURES[attribute]}"></div>'
+            )
+        out.append(
+            '<div class="hdue-param" markdown>\n'
+            f'<div class="hdue-param__name">{html.escape(label)}</div>\n'
+            '<div class="hdue-param__body" markdown>\n\n'
+            + "\n\n".join(body)
+            + "\n\n</div>\n</div>\n"
+        )
+    if grid:
+        out.append("</div>\n")
     return "\n".join(out)
 
 
@@ -217,7 +250,10 @@ def main():
         )
         page.append(f"# {heading}{title}\n")
         page.append(
-            f'<p class="hdue-node-type">{kind} node · <code>{d.nodeTypeName()}</code></p>\n'
+            facts_html(
+                [("Context", f"{kind} node"), ("Type", code(d.nodeTypeName()))]
+            )
+            + "\n"
         )
         if summary:
             page.append(f"{summary}\n{{ .hdue-node-summary }}\n")
@@ -229,7 +265,10 @@ def main():
             ("parameters", "Parameters"),
         ):
             if any(item[0] == "entry" for item in sections.get(key, [])):
-                page.append(f"## {label}\n\n" + section(d, sections[key]))
+                page.append(
+                    f"## {label} {{ .hdue-section }}\n\n"
+                    + section(d, sections[key])
+                )
         path = OUT / context / f"{name}.md"
         path.parent.mkdir(exist_ok=True)
         path.write_text(

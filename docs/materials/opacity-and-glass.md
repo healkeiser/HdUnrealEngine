@@ -29,7 +29,16 @@ See [Preview Surface](preview-surface.md#opacity) for the opacity inputs, with f
 
 ## Translucency Method
 
-**Translucency Method** · [`unreal:postProcess:TranslucencyType`](../reference/render-settings/rendering-features.md#unreal-postprocess-translucencytype) · default Raster · Realtime only
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Translucency Method</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">[`unreal:postProcess:TranslucencyType`](../reference/render-settings/rendering-features.md#unreal-postprocess-translucencytype)</dd></div><div markdown><dt>Default</dt><dd markdown="span">Raster</dd></div><span class="hdue-badge">Realtime only</span></dl>
+</div>
+</div>
+
+</div>
 
 How UE draws translucent surfaces in Realtime. **Raster** draws them over the scene; refraction is a screen-space offset. **Ray Traced** traces refraction and reflection rays through them and comes much closer to the Path Tracer. The Path Tracer always traces glass.
 
@@ -39,7 +48,16 @@ With Ray Traced, its section shows UE's own settings: [Max Roughness](../referen
 
 ## Specular Roughness
 
-**Specular Roughness** · `specular_roughness` · default 0.2
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Specular Roughness</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`specular_roughness`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0.2</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 On a transmissive surface, roughness blurs both the reflection and what is seen through the glass: frosted glass. With Ray Traced translucency, roughness above **Max Roughness** (0.6) fades out the traced refraction.
 
@@ -47,8 +65,23 @@ On a transmissive surface, roughness blurs both the reflection and what is seen 
 
 ## Transmission Color and Transmission Depth
 
-**Transmission Color** · `transmission_color` · default (1, 1, 1)
-**Transmission Depth** · `transmission_depth` · default 0, scene units
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Transmission Color</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`transmission_color`</dd></div><div markdown><dt>Default</dt><dd markdown="span">(1, 1, 1)</dd></div></dl>
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name" markdown="span">Transmission Depth</div>
+<div class="hdue-param__body" markdown>
+<dl class="hdue-facts" markdown><div markdown><dt>USD attribute</dt><dd markdown="span">`transmission_depth`</dd></div><div markdown><dt>Default</dt><dd markdown="span">0, scene units</dd></div></dl>
+</div>
+</div>
+
+</div>
 
 Light travelling through the glass reaches **Transmission Color** after **Transmission Depth**: thick parts are darker and more saturated than thin ones, as in a bottle. UE turns the pair into an absorption distance (its `Substrate-StandardSurface-Translucent` function, as Interchange imports it). Path Tracer below, on a 9 cm ball.
 

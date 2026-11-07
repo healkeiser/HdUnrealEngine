@@ -3,170 +3,348 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Sky Atmosphere
 
-<p class="hdue-node-type">LOP node · <code>hdue::hdueskyatmosphere::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hdueskyatmosphere::1.0</code></dd></div></dl>
 
 Creates or edits a UE Sky Atmosphere: UE's physical sky, lit by the distant lights.
 { .hdue-node-summary }
 
 Like a Sky Atmosphere placed in a UE level, it creates or edits an UnrealSkyAtmosphere prim with UE's properties (kilometres, as in UE). Distant lights light it as atmosphere suns. A prim takes the place of hdUE Render Settings' Sky Atmosphere; UE draws one, the first prim by path. Its position counts only when Transform Mode places the planet at the component.
 
-## Parameters
+## Parameters { .hdue-section }
 
-### Sky
+### Sky { .hdue-tab }
 
-#### Planet
+#### Planet { .hdue-folder }
 
-Transform Mode
-:   The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+<div class="hdue-params" markdown>
 
-    `unreal:skyAtmosphere:TransformMode` · Default `ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin` · Menu PlanetTopAtAbsoluteWorldOrigin, PlanetTopAtComponentTransform, PlanetCenterAtComponentTransform
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transform Mode</div>
+<div class="hdue-param__body" markdown>
 
-Ground Radius
-:   The radius in kilometers from the center of the planet to the ground level.
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
 
-    `unreal:skyAtmosphere:BottomRadius` · Default 6360
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransformMode</code></dd></div><div><dt>Default</dt><dd><code>ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin</code></dd></div><div><dt>Menu</dt><dd>PlanetTopAtAbsoluteWorldOrigin, PlanetTopAtComponentTransform, PlanetCenterAtComponentTransform</dd></div></dl>
 
-Ground Albedo
-:   The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:GroundAlbedo` · Default 0.401978, 0.401978, 0.401978
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Radius</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-ground-albedo"></div>
+The radius in kilometers from the center of the planet to the ground level.
 
-#### Atmosphere
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:BottomRadius</code></dd></div><div><dt>Default</dt><dd>6360</dd></div></dl>
 
-Atmosphere Height
-:   The height of the atmosphere layer above the ground in kilometers.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:AtmosphereHeight` · Default 60
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Albedo</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
 
-MultiScattering
-:   Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd>0.401978, 0.401978, 0.401978</dd></div></dl>
 
-    `unreal:skyAtmosphere:MultiScatteringFactor` · Default 1
+<div class="hdue-figure" data-figure="ref-ground-albedo"></div>
 
-    <div class="hdue-figure" data-figure="ref-multiscattering"></div>
+</div>
+</div>
 
-Trace Sample Count Scale
-:   Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
+</div>
 
-    `unreal:skyAtmosphere:TraceSampleCountScale` · Default 1
+#### Atmosphere { .hdue-folder }
 
-#### Atmosphere - Rayleigh
+<div class="hdue-params" markdown>
 
-Rayleigh Scattering Scale
-:   Rayleigh scattering coefficient scale.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Atmosphere Height</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:RayleighScatteringScale` · Default 0.0331
+The height of the atmosphere layer above the ground in kilometers.
 
-    <div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AtmosphereHeight</code></dd></div><div><dt>Default</dt><dd>60</dd></div></dl>
 
-Rayleigh Scattering
-:   The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
+<div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
 
-    `unreal:skyAtmosphere:RayleighScattering` · Default 0.175287, 0.409607, 1
+</div>
+</div>
 
-Rayleigh Exponential Distribution
-:   The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">MultiScattering</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:RayleighExponentialDistribution` · Default 8
+Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
 
-#### Atmosphere - Mie
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MultiScatteringFactor</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Mie Scattering Scale
-:   Mie scattering coefficient scale.
+<div class="hdue-figure" data-figure="ref-multiscattering"></div>
 
-    `unreal:skyAtmosphere:MieScatteringScale` · Default 0.003996
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="sky-mie-scattering"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Trace Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
 
-Mie Scattering
-:   The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
+Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
 
-    `unreal:skyAtmosphere:MieScattering` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TraceSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Mie Absorption Scale
-:   Mie absorption coefficient scale.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:MieAbsorptionScale` · Default 0.000444
+</div>
 
-    <div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
+#### Atmosphere - Rayleigh { .hdue-folder }
 
-Mie Absorption
-:   The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
+<div class="hdue-params" markdown>
 
-    `unreal:skyAtmosphere:MieAbsorption` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Scattering Scale</div>
+<div class="hdue-param__body" markdown>
 
-Mie Anisotropy
-:   A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
+Rayleigh scattering coefficient scale.
 
-    `unreal:skyAtmosphere:MieAnisotropy` · Default 0.8
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScatteringScale</code></dd></div><div><dt>Default</dt><dd>0.0331</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
+<div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
 
-Mie Exponential Distribution
-:   The altitude in kilometer at which Mie effects are reduced to 40%.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:MieExponentialDistribution` · Default 1.2
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Scattering</div>
+<div class="hdue-param__body" markdown>
 
-#### Atmosphere - Absorption
+The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
 
-Absorption Scale
-:   Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScattering</code></dd></div><div><dt>Default</dt><dd>0.175287, 0.409607, 1</dd></div></dl>
 
-    `unreal:skyAtmosphere:OtherAbsorptionScale` · Default 0.001881
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Exponential Distribution</div>
+<div class="hdue-param__body" markdown>
 
-Absorption
-:   Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
+The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
 
-    `unreal:skyAtmosphere:OtherAbsorption` · Default 0.345561, 1, 0.0451887
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighExponentialDistribution</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
 
-#### Art Direction
+</div>
+</div>
 
-Sky Luminance Factor
-:   Scales the luminance of pixels representing the sky. This will impact the captured sky light.
+</div>
 
-    `unreal:skyAtmosphere:SkyLuminanceFactor` · Default 1, 1, 1
+#### Atmosphere - Mie { .hdue-folder }
 
-    <div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
+<div class="hdue-params" markdown>
 
-Sky And Aerial Perspective Luminance Factor
-:   Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Scattering Scale</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor` · Default 1, 1, 1
+Mie scattering coefficient scale.
 
-Aerial Perspective View Distance Scale
-:   Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScatteringScale</code></dd></div><div><dt>Default</dt><dd>0.003996</dd></div></dl>
 
-    `unreal:skyAtmosphere:AerialPespectiveViewDistanceScale` · Default 1
+<div class="hdue-figure" data-figure="sky-mie-scattering"></div>
 
-Height Fog Contribution
-:   Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:HeightFogContribution` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Scattering</div>
+<div class="hdue-param__body" markdown>
 
-Transmittance Min Light Elevation Angle
-:   The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective.
+The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
 
-    `unreal:skyAtmosphere:TransmittanceMinLightElevationAngle` · Default -90
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScattering</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-Aerial Perspective Start Depth
-:   The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:AerialPerspectiveStartDepth` · Default 0.1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Absorption Scale</div>
+<div class="hdue-param__body" markdown>
 
-#### Rendering
+Mie absorption coefficient scale.
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorptionScale</code></dd></div><div><dt>Default</dt><dd>0.000444</dd></div></dl>
 
-    `unreal:skyAtmosphere:bHoldout` · Default off
+<div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+</div>
+</div>
 
-    `unreal:skyAtmosphere:bRenderInMainPass` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Absorption</div>
+<div class="hdue-param__body" markdown>
+
+The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorption</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Anisotropy</div>
+<div class="hdue-param__body" markdown>
+
+A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAnisotropy</code></dd></div><div><dt>Default</dt><dd>0.8</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Exponential Distribution</div>
+<div class="hdue-param__body" markdown>
+
+The altitude in kilometer at which Mie effects are reduced to 40%.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieExponentialDistribution</code></dd></div><div><dt>Default</dt><dd>1.2</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Atmosphere - Absorption { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Absorption Scale</div>
+<div class="hdue-param__body" markdown>
+
+Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorptionScale</code></dd></div><div><dt>Default</dt><dd>0.001881</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Absorption</div>
+<div class="hdue-param__body" markdown>
+
+Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorption</code></dd></div><div><dt>Default</dt><dd>0.345561, 1, 0.0451887</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Art Direction { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Luminance Factor</div>
+<div class="hdue-param__body" markdown>
+
+Scales the luminance of pixels representing the sky. This will impact the captured sky light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyLuminanceFactor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky And Aerial Perspective Luminance Factor</div>
+<div class="hdue-param__body" markdown>
+
+Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Perspective View Distance Scale</div>
+<div class="hdue-param__body" markdown>
+
+Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPespectiveViewDistanceScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Height Fog Contribution</div>
+<div class="hdue-param__body" markdown>
+
+Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:HeightFogContribution</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transmittance Min Light Elevation Angle</div>
+<div class="hdue-param__body" markdown>
+
+The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransmittanceMinLightElevationAngle</code></dd></div><div><dt>Default</dt><dd>-90</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Perspective Start Depth</div>
+<div class="hdue-param__body" markdown>
+
+The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPerspectiveStartDepth</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Rendering { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
+
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be rendered in the main pass (basepass, transparency)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>

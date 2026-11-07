@@ -3,240 +3,498 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Height Fog
 
-<p class="hdue-node-type">LOP node · <code>hdue::hdueheightfog::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hdueheightfog::1.0</code></dd></div></dl>
 
 Creates or edits a UE Exponential Height Fog: fog thickest below the prim's height.
 { .hdue-node-summary }
 
 Like an Exponential Height Fog placed in a UE level, it creates or edits an UnrealExponentialHeightFog prim: the fog's density is Fog Density at the prim's height (its world position along the up axis), with UE's properties (Volumetric Fog included). A prim takes the place of hdUE Render Settings' Fog tab; UE draws one height fog, the first prim by path. Each property's control starts at Do Nothing: the prim's fallback is UE's default.
 
-## Parameters
+## Parameters { .hdue-section }
 
-### Fog
+### Fog { .hdue-tab }
 
-#### Exponential Height Fog Component
+#### Exponential Height Fog Component { .hdue-folder }
 
-Fog Density
-:   Global density factor.
+<div class="hdue-params" markdown>
 
-    `unreal:heightFog:FogDensity` · Default 0.02
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Density</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="fog-density"></div>
+Global density factor.
 
-Fog Height Falloff
-:   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogDensity</code></dd></div><div><dt>Default</dt><dd>0.02</dd></div></dl>
 
-    `unreal:heightFog:FogHeightFalloff` · Default 0.2
+<div class="hdue-figure" data-figure="fog-density"></div>
 
-    <div class="hdue-figure" data-figure="fog-height-falloff"></div>
+</div>
+</div>
 
-Second Fog Density
-:   Global density factor for this fog. Density 0 turns the second fog off.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Height Falloff</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:SecondFogData:FogDensity` · Default 0
+Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
-    <div class="hdue-figure" data-figure="ref-second-fog-density"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
 
-Second Fog Height Falloff
-:   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+<div class="hdue-figure" data-figure="fog-height-falloff"></div>
 
-    `unreal:heightFog:SecondFogData:FogHeightFalloff` · Default 0.2
+</div>
+</div>
 
-Second Fog Height Offset
-:   Height offset, relative to the actor position Z.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Density</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:SecondFogData:FogHeightOffset` · Default 0
+Global density factor for this fog. Density 0 turns the second fog off.
 
-Fog Inscattering Color
-:   Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogDensity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:FogInscatteringLuminance` · Default 0, 0, 0
+<div class="hdue-figure" data-figure="ref-second-fog-density"></div>
 
-    <div class="hdue-figure" data-figure="fog-inscattering-color"></div>
+</div>
+</div>
 
-Sky Atmosphere Ambient Contribution Color Scale
-:   Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Height Falloff</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:SkyAtmosphereAmbientContributionColorScale` · Default 1, 1, 1
+Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
-Fog Max Opacity
-:   Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
 
-    `unreal:heightFog:FogMaxOpacity` · Default 1
+</div>
+</div>
 
-Start Distance
-:   Distance from the camera that the fog will start, in world units.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Height Offset</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:StartDistance` · Default 0
+Height offset, relative to the actor position Z.
 
-End Distance
-:   Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightOffset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:EndDistance` · Default 0
+</div>
+</div>
 
-Fog Cutoff Distance
-:   Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Inscattering Color</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:FogCutoffDistance` · Default 0
+Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
 
-#### Inscattering Texture
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
 
-Inscattering Color Cubemap
-:   Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-figure" data-figure="fog-inscattering-color"></div>
 
-    `unreal:heightFog:InscatteringColorCubemap`
+</div>
+</div>
 
-Sky Light Capture In-Scattering Strength
-:   When >0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Atmosphere Ambient Contribution Color Scale</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength` · Default 0
+Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0
 
-Sky Light Capture In-Scattering Roughness
-:   This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyAtmosphereAmbientContributionColorScale</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-    `unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness` · Default 0.15
+</div>
+</div>
 
-Inscattering Color Cubemap Angle
-:   Angle to rotate the InscatteringColorCubemap around the Z axis.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Max Opacity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:InscatteringColorCubemapAngle` · Default 0
+Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all.
 
-Inscattering Texture Tint
-:   Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogMaxOpacity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:heightFog:InscatteringTextureTint` · Default 1, 1, 1
+</div>
+</div>
 
-Fully Directional Inscattering Color Distance
-:   Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Distance</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:FullyDirectionalInscatteringColorDistance` · Default 100000
+Distance from the camera that the fog will start, in world units.
 
-Non Directional Inscattering Color Distance
-:   Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:StartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:NonDirectionalInscatteringColorDistance` · Default 1000
+</div>
+</div>
 
-#### Directional Inscattering
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">End Distance</div>
+<div class="hdue-param__body" markdown>
 
-Directional Inscattering Exponent
-:   Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead.
+Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0.
 
-    `unreal:heightFog:DirectionalInscatteringExponent` · Default 4
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:EndDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Directional Inscattering Start Distance
-:   Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+</div>
+</div>
 
-    `unreal:heightFog:DirectionalInscatteringStartDistance` · Default 10000
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Cutoff Distance</div>
+<div class="hdue-param__body" markdown>
 
-Directional Inscattering Color
-:   Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in.
 
-    `unreal:heightFog:DirectionalInscatteringLuminance` · Default 0, 0, 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogCutoffDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-#### Volumetric Fog
+</div>
+</div>
 
-Volumetric Fog
-:   Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
+</div>
 
-    `unreal:heightFog:bEnableVolumetricFog` · Default off
+#### Inscattering Texture { .hdue-folder }
 
-    <div class="hdue-figure" data-figure="fog-volumetric"></div>
+<div class="hdue-params" markdown>
 
-Scattering Distribution
-:   Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Color Cubemap</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:VolumetricFogScatteringDistribution` · Default 0.2
+Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
-    <div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemap</code></dd></div></dl>
 
-Albedo
-:   The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
+</div>
+</div>
 
-    `unreal:heightFog:VolumetricFogAlbedo` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Capture In-Scattering Strength</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+When >0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
 
-Emissive
-:   Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:VolumetricFogEmissive` · Default 0, 0, 0
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Capture In-Scattering Roughness</div>
+<div class="hdue-param__body" markdown>
 
-Extinction Scale
-:   Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function.
 
-    `unreal:heightFog:VolumetricFogExtinctionScale` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness</code></dd></div><div><dt>Default</dt><dd>0.15</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="fog-extinction-scale"></div>
+</div>
+</div>
 
-View Distance
-:   Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Color Cubemap Angle</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:VolumetricFogDistance` · Default 6000
+Angle to rotate the InscatteringColorCubemap around the Z axis.
 
-Start Distance
-:   Distance from the camera that the volumetric fog will start, in world units.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemapAngle</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:VolumetricFogStartDistance` · Default 0
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Texture Tint</div>
+<div class="hdue-param__body" markdown>
 
-Near Fade In Distance
-:   Distance over which volumetric fog will fade in from the start distance.
+Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap.
 
-    `unreal:heightFog:VolumetricFogNearFadeInDistance` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringTextureTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-Override Light Colors With Fog Inscattering Colors
-:   Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting.
+</div>
+</div>
 
-    `unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fully Directional Inscattering Color Distance</div>
+<div class="hdue-param__body" markdown>
 
-#### Fog Screen Space Scattering - EXPERIMENTAL
+Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color.
 
-Enable Fog Screen Space Scattering
-:   Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FullyDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd>100000</dd></div></dl>
 
-    `unreal:heightFog:bEnableFSSS` · Default off
+</div>
+</div>
 
-Scene Color Scattering Amount Scale
-:   The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Non Directional Inscattering Color Distance</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:FSSSSceneColorScatteringAmountScale` · Default 1
+Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color.
 
-Scene Color Scattering Amount Power
-:   Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:NonDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd>1000</dd></div></dl>
 
-    `unreal:heightFog:FSSSSceneColorScatteringAmountPower` · Default 1
+</div>
+</div>
 
-Spread Scale
-:   The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities.
+</div>
 
-    `unreal:heightFog:FSSSSpreadScale` · Default 0.1
+#### Directional Inscattering { .hdue-folder }
 
-Blur Control
-:   When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture.
+<div class="hdue-params" markdown>
 
-    `unreal:heightFog:FSSSBlurControl` · Default 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Exponent</div>
+<div class="hdue-param__body" markdown>
 
-#### Rendering
+Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead.
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringExponent</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
 
-    `unreal:heightFog:bHoldout` · Default off
+</div>
+</div>
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Start Distance</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:bRenderInMainPass` · Default on
+Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
 
-Visible In Reflection Captures
-:   If true, this component will be visible in reflection captures.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>10000</dd></div></dl>
 
-    `unreal:heightFog:bVisibleInReflectionCaptures` · Default on
+</div>
+</div>
 
-Visible In Real Time Sky Captures
-:   If true, this component will be visible in real-time sky light reflection captures.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Color</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:bVisibleInRealTimeSkyCaptures` · Default on
+Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Volumetric Fog { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Volumetric Fog</div>
+<div class="hdue-param__body" markdown>
+
+Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableVolumetricFog</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-volumetric"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scattering Distribution</div>
+<div class="hdue-param__body" markdown>
+
+Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogScatteringDistribution</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
+
+The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogAlbedo</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emissive</div>
+<div class="hdue-param__body" markdown>
+
+Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogEmissive</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Extinction Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogExtinctionScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-extinction-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">View Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogDistance</code></dd></div><div><dt>Default</dt><dd>6000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance from the camera that the volumetric fog will start, in world units.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Near Fade In Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance over which volumetric fog will fade in from the start distance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogNearFadeInDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Override Light Colors With Fog Inscattering Colors</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Fog Screen Space Scattering - EXPERIMENTAL { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Enable Fog Screen Space Scattering</div>
+<div class="hdue-param__body" markdown>
+
+Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableFSSS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scene Color Scattering Amount Scale</div>
+<div class="hdue-param__body" markdown>
+
+The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scene Color Scattering Amount Power</div>
+<div class="hdue-param__body" markdown>
+
+Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountPower</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Spread Scale</div>
+<div class="hdue-param__body" markdown>
+
+The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSpreadScale</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Blur Control</div>
+<div class="hdue-param__body" markdown>
+
+When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSBlurControl</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Rendering { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
+
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be rendered in the main pass (basepass, transparency)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Reflection Captures</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be visible in reflection captures.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInReflectionCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Real Time Sky Captures</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be visible in real-time sky light reflection captures.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>

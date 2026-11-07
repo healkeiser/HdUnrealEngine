@@ -3,62 +3,148 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Eye
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_eye::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_eye::1.3</code></dd></div></dl>
 
 UE's Substrate Eye BSDF, for eyes modeled as UE's eye shading expects (cornea, iris and their normals).
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Diffuse Color
-:   Iris and sclera color.
+<div class="hdue-params" markdown>
 
-Roughness
-:   Roughness of the cornea.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse Color</div>
+<div class="hdue-param__body" markdown>
 
-Cornea Normal
-:   Cornea normal. Unconnected, the mesh normal.
+Iris and sclera color.
 
-Iris Normal
-:   Iris normal. Unconnected, the mesh normal.
+</div>
+</div>
 
-Iris Plane Normal
-:   Normal of the iris plane. Unconnected, the mesh normal.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
 
-Iris Mask
-:   1 on the iris, 0 elsewhere.
+Roughness of the cornea.
 
-Iris Distance
-:   Depth of the iris below the cornea.
+</div>
+</div>
 
-Emission
-:   Emitted light.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Cornea Normal</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Cornea normal. Unconnected, the mesh normal.
 
-Diffuse Color
-:   Iris and sclera color.
+</div>
+</div>
 
-    `diffuse_color` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Normal</div>
+<div class="hdue-param__body" markdown>
 
-Roughness
-:   Roughness of the cornea.
+Iris normal. Unconnected, the mesh normal.
 
-    `roughness` · Default 0.5
+</div>
+</div>
 
-Iris Mask
-:   1 on the iris, 0 elsewhere.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Plane Normal</div>
+<div class="hdue-param__body" markdown>
 
-    `iris_mask` · Default 0
+Normal of the iris plane. Unconnected, the mesh normal.
 
-Iris Distance
-:   Depth of the iris below the cornea.
+</div>
+</div>
 
-    `iris_distance` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Mask</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted light.
+1 on the iris, 0 elsewhere.
 
-    `emission` · Default 0, 0, 0
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Distance</div>
+<div class="hdue-param__body" markdown>
+
+Depth of the iris below the cornea.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse Color</div>
+<div class="hdue-param__body" markdown>
+
+Iris and sclera color.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>diffuse_color</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Roughness of the cornea.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>roughness</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Mask</div>
+<div class="hdue-param__body" markdown>
+
+1 on the iris, 0 elsewhere.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>iris_mask</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Iris Distance</div>
+<div class="hdue-param__body" markdown>
+
+Depth of the iris below the cornea.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>iris_distance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>emission</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

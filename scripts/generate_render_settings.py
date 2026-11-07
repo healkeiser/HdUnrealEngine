@@ -14,6 +14,7 @@ update, then scripts/build_render_settings_hda.py, and commit the result:
 """
 
 import argparse
+import html
 import json
 import os
 import re
@@ -2458,7 +2459,7 @@ FIGURES = figure_index()
 
 def md_text(text):
     """UE tooltip text as Markdown: no HTML, emphasis or headings by accident."""
-    return re.sub(r"([*<>\[\]])", r"\\1", text.strip()).replace("\n", " ")
+    return re.sub(r"([*<>\[\]])", r"\\\1", text.strip()).replace("\n", " ")
 
 
 def md_default(setting):
@@ -2473,23 +2474,46 @@ def md_default(setting):
     return "`" + ", ".join(ds_number(x) for x in v) + "`"
 
 
+def html_inline(text):
+    """A fact's Markdown (code spans only) as HTML, for the facts strip."""
+    parts = text.split("`")
+    return "".join(
+        f"<code>{html.escape(p)}</code>" if i % 2 else html.escape(p)
+        for i, p in enumerate(parts)
+    )
+
+
+def facts_html(facts, badges=()):
+    """The facts strip (docs/assets/hdue.css .hdue-facts): each fact a small label over its value, then badges."""
+    cells = "".join(
+        f"<div><dt>{label}</dt><dd>{html_inline(value)}</dd></div>"
+        for label, value in facts
+    )
+    marks = "".join(f'<span class="hdue-badge">{b}</span>' for b in badges)
+    return f'<dl class="hdue-facts">{cells}{marks}</dl>'
+
+
 def md_setting(setting, level):
-    """One parameter: its label as a heading with the attribute as anchor, then a fact line, help and menu."""
+    """One parameter: its label as a heading with the attribute as anchor, then its facts, help and menu."""
     attribute = setting["attribute"]
     anchor = re.sub(r"[^\w-]", "-", attribute).lower()
-    facts = [f"`{attribute}`", f"Default {md_default(setting)}"]
+    facts = [
+        ("USD attribute", f"`{attribute}`"),
+        ("Default", md_default(setting)),
+    ]
     if setting.get("range"):
         lo, hi = setting["range"][:2]
-        facts.append(f"Range {ds_number(lo)} to {ds_number(hi)}")
+        facts.append(("Range", f"{ds_number(lo)} to {ds_number(hi)}"))
+    facts.append(("Houdini parameter", f"`{houdini_name(attribute)}`"))
+    badges = []
     if setting.get("mode"):
-        facts.append(MODE_NAMES[setting["mode"]])
+        badges.append(MODE_NAMES[setting["mode"]])
     if setting.get("advanced"):
-        facts.append("Advanced")
+        badges.append("Advanced")
     lines = [
         f"{'#' * level} {md_text(setting['label'])} {{ #{anchor} }}",
         "",
-        " · ".join(facts) + "  ",
-        f"Houdini parameter `{houdini_name(attribute)}`",
+        facts_html(facts, badges),
         "",
     ]
     if setting["help"]:

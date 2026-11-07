@@ -3,16 +3,26 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Volume Field
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_volume_field::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_volume_field::1.3</code></dd></div></dl>
 
 A grid of the Volume prim at the shaded point.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Parameters
+## Parameters { .hdue-section }
 
-Field
-:   Density: the density field (or the first field). Emission: the field primvars:unreal:emissionField names.
+<div class="hdue-params" markdown>
 
-    `field` · Default `density` · Menu Density, Emission
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Field</div>
+<div class="hdue-param__body" markdown>
+
+Density: the density field (or the first field). Emission: the field primvars:unreal:emissionField names.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>field</code></dd></div><div><dt>Default</dt><dd><code>density</code></dd></div><div><dt>Menu</dt><dd>Density, Emission</dd></div></dl>
+
+</div>
+</div>
+
+</div>

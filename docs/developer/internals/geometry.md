@@ -14,7 +14,7 @@ This sets the scale hdUE renders from Hydra geometry. NVIDIA's Da Vinci Workshop
 
 The Preview Surface `displacement` input and MaterialX `ND_displacement_float` (`displacement` × `scale`) move the mesh's points along their normals by that distance, in the mesh's object space and units, before the mesh is uploaded, so Lumen, the Path Tracer and Nanite see the same surface. A textured displacement first dices the mesh uniformly: each triangle splits into four per level, up to about one triangle per two texels and at most about a million triangles per mesh. Normals are then recomputed from the displaced surface; a UV seam splits the surface only where the texture differs across it, and hard edges open. A constant displacement moves the points without dicing. Meshes with wet-surface effects are not displaced. Displacement is not adaptive (Karma dices by screen size). UE's Nanite tessellation and World Position Offset are not used: UE 5.8's ray-traced geometry, which the Path Tracer renders, ignores both. MaterialX vector displacement is not translated.
 
-Dicing is `HdUEDiceLevels` in `src/hydra/displacement.h`: levels until the triangle count reaches min(texels / 2, 2^20).
+Dicing is `HdUEDiceLevels` in `src/hydra/displacement.h`: levels until the triangle count reaches $\min(\text{texels} / 2,\ 2^{20})$.
 
 ## Meshes and instancing
 

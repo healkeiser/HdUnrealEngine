@@ -8,8 +8,7 @@ Every one of the 372 render settings, in the order the Unreal Engine tab of a Re
 
 #### Render Mode { #unreal-rendermode }
 
-`unreal:renderMode` · Default Realtime (Lumen)  
-Houdini parameter `xn__unrealrenderMode_41a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:renderMode</code></dd></div><div><dt>Default</dt><dd>Realtime (Lumen)</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealrenderMode_41a</code></dd></div></dl>
 
 Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. Path Tracer accumulates UE's reference path tracer.
 
@@ -22,8 +21,7 @@ Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant
 
 #### Path Tracer Samples { #unreal-samplesperpixel }
 
-`unreal:samplesPerPixel` · Default `2048` · Range 1 to 65536 · Path Tracer only  
-Houdini parameter `xn__unrealsamplesPerPixel_99a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:samplesPerPixel</code></dd></div><div><dt>Default</dt><dd><code>2048</code></dd></div><div><dt>Range</dt><dd>1 to 65536</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealsamplesPerPixel_99a</code></dd></div><span class="hdue-badge">Path Tracer only</span></dl>
 
 Samples per pixel. Divided between motion-blur sub-frames.
 
@@ -31,8 +29,7 @@ Samples per pixel. Divided between motion-blur sub-frames.
 
 #### Warmup Frames { #unreal-warmupframes }
 
-`unreal:warmupFrames` · Default `64` · Range 1 to 256 · Realtime only  
-Houdini parameter `xn__unrealwarmupFrames_e5a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:warmupFrames</code></dd></div><div><dt>Default</dt><dd><code>64</code></dd></div><div><dt>Range</dt><dd>1 to 256</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealwarmupFrames_e5a</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. In husk, only a sequence's first frame warms up: each later frame continues its history with one draw, as Movie Render Queue does.
 
@@ -40,8 +37,7 @@ Realtime frames rendered before a frame counts as converged, so Lumen and tempor
 
 #### Unreal Tonemapper { #unreal-tonemapper }
 
-`unreal:tonemapper` · Default Off  
-Houdini parameter `xn__unrealtonemapper_41a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:tonemapper</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealtonemapper_41a</code></dd></div></dl>
 
 Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone curve, the beauty becomes UE's tone-mapped image (display-linear): view it with an sRGB view that only encodes (Houdini's Un-tone-mapped), not Raw.
 
@@ -49,8 +45,7 @@ Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone cu
 
 #### Disable Tone Curve { #unreal-disabletonecurve }
 
-`unreal:disableToneCurve` · Default Off  
-Houdini parameter `xn__unrealdisableToneCurve_wcb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:disableToneCurve</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealdisableToneCurve_wcb</code></dd></div></dl>
 
 Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blooms, vignettes and adds grain, without UE's film curve, so the beauty stays scene-linear for the OCIO view. Forced on, as UE forces it when OpenColorIO does the display, when the OCIO config's default view is a display transform of its own (ACES, AgX).
 
@@ -58,8 +53,7 @@ Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blo
 
 #### Exposure Compensation { #unreal-postprocess-autoexposurebias }
 
-`unreal:postProcess:AutoExposureBias` · Default `0` · Range -15 to 15  
-Houdini parameter `xn__unrealpostProcessAutoExposureBias_tubl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureBias</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-15 to 15</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessAutoExposureBias_tubl</code></dd></div></dl>
 
 Logarithmic adjustment for the exposure. Only used if a tonemapper is specified. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... hdUE adds the USD camera exposure to it.
 

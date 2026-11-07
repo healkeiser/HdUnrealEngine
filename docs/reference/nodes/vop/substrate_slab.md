@@ -3,65 +3,157 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Substrate Slab
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_slab::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_slab::1.3</code></dd></div></dl>
 
 One Substrate slab: diffuse and specular reflection, with optional simple-volume subsurface scattering.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Diffuse Albedo
-:   Diffuse color.
+<div class="hdue-params" markdown>
 
-F0
-:   Specular reflectance at normal incidence: about 0.04 for common dielectrics, 0.02 for water.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse Albedo</div>
+<div class="hdue-param__body" markdown>
 
-Roughness
-:   Specular roughness, from 0 (mirror) to 1.
+Diffuse color.
 
-Normal
-:   Shading normal from a Normal Map node. Unconnected, the mesh normal.
+</div>
+</div>
 
-Mfp
-:   Mean free path of light in the slab, in scene units, used by Simple Volume subsurface.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F0</div>
+<div class="hdue-param__body" markdown>
 
-F90
-:   Specular reflectance at grazing angles, for example a Thin Film's F90. Unconnected, white.
+Specular reflectance at normal incidence: about 0.04 for common dielectrics, 0.02 for water.
 
-Second Roughness
-:   Roughness of a second specular lobe, for example from Haziness to Second Roughness. Unconnected, none.
+</div>
+</div>
 
-Second Roughness Weight
-:   Weight of the second specular lobe. Unconnected, none.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
 
-Emission
-:   Emitted light. Unconnected, none.
+Specular roughness, from 0 (mirror) to 1.
 
-## Parameters
+</div>
+</div>
 
-Diffuse Albedo
-:   Diffuse color.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Normal</div>
+<div class="hdue-param__body" markdown>
 
-    `diffuse_albedo` · Default 0.18, 0.18, 0.18
+Shading normal from a Normal Map node. Unconnected, the mesh normal.
 
-F0
-:   Specular reflectance at normal incidence: about 0.04 for common dielectrics, 0.02 for water.
+</div>
+</div>
 
-    `f0` · Default 0.04, 0.04, 0.04
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mfp</div>
+<div class="hdue-param__body" markdown>
 
-Roughness
-:   Specular roughness, from 0 (mirror) to 1.
+Mean free path of light in the slab, in scene units, used by Simple Volume subsurface.
 
-    `roughness` · Default 0.5
+</div>
+</div>
 
-Mfp
-:   Mean free path of light in the slab, in scene units, used by Simple Volume subsurface.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F90</div>
+<div class="hdue-param__body" markdown>
 
-    `mfp` · Default 0, 0, 0
+Specular reflectance at grazing angles, for example a Thin Film's F90. Unconnected, white.
 
-Subsurface
-:   None: an opaque slab. Simple Volume: light scatters in the slab over its mean free path.
+</div>
+</div>
 
-    `subsurface` · Default `none` · Menu None, Simple Volume
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Roughness of a second specular lobe, for example from Haziness to Second Roughness. Unconnected, none.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Roughness Weight</div>
+<div class="hdue-param__body" markdown>
+
+Weight of the second specular lobe. Unconnected, none.
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emission</div>
+<div class="hdue-param__body" markdown>
+
+Emitted light. Unconnected, none.
+
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse Albedo</div>
+<div class="hdue-param__body" markdown>
+
+Diffuse color.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>diffuse_albedo</code></dd></div><div><dt>Default</dt><dd>0.18, 0.18, 0.18</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">F0</div>
+<div class="hdue-param__body" markdown>
+
+Specular reflectance at normal incidence: about 0.04 for common dielectrics, 0.02 for water.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>f0</code></dd></div><div><dt>Default</dt><dd>0.04, 0.04, 0.04</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Specular roughness, from 0 (mirror) to 1.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>roughness</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mfp</div>
+<div class="hdue-param__body" markdown>
+
+Mean free path of light in the slab, in scene units, used by Simple Volume subsurface.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>mfp</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Subsurface</div>
+<div class="hdue-param__body" markdown>
+
+None: an opaque slab. Simple Volume: light scatters in the slab over its mean free path.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>subsurface</code></dd></div><div><dt>Default</dt><dd><code>none</code></dd></div><div><dt>Menu</dt><dd>None, Simple Volume</dd></div></dl>
+
+</div>
+</div>
+
+</div>

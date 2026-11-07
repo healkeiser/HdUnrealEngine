@@ -3,14 +3,24 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Substrate Builder
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_builder::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_builder::1.3</code></dd></div></dl>
 
 Composes a UE Substrate material from hdUE Substrate nodes. Like a Karma Material Builder, it goes in a Material Library LOP (or /mat, with the library's Material VOP pointing at it), which authors the material's typed USD graph; hdUE prepares that graph into a native Substrate material.
 { .hdue-node-summary }
 
-## Parameters
+## Parameters { .hdue-section }
 
-Tab Menu Mask
-:   Nodes the TAB menu offers inside the builder: the hdUE Substrate nodes, the only ones it translates.
+<div class="hdue-params" markdown>
 
-    `tabmenumask` · Default `hdUE`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tab Menu Mask</div>
+<div class="hdue-param__body" markdown>
+
+Nodes the TAB menu offers inside the builder: the hdUE Substrate nodes, the only ones it translates.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>tabmenumask</code></dd></div><div><dt>Default</dt><dd><code>hdUE</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>

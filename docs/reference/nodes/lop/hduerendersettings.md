@@ -3,2499 +3,5255 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hduerenderproperties.svg" alt=""> hdUE Render Settings
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduerendersettings::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduerendersettings::1.0</code></dd></div></dl>
 
 Renders the stage with Unreal Engine: render settings, camera, resolution, output and AOVs.
 { .hdue-node-summary }
 
 Like Karma Render Settings, it creates the render settings prim, its render product and render vars, and makes that prim the stage's default render settings. It authors the hdUE settings changed from their defaults; the others keep hdUE's defaults (see docs/rendering/render-settings.md in the hdUE repository). In Image Output, it can also render the render products and add the render vars authored upstream, by hdUE Render Products and hdUE Standard Render Vars.
 
-## Parameters
+## Parameters { .hdue-section }
 
-Show
-:   Essential shows the settings UE's editor shows by default; Advanced adds those it keeps behind its Advanced expanders (AdvancedDisplay), the console variables it shows only in the console, and hdUE's rarely changed settings. Essential also hides the Unreal Tonemapper's effects while it is off. Settings for the other render mode are hidden in both and, as in a Render Settings LOP, not authored; those Essential hides are.
+<div class="hdue-params" markdown>
 
-    `hdue_show` · Default Essential · Menu Essential, Advanced
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Show</div>
+<div class="hdue-param__body" markdown>
 
-Show in Advanced
-:   Switches Show to Advanced, which shows the changed settings Essential hides.
+Essential shows the settings UE's editor shows by default; Advanced adds those it keeps behind its Advanced expanders (AdvancedDisplay), the console variables it shows only in the console, and hdUE's rarely changed settings. Essential also hides the Unreal Tonemapper's effects while it is off. Settings for the other render mode are hidden in both and, as in a Render Settings LOP, not authored; those Essential hides are.
 
-    `hdue_showhidden`
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>hdue_show</code></dd></div><div><dt>Default</dt><dd>Essential</dd></div><div><dt>Menu</dt><dd>Essential, Advanced</dd></div></dl>
 
+</div>
+</div>
 
-:   Settings changed from their default that Essential hides: they are still rendered.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Show in Advanced</div>
+<div class="hdue-param__body" markdown>
 
-    `hdue_hiddenchanges`
+Switches Show to Advanced, which shows the changed settings Essential hides.
 
-### Render Settings Prim
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>hdue_showhidden</code></dd></div></dl>
 
-Render Settings Prim
-:   Path of the UsdRenderSettings prim this node creates or edits.
+</div>
+</div>
 
-    `primpath` · Default `/Render/rendersettings`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name"></div>
+<div class="hdue-param__body" markdown>
 
-Set as Default Render Settings Prim
-:   Makes this prim the stage's default render settings (renderSettingsPrimPath), which the viewport and husk render with, also where the input stage brings render settings of its own.
+Settings changed from their default that Essential hides: they are still rendered.
 
-    `setlayerrendersettings` · Default on
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>hdue_hiddenchanges</code></dd></div></dl>
 
-Output Picture
-:   Image the built-in render product writes (husk, USD Render ROP): its productName.
+</div>
+</div>
 
-    `picture` · Default `$HIP/render/$HIPNAME.$OS.$F4.exr`
+</div>
 
-Camera
-:   Camera prim the render looks through (husk, USD Render ROP; the viewport uses its own camera unless you look through this one).
+### Render Settings Prim { .hdue-tab }
 
-    `camera` · Default `/cameras/camera1`
+<div class="hdue-params" markdown>
 
-Resolution Mode
-:   How the resolution is chosen: set both sizes, or set one and compute the other from the camera's aperture.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render Settings Prim</div>
+<div class="hdue-param__body" markdown>
 
-    `res_mode` · Default `autoheight`
+Path of the UsdRenderSettings prim this node creates or edits.
 
-Resolution
-:   Image size in pixels.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>primpath</code></dd></div><div><dt>Default</dt><dd><code>/Render/rendersettings</code></dd></div></dl>
 
-    `resolution` · Default 2048, 1080
+</div>
+</div>
 
-Choose Resolution
-:   Common image sizes.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Set as Default Render Settings Prim</div>
+<div class="hdue-param__body" markdown>
 
-    `resolutionMenu`
+Makes this prim the stage's default render settings (renderSettingsPrimPath), which the viewport and husk render with, also where the input stage brings render settings of its own.
 
-Pixel Aspect Ratio
-:   Width of a pixel relative to its height.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>setlayerrendersettings</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `pixelAspectRatio` · Default 1
+</div>
+</div>
 
-### Unreal Engine
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Output Picture</div>
+<div class="hdue-param__body" markdown>
 
-Render Mode
-:   Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. Path Tracer accumulates UE's reference path tracer.
+Image the built-in render product writes (husk, USD Render ROP): its productName.
 
-    `unreal:renderMode` · Default `realtime` · Menu Realtime (Lumen), Path Tracer
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>picture</code></dd></div><div><dt>Default</dt><dd><code>$HIP/render/$HIPNAME.$OS.$F4.exr</code></dd></div></dl>
 
-    <div class="hdue-figure" data-figure="render-mode"></div>
+</div>
+</div>
 
-Path Tracer Samples
-:   Samples per pixel. Divided between motion-blur sub-frames.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Camera</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:samplesPerPixel` · Default 2048
+Camera prim the render looks through (husk, USD Render ROP; the viewport uses its own camera unless you look through this one).
 
-    <div class="hdue-figure" data-figure="samples"></div>
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>camera</code></dd></div><div><dt>Default</dt><dd><code>/cameras/camera1</code></dd></div></dl>
 
-Warmup Frames
-:   Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. In husk, only a sequence's first frame warms up: each later frame continues its history with one draw, as Movie Render Queue does.
+</div>
+</div>
 
-    `unreal:warmupFrames` · Default 64
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Resolution Mode</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="warmup"></div>
+How the resolution is chosen: set both sizes, or set one and compute the other from the camera's aperture.
 
-Unreal Tonemapper
-:   Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone curve, the beauty becomes UE's tone-mapped image (display-linear): view it with an sRGB view that only encodes (Houdini's Un-tone-mapped), not Raw.
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>res_mode</code></dd></div><div><dt>Default</dt><dd><code>autoheight</code></dd></div></dl>
 
-    `unreal:tonemapper` · Default off
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="tonemapper"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Resolution</div>
+<div class="hdue-param__body" markdown>
 
-Disable Tone Curve
-:   Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blooms, vignettes and adds grain, without UE's film curve, so the beauty stays scene-linear for the OCIO view. Forced on, as UE forces it when OpenColorIO does the display, when the OCIO config's default view is a display transform of its own (ACES, AgX).
+Image size in pixels.
 
-    `unreal:disableToneCurve` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>resolution</code></dd></div><div><dt>Default</dt><dd>2048, 1080</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="cm-tone-curve"></div>
+</div>
+</div>
 
-Exposure Compensation
-:   Logarithmic adjustment for the exposure. Only used if a tonemapper is specified. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... hdUE adds the USD camera exposure to it.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Choose Resolution</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AutoExposureBias` · Default 0
+Common image sizes.
 
-    <div class="hdue-figure" data-figure="post-exposure-compensation"></div>
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>resolutionMenu</code></dd></div></dl>
 
-### Rendering
+</div>
+</div>
 
-#### Anti-Aliasing
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Pixel Aspect Ratio</div>
+<div class="hdue-param__body" markdown>
 
-Anti-Aliasing Method
-:   Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide).
+Width of a pixel relative to its height.
 
-    `unreal:cvar:r:AntiAliasingMethod` · Default 4
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>pixelAspectRatio</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-anti-aliasing"></div>
+</div>
+</div>
 
-Screen Percentage
-:   To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, >0 and <=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.<=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
+</div>
 
-    `unreal:cvar:r:ScreenPercentage` · Default 100
+### Unreal Engine { .hdue-tab }
 
-    <div class="hdue-figure" data-figure="ref-screen-percentage"></div>
+<div class="hdue-params" markdown>
 
-Lower Resolution While Moving
-:   Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render Mode</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:HdUE:InteractiveResolution` · Default on
+Realtime renders with UE's deferred renderer, Lumen and MegaLights, and is meant for final frames too. Path Tracer accumulates UE's reference path tracer.
 
-Moving Screen Percentage
-:   Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:renderMode</code></dd></div><div><dt>Default</dt><dd><code>realtime</code></dd></div><div><dt>Menu</dt><dd>Realtime (Lumen), Path Tracer</dd></div></dl>
 
-    `unreal:cvar:r:HdUE:InteractiveScreenPercentage` · Default 50
+<div class="hdue-figure" data-figure="render-mode"></div>
 
-NVIDIA DLSS
-:   NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the anti-aliasing method renders. Realtime mode only. Console variable r.NGX.DLSS.Enable (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:NGX:DLSS:Enable` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Path Tracer Samples</div>
+<div class="hdue-param__body" markdown>
 
-DLSS Ray Reconstruction
-:   NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and restores them. Needs NVIDIA DLSS on. Realtime mode only. Console variable r.HdUE.DLSS.RayReconstruction (process-wide).
+Samples per pixel. Divided between motion-blur sub-frames.
 
-    `unreal:cvar:r:HdUE:DLSS:RayReconstruction` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:samplesPerPixel</code></dd></div><div><dt>Default</dt><dd>2048</dd></div></dl>
 
-DLSS Preset
-:   DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only. Console variable r.NGX.DLSS.Preset (process-wide).
+<div class="hdue-figure" data-figure="samples"></div>
 
-    `unreal:cvar:r:NGX:DLSS:Preset` · Default 0
+</div>
+</div>
 
-Ray Reconstruction Preset
-:   DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default RR2 model. Realtime mode only. Console variable r.NGX.DLSSRR.Preset (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Warmup Frames</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:NGX:DLSSRR:Preset` · Default 0
+Realtime frames rendered before a frame counts as converged, so Lumen and temporal effects settle. In husk, only a sequence's first frame warms up: each later frame continues its history with one draw, as Movie Render Queue does.
 
-DLSS Auto Exposure
-:   DLSS computes its own exposure for its inputs; off passes UE's exposure, which in some cases reduces artifacts. Realtime mode only. Console variable r.NGX.DLSS.AutoExposure (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:warmupFrames</code></dd></div><div><dt>Default</dt><dd>64</dd></div></dl>
 
-    `unreal:cvar:r:NGX:DLSS:AutoExposure` · Default on
+<div class="hdue-figure" data-figure="warmup"></div>
 
-DLSS Exposure Scale
-:   Scale of the exposure DLSS receives. Realtime mode only. Console variable r.NGX.DLSS.ExposureScale (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:NGX:DLSS:ExposureScale` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Unreal Tonemapper</div>
+<div class="hdue-param__body" markdown>
 
-DLSS Alpha Upscaling
-:   Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime enables. Realtime mode only. Console variable r.NGX.DLSS.EnableAlphaUpscaling (process-wide).
+Run UE's tonemapper, bloom, colour grading, vignette and grain. With the tone curve, the beauty becomes UE's tone-mapped image (display-linear): view it with an sRGB view that only encodes (Houdini's Un-tone-mapped), not Raw.
 
-    `unreal:cvar:r:NGX:DLSS:EnableAlphaUpscaling` · Default -1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:tonemapper</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-DLSS Reflections Temporal AA
-:   A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Realtime mode only. Console variable r.NGX.DLSS.Reflections.TemporalAA (process-wide).
+<div class="hdue-figure" data-figure="tonemapper"></div>
 
-    `unreal:cvar:r:NGX:DLSS:Reflections:TemporalAA` · Default on
+</div>
+</div>
 
-#### Path Tracing
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Disable Tone Curve</div>
+<div class="hdue-param__body" markdown>
 
-Max. Bounces
-:   Sets the path tracing maximum bounces. Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces.
+Movie Render Queue's Disable Tone Curve: the Unreal Tonemapper still grades, blooms, vignettes and adds grain, without UE's film curve, so the beauty stays scene-linear for the OCIO view. Forced on, as UE forces it when OpenColorIO does the display, when the OCIO config's default view is a display transform of its own (ACES, AgX).
 
-    `unreal:postProcess:PathTracingMaxBounces` · Default 32
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:disableToneCurve</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-pt-max-bounces"></div>
+<div class="hdue-figure" data-figure="cm-tone-curve"></div>
 
-Max Path Intensity
-:   Sets the maximum intensity of indirect samples to reduce fireflies. Lowering this value reduces noise at the expense of accuracy. Increasing it is more accurate but may lead to more noise.
+</div>
+</div>
 
-    `unreal:postProcess:PathTracingMaxPathIntensity` · Default 24
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Exposure Compensation</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="tut-noise-fireflies"></div>
+Logarithmic adjustment for the exposure. Only used if a tonemapper is specified. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... hdUE adds the USD camera exposure to it.
 
-Emissive Materials
-:   Should emissive materials contribute to scene lighting?
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureBias</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:postProcess:PathTracingEnableEmissiveMaterials` · Default on
+<div class="hdue-figure" data-figure="post-exposure-compensation"></div>
 
-Reference Depth Of Field
-:   Enables a reference quality depth-of-field which replaces the post-process effect. hdUE turns it on when the USD camera has depth of field.
+</div>
+</div>
 
-    `unreal:postProcess:PathTracingEnableReferenceDOF` · Default on
+</div>
 
-Reference Atmosphere
-:   Enables path tracing in the atmosphere instead of baking the sky atmosphere contribution into a skylight. Any skylight present in the scene will be automatically ignored when this is enabled.
+### Rendering { .hdue-tab }
 
-    `unreal:postProcess:PathTracingEnableReferenceAtmosphere` · Default off
+#### Anti-Aliasing { .hdue-folder }
 
-Denoiser
-:   Run the currently loaded denoiser plugin on the last sample to remove noise from the output. Has no effect if a plug-in is not loaded.
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:PathTracingEnableDenoiser` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Anti-Aliasing Method</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="denoiser"></div>
+Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide).
 
-Denoiser Plugin
-:   Set the spatial denoiser name. It is the corresponding name registered by a denoiser plugin Any registered denoiser should be able to denoise a single frame spatially. Console variable r.PathTracing.Denoiser.Name (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:AntiAliasingMethod</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
 
-    `unreal:cvar:r:PathTracing:Denoiser:Name` · Default `NNEDenoiser` · Menu NNE Denoiser, NVIDIA OptiX
+<div class="hdue-figure" data-figure="ref-anti-aliasing"></div>
 
-NNE Denoiser Model
-:   Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:NNEDenoiser:Asset` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Screen Percentage</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="denoising-model"></div>
+To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, >0 and <=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.<=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
 
-NNE Denoiser Runtime
-:   Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, the default), GPU or CPU. Console variable NNEDenoiser.Runtime.Type (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:ScreenPercentage</code></dd></div><div><dt>Default</dt><dd>100</dd></div></dl>
 
-    `unreal:cvar:NNEDenoiser:Runtime:Type` · Default 2
+<div class="hdue-figure" data-figure="ref-screen-percentage"></div>
 
-OptiX Tile Width
-:   Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0. Console variable r.OptixDenoise.TileWidth (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:OptixDenoise:TileWidth` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lower Resolution While Moving</div>
+<div class="hdue-param__body" markdown>
 
-OptiX Tile Height
-:   Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width). Console variable r.OptixDenoise.TileHeight (process-wide).
+Interactive hosts (Houdini's viewport): render at Moving Screen Percentage while the camera or scene changes, and at full Screen Percentage 250 ms after the last change. Realtime mode only. Console variable r.HdUE.InteractiveResolution (process-wide).
 
-    `unreal:cvar:r:OptixDenoise:TileHeight` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:InteractiveResolution</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-Approximate Caustics
-:   When true, the path tracer will approximate caustic paths to reduce noise. This reduces speckles and noise from low-roughness glass and metals. Console variable r.PathTracing.ApproximateCaustics (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:PathTracing:ApproximateCaustics` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Moving Screen Percentage</div>
+<div class="hdue-param__body" markdown>
 
-Pixel Filter Width
-:   Sets the anti-aliasing filter width (default = 3.0 which corresponds to a gaussian with standard deviation of a 1/2 pixel) Console variable r.PathTracing.FilterWidth (process-wide).
+Screen percentage while moving, upsampled by the anti-aliasing method (TSR by default). Console variable r.HdUE.InteractiveScreenPercentage (process-wide).
 
-    `unreal:cvar:r:PathTracing:FilterWidth` · Default 3
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:InteractiveScreenPercentage</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
 
-#### Lighting Components
+</div>
+</div>
 
-Emissive
-:   Should the render include directly visible emissive elements?
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">NVIDIA DLSS</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:PathTracingIncludeEmissive` · Default on
+NVIDIA DLSS Super Resolution in place of TAA or TSR: Screen Percentage picks the DLSS mode, 100 is DLAA. Needs NVIDIA's DLSS plugin in the backend (docs/building.md) and an RTX GPU; otherwise the anti-aliasing method renders. Realtime mode only. Console variable r.NGX.DLSS.Enable (process-wide).
 
-Diffuse
-:   Should the render include diffuse lighting contributions?
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Enable</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `unreal:postProcess:PathTracingIncludeDiffuse` · Default on
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-pt-include-diffuse"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Ray Reconstruction</div>
+<div class="hdue-param__body" markdown>
 
-Indirect Diffuse
-:   Should the render include indirect diffuse lighting contributions?
+NVIDIA DLSS Ray Reconstruction: DLSS also denoises, in place of UE's denoisers (Lumen reflections, ray traced shadows), through the DLSS plugin's own switch, which turns them off and restores them. Needs NVIDIA DLSS on. Realtime mode only. Console variable r.HdUE.DLSS.RayReconstruction (process-wide).
 
-    `unreal:postProcess:PathTracingIncludeIndirectDiffuse` · Default on
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:HdUE:DLSS:RayReconstruction</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-pt-include-indirect-diffuse"></div>
+</div>
+</div>
 
-Specular
-:   Should the render include specular lighting contributions?
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Preset</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:PathTracingIncludeSpecular` · Default on
+DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only. Console variable r.NGX.DLSS.Preset (process-wide).
 
-    <div class="hdue-figure" data-figure="ref-pt-include-specular"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Preset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Indirect Specular
-:   Should the render include indirect specular lighting contributions?
+</div>
+</div>
 
-    `unreal:postProcess:PathTracingIncludeIndirectSpecular` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ray Reconstruction Preset</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-pt-include-indirect-specular"></div>
+DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default RR2 model. Realtime mode only. Console variable r.NGX.DLSSRR.Preset (process-wide).
 
-Volume
-:   Should the render include volume lighting contributions?
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSSRR:Preset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:postProcess:PathTracingIncludeVolume` · Default on
+</div>
+</div>
 
-Indirect Volume
-:   Should the render include volume lighting contributions?
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Auto Exposure</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:PathTracingIncludeIndirectVolume` · Default on
+DLSS computes its own exposure for its inputs; off passes UE's exposure, which in some cases reduces artifacts. Realtime mode only. Console variable r.NGX.DLSS.AutoExposure (process-wide).
 
-#### View Mode
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:AutoExposure</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-Debug View
-:   Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
+</div>
+</div>
 
-    `unreal:debugView` · Default `off` · Menu Lit, Unlit, Lighting Only, Detail Lighting, Reflections, Light Complexity, Buffer: Base Color, Buffer: Metallic, Buffer: Roughness, Buffer: Specular, Buffer: World Normal, Buffer: Scene Depth, Buffer: Shading Model, Nanite: Mask, Nanite: Triangles, Nanite: Clusters, Nanite: Primitives, Nanite: Instances, Nanite: Overdraw, Lumen: Overview, Lumen: Lumen Scene, Lumen: Surface Cache, Lumen: Geometry Normals, Lumen: Reflection View, Virtual Shadow Map: Mip Level, Virtual Shadow Map: Virtual Page, Virtual Shadow Map: Cached Page
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Exposure Scale</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="debug-views-modes"></div>
+Scale of the exposure DLSS receives. Realtime mode only. Console variable r.NGX.DLSS.ExposureScale (process-wide).
 
-#### Geometry
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:ExposureScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Subdivision Level
-:   Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage default, renders the cage; 3 matches Karma's surfaces closely.
+</div>
+</div>
 
-    `unreal:subdivisionLevel` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Alpha Upscaling</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="subdivision"></div>
+Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime enables. Realtime mode only. Console variable r.NGX.DLSS.EnableAlphaUpscaling (process-wide).
 
-Require Nanite
-:   Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). Meshes built from Hydra are unaffected.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:EnableAlphaUpscaling</code></dd></div><div><dt>Default</dt><dd>-1</dd></div></dl>
 
-    `unreal:requireNanite` · Default off
+</div>
+</div>
 
-Nanite Triangle Threshold
-:   Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes every mesh Nanite.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">DLSS Reflections Temporal AA</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:naniteTriangleThreshold` · Default 1000000
+A temporal anti-aliasing pass on the reflections Ray Reconstruction denoises. Realtime mode only. Console variable r.NGX.DLSS.Reflections.TemporalAA (process-wide).
 
-Cull Backface
-:   Meshes whose USD doubleSided is off render their front faces only, as UE's USD importer does. Off, every mesh renders both sides, as in Karma.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:NGX:DLSS:Reflections:TemporalAA</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:cullBackface` · Default on
+</div>
+</div>
 
-Stage Up Axis
-:   Overrides the stage's upAxis metadata.
+</div>
 
-    `unreal:upAxis` · Default `Y` · Menu Y, Z
+#### Path Tracing { .hdue-folder }
 
-#### Materials
+<div class="hdue-params" markdown>
 
-Cooked MaterialX Library
-:   library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: HDUE_MATERIALX_LIBRARY, else the runtime profile's materialx_library. Houdini's viewport and husk render the bound MaterialX materials as their cooked assets; a material changed since its import fails a husk frame.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max. Bounces</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:materialxLibrary`
+Sets the path tracing maximum bounces. Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces.
 
-Prepared Substrate Library
-:   library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: HDUE_SUBSTRATE_LIBRARY, else the runtime profile's substrate_library. Houdini's viewport and husk render Substrate Builder materials as their prepared assets; a graph changed since its preparation fails a husk frame.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingMaxBounces</code></dd></div><div><dt>Default</dt><dd>32</dd></div></dl>
 
-    `unreal:substrateLibrary`
+<div class="hdue-figure" data-figure="ref-pt-max-bounces"></div>
 
-Prepare Edited Materials
-:   Substrate Builder materials missing from the Prepared Substrate Library, and MaterialX materials hdUE cannot translate at render time, are prepared in the background (UE's editor compiles or imports them, seconds per job) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, such a Substrate Builder material shows the library's message and fails a husk frame; such a MaterialX material renders with the inputs hdUE cannot translate at their constants.
+</div>
+</div>
 
-    `unreal:substrateAutoPrepare` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Path Intensity</div>
+<div class="hdue-param__body" markdown>
 
-### Lens
+Sets the maximum intensity of indirect samples to reduce fireflies. Lowering this value reduces noise at the expense of accuracy. Increasing it is more accurate but may lead to more noise.
 
-#### Bloom
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingMaxPathIntensity</code></dd></div><div><dt>Default</dt><dd>24</dd></div></dl>
 
-Preferred Method
-:   Preferred bloom algorithm. A different method may be used if the preferred method is not available on the target platform, e.g. due to performance limits.
+<div class="hdue-figure" data-figure="tut-noise-fireflies"></div>
 
-    `unreal:postProcess:BloomMethod` · Default `BM_SOG` · Menu Standard, Convolution
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-bloom-method"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emissive Materials</div>
+<div class="hdue-param__body" markdown>
 
-Intensity
-:   Multiplier for all bloom contributions >=0: off, 1(default), >1 brighter
+Should emissive materials contribute to scene lighting?
 
-    `unreal:postProcess:BloomIntensity` · Default 0.675
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableEmissiveMaterials</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="post-bloom"></div>
+</div>
+</div>
 
-#### Gaussian
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Reference Depth Of Field</div>
+<div class="hdue-param__body" markdown>
 
-Intensity
-:   Multiplier for Gaussian bloom contributions >=0: off, 1(default), >1 brighter
+Enables a reference quality depth-of-field which replaces the post-process effect. hdUE turns it on when the USD camera has depth of field.
 
-    `unreal:postProcess:BloomGaussianIntensity` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableReferenceDOF</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-Threshold
-:   minimum brightness the bloom starts having effect -1:all pixels affect bloom equally (physically correct, faster as a threshold pass is omitted), 0:all pixels affect bloom brights more, 1(default), >1 brighter
+</div>
+</div>
 
-    `unreal:postProcess:BloomThreshold` · Default -1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Reference Atmosphere</div>
+<div class="hdue-param__body" markdown>
 
-Size scale
-:   Scale for all bloom sizes
+Enables path tracing in the atmosphere instead of baking the sky atmosphere contribution into a skylight. Any skylight present in the scene will be automatically ignored when this is enabled.
 
-    `unreal:postProcess:BloomSizeScale` · Default 4
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableReferenceAtmosphere</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-bloom-size-scale"></div>
+</div>
+</div>
 
-#1 Size
-:   Diameter size for the Bloom1 in percent of the screen width (is done in 1/2 resolution, larger values cost more performance, good for high frequency details) >=0: can be clamped because of shader limitations
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Denoiser</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:Bloom1Size` · Default 0.3
+Run the currently loaded denoiser plugin on the last sample to remove noise from the output. Has no effect if a plug-in is not loaded.
 
-#2 Size
-:   Diameter size for Bloom2 in percent of the screen width (is done in 1/4 resolution, larger values cost more performance) >=0: can be clamped because of shader limitations
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingEnableDenoiser</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:Bloom2Size` · Default 1
+<div class="hdue-figure" data-figure="denoiser"></div>
 
-#3 Size
-:   Diameter size for Bloom3 in percent of the screen width (is done in 1/8 resolution, larger values cost more performance) >=0: can be clamped because of shader limitations
+</div>
+</div>
 
-    `unreal:postProcess:Bloom3Size` · Default 2
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Denoiser Plugin</div>
+<div class="hdue-param__body" markdown>
 
-#4 Size
-:   Diameter size for Bloom4 in percent of the screen width (is done in 1/16 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
+Set the spatial denoiser name. It is the corresponding name registered by a denoiser plugin Any registered denoiser should be able to denoise a single frame spatially. Console variable r.PathTracing.Denoiser.Name (process-wide).
 
-    `unreal:postProcess:Bloom4Size` · Default 10
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:Denoiser:Name</code></dd></div><div><dt>Default</dt><dd><code>NNEDenoiser</code></dd></div><div><dt>Menu</dt><dd>NNE Denoiser, NVIDIA OptiX</dd></div></dl>
 
-#5 Size
-:   Diameter size for Bloom5 in percent of the screen width (is done in 1/32 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
+</div>
+</div>
 
-    `unreal:postProcess:Bloom5Size` · Default 30
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">NNE Denoiser Model</div>
+<div class="hdue-param__body" markdown>
 
-#6 Size
-:   Diameter size for Bloom6 in percent of the screen width (is done in 1/64 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
+Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide).
 
-    `unreal:postProcess:Bloom6Size` · Default 64
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:NNEDenoiser:Asset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-#1 Tint
-:   Bloom1 tint color
+<div class="hdue-figure" data-figure="denoising-model"></div>
 
-    `unreal:postProcess:Bloom1Tint` · Default 0.3465, 0.3465, 0.3465
+</div>
+</div>
 
-#2 Tint
-:   Bloom2 tint color
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">NNE Denoiser Runtime</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:Bloom2Tint` · Default 0.138, 0.138, 0.138
+Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, the default), GPU or CPU. Console variable NNEDenoiser.Runtime.Type (process-wide).
 
-#3 Tint
-:   Bloom3 tint color
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:NNEDenoiser:Runtime:Type</code></dd></div><div><dt>Default</dt><dd>2</dd></div></dl>
 
-    `unreal:postProcess:Bloom3Tint` · Default 0.1176, 0.1176, 0.1176
+</div>
+</div>
 
-#4 Tint
-:   Bloom4 tint color
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">OptiX Tile Width</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:Bloom4Tint` · Default 0.066, 0.066, 0.066
+Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0. Console variable r.OptixDenoise.TileWidth (process-wide).
 
-#5 Tint
-:   Bloom5 tint color
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:OptixDenoise:TileWidth</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:postProcess:Bloom5Tint` · Default 0.066, 0.066, 0.066
+</div>
+</div>
 
-#6 Tint
-:   Bloom6 tint color
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">OptiX Tile Height</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:Bloom6Tint` · Default 0.061, 0.061, 0.061
+Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width). Console variable r.OptixDenoise.TileHeight (process-wide).
 
-#### Convolution
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:OptixDenoise:TileHeight</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Intensity
-:   Multiplier for Convolution bloom contributions >=0: off, 1(default), >1 brighter
+</div>
+</div>
 
-    `unreal:postProcess:BloomConvolutionIntensity` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Approximate Caustics</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-bloom-convolution-intensity"></div>
+When true, the path tracer will approximate caustic paths to reduce noise. This reduces speckles and noise from low-roughness glass and metals. Console variable r.PathTracing.ApproximateCaustics (process-wide).
 
-Scatter Dispersion
-:   Intensity multiplier on the scatter dispersion energy of the kernel. 1.0 means exactly use the same energy as the kernel scatter dispersion.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:ApproximateCaustics</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:BloomConvolutionScatterDispersion` · Default 1
+</div>
+</div>
 
-Kernel
-:   Texture to replace default convolution bloom kernel. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Pixel Filter Width</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:BloomConvolutionTexture`
+Sets the anti-aliasing filter width (default = 3.0 which corresponds to a gaussian with standard deviation of a 1/2 pixel) Console variable r.PathTracing.FilterWidth (process-wide).
 
-Scale
-:   Relative size of the convolution kernel image compared to the minor axis of the viewport
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:PathTracing:FilterWidth</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
 
-    `unreal:postProcess:BloomConvolutionSize` · Default 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-bloom-convolution-size"></div>
+</div>
 
-Center
-:   The UV location of the center of the kernel. Should be very close to (.5,.5)
+#### Lighting Components { .hdue-folder }
 
-    `unreal:postProcess:BloomConvolutionCenterUV` · Default 0.5, 0.5
+<div class="hdue-params" markdown>
 
-Boost Min
-:   Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emissive</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:BloomConvolutionPreFilterMin` · Default 7
+Should the render include directly visible emissive elements?
 
-Boost Max
-:   Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeEmissive</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:BloomConvolutionPreFilterMax` · Default 15000
+</div>
+</div>
 
-Boost Mult
-:   Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:BloomConvolutionPreFilterMult` · Default 15
+Should the render include diffuse lighting contributions?
 
-Buffer
-:   Implicit buffer region as a fraction of the screen size to insure the bloom does not wrap across the screen. Larger sizes have perf impact.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeDiffuse</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:BloomConvolutionBufferScale` · Default 0.133
+<div class="hdue-figure" data-figure="ref-pt-include-diffuse"></div>
 
-#### Exposure
+</div>
+</div>
 
-Metering Mode
-:   Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Diffuse</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AutoExposureMethod` · Default `AEM_Manual` · Menu Auto Exposure Histogram, Auto Exposure Basic, Manual
+Should the render include indirect diffuse lighting contributions?
 
-    <div class="hdue-figure" data-figure="post-metering-mode"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectDiffuse</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-Apply Physical Camera Exposure
-:   Enables physical camera exposure using ShutterSpeed/ISO/Aperture.
+<div class="hdue-figure" data-figure="ref-pt-include-indirect-diffuse"></div>
 
-    `unreal:postProcess:AutoExposureApplyPhysicalCameraExposure` · Default off
+</div>
+</div>
 
-Exposure Compensation Curve
-:   Exposure compensation based on the scene EV100. Used to calibrate the final exposure differently depending on the average scene luminance. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AutoExposureBiasCurve`
+Should the render include specular lighting contributions?
 
-Exposure Metering Mask
-:   Exposure metering mask. Bright spots on the mask will have high influence on auto-exposure metering and dark spots will have low influence. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeSpecular</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:AutoExposureMeterMask`
+<div class="hdue-figure" data-figure="ref-pt-include-specular"></div>
 
-Min Brightness
-:   Auto-Exposure minimum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
+</div>
+</div>
 
-    `unreal:postProcess:AutoExposureMinBrightness` · Default 0.03
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Specular</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-min-brightness"></div>
+Should the render include indirect specular lighting contributions?
 
-Max Brightness
-:   Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectSpecular</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:AutoExposureMaxBrightness` · Default 8
+<div class="hdue-figure" data-figure="ref-pt-include-indirect-specular"></div>
 
-    <div class="hdue-figure" data-figure="ref-max-brightness"></div>
+</div>
+</div>
 
-Speed Up
-:   >0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Volume</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AutoExposureSpeedUp` · Default 3
+Should the render include volume lighting contributions?
 
-Speed Down
-:   >0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeVolume</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:AutoExposureSpeedDown` · Default 1
+</div>
+</div>
 
-Low Percent
-:   The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. >0, <100, good values are in the range 70 .. 80
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Volume</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AutoExposureLowPercent` · Default 10
+Should the render include volume lighting contributions?
 
-    <div class="hdue-figure" data-figure="ref-low-percent"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:PathTracingIncludeIndirectVolume</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-High Percent
-:   The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. >0, <100, good values are in the range 80 .. 95
+</div>
+</div>
 
-    `unreal:postProcess:AutoExposureHighPercent` · Default 90
+</div>
 
-    <div class="hdue-figure" data-figure="ref-high-percent"></div>
+#### View Mode { .hdue-folder }
 
-Histogram Log Min
-:   Histogram Min value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:HistogramLogMin` · Default -8
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Debug View</div>
+<div class="hdue-param__body" markdown>
 
-Histogram Log Max
-:   Histogram Max value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
+Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
 
-    `unreal:postProcess:HistogramLogMax` · Default 4
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:debugView</code></dd></div><div><dt>Default</dt><dd><code>off</code></dd></div><div><dt>Menu</dt><dd>Lit, Unlit, Lighting Only, Detail Lighting, Reflections, Light Complexity, Buffer: Base Color, Buffer: Metallic, Buffer: Roughness, Buffer: Specular, Buffer: World Normal, Buffer: Scene Depth, Buffer: Shading Model, Nanite: Mask, Nanite: Triangles, Nanite: Clusters, Nanite: Primitives, Nanite: Instances, Nanite: Overdraw, Lumen: Overview, Lumen: Lumen Scene, Lumen: Surface Cache, Lumen: Geometry Normals, Lumen: Reflection View, Virtual Shadow Map: Mip Level, Virtual Shadow Map: Virtual Page, Virtual Shadow Map: Cached Page</dd></div></dl>
 
-#### Chromatic Aberration
+<div class="hdue-figure" data-figure="debug-views-modes"></div>
 
-Intensity
-:   in percent, Scene chromatic aberration / color fringe (camera imperfection) to simulate an artifact that happens in real-world lens, mostly visible in the image corners.
+</div>
+</div>
 
-    `unreal:postProcess:SceneFringeIntensity` · Default 0
+</div>
 
-    <div class="hdue-figure" data-figure="post-chromatic-aberration"></div>
+#### Geometry { .hdue-folder }
 
-Start Offset
-:   A normalized distance to the center of the framebuffer where the effect takes place.
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:ChromaticAberrationStartOffset` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Subdivision Level</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-chromatic-aberration-offset"></div>
+Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage default, renders the cage; 3 matches Karma's surfaces closely.
 
-#### Dirt Mask
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:subdivisionLevel</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Dirt Mask Texture
-:   Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-figure" data-figure="subdivision"></div>
 
-    `unreal:postProcess:BloomDirtMask`
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-dirt-mask-texture"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Require Nanite</div>
+<div class="hdue-param__body" markdown>
 
-Dirt Mask Intensity
-:   BloomDirtMask intensity
+Meshes from the native asset catalog must render with Nanite (their cooked asset needs Nanite data). Meshes built from Hydra are unaffected.
 
-    `unreal:postProcess:BloomDirtMaskIntensity` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:requireNanite</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-dirt-mask-intensity"></div>
+</div>
+</div>
 
-Dirt Mask Tint
-:   BloomDirtMask tint color
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Nanite Triangle Threshold</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:BloomDirtMaskTint` · Default 0.5, 0.5, 0.5
+Meshes with at least this many triangles build Nanite data, as UE's USD Stage Actor decides (its Nanite Triangle Threshold, default 1,000,000); smaller ones stay regular static meshes, which ray tracing (the Path Tracer, Lumen hit lighting) traces at full resolution. Instancer prototypes always build Nanite. 0 makes every mesh Nanite.
 
-    <div class="hdue-figure" data-figure="ref-dirt-mask-tint"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:naniteTriangleThreshold</code></dd></div><div><dt>Default</dt><dd>1000000</dd></div></dl>
 
-#### Camera
+</div>
+</div>
 
-Shutter Speed (1/s)
-:   The camera shutter in 1/seconds.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Cull Backface</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:CameraShutterSpeed` · Default 60
+Meshes whose USD doubleSided is off render their front faces only, as UE's USD importer does. Off, every mesh renders both sides, as in Karma.
 
-ISO
-:   The camera sensor sensitivity in ISO.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cullBackface</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:CameraISO` · Default 100
+</div>
+</div>
 
-Aperture (F-stop)
-:   Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Stage Up Axis</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:DepthOfFieldFstop` · Default 4
+Overrides the stage's upAxis metadata.
 
-    <div class="hdue-figure" data-figure="ref-camera-aperture"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:upAxis</code></dd></div><div><dt>Default</dt><dd><code>Y</code></dd></div><div><dt>Menu</dt><dd>Y, Z</dd></div></dl>
 
-Maximum Aperture (min F-stop)
-:   Defines the maximum opening of the camera lens to control the curvature of blades of the diaphragm. Set it to 0 to get straight blades.
+</div>
+</div>
 
-    `unreal:postProcess:DepthOfFieldMinFstop` · Default 1.2
+</div>
 
-Number of diaphragm blades
-:   Defines the number of blades of the diaphragm within the lens (between 4 and 16).
+#### Materials { .hdue-folder }
 
-    `unreal:postProcess:DepthOfFieldBladeCount` · Default 5
+<div class="hdue-params" markdown>
 
-#### Local Exposure
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Cooked MaterialX Library</div>
+<div class="hdue-param__body" markdown>
 
-Method
-:   Local Exposure algorithm
+library.json of MaterialX materials cooked to UE materials (scripts/Import-MaterialX.ps1). Unset: HDUE_MATERIALX_LIBRARY, else the runtime profile's materialx_library. Houdini's viewport and husk render the bound MaterialX materials as their cooked assets; a material changed since its import fails a husk frame.
 
-    `unreal:postProcess:LocalExposureMethod` · Default `ELocalExposureMethod::Bilateral` · Menu Bilateral, Fusion (Experimental)
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:materialxLibrary</code></dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-local-exposure-method"></div>
+</div>
+</div>
 
-Highlight Contrast
-:   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Prepared Substrate Library</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LocalExposureHighlightContrastScale` · Default 1
+library.json of prepared Substrate materials (scripts/Prepare-Substrate.ps1). Unset: HDUE_SUBSTRATE_LIBRARY, else the runtime profile's substrate_library. Houdini's viewport and husk render Substrate Builder materials as their prepared assets; a graph changed since its preparation fails a husk frame.
 
-    <div class="hdue-figure" data-figure="ref-local-exposure-highlights"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:substrateLibrary</code></dd></div></dl>
 
-Shadow Contrast
-:   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
+</div>
+</div>
 
-    `unreal:postProcess:LocalExposureShadowContrastScale` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Prepare Edited Materials</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-local-exposure-shadows"></div>
+Substrate Builder materials missing from the Prepared Substrate Library, and MaterialX materials hdUE cannot translate at render time, are prepared in the background (UE's editor compiles or imports them, seconds per job) and render once ready: in Houdini's viewport as you edit, and in husk before the frame renders. Off, such a Substrate Builder material shows the library's message and fails a husk frame; such a MaterialX material renders with the inputs hdUE cannot translate at their constants.
 
-Highlight Contrast Curve
-:   Local Exposure Highlight Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:substrateAutoPrepare</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:postProcess:LocalExposureHighlightContrastCurve`
+</div>
+</div>
 
-Shadow Contrast Curve
-:   Local Exposure Shadow Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+</div>
 
-    `unreal:postProcess:LocalExposureShadowContrastCurve`
+### Lens { .hdue-tab }
 
-Highlight Threshold
-:   Threshold used to determine which regions of the screen are considered highlights.
+#### Bloom { .hdue-folder }
 
-    `unreal:postProcess:LocalExposureHighlightThreshold` · Default 0
+<div class="hdue-params" markdown>
 
-Shadow Threshold
-:   Threshold used to determine which regions of the screen are considered shadows.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Preferred Method</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LocalExposureShadowThreshold` · Default 0
+Preferred bloom algorithm. A different method may be used if the preferred method is not available on the target platform, e.g. due to performance limits.
 
-Detail Strength
-:   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Value different than 1 will enable local exposure. This value should be set to 1 in most cases.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomMethod</code></dd></div><div><dt>Default</dt><dd><code>BM_SOG</code></dd></div><div><dt>Menu</dt><dd>Standard, Convolution</dd></div></dl>
 
-    `unreal:postProcess:LocalExposureDetailStrength` · Default 1
+<div class="hdue-figure" data-figure="ref-bloom-method"></div>
 
-    <div class="hdue-figure" data-figure="ref-local-exposure-detail"></div>
+</div>
+</div>
 
-Blurred Luminance Blend
-:   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Blend between bilateral filtered and blurred luminance as the base layer. Blurred luminance helps preserve image appearance and specular highlights, and reduce ringing. Good values are usually in the range 0.4 .. 0.6
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LocalExposureBlurredLuminanceBlend` · Default 0.6
+Multiplier for all bloom contributions >=0: off, 1(default), >1 brighter
 
-Blurred Luminance Kernel Size Percent
-:   Kernel size (percentage of screen) used to blur frame luminance.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomIntensity</code></dd></div><div><dt>Default</dt><dd>0.675</dd></div></dl>
 
-    `unreal:postProcess:LocalExposureBlurredLuminanceKernelSizePercent` · Default 50
+<div class="hdue-figure" data-figure="post-bloom"></div>
 
-Highlight Threshold Strength
-:   Strength of the highlight threshold.
+</div>
+</div>
 
-    `unreal:postProcess:LocalExposureHighlightThresholdStrength` · Default 1
+</div>
 
-Shadow Threshold Strength
-:   Strength of the shadow threshold.
+#### Gaussian { .hdue-folder }
 
-    `unreal:postProcess:LocalExposureShadowThresholdStrength` · Default 1
+<div class="hdue-params" markdown>
 
-Middle Grey Bias
-:   Logarithmic adjustment for the local exposure middle grey. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ...
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LocalExposureMiddleGreyBias` · Default 0
+Multiplier for Gaussian bloom contributions >=0: off, 1(default), >1 brighter
 
-#### Lens Flares
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomGaussianIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Intensity
-:   Brightness scale of the image cased lens flares (linear)
+</div>
+</div>
 
-    `unreal:postProcess:LensFlareIntensity` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Threshold</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="post-lens-flares"></div>
+minimum brightness the bloom starts having effect -1:all pixels affect bloom equally (physically correct, faster as a threshold pass is omitted), 0:all pixels affect bloom brights more, 1(default), >1 brighter
 
-Tint
-:   Tint color for the image based lens flares.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomThreshold</code></dd></div><div><dt>Default</dt><dd>-1</dd></div></dl>
 
-    `unreal:postProcess:LensFlareTint` · Default 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-lens-flare-tint"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Size scale</div>
+<div class="hdue-param__body" markdown>
 
-BokehSize
-:   Size of the Lens Blur (in percent of the view width) that is done with the Bokeh texture (note: performance cost is radius*radius)
+Scale for all bloom sizes
 
-    `unreal:postProcess:LensFlareBokehSize` · Default 3
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomSizeScale</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-lens-flare-bokeh-size"></div>
+<div class="hdue-figure" data-figure="ref-bloom-size-scale"></div>
 
-Threshold
-:   Minimum brightness the lens flare starts having effect (this should be as high as possible to avoid the performance cost of blurring content that is too dark too see)
+</div>
+</div>
 
-    `unreal:postProcess:LensFlareThreshold` · Default 8
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#1 Size</div>
+<div class="hdue-param__body" markdown>
 
-BokehShape
-:   Defines the shape of the Bokeh when the image base lens flares are blurred, cannot be blended. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+Diameter size for the Bloom1 in percent of the screen width (is done in 1/2 resolution, larger values cost more performance, good for high frequency details) >=0: can be clamped because of shader limitations
 
-    `unreal:postProcess:LensFlareBokehShape`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Size</code></dd></div><div><dt>Default</dt><dd>0.3</dd></div></dl>
 
-#### Image Effects
+</div>
+</div>
 
-Vignette Intensity
-:   0..1 0=off/no vignette .. 1=strong vignette
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#2 Size</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:VignetteIntensity` · Default 0.4
+Diameter size for Bloom2 in percent of the screen width (is done in 1/4 resolution, larger values cost more performance) >=0: can be clamped because of shader limitations
 
-    <div class="hdue-figure" data-figure="post-vignette"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Size</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Sharpen
-:   Controls the strength of image sharpening applied during tonemapping.
+</div>
+</div>
 
-    `unreal:postProcess:Sharpen` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#3 Size</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-sharpen"></div>
+Diameter size for Bloom3 in percent of the screen width (is done in 1/8 resolution, larger values cost more performance) >=0: can be clamped because of shader limitations
 
-Vignette Type
-:   The shape type of the vignette
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Size</code></dd></div><div><dt>Default</dt><dd>2</dd></div></dl>
 
-    `unreal:postProcess:VignetteType` · Default `EVignetteType::CosineFourthLaw` · Menu Cosine Fourth Law (Default), Texture, Oval
+</div>
+</div>
 
-Vignette Center
-:   Position of the vignette center in UV space.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#4 Size</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:VignetteCenter` · Default 0.5, 0.5
+Diameter size for Bloom4 in percent of the screen width (is done in 1/16 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
 
-Vignette Color
-:   Color multiplied with areas that are masked by the vignette. Default is black.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Size</code></dd></div><div><dt>Default</dt><dd>10</dd></div></dl>
 
-    `unreal:postProcess:VignetteColor` · Default 0, 0, 0
+</div>
+</div>
 
-Vignette Size
-:   Scale of the vignette shape in screenspace. Can be used to scale vignette anamorphically. Default is 1.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#5 Size</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:VignetteSize` · Default 1, 1
+Diameter size for Bloom5 in percent of the screen width (is done in 1/32 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
 
-Vignette Softness
-:   The softness of the transition from opaque to transparant on the edge of the vignette shape.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Size</code></dd></div><div><dt>Default</dt><dd>30</dd></div></dl>
 
-    `unreal:postProcess:VignetteSoftness` · Default 5
+</div>
+</div>
 
-Vignette Texture
-:   Defines the shape of the vignette when VignetteType is set to Texture. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#6 Size</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:VignetteTexture`
+Diameter size for Bloom6 in percent of the screen width (is done in 1/64 resolution, larger values cost more performance, best for wide contributions) >=0: can be clamped because of shader limitations
 
-#### Depth of Field
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Size</code></dd></div><div><dt>Default</dt><dd>64</dd></div></dl>
 
-Enabled
-:   When false, post-process depth of field will not be used. When true, DoF may be used depending on lens and scalability settings.
+</div>
+</div>
 
-    `unreal:postProcess:DepthOfFieldEnabled` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#1 Tint</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-dof-enabled"></div>
+Bloom1 tint color
 
-Sensor Width (mm)
-:   Width of the camera sensor to assume, in mm. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom1Tint</code></dd></div><div><dt>Default</dt><dd>0.3465, 0.3465, 0.3465</dd></div></dl>
 
-    `unreal:postProcess:DepthOfFieldSensorWidth` · Default 24.576
+</div>
+</div>
 
-Squeeze Factor
-:   This is the squeeze factor for the DOF, which emulates the properties of anamorphic lenses. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#2 Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:DepthOfFieldSqueezeFactor` · Default 1
+Bloom2 tint color
 
-    <div class="hdue-figure" data-figure="ref-dof-squeeze"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom2Tint</code></dd></div><div><dt>Default</dt><dd>0.138, 0.138, 0.138</dd></div></dl>
 
-Focal Distance
-:   Distance in which the Depth of Field effect should be sharp, in unreal units (cm). Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
+</div>
+</div>
 
-    `unreal:postProcess:DepthOfFieldFocalDistance` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#3 Tint</div>
+<div class="hdue-param__body" markdown>
 
-Depth Blur km for 50%
-:   CircleDOF only: Depth blur km for 50%
+Bloom3 tint color
 
-    `unreal:postProcess:DepthOfFieldDepthBlurAmount` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom3Tint</code></dd></div><div><dt>Default</dt><dd>0.1176, 0.1176, 0.1176</dd></div></dl>
 
-Depth Blur Radius
-:   CircleDOF only: Depth blur radius in pixels at 1920x
+</div>
+</div>
 
-    `unreal:postProcess:DepthOfFieldDepthBlurRadius` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#4 Tint</div>
+<div class="hdue-param__body" markdown>
 
-Petzval Bokeh
-:   Simulate stretching in blur and bokeh. Positive values for sagittal (swirly bokeh), negative values for tangential.
+Bloom4 tint color
 
-    `unreal:postProcess:DepthOfFieldPetzvalBokeh` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom4Tint</code></dd></div><div><dt>Default</dt><dd>0.066, 0.066, 0.066</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-dof-petzval"></div>
+</div>
+</div>
 
-Petzval Bokeh Falloff
-:   How quickly does the Petzval bokeh effect increase towards the edge of the image
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#5 Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:DepthOfFieldPetzvalBokehFalloff` · Default 1
+Bloom5 tint color
 
-Petzval Bokeh Exclusion Box
-:   Box, centered on screen, around which the Petzval effect is applied.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom5Tint</code></dd></div><div><dt>Default</dt><dd>0.066, 0.066, 0.066</dd></div></dl>
 
-    `unreal:postProcess:DepthOfFieldPetzvalExclusionBoxExtents` · Default 0, 0
+</div>
+</div>
 
-Petzval Bokeh Exclusion Box Radius
-:   Corner radius
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">#6 Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:DepthOfFieldPetzvalExclusionBoxRadius` · Default 0
+Bloom6 tint color
 
-Aspect Ratio Scalar
-:   Amount to scale the output viewport's aspect ratio by when computing depth of field properties.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Bloom6Tint</code></dd></div><div><dt>Default</dt><dd>0.061, 0.061, 0.061</dd></div></dl>
 
-    `unreal:postProcess:DepthOfFieldAspectRatioScalar` · Default 1
+</div>
+</div>
 
-Barrel Radius
-:   The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
+</div>
 
-    `unreal:postProcess:DepthOfFieldBarrelRadius` · Default 5
+#### Convolution { .hdue-folder }
 
-Barrel Length
-:   The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:DepthOfFieldBarrelLength` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Use Hair Depth
-:   For depth of field to use the hair depth for computing circle of confusion size. Otherwise use an interpolated distance between the hair depth and the scene depth based on the hair coverage (default).
+Multiplier for Convolution bloom contributions >=0: off, 1(default), >1 brighter
 
-    `unreal:postProcess:DepthOfFieldUseHairDepth` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-### Color Grading
+<div class="hdue-figure" data-figure="ref-bloom-convolution-intensity"></div>
 
-#### Temperature
+</div>
+</div>
 
-Temperature Type
-:   Selects the type of temperature calculation. White Balance uses the Temperature value to control the virtual camera's White Balance. This is the default selection. Color Temperature uses the Temperature value to adjust the color temperature of the scene, which is the inverse of the White Balance operation.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scatter Dispersion</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:TemperatureType` · Default `TEMP_WhiteBalance` · Menu White Balance, Color Temperature
+Intensity multiplier on the scatter dispersion energy of the kernel. 1.0 means exactly use the same energy as the kernel scatter dispersion.
 
-    <div class="hdue-figure" data-figure="ref-temperature-type"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionScatterDispersion</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Temp
-:   Controls the color temperature or white balance in degrees Kelvin which the scene considers as white light.
+</div>
+</div>
 
-    `unreal:postProcess:WhiteTemp` · Default 6500
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Kernel</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="post-white-temp"></div>
+Texture to replace default convolution bloom kernel. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-Tint
-:   Controls the color of the scene along the magenta - green axis (orthogonal to the color temperature). This feature is equivalent to color tint in digital cameras.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionTexture</code></dd></div></dl>
 
-    `unreal:postProcess:WhiteTint` · Default 0
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-white-tint"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scale</div>
+<div class="hdue-param__body" markdown>
 
-#### Global
+Relative size of the convolution kernel image compared to the minor axis of the viewport
 
-Saturation
-:   Control the intensity of the color(hue) for the entire image.Higher values will result in more vibrant colors.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionSize</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:ColorSaturation` · Default 1, 1, 1, 1
+<div class="hdue-figure" data-figure="ref-bloom-convolution-size"></div>
 
-    <div class="hdue-figure" data-figure="post-saturation"></div>
+</div>
+</div>
 
-Contrast
-:   Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Center</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ColorContrast` · Default 1, 1, 1, 1
+The UV location of the center of the kernel. Should be very close to (.5,.5)
 
-    <div class="hdue-figure" data-figure="ref-contrast"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionCenterUV</code></dd></div><div><dt>Default</dt><dd>0.5, 0.5</dd></div></dl>
 
-Gamma
-:   Control the luminance curve of the scene. Raising or lowering this value will result brightening or darkening the mid-tones of the entire image.
+</div>
+</div>
 
-    `unreal:postProcess:ColorGamma` · Default 1, 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Boost Min</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-gamma"></div>
+Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
 
-Gain
-:   This value multiplies the colors of the image. Raising or lowering this value will result in brightening or darkening the entire scene.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMin</code></dd></div><div><dt>Default</dt><dd>7</dd></div></dl>
 
-    `unreal:postProcess:ColorGain` · Default 1, 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-gain"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Boost Max</div>
+<div class="hdue-param__body" markdown>
 
-Offset
-:   This value is added to the colors of the scene. Raising or lowering this value will result in the image being more or less washed-out.
+Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
 
-    `unreal:postProcess:ColorOffset` · Default 0, 0, 0, 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMax</code></dd></div><div><dt>Default</dt><dd>15000</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-offset"></div>
+</div>
+</div>
 
-#### Shadows
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Boost Mult</div>
+<div class="hdue-param__body" markdown>
 
-Saturation
-:   Control the intensity of the colors (hue) in the shadow region of the image. Higher values will result in more vibrant colors.
+Boost intensity of select pixels prior to computing bloom convolution (Min, Max, Multiplier). Max < Min disables
 
-    `unreal:postProcess:ColorSaturationShadows` · Default 1, 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionPreFilterMult</code></dd></div><div><dt>Default</dt><dd>15</dd></div></dl>
 
-Contrast
-:   Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+</div>
+</div>
 
-    `unreal:postProcess:ColorContrastShadows` · Default 1, 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Buffer</div>
+<div class="hdue-param__body" markdown>
 
-Gamma
-:   Control the luminance curve of the shadow region. Raising or lowering this value will result brightening or darkening the mid-tones of the shadow region.
+Implicit buffer region as a fraction of the screen size to insure the bloom does not wrap across the screen. Larger sizes have perf impact.
 
-    `unreal:postProcess:ColorGammaShadows` · Default 1, 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomConvolutionBufferScale</code></dd></div><div><dt>Default</dt><dd>0.133</dd></div></dl>
 
-Gain
-:   This value multiplies the colors in the shadow region. Raising or lowering this value will result in brightening or darkening the affected region.
+</div>
+</div>
 
-    `unreal:postProcess:ColorGainShadows` · Default 1, 1, 1, 1
+</div>
 
-Offset
-:   This value is added to the colors in the shadow region. Raising or lowering this value will result in the shadows being more or less washed-out.
+#### Exposure { .hdue-folder }
 
-    `unreal:postProcess:ColorOffsetShadows` · Default 0, 0, 0, 0
+<div class="hdue-params" markdown>
 
-ShadowsMax
-:   This value sets the threshold for what is considered to be the shadow region of the image.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metering Mode</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ColorCorrectionShadowsMax` · Default 0.09
+Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure.
 
-    <div class="hdue-figure" data-figure="ref-shadows-max"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMethod</code></dd></div><div><dt>Default</dt><dd><code>AEM_Manual</code></dd></div><div><dt>Menu</dt><dd>Auto Exposure Histogram, Auto Exposure Basic, Manual</dd></div></dl>
 
-#### Midtones
+<div class="hdue-figure" data-figure="post-metering-mode"></div>
 
-Saturation
-:   Control the intensity of the colors (hue) in the mid-tone region of the image. Higher values will result in more vibrant colors.
+</div>
+</div>
 
-    `unreal:postProcess:ColorSaturationMidtones` · Default 1, 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Apply Physical Camera Exposure</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-saturation-midtones"></div>
+Enables physical camera exposure using ShutterSpeed/ISO/Aperture.
 
-Contrast
-:   Control the range of light and dark values in the mid-tone region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureApplyPhysicalCameraExposure</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `unreal:postProcess:ColorContrastMidtones` · Default 1, 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-contrast-midtones"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Exposure Compensation Curve</div>
+<div class="hdue-param__body" markdown>
 
-Gamma
-:   Control the luminance curve of the mid-tone region of the image. Raising or lowering this value will result brightening or darkening the mid-tones of the image.
+Exposure compensation based on the scene EV100. Used to calibrate the final exposure differently depending on the average scene luminance. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ... Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
-    `unreal:postProcess:ColorGammaMidtones` · Default 1, 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureBiasCurve</code></dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-gamma-midtones"></div>
+</div>
+</div>
 
-Gain
-:   This value multiplies the colors in the mid-tone region of the image. Raising or lowering this value will result in brightening or darkening the affected region.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Exposure Metering Mask</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ColorGainMidtones` · Default 1, 1, 1, 1
+Exposure metering mask. Bright spots on the mask will have high influence on auto-exposure metering and dark spots will have low influence. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-    <div class="hdue-figure" data-figure="ref-gain-midtones"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMeterMask</code></dd></div></dl>
 
-Offset
-:   This value is added to the colors in the mid-tone region of the image. Raising or lowering this value will result in the mid-tones being more or less washed-out.
+</div>
+</div>
 
-    `unreal:postProcess:ColorOffsetMidtones` · Default 0, 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Min Brightness</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-offset-midtones"></div>
+Auto-Exposure minimum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
-#### Highlights
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMinBrightness</code></dd></div><div><dt>Default</dt><dd>0.03</dd></div></dl>
 
-Saturation
-:   Control the intensity of the color (hue) for the highlights region of the image. Higher values will result in more vibrant colors.
+<div class="hdue-figure" data-figure="ref-min-brightness"></div>
 
-    `unreal:postProcess:ColorSaturationHighlights` · Default 1, 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-saturation-highlights"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Brightness</div>
+<div class="hdue-param__body" markdown>
 
-Contrast
-:   Control the range of light and dark values in the highlights region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
-    `unreal:postProcess:ColorContrastHighlights` · Default 1, 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureMaxBrightness</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-contrast-highlights"></div>
+<div class="hdue-figure" data-figure="ref-max-brightness"></div>
 
-Gamma
-:   Control the luminance curve of the highlight region. Raising or lowering this value will result brightening or darkening the mid-tones of the highlight region.
+</div>
+</div>
 
-    `unreal:postProcess:ColorGammaHighlights` · Default 1, 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Speed Up</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-gamma-highlights"></div>
+>0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
 
-Gain
-:   This value multiplies the colors in the highlight region. Raising or lowering this value will result in brightening or darkening the affected region.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedUp</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
 
-    `unreal:postProcess:ColorGainHighlights` · Default 1, 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-gain-highlights"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Speed Down</div>
+<div class="hdue-param__body" markdown>
 
-Offset
-:   This value is added to the colors in the highlight region. Raising or lowering this value will result in the highlights being more or less washed-out.
+>0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
 
-    `unreal:postProcess:ColorOffsetHighlights` · Default 0, 0, 0, 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureSpeedDown</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-offset-highlights"></div>
+</div>
+</div>
 
-HighlightsMin
-:   This value sets the lower threshold for what is considered to be the highlight region of the image.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Low Percent</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ColorCorrectionHighlightsMin` · Default 0.5
+The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. >0, <100, good values are in the range 70 .. 80
 
-    <div class="hdue-figure" data-figure="ref-highlights-min"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureLowPercent</code></dd></div><div><dt>Default</dt><dd>10</dd></div></dl>
 
-HighlightsMax
-:   This value sets the upper threshold for what is considered to be the highlight region of the image. This value should be larger than HighlightsMin. Default is 1.0, for backwards compatibility
+<div class="hdue-figure" data-figure="ref-low-percent"></div>
 
-    `unreal:postProcess:ColorCorrectionHighlightsMax` · Default 1
+</div>
+</div>
 
-#### Misc
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">High Percent</div>
+<div class="hdue-param__body" markdown>
 
-Blue Correction
-:   Correct for artifacts with "electric" blues due to the ACEScg color space. Bright blue desaturates instead of going to violet.
+The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. >0, <100, good values are in the range 80 .. 95
 
-    `unreal:postProcess:BlueCorrection` · Default 0.6
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AutoExposureHighPercent</code></dd></div><div><dt>Default</dt><dd>90</dd></div></dl>
 
-Expand Gamut
-:   Expand bright saturated colors outside the sRGB gamut to fake wide gamut rendering.
+<div class="hdue-figure" data-figure="ref-high-percent"></div>
 
-    `unreal:postProcess:ExpandGamut` · Default 1
+</div>
+</div>
 
-Tone Curve Amount
-:   Allow effect of Tone Curve to be reduced (Set ToneCurveAmount and ExpandGamut to 0.0 to fully disable tone curve)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Histogram Log Min</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ToneCurveAmount` · Default 1
+Histogram Min value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
 
-    <div class="hdue-figure" data-figure="ref-tone-curve-amount"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMin</code></dd></div><div><dt>Default</dt><dd>-8</dd></div></dl>
 
-Scene Color Tint
-:   Scene tint color
+</div>
+</div>
 
-    `unreal:postProcess:SceneColorTint` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Histogram Log Max</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-scene-color-tint"></div>
+Histogram Max value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
 
-Color Grading LUT Intensity
-:   Color grading lookup table intensity. 0 = no intensity, 1=full intensity
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:HistogramLogMax</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
 
-    `unreal:postProcess:ColorGradingIntensity` · Default 1
+</div>
+</div>
 
-Color Grading LUT
-:   Look up table texture to use or none of not used. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+</div>
 
-    `unreal:postProcess:ColorGradingLUT`
+#### Chromatic Aberration { .hdue-folder }
 
-#### Film
+<div class="hdue-params" markdown>
 
-Method
-:   Controls the method of tonemapping.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:TonemappingMethod` · Default `ETonemappingMethod::Filmic` · Menu Filmic, Standard ACES
+in percent, Scene chromatic aberration / color fringe (camera imperfection) to simulate an artifact that happens in real-world lens, mostly visible in the image corners.
 
-    <div class="hdue-figure" data-figure="post-tonemapping-method"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:SceneFringeIntensity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Slope
-:   Controls the overall steepness of the tonemapper curve. Larger values increase scene contrast and smaller values reduce contrast.
+<div class="hdue-figure" data-figure="post-chromatic-aberration"></div>
 
-    `unreal:postProcess:FilmSlope` · Default 0.88
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-film-slope"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Offset</div>
+<div class="hdue-param__body" markdown>
 
-Toe
-:   Controls the contrast of the dark end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
+A normalized distance to the center of the framebuffer where the effect takes place.
 
-    `unreal:postProcess:FilmToe` · Default 0.55
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ChromaticAberrationStartOffset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-film-toe"></div>
+<div class="hdue-figure" data-figure="ref-chromatic-aberration-offset"></div>
 
-Shoulder
-:   Sometimes referred to as highlight rolloff. Controls the contrast of the bright end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
+</div>
+</div>
 
-    `unreal:postProcess:FilmShoulder` · Default 0.26
+</div>
 
-    <div class="hdue-figure" data-figure="ref-film-shoulder"></div>
+#### Dirt Mask { .hdue-folder }
 
-Black clip
-:   Lowers the toe of the tonemapper curve by this amount. Increasing this value causes more of the scene to clip to black. For most purposes, this property should remain 0
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:FilmBlackClip` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Dirt Mask Texture</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-film-black-clip"></div>
+Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-White clip
-:   Controls the height of the tonemapper curve. Raising this value can cause bright values to more quickly approach fully-saturated white.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMask</code></dd></div></dl>
 
-    `unreal:postProcess:FilmWhiteClip` · Default 0.04
+<div class="hdue-figure" data-figure="ref-dirt-mask-texture"></div>
 
-    <div class="hdue-figure" data-figure="ref-film-white-clip"></div>
+</div>
+</div>
 
-#### Film Grain
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Dirt Mask Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Film Grain Intensity
-:   0..1 Film grain intensity to apply. LinearSceneColor *= lerp(1.0, DecodedFilmGrainTexture, FilmGrainIntensity)
+BloomDirtMask intensity
 
-    `unreal:postProcess:FilmGrainIntensity` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskIntensity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="post-film-grain"></div>
+<div class="hdue-figure" data-figure="ref-dirt-mask-intensity"></div>
 
-Film Grain Intensity Shadows
-:   Control over the grain intensity in the regions of the image considered shadow areas.
+</div>
+</div>
 
-    `unreal:postProcess:FilmGrainIntensityShadows` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Dirt Mask Tint</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-film-grain-shadows"></div>
+BloomDirtMask tint color
 
-Film Grain Intensity Midtones
-:   Control over the grain intensity in the mid-tone region of the image.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BloomDirtMaskTint</code></dd></div><div><dt>Default</dt><dd>0.5, 0.5, 0.5</dd></div></dl>
 
-    `unreal:postProcess:FilmGrainIntensityMidtones` · Default 1
+<div class="hdue-figure" data-figure="ref-dirt-mask-tint"></div>
 
-    <div class="hdue-figure" data-figure="ref-film-grain-midtones"></div>
+</div>
+</div>
 
-Film Grain Intensity Highlights
-:   Control over the grain intensity in the regions of the image considered highlight areas.
+</div>
 
-    `unreal:postProcess:FilmGrainIntensityHighlights` · Default 1
+#### Camera { .hdue-folder }
 
-    <div class="hdue-figure" data-figure="ref-film-grain-highlights"></div>
+<div class="hdue-params" markdown>
 
-Film Grain Shadows Max
-:   Sets the upper bound used for Film Grain Shadow Intensity.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shutter Speed (1/s)</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:FilmGrainShadowsMax` · Default 0.09
+The camera shutter in 1/seconds.
 
-Film Grain Highlights Min
-:   Sets the lower bound used for Film Grain Highlight Intensity.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraShutterSpeed</code></dd></div><div><dt>Default</dt><dd>60</dd></div></dl>
 
-    `unreal:postProcess:FilmGrainHighlightsMin` · Default 0.5
+</div>
+</div>
 
-Film Grain Highlights Max
-:   Sets the upper bound used for Film Grain Highlight Intensity. This value should be larger than HighlightsMin.. Default is 1.0, for backwards compatibility
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">ISO</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:FilmGrainHighlightsMax` · Default 1
+The camera sensor sensitivity in ISO.
 
-Film Grain Scale
-:   Controls the size of the film grain. Size of texel of FilmGrainTexture on screen.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:CameraISO</code></dd></div><div><dt>Default</dt><dd>100</dd></div></dl>
 
-    `unreal:postProcess:FilmGrainScale` · Default 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-film-grain-scale"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aperture (F-stop)</div>
+<div class="hdue-param__body" markdown>
 
-Film Grain Texture
-:   Defines film grain texture to use. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
-    `unreal:postProcess:FilmGrainTexture`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFstop</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
 
-### Lighting
+<div class="hdue-figure" data-figure="ref-camera-aperture"></div>
 
-#### Global Illumination
+</div>
+</div>
 
-Lumen
-:   Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal Engine tab.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Maximum Aperture (min F-stop)</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:lumenEnabled` · Default on
+Defines the maximum opening of the camera lens to control the curvature of blades of the diaphragm. Set it to 0 to get straight blades.
 
-    <div class="hdue-figure" data-figure="ref-lumen-enabled"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldMinFstop</code></dd></div><div><dt>Default</dt><dd>1.2</dd></div></dl>
 
-Method
-:   Chooses the Dynamic Global Illumination method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
+</div>
+</div>
 
-    `unreal:postProcess:DynamicGlobalIlluminationMethod` · Default `EDynamicGlobalIlluminationMethod::Lumen` · Menu None, Lumen, Screen Space (Deprecated), Plugin
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Number of diaphragm blades</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="global-illumination"></div>
+Defines the number of blades of the diaphragm within the lens (between 4 and 16).
 
-Indirect Lighting Color
-:   Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The show flag 'Global Illumination' must be enabled to use this property.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBladeCount</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
 
-    `unreal:postProcess:IndirectLightingColor` · Default 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-indirect-lighting-color"></div>
+</div>
 
-Indirect Lighting Intensity
-:   Scales the indirect lighting contribution. A value of 0 disables GI. Default is 1. The show flag 'Global Illumination' must be enabled to use this property.
+#### Local Exposure { .hdue-folder }
 
-    `unreal:postProcess:IndirectLightingIntensity` · Default 1
+<div class="hdue-params" markdown>
 
-    <div class="hdue-figure" data-figure="ref-indirect-lighting-intensity"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Method</div>
+<div class="hdue-param__body" markdown>
 
-#### Lumen Global Illumination
+Local Exposure algorithm
 
-Hit Lighting
-:   Lights Lumen's hardware rays where they hit, instead of from the surface cache: brighter, more accurate indirect light and reflections, at a cost in render time. Off by default, as in UE. On, it sets the Ray Lighting Mode below to Hit Lighting (unreal:postProcess:LumenRayLightingMode).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMethod</code></dd></div><div><dt>Default</dt><dd><code>ELocalExposureMethod::Bilateral</code></dd></div><div><dt>Menu</dt><dd>Bilateral, Fusion (Experimental)</dd></div></dl>
 
-    `hdue_lumenHitLighting` · Default off
+<div class="hdue-figure" data-figure="ref-local-exposure-method"></div>
 
-Ray Lighting Mode
-:   Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality.
+</div>
+</div>
 
-    `unreal:postProcess:LumenRayLightingMode` · Default `ELumenRayLightingModeOverride::Default` · Menu Project Default, Surface Cache, Hit Lighting for Reflections, Hit Lighting
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Highlight Contrast</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="tut-lumen-pt-reflections"></div>
+Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
-Lumen Scene Lighting Quality
-:   Scales Lumen Scene's quality. Larger scales cause Lumen Scene to be calculated with a higher fidelity, which can be visible in reflections, but increase GPU cost.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:LumenSceneLightingQuality` · Default 1
+<div class="hdue-figure" data-figure="ref-local-exposure-highlights"></div>
 
-Lumen Scene Detail
-:   Controls the size of instances that can be represented in Lumen Scene. Larger values will ensure small objects are represented, but increase GPU cost.
+</div>
+</div>
 
-    `unreal:postProcess:LumenSceneDetail` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Contrast</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-lumen-scene-detail"></div>
+Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
-Lumen Scene View Distance
-:   Sets the maximum view distance of the scene that Lumen maintains for ray tracing against. Larger values will increase the effective range of sky shadowing and Global Illumination, but increase GPU cost.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:LumenSceneViewDistance` · Default 20000
+<div class="hdue-figure" data-figure="ref-local-exposure-shadows"></div>
 
-Final Gather Quality
-:   Scales Lumen's Final Gather quality. Larger scales reduce noise, but greatly increase GPU cost.
+</div>
+</div>
 
-    `unreal:postProcess:LumenFinalGatherQuality` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Highlight Contrast Curve</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="tut-noise-lumen-quality"></div>
+Local Exposure Highlight Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
-Screen Traces
-:   Whether to use screen space traces for Lumen Global Illumination. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightContrastCurve</code></dd></div></dl>
 
-    `unreal:postProcess:LumenFinalGatherScreenTraces` · Default on
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-lumen-screen-traces"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Contrast Curve</div>
+<div class="hdue-param__body" markdown>
 
-Max Trace Distance
-:   Controls the maximum distance that Lumen should trace while solving lighting. Values that are too small will cause lighting to leak into large caves, while values that are large will increase GPU cost.
+Local Exposure Shadow Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
-    `unreal:postProcess:LumenMaxTraceDistance` · Default 20000
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowContrastCurve</code></dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-lumen-max-trace-distance"></div>
+</div>
+</div>
 
-Lumen Surface Cache Resolution
-:   Scale factor for Lumen Surface Cache resolution. Smaller values save GPU memory, at a cost in quality. Defaults to 0.5 for Scene Captures if not overridden.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Highlight Threshold</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LumenSurfaceCacheResolution` · Default 1
+Threshold used to determine which regions of the screen are considered highlights.
 
-Hardware Ray Tracing
-:   Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall back to Software Ray Tracing otherwise. Note: Hardware ray tracing has significant scene update costs for scenes with more than 100k instances. Console variable r.Lumen.HardwareRayTracing (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThreshold</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:cvar:r:Lumen:HardwareRayTracing` · Default on
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-lumen-hardware-ray-tracing"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Threshold</div>
+<div class="hdue-param__body" markdown>
 
-Lumen Scene Lighting Update Speed
-:   Controls how much Lumen Scene is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost.
+Threshold used to determine which regions of the screen are considered shadows.
 
-    `unreal:postProcess:LumenSceneLightingUpdateSpeed` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThreshold</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Final Gather Lighting Update Speed
-:   Controls how much Lumen Final Gather is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost and noise.
+</div>
+</div>
 
-    `unreal:postProcess:LumenFinalGatherLightingUpdateSpeed` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Detail Strength</div>
+<div class="hdue-param__body" markdown>
 
-Diffuse Color Boost
-:   Allows brightening indirect lighting by calculating material diffuse color for indirect lighting. Values above 1 (original diffuse color) aren't physically correct, but they can be useful as an art direction knob to increase the amount of bounced light in the scene. Best to keep below 2 as it also causes reflections to be brighter than the scene.
+Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Value different than 1 will enable local exposure. This value should be set to 1 in most cases.
 
-    `unreal:postProcess:LumenDiffuseColorBoost` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureDetailStrength</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-lumen-diffuse-color-boost"></div>
+<div class="hdue-figure" data-figure="ref-local-exposure-detail"></div>
 
-Ambient Occlusion Intensity
-:   Allows control over the strength of Lumen's Short Range Ambient Occlusion.
+</div>
+</div>
 
-    `unreal:postProcess:LumenAmbientOcclusionIntensity` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Blurred Luminance Blend</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-lumen-ao-intensity"></div>
+Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Blend between bilateral filtered and blurred luminance as the base layer. Blurred luminance helps preserve image appearance and specular highlights, and reduce ringing. Good values are usually in the range 0.4 .. 0.6
 
-Skylight Leaking
-:   Controls what fraction of the skylight intensity should be allowed to leak. This can be useful as an art direction knob (non-physically based) to keep indoor areas from going fully black.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceBlend</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
 
-    `unreal:postProcess:LumenSkylightLeaking` · Default 0
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-lumen-skylight-leaking"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Blurred Luminance Kernel Size Percent</div>
+<div class="hdue-param__body" markdown>
 
-Skylight Leaking Tint
-:   Color tint for Lumen Skylight Leaking.
+Kernel size (percentage of screen) used to blur frame luminance.
 
-    `unreal:postProcess:LumenSkylightLeakingTint` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureBlurredLuminanceKernelSizePercent</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
 
-Full Skylight Leaking Distance
-:   Controls the distance from a receiving surface where skylight leaking reaches its full intensity. Smaller values make the skylight leaking flatter, while larger values create an Ambient Occlusion effect.
+</div>
+</div>
 
-    `unreal:postProcess:LumenFullSkylightLeakingDistance` · Default 1000
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Highlight Threshold Strength</div>
+<div class="hdue-param__body" markdown>
 
-#### Reflections
+Strength of the highlight threshold.
 
-Method
-:   Chooses the Reflection method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureHighlightThresholdStrength</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:ReflectionMethod` · Default `EReflectionMethod::Lumen` · Menu None, Lumen, Screen Space
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-reflection-method"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Threshold Strength</div>
+<div class="hdue-param__body" markdown>
 
-#### Lumen Reflections
+Strength of the shadow threshold.
 
-Quality
-:   Scales the Reflection quality. Larger scales reduce noise in reflections, but increase GPU cost.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureShadowThresholdStrength</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:LumenReflectionQuality` · Default 1
+</div>
+</div>
 
-Screen Traces
-:   Whether to use screen space traces for Lumen Reflections. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Middle Grey Bias</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:LumenReflectionsScreenTraces` · Default on
+Logarithmic adjustment for the local exposure middle grey. 0: no adjustment, -1:2x darker, -2:4x darker, 1:2x brighter, 2:4x brighter, ...
 
-    <div class="hdue-figure" data-figure="ref-lumen-reflection-screen-traces"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LocalExposureMiddleGreyBias</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-High Quality Translucency Reflections
-:   Whether to use high quality mirror reflections on the front layer of translucent surfaces. Other layers will use the lower quality Radiance Cache method that can only produce glossy reflections. Increases GPU cost when enabled.
+</div>
+</div>
 
-    `unreal:postProcess:LumenFrontLayerTranslucencyReflections` · Default off
+</div>
 
-Max Roughness To Trace
-:   Sets the maximum roughness value for which Lumen still traces dedicated reflection rays. Higher values improve reflection quality, but greatly increase GPU cost.
+#### Lens Flares { .hdue-folder }
 
-    `unreal:postProcess:LumenMaxRoughnessToTraceReflections` · Default 0.4
+<div class="hdue-params" markdown>
 
-    <div class="hdue-figure" data-figure="tut-lumen-pt-roughness"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Max Reflection Bounces
-:   Sets the maximum number of recursive reflection bounces. 1 means a single reflection ray (no secondary reflections in mirrors). Currently only supported by Hardware Ray Tracing with Hit Lighting.
+Brightness scale of the image cased lens flares (linear)
 
-    `unreal:postProcess:LumenMaxReflectionBounces` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Max Refraction Bounces
-:   The maximum count of refraction event to trace. When hit lighting is used, Translucent meshes will be traced when LumenMaxRefractionBounces > 0, making the reflection tracing more expenssive.
+<div class="hdue-figure" data-figure="post-lens-flares"></div>
 
-    `unreal:postProcess:LumenMaxRefractionBounces` · Default 0
+</div>
+</div>
 
-Hardware Ray Traced Reflections
-:   Enables hardware ray tracing for Lumen reflections (Default = 1) Console variable r.Lumen.Reflections.HardwareRayTracing (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:Lumen:Reflections:HardwareRayTracing` · Default on
+Tint color for the image based lens flares.
 
-#### Screen Space Reflections
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-Intensity
-:   Enable/Fade/disable the Screen Space Reflection feature, in percent, avoid numbers between 0 and 1 fo consistency
+<div class="hdue-figure" data-figure="ref-lens-flare-tint"></div>
 
-    `unreal:postProcess:ScreenSpaceReflectionIntensity` · Default 100
+</div>
+</div>
 
-Quality
-:   0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition, 50 is the default for better performance.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">BokehSize</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:ScreenSpaceReflectionQuality` · Default 50
+Size of the Lens Blur (in percent of the view width) that is done with the Bokeh texture (note: performance cost is radius*radius)
 
-Max Roughness
-:   Until what roughness we fade the screen space reflections, 0.8 works well, smaller can run faster
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehSize</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
 
-    `unreal:postProcess:ScreenSpaceReflectionMaxRoughness` · Default 0.6
+<div class="hdue-figure" data-figure="ref-lens-flare-bokeh-size"></div>
 
-#### Shadows
+</div>
+</div>
 
-Virtual Shadow Maps
-:   Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps for shadowing. Provides high - quality shadows for next - gen projects with simplified setup.High efficiency culling when used with Nanite. Console variable r.Shadow.Virtual.Enable (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Threshold</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:Shadow:Virtual:Enable` · Default on
+Minimum brightness the lens flare starts having effect (this should be as high as possible to avoid the performance cost of blurring content that is too dark too see)
 
-    <div class="hdue-figure" data-figure="ref-virtual-shadow-maps"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareThreshold</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
 
-Ray Traced Shadows
-:   0: use traditional rasterized shadow map (default) 1: use ray tracing shadows Console variable r.RayTracing.Shadows (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:RayTracing:Shadows` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">BokehShape</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-ray-traced-shadows"></div>
+Defines the shape of the Bokeh when the image base lens flares are blurred, cannot be blended. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-Directional Resolution Bias
-:   Bias applied to LOD calculations for directional lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasDirectional (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LensFlareBokehShape</code></dd></div></dl>
 
-    `unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional` · Default -1.5
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-vsm-directional-bias"></div>
+</div>
 
-Local Resolution Bias
-:   Bias applied to LOD calculations for local lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasLocal (process-wide).
+#### Image Effects { .hdue-folder }
 
-    `unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasLocal` · Default 0
+<div class="hdue-params" markdown>
 
-Directional Soft Shadow Rays
-:   Ray count for shadow map tracing of directional lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountDirectional (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Intensity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional` · Default 8
+0..1 0=off/no vignette .. 1=strong vignette
 
-    <div class="hdue-figure" data-figure="tut-noise-shadow-rays"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteIntensity</code></dd></div><div><dt>Default</dt><dd>0.4</dd></div></dl>
 
-Directional Samples per Ray
-:   Shadow map samples per ray for directional lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayDirectional (process-wide).
+<div class="hdue-figure" data-figure="post-vignette"></div>
 
-    `unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayDirectional` · Default 4
+</div>
+</div>
 
-Local Soft Shadow Rays
-:   Ray count for shadow map tracing of local lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountLocal (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sharpen</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:Shadow:Virtual:SMRT:RayCountLocal` · Default 8
+Controls the strength of image sharpening applied during tonemapping.
 
-Local Samples per Ray
-:   Shadow map samples per ray for local lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayLocal (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:Sharpen</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayLocal` · Default 4
+<div class="hdue-figure" data-figure="ref-sharpen"></div>
 
-Shadow Map Filter
-:   Chooses the shadow filtering method. 0: Uniform PCF (default) 1: PCSS (experimental) Console variable r.Shadow.FilterMethod (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:Shadow:FilterMethod` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Type</div>
+<div class="hdue-param__body" markdown>
 
-#### Dome and Viewer Lights
+The shape type of the vignette
 
-Environment Cube Resolution
-:   Face size of the cubemap dome lights are baked into, for lighting, reflections and the background.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteType</code></dd></div><div><dt>Default</dt><dd><code>EVignetteType::CosineFourthLaw</code></dd></div><div><dt>Menu</dt><dd>Cosine Fourth Law (Default), Texture, Oval</dd></div></dl>
 
-    `unreal:domeResolution` · Default 128
+</div>
+</div>
 
-Light Unlit Scenes
-:   Add a camera-relative key and fill light when the scene has no lights, so unlit scenes are reviewable.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Center</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:autoViewerLight` · Default on
+Position of the vignette center in UV space.
 
-Viewer Light Intensity
-:   Intensity of the unlit-scene lights and of the viewport's headlight.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteCenter</code></dd></div><div><dt>Default</dt><dd>0.5, 0.5</dd></div></dl>
 
-    `unreal:viewerLightIntensity` · Default 4
+</div>
+</div>
 
-### Fog
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Color</div>
+<div class="hdue-param__body" markdown>
 
-Exponential Height Fog
-:   Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor in a level. Turn on Volumetric Fog for lit, shadowed fog (light shafts); the Path Tracer renders the fog only with Volumetric Fog on. Lights scatter into it by their Volumetric Scattering Intensity.
+Color multiplied with areas that are masked by the vignette. Default is black.
 
-    `unreal:heightFog` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteColor</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-height-fog"></div>
+</div>
+</div>
 
-Fog Height
-:   Height of the fog actor, in scene units along the stage's up axis: the fog's density is Fog Density there and grows below it.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Size</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFogHeight` · Default 0
+Scale of the vignette shape in screenspace. Can be used to scale vignette anamorphically. Default is 1.
 
-#### Exponential Height Fog Component
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSize</code></dd></div><div><dt>Default</dt><dd>1, 1</dd></div></dl>
 
-Fog Density
-:   Global density factor.
+</div>
+</div>
 
-    `unreal:heightFog:FogDensity` · Default 0.02
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Softness</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="fog-density"></div>
+The softness of the transition from opaque to transparant on the edge of the vignette shape.
 
-Fog Height Falloff
-:   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteSoftness</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
 
-    `unreal:heightFog:FogHeightFalloff` · Default 0.2
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="fog-height-falloff"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Vignette Texture</div>
+<div class="hdue-param__body" markdown>
 
-Second Fog Density
-:   Global density factor for this fog. Density 0 turns the second fog off.
+Defines the shape of the vignette when VignetteType is set to Texture. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-    `unreal:heightFog:SecondFogData:FogDensity` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:VignetteTexture</code></dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-second-fog-density"></div>
+</div>
+</div>
 
-Second Fog Height Falloff
-:   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+</div>
 
-    `unreal:heightFog:SecondFogData:FogHeightFalloff` · Default 0.2
+#### Depth of Field { .hdue-folder }
 
-Second Fog Height Offset
-:   Height offset, relative to the actor position Z.
+<div class="hdue-params" markdown>
 
-    `unreal:heightFog:SecondFogData:FogHeightOffset` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Enabled</div>
+<div class="hdue-param__body" markdown>
 
-Fog Inscattering Color
-:   Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
+When false, post-process depth of field will not be used. When true, DoF may be used depending on lens and scalability settings.
 
-    `unreal:heightFog:FogInscatteringLuminance` · Default 0, 0, 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldEnabled</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="fog-inscattering-color"></div>
+<div class="hdue-figure" data-figure="ref-dof-enabled"></div>
 
-Sky Atmosphere Ambient Contribution Color Scale
-:   Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0
+</div>
+</div>
 
-    `unreal:heightFog:SkyAtmosphereAmbientContributionColorScale` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sensor Width (mm)</div>
+<div class="hdue-param__body" markdown>
 
-Fog Max Opacity
-:   Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all.
+Width of the camera sensor to assume, in mm. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
-    `unreal:heightFog:FogMaxOpacity` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSensorWidth</code></dd></div><div><dt>Default</dt><dd>24.576</dd></div></dl>
 
-Start Distance
-:   Distance from the camera that the fog will start, in world units.
+</div>
+</div>
 
-    `unreal:heightFog:StartDistance` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Squeeze Factor</div>
+<div class="hdue-param__body" markdown>
 
-End Distance
-:   Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0.
+This is the squeeze factor for the DOF, which emulates the properties of anamorphic lenses. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
-    `unreal:heightFog:EndDistance` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldSqueezeFactor</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Fog Cutoff Distance
-:   Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in.
+<div class="hdue-figure" data-figure="ref-dof-squeeze"></div>
 
-    `unreal:heightFog:FogCutoffDistance` · Default 0
+</div>
+</div>
 
-#### Inscattering Texture
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Focal Distance</div>
+<div class="hdue-param__body" markdown>
 
-Inscattering Color Cubemap
-:   Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+Distance in which the Depth of Field effect should be sharp, in unreal units (cm). Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
-    `unreal:heightFog:InscatteringColorCubemap`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldFocalDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Sky Light Capture In-Scattering Strength
-:   When >0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
+</div>
+</div>
 
-    `unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Depth Blur km for 50%</div>
+<div class="hdue-param__body" markdown>
 
-Sky Light Capture In-Scattering Roughness
-:   This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function.
+CircleDOF only: Depth blur km for 50%
 
-    `unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness` · Default 0.15
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurAmount</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Inscattering Color Cubemap Angle
-:   Angle to rotate the InscatteringColorCubemap around the Z axis.
+</div>
+</div>
 
-    `unreal:heightFog:InscatteringColorCubemapAngle` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Depth Blur Radius</div>
+<div class="hdue-param__body" markdown>
 
-Inscattering Texture Tint
-:   Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap.
+CircleDOF only: Depth blur radius in pixels at 1920x
 
-    `unreal:heightFog:InscatteringTextureTint` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldDepthBlurRadius</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Fully Directional Inscattering Color Distance
-:   Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color.
+</div>
+</div>
 
-    `unreal:heightFog:FullyDirectionalInscatteringColorDistance` · Default 100000
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Petzval Bokeh</div>
+<div class="hdue-param__body" markdown>
 
-Non Directional Inscattering Color Distance
-:   Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color.
+Simulate stretching in blur and bokeh. Positive values for sagittal (swirly bokeh), negative values for tangential.
 
-    `unreal:heightFog:NonDirectionalInscatteringColorDistance` · Default 1000
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokeh</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-#### Directional Inscattering
+<div class="hdue-figure" data-figure="ref-dof-petzval"></div>
 
-Directional Inscattering Exponent
-:   Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead.
+</div>
+</div>
 
-    `unreal:heightFog:DirectionalInscatteringExponent` · Default 4
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Petzval Bokeh Falloff</div>
+<div class="hdue-param__body" markdown>
 
-Directional Inscattering Start Distance
-:   Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+How quickly does the Petzval bokeh effect increase towards the edge of the image
 
-    `unreal:heightFog:DirectionalInscatteringStartDistance` · Default 10000
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalBokehFalloff</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Directional Inscattering Color
-:   Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+</div>
+</div>
 
-    `unreal:heightFog:DirectionalInscatteringLuminance` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Petzval Bokeh Exclusion Box</div>
+<div class="hdue-param__body" markdown>
 
-#### Volumetric Fog
+Box, centered on screen, around which the Petzval effect is applied.
 
-Volumetric Fog
-:   Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxExtents</code></dd></div><div><dt>Default</dt><dd>0, 0</dd></div></dl>
 
-    `unreal:heightFog:bEnableVolumetricFog` · Default off
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="fog-volumetric"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Petzval Bokeh Exclusion Box Radius</div>
+<div class="hdue-param__body" markdown>
 
-Scattering Distribution
-:   Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+Corner radius
 
-    `unreal:heightFog:VolumetricFogScatteringDistribution` · Default 0.2
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldPetzvalExclusionBoxRadius</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
+</div>
+</div>
 
-Albedo
-:   The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aspect Ratio Scalar</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:VolumetricFogAlbedo` · Default 1, 1, 1
+Amount to scale the output viewport's aspect ratio by when computing depth of field properties.
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldAspectRatioScalar</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Emissive
-:   Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
+</div>
+</div>
 
-    `unreal:heightFog:VolumetricFogEmissive` · Default 0, 0, 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Barrel Radius</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
 
-Extinction Scale
-:   Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelRadius</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
 
-    `unreal:heightFog:VolumetricFogExtinctionScale` · Default 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="fog-extinction-scale"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Barrel Length</div>
+<div class="hdue-param__body" markdown>
 
-View Distance
-:   Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
+The lens barrel creates vignetting and occludes bokeh, i.e. cat's eye bokeh
 
-    `unreal:heightFog:VolumetricFogDistance` · Default 6000
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldBarrelLength</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Start Distance
-:   Distance from the camera that the volumetric fog will start, in world units.
+</div>
+</div>
 
-    `unreal:heightFog:VolumetricFogStartDistance` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Use Hair Depth</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
+For depth of field to use the hair depth for computing circle of confusion size. Otherwise use an interpolated distance between the hair depth and the scene depth based on the hair coverage (default).
 
-Near Fade In Distance
-:   Distance over which volumetric fog will fade in from the start distance.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DepthOfFieldUseHairDepth</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-    `unreal:heightFog:VolumetricFogNearFadeInDistance` · Default 0
+</div>
+</div>
 
-Override Light Colors With Fog Inscattering Colors
-:   Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting.
+</div>
 
-    `unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors` · Default off
+### Color Grading { .hdue-tab }
 
-#### Fog Screen Space Scattering - EXPERIMENTAL
+#### Temperature { .hdue-folder }
 
-Enable Fog Screen Space Scattering
-:   Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering.
+<div class="hdue-params" markdown>
 
-    `unreal:heightFog:bEnableFSSS` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Temperature Type</div>
+<div class="hdue-param__body" markdown>
 
-Scene Color Scattering Amount Scale
-:   The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however.
+Selects the type of temperature calculation. White Balance uses the Temperature value to control the virtual camera's White Balance. This is the default selection. Color Temperature uses the Temperature value to adjust the color temperature of the scene, which is the inverse of the White Balance operation.
 
-    `unreal:heightFog:FSSSSceneColorScatteringAmountScale` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:TemperatureType</code></dd></div><div><dt>Default</dt><dd><code>TEMP_WhiteBalance</code></dd></div><div><dt>Menu</dt><dd>White Balance, Color Temperature</dd></div></dl>
 
-Scene Color Scattering Amount Power
-:   Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense.
+<div class="hdue-figure" data-figure="ref-temperature-type"></div>
 
-    `unreal:heightFog:FSSSSceneColorScatteringAmountPower` · Default 1
+</div>
+</div>
 
-Spread Scale
-:   The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Temp</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:FSSSSpreadScale` · Default 0.1
+Controls the color temperature or white balance in degrees Kelvin which the scene considers as white light.
 
-Blur Control
-:   When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:WhiteTemp</code></dd></div><div><dt>Default</dt><dd>6500</dd></div></dl>
 
-    `unreal:heightFog:FSSSBlurControl` · Default 0.5
+<div class="hdue-figure" data-figure="post-white-temp"></div>
 
-#### Rendering
+</div>
+</div>
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:heightFog:bHoldout` · Default off
+Controls the color of the scene along the magenta - green axis (orthogonal to the color temperature). This feature is equivalent to color tint in digital cameras.
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:WhiteTint</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:heightFog:bRenderInMainPass` · Default on
+<div class="hdue-figure" data-figure="ref-white-tint"></div>
 
-Visible In Reflection Captures
-:   If true, this component will be visible in reflection captures.
+</div>
+</div>
 
-    `unreal:heightFog:bVisibleInReflectionCaptures` · Default on
+</div>
 
-Visible In Real Time Sky Captures
-:   If true, this component will be visible in real-time sky light reflection captures.
+#### Global { .hdue-folder }
 
-    `unreal:heightFog:bVisibleInRealTimeSkyCaptures` · Default on
+<div class="hdue-params" markdown>
 
-### Sky
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Saturation</div>
+<div class="hdue-param__body" markdown>
 
-Sky Atmosphere
-:   Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a physical sky lit by the distant lights that are Atmosphere Sun Lights (UE's default for a distant light; Light LOP, Unreal Engine tab). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE needs for Lumen and its Path Tracer; a DomeLight's environment takes its place.
+Control the intensity of the color(hue) for the entire image.Higher values will result in more vibrant colors.
 
-    `unreal:skyAtmosphere` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorSaturation</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-sky-atmosphere"></div>
+<div class="hdue-figure" data-figure="post-saturation"></div>
 
-Volumetric Cloud
-:   Place UE's Volumetric Cloud in the scene, with UE's default cloud material unless Material is set. Clouds need the Sky Atmosphere; the Path Tracer renders them with Reference Atmosphere on (Path Tracing).
+</div>
+</div>
 
-    `unreal:volumetricCloud` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Contrast</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="sky-clouds"></div>
+Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
-#### Planet
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorContrast</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Transform Mode
-:   The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+<div class="hdue-figure" data-figure="ref-contrast"></div>
 
-    `unreal:skyAtmosphere:TransformMode` · Default `ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin` · Menu PlanetTopAtAbsoluteWorldOrigin, PlanetTopAtComponentTransform, PlanetCenterAtComponentTransform
+</div>
+</div>
 
-Ground Radius
-:   The radius in kilometers from the center of the planet to the ground level.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gamma</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:BottomRadius` · Default 6360
+Control the luminance curve of the scene. Raising or lowering this value will result brightening or darkening the mid-tones of the entire image.
 
-Ground Albedo
-:   The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGamma</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    `unreal:skyAtmosphere:GroundAlbedo` · Default 0.401978, 0.401978, 0.401978
+<div class="hdue-figure" data-figure="ref-gamma"></div>
 
-    <div class="hdue-figure" data-figure="ref-ground-albedo"></div>
+</div>
+</div>
 
-Planet Radius
-:   The planet radius used when there is not SkyAtmosphere component present in the scene.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gain</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:PlanetRadius` · Default 6360
+This value multiplies the colors of the image. Raising or lowering this value will result in brightening or darkening the entire scene.
 
-Ground Albedo
-:   The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGain</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    `unreal:volumetricCloud:GroundAlbedo` · Default 0.401978, 0.401978, 0.401978
+<div class="hdue-figure" data-figure="ref-gain"></div>
 
-#### Atmosphere
+</div>
+</div>
 
-Atmosphere Height
-:   The height of the atmosphere layer above the ground in kilometers.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:AtmosphereHeight` · Default 60
+This value is added to the colors of the scene. Raising or lowering this value will result in the image being more or less washed-out.
 
-    <div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorOffset</code></dd></div><div><dt>Default</dt><dd>0, 0, 0, 0</dd></div></dl>
 
-MultiScattering
-:   Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
+<div class="hdue-figure" data-figure="ref-offset"></div>
 
-    `unreal:skyAtmosphere:MultiScatteringFactor` · Default 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-multiscattering"></div>
+</div>
 
-Trace Sample Count Scale
-:   Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
+#### Shadows { .hdue-folder }
 
-    `unreal:skyAtmosphere:TraceSampleCountScale` · Default 1
+<div class="hdue-params" markdown>
 
-#### Atmosphere - Rayleigh
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Saturation</div>
+<div class="hdue-param__body" markdown>
 
-Rayleigh Scattering Scale
-:   Rayleigh scattering coefficient scale.
+Control the intensity of the colors (hue) in the shadow region of the image. Higher values will result in more vibrant colors.
 
-    `unreal:skyAtmosphere:RayleighScatteringScale` · Default 0.0331
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorSaturationShadows</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
+</div>
+</div>
 
-Rayleigh Scattering
-:   The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Contrast</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:RayleighScattering` · Default 0.175287, 0.409607, 1
+Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
-Rayleigh Exponential Distribution
-:   The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorContrastShadows</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    `unreal:skyAtmosphere:RayleighExponentialDistribution` · Default 8
+</div>
+</div>
 
-#### Atmosphere - Mie
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gamma</div>
+<div class="hdue-param__body" markdown>
 
-Mie Scattering Scale
-:   Mie scattering coefficient scale.
+Control the luminance curve of the shadow region. Raising or lowering this value will result brightening or darkening the mid-tones of the shadow region.
 
-    `unreal:skyAtmosphere:MieScatteringScale` · Default 0.003996
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGammaShadows</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="sky-mie-scattering"></div>
+</div>
+</div>
 
-Mie Scattering
-:   The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gain</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:MieScattering` · Default 1, 1, 1
+This value multiplies the colors in the shadow region. Raising or lowering this value will result in brightening or darkening the affected region.
 
-Mie Absorption Scale
-:   Mie absorption coefficient scale.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGainShadows</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    `unreal:skyAtmosphere:MieAbsorptionScale` · Default 0.000444
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
 
-Mie Absorption
-:   The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
+This value is added to the colors in the shadow region. Raising or lowering this value will result in the shadows being more or less washed-out.
 
-    `unreal:skyAtmosphere:MieAbsorption` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorOffsetShadows</code></dd></div><div><dt>Default</dt><dd>0, 0, 0, 0</dd></div></dl>
 
-Mie Anisotropy
-:   A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:MieAnisotropy` · Default 0.8
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">ShadowsMax</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
+This value sets the threshold for what is considered to be the shadow region of the image.
 
-Mie Exponential Distribution
-:   The altitude in kilometer at which Mie effects are reduced to 40%.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorCorrectionShadowsMax</code></dd></div><div><dt>Default</dt><dd>0.09</dd></div></dl>
 
-    `unreal:skyAtmosphere:MieExponentialDistribution` · Default 1.2
+<div class="hdue-figure" data-figure="ref-shadows-max"></div>
 
-#### Atmosphere - Absorption
+</div>
+</div>
 
-Absorption Scale
-:   Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
+</div>
 
-    `unreal:skyAtmosphere:OtherAbsorptionScale` · Default 0.001881
+#### Midtones { .hdue-folder }
 
-    <div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+<div class="hdue-params" markdown>
 
-Absorption
-:   Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Saturation</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:OtherAbsorption` · Default 0.345561, 1, 0.0451887
+Control the intensity of the colors (hue) in the mid-tone region of the image. Higher values will result in more vibrant colors.
 
-#### Art Direction
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorSaturationMidtones</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Sky Luminance Factor
-:   Scales the luminance of pixels representing the sky. This will impact the captured sky light.
+<div class="hdue-figure" data-figure="ref-saturation-midtones"></div>
 
-    `unreal:skyAtmosphere:SkyLuminanceFactor` · Default 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Contrast</div>
+<div class="hdue-param__body" markdown>
 
-Sky And Aerial Perspective Luminance Factor
-:   Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.
+Control the range of light and dark values in the mid-tone region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
-    `unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor` · Default 1, 1, 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorContrastMidtones</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Aerial Perspective View Distance Scale
-:   Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent).
+<div class="hdue-figure" data-figure="ref-contrast-midtones"></div>
 
-    `unreal:skyAtmosphere:AerialPespectiveViewDistanceScale` · Default 1
+</div>
+</div>
 
-Height Fog Contribution
-:   Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gamma</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:skyAtmosphere:HeightFogContribution` · Default 1
+Control the luminance curve of the mid-tone region of the image. Raising or lowering this value will result brightening or darkening the mid-tones of the image.
 
-Transmittance Min Light Elevation Angle
-:   The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGammaMidtones</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    `unreal:skyAtmosphere:TransmittanceMinLightElevationAngle` · Default -90
+<div class="hdue-figure" data-figure="ref-gamma-midtones"></div>
 
-Aerial Perspective Start Depth
-:   The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test.
+</div>
+</div>
 
-    `unreal:skyAtmosphere:AerialPerspectiveStartDepth` · Default 0.1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gain</div>
+<div class="hdue-param__body" markdown>
 
-Aerial Pespective Rayleigh Scattering Start Distance
-:   Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)
+This value multiplies the colors in the mid-tone region of the image. Raising or lowering this value will result in brightening or darkening the affected region.
 
-    `unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGainMidtones</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Aerial Pespective Rayleigh Scattering Fade Distance
-:   Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+<div class="hdue-figure" data-figure="ref-gain-midtones"></div>
 
-    `unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance` · Default 0
+</div>
+</div>
 
-Aerial Pespective Mie Scattering Start Distance
-:   Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance` · Default 0
+This value is added to the colors in the mid-tone region of the image. Raising or lowering this value will result in the mid-tones being more or less washed-out.
 
-Aerial Pespective Mie Scattering Fade Distance
-:   Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorOffsetMidtones</code></dd></div><div><dt>Default</dt><dd>0, 0, 0, 0</dd></div></dl>
 
-    `unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance` · Default 0
+<div class="hdue-figure" data-figure="ref-offset-midtones"></div>
 
-#### Rendering
+</div>
+</div>
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+</div>
 
-    `unreal:skyAtmosphere:bHoldout` · Default off
+#### Highlights { .hdue-folder }
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+<div class="hdue-params" markdown>
 
-    `unreal:skyAtmosphere:bRenderInMainPass` · Default on
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Saturation</div>
+<div class="hdue-param__body" markdown>
 
-Holdout
-:   If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+Control the intensity of the color (hue) for the highlights region of the image. Higher values will result in more vibrant colors.
 
-    `unreal:volumetricCloud:bHoldout` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorSaturationHighlights</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Render In Main Pass
-:   If true, this component will be rendered in the main pass (basepass, transparency)
+<div class="hdue-figure" data-figure="ref-saturation-highlights"></div>
 
-    `unreal:volumetricCloud:bRenderInMainPass` · Default on
+</div>
+</div>
 
-Visible In Real Time Sky Captures
-:   If true, this component will be visible in real-time sky light reflection captures.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Contrast</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures` · Default on
+Control the range of light and dark values in the highlights region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
-#### Layer
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorContrastHighlights</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Layer Bottom Altitude
-:   The altitude at which the cloud layer starts. (kilometers above the ground)
+<div class="hdue-figure" data-figure="ref-contrast-highlights"></div>
 
-    `unreal:volumetricCloud:LayerBottomAltitude` · Default 5
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gamma</div>
+<div class="hdue-param__body" markdown>
 
-Layer Height
-:   The height of the the cloud layer. (kilometers above the layer bottom altitude)
+Control the luminance curve of the highlight region. Raising or lowering this value will result brightening or darkening the mid-tones of the highlight region.
 
-    `unreal:volumetricCloud:LayerHeight` · Default 10
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGammaHighlights</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
+<div class="hdue-figure" data-figure="ref-gamma-highlights"></div>
 
-Tracing Start Max Distance
-:   The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
+</div>
+</div>
 
-    `unreal:volumetricCloud:TracingStartMaxDistance` · Default 350
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Gain</div>
+<div class="hdue-param__body" markdown>
 
-Tracing Start Distance From Camera
-:   The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)
+This value multiplies the colors in the highlight region. Raising or lowering this value will result in brightening or darkening the affected region.
 
-    `unreal:volumetricCloud:TracingStartDistanceFromCamera` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGainHighlights</code></dd></div><div><dt>Default</dt><dd>1, 1, 1, 1</dd></div></dl>
 
-Tracing Max Distance
-:   The maximum distance that will be traced inside the cloud layer. (kilometers)
+<div class="hdue-figure" data-figure="ref-gain-highlights"></div>
 
-    `unreal:volumetricCloud:TracingMaxDistance` · Default 50
+</div>
+</div>
 
-#### Cloud Material
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Offset</div>
+<div class="hdue-param__body" markdown>
 
-Material
-:   The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+This value is added to the colors in the highlight region. Raising or lowering this value will result in the highlights being more or less washed-out.
 
-    `unreal:volumetricCloud:Material`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorOffsetHighlights</code></dd></div><div><dt>Default</dt><dd>0, 0, 0, 0</dd></div></dl>
 
-#### Cloud Tracing
+<div class="hdue-figure" data-figure="ref-offset-highlights"></div>
 
-Use Per Sample Atmospheric Light Transmittance
-:   Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance.
+</div>
+</div>
 
-    `unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">HighlightsMin</div>
+<div class="hdue-param__body" markdown>
 
-Sky Light Cloud Bottom Occlusion
-:   Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value.
+This value sets the lower threshold for what is considered to be the highlight region of the image.
 
-    `unreal:volumetricCloud:SkyLightCloudBottomOcclusion` · Default 0.5
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorCorrectionHighlightsMin</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
 
-View Sample Count Scale
-:   Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
+<div class="hdue-figure" data-figure="ref-highlights-min"></div>
 
-    `unreal:volumetricCloud:ViewSampleCountScale` · Default 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">HighlightsMax</div>
+<div class="hdue-param__body" markdown>
 
-Reflection View Sample Count Scale Value
-:   Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.
+This value sets the upper threshold for what is considered to be the highlight region of the image. This value should be larger than HighlightsMin. Default is 1.0, for backwards compatibility
 
-    `unreal:volumetricCloud:ReflectionViewSampleCountScaleValue` · Default 1
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorCorrectionHighlightsMax</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Shadow View Sample Count Scale
-:   Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'.
+</div>
+</div>
 
-    `unreal:volumetricCloud:ShadowViewSampleCountScale` · Default 1
+</div>
 
-Shadow Reflection View Sample Count Scale Value
-:   Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'.
+#### Misc { .hdue-folder }
 
-    `unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue` · Default 1
+<div class="hdue-params" markdown>
 
-Shadow Tracing Distance
-:   The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Blue Correction</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:volumetricCloud:ShadowTracingDistance` · Default 15
+Correct for artifacts with "electric" blues due to the ACEScg color space. Bright blue desaturates instead of going to violet.
 
-Stop Tracing Transmittance Threshold
-:   When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:BlueCorrection</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
 
-    `unreal:volumetricCloud:StopTracingTransmittanceThreshold` · Default 0.005
+</div>
+</div>
 
-### Rendering Features
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Expand Gamut</div>
+<div class="hdue-param__body" markdown>
 
-User Flags
-:   Per-view user flags accessible in materials via TestPostVolumeUserFlag node, allowing per-view overrides of material behavior.
+Expand bright saturated colors outside the sRGB gamut to fake wide gamut rendering.
 
-    `unreal:postProcess:UserFlags` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ExpandGamut</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Post-Process Materials
-:   Cooked post-process material paths, separated by spaces, added as blendables to the beauty. Before Tonemapping materials work with the Unreal tonemapper off.
+</div>
+</div>
 
-    `unreal:postProcessMaterials`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tone Curve Amount</div>
+<div class="hdue-param__body" markdown>
 
-#### Motion Blur
+Allow effect of Tone Curve to be reduced (Set ToneCurveAmount and ExpandGamut to 0.0 to fully disable tone curve)
 
-Motion Blur
-:   Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes from the camera's fStop and focusDistance.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ToneCurveAmount</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:motionBlur` · Default on
+<div class="hdue-figure" data-figure="ref-tone-curve-amount"></div>
 
-    <div class="hdue-figure" data-figure="motion-blur"></div>
+</div>
+</div>
 
-Motion Samples
-:   Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show discrete copies of fast objects.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scene Color Tint</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:motionSamples` · Default 16
+Scene tint color
 
-    <div class="hdue-figure" data-figure="motion-blur-samples"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:SceneColorTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-Amount
-:   Strength of motion blur, 0:off
+<div class="hdue-figure" data-figure="ref-scene-color-tint"></div>
 
-    `unreal:postProcess:MotionBlurAmount` · Default 0.5
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-motion-blur-amount"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color Grading LUT Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Max
-:   max distortion caused by motion blur, in percent of the screen width, 0:off
+Color grading lookup table intensity. 0 = no intensity, 1=full intensity
 
-    `unreal:postProcess:MotionBlurMax` · Default 5
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGradingIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Target FPS
-:   Defines the target FPS for motion blur. Makes motion blur independent of actual frame rate and relative to the specified target FPS instead. Higher target FPS results in shorter frames, which means shorter shutter times and less motion blur. Lower FPS means more motion blur. A value of zero makes the motion blur dependent on the actual frame rate.
+</div>
+</div>
 
-    `unreal:postProcess:MotionBlurTargetFPS` · Default 30
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Color Grading LUT</div>
+<div class="hdue-param__body" markdown>
 
-Per Object Size
-:   The minimum projected screen radius for a primitive to be drawn in the velocity pass, percentage of screen width. smaller numbers cause more draw calls, default: 4%
+Look up table texture to use or none of not used. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-    `unreal:postProcess:MotionBlurPerObjectSize` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ColorGradingLUT</code></dd></div></dl>
 
-#### MegaLights
+</div>
+</div>
 
-MegaLights
-:   Allows forcing MegaLights on or off for this volume, regardless of the project setting for MegaLights. MegaLights will stochastically sample lights, which allows many shadow casting lights to be rendered efficiently, with a consistent and low GPU cost. When MegaLights is enabled, other direct lighting algorithms like Deferred Shading will no longer be used, and other shadowing methods like Ray Traced Shadows, Distance Field Shadows and Shadow Maps will no longer be used. MegaLights requires Hardware Ray Tracing and Shader Model 6.
+</div>
 
-    `unreal:postProcess:bMegaLights` · Default on
+#### Film { .hdue-folder }
 
-    <div class="hdue-figure" data-figure="ref-megalights"></div>
+<div class="hdue-params" markdown>
 
-MegaLights - High Quality Translucency
-:   Whether to use high quality direct lighting on the front layer of translucent surfaces. Other layers will use the lower quality Translucency Lighting Volume. Increases GPU cost when enabled.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Method</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:MegaLightsFrontLayerTranslucency` · Default off
+Controls the method of tonemapping.
 
-Samples per Pixel
-:   Number of samples per downsampled pixel for the opaque lighting pass. Final number of samples depends also on the downsampling mode. Supported values: 1, 2 and 4. Console variable r.MegaLights.NumSamplesPerPixel (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:TonemappingMethod</code></dd></div><div><dt>Default</dt><dd><code>ETonemappingMethod::Filmic</code></dd></div><div><dt>Menu</dt><dd>Filmic, Standard ACES</dd></div></dl>
 
-    `unreal:cvar:r:MegaLights:NumSamplesPerPixel` · Default 4
+<div class="hdue-figure" data-figure="post-tonemapping-method"></div>
 
-Default Shadow Method
-:   The default shadowing method for MegaLights, unless over-ridden on the light component. 0 - Ray Tracing. Preferred method, which guarantees fixed MegaLights cost and correct area shadows, but is dependent on the BVH representation quality. 1 - Virtual Shadow Maps. Has a significant per light cost, but can cast shadows directly from the Nanite geometry using rasterization. Console variable r.MegaLights.DefaultShadowMethod (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:MegaLights:DefaultShadowMethod` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Slope</div>
+<div class="hdue-param__body" markdown>
 
-#### Ambient Cubemap
+Controls the overall steepness of the tonemapper curve. Larger values increase scene contrast and smaller values reduce contrast.
 
-Tint
-:   AmbientCubemap tint color
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmSlope</code></dd></div><div><dt>Default</dt><dd>0.88</dd></div></dl>
 
-    `unreal:postProcess:AmbientCubemapTint` · Default 1, 1, 1
+<div class="hdue-figure" data-figure="ref-film-slope"></div>
 
-Intensity
-:   To scale the Ambient cubemap brightness >=0: off, 1(default), >1 brighter
+</div>
+</div>
 
-    `unreal:postProcess:AmbientCubemapIntensity` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Toe</div>
+<div class="hdue-param__body" markdown>
 
-Cubemap Texture
-:   The Ambient cubemap (Affects diffuse and specular shading), blends additively which if different from all other settings here. An image file, imported at render time (a lat-long panorama, made a cubemap as UE imports one), or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+Controls the contrast of the dark end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
 
-    `unreal:postProcess:AmbientCubemap`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmToe</code></dd></div><div><dt>Default</dt><dd>0.55</dd></div></dl>
 
-#### Ambient Occlusion
+<div class="hdue-figure" data-figure="ref-film-toe"></div>
 
-Intensity
-:   0..1 0=off/no ambient occlusion .. 1=strong ambient occlusion, defines how much it affects the non direct lighting after base pass
+</div>
+</div>
 
-    `unreal:postProcess:AmbientOcclusionIntensity` · Default 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shoulder</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-ssao-intensity"></div>
+Sometimes referred to as highlight rolloff. Controls the contrast of the bright end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
 
-Radius
-:   >0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmShoulder</code></dd></div><div><dt>Default</dt><dd>0.26</dd></div></dl>
 
-    `unreal:postProcess:AmbientOcclusionRadius` · Default 200
+<div class="hdue-figure" data-figure="ref-film-shoulder"></div>
 
-    <div class="hdue-figure" data-figure="ref-ssao-radius"></div>
+</div>
+</div>
 
-Static Fraction
-:   0..1 0=no effect on static lighting .. 1=AO affects the stat lighting, 0 is free meaning no extra rendering pass
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Black clip</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AmbientOcclusionStaticFraction` · Default 1
+Lowers the toe of the tonemapper curve by this amount. Increasing this value causes more of the scene to clip to black. For most purposes, this property should remain 0
 
-Radius in WorldSpace
-:   true: AO radius is in world space units, false: AO radius is locked the view space in 400 units
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmBlackClip</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:postProcess:AmbientOcclusionRadiusInWS` · Default off
+<div class="hdue-figure" data-figure="ref-film-black-clip"></div>
 
-Fade Out Distance
-:   >0, in unreal units, at what distance the AO effect disppears in the distance (avoding artifacts and AO effects on huge object)
+</div>
+</div>
 
-    `unreal:postProcess:AmbientOcclusionFadeDistance` · Default 8000
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">White clip</div>
+<div class="hdue-param__body" markdown>
 
-Fade Out Radius
-:   >0, in unreal units, how many units before AmbientOcclusionFadeOutDistance it starts fading out
+Controls the height of the tonemapper curve. Raising this value can cause bright values to more quickly approach fully-saturated white.
 
-    `unreal:postProcess:AmbientOcclusionFadeRadius` · Default 5000
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmWhiteClip</code></dd></div><div><dt>Default</dt><dd>0.04</dd></div></dl>
 
-Power
-:   >0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+<div class="hdue-figure" data-figure="ref-film-white-clip"></div>
 
-    `unreal:postProcess:AmbientOcclusionPower` · Default 2
+</div>
+</div>
 
-Bias
-:   >0, in unreal units, default (3.0) works well for flat surfaces but can reduce details
+</div>
 
-    `unreal:postProcess:AmbientOcclusionBias` · Default 3
+#### Film Grain { .hdue-folder }
 
-Quality
-:   0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition
+<div class="hdue-params" markdown>
 
-    `unreal:postProcess:AmbientOcclusionQuality` · Default 50
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Mip Blend
-:   Affects the blend over the multiple mips (lower resolution versions) , 0:fully use full resolution, 1::fully use low resolution, around 0.6 seems to be a good value
+0..1 Film grain intensity to apply. LinearSceneColor *= lerp(1.0, DecodedFilmGrainTexture, FilmGrainIntensity)
 
-    `unreal:postProcess:AmbientOcclusionMipBlend` · Default 0.6
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainIntensity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-Mip Scale
-:   Affects the radius AO radius scale over the multiple mips (lower resolution versions)
+<div class="hdue-figure" data-figure="post-film-grain"></div>
 
-    `unreal:postProcess:AmbientOcclusionMipScale` · Default 1.7
+</div>
+</div>
 
-Mip Threshold
-:   to tweak the bilateral upsampling when using multiple mips (lower resolution versions)
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Intensity Shadows</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:AmbientOcclusionMipThreshold` · Default 0.01
+Control over the grain intensity in the regions of the image considered shadow areas.
 
-Temporal Blend Weight
-:   How much to blend the current frame with previous frames when using GTAO with temporal accumulation
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainIntensityShadows</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:AmbientOcclusionTemporalBlendWeight` · Default 0.1
+<div class="hdue-figure" data-figure="ref-film-grain-shadows"></div>
 
-#### Ray Tracing Ambient Occlusion
+</div>
+</div>
 
-Enabled
-:   Enables ray tracing ambient occlusion.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Intensity Midtones</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:RayTracingAO` · Default off
+Control over the grain intensity in the mid-tone region of the image.
 
-    <div class="hdue-figure" data-figure="ref-rtao"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainIntensityMidtones</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Samples Per Pixel
-:   Sets the samples per pixel for ray tracing ambient occlusion.
+<div class="hdue-figure" data-figure="ref-film-grain-midtones"></div>
 
-    `unreal:postProcess:RayTracingAOSamplesPerPixel` · Default 1
+</div>
+</div>
 
-Intensity
-:   Scalar factor on the ray-tracing ambient occlusion score.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Intensity Highlights</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:RayTracingAOIntensity` · Default 1
+Control over the grain intensity in the regions of the image considered highlight areas.
 
-Radius
-:   Defines the world-space search radius for occlusion rays.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainIntensityHighlights</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:postProcess:RayTracingAORadius` · Default 200
+<div class="hdue-figure" data-figure="ref-film-grain-highlights"></div>
 
-#### Translucency
+</div>
+</div>
 
-Translucency Method
-:   Sets the translucency type
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Shadows Max</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:TranslucencyType` · Default `ETranslucencyType::Raster` · Menu Raster, Ray Traced
+Sets the upper bound used for Film Grain Shadow Intensity.
 
-    <div class="hdue-figure" data-figure="opacity-and-glass-translucency-method"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainShadowsMax</code></dd></div><div><dt>Default</dt><dd>0.09</dd></div></dl>
 
-Max Roughness
-:   Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.
+</div>
+</div>
 
-    `unreal:postProcess:RayTracingTranslucencyMaxRoughness` · Default 0.6
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Highlights Min</div>
+<div class="hdue-param__body" markdown>
 
-Max. Refraction Rays
-:   Sets the maximum number of ray tracing refraction rays.
+Sets the lower bound used for Film Grain Highlight Intensity.
 
-    `unreal:postProcess:RayTracingTranslucencyRefractionRays` · Default 3
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainHighlightsMin</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
 
-Samples Per Pixel
-:   Sets the samples per pixel for ray traced translucency.
+</div>
+</div>
 
-    `unreal:postProcess:RayTracingTranslucencySamplesPerPixel` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Highlights Max</div>
+<div class="hdue-param__body" markdown>
 
-Max. Primary Hit Events
-:   Maximum number of hit events allowed on primary ray paths
+Sets the upper bound used for Film Grain Highlight Intensity. This value should be larger than HighlightsMin.. Default is 1.0, for backwards compatibility
 
-    `unreal:postProcess:RayTracingTranslucencyMaxPrimaryHitEvents` · Default 4
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainHighlightsMax</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Max. Secondary Hit Events
-:   Maximum number of hit events allowed on secondary ray paths
+</div>
+</div>
 
-    `unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents` · Default 2
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Scale</div>
+<div class="hdue-param__body" markdown>
 
-Shadows
-:   Sets the translucency shadows type.
+Controls the size of the film grain. Size of texel of FilmGrainTexture on screen.
 
-    `unreal:postProcess:RayTracingTranslucencyShadows` · Default `EReflectedAndRefractedRayTracedShadows::Hard_shadows` · Menu Disabled, Hard Shadows, Area Shadows
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainScale</code></dd></div><div><dt>Default</dt><dd>1, 1</dd></div></dl>
 
-Refraction
-:   Sets whether refraction should be enabled or not (if not rays will not scatter and only travel in the same direction as before the intersection event).
+<div class="hdue-figure" data-figure="ref-film-grain-scale"></div>
 
-    `unreal:postProcess:RayTracingTranslucencyRefraction` · Default on
+</div>
+</div>
 
-Use Ray Traced Refraction
-:   Whether to use ray traced refraction which currently doesn't work well with rough refraction or simulate it using a screen space effect
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Film Grain Texture</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:postProcess:RayTracingTranslucencyUseRayTracedRefraction` · Default off
+Defines film grain texture to use. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
-### Image Output
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:FilmGrainTexture</code></dd></div></dl>
 
-Render Products
-:   Which render products the render settings render: this node's own product (Output Picture above, AOVs below), the render products authored upstream (hdUE Render Products, Render Product LOPs), or both.
+</div>
+</div>
 
-    `outputproducts` · Default `builtin` · Menu Built-in Product, Upstream Products, Built-in and Upstream Products
+</div>
 
-Upstream Products
-:   Render products of the input stage the render settings also render.
+### Lighting { .hdue-tab }
 
-    `upstreamproducts` · Default `/Render/** & %type:RenderProduct`
+#### Global Illumination { .hdue-folder }
 
-#### AOVs (Render Vars)
+<div class="hdue-params" markdown>
 
-Depth
-:   Read back with the beauty.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_depth` · Default off
+Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal Engine tab.
 
-Albedo
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:lumenEnabled</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `aov_albedo` · Default off
+<div class="hdue-figure" data-figure="ref-lumen-enabled"></div>
 
-Normal
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+</div>
+</div>
 
-    `aov_normal` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Method</div>
+<div class="hdue-param__body" markdown>
 
-Roughness
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Chooses the Dynamic Global Illumination method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
 
-    `aov_roughness` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DynamicGlobalIlluminationMethod</code></dd></div><div><dt>Default</dt><dd><code>EDynamicGlobalIlluminationMethod::Lumen</code></dd></div><div><dt>Menu</dt><dd>None, Lumen, Screen Space (Deprecated), Plugin</dd></div></dl>
 
-Metallic
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-figure" data-figure="global-illumination"></div>
 
-    `aov_metallic` · Default off
+</div>
+</div>
 
-Specular
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Lighting Color</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_specular` · Default off
+Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The show flag 'Global Illumination' must be enabled to use this property.
 
-Occlusion
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:IndirectLightingColor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-    `aov_occlusion` · Default off
+<div class="hdue-figure" data-figure="ref-indirect-lighting-color"></div>
 
-Ambient Occlusion
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+</div>
+</div>
 
-    `aov_ambientOcclusion` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Lighting Intensity</div>
+<div class="hdue-param__body" markdown>
 
-Opacity
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Scales the indirect lighting contribution. A value of 0 disables GI. Default is 1. The show flag 'Global Illumination' must be enabled to use this property.
 
-    `aov_opacity` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:IndirectLightingIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Subsurface Color
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-figure" data-figure="ref-indirect-lighting-intensity"></div>
 
-    `aov_subsurfaceColor` · Default off
+</div>
+</div>
 
-Anisotropy
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+</div>
 
-    `aov_anisotropy` · Default off
+#### Lumen Global Illumination { .hdue-folder }
 
-Tangent
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-params" markdown>
 
-    `aov_tangent` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Hit Lighting</div>
+<div class="hdue-param__body" markdown>
 
-Shading Model
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Lights Lumen's hardware rays where they hit, instead of from the surface cache: brighter, more accurate indirect light and reflections, at a cost in render time. Off by default, as in UE. On, it sets the Ray Lighting Mode below to Hit Lighting (unreal:postProcess:LumenRayLightingMode).
 
-    `aov_shadingModel` · Default off
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>hdue_lumenHitLighting</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
 
-Custom Depth
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+</div>
+</div>
 
-    `aov_customDepth` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ray Lighting Mode</div>
+<div class="hdue-param__body" markdown>
 
-Custom Stencil
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality.
 
-    `aov_customStencil` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenRayLightingMode</code></dd></div><div><dt>Default</dt><dd><code>ELumenRayLightingModeOverride::Default</code></dd></div><div><dt>Menu</dt><dd>Project Default, Surface Cache, Hit Lighting for Reflections, Hit Lighting</dd></div></dl>
 
-Velocity
-:   One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+<div class="hdue-figure" data-figure="tut-lumen-pt-reflections"></div>
 
-    `aov_velocity` · Default off
+</div>
+</div>
 
-Combined Diffuse
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen Scene Lighting Quality</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_combineddiffuse` · Default off
+Scales Lumen Scene's quality. Larger scales cause Lumen Scene to be calculated with a higher fidelity, which can be visible in reflections, but increase GPU cost.
 
-Direct Diffuse
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneLightingQuality</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `aov_directdiffuse` · Default off
+</div>
+</div>
 
-Indirect Diffuse
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen Scene Detail</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_indirectdiffuse` · Default off
+Controls the size of instances that can be represented in Lumen Scene. Larger values will ensure small objects are represented, but increase GPU cost.
 
-Combined Glossy Reflection
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneDetail</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `aov_combinedglossyreflection` · Default off
+<div class="hdue-figure" data-figure="ref-lumen-scene-detail"></div>
 
-Direct Glossy Reflection
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+</div>
+</div>
 
-    `aov_directglossyreflection` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen Scene View Distance</div>
+<div class="hdue-param__body" markdown>
 
-Indirect Glossy Reflection
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+Sets the maximum view distance of the scene that Lumen maintains for ray tracing against. Larger values will increase the effective range of sky shadowing and Global Illumination, but increase GPU cost.
 
-    `aov_indirectglossyreflection` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneViewDistance</code></dd></div><div><dt>Default</dt><dd>20000</dd></div></dl>
 
-Direct Emission
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+</div>
+</div>
 
-    `aov_directemission` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Final Gather Quality</div>
+<div class="hdue-param__body" markdown>
 
-Combined Volume
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+Scales Lumen's Final Gather quality. Larger scales reduce noise, but greatly increase GPU cost.
 
-    `aov_combinedvolume` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherQuality</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Direct Volume
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<div class="hdue-figure" data-figure="tut-noise-lumen-quality"></div>
 
-    `aov_directvolume` · Default off
+</div>
+</div>
 
-Indirect Volume
-:   The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Screen Traces</div>
+<div class="hdue-param__body" markdown>
 
-    `aov_indirectvolume` · Default off
+Whether to use screen space traces for Lumen Global Illumination. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
-Prim ID
-:   An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherScreenTraces</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `aov_primId` · Default off
+<div class="hdue-figure" data-figure="ref-lumen-screen-traces"></div>
 
-Instance ID
-:   An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+</div>
+</div>
 
-    `aov_instanceId` · Default off
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Trace Distance</div>
+<div class="hdue-param__body" markdown>
 
-Import Upstream Render Vars
-:   Also writes the render vars authored upstream (hdUE Standard Render Vars, Render Var LOPs) to the built-in product, after the beauty and the AOVs above. An upstream var at the path of a built-in one is replaced by it.
+Controls the maximum distance that Lumen should trace while solving lighting. Values that are too small will cause lighting to leak into large caves, while values that are large will increase GPU cost.
 
-    `importvars` · Default off
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxTraceDistance</code></dd></div><div><dt>Default</dt><dd>20000</dd></div></dl>
 
-Upstream Render Vars
-:   Render vars of the input stage the built-in product writes.
+<div class="hdue-figure" data-figure="ref-lumen-max-trace-distance"></div>
 
-    `upstreamvars` · Default `/Render/** & %type:RenderVar`
+</div>
+</div>
 
-Import Render Vars From Second Input
-:   As Karma Render Settings: merges the render vars of the second input (Additional Render Vars: hdUE Standard Render Vars, Render Var LOPs; its other prims are deactivated) and appends them to the built-in product's ordered vars, after the vars above. As in Karma's merge, a var at the path of a built-in one is stronger (its format, for example).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen Surface Cache Resolution</div>
+<div class="hdue-param__body" markdown>
 
-    `importsecondaryinputvars` · Default off
+Scale factor for Lumen Surface Cache resolution. Smaller values save GPU memory, at a cost in quality. Defaults to 0.5 for Scene Captures if not overridden.
 
-### Engine Quality
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSurfaceCacheResolution</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-#### Scalability
+</div>
+</div>
 
-View Distance
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ViewDistanceQuality (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Hardware Ray Tracing</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:sg:ViewDistanceQuality` · Default 3
+Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall back to Software Ray Tracing otherwise. Note: Hardware ray tracing has significant scene update costs for scenes with more than 100k instances. Console variable r.Lumen.HardwareRayTracing (process-wide).
 
-Anti-Aliasing
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.AntiAliasingQuality (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Lumen:HardwareRayTracing</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
-    `unreal:cvar:sg:AntiAliasingQuality` · Default 3
+<div class="hdue-figure" data-figure="ref-lumen-hardware-ray-tracing"></div>
 
-Shadows
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:sg:ShadowQuality` · Default 3
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Lumen Scene Lighting Update Speed</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-shadow-quality"></div>
+Controls how much Lumen Scene is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost.
 
-Global Illumination
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneLightingUpdateSpeed</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:cvar:sg:GlobalIlluminationQuality` · Default 3
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="engine-quality-gi"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Final Gather Lighting Update Speed</div>
+<div class="hdue-param__body" markdown>
 
-Reflections
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ReflectionQuality (process-wide).
+Controls how much Lumen Final Gather is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost and noise.
 
-    `unreal:cvar:sg:ReflectionQuality` · Default 3
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherLightingUpdateSpeed</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Post-Processing
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.PostProcessQuality (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:sg:PostProcessQuality` · Default 3
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Diffuse Color Boost</div>
+<div class="hdue-param__body" markdown>
 
-Textures
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.TextureQuality (process-wide).
+Allows brightening indirect lighting by calculating material diffuse color for indirect lighting. Values above 1 (original diffuse color) aren't physically correct, but they can be useful as an art direction knob to increase the amount of bounced light in the scene. Best to keep below 2 as it also causes reflections to be brighter than the scene.
 
-    `unreal:cvar:sg:TextureQuality` · Default 3
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenDiffuseColorBoost</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Effects
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.EffectsQuality (process-wide).
+<div class="hdue-figure" data-figure="ref-lumen-diffuse-color-boost"></div>
 
-    `unreal:cvar:sg:EffectsQuality` · Default 3
+</div>
+</div>
 
-Foliage
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.FoliageQuality (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ambient Occlusion Intensity</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:sg:FoliageQuality` · Default 3
+Allows control over the strength of Lumen's Short Range Ambient Occlusion.
 
-Shading
-:   UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadingQuality (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenAmbientOcclusionIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:cvar:sg:ShadingQuality` · Default 3
+<div class="hdue-figure" data-figure="ref-lumen-ao-intensity"></div>
 
-#### Nanite
+</div>
+</div>
 
-Nanite
-:   Render static meshes using Nanite. Console variable r.Nanite (process-wide).
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Skylight Leaking</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:cvar:r:Nanite` · Default on
+Controls what fraction of the skylight intensity should be allowed to leak. This can be useful as an art direction knob (non-physically based) to keep indoor areas from going fully black.
 
-Max Pixels per Edge
-:   The triangle edge length that the Nanite runtime targets, measured in pixels. Console variable r.Nanite.MaxPixelsPerEdge (process-wide).
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSkylightLeaking</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    `unreal:cvar:r:Nanite:MaxPixelsPerEdge` · Default 1
+<div class="hdue-figure" data-figure="ref-lumen-skylight-leaking"></div>
 
-    <div class="hdue-figure" data-figure="nanite-pixels-per-edge"></div>
+</div>
+</div>
 
-#### Ray Tracing
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Skylight Leaking Tint</div>
+<div class="hdue-param__body" markdown>
 
-Ray Tracing
-:   Whether ray tracing is enabled at runtime. If r.RayTracing.EnableOnDemand is enabled, ray tracing can be toggled on/off at runtime. Otherwise this is only checked during initialization. Console variable r.RayTracing.Enable (process-wide).
+Color tint for Lumen Skylight Leaking.
 
-    `unreal:cvar:r:RayTracing:Enable` · Default on
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSkylightLeakingTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
 
-Nanite Ray Tracing
-:   0 - fallback mesh (default); 1 - streamed out mesh; 2 - use CLAS; Console variable r.RayTracing.Nanite.Mode (process-wide).
+</div>
+</div>
 
-    `unreal:cvar:r:RayTracing:Nanite:Mode` · Default 0
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Full Skylight Leaking Distance</div>
+<div class="hdue-param__body" markdown>
+
+Controls the distance from a receiving surface where skylight leaking reaches its full intensity. Smaller values make the skylight leaking flatter, while larger values create an Ambient Occlusion effect.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFullSkylightLeakingDistance</code></dd></div><div><dt>Default</dt><dd>1000</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Reflections { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Method</div>
+<div class="hdue-param__body" markdown>
+
+Chooses the Reflection method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ReflectionMethod</code></dd></div><div><dt>Default</dt><dd><code>EReflectionMethod::Lumen</code></dd></div><div><dt>Menu</dt><dd>None, Lumen, Screen Space</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-reflection-method"></div>
+
+</div>
+</div>
+
+</div>
+
+#### Lumen Reflections { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Quality</div>
+<div class="hdue-param__body" markdown>
+
+Scales the Reflection quality. Larger scales reduce noise in reflections, but increase GPU cost.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenReflectionQuality</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Screen Traces</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use screen space traces for Lumen Reflections. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenReflectionsScreenTraces</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-lumen-reflection-screen-traces"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">High Quality Translucency Reflections</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use high quality mirror reflections on the front layer of translucent surfaces. Other layers will use the lower quality Radiance Cache method that can only produce glossy reflections. Increases GPU cost when enabled.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFrontLayerTranslucencyReflections</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Roughness To Trace</div>
+<div class="hdue-param__body" markdown>
+
+Sets the maximum roughness value for which Lumen still traces dedicated reflection rays. Higher values improve reflection quality, but greatly increase GPU cost.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxRoughnessToTraceReflections</code></dd></div><div><dt>Default</dt><dd>0.4</dd></div></dl>
+
+<div class="hdue-figure" data-figure="tut-lumen-pt-roughness"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Reflection Bounces</div>
+<div class="hdue-param__body" markdown>
+
+Sets the maximum number of recursive reflection bounces. 1 means a single reflection ray (no secondary reflections in mirrors). Currently only supported by Hardware Ray Tracing with Hit Lighting.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxReflectionBounces</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Refraction Bounces</div>
+<div class="hdue-param__body" markdown>
+
+The maximum count of refraction event to trace. When hit lighting is used, Translucent meshes will be traced when LumenMaxRefractionBounces > 0, making the reflection tracing more expenssive.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxRefractionBounces</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Hardware Ray Traced Reflections</div>
+<div class="hdue-param__body" markdown>
+
+Enables hardware ray tracing for Lumen reflections (Default = 1) Console variable r.Lumen.Reflections.HardwareRayTracing (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Lumen:Reflections:HardwareRayTracing</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Screen Space Reflections { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
+
+Enable/Fade/disable the Screen Space Reflection feature, in percent, avoid numbers between 0 and 1 fo consistency
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionIntensity</code></dd></div><div><dt>Default</dt><dd>100</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Quality</div>
+<div class="hdue-param__body" markdown>
+
+0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition, 50 is the default for better performance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionQuality</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Until what roughness we fade the screen space reflections, 0.8 works well, smaller can run faster
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionMaxRoughness</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Shadows { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Virtual Shadow Maps</div>
+<div class="hdue-param__body" markdown>
+
+Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps for shadowing. Provides high - quality shadows for next - gen projects with simplified setup.High efficiency culling when used with Nanite. Console variable r.Shadow.Virtual.Enable (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:Enable</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-virtual-shadow-maps"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ray Traced Shadows</div>
+<div class="hdue-param__body" markdown>
+
+0: use traditional rasterized shadow map (default) 1: use ray tracing shadows Console variable r.RayTracing.Shadows (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Shadows</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ray-traced-shadows"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Resolution Bias</div>
+<div class="hdue-param__body" markdown>
+
+Bias applied to LOD calculations for directional lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasDirectional (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional</code></dd></div><div><dt>Default</dt><dd>-1.5</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-vsm-directional-bias"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Local Resolution Bias</div>
+<div class="hdue-param__body" markdown>
+
+Bias applied to LOD calculations for local lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasLocal (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasLocal</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Soft Shadow Rays</div>
+<div class="hdue-param__body" markdown>
+
+Ray count for shadow map tracing of directional lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountDirectional (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
+
+<div class="hdue-figure" data-figure="tut-noise-shadow-rays"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Samples per Ray</div>
+<div class="hdue-param__body" markdown>
+
+Shadow map samples per ray for directional lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayDirectional (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayDirectional</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Local Soft Shadow Rays</div>
+<div class="hdue-param__body" markdown>
+
+Ray count for shadow map tracing of local lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountLocal (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:RayCountLocal</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Local Samples per Ray</div>
+<div class="hdue-param__body" markdown>
+
+Shadow map samples per ray for local lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayLocal (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayLocal</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Map Filter</div>
+<div class="hdue-param__body" markdown>
+
+Chooses the shadow filtering method. 0: Uniform PCF (default) 1: PCSS (experimental) Console variable r.Shadow.FilterMethod (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:FilterMethod</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Dome and Viewer Lights { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Environment Cube Resolution</div>
+<div class="hdue-param__body" markdown>
+
+Face size of the cubemap dome lights are baked into, for lighting, reflections and the background.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:domeResolution</code></dd></div><div><dt>Default</dt><dd>128</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Light Unlit Scenes</div>
+<div class="hdue-param__body" markdown>
+
+Add a camera-relative key and fill light when the scene has no lights, so unlit scenes are reviewable.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:autoViewerLight</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Viewer Light Intensity</div>
+<div class="hdue-param__body" markdown>
+
+Intensity of the unlit-scene lights and of the viewport's headlight.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:viewerLightIntensity</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Fog { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Exponential Height Fog</div>
+<div class="hdue-param__body" markdown>
+
+Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor in a level. Turn on Volumetric Fog for lit, shadowed fog (light shafts); the Path Tracer renders the fog only with Volumetric Fog on. Lights scatter into it by their Volumetric Scattering Intensity.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-height-fog"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Height</div>
+<div class="hdue-param__body" markdown>
+
+Height of the fog actor, in scene units along the stage's up axis: the fog's density is Fog Density there and grows below it.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFogHeight</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Exponential Height Fog Component { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Density</div>
+<div class="hdue-param__body" markdown>
+
+Global density factor.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogDensity</code></dd></div><div><dt>Default</dt><dd>0.02</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-density"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Height Falloff</div>
+<div class="hdue-param__body" markdown>
+
+Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-height-falloff"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Density</div>
+<div class="hdue-param__body" markdown>
+
+Global density factor for this fog. Density 0 turns the second fog off.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogDensity</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-second-fog-density"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Height Falloff</div>
+<div class="hdue-param__body" markdown>
+
+Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightFalloff</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Second Fog Height Offset</div>
+<div class="hdue-param__body" markdown>
+
+Height offset, relative to the actor position Z.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SecondFogData:FogHeightOffset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Inscattering Color</div>
+<div class="hdue-param__body" markdown>
+
+Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-inscattering-color"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Atmosphere Ambient Contribution Color Scale</div>
+<div class="hdue-param__body" markdown>
+
+Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyAtmosphereAmbientContributionColorScale</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Max Opacity</div>
+<div class="hdue-param__body" markdown>
+
+Maximum opacity of the fog. A value of 1 means the fog can become fully opaque at a distance and replace scene color completely, A value of 0 means the fog color will not be factored in at all.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogMaxOpacity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance from the camera that the fog will start, in world units.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:StartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">End Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance from the camera, on the horizontal XY plane, that the fog will end integrating the lighting and transmittance. Disabled when 0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:EndDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Cutoff Distance</div>
+<div class="hdue-param__body" markdown>
+
+Scene elements past this distance will not have fog applied. This is useful for excluding skyboxes which already have fog baked in.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FogCutoffDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Inscattering Texture { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Color Cubemap</div>
+<div class="hdue-param__body" markdown>
+
+Cubemap that can be specified for fog color, which is useful to make distant, heavily fogged scene elements match the sky. When the cubemap is specified, FogInscatteringColor is ignored and Directional inscattering is disabled. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemap</code></dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Capture In-Scattering Strength</div>
+<div class="hdue-param__body" markdown>
+
+When >0 and when r.SupportsSkyLightCaptureAffectsHeightFogInScattering is true, this will make the sky light capture inject scattered light into the height fog.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogStrength</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Capture In-Scattering Roughness</div>
+<div class="hdue-param__body" markdown>
+
+This is the roughness at which the sky light capture cubemap will be sample to simulate scattering dispersion due to a phase function.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:SkyLightCaptureAffectsHeightFogRoughness</code></dd></div><div><dt>Default</dt><dd>0.15</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Color Cubemap Angle</div>
+<div class="hdue-param__body" markdown>
+
+Angle to rotate the InscatteringColorCubemap around the Z axis.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringColorCubemapAngle</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Inscattering Texture Tint</div>
+<div class="hdue-param__body" markdown>
+
+Tint color used when InscatteringColorCubemap is specified, for quick edits without having to reimport InscatteringColorCubemap.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:InscatteringTextureTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fully Directional Inscattering Color Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance at which InscatteringColorCubemap should be used directly for the Inscattering Color.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FullyDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd>100000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Non Directional Inscattering Color Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance at which only the average color of InscatteringColorCubemap should be used as Inscattering Color.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:NonDirectionalInscatteringColorDistance</code></dd></div><div><dt>Default</dt><dd>1000</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Directional Inscattering { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Exponent</div>
+<div class="hdue-param__body" markdown>
+
+Controls the size of the directional inscattering cone, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Scattering Distribution is used instead.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringExponent</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Controls the start distance from the viewer of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - There must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>10000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Directional Inscattering Color</div>
+<div class="hdue-param__body" markdown>
+
+Controls the color of the directional inscattering, which is used to approximate inscattering from a directional light. Note: - there must be a directional light with bUsedAsAtmosphereSunLight enabled for DirectionalInscattering to be used. - When r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:DirectionalInscatteringLuminance</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Volumetric Fog { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Volumetric Fog</div>
+<div class="hdue-param__body" markdown>
+
+Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableVolumetricFog</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-volumetric"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scattering Distribution</div>
+<div class="hdue-param__body" markdown>
+
+Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogScatteringDistribution</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
+
+The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogAlbedo</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Emissive</div>
+<div class="hdue-param__body" markdown>
+
+Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogEmissive</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Extinction Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogExtinctionScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="fog-extinction-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">View Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogDistance</code></dd></div><div><dt>Default</dt><dd>6000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance from the camera that the volumetric fog will start, in world units.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Near Fade In Distance</div>
+<div class="hdue-param__body" markdown>
+
+Distance over which volumetric fog will fade in from the start distance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:VolumetricFogNearFadeInDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Override Light Colors With Fog Inscattering Colors</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use FogInscatteringColor for the Sky Light volumetric scattering color and DirectionalInscatteringColor for the Directional Light scattering color. Make sure your directional light has 'Atmosphere Sun Light' enabled! Enabling this allows Volumetric fog to better match Height fog in the distance, but produces non-physical volumetric lighting that may not match surface lighting.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bOverrideLightColorsWithFogInscatteringColors</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Fog Screen Space Scattering - EXPERIMENTAL { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Enable Fog Screen Space Scattering</div>
+<div class="hdue-param__body" markdown>
+
+Enable FSSS (Fog Screen Space Scattering) to approximate multiple scattering.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bEnableFSSS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scene Color Scattering Amount Scale</div>
+<div class="hdue-param__body" markdown>
+
+The amount of scene color injected into the fog screen space scattering technique. When 0, only the fog luminance will be scattered. When 1, fog and scene luminance will be scattered. When above 1, more scene color can be injected to increase the brightness of the multiple scattering effect, even when the fog is not too intense. We cannot scatter more than the scene color however.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scene Color Scattering Amount Power</div>
+<div class="hdue-param__body" markdown>
+
+Apply a power over the amount of scattered scene luminance after it is evaluated using Scene Color Scattering Amount Scale. A value smaller than 1 can show more scattering where the fog is less intense.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSceneColorScatteringAmountPower</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Spread Scale</div>
+<div class="hdue-param__body" markdown>
+
+The scale of the spread for the fog multiple scattering. This basically scales mip level sampled from the blurred screen space FSSS texture. Increasing will make scene and thicker fog look fuzzier. But too high values can cause artifacts such as halos around depth discontinuities.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSSpreadScale</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Blur Control</div>
+<div class="hdue-param__body" markdown>
+
+When generating the the blurred screen space FSSS texture, this controls how much of the blurred lower mip levels is injected back into the sharper higher mip levels. A higher value will result in a blurrier result. But when = 1, multiple scattering will be a single average color of the FSSS texture.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:FSSSBlurControl</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Rendering { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
+
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be rendered in the main pass (basepass, transparency)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Reflection Captures</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be visible in reflection captures.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInReflectionCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Real Time Sky Captures</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be visible in real-time sky light reflection captures.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:heightFog:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Sky { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Atmosphere</div>
+<div class="hdue-param__body" markdown>
+
+Place UE's Sky Atmosphere in the scene, as a Sky Atmosphere actor in a level: a physical sky lit by the distant lights that are Atmosphere Sun Lights (UE's default for a distant light; Light LOP, Unreal Engine tab). Without a DomeLight, hdUE adds a Sky Light with Real Time Capture so the sky lights the scene, as UE needs for Lumen and its Path Tracer; a DomeLight's environment takes its place.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-sky-atmosphere"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Volumetric Cloud</div>
+<div class="hdue-param__body" markdown>
+
+Place UE's Volumetric Cloud in the scene, with UE's default cloud material unless Material is set. Clouds need the Sky Atmosphere; the Path Tracer renders them with Reference Atmosphere on (Path Tracing).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="sky-clouds"></div>
+
+</div>
+</div>
+
+</div>
+
+#### Planet { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transform Mode</div>
+<div class="hdue-param__body" markdown>
+
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransformMode</code></dd></div><div><dt>Default</dt><dd><code>ESkyAtmosphereTransformMode::PlanetTopAtAbsoluteWorldOrigin</code></dd></div><div><dt>Menu</dt><dd>PlanetTopAtAbsoluteWorldOrigin, PlanetTopAtComponentTransform, PlanetCenterAtComponentTransform</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Radius</div>
+<div class="hdue-param__body" markdown>
+
+The radius in kilometers from the center of the planet to the ground level.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:BottomRadius</code></dd></div><div><dt>Default</dt><dd>6360</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Albedo</div>
+<div class="hdue-param__body" markdown>
+
+The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering>0.0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd>0.401978, 0.401978, 0.401978</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ground-albedo"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Planet Radius</div>
+<div class="hdue-param__body" markdown>
+
+The planet radius used when there is not SkyAtmosphere component present in the scene.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:PlanetRadius</code></dd></div><div><dt>Default</dt><dd>6360</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ground Albedo</div>
+<div class="hdue-param__body" markdown>
+
+The ground albedo used to light the cloud from below with respect to the sun light and sky atmosphere. This is only used by the cloud material when the 'Volumetric Advanced' node have GroundContribution enabled.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:GroundAlbedo</code></dd></div><div><dt>Default</dt><dd>0.401978, 0.401978, 0.401978</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Atmosphere { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Atmosphere Height</div>
+<div class="hdue-param__body" markdown>
+
+The height of the atmosphere layer above the ground in kilometers.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AtmosphereHeight</code></dd></div><div><dt>Default</dt><dd>60</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">MultiScattering</div>
+<div class="hdue-param__body" markdown>
+
+Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MultiScatteringFactor</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-multiscattering"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Trace Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TraceSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Atmosphere - Rayleigh { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Scattering Scale</div>
+<div class="hdue-param__body" markdown>
+
+Rayleigh scattering coefficient scale.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScatteringScale</code></dd></div><div><dt>Default</dt><dd>0.0331</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Scattering</div>
+<div class="hdue-param__body" markdown>
+
+The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighScattering</code></dd></div><div><dt>Default</dt><dd>0.175287, 0.409607, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Rayleigh Exponential Distribution</div>
+<div class="hdue-param__body" markdown>
+
+The altitude in kilometer at which Rayleigh scattering effect is reduced to 40%.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:RayleighExponentialDistribution</code></dd></div><div><dt>Default</dt><dd>8</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Atmosphere - Mie { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Scattering Scale</div>
+<div class="hdue-param__body" markdown>
+
+Mie scattering coefficient scale.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScatteringScale</code></dd></div><div><dt>Default</dt><dd>0.003996</dd></div></dl>
+
+<div class="hdue-figure" data-figure="sky-mie-scattering"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Scattering</div>
+<div class="hdue-param__body" markdown>
+
+The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieScattering</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Absorption Scale</div>
+<div class="hdue-param__body" markdown>
+
+Mie absorption coefficient scale.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorptionScale</code></dd></div><div><dt>Default</dt><dd>0.000444</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Absorption</div>
+<div class="hdue-param__body" markdown>
+
+The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAbsorption</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Anisotropy</div>
+<div class="hdue-param__body" markdown>
+
+A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieAnisotropy</code></dd></div><div><dt>Default</dt><dd>0.8</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mie Exponential Distribution</div>
+<div class="hdue-param__body" markdown>
+
+The altitude in kilometer at which Mie effects are reduced to 40%.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:MieExponentialDistribution</code></dd></div><div><dt>Default</dt><dd>1.2</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Atmosphere - Absorption { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Absorption Scale</div>
+<div class="hdue-param__body" markdown>
+
+Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorptionScale</code></dd></div><div><dt>Default</dt><dd>0.001881</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Absorption</div>
+<div class="hdue-param__body" markdown>
+
+Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:OtherAbsorption</code></dd></div><div><dt>Default</dt><dd>0.345561, 1, 0.0451887</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Art Direction { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Luminance Factor</div>
+<div class="hdue-param__body" markdown>
+
+Scales the luminance of pixels representing the sky. This will impact the captured sky light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyLuminanceFactor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky And Aerial Perspective Luminance Factor</div>
+<div class="hdue-param__body" markdown>
+
+Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:SkyAndAerialPerspectiveLuminanceFactor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Perspective View Distance Scale</div>
+<div class="hdue-param__body" markdown>
+
+Makes the aerial perspective look thicker by scaling distances from view to surfaces (opaque and translucent).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPespectiveViewDistanceScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Height Fog Contribution</div>
+<div class="hdue-param__body" markdown>
+
+Scale the sky and atmosphere lights contribution to the height fog when SupportSkyAtmosphereAffectsHeightFog project setting is true.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:HeightFogContribution</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transmittance Min Light Elevation Angle</div>
+<div class="hdue-param__body" markdown>
+
+The minimum elevation angle in degree that should be used to evaluate the sun transmittance to the ground. Useful to maintain a visible sun light and shadow on meshes even when the sun has started going below the horizon. This does not affect the aerial perspective.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:TransmittanceMinLightElevationAngle</code></dd></div><div><dt>Default</dt><dd>-90</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Perspective Start Depth</div>
+<div class="hdue-param__body" markdown>
+
+The distance (kilometers) at which we start evaluating the aerial perspective. Having the aerial perspective starts away from the camera can help with performance: pixels not affected by the aerial perspective will have their computation skipped using early depth test.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:AerialPerspectiveStartDepth</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Rayleigh Scattering Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Specify the aerial perspective start distance on cloud for Rayleigh scattering only. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Rayleigh Scattering Fade Distance</div>
+<div class="hdue-param__body" markdown>
+
+Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveRayleighScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Mie Scattering Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Specify the aerial perspective start distance on cloud for Mie scattering only. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Aerial Pespective Mie Scattering Fade Distance</div>
+<div class="hdue-param__body" markdown>
+
+Specify the distance over which the Rayleigh scattering will linearly ramp up to full effect. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:AerialPespectiveMieScatteringFadeDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Rendering { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
+
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be rendered in the main pass (basepass, transparency)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:skyAtmosphere:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Holdout</div>
+<div class="hdue-param__body" markdown>
+
+If this is True, this primitive will render black with an alpha of 0, but all secondary effects (shadows, reflections, indirect lighting) remain. This feature requires activating the project setting(s) "Alpha Output", and "Support Primitive Alpha Holdout" if using the deferred renderer.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bHoldout</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render In Main Pass</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be rendered in the main pass (basepass, transparency)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bRenderInMainPass</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Visible In Real Time Sky Captures</div>
+<div class="hdue-param__body" markdown>
+
+If true, this component will be visible in real-time sky light reflection captures.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bVisibleInRealTimeSkyCaptures</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Layer { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Layer Bottom Altitude</div>
+<div class="hdue-param__body" markdown>
+
+The altitude at which the cloud layer starts. (kilometers above the ground)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerBottomAltitude</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Layer Height</div>
+<div class="hdue-param__body" markdown>
+
+The height of the the cloud layer. (kilometers above the layer bottom altitude)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:LayerHeight</code></dd></div><div><dt>Default</dt><dd>10</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Start Max Distance</div>
+<div class="hdue-param__body" markdown>
+
+The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartMaxDistance</code></dd></div><div><dt>Default</dt><dd>350</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Start Distance From Camera</div>
+<div class="hdue-param__body" markdown>
+
+The distance from which the tracing will start. This is useful when the camera for instance is inside the layer of cloud. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingStartDistanceFromCamera</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tracing Max Distance</div>
+<div class="hdue-param__body" markdown>
+
+The maximum distance that will be traced inside the cloud layer. (kilometers)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:TracingMaxDistance</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Cloud Material { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Material</div>
+<div class="hdue-param__body" markdown>
+
+The material describing the cloud volume. It must be a Volume domain material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:Material</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Cloud Tracing { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Use Per Sample Atmospheric Light Transmittance</div>
+<div class="hdue-param__body" markdown>
+
+Whether to apply atmosphere transmittance per sample, instead of using the light global transmittance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:bUsePerSampleAtmosphericLightTransmittance</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sky Light Cloud Bottom Occlusion</div>
+<div class="hdue-param__body" markdown>
+
+Occlude the sky light contribution at the bottom of the cloud layer. This is a fast approximation to sky lighting being occluded by cloud without having to trace rays or sample AO texture. Ignored if the cloud material explicitely sets the ambient occlusion value.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:SkyLightCloudBottomOcclusion</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">View Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Reflection View Sample Count Scale Value</div>
+<div class="hdue-param__body" markdown>
+
+Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow View Sample Count Scale</div>
+<div class="hdue-param__body" markdown>
+
+Scale the shadow tracing sample count in primary views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ViewRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowViewSampleCountScale</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Reflection View Sample Count Scale Value</div>
+<div class="hdue-param__body" markdown>
+
+Scale the shadow tracing sample count in reflection views, only used with Advanced Output ray marched shadows. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.Shadow.ReflectionRaySampleMaxCount'.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowReflectionViewSampleCountScaleValue</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadow Tracing Distance</div>
+<div class="hdue-param__body" markdown>
+
+The shadow tracing distance in kilometers, only used with Advanced Output ray marched shadows.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:ShadowTracingDistance</code></dd></div><div><dt>Default</dt><dd>15</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Stop Tracing Transmittance Threshold</div>
+<div class="hdue-param__body" markdown>
+
+When the mean transmittance is below this threshold, we stop tracing. This is a good way to reduce the ray marched sample count, and thus to increase performance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:volumetricCloud:StopTracingTransmittanceThreshold</code></dd></div><div><dt>Default</dt><dd>0.005</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Rendering Features { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">User Flags</div>
+<div class="hdue-param__body" markdown>
+
+Per-view user flags accessible in materials via TestPostVolumeUserFlag node, allowing per-view overrides of material behavior.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:UserFlags</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Post-Process Materials</div>
+<div class="hdue-param__body" markdown>
+
+Cooked post-process material paths, separated by spaces, added as blendables to the beauty. Before Tonemapping materials work with the Unreal tonemapper off.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcessMaterials</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Motion Blur { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Motion Blur</div>
+<div class="hdue-param__body" markdown>
+
+Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes from the camera's fStop and focusDistance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:motionBlur</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+<div class="hdue-figure" data-figure="motion-blur"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Motion Samples</div>
+<div class="hdue-param__body" markdown>
+
+Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show discrete copies of fast objects.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:motionSamples</code></dd></div><div><dt>Default</dt><dd>16</dd></div></dl>
+
+<div class="hdue-figure" data-figure="motion-blur-samples"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Amount</div>
+<div class="hdue-param__body" markdown>
+
+Strength of motion blur, 0:off
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurAmount</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-motion-blur-amount"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max</div>
+<div class="hdue-param__body" markdown>
+
+max distortion caused by motion blur, in percent of the screen width, 0:off
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurMax</code></dd></div><div><dt>Default</dt><dd>5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Target FPS</div>
+<div class="hdue-param__body" markdown>
+
+Defines the target FPS for motion blur. Makes motion blur independent of actual frame rate and relative to the specified target FPS instead. Higher target FPS results in shorter frames, which means shorter shutter times and less motion blur. Lower FPS means more motion blur. A value of zero makes the motion blur dependent on the actual frame rate.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurTargetFPS</code></dd></div><div><dt>Default</dt><dd>30</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Per Object Size</div>
+<div class="hdue-param__body" markdown>
+
+The minimum projected screen radius for a primitive to be drawn in the velocity pass, percentage of screen width. smaller numbers cause more draw calls, default: 4%
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MotionBlurPerObjectSize</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### MegaLights { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">MegaLights</div>
+<div class="hdue-param__body" markdown>
+
+Allows forcing MegaLights on or off for this volume, regardless of the project setting for MegaLights. MegaLights will stochastically sample lights, which allows many shadow casting lights to be rendered efficiently, with a consistent and low GPU cost. When MegaLights is enabled, other direct lighting algorithms like Deferred Shading will no longer be used, and other shadowing methods like Ray Traced Shadows, Distance Field Shadows and Shadow Maps will no longer be used. MegaLights requires Hardware Ray Tracing and Shader Model 6.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:bMegaLights</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-megalights"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">MegaLights - High Quality Translucency</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use high quality direct lighting on the front layer of translucent surfaces. Other layers will use the lower quality Translucency Lighting Volume. Increases GPU cost when enabled.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:MegaLightsFrontLayerTranslucency</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Samples per Pixel</div>
+<div class="hdue-param__body" markdown>
+
+Number of samples per downsampled pixel for the opaque lighting pass. Final number of samples depends also on the downsampling mode. Supported values: 1, 2 and 4. Console variable r.MegaLights.NumSamplesPerPixel (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:MegaLights:NumSamplesPerPixel</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Default Shadow Method</div>
+<div class="hdue-param__body" markdown>
+
+The default shadowing method for MegaLights, unless over-ridden on the light component. 0 - Ray Tracing. Preferred method, which guarantees fixed MegaLights cost and correct area shadows, but is dependent on the BVH representation quality. 1 - Virtual Shadow Maps. Has a significant per light cost, but can cast shadows directly from the Nanite geometry using rasterization. Console variable r.MegaLights.DefaultShadowMethod (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:MegaLights:DefaultShadowMethod</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Ambient Cubemap { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tint</div>
+<div class="hdue-param__body" markdown>
+
+AmbientCubemap tint color
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemapTint</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
+
+To scale the Ambient cubemap brightness >=0: off, 1(default), >1 brighter
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemapIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Cubemap Texture</div>
+<div class="hdue-param__body" markdown>
+
+The Ambient cubemap (Affects diffuse and specular shading), blends additively which if different from all other settings here. An image file, imported at render time (a lat-long panorama, made a cubemap as UE imports one), or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientCubemap</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Ambient Occlusion { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
+
+0..1 0=off/no ambient occlusion .. 1=strong ambient occlusion, defines how much it affects the non direct lighting after base pass
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionIntensity</code></dd></div><div><dt>Default</dt><dd>0.5</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ssao-intensity"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Radius</div>
+<div class="hdue-param__body" markdown>
+
+>0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionRadius</code></dd></div><div><dt>Default</dt><dd>200</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-ssao-radius"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Static Fraction</div>
+<div class="hdue-param__body" markdown>
+
+0..1 0=no effect on static lighting .. 1=AO affects the stat lighting, 0 is free meaning no extra rendering pass
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionStaticFraction</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Radius in WorldSpace</div>
+<div class="hdue-param__body" markdown>
+
+true: AO radius is in world space units, false: AO radius is locked the view space in 400 units
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionRadiusInWS</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fade Out Distance</div>
+<div class="hdue-param__body" markdown>
+
+>0, in unreal units, at what distance the AO effect disppears in the distance (avoding artifacts and AO effects on huge object)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionFadeDistance</code></dd></div><div><dt>Default</dt><dd>8000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fade Out Radius</div>
+<div class="hdue-param__body" markdown>
+
+>0, in unreal units, how many units before AmbientOcclusionFadeOutDistance it starts fading out
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionFadeRadius</code></dd></div><div><dt>Default</dt><dd>5000</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Power</div>
+<div class="hdue-param__body" markdown>
+
+>0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionPower</code></dd></div><div><dt>Default</dt><dd>2</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Bias</div>
+<div class="hdue-param__body" markdown>
+
+>0, in unreal units, default (3.0) works well for flat surfaces but can reduce details
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionBias</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Quality</div>
+<div class="hdue-param__body" markdown>
+
+0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionQuality</code></dd></div><div><dt>Default</dt><dd>50</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mip Blend</div>
+<div class="hdue-param__body" markdown>
+
+Affects the blend over the multiple mips (lower resolution versions) , 0:fully use full resolution, 1::fully use low resolution, around 0.6 seems to be a good value
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipBlend</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mip Scale</div>
+<div class="hdue-param__body" markdown>
+
+Affects the radius AO radius scale over the multiple mips (lower resolution versions)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipScale</code></dd></div><div><dt>Default</dt><dd>1.7</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Mip Threshold</div>
+<div class="hdue-param__body" markdown>
+
+to tweak the bilateral upsampling when using multiple mips (lower resolution versions)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionMipThreshold</code></dd></div><div><dt>Default</dt><dd>0.01</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Temporal Blend Weight</div>
+<div class="hdue-param__body" markdown>
+
+How much to blend the current frame with previous frames when using GTAO with temporal accumulation
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:AmbientOcclusionTemporalBlendWeight</code></dd></div><div><dt>Default</dt><dd>0.1</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Ray Tracing Ambient Occlusion { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Enabled</div>
+<div class="hdue-param__body" markdown>
+
+Enables ray tracing ambient occlusion.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAO</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-rtao"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Samples Per Pixel</div>
+<div class="hdue-param__body" markdown>
+
+Sets the samples per pixel for ray tracing ambient occlusion.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAOSamplesPerPixel</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Intensity</div>
+<div class="hdue-param__body" markdown>
+
+Scalar factor on the ray-tracing ambient occlusion score.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAOIntensity</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Radius</div>
+<div class="hdue-param__body" markdown>
+
+Defines the world-space search radius for occlusion rays.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingAORadius</code></dd></div><div><dt>Default</dt><dd>200</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Translucency { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Translucency Method</div>
+<div class="hdue-param__body" markdown>
+
+Sets the translucency type
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:TranslucencyType</code></dd></div><div><dt>Default</dt><dd><code>ETranslucencyType::Raster</code></dd></div><div><dt>Menu</dt><dd>Raster, Ray Traced</dd></div></dl>
+
+<div class="hdue-figure" data-figure="opacity-and-glass-translucency-method"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Roughness</div>
+<div class="hdue-param__body" markdown>
+
+Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxRoughness</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max. Refraction Rays</div>
+<div class="hdue-param__body" markdown>
+
+Sets the maximum number of ray tracing refraction rays.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefractionRays</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Samples Per Pixel</div>
+<div class="hdue-param__body" markdown>
+
+Sets the samples per pixel for ray traced translucency.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencySamplesPerPixel</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max. Primary Hit Events</div>
+<div class="hdue-param__body" markdown>
+
+Maximum number of hit events allowed on primary ray paths
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxPrimaryHitEvents</code></dd></div><div><dt>Default</dt><dd>4</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max. Secondary Hit Events</div>
+<div class="hdue-param__body" markdown>
+
+Maximum number of hit events allowed on secondary ray paths
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents</code></dd></div><div><dt>Default</dt><dd>2</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadows</div>
+<div class="hdue-param__body" markdown>
+
+Sets the translucency shadows type.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyShadows</code></dd></div><div><dt>Default</dt><dd><code>EReflectedAndRefractedRayTracedShadows::Hard_shadows</code></dd></div><div><dt>Menu</dt><dd>Disabled, Hard Shadows, Area Shadows</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Refraction</div>
+<div class="hdue-param__body" markdown>
+
+Sets whether refraction should be enabled or not (if not rays will not scatter and only travel in the same direction as before the intersection event).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefraction</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Use Ray Traced Refraction</div>
+<div class="hdue-param__body" markdown>
+
+Whether to use ray traced refraction which currently doesn't work well with rough refraction or simulate it using a screen space effect
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyUseRayTracedRefraction</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Image Output { .hdue-tab }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Render Products</div>
+<div class="hdue-param__body" markdown>
+
+Which render products the render settings render: this node's own product (Output Picture above, AOVs below), the render products authored upstream (hdUE Render Products, Render Product LOPs), or both.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>outputproducts</code></dd></div><div><dt>Default</dt><dd><code>builtin</code></dd></div><div><dt>Menu</dt><dd>Built-in Product, Upstream Products, Built-in and Upstream Products</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Upstream Products</div>
+<div class="hdue-param__body" markdown>
+
+Render products of the input stage the render settings also render.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>upstreamproducts</code></dd></div><div><dt>Default</dt><dd><code>/Render/** &amp; %type:RenderProduct</code></dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### AOVs (Render Vars) { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Depth</div>
+<div class="hdue-param__body" markdown>
+
+Read back with the beauty.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_depth</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Albedo</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_albedo</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Normal</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_normal</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Roughness</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_roughness</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Metallic</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_metallic</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Specular</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_specular</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Occlusion</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_occlusion</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ambient Occlusion</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_ambientOcclusion</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Opacity</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_opacity</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Subsurface Color</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_subsurfaceColor</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Anisotropy</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_anisotropy</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Tangent</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_tangent</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shading Model</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_shadingModel</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Custom Depth</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customDepth</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Custom Stencil</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_customStencil</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Velocity</div>
+<div class="hdue-param__body" markdown>
+
+One of UE's buffer visualizations: all of a frame's render in one raster pass after the beauty converges (Movie Render Queue's buffer visualization pipes), from the same camera without Lumen, anti-aliasing or post effects. In path-traced mode albedo and normal are the Path Tracer's own buffers of the beauty instead (anti-aliased, with its depth of field).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_velocity</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combineddiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directdiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Diffuse</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectdiffuse</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Glossy Reflection</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectglossyreflection</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Emission</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directemission</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Combined Volume</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_combinedvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Direct Volume</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_directvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Indirect Volume</div>
+<div class="hdue-param__body" markdown>
+
+The beauty restricted to this lighting component (UE's Path Tracer Lighting Components; realtime, its Diffuse, Specular, Direct Lighting and Global Illumination show flags, with emission in every component): one full render per AOV and frame after the beauty converges.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_indirectvolume</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Prim ID</div>
+<div class="hdue-param__body" markdown>
+
+An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_primId</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Instance ID</div>
+<div class="hdue-param__body" markdown>
+
+An unlit ID pass after the beauty converges: one short raster render per AOV and frame.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>aov_instanceId</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Import Upstream Render Vars</div>
+<div class="hdue-param__body" markdown>
+
+Also writes the render vars authored upstream (hdUE Standard Render Vars, Render Var LOPs) to the built-in product, after the beauty and the AOVs above. An upstream var at the path of a built-in one is replaced by it.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>importvars</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Upstream Render Vars</div>
+<div class="hdue-param__body" markdown>
+
+Render vars of the input stage the built-in product writes.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>upstreamvars</code></dd></div><div><dt>Default</dt><dd><code>/Render/** &amp; %type:RenderVar</code></dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Import Render Vars From Second Input</div>
+<div class="hdue-param__body" markdown>
+
+As Karma Render Settings: merges the render vars of the second input (Additional Render Vars: hdUE Standard Render Vars, Render Var LOPs; its other prims are deactivated) and appends them to the built-in product's ordered vars, after the vars above. As in Karma's merge, a var at the path of a built-in one is stronger (its format, for example).
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>importsecondaryinputvars</code></dd></div><div><dt>Default</dt><dd>Off</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+### Engine Quality { .hdue-tab }
+
+#### Scalability { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">View Distance</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ViewDistanceQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ViewDistanceQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Anti-Aliasing</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.AntiAliasingQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:AntiAliasingQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shadows</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadowQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-shadow-quality"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Global Illumination</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:GlobalIlluminationQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+<div class="hdue-figure" data-figure="engine-quality-gi"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Reflections</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ReflectionQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ReflectionQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Post-Processing</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.PostProcessQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:PostProcessQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Textures</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.TextureQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:TextureQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Effects</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.EffectsQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:EffectsQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Foliage</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.FoliageQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:FoliageQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Shading</div>
+<div class="hdue-param__body" markdown>
+
+UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadingQuality (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:sg:ShadingQuality</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
+
+</div>
+</div>
+
+</div>
+
+#### Nanite { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Nanite</div>
+<div class="hdue-param__body" markdown>
+
+Render static meshes using Nanite. Console variable r.Nanite (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Max Pixels per Edge</div>
+<div class="hdue-param__body" markdown>
+
+The triangle edge length that the Nanite runtime targets, measured in pixels. Console variable r.Nanite.MaxPixelsPerEdge (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Nanite:MaxPixelsPerEdge</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="nanite-pixels-per-edge"></div>
+
+</div>
+</div>
+
+</div>
+
+#### Ray Tracing { .hdue-folder }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Ray Tracing</div>
+<div class="hdue-param__body" markdown>
+
+Whether ray tracing is enabled at runtime. If r.RayTracing.EnableOnDemand is enabled, ray tracing can be toggled on/off at runtime. Otherwise this is only checked during initialization. Console variable r.RayTracing.Enable (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Enable</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Nanite Ray Tracing</div>
+<div class="hdue-param__body" markdown>
+
+0 - fallback mesh (default); 1 - streamed out mesh; 2 - use CLAS; Console variable r.RayTracing.Nanite.Mode (process-wide).
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Nanite:Mode</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

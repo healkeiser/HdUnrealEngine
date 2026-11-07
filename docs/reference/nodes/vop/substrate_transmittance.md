@@ -3,29 +3,61 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> Transmittance to MFP
 
-<p class="hdue-node-type">VOP node · <code>hdue::substrate_transmittance::1.3</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>VOP node</dd></div><div><dt>Type</dt><dd><code>hdue::substrate_transmittance::1.3</code></dd></div></dl>
 
 Converts the color light keeps through a thickness into a Slab's mean free path.
 { .hdue-node-summary }
 
 It is part of an hdUE Substrate Material Builder graph, which hdUE prepares into a UE Substrate material; it does not run as a VEX or MaterialX shader.
 
-## Inputs
+## Inputs { .hdue-section }
 
-Transmittance
-:   Color of white light after crossing Thickness.
+<div class="hdue-params" markdown>
 
-Thickness
-:   Thickness in centimetres.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transmittance</div>
+<div class="hdue-param__body" markdown>
 
-## Parameters
+Color of white light after crossing Thickness.
 
-Transmittance
-:   Color of white light after crossing Thickness.
+</div>
+</div>
 
-    `transmittance` · Default 0.5, 0.5, 0.5
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Thickness</div>
+<div class="hdue-param__body" markdown>
 
-Thickness
-:   Thickness in centimetres.
+Thickness in centimetres.
 
-    `thickness` · Default 0.01
+</div>
+</div>
+
+</div>
+
+## Parameters { .hdue-section }
+
+<div class="hdue-params" markdown>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Transmittance</div>
+<div class="hdue-param__body" markdown>
+
+Color of white light after crossing Thickness.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>transmittance</code></dd></div><div><dt>Default</dt><dd>0.5, 0.5, 0.5</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Thickness</div>
+<div class="hdue-param__body" markdown>
+
+Thickness in centimetres.
+
+<dl class="hdue-facts"><div><dt>Parameter</dt><dd><code>thickness</code></dd></div><div><dt>Default</dt><dd>0.01</dd></div></dl>
+
+</div>
+</div>
+
+</div>

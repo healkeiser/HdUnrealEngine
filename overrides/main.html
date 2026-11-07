@@ -13,13 +13,10 @@
     <p class="hdue-copyright">{{ config.copyright }}</p>
   {% endif %}
 {% endblock %}
-{#- A page with a diagram loads Mermaid before the theme does, so the theme renders with this copy: Lucide registered
-    as an icon pack (`A@{ icon: "lucide:camera" }`) and hdUE's look (assets/hdue-mermaid.js). -#}
+{#- Before the theme: the stand-in it takes for Mermaid (assets/hdue-mermaid.js), on every page, since instant
+    navigation runs no new page's scripts. -#}
 {% block scripts %}
-  {% if page and page.content and 'class="mermaid"' in page.content %}
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@12.1.0/dist/mermaid.min.js" integrity="sha384-EbBpjO7rlR6eqZEcG7GaPpyk9H9WrMyPWX4d3KvPYltgt8Z8l0z6R56B1qP40pR4" crossorigin="anonymous"></script>
-    <script src="{{ 'assets/hdue-mermaid.js' | url }}"></script>
-  {% endif %}
+  <script src="{{ 'assets/hdue-mermaid.js' | url }}"></script>
   {{ super() }}
 {% endblock %}
 {% block footer %}

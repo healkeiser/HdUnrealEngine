@@ -3,70 +3,128 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Local Fog Volume
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduelocalfogvolume::2.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduelocalfogvolume::2.0</code></dd></div></dl>
 
 Creates or edits a UE Local Fog Volume: a sphere of fog that fades out radially, rendered by hdUE.
 { .hdue-node-summary }
 
 Like Karma Sky Atmosphere for Karma, it creates or edits a prim hdUE renders: an UnrealLocalFogVolume, UE's Local Fog Volume (realtime only; UE's Path Tracer does not render local fog volumes). Uniform Scale is the radius in scene units (UE's volume is a sphere of radius 500 cm). In Create mode it authors every property, at UE's defaults too, and a guide sphere. In Edit mode every control starts at Set or Create, as on Houdini's prim LOPs: Initialize Parameters sets them to Do Nothing and reads the prim's property values (not its transform). UE draws no local fog nearer than 10 m to the camera unless r.LocalFogVolume.GlobalStartDistance is lowered (Engine Quality console variables). Height Fog Density 0 hides the whole volume: UE multiplies its radial and height coverage.
 
-## Parameters
+## Parameters { .hdue-section }
 
-### Local Fog Volume
+### Local Fog Volume { .hdue-tab }
 
-Radial Fog Density
-:   The density of the radial fog representing its extinction coefficient at the center of the sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
+<div class="hdue-params" markdown>
 
-    `unreal:localFogVolume:RadialFogExtinction` · Default 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Radial Fog Density</div>
+<div class="hdue-param__body" markdown>
 
-    <div class="hdue-figure" data-figure="ref-lfv-radial-density"></div>
+The density of the radial fog representing its extinction coefficient at the center of the sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
 
-Height Fog Density
-:   The density of the radial fog representing its extinction coefficient at height 0 in the unit sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:RadialFogExtinction</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-    `unreal:localFogVolume:HeightFogExtinction` · Default 1
+<div class="hdue-figure" data-figure="ref-lfv-radial-density"></div>
 
-    <div class="hdue-figure" data-figure="ref-lfv-height-density"></div>
+</div>
+</div>
 
-Height Fog Falloff
-:   Controls how the density decreases as height increases. Smaller values make the visible transition larger. 1.0 is the lowest value before visual artifact are visible at the horizon.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Height Fog Density</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:localFogVolume:HeightFogFalloff` · Default 1000
+The density of the radial fog representing its extinction coefficient at height 0 in the unit sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
 
-    <div class="hdue-figure" data-figure="ref-lfv-height-falloff"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:HeightFogExtinction</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
 
-Height Fog Offset
-:   Height offset, relative to the actor Z position.
+<div class="hdue-figure" data-figure="ref-lfv-height-density"></div>
 
-    `unreal:localFogVolume:HeightFogOffset` · Default 0
+</div>
+</div>
 
-Scattering Distribution
-:   Controls the phase `G` parameter, describing the directionality of the scattering within this fog volume.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Height Fog Falloff</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:localFogVolume:FogPhaseG` · Default 0.2
+Controls how the density decreases as height increases. Smaller values make the visible transition larger. 1.0 is the lowest value before visual artifact are visible at the horizon.
 
-    <div class="hdue-figure" data-figure="ref-lfv-phase"></div>
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:HeightFogFalloff</code></dd></div><div><dt>Default</dt><dd>1000</dd></div></dl>
 
-Fog Albedo
-:   Controls the albedo of this fog volume.
+<div class="hdue-figure" data-figure="ref-lfv-height-falloff"></div>
 
-    `unreal:localFogVolume:FogAlbedo` · Default 1, 1, 1
+</div>
+</div>
 
-    <div class="hdue-figure" data-figure="ref-lfv-albedo"></div>
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Height Fog Offset</div>
+<div class="hdue-param__body" markdown>
 
-Fog Emissive
-:   Controls the emissive color of this fog volume. (Unit = Luminance)
+Height offset, relative to the actor Z position.
 
-    `unreal:localFogVolume:FogEmissive` · Default 0, 0, 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:HeightFogOffset</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
 
-    <div class="hdue-figure" data-figure="ref-lfv-emissive"></div>
+</div>
+</div>
 
-Start Distance
-:   Controls the distance after which this volume starts to appear. (Unit = Centimeter) This distance is clamped to be greater than r.LocalFogVolume.GlobalStartDistance.
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Scattering Distribution</div>
+<div class="hdue-param__body" markdown>
 
-    `unreal:localFogVolume:FogStartDistance` · Default 0
+Controls the phase `G` parameter, describing the directionality of the scattering within this fog volume.
 
-Fog Sort Priority
-:   The priority can be used as a way to override the sorting by distance. A lower value means the volume will be considered further away, i.e. it will draw behind the one with a higher priority value.
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:FogPhaseG</code></dd></div><div><dt>Default</dt><dd>0.2</dd></div></dl>
 
-    `unreal:localFogVolume:FogSortPriority` · Default 0
+<div class="hdue-figure" data-figure="ref-lfv-phase"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Albedo</div>
+<div class="hdue-param__body" markdown>
+
+Controls the albedo of this fog volume.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:FogAlbedo</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-lfv-albedo"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Emissive</div>
+<div class="hdue-param__body" markdown>
+
+Controls the emissive color of this fog volume. (Unit = Luminance)
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:FogEmissive</code></dd></div><div><dt>Default</dt><dd>0, 0, 0</dd></div></dl>
+
+<div class="hdue-figure" data-figure="ref-lfv-emissive"></div>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Start Distance</div>
+<div class="hdue-param__body" markdown>
+
+Controls the distance after which this volume starts to appear. (Unit = Centimeter) This distance is clamped to be greater than r.LocalFogVolume.GlobalStartDistance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:FogStartDistance</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Fog Sort Priority</div>
+<div class="hdue-param__body" markdown>
+
+The priority can be used as a way to override the sorting by distance. A lower value means the volume will be considered further away, i.e. it will draw behind the one with a higher priority value.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:localFogVolume:FogSortPriority</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+</div>

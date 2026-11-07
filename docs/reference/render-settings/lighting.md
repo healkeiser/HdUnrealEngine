@@ -6,8 +6,7 @@
 
 #### Lumen { #unreal-lumenenabled }
 
-`unreal:lumenEnabled` · Default On · Realtime only  
-Houdini parameter `xn__unreallumenEnabled_e5a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:lumenEnabled</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unreallumenEnabled_e5a</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal Engine tab.
 
@@ -15,8 +14,7 @@ Lumen global illumination and reflections in realtime mode. Per-light MegaLights
 
 #### Method { #unreal-postprocess-dynamicglobalilluminationmethod }
 
-`unreal:postProcess:DynamicGlobalIlluminationMethod` · Default Lumen · Realtime only  
-Houdini parameter `xn__unrealpostProcessDynamicGlobalIlluminationMethod_8jcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:DynamicGlobalIlluminationMethod</code></dd></div><div><dt>Default</dt><dd>Lumen</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessDynamicGlobalIlluminationMethod_8jcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Chooses the Dynamic Global Illumination method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
 
@@ -31,8 +29,7 @@ Chooses the Dynamic Global Illumination method. Not compatible with Forward Shad
 
 #### Indirect Lighting Color { #unreal-postprocess-indirectlightingcolor }
 
-`unreal:postProcess:IndirectLightingColor` · Default `1, 1, 1` · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessIndirectLightingColor_y2bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:IndirectLightingColor</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessIndirectLightingColor_y2bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The show flag 'Global Illumination' must be enabled to use this property.
 
@@ -40,8 +37,7 @@ Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The 
 
 #### Indirect Lighting Intensity { #unreal-postprocess-indirectlightingintensity }
 
-`unreal:postProcess:IndirectLightingIntensity` · Default `1` · Range 0 to 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessIndirectLightingIntensity_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:IndirectLightingIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessIndirectLightingIntensity_h9bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Scales the indirect lighting contribution. A value of 0 disables GI. Default is 1. The show flag 'Global Illumination' must be enabled to use this property.
 
@@ -51,8 +47,7 @@ Scales the indirect lighting contribution. A value of 0 disables GI. Default is 
 
 #### Ray Lighting Mode { #unreal-postprocess-lumenraylightingmode }
 
-`unreal:postProcess:LumenRayLightingMode` · Default Project Default · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenRayLightingMode_c1bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenRayLightingMode</code></dd></div><div><dt>Default</dt><dd>Project Default</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenRayLightingMode_c1bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality.
 
@@ -67,15 +62,13 @@ Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By def
 
 #### Lumen Scene Lighting Quality { #unreal-postprocess-lumenscenelightingquality }
 
-`unreal:postProcess:LumenSceneLightingQuality` · Default `1` · Range 0.25 to 2 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenSceneLightingQuality_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneLightingQuality</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSceneLightingQuality_h9bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scales Lumen Scene's quality. Larger scales cause Lumen Scene to be calculated with a higher fidelity, which can be visible in reflections, but increase GPU cost.
 
 #### Lumen Scene Detail { #unreal-postprocess-lumenscenedetail }
 
-`unreal:postProcess:LumenSceneDetail` · Default `1` · Range 0.25 to 4 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenSceneDetail_tubl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneDetail</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSceneDetail_tubl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls the size of instances that can be represented in Lumen Scene. Larger values will ensure small objects are represented, but increase GPU cost.
 
@@ -83,15 +76,13 @@ Controls the size of instances that can be represented in Lumen Scene. Larger va
 
 #### Lumen Scene View Distance { #unreal-postprocess-lumensceneviewdistance }
 
-`unreal:postProcess:LumenSceneViewDistance` · Default `20000` · Range 1 to 2097152 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenSceneViewDistance_l4bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneViewDistance</code></dd></div><div><dt>Default</dt><dd><code>20000</code></dd></div><div><dt>Range</dt><dd>1 to 2097152</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSceneViewDistance_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the maximum view distance of the scene that Lumen maintains for ray tracing against. Larger values will increase the effective range of sky shadowing and Global Illumination, but increase GPU cost.
 
 #### Final Gather Quality { #unreal-postprocess-lumenfinalgatherquality }
 
-`unreal:postProcess:LumenFinalGatherQuality` · Default `1` · Range 0.25 to 2 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenFinalGatherQuality_75bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherQuality</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenFinalGatherQuality_75bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scales Lumen's Final Gather quality. Larger scales reduce noise, but greatly increase GPU cost.
 
@@ -99,8 +90,7 @@ Scales Lumen's Final Gather quality. Larger scales reduce noise, but greatly inc
 
 #### Screen Traces { #unreal-postprocess-lumenfinalgatherscreentraces }
 
-`unreal:postProcess:LumenFinalGatherScreenTraces` · Default On · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenFinalGatherScreenTraces_dfcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherScreenTraces</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenFinalGatherScreenTraces_dfcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to use screen space traces for Lumen Global Illumination. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
@@ -108,8 +98,7 @@ Whether to use screen space traces for Lumen Global Illumination. Screen space t
 
 #### Max Trace Distance { #unreal-postprocess-lumenmaxtracedistance }
 
-`unreal:postProcess:LumenMaxTraceDistance` · Default `20000` · Range 1 to 2097152 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenMaxTraceDistance_y2bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxTraceDistance</code></dd></div><div><dt>Default</dt><dd><code>20000</code></dd></div><div><dt>Range</dt><dd>1 to 2097152</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenMaxTraceDistance_y2bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Controls the maximum distance that Lumen should trace while solving lighting. Values that are too small will cause lighting to leak into large caves, while values that are large will increase GPU cost.
 
@@ -117,15 +106,13 @@ Controls the maximum distance that Lumen should trace while solving lighting. Va
 
 #### Lumen Surface Cache Resolution { #unreal-postprocess-lumensurfacecacheresolution }
 
-`unreal:postProcess:LumenSurfaceCacheResolution` · Default `1` · Range 0.5 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenSurfaceCacheResolution_qdcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSurfaceCacheResolution</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.5 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSurfaceCacheResolution_qdcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scale factor for Lumen Surface Cache resolution. Smaller values save GPU memory, at a cost in quality. Defaults to 0.5 for Scene Captures if not overridden.
 
 #### Hardware Ray Tracing { #unreal-cvar-r-lumen-hardwareraytracing }
 
-`unreal:cvar:r:Lumen:HardwareRayTracing` · Default On · Realtime only  
-Houdini parameter `xn__unrealcvarrLumenHardwareRayTracing_gwbebf`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Lumen:HardwareRayTracing</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrLumenHardwareRayTracing_gwbebf</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall back to Software Ray Tracing otherwise. Note: Hardware ray tracing has significant scene update costs for scenes with more than 100k instances. Console variable r.Lumen.HardwareRayTracing (process-wide).
 
@@ -133,22 +120,19 @@ Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall ba
 
 #### Lumen Scene Lighting Update Speed { #unreal-postprocess-lumenscenelightingupdatespeed }
 
-`unreal:postProcess:LumenSceneLightingUpdateSpeed` · Default `1` · Range 0.5 to 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenSceneLightingUpdateSpeed_zgcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSceneLightingUpdateSpeed</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.5 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSceneLightingUpdateSpeed_zgcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Controls how much Lumen Scene is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost.
 
 #### Final Gather Lighting Update Speed { #unreal-postprocess-lumenfinalgatherlightingupdatespeed }
 
-`unreal:postProcess:LumenFinalGatherLightingUpdateSpeed` · Default `1` · Range 0.5 to 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenFinalGatherLightingUpdateSpeed_rqcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFinalGatherLightingUpdateSpeed</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.5 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenFinalGatherLightingUpdateSpeed_rqcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Controls how much Lumen Final Gather is allowed to cache lighting results to improve performance. Larger scales cause lighting changes to propagate faster, but increase GPU cost and noise.
 
 #### Diffuse Color Boost { #unreal-postprocess-lumendiffusecolorboost }
 
-`unreal:postProcess:LumenDiffuseColorBoost` · Default `1` · Range 1 to 4 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenDiffuseColorBoost_l4bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenDiffuseColorBoost</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 4</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenDiffuseColorBoost_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Allows brightening indirect lighting by calculating material diffuse color for indirect lighting. Values above 1 (original diffuse color) aren't physically correct, but they can be useful as an art direction knob to increase the amount of bounced light in the scene. Best to keep below 2 as it also causes reflections to be brighter than the scene.
 
@@ -156,8 +140,7 @@ Allows brightening indirect lighting by calculating material diffuse color for i
 
 #### Ambient Occlusion Intensity { #unreal-postprocess-lumenambientocclusionintensity }
 
-`unreal:postProcess:LumenAmbientOcclusionIntensity` · Default `1` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenAmbientOcclusionIntensity_micl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenAmbientOcclusionIntensity</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenAmbientOcclusionIntensity_micl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Allows control over the strength of Lumen's Short Range Ambient Occlusion.
 
@@ -165,8 +148,7 @@ Allows control over the strength of Lumen's Short Range Ambient Occlusion.
 
 #### Skylight Leaking { #unreal-postprocess-lumenskylightleaking }
 
-`unreal:postProcess:LumenSkylightLeaking` · Default `0` · Range 0 to 1 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenSkylightLeaking_c1bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSkylightLeaking</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSkylightLeaking_c1bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Controls what fraction of the skylight intensity should be allowed to leak. This can be useful as an art direction knob (non-physically based) to keep indoor areas from going fully black.
 
@@ -174,15 +156,13 @@ Controls what fraction of the skylight intensity should be allowed to leak. This
 
 #### Skylight Leaking Tint { #unreal-postprocess-lumenskylightleakingtint }
 
-`unreal:postProcess:LumenSkylightLeakingTint` · Default `1, 1, 1` · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenSkylightLeakingTint_u7bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenSkylightLeakingTint</code></dd></div><div><dt>Default</dt><dd><code>1, 1, 1</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenSkylightLeakingTint_u7bl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Color tint for Lumen Skylight Leaking.
 
 #### Full Skylight Leaking Distance { #unreal-postprocess-lumenfullskylightleakingdistance }
 
-`unreal:postProcess:LumenFullSkylightLeakingDistance` · Default `1000` · Range 0.1 to 2000 · Realtime only · Advanced  
-Houdini parameter `xn__unrealpostProcessLumenFullSkylightLeakingDistance_vlcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFullSkylightLeakingDistance</code></dd></div><div><dt>Default</dt><dd><code>1000</code></dd></div><div><dt>Range</dt><dd>0.1 to 2000</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenFullSkylightLeakingDistance_vlcl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Controls the distance from a receiving surface where skylight leaking reaches its full intensity. Smaller values make the skylight leaking flatter, while larger values create an Ambient Occlusion effect.
 
@@ -190,8 +170,7 @@ Controls the distance from a receiving surface where skylight leaking reaches it
 
 #### Method { #unreal-postprocess-reflectionmethod }
 
-`unreal:postProcess:ReflectionMethod` · Default Lumen · Realtime only  
-Houdini parameter `xn__unrealpostProcessReflectionMethod_tubl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ReflectionMethod</code></dd></div><div><dt>Default</dt><dd>Lumen</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessReflectionMethod_tubl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Chooses the Reflection method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
 
@@ -207,15 +186,13 @@ Chooses the Reflection method. Not compatible with Forward Shading. Overrides un
 
 #### Quality { #unreal-postprocess-lumenreflectionquality }
 
-`unreal:postProcess:LumenReflectionQuality` · Default `1` · Range 0.25 to 2 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenReflectionQuality_l4bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenReflectionQuality</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>0.25 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenReflectionQuality_l4bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Scales the Reflection quality. Larger scales reduce noise in reflections, but increase GPU cost.
 
 #### Screen Traces { #unreal-postprocess-lumenreflectionsscreentraces }
 
-`unreal:postProcess:LumenReflectionsScreenTraces` · Default On · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenReflectionsScreenTraces_dfcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenReflectionsScreenTraces</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenReflectionsScreenTraces_dfcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to use screen space traces for Lumen Reflections. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
@@ -223,15 +200,13 @@ Whether to use screen space traces for Lumen Reflections. Screen space traces by
 
 #### High Quality Translucency Reflections { #unreal-postprocess-lumenfrontlayertranslucencyreflections }
 
-`unreal:postProcess:LumenFrontLayerTranslucencyReflections` · Default Off · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenFrontLayerTranslucencyReflections_nvcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenFrontLayerTranslucencyReflections</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenFrontLayerTranslucencyReflections_nvcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Whether to use high quality mirror reflections on the front layer of translucent surfaces. Other layers will use the lower quality Radiance Cache method that can only produce glossy reflections. Increases GPU cost when enabled.
 
 #### Max Roughness To Trace { #unreal-postprocess-lumenmaxroughnesstotracereflections }
 
-`unreal:postProcess:LumenMaxRoughnessToTraceReflections` · Default `0.4` · Range 0 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenMaxRoughnessToTraceReflections_rqcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxRoughnessToTraceReflections</code></dd></div><div><dt>Default</dt><dd><code>0.4</code></dd></div><div><dt>Range</dt><dd>0 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenMaxRoughnessToTraceReflections_rqcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the maximum roughness value for which Lumen still traces dedicated reflection rays. Higher values improve reflection quality, but greatly increase GPU cost.
 
@@ -239,22 +214,19 @@ Sets the maximum roughness value for which Lumen still traces dedicated reflecti
 
 #### Max Reflection Bounces { #unreal-postprocess-lumenmaxreflectionbounces }
 
-`unreal:postProcess:LumenMaxReflectionBounces` · Default `1` · Range 1 to 8 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenMaxReflectionBounces_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxReflectionBounces</code></dd></div><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 8</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenMaxReflectionBounces_h9bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Sets the maximum number of recursive reflection bounces. 1 means a single reflection ray (no secondary reflections in mirrors). Currently only supported by Hardware Ray Tracing with Hit Lighting.
 
 #### Max Refraction Bounces { #unreal-postprocess-lumenmaxrefractionbounces }
 
-`unreal:postProcess:LumenMaxRefractionBounces` · Default `0` · Range 0 to 64 · Realtime only  
-Houdini parameter `xn__unrealpostProcessLumenMaxRefractionBounces_h9bl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:LumenMaxRefractionBounces</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessLumenMaxRefractionBounces_h9bl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
-The maximum count of refraction event to trace. When hit lighting is used, Translucent meshes will be traced when LumenMaxRefractionBounces \1 0, making the reflection tracing more expenssive.
+The maximum count of refraction event to trace. When hit lighting is used, Translucent meshes will be traced when LumenMaxRefractionBounces \> 0, making the reflection tracing more expenssive.
 
 #### Hardware Ray Traced Reflections { #unreal-cvar-r-lumen-reflections-hardwareraytracing }
 
-`unreal:cvar:r:Lumen:Reflections:HardwareRayTracing` · Default On · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrLumenReflectionsHardwareRayTracing_dfcebfl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Lumen:Reflections:HardwareRayTracing</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrLumenReflectionsHardwareRayTracing_dfcebfl</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Enables hardware ray tracing for Lumen reflections (Default = 1) Console variable r.Lumen.Reflections.HardwareRayTracing (process-wide).
 
@@ -262,22 +234,19 @@ Enables hardware ray tracing for Lumen reflections (Default = 1) Console variabl
 
 #### Intensity { #unreal-postprocess-screenspacereflectionintensity }
 
-`unreal:postProcess:ScreenSpaceReflectionIntensity` · Default `100` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealpostProcessScreenSpaceReflectionIntensity_micl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionIntensity</code></dd></div><div><dt>Default</dt><dd><code>100</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessScreenSpaceReflectionIntensity_micl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Enable/Fade/disable the Screen Space Reflection feature, in percent, avoid numbers between 0 and 1 fo consistency
 
 #### Quality { #unreal-postprocess-screenspacereflectionquality }
 
-`unreal:postProcess:ScreenSpaceReflectionQuality` · Default `50` · Range 0 to 100 · Realtime only  
-Houdini parameter `xn__unrealpostProcessScreenSpaceReflectionQuality_dfcl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionQuality</code></dd></div><div><dt>Default</dt><dd><code>50</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessScreenSpaceReflectionQuality_dfcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 0=lowest quality..100=maximum quality, only a few quality levels are implemented, no soft transition, 50 is the default for better performance.
 
 #### Max Roughness { #unreal-postprocess-screenspacereflectionmaxroughness }
 
-`unreal:postProcess:ScreenSpaceReflectionMaxRoughness` · Default `0.6` · Range 0.01 to 1 · Realtime only  
-Houdini parameter `xn__unrealpostProcessScreenSpaceReflectionMaxRoughness_incl`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:ScreenSpaceReflectionMaxRoughness</code></dd></div><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0.01 to 1</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessScreenSpaceReflectionMaxRoughness_incl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Until what roughness we fade the screen space reflections, 0.8 works well, smaller can run faster
 
@@ -285,8 +254,7 @@ Until what roughness we fade the screen space reflections, 0.8 works well, small
 
 #### Virtual Shadow Maps { #unreal-cvar-r-shadow-virtual-enable }
 
-`unreal:cvar:r:Shadow:Virtual:Enable` · Default On · Realtime only  
-Houdini parameter `xn__unrealcvarrShadowVirtualEnable_xpbebgh`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:Enable</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualEnable_xpbebgh</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps for shadowing. Provides high - quality shadows for next - gen projects with simplified setup.High efficiency culling when used with Nanite. Console variable r.Shadow.Virtual.Enable (process-wide).
 
@@ -294,8 +262,7 @@ Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps 
 
 #### Ray Traced Shadows { #unreal-cvar-r-raytracing-shadows }
 
-`unreal:cvar:r:RayTracing:Shadows` · Default Off · Realtime only  
-Houdini parameter `xn__unrealcvarrRayTracingShadows_ombebk`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:RayTracing:Shadows</code></dd></div><div><dt>Default</dt><dd>Off</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrRayTracingShadows_ombebk</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 0: use traditional rasterized shadow map (default) 1: use ray tracing shadows Console variable r.RayTracing.Shadows (process-wide).
 
@@ -303,8 +270,7 @@ Houdini parameter `xn__unrealcvarrRayTracingShadows_ombebk`
 
 #### Directional Resolution Bias { #unreal-cvar-r-shadow-virtual-resolutionlodbiasdirectional }
 
-`unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional` · Default `-1.5` · Range -2 to 2 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualResolutionLodBiasDirectional_rqcebgh`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional</code></dd></div><div><dt>Default</dt><dd><code>-1.5</code></dd></div><div><dt>Range</dt><dd>-2 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualResolutionLodBiasDirectional_rqcebgh</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Bias applied to LOD calculations for directional lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasDirectional (process-wide).
 
@@ -312,15 +278,13 @@ Bias applied to LOD calculations for directional lights. -1.0 doubles resolution
 
 #### Local Resolution Bias { #unreal-cvar-r-shadow-virtual-resolutionlodbiaslocal }
 
-`unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasLocal` · Default `0` · Range -2 to 2 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualResolutionLodBiasLocal_zgcebgh`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasLocal</code></dd></div><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>-2 to 2</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualResolutionLodBiasLocal_zgcebgh</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Bias applied to LOD calculations for local lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasLocal (process-wide).
 
 #### Directional Soft Shadow Rays { #unreal-cvar-r-shadow-virtual-smrt-raycountdirectional }
 
-`unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional` · Default `8` · Range 0 to 16 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualSMRTRayCountDirectional_micebghe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional</code></dd></div><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualSMRTRayCountDirectional_micebghe</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Ray count for shadow map tracing of directional lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountDirectional (process-wide).
 
@@ -328,29 +292,25 @@ Ray count for shadow map tracing of directional lights. 0 = disabled. Console va
 
 #### Directional Samples per Ray { #unreal-cvar-r-shadow-virtual-smrt-samplesperraydirectional }
 
-`unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayDirectional` · Default `4` · Range 0 to 16 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualSMRTSamplesPerRayDirectional_rqcebghe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayDirectional</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualSMRTSamplesPerRayDirectional_rqcebghe</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Shadow map samples per ray for directional lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayDirectional (process-wide).
 
 #### Local Soft Shadow Rays { #unreal-cvar-r-shadow-virtual-smrt-raycountlocal }
 
-`unreal:cvar:r:Shadow:Virtual:SMRT:RayCountLocal` · Default `8` · Range 0 to 16 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualSMRTRayCountLocal_u7bebghe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:RayCountLocal</code></dd></div><div><dt>Default</dt><dd><code>8</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualSMRTRayCountLocal_u7bebghe</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Ray count for shadow map tracing of local lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountLocal (process-wide).
 
 #### Local Samples per Ray { #unreal-cvar-r-shadow-virtual-smrt-samplesperraylocal }
 
-`unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayLocal` · Default `4` · Range 0 to 16 · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowVirtualSMRTSamplesPerRayLocal_zgcebghe`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:Virtual:SMRT:SamplesPerRayLocal</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 16</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowVirtualSMRTSamplesPerRayLocal_zgcebghe</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Shadow map samples per ray for local lights Console variable r.Shadow.Virtual.SMRT.SamplesPerRayLocal (process-wide).
 
 #### Shadow Map Filter { #unreal-cvar-r-shadow-filtermethod }
 
-`unreal:cvar:r:Shadow:FilterMethod` · Default PCF · Realtime only · Advanced  
-Houdini parameter `xn__unrealcvarrShadowFilterMethod_bobebg`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:Shadow:FilterMethod</code></dd></div><div><dt>Default</dt><dd>PCF</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrShadowFilterMethod_bobebg</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
 Chooses the shadow filtering method. 0: Uniform PCF (default) 1: PCSS (experimental) Console variable r.Shadow.FilterMethod (process-wide).
 
@@ -363,8 +323,7 @@ Chooses the shadow filtering method. 0: Uniform PCF (default) 1: PCSS (experimen
 
 #### Environment Cube Resolution { #unreal-domeresolution }
 
-`unreal:domeResolution` · Default 128 · Advanced  
-Houdini parameter `xn__unrealdomeResolution_n8a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:domeResolution</code></dd></div><div><dt>Default</dt><dd>128</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealdomeResolution_n8a</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Face size of the cubemap dome lights are baked into, for lighting, reflections and the background.
 
@@ -380,14 +339,12 @@ Face size of the cubemap dome lights are baked into, for lighting, reflections a
 
 #### Light Unlit Scenes { #unreal-autoviewerlight }
 
-`unreal:autoViewerLight` · Default On · Advanced  
-Houdini parameter `xn__unrealautoViewerLight_99a`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:autoViewerLight</code></dd></div><div><dt>Default</dt><dd>On</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealautoViewerLight_99a</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Add a camera-relative key and fill light when the scene has no lights, so unlit scenes are reviewable.
 
 #### Viewer Light Intensity { #unreal-viewerlightintensity }
 
-`unreal:viewerLightIntensity` · Default `4` · Range 0 to 100 · Advanced  
-Houdini parameter `xn__unrealviewerLightIntensity_fjb`
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:viewerLightIntensity</code></dd></div><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>0 to 100</dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealviewerLightIntensity_fjb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
 
 Intensity of the unlit-scene lights and of the viewport's headlight.

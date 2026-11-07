@@ -3,28 +3,50 @@
 
 # <img class="hdue-node-icon" src="../icons/HDUE_hdue.svg" alt=""> hdUE Decal
 
-<p class="hdue-node-type">LOP node · <code>hdue::hduedecal::1.0</code></p>
+<dl class="hdue-facts"><div><dt>Context</dt><dd>LOP node</dd></div><div><dt>Type</dt><dd><code>hdue::hduedecal::1.0</code></dd></div></dl>
 
 Creates or edits a UE decal: a box projecting its material onto the surfaces it covers.
 { .hdue-node-summary }
 
 Like a Decal Actor placed in a UE level, it creates or edits an UnrealDecal prim: a box filling the cube from -1 to 1 of its local space (Uniform Scale 1 is a 2-unit box), projecting along the prim's local down axis. Its material is the material bound to the prim (Assign Material LOP), a Substrate Builder decal material (hdUE Substrate Material Builder, decal preset) prepared for hdUE, applied in Houdini's viewport; else Decal Material, a cooked Deferred Decal material path. Decal Color tints it, Sort Order orders overlapping decals, and Fade Screen Size hides it below that screen size.
 
-## Parameters
+## Parameters { .hdue-section }
 
-### Decal
+### Decal { .hdue-tab }
 
-Decal Material
-:   Decal material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
+<div class="hdue-params" markdown>
 
-    `unreal:decal:DecalMaterial`
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Decal Material</div>
+<div class="hdue-param__body" markdown>
 
-Sort Order
-:   Controls the order in which decal elements are rendered. Higher values draw later (on top). Setting many different sort orders on many different decals prevents sorting by state and can reduce performance.
+Decal material. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
 
-    `unreal:decal:SortOrder` · Default 0
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:decal:DecalMaterial</code></dd></div></dl>
 
-Decal Color
-:   Decal color, can be accessed using the material Decal Color node.
+</div>
+</div>
 
-    `unreal:decal:DecalColor` · Default 1, 1, 1
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Sort Order</div>
+<div class="hdue-param__body" markdown>
+
+Controls the order in which decal elements are rendered. Higher values draw later (on top). Setting many different sort orders on many different decals prevents sorting by state and can reduce performance.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:decal:SortOrder</code></dd></div><div><dt>Default</dt><dd>0</dd></div></dl>
+
+</div>
+</div>
+
+<div class="hdue-param" markdown>
+<div class="hdue-param__name">Decal Color</div>
+<div class="hdue-param__body" markdown>
+
+Decal color, can be accessed using the material Decal Color node.
+
+<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:decal:DecalColor</code></dd></div><div><dt>Default</dt><dd>1, 1, 1</dd></div></dl>
+
+</div>
+</div>
+
+</div>
