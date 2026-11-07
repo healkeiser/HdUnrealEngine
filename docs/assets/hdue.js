@@ -1,5 +1,5 @@
 // Setting comparisons (scripts/render_docs_images.py): <div class="hdue-figure" data-figure="<name>"></div> becomes a
-// before/after slider for two images and a value scrubber for more. Images and captions come from
+// before/after slider for two images and, for more, a picture with a strip of thumbnails. Images and captions come from
 // images/settings/, found next to this script so the page's depth does not matter.
 (function () {
   const base = new URL("../images/settings/", document.currentScript.src);
@@ -19,21 +19,53 @@
     set();
   }
 
-  function scrubber(root, name, captions) {
-    root.classList.add("hdue-scrub");
+  // More than two values: the images stacked, the selected one shown with its caption, and a strip of thumbnails to
+  // pick a value; swipes and the arrow keys step through them.
+  function stepper(root, name, captions) {
+    root.classList.add("hdue-steps");
+    const src = (i) => new URL(`${name}/${i}.jpg`, base);
     root.innerHTML =
-      captions.map((c, i) => `<img src="${new URL(`${name}/${i}.jpg`, base)}" alt="${c}" loading="lazy">`).join("") +
-      `<div class="hdue-controls"><input type="range" min="0" max="${captions.length - 1}" step="1" value="0" ` +
-      `aria-label="Setting value"><output></output></div>` +
-      `<div class="hdue-ticks">${captions.map((c) => `<span>${c}</span>`).join("")}</div>`;
-    const input = root.querySelector("input");
-    const images = root.querySelectorAll("img");
-    const show = () => {
-      images.forEach((img, i) => img.classList.toggle("hdue-current", i === Number(input.value)));
-      root.querySelector("output").textContent = captions[input.value];
+      `<div class="hdue-stage" tabindex="0" aria-label="${captions.length} values, arrow keys to change">` +
+      captions.map((c, i) => `<img src="${src(i)}" alt="${c}"${i ? ' loading="lazy"' : ""}>`).join("") +
+      `<span class="hdue-label hdue-left" aria-live="polite"></span></div>` +
+      `<div class="hdue-thumbs">` +
+      captions
+        .map(
+          (c, i) =>
+            `<button type="button" aria-label="${c}"><img src="${src(i)}" alt="" loading="lazy"><span>${c}</span></button>`,
+        )
+        .join("") +
+      `</div>`;
+    const stage = root.querySelector(".hdue-stage");
+    const images = stage.querySelectorAll("img");
+    const strip = root.querySelector(".hdue-thumbs");
+    const buttons = strip.querySelectorAll("button");
+    let current = 0;
+    const show = (i) => {
+      current = Math.max(0, Math.min(captions.length - 1, i));
+      images.forEach((img, j) => img.classList.toggle("hdue-current", j === current));
+      buttons.forEach((b, j) => b.setAttribute("aria-pressed", String(j === current)));
+      // Centre the selected thumbnail in the strip, without scrolling the page (scrollIntoView would).
+      const b = buttons[current];
+      strip.scrollTo({ left: b.offsetLeft - strip.offsetLeft - (strip.clientWidth - b.clientWidth) / 2, behavior: "smooth" });
+      stage.querySelector(".hdue-label").textContent = captions[current];
     };
-    input.addEventListener("input", show);
-    show();
+    buttons.forEach((b, i) => b.addEventListener("click", () => show(i)));
+    stage.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        show(current + (e.key === "ArrowRight" ? 1 : -1));
+      }
+    });
+    // A horizontal swipe of 30 px or more steps one value; vertical moves scroll the page (touch-action: pan-y).
+    let startX = null;
+    stage.addEventListener("pointerdown", (e) => (startX = e.clientX));
+    stage.addEventListener("pointerup", (e) => {
+      if (startX !== null && Math.abs(e.clientX - startX) >= 30) show(current + (e.clientX < startX ? 1 : -1));
+      startX = null;
+    });
+    stage.addEventListener("pointercancel", () => (startX = null));
+    show(0);
   }
 
   async function build() {
@@ -45,7 +77,7 @@
       const captions = figures[name];
       if (!captions) return;
       root.dataset.built = "";
-      (captions.length === 2 ? slider : scrubber)(root, name, captions);
+      (captions.length === 2 ? slider : stepper)(root, name, captions);
     });
   }
 

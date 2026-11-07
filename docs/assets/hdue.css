@@ -45,6 +45,7 @@
   font-size: 0.8rem;
 }
 .hdue-compare input {
+  touch-action: pan-y;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -70,31 +71,77 @@
   right: 0.6em;
 }
 
-/* Scrubber: stacked images, the selected one shown. */
-.hdue-scrub img {
+/* More values: the selected image, and a strip of thumbnails (scrolls sideways when it does not fit). */
+.hdue-stage {
+  position: relative;
+  touch-action: pan-y;
+  outline-offset: 2px;
+}
+.hdue-stage img {
   display: none;
 }
-.hdue-scrub img.hdue-current {
+.hdue-stage img.hdue-current {
   display: block;
 }
-.hdue-controls {
+.hdue-thumbs {
   display: flex;
-  align-items: center;
-  gap: 0.8em;
+  gap: 0.4em;
   margin-top: 0.5em;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.2em;
 }
-.hdue-controls input {
-  flex: 1;
-  accent-color: var(--md-accent-fg-color, #2a78d6);
+.hdue-thumbs button {
+  flex: 1 0 5.5em;
+  max-width: 9em;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--md-default-fg-color--light, #888);
+  font: inherit;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+  scroll-snap-align: start;
 }
-.hdue-controls output {
-  min-width: 9em;
-  font-size: 0.75rem;
+.hdue-thumbs button img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+  opacity: 0.6;
+}
+.hdue-thumbs button span {
+  display: block;
+  padding: 0.2em 0.1em;
+}
+.hdue-thumbs button[aria-pressed="true"] {
+  border-color: var(--md-accent-fg-color, #2a78d6);
+  color: var(--md-default-fg-color, inherit);
   font-weight: 600;
 }
-.hdue-ticks {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.6rem;
+.hdue-thumbs button[aria-pressed="true"] img,
+.hdue-thumbs button:hover img {
+  opacity: 1;
+}
+
+/* Houdini node reference (scripts/generate_node_docs.py). */
+.md-typeset .hdue-node-icon {
+  width: auto;
+  height: 1.1em;
+  vertical-align: -0.12em;
+}
+.hdue-node-type {
+  margin-top: -0.8em;
   color: var(--md-default-fg-color--light, #888);
+  font-size: 0.75rem;
+}
+.hdue-node-summary {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.md-typeset dl dt {
+  font-weight: 600;
 }

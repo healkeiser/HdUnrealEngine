@@ -30,8 +30,12 @@ The user guide is written for the artist or TD rendering with hdUE in Houdini, n
 - Every comparison is rendered by `scripts/render_docs_images.py` from a scene in `samples/`, so a rebuild refreshes it. No hand-made screenshots of renders.
 - One small scene per kind of effect, chosen so the effect reads: SideFX's lookdev shader ball (`docs/lookdev.usda`) for materials, SideFX's Veach planks (`docs/veach.usda`) for light size against roughness, the chrome ball and box (`docs/lights.usda`) for light types and shadows, the beam in fog (`docs/fog.usda`) for scattering, the row of rubber toys (`docs/row.usda`) for focus, the Bistro (`docs/bistro.usda`, a local download) for interiors and global illumination, the Cornell box for render settings. Keep the camera and lighting fixed across a page.
 - Captions are the value only ("0.5"), with "(default)" after the default. Add the render time when the setting costs time.
-- Two values: before/after slider. Three to six: scrubber. Pick values that span the useful range, not the full numeric range.
+- Two values: before/after slider. Three to six: the picture with a strip of thumbnails (tap one, or swipe the picture). Pick values that span the useful range, not the full numeric range.
 - Houdini UI screenshots only where the step cannot be said in words (a network to wire, a menu to find), and cropped to the panel.
+
+## Houdini node reference
+
+`docs/reference/nodes/` is generated: `hython scripts/generate_node_docs.py` turns each digital asset's help card (its Help section, written by `build_render_settings_hda.py` and `build_substrate_hda.py`, and shown by Houdini on F1) into a page like SideFX's node help, and writes its navigation into `zensical.toml`. Run it after rebuilding an asset; to change a node's page, change its builder's help text, never the generated Markdown.
 
 ## Writing
 
