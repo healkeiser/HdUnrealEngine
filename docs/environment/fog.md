@@ -141,6 +141,35 @@ Local fog volumes follow UE's rules:
 - **Height Fog Density** 0 hides the whole volume: UE multiplies the radial and height coverages. For radial fog alone, use a small height density such as 0.01.
 - With Volumetric Fog on the height fog, local volumes are lit and shadowed through it too.
 
+## Breaking up the fog
+
+Height fog and Local Fog Volumes are smooth: UE gives neither a noise or texture input. In UE, uneven fog comes from fog particles: particles with a Volume-domain material add their own density to Volumetric Fog, and a noise in that material breaks it into wisps and gaps ([Volumetric Fog in UE 5.8](https://dev.epicgames.com/documentation/en-us/unreal-engine/volumetric-fog-in-unreal-engine), "Local controls"). hdUE does the same with USD points: give a Points prim the primvars below, and each point becomes a sphere of fog, as wide as the point, in Volumetric Fog.
+
+| Primvar on the Points prim (constant) | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `primvars:unreal:fog:extinction` | float | 0 | Density at a sphere's centre, per metre. Above 0, the points render as fog instead of spheres |
+| `primvars:unreal:fog:noiseStrength` | float | 0 | How much the noise breaks up the density: 0 is smooth, 1 leaves clear gaps and denser pockets |
+| `primvars:unreal:fog:noiseSize` | float | 1 m | Size of the noise's pockets, in scene units |
+| `primvars:unreal:fog:noiseOffset` | float3 | (0, 0, 0) | Moves the noise, in scene units: animate it for drifting fog |
+| `primvars:unreal:fog:edgeSoftness` | float | 1 | How a sphere fades from its centre to its edge: higher fades sooner, for softer edges |
+| `primvars:unreal:fog:albedo` | color3f | (1, 1, 1) | Fraction of the light the fog scatters |
+| `primvars:unreal:fog:emissive` | color3f | (0, 0, 0) | Light the fog gives off, per unit of density |
+
+1. Turn on **Exponential Height Fog** and **Volumetric Fog**: fog particles add to the volumetric fog, and nothing shows without it. A low **Fog Density** (0.02 to 0.05) leaves the particles to shape the fog.
+2. Scatter points where the fog should be (a **Scatter** SOP on the ground, for example) and give them a size with `pscale`. A **SOP Import** turns them into a Points prim and converts `pscale` into USD `widths`; hdUE reads `widths` as each sphere's diameter, so check it in the Scene Graph Details pane.
+3. Add the primvars with an **Edit Properties** LOP (or a wrangle) on the Points prim: at least `primvars:unreal:fog:extinction`, and `primvars:unreal:fog:noiseStrength` for uneven fog.
+
+The fog room of `samples/docs/fog.usda`: 26 fog particles along the spot light's beam and where it lands, over a thin height fog (Realtime):
+
+<div class="hdue-figure" data-figure="fog-particles"></div>
+
+How it maps to UE:
+
+- Each point is a UE primitive with hdUE's `M_HdUEFogParticle` material: Volume domain, density fading from the point to its radius, times 3D gradient noise in world space, as UE's Volumetric Fog page builds its fog particles.
+- UE documents Volume-domain materials for particles. hdUE gives each point its own static mesh component instead, which UE voxelizes the same way: as a camera-facing quad over the primitive's bounding sphere (`VolumetricFogVoxelization.cpp`). One instanced mesh for all the points would give one sphere around them all.
+- Like the rest of Volumetric Fog, fog particles render in Realtime only, and Volumetric Fog's **View Distance** limits how far away they show.
+- A point's own material and `displayColor` are ignored while it is fog.
+
 ## Recipes
 
 **How to get light shafts in a dark room**

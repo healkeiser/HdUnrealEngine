@@ -1,0 +1,39 @@
+#usda 1.0
+(
+    doc = """Ground mist: the light study with a 4 x 1 x 3 m slab of fog over the floor (scripts/build_docs_volumes.py), lit by a low sun. The volume figures switch the slab between uniform density and density broken up by noise."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./lights.usda@]
+)
+
+over "scene"
+{
+    over "key"
+    {
+        float inputs:exposure = 2
+    }
+
+    # Low and from behind the objects, so the mist glows and the box and ball cast shadows into it.
+    over "sun" (active = true)
+    {
+        float inputs:exposure = 3
+        float3 xformOp:rotateXYZ = (-20, 160, 0)
+        bool unreal:light:bCastVolumetricShadow = 1
+    }
+
+    def Volume "mist"
+    {
+        rel field:density = </scene/mist/density>
+
+        def OpenVDBAsset "density"
+        {
+            asset filePath = @./mist_noise.vdb@
+            token fieldName = "density"
+        }
+    }
+}

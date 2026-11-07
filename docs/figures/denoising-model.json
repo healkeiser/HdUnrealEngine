@@ -1,6 +1,9 @@
 {
  "scene": "cornell/cornell.usda",
  "display": "linear",
+ "settings": [
+  "unreal:cvar:NNEDenoiser:Asset"
+ ],
  "base": {
   "/Render/Settings": [
    "int unreal:samplesPerPixel = 4"

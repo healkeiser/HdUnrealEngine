@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Nanite:MaxPixelsPerEdge"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:debugView = \"nanite:Triangles\""

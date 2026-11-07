@@ -1,6 +1,9 @@
 {
  "scene": "cornell/variants/glossy.usda",
  "display": "linear",
+ "settings": [
+  "unreal:postProcess:PathTracingMaxPathIntensity"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"pathtraced\"",

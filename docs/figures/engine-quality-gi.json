@@ -1,6 +1,9 @@
 {
  "scene": "docs/bistro.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:sg:GlobalIlluminationQuality"
+ ],
  "base": {},
  "values": [
   {

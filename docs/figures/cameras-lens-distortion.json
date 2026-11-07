@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:lensDistortion:K1"
+ ],
  "base": {},
  "values": [
   {

@@ -54,9 +54,9 @@ over "scene"
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
     }
 
-    def Cube "box" (prepend apiSchemas = ["MaterialBindingAPI"])
+    # A 1 m cube with 1.5 cm rounded edges (scripts/build_docs_box.py): its edges catch the light as a real box's do.
+    def Mesh "box" (prepend apiSchemas = ["MaterialBindingAPI"]; prepend references = @./box.usda@)
     {
-        double size = 1
         rel material:binding = </scene/Looks/grey>
         double3 xformOp:translate = (0.7, 0.4, -0.2)
         float3 xformOp:rotateXYZ = (0, 0, 0)
@@ -98,6 +98,14 @@ over "scene"
         double3 xformOp:translate = (0, 0, 0)
         float3 xformOp:rotateXYZ = (-47.969, 56.31, 0)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    # Inactive: the Local Fog Volume reference figures activate it. A sphere of 1.5 m radius around the box (the volume fills the prim's unit sphere).
+    def UnrealLocalFogVolume "localFog" (active = false)
+    {
+        double3 xformOp:translate = (0.7, 0.4, -0.2)
+        float3 xformOp:scale = (1.5, 1.5, 1.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
     }
 
     def Camera "camera"

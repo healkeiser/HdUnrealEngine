@@ -1,6 +1,9 @@
 {
  "scene": "docs/fog.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:VolumetricFogScatteringDistribution"
+ ],
  "base": {},
  "values": [
   {

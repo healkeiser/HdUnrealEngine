@@ -1,6 +1,7 @@
 # The hdUE user guide: uvx zensical serve (preview), uvx zensical build --clean (writes site/).
 [project]
 site_name = "hdUE"
+site_url = "https://healkeiser.github.io/HdUnrealEngine/"
 site_description = "Unreal Engine 5.8 as a Hydra render delegate for Houdini Solaris, husk and usdview"
 repo_url = "https://github.com/healkeiser/HdUnrealEngine"
 repo_name = "healkeiser/HdUnrealEngine"
@@ -13,6 +14,7 @@ extra_javascript = ["assets/hdue.js"]
 # Audit reports are dated records of the repository, not user documentation.
 exclude_docs = """
 /audit/
+/includes/
 /images/*.py
 /images/*.html
 __pycache__/
@@ -162,18 +164,38 @@ nav = [
 
 [project.theme]
 language = "en"
+# The hdUE icon (integrations/houdini/config/Icons/HDUE_hdue.svg): docs_dir only serves files under docs/.
+logo = "assets/logo.svg"
+favicon = "assets/logo.svg"
 features = [
+  "announce.dismiss",
   "content.action.edit",
+  "content.action.view",
+  "content.code.annotate",
   "content.code.copy",
+  "content.code.select",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
   "navigation.indexes",
   "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.instant.progress",
+  "navigation.path",
   "navigation.sections",
   "navigation.tabs",
+  "navigation.tabs.sticky",
   "navigation.top",
-  "navigation.footer",
+  "navigation.tracking",
   "search.highlight",
   "toc.follow",
 ]
+
+# Follows the system until the reader picks light or dark.
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
@@ -185,7 +207,24 @@ toggle.name = "Switch to dark mode"
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
 toggle.icon = "lucide/moon"
-toggle.name = "Switch to light mode"
+toggle.name = "Switch to system preference"
+
+# Versions are published by mike (.github/workflows/docs.yml): this shows the selector over its versions.json.
+[project.extra.version]
+provider = "mike"
+default = "latest"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/healkeiser/HdUnrealEngine"
+name = "hdUE on GitHub"
+
+# Click a page image to see it full size; the setting comparisons (hdue.js) are built after it and stay sliders.
+[project.plugins.glightbox]
+skip_classes = ["hdue-node-icon"]
+
+[project.plugins.minify]
+minify_html = true
 
 [project.markdown_extensions]
 abbr = {}
@@ -201,4 +240,14 @@ pymdownx.superfences = { custom_fences = [{ name = "mermaid", class = "mermaid",
 pymdownx.tabbed = { alternate_style = true }
 pymdownx.highlight = { anchor_linenums = true }
 pymdownx.inlinehilite = {}
-pymdownx.snippets = { base_path = ["."], check_paths = true }
+# The glossary: every page gets its abbreviations, shown as tooltips (content.tooltips).
+pymdownx.snippets = { base_path = ["."], check_paths = true, auto_append = ["docs/includes/glossary.md"] }
+pymdownx.blocks.caption = {}
+pymdownx.betterem = {}
+pymdownx.caret = {}
+pymdownx.mark = {}
+pymdownx.tilde = {}
+pymdownx.keys = {}
+pymdownx.smartsymbols = {}
+pymdownx.tasklist = { custom_checkbox = true }
+pymdownx.emoji = { emoji_index = "zensical.extensions.emoji.twemoji", emoji_generator = "zensical.extensions.emoji.to_svg" }

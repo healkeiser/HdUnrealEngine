@@ -91,15 +91,21 @@ In the Path Tracer, the first frames of a scene with UDIMs are a warm-up while U
 
 A Mesh, Xform or Scope prim with `unreal:asset` renders a cooked UE asset from the runtime project in its place: a Static Mesh, Skeletal Mesh, Actor Blueprint, Level or Sparse Volume Texture.
 
-```usda
-def Xform "NativeMesh"
-{
-    custom string unreal:asset = "/Game/HdUE/SM_Nanite.SM_Nanite"
-}
-```
+=== "Houdini"
 
-1. Add a **Render Geometry Settings** LOP and select the prims.
-2. On its **Unreal Engine** tab, set **Native Asset** to Set or Create and pick the asset from the menu.
+    1. Add a **Render Geometry Settings** LOP and select the prims.
+    2. On its **Unreal Engine** tab, set **Native Asset** to Set or Create and pick the asset from the menu.
+
+=== "USD"
+
+    ```usda
+    def Xform "NativeMesh"
+    {
+        custom string unreal:asset = "/Game/HdUE/SM_Nanite.SM_Nanite" # (1)!
+    }
+    ```
+
+    1. The asset's UE object path in the runtime project.
 
 The asset keeps its UE materials, material slots, pivot and centimetre dimensions; the prim's transform places it. Without an asset catalog the menu lists the staged runtime's levels and the assets named with UE's prefixes (`SM_`, `SK_`, `BP_`, `SVT_`).
 

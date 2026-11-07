@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenRayLightingMode"
+ ],
  "base": {
   "/scene/Looks/ball/S": [
    "float inputs:metallic = 1",

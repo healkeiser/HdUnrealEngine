@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:TranslucencyType"
+ ],
  "base": {
   "/scene/Looks/ball/S": [
    "uniform token info:id = \"ND_standard_surface_surfaceshader\"",

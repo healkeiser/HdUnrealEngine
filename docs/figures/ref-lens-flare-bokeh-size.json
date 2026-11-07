@@ -1,0 +1,42 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LensFlareBokehSize"
+ ],
+ "base": {
+  "/scene/key": [
+   "float inputs:exposure = 7"
+  ],
+  "/Render/Settings": [
+   "float unreal:postProcess:AutoExposureBias = -2.5",
+   "float unreal:postProcess:LensFlareIntensity = 4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LensFlareBokehSize = 1"
+    ]
+   }
+  },
+  {
+   "caption": "3 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LensFlareBokehSize = 3"
+    ]
+   }
+  },
+  {
+   "caption": "8",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LensFlareBokehSize = 8"
+    ]
+   }
+  }
+ ]
+}

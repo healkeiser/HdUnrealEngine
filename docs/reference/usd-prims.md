@@ -15,6 +15,8 @@ Houdini parameter `xn__unreallocalFogVolumeRadialFogExtinction_l4bo`
 
 The density of the radial fog representing its extinction coefficient at the center of the sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
 
+<div class="hdue-figure" data-figure="ref-lfv-radial-density"></div>
+
 #### Height Fog Density { #unreal-localfogvolume-heightfogextinction }
 
 `unreal:localFogVolume:HeightFogExtinction` · Default `1` · Range 0 to 2  
@@ -22,12 +24,16 @@ Houdini parameter `xn__unreallocalFogVolumeHeightFogExtinction_l4bo`
 
 The density of the radial fog representing its extinction coefficient at height 0 in the unit sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
 
+<div class="hdue-figure" data-figure="ref-lfv-height-density"></div>
+
 #### Height Fog Falloff { #unreal-localfogvolume-heightfogfalloff }
 
 `unreal:localFogVolume:HeightFogFalloff` · Default `1000` · Range 1 to 5000  
 Houdini parameter `xn__unreallocalFogVolumeHeightFogFalloff_pzbo`
 
 Controls how the density decreases as height increases. Smaller values make the visible transition larger. 1.0 is the lowest value before visual artifact are visible at the horizon.
+
+<div class="hdue-figure" data-figure="ref-lfv-height-falloff"></div>
 
 #### Height Fog Offset { #unreal-localfogvolume-heightfogoffset }
 
@@ -43,6 +49,8 @@ Houdini parameter `xn__unreallocalFogVolumeFogPhaseG_bobo`
 
 Controls the phase `G` parameter, describing the directionality of the scattering within this fog volume.
 
+<div class="hdue-figure" data-figure="ref-lfv-phase"></div>
+
 #### Fog Albedo { #unreal-localfogvolume-fogalbedo }
 
 `unreal:localFogVolume:FogAlbedo` · Default `1, 1, 1` · Range 0 to 1  
@@ -50,12 +58,16 @@ Houdini parameter `xn__unreallocalFogVolumeFogAlbedo_bobo`
 
 Controls the albedo of this fog volume.
 
+<div class="hdue-figure" data-figure="ref-lfv-albedo"></div>
+
 #### Fog Emissive { #unreal-localfogvolume-fogemissive }
 
 `unreal:localFogVolume:FogEmissive` · Default `0, 0, 0`  
 Houdini parameter `xn__unreallocalFogVolumeFogEmissive_krbo`
 
 Controls the emissive color of this fog volume. (Unit = Luminance)
+
+<div class="hdue-figure" data-figure="ref-lfv-emissive"></div>
 
 #### Start Distance { #unreal-localfogvolume-fogstartdistance }
 
@@ -121,6 +133,8 @@ Houdini parameter `xn__unrealheightFogFogDensity_shbj`
 
 Global density factor.
 
+<div class="hdue-figure" data-figure="fog-density"></div>
+
 #### Fog Height Falloff { #unreal-heightfog-fogheightfalloff }
 
 `unreal:heightFog:FogHeightFalloff` · Default `0.2` · Range 0.001 to 2  
@@ -128,12 +142,16 @@ Houdini parameter `xn__unrealheightFogFogHeightFalloff_krbj`
 
 Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
+<div class="hdue-figure" data-figure="fog-height-falloff"></div>
+
 #### Second Fog Density { #unreal-heightfog-secondfogdata-fogdensity }
 
 `unreal:heightFog:SecondFogData:FogDensity` · Default `0` · Range 0 to 0.05  
 Houdini parameter `xn__unrealheightFogSecondFogDataFogDensity_y2bjn`
 
 Global density factor for this fog. Density 0 turns the second fog off.
+
+<div class="hdue-figure" data-figure="ref-second-fog-density"></div>
 
 #### Second Fog Height Falloff { #unreal-heightfog-secondfogdata-fogheightfalloff }
 
@@ -155,6 +173,8 @@ Height offset, relative to the actor position Z.
 Houdini parameter `xn__unrealheightFogFogInscatteringLuminance_l4bj`
 
 Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
+
+<div class="hdue-figure" data-figure="fog-inscattering-color"></div>
 
 #### Sky Atmosphere Ambient Contribution Color Scale { #unreal-heightfog-skyatmosphereambientcontributioncolorscale }
 
@@ -268,12 +288,16 @@ Houdini parameter `xn__unrealheightFogbEnableVolumetricFog_2xbj`
 
 Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
 
+<div class="hdue-figure" data-figure="fog-volumetric"></div>
+
 #### Scattering Distribution { #unreal-heightfog-volumetricfogscatteringdistribution }
 
 `unreal:heightFog:VolumetricFogScatteringDistribution` · Default `0.2` · Range -0.9 to 0.9  
 Houdini parameter `xn__unrealheightFogVolumetricFogScatteringDistribution_incj`
 
 Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+
+<div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
 
 #### Albedo { #unreal-heightfog-volumetricfogalbedo }
 
@@ -282,6 +306,8 @@ Houdini parameter `xn__unrealheightFogVolumetricFogAlbedo_gwbj`
 
 The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
 
+<div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+
 #### Emissive { #unreal-heightfog-volumetricfogemissive }
 
 `unreal:heightFog:VolumetricFogEmissive` · Default `0, 0, 0` · Realtime only  
@@ -289,12 +315,16 @@ Houdini parameter `xn__unrealheightFogVolumetricFogEmissive_pzbj`
 
 Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
 
+<div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+
 #### Extinction Scale { #unreal-heightfog-volumetricfogextinctionscale }
 
 `unreal:heightFog:VolumetricFogExtinctionScale` · Default `1` · Range 0.1 to 10  
 Houdini parameter `xn__unrealheightFogVolumetricFogExtinctionScale_3bcj`
 
 Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+
+<div class="hdue-figure" data-figure="fog-extinction-scale"></div>
 
 #### View Distance { #unreal-heightfog-volumetricfogdistance }
 
@@ -309,6 +339,8 @@ Distance over which volumetric fog should be computed, after the start distance.
 Houdini parameter `xn__unrealheightFogVolumetricFogStartDistance_u7bj`
 
 Distance from the camera that the volumetric fog will start, in world units.
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
 
 #### Near Fade In Distance { #unreal-heightfog-volumetricfognearfadeindistance }
 
@@ -423,6 +455,8 @@ Houdini parameter `xn__unrealskyAtmosphereGroundAlbedo_krbn`
 
 The ground albedo that will tint the atmosphere when the sun light will bounce on it. Only taken into account when MultiScattering\10.0.
 
+<div class="hdue-figure" data-figure="ref-ground-albedo"></div>
+
 #### Atmosphere Height { #unreal-skyatmosphere-atmosphereheight }
 
 `unreal:skyAtmosphere:AtmosphereHeight` · Default `60` · Range 0.1 to 200  
@@ -430,12 +464,16 @@ Houdini parameter `xn__unrealskyAtmosphereAtmosphereHeight_2xbn`
 
 The height of the atmosphere layer above the ground in kilometers.
 
+<div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
+
 #### MultiScattering { #unreal-skyatmosphere-multiscatteringfactor }
 
 `unreal:skyAtmosphere:MultiScatteringFactor` · Default `1` · Range 0 to 100 · Realtime only  
 Houdini parameter `xn__unrealskyAtmosphereMultiScatteringFactor_75bn`
 
 Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
+
+<div class="hdue-figure" data-figure="ref-multiscattering"></div>
 
 #### Trace Sample Count Scale { #unreal-skyatmosphere-tracesamplecountscale }
 
@@ -450,6 +488,8 @@ Scale the atmosphere tracing sample count. Quality level scalability The sample 
 Houdini parameter `xn__unrealskyAtmosphereRayleighScatteringScale_h9bn`
 
 Rayleigh scattering coefficient scale.
+
+<div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
 
 #### Rayleigh Scattering { #unreal-skyatmosphere-rayleighscattering }
 
@@ -472,6 +512,8 @@ Houdini parameter `xn__unrealskyAtmosphereMieScatteringScale_c1bn`
 
 Mie scattering coefficient scale.
 
+<div class="hdue-figure" data-figure="sky-mie-scattering"></div>
+
 #### Mie Scattering { #unreal-skyatmosphere-miescattering }
 
 `unreal:skyAtmosphere:MieScattering` · Default `1, 1, 1`  
@@ -485,6 +527,8 @@ The Mie scattering coefficients resulting from particles in the air at an altitu
 Houdini parameter `xn__unrealskyAtmosphereMieAbsorptionScale_c1bn`
 
 Mie absorption coefficient scale.
+
+<div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
 
 #### Mie Absorption { #unreal-skyatmosphere-mieabsorption }
 
@@ -500,6 +544,8 @@ Houdini parameter `xn__unrealskyAtmosphereMieAnisotropy_6sbn`
 
 A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
 
+<div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
+
 #### Mie Exponential Distribution { #unreal-skyatmosphere-mieexponentialdistribution }
 
 `unreal:skyAtmosphere:MieExponentialDistribution` · Default `1.2` · Range 0.001 to 10  
@@ -514,6 +560,8 @@ Houdini parameter `xn__unrealskyAtmosphereOtherAbsorptionScale_l4bn`
 
 Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. This approximates ozone molecules distribution in the Earth atmosphere.
 
+<div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+
 #### Absorption { #unreal-skyatmosphere-otherabsorption }
 
 `unreal:skyAtmosphere:OtherAbsorption` · Default `0.34556087187666135, 1, 0.045188729399255716`  
@@ -527,6 +575,8 @@ Absorption coefficients for another atmosphere layer. Density increase from 0 to
 Houdini parameter `xn__unrealskyAtmosphereSkyLuminanceFactor_c1bn`
 
 Scales the luminance of pixels representing the sky. This will impact the captured sky light.
+
+<div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
 
 #### Sky And Aerial Perspective Luminance Factor { #unreal-skyatmosphere-skyandaerialperspectiveluminancefactor }
 
@@ -588,12 +638,16 @@ Houdini parameter `xn__unrealvolumetricCloudLayerBottomAltitude_75bp`
 
 The altitude at which the cloud layer starts. (kilometers above the ground)
 
+<div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
+
 #### Layer Height { #unreal-volumetriccloud-layerheight }
 
 `unreal:volumetricCloud:LayerHeight` · Default `10` · Range 0.1 to 20  
 Houdini parameter `xn__unrealvolumetricCloudLayerHeight_6sbp`
 
 The height of the the cloud layer. (kilometers above the layer bottom altitude)
+
+<div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
 
 #### Tracing Start Max Distance { #unreal-volumetriccloud-tracingstartmaxdistance }
 
@@ -657,6 +711,8 @@ Occlude the sky light contribution at the bottom of the cloud layer. This is a f
 Houdini parameter `xn__unrealvolumetricCloudViewSampleCountScale_u7bp`
 
 Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
+
+<div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
 
 #### Reflection View Sample Count Scale Value { #unreal-volumetriccloud-reflectionviewsamplecountscalevalue }
 

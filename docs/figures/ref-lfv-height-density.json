@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:localFogVolume:HeightFogExtinction"
+ ],
+ "base": {
+  "/scene/localFog": [
+   "(active = true)"
+  ],
+  "/Render/Settings": [
+   "float unreal:cvar:r:LocalFogVolume:GlobalStartDistance = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.01",
+   "set": {
+    "/scene/localFog": [
+     "float unreal:localFogVolume:HeightFogExtinction = 0.01"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/scene/localFog": [
+     "float unreal:localFogVolume:HeightFogExtinction = 1"
+    ]
+   }
+  }
+ ]
+}

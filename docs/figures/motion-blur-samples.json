@@ -1,6 +1,9 @@
 {
  "scene": "cornell/variants/motion_blur.usda",
  "display": "linear",
+ "settings": [
+  "unreal:motionSamples"
+ ],
  "base": {},
  "values": [
   {

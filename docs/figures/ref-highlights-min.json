@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorCorrectionHighlightsMin"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float4 unreal:postProcess:ColorSaturationHighlights = (1, 1, 1, 0)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.5 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ColorCorrectionHighlightsMin = 0.5"
+    ]
+   }
+  },
+  {
+   "caption": "0.2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ColorCorrectionHighlightsMin = 0.2"
+    ]
+   }
+  }
+ ]
+}

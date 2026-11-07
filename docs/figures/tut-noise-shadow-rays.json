@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Shadow:Virtual:SMRT:RayCountDirectional"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"realtime\""

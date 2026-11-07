@@ -1,6 +1,9 @@
 {
  "scene": "cornell/cornell.usda",
  "display": "linear",
+ "settings": [
+  "unreal:postProcess:PathTracingEnableDenoiser"
+ ],
  "base": {
   "/Render/Settings": [
    "int unreal:samplesPerPixel = 16"

@@ -226,5 +226,7 @@ private:
     TMap<FString, TSharedPtr<FNativePickGeometry>> NativePickGeometry;
     void Remove(const FString& Id);
     void BindMaterials();
+    void SplitVolumeInstances(AActor& Actor, class UInstancedStaticMeshComponent& Instances,
+                              UMaterialInterface* Material);
     UMaterialInterface* MeshMaterial(const FString& MeshId);  // its material, one-sided if the mesh is
 };

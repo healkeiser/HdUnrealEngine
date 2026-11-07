@@ -1,6 +1,9 @@
 {
  "scene": "cornell/cornell.usda",
  "display": "linear",
+ "settings": [
+  "unreal:renderMode"
+ ],
  "base": {},
  "values": [
   {

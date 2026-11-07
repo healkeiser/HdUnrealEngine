@@ -72,10 +72,14 @@ Layer Bottom Altitude
 
     `unreal:volumetricCloud:LayerBottomAltitude` · Default 5
 
+    <div class="hdue-figure" data-figure="ref-cloud-bottom-altitude"></div>
+
 Layer Height
 :   The height of the the cloud layer. (kilometers above the layer bottom altitude)
 
     `unreal:volumetricCloud:LayerHeight` · Default 10
+
+    <div class="hdue-figure" data-figure="ref-cloud-layer-height"></div>
 
 Tracing Start Max Distance
 :   The maximum distance of the volumetric surface, i.e. cloud layer upper and lower bound, before which we will accept to start tracing. (kilometers)
@@ -115,6 +119,8 @@ View Sample Count Scale
 :   Scale the tracing sample count in primary views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ViewRaySampleCountMax'.
 
     `unreal:volumetricCloud:ViewSampleCountScale` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-cloud-view-samples"></div>
 
 Reflection View Sample Count Scale Value
 :   Scale the tracing sample count in reflection views. Quality level scalability CVARs affect the maximum range. The sample count resolution is still clamped according to scalability setting to 'r.VolumetricCloud.ReflectionRaySampleMaxCount'.

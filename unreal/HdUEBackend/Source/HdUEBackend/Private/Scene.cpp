@@ -1190,8 +1190,48 @@ void FHdueScene::BindMaterials() {
                 IsTranslucentBlendMode(*Desired) && !TranslucentStatic.Contains(Entry.Key))
                 continue;
             if (Component->GetMaterial(0) != Desired) Component->SetMaterial(0, Desired);
+            if (auto* Instances = Cast<UInstancedStaticMeshComponent>(Component))
+                SplitVolumeInstances(**Actor, *Instances, Desired);
         }
     }
+}
+// UE voxelizes a Volume-domain primitive into Volumetric Fog over the primitive's bounding sphere
+// (VolumetricFogVoxelization.cpp), so instances drawn by one ISM would make one sphere around all of them: each
+// instance becomes its own static mesh component, as each of UE's fog particles is its own sprite. Other materials keep
+// the ISM.
+void FHdueScene::SplitVolumeInstances(AActor& Actor, UInstancedStaticMeshComponent& Instances,
+                                      UMaterialInterface* Material) {
+    const bool Volume = Material && Material->GetMaterial() && Material->GetMaterial()->MaterialDomain == MD_Volume;
+    TArray<UStaticMeshComponent*> Parts;
+    for (UActorComponent* Component : Actor.GetComponents())
+        if (Component != &Instances && Component->IsA<UStaticMeshComponent>() &&
+            !Component->IsA<UInstancedStaticMeshComponent>())
+            Parts.Add(static_cast<UStaticMeshComponent*>(Component));
+    const int32 Count = Volume ? Instances.GetInstanceCount() : 0;
+    bool Current = Parts.Num() == Count;
+    for (int32 I = 0; Current && I < Count; ++I) {
+        FTransform Transform;
+        Instances.GetInstanceTransform(I, Transform, true);
+        Current = Parts[I]->GetMaterial(0) == Material && Parts[I]->GetStaticMesh() == Instances.GetStaticMesh() &&
+                  Parts[I]->GetComponentTransform().Equals(Transform);
+    }
+    if (!Current) {
+        for (UStaticMeshComponent* Part : Parts) Part->DestroyComponent();
+        for (int32 I = 0; I < Count; ++I) {
+            FTransform Transform;
+            Instances.GetInstanceTransform(I, Transform, true);
+            auto* Part = NewObject<UStaticMeshComponent>(&Actor);
+            Part->bDisallowNanite = true;  // Nanite draws no Volume-domain material; the fallback mesh is voxelized
+            Part->SetCastShadow(false);
+            Part->SetStaticMesh(Instances.GetStaticMesh());
+            Part->SetMaterial(0, Material);
+            Part->SetupAttachment(&Instances);
+            Part->SetWorldTransform(Transform);
+            Part->RegisterComponent();
+            Actor.AddInstanceComponent(Part);
+        }
+    }
+    Instances.SetVisibility(!Volume);
 }
 namespace {
 // One Hydra vertex for static and Nanite meshes (any thread). Hydra meshes carry no tangents: the frame around the

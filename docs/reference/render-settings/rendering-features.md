@@ -25,6 +25,8 @@ Houdini parameter `xn__unrealmotionBlur_41a`
 
 Average sub-frames over the camera shutter (shutter:open/close) when something moves. Depth of field comes from the camera's fStop and focusDistance.
 
+<div class="hdue-figure" data-figure="motion-blur"></div>
+
 #### Motion Samples { #unreal-motionsamples }
 
 `unreal:motionSamples` · Default `16` · Range 1 to 64  
@@ -32,12 +34,16 @@ Houdini parameter `xn__unrealmotionSamples_06a`
 
 Sub-frames per frame. Path Tracer samples and realtime warmup frames are divided between them; too few show discrete copies of fast objects.
 
+<div class="hdue-figure" data-figure="motion-blur-samples"></div>
+
 #### Amount { #unreal-postprocess-motionbluramount }
 
 `unreal:postProcess:MotionBlurAmount` · Default `0.5` · Range 0 to 1 · Realtime only  
 Houdini parameter `xn__unrealpostProcessMotionBlurAmount_tubl`
 
 Strength of motion blur, 0:off
+
+<div class="hdue-figure" data-figure="ref-motion-blur-amount"></div>
 
 #### Max { #unreal-postprocess-motionblurmax }
 
@@ -68,6 +74,8 @@ The minimum projected screen radius for a primitive to be drawn in the velocity 
 Houdini parameter `xn__unrealpostProcessbMegaLights_ombl`
 
 Allows forcing MegaLights on or off for this volume, regardless of the project setting for MegaLights. MegaLights will stochastically sample lights, which allows many shadow casting lights to be rendered efficiently, with a consistent and low GPU cost. When MegaLights is enabled, other direct lighting algorithms like Deferred Shading will no longer be used, and other shadowing methods like Ray Traced Shadows, Distance Field Shadows and Shadow Maps will no longer be used. MegaLights requires Hardware Ray Tracing and Shader Model 6.
+
+<div class="hdue-figure" data-figure="ref-megalights"></div>
 
 #### MegaLights - High Quality Translucency { #unreal-postprocess-megalightsfrontlayertranslucency }
 
@@ -133,12 +141,16 @@ Houdini parameter `xn__unrealpostProcessAmbientOcclusionIntensity_h9bl`
 
 0..1 0=off/no ambient occlusion .. 1=strong ambient occlusion, defines how much it affects the non direct lighting after base pass
 
+<div class="hdue-figure" data-figure="ref-ssao-intensity"></div>
+
 #### Radius { #unreal-postprocess-ambientocclusionradius }
 
 `unreal:postProcess:AmbientOcclusionRadius` · Default `200` · Range 0.1 to 500 · Realtime only  
 Houdini parameter `xn__unrealpostProcessAmbientOcclusionRadius_l4bl`
 
 \10, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
+
+<div class="hdue-figure" data-figure="ref-ssao-radius"></div>
 
 #### Static Fraction { #unreal-postprocess-ambientocclusionstaticfraction }
 
@@ -226,6 +238,8 @@ Houdini parameter `xn__unrealpostProcessRayTracingAO_bobl`
 
 Enables ray tracing ambient occlusion.
 
+<div class="hdue-figure" data-figure="ref-rtao"></div>
+
 #### Samples Per Pixel { #unreal-postprocess-raytracingaosamplesperpixel }
 
 `unreal:postProcess:RayTracingAOSamplesPerPixel` · Default `1` · Range 1 to 65536 · Realtime only  
@@ -255,6 +269,8 @@ Defines the world-space search radius for occlusion rays.
 Houdini parameter `xn__unrealpostProcessTranslucencyType_tubl`
 
 Sets the translucency type
+
+<div class="hdue-figure" data-figure="opacity-and-glass-translucency-method"></div>
 
 | Value | Label |
 |---|---|

@@ -51,7 +51,7 @@ Air in a busy room is never clean. A thin volumetric fog lets the lights draw th
 3. On the lights, raise **Volumetric Scattering Intensity** (`unreal:light:VolumetricScatteringIntensity`) to 2: the lamps glow in the air without lighting the room more.
 4. For dust, add a **Points** prim inside the key's cone: 700 points, 1.5 to 3 mm wide, with a pale MaterialX standard surface. Dust shows only where light hits it, so place it in the beam, not the whole room.
 
-!!! tip
+!!! tip "Fog density"
     Keep the fog thin. At **Fog Density** 0.1 the room turns milky and the shadows lose their depth; 0.03 to 0.05 reads as air.
 
 ## The lens

@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:AutoExposureBias"
+ ],
  "base": {
   "/Render/Settings": [
    "bool unreal:tonemapper = 1"

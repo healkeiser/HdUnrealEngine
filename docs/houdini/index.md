@@ -11,14 +11,57 @@ flowchart LR
 
 ## Where to start
 
-| Page | What you learn |
-| --- | --- |
-| [Solaris viewport](viewport.md) | Picking Unreal Engine, the Unreal Engine tab, the Unreal menu, keeping the viewport fast |
-| [Rendering with husk](husk.md) | Command lines, frame ranges, farms, render products, failures |
-| [Live Render and Copernicus](live-render.md) | Rendering into a Live Render LOP for compositing |
-| [Substrate materials](substrate-materials.md) | Building UE Substrate materials in a VOP network |
-| [AOVs in Houdini](../output/aovs.md#aovs-in-houdini) | Render vars, hdUE Standard Render Vars, Cryptomatte |
-| [COP and embedded textures](../materials/cop-textures.md) | `op:` images and textures embedded in assets |
+<div class="grid cards" markdown>
+
+-   :lucide-monitor:{ .lg .middle } **Solaris viewport**
+
+    ---
+
+    Picking Unreal Engine, the Unreal Engine tab, the Unreal menu, keeping the viewport fast.
+
+    [:lucide-arrow-right: Solaris viewport](viewport.md)
+
+-   :lucide-terminal:{ .lg .middle } **Rendering with husk**
+
+    ---
+
+    Command lines, frame ranges, farms, render products, failures.
+
+    [:lucide-arrow-right: Rendering with husk](husk.md)
+
+-   :lucide-radio:{ .lg .middle } **Live Render and Copernicus**
+
+    ---
+
+    Rendering into a Live Render LOP for compositing.
+
+    [:lucide-arrow-right: Live Render and Copernicus](live-render.md)
+
+-   :lucide-layers:{ .lg .middle } **Substrate materials**
+
+    ---
+
+    Building UE Substrate materials in a VOP network.
+
+    [:lucide-arrow-right: Substrate materials](substrate-materials.md)
+
+-   :lucide-images:{ .lg .middle } **AOVs in Houdini**
+
+    ---
+
+    Render vars, hdUE Standard Render Vars, Cryptomatte.
+
+    [:lucide-arrow-right: AOVs in Houdini](../output/aovs.md#aovs-in-houdini)
+
+-   :lucide-image:{ .lg .middle } **COP and embedded textures**
+
+    ---
+
+    `op:` images and textures embedded in assets.
+
+    [:lucide-arrow-right: COP and embedded textures](../materials/cop-textures.md)
+
+</div>
 
 ## The hdUE LOPs
 

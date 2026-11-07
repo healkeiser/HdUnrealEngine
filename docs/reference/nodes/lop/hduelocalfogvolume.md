@@ -19,15 +19,21 @@ Radial Fog Density
 
     `unreal:localFogVolume:RadialFogExtinction` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-lfv-radial-density"></div>
+
 Height Fog Density
 :   The density of the radial fog representing its extinction coefficient at height 0 in the unit sphere. The final look of the volume is determined by combining the "Coverage=1-Transmittance" of both radial and height fog in order to achieve both soft edges and height fog.
 
     `unreal:localFogVolume:HeightFogExtinction` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-lfv-height-density"></div>
+
 Height Fog Falloff
 :   Controls how the density decreases as height increases. Smaller values make the visible transition larger. 1.0 is the lowest value before visual artifact are visible at the horizon.
 
     `unreal:localFogVolume:HeightFogFalloff` · Default 1000
+
+    <div class="hdue-figure" data-figure="ref-lfv-height-falloff"></div>
 
 Height Fog Offset
 :   Height offset, relative to the actor Z position.
@@ -39,15 +45,21 @@ Scattering Distribution
 
     `unreal:localFogVolume:FogPhaseG` · Default 0.2
 
+    <div class="hdue-figure" data-figure="ref-lfv-phase"></div>
+
 Fog Albedo
 :   Controls the albedo of this fog volume.
 
     `unreal:localFogVolume:FogAlbedo` · Default 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-lfv-albedo"></div>
+
 Fog Emissive
 :   Controls the emissive color of this fog volume. (Unit = Luminance)
 
     `unreal:localFogVolume:FogEmissive` · Default 0, 0, 0
+
+    <div class="hdue-figure" data-figure="ref-lfv-emissive"></div>
 
 Start Distance
 :   Controls the distance after which this volume starts to appear. (Unit = Centimeter) This distance is clamped to be greater than r.LocalFogVolume.GlobalStartDistance.

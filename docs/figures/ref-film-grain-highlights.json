@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:FilmGrainIntensityHighlights"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float unreal:postProcess:FilmGrainIntensity = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmGrainIntensityHighlights = 1"
+    ]
+   }
+  },
+  {
+   "caption": "0",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmGrainIntensityHighlights = 0"
+    ]
+   }
+  }
+ ]
+}

@@ -30,11 +30,11 @@ The dicing is uniform over the mesh, not adaptive to the camera: a mesh far from
 
 ## Recipes
 
-**How to get sharp displacement detail**
+!!! example "How to get sharp displacement detail"
 
-1. Use a displacement texture at the resolution the detail needs: a 1024 x 1024 map dices to about 500,000 triangles; 2048 x 2048 and larger reach the one-million-triangle limit.
-2. Split a large displaced surface into several meshes: the limit is per mesh.
-3. Keep the texture's colour space **raw**, so the heights are linear.
+    1. Use a displacement texture at the resolution the detail needs: a 1024 x 1024 map dices to about 500,000 triangles; 2048 x 2048 and larger reach the one-million-triangle limit.
+    2. Split a large displaced surface into several meshes: the limit is per mesh.
+    3. Keep the texture's colour space **raw**, so the heights are linear.
 
 ## Troubleshooting
 

@@ -50,7 +50,7 @@ Houdini's own **Render Settings** LOP gets the same settings on an **Unreal Engi
 
 The viewport's Display Options get an **Unreal Engine** tab with the settings you change while working: Render Mode, Warmup Frames, Path Tracer Samples, Debug View, Motion Blur, Lumen, Light Unlit Scenes, Viewer Light Intensity, Subdivision Level, Unreal Tonemapper and the Engine Quality group (scalability, anti-aliasing, DLSS, screen percentage, hardware ray tracing, Virtual Shadow Maps).
 
-!!! note
+!!! note "Console variables apply to the whole session"
     Settings named `unreal:cvar:*` are Unreal Engine console variables. They apply to the whole Houdini process, so they change every hdUE render in the session until you change them back.
 
 ### Light and geometry settings

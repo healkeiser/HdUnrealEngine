@@ -13,6 +13,8 @@ Houdini parameter `xn__unreallightIndirectLightingIntensity_pzbf`
 
 Scales the indirect lighting contribution from this light. A value of 0 disables any GI from this light. Default is 1.
 
+<div class="hdue-figure" data-figure="lights-indirect-intensity"></div>
+
 #### Volumetric Scattering Intensity { #unreal-light-volumetricscatteringintensity }
 
 `unreal:light:VolumetricScatteringIntensity` · Default `1` · Range 0.25 to 4  
@@ -20,12 +22,16 @@ Houdini parameter `xn__unreallightVolumetricScatteringIntensity_75bf`
 
 Intensity of the volumetric scattering from this light. This scales Intensity and LightColor.
 
+<div class="hdue-figure" data-figure="lights-volumetric-scattering"></div>
+
 #### Cast Volumetric Shadow { #unreal-light-bcastvolumetricshadow }
 
 `unreal:light:bCastVolumetricShadow` · Default Off  
 Houdini parameter `xn__unreallightbCastVolumetricShadow_6sbf`
 
 Whether the light shadows volumetric fog. Disabling this can save GPU time. Distant lights default to on (UDirectionalLightComponent). It also lets heterogeneous volumes shadow the scene in realtime.
+
+<div class="hdue-figure" data-figure="lights-volumetric-shadow"></div>
 
 #### Affect Translucent Lighting { #unreal-light-baffecttranslucentlighting }
 
@@ -187,12 +193,16 @@ Houdini parameter `xn__unreallightbCastCloudShadows_ombf`
 
 Whether the light should cast any shadows from clouds onto the atmosphere and other scene elements.
 
+<div class="hdue-figure" data-figure="ref-light-cast-cloud-shadows"></div>
+
 #### Cloud Shadow Strength { #unreal-light-cloudshadowstrength }
 
 `unreal:light:CloudShadowStrength` · Default `1` · Range 0 to 1  
 Houdini parameter `xn__unreallightCloudShadowStrength_xpbf`
 
 The overall strength of the cloud shadow, higher value will block more light.
+
+<div class="hdue-figure" data-figure="ref-light-cloud-shadow-strength"></div>
 
 #### Cloud Shadow On Atmosphere Strength { #unreal-light-cloudshadowonatmospherestrength }
 

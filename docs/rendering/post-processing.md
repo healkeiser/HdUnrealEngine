@@ -8,18 +8,24 @@ Unreal Tonemapper off (default) and on.
 
 ## Using it in Solaris
 
-1. Add **hdUE Render Settings** (TAB menu > hdUE > Rendering), or select the one in your scene.
-2. Turn on **Unreal Tonemapper** at the top of the parameters.
-3. Set the effects on the **Lens** and **Color Grading** tabs. Their parameters are greyed out while the tonemapper is off, and hidden in **Essential** mode.
-4. View the result with Houdini's default **Un-tone-mapped** view, not Raw. See [Colour management](color-management.md).
+=== "Houdini"
 
-Every parameter is UE's own [Post Process Settings](https://dev.epicgames.com/documentation/en-us/unreal-engine/post-process-effects-in-unreal-engine) property, with UE's name, range and default. The [render settings reference](../reference/render-settings/lens.md) lists all of them. On a plain Render Settings LOP or in a USD file, author `unreal:postProcess:<Property>` on the render settings prim:
+    1. Add **hdUE Render Settings** (TAB menu > hdUE > Rendering), or select the one in your scene.
+    2. Turn on **Unreal Tonemapper** at the top of the parameters.
+    3. Set the effects on the **Lens** and **Color Grading** tabs. Their parameters are greyed out while the tonemapper is off, and hidden in **Essential** mode.
+    4. View the result with Houdini's default **Un-tone-mapped** view, not Raw. See [Colour management](color-management.md).
 
-```usda
-bool unreal:tonemapper = 1
-float unreal:postProcess:BloomIntensity = 2
-float4 unreal:postProcess:ColorSaturation = (1, 1, 1, 0.8)
-```
+=== "USD"
+
+    On a plain Render Settings LOP or in a USD file, author `unreal:postProcess:<Property>` on the render settings prim:
+
+    ```usda
+    bool unreal:tonemapper = 1
+    float unreal:postProcess:BloomIntensity = 2
+    float4 unreal:postProcess:ColorSaturation = (1, 1, 1, 0.8)
+    ```
+
+Every parameter is UE's own [Post Process Settings](https://dev.epicgames.com/documentation/en-us/unreal-engine/post-process-effects-in-unreal-engine) property, with UE's name, range and default. The [render settings reference](../reference/render-settings/lens.md) lists all of them.
 
 Post-processing applies to the beauty only. AOVs stay unprocessed. Changing a post-process setting restarts Path Tracer accumulation.
 

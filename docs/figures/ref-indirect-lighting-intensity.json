@@ -1,0 +1,38 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:IndirectLightingIntensity"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:IndirectLightingIntensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:IndirectLightingIntensity = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:IndirectLightingIntensity = 2"
+    ]
+   }
+  }
+ ]
+}

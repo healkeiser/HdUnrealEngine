@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenMaxRoughnessToTraceReflections"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"realtime\""

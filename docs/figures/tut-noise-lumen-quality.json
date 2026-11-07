@@ -1,6 +1,9 @@
 {
  "scene": "docs/bistro.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenFinalGatherQuality"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"realtime\""

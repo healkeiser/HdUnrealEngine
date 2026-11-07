@@ -46,6 +46,8 @@ Exposure Compensation
 
     `unreal:postProcess:AutoExposureBias` · Default 0
 
+    <div class="hdue-figure" data-figure="post-exposure-compensation"></div>
+
 ### Rendering
 
 #### Path Tracing
@@ -55,10 +57,14 @@ Max. Bounces
 
     `unreal:postProcess:PathTracingMaxBounces` · Default 32
 
+    <div class="hdue-figure" data-figure="ref-pt-max-bounces"></div>
+
 Max Path Intensity
 :   Sets the maximum intensity of indirect samples to reduce fireflies. Lowering this value reduces noise at the expense of accuracy. Increasing it is more accurate but may lead to more noise.
 
     `unreal:postProcess:PathTracingMaxPathIntensity` · Default 24
+
+    <div class="hdue-figure" data-figure="tut-noise-fireflies"></div>
 
 Emissive Materials
 :   Should emissive materials contribute to scene lighting?
@@ -80,6 +86,8 @@ Denoiser
 
     `unreal:postProcess:PathTracingEnableDenoiser` · Default on
 
+    <div class="hdue-figure" data-figure="denoiser"></div>
+
 #### Lighting Components
 
 Emissive
@@ -92,20 +100,28 @@ Diffuse
 
     `unreal:postProcess:PathTracingIncludeDiffuse` · Default on
 
+    <div class="hdue-figure" data-figure="ref-pt-include-diffuse"></div>
+
 Indirect Diffuse
 :   Should the render include indirect diffuse lighting contributions?
 
     `unreal:postProcess:PathTracingIncludeIndirectDiffuse` · Default on
+
+    <div class="hdue-figure" data-figure="ref-pt-include-indirect-diffuse"></div>
 
 Specular
 :   Should the render include specular lighting contributions?
 
     `unreal:postProcess:PathTracingIncludeSpecular` · Default on
 
+    <div class="hdue-figure" data-figure="ref-pt-include-specular"></div>
+
 Indirect Specular
 :   Should the render include indirect specular lighting contributions?
 
     `unreal:postProcess:PathTracingIncludeIndirectSpecular` · Default on
+
+    <div class="hdue-figure" data-figure="ref-pt-include-indirect-specular"></div>
 
 Volume
 :   Should the render include volume lighting contributions?
@@ -126,10 +142,14 @@ Preferred Method
 
     `unreal:postProcess:BloomMethod` · Default `BM_SOG` · Menu Standard, Convolution
 
+    <div class="hdue-figure" data-figure="ref-bloom-method"></div>
+
 Intensity
 :   Multiplier for all bloom contributions >=0: off, 1(default), >1 brighter
 
     `unreal:postProcess:BloomIntensity` · Default 0.675
+
+    <div class="hdue-figure" data-figure="post-bloom"></div>
 
 #### Gaussian
 
@@ -147,6 +167,8 @@ Size scale
 :   Scale for all bloom sizes
 
     `unreal:postProcess:BloomSizeScale` · Default 4
+
+    <div class="hdue-figure" data-figure="ref-bloom-size-scale"></div>
 
 #1 Size
 :   Diameter size for the Bloom1 in percent of the screen width (is done in 1/2 resolution, larger values cost more performance, good for high frequency details) >=0: can be clamped because of shader limitations
@@ -215,6 +237,8 @@ Intensity
 
     `unreal:postProcess:BloomConvolutionIntensity` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-bloom-convolution-intensity"></div>
+
 Scatter Dispersion
 :   Intensity multiplier on the scatter dispersion energy of the kernel. 1.0 means exactly use the same energy as the kernel scatter dispersion.
 
@@ -224,6 +248,8 @@ Scale
 :   Relative size of the convolution kernel image compared to the minor axis of the viewport
 
     `unreal:postProcess:BloomConvolutionSize` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-bloom-convolution-size"></div>
 
 Center
 :   The UV location of the center of the kernel. Should be very close to (.5,.5)
@@ -257,6 +283,8 @@ Metering Mode
 
     `unreal:postProcess:AutoExposureMethod` · Default `AEM_Manual` · Menu Auto Exposure Histogram, Auto Exposure Basic, Manual
 
+    <div class="hdue-figure" data-figure="post-metering-mode"></div>
+
 Apply Physical Camera Exposure
 :   Enables physical camera exposure using ShutterSpeed/ISO/Aperture.
 
@@ -272,10 +300,14 @@ Min Brightness
 
     `unreal:postProcess:AutoExposureMinBrightness` · Default 0.03
 
+    <div class="hdue-figure" data-figure="ref-min-brightness"></div>
+
 Max Brightness
 :   Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
     `unreal:postProcess:AutoExposureMaxBrightness` · Default 8
+
+    <div class="hdue-figure" data-figure="ref-max-brightness"></div>
 
 Speed Up
 :   >0. Unless a speed is set, auto exposure reaches its target in every frame; set, the realtime viewport adapts at this speed (husk and Path Tracer renders always use the target).
@@ -292,10 +324,14 @@ Low Percent
 
     `unreal:postProcess:AutoExposureLowPercent` · Default 10
 
+    <div class="hdue-figure" data-figure="ref-low-percent"></div>
+
 High Percent
 :   The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. >0, <100, good values are in the range 80 .. 95
 
     `unreal:postProcess:AutoExposureHighPercent` · Default 90
+
+    <div class="hdue-figure" data-figure="ref-high-percent"></div>
 
 Histogram Log Min
 :   Histogram Min value. Expressed in Log2(Luminance) or in EV100 when using ExtendDefaultLuminanceRange (see project settings)
@@ -314,10 +350,14 @@ Intensity
 
     `unreal:postProcess:SceneFringeIntensity` · Default 0
 
+    <div class="hdue-figure" data-figure="post-chromatic-aberration"></div>
+
 Start Offset
 :   A normalized distance to the center of the framebuffer where the effect takes place.
 
     `unreal:postProcess:ChromaticAberrationStartOffset` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-chromatic-aberration-offset"></div>
 
 #### Dirt Mask
 
@@ -326,10 +366,14 @@ Dirt Mask Intensity
 
     `unreal:postProcess:BloomDirtMaskIntensity` · Default 0
 
+    <div class="hdue-figure" data-figure="ref-dirt-mask-intensity"></div>
+
 Dirt Mask Tint
 :   BloomDirtMask tint color
 
     `unreal:postProcess:BloomDirtMaskTint` · Default 0.5, 0.5, 0.5
+
+    <div class="hdue-figure" data-figure="ref-dirt-mask-tint"></div>
 
 #### Camera
 
@@ -348,6 +392,8 @@ Aperture (F-stop)
 
     `unreal:postProcess:DepthOfFieldFstop` · Default 4
 
+    <div class="hdue-figure" data-figure="ref-camera-aperture"></div>
+
 Maximum Aperture (min F-stop)
 :   Defines the maximum opening of the camera lens to control the curvature of blades of the diaphragm. Set it to 0 to get straight blades.
 
@@ -365,15 +411,21 @@ Method
 
     `unreal:postProcess:LocalExposureMethod` · Default `ELocalExposureMethod::Bilateral` · Menu Bilateral, Fusion (Experimental)
 
+    <div class="hdue-figure" data-figure="ref-local-exposure-method"></div>
+
 Highlight Contrast
 :   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
     `unreal:postProcess:LocalExposureHighlightContrastScale` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-local-exposure-highlights"></div>
+
 Shadow Contrast
 :   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
     `unreal:postProcess:LocalExposureShadowContrastScale` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-local-exposure-shadows"></div>
 
 Highlight Contrast Curve
 :   Local Exposure Highlight Contrast based on the scene EV100. Used to calibrate Local Exposure differently depending on the average scene luminance. Path of a cooked asset in the runtime project (/Game/... or /Engine/...).
@@ -399,6 +451,8 @@ Detail Strength
 :   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Value different than 1 will enable local exposure. This value should be set to 1 in most cases.
 
     `unreal:postProcess:LocalExposureDetailStrength` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-local-exposure-detail"></div>
 
 Blurred Luminance Blend
 :   Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Blend between bilateral filtered and blurred luminance as the base layer. Blurred luminance helps preserve image appearance and specular highlights, and reduce ringing. Good values are usually in the range 0.4 .. 0.6
@@ -432,15 +486,21 @@ Intensity
 
     `unreal:postProcess:LensFlareIntensity` · Default 1
 
+    <div class="hdue-figure" data-figure="post-lens-flares"></div>
+
 Tint
 :   Tint color for the image based lens flares.
 
     `unreal:postProcess:LensFlareTint` · Default 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-lens-flare-tint"></div>
+
 BokehSize
 :   Size of the Lens Blur (in percent of the view width) that is done with the Bokeh texture (note: performance cost is radius*radius)
 
     `unreal:postProcess:LensFlareBokehSize` · Default 3
+
+    <div class="hdue-figure" data-figure="ref-lens-flare-bokeh-size"></div>
 
 Threshold
 :   Minimum brightness the lens flare starts having effect (this should be as high as possible to avoid the performance cost of blurring content that is too dark too see)
@@ -454,10 +514,14 @@ Vignette Intensity
 
     `unreal:postProcess:VignetteIntensity` · Default 0.4
 
+    <div class="hdue-figure" data-figure="post-vignette"></div>
+
 Sharpen
 :   Controls the strength of image sharpening applied during tonemapping.
 
     `unreal:postProcess:Sharpen` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-sharpen"></div>
 
 Vignette Type
 :   The shape type of the vignette
@@ -491,6 +555,8 @@ Enabled
 
     `unreal:postProcess:DepthOfFieldEnabled` · Default on
 
+    <div class="hdue-figure" data-figure="ref-dof-enabled"></div>
+
 Sensor Width (mm)
 :   Width of the camera sensor to assume, in mm. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
@@ -500,6 +566,8 @@ Squeeze Factor
 :   This is the squeeze factor for the DOF, which emulates the properties of anamorphic lenses. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
     `unreal:postProcess:DepthOfFieldSqueezeFactor` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-dof-squeeze"></div>
 
 Focal Distance
 :   Distance in which the Depth of Field effect should be sharp, in unreal units (cm). Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
@@ -520,6 +588,8 @@ Petzval Bokeh
 :   Simulate stretching in blur and bokeh. Positive values for sagittal (swirly bokeh), negative values for tangential.
 
     `unreal:postProcess:DepthOfFieldPetzvalBokeh` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-dof-petzval"></div>
 
 Petzval Bokeh Falloff
 :   How quickly does the Petzval bokeh effect increase towards the edge of the image
@@ -565,15 +635,21 @@ Temperature Type
 
     `unreal:postProcess:TemperatureType` · Default `TEMP_WhiteBalance` · Menu White Balance, Color Temperature
 
+    <div class="hdue-figure" data-figure="ref-temperature-type"></div>
+
 Temp
 :   Controls the color temperature or white balance in degrees Kelvin which the scene considers as white light.
 
     `unreal:postProcess:WhiteTemp` · Default 6500
 
+    <div class="hdue-figure" data-figure="post-white-temp"></div>
+
 Tint
 :   Controls the color of the scene along the magenta - green axis (orthogonal to the color temperature). This feature is equivalent to color tint in digital cameras.
 
     `unreal:postProcess:WhiteTint` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-white-tint"></div>
 
 #### Global
 
@@ -582,25 +658,35 @@ Saturation
 
     `unreal:postProcess:ColorSaturation` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="post-saturation"></div>
+
 Contrast
 :   Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
     `unreal:postProcess:ColorContrast` · Default 1, 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-contrast"></div>
 
 Gamma
 :   Control the luminance curve of the scene. Raising or lowering this value will result brightening or darkening the mid-tones of the entire image.
 
     `unreal:postProcess:ColorGamma` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-gamma"></div>
+
 Gain
 :   This value multiplies the colors of the image. Raising or lowering this value will result in brightening or darkening the entire scene.
 
     `unreal:postProcess:ColorGain` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-gain"></div>
+
 Offset
 :   This value is added to the colors of the scene. Raising or lowering this value will result in the image being more or less washed-out.
 
     `unreal:postProcess:ColorOffset` · Default 0, 0, 0, 0
+
+    <div class="hdue-figure" data-figure="ref-offset"></div>
 
 #### Shadows
 
@@ -634,6 +720,8 @@ ShadowsMax
 
     `unreal:postProcess:ColorCorrectionShadowsMax` · Default 0.09
 
+    <div class="hdue-figure" data-figure="ref-shadows-max"></div>
+
 #### Midtones
 
 Saturation
@@ -641,25 +729,35 @@ Saturation
 
     `unreal:postProcess:ColorSaturationMidtones` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-saturation-midtones"></div>
+
 Contrast
 :   Control the range of light and dark values in the mid-tone region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
     `unreal:postProcess:ColorContrastMidtones` · Default 1, 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-contrast-midtones"></div>
 
 Gamma
 :   Control the luminance curve of the mid-tone region of the image. Raising or lowering this value will result brightening or darkening the mid-tones of the image.
 
     `unreal:postProcess:ColorGammaMidtones` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-gamma-midtones"></div>
+
 Gain
 :   This value multiplies the colors in the mid-tone region of the image. Raising or lowering this value will result in brightening or darkening the affected region.
 
     `unreal:postProcess:ColorGainMidtones` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-gain-midtones"></div>
+
 Offset
 :   This value is added to the colors in the mid-tone region of the image. Raising or lowering this value will result in the mid-tones being more or less washed-out.
 
     `unreal:postProcess:ColorOffsetMidtones` · Default 0, 0, 0, 0
+
+    <div class="hdue-figure" data-figure="ref-offset-midtones"></div>
 
 #### Highlights
 
@@ -668,30 +766,42 @@ Saturation
 
     `unreal:postProcess:ColorSaturationHighlights` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-saturation-highlights"></div>
+
 Contrast
 :   Control the range of light and dark values in the highlights region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
 
     `unreal:postProcess:ColorContrastHighlights` · Default 1, 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-contrast-highlights"></div>
 
 Gamma
 :   Control the luminance curve of the highlight region. Raising or lowering this value will result brightening or darkening the mid-tones of the highlight region.
 
     `unreal:postProcess:ColorGammaHighlights` · Default 1, 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-gamma-highlights"></div>
+
 Gain
 :   This value multiplies the colors in the highlight region. Raising or lowering this value will result in brightening or darkening the affected region.
 
     `unreal:postProcess:ColorGainHighlights` · Default 1, 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-gain-highlights"></div>
 
 Offset
 :   This value is added to the colors in the highlight region. Raising or lowering this value will result in the highlights being more or less washed-out.
 
     `unreal:postProcess:ColorOffsetHighlights` · Default 0, 0, 0, 0
 
+    <div class="hdue-figure" data-figure="ref-offset-highlights"></div>
+
 HighlightsMin
 :   This value sets the lower threshold for what is considered to be the highlight region of the image.
 
     `unreal:postProcess:ColorCorrectionHighlightsMin` · Default 0.5
+
+    <div class="hdue-figure" data-figure="ref-highlights-min"></div>
 
 HighlightsMax
 :   This value sets the upper threshold for what is considered to be the highlight region of the image. This value should be larger than HighlightsMin. Default is 1.0, for backwards compatibility
@@ -715,10 +825,14 @@ Tone Curve Amount
 
     `unreal:postProcess:ToneCurveAmount` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-tone-curve-amount"></div>
+
 Scene Color Tint
 :   Scene tint color
 
     `unreal:postProcess:SceneColorTint` · Default 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-scene-color-tint"></div>
 
 Color Grading LUT Intensity
 :   Color grading lookup table intensity. 0 = no intensity, 1=full intensity
@@ -732,30 +846,42 @@ Method
 
     `unreal:postProcess:TonemappingMethod` · Default `ETonemappingMethod::Filmic` · Menu Filmic, Standard ACES
 
+    <div class="hdue-figure" data-figure="post-tonemapping-method"></div>
+
 Slope
 :   Controls the overall steepness of the tonemapper curve. Larger values increase scene contrast and smaller values reduce contrast.
 
     `unreal:postProcess:FilmSlope` · Default 0.88
+
+    <div class="hdue-figure" data-figure="ref-film-slope"></div>
 
 Toe
 :   Controls the contrast of the dark end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
 
     `unreal:postProcess:FilmToe` · Default 0.55
 
+    <div class="hdue-figure" data-figure="ref-film-toe"></div>
+
 Shoulder
 :   Sometimes referred to as highlight rolloff. Controls the contrast of the bright end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
 
     `unreal:postProcess:FilmShoulder` · Default 0.26
+
+    <div class="hdue-figure" data-figure="ref-film-shoulder"></div>
 
 Black clip
 :   Lowers the toe of the tonemapper curve by this amount. Increasing this value causes more of the scene to clip to black. For most purposes, this property should remain 0
 
     `unreal:postProcess:FilmBlackClip` · Default 0
 
+    <div class="hdue-figure" data-figure="ref-film-black-clip"></div>
+
 White clip
 :   Controls the height of the tonemapper curve. Raising this value can cause bright values to more quickly approach fully-saturated white.
 
     `unreal:postProcess:FilmWhiteClip` · Default 0.04
+
+    <div class="hdue-figure" data-figure="ref-film-white-clip"></div>
 
 #### Film Grain
 
@@ -764,20 +890,28 @@ Film Grain Intensity
 
     `unreal:postProcess:FilmGrainIntensity` · Default 0
 
+    <div class="hdue-figure" data-figure="post-film-grain"></div>
+
 Film Grain Intensity Shadows
 :   Control over the grain intensity in the regions of the image considered shadow areas.
 
     `unreal:postProcess:FilmGrainIntensityShadows` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-film-grain-shadows"></div>
 
 Film Grain Intensity Midtones
 :   Control over the grain intensity in the mid-tone region of the image.
 
     `unreal:postProcess:FilmGrainIntensityMidtones` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-film-grain-midtones"></div>
+
 Film Grain Intensity Highlights
 :   Control over the grain intensity in the regions of the image considered highlight areas.
 
     `unreal:postProcess:FilmGrainIntensityHighlights` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-film-grain-highlights"></div>
 
 Film Grain Shadows Max
 :   Sets the upper bound used for Film Grain Shadow Intensity.
@@ -799,6 +933,8 @@ Film Grain Scale
 
     `unreal:postProcess:FilmGrainScale` · Default 1, 1
 
+    <div class="hdue-figure" data-figure="ref-film-grain-scale"></div>
+
 ### Lighting
 
 #### Global Illumination
@@ -808,15 +944,21 @@ Method
 
     `unreal:postProcess:DynamicGlobalIlluminationMethod` · Default `EDynamicGlobalIlluminationMethod::Lumen` · Menu None, Lumen, Screen Space (Deprecated), Plugin
 
+    <div class="hdue-figure" data-figure="global-illumination"></div>
+
 Indirect Lighting Color
 :   Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The show flag 'Global Illumination' must be enabled to use this property.
 
     `unreal:postProcess:IndirectLightingColor` · Default 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-indirect-lighting-color"></div>
+
 Indirect Lighting Intensity
 :   Scales the indirect lighting contribution. A value of 0 disables GI. Default is 1. The show flag 'Global Illumination' must be enabled to use this property.
 
     `unreal:postProcess:IndirectLightingIntensity` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-indirect-lighting-intensity"></div>
 
 #### Lumen Global Illumination
 
@@ -824,6 +966,8 @@ Ray Lighting Mode
 :   Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality.
 
     `unreal:postProcess:LumenRayLightingMode` · Default `ELumenRayLightingModeOverride::Default` · Menu Project Default, Surface Cache, Hit Lighting for Reflections, Hit Lighting
+
+    <div class="hdue-figure" data-figure="tut-lumen-pt-reflections"></div>
 
 Lumen Scene Lighting Quality
 :   Scales Lumen Scene's quality. Larger scales cause Lumen Scene to be calculated with a higher fidelity, which can be visible in reflections, but increase GPU cost.
@@ -835,6 +979,8 @@ Lumen Scene Detail
 
     `unreal:postProcess:LumenSceneDetail` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-lumen-scene-detail"></div>
+
 Lumen Scene View Distance
 :   Sets the maximum view distance of the scene that Lumen maintains for ray tracing against. Larger values will increase the effective range of sky shadowing and Global Illumination, but increase GPU cost.
 
@@ -845,15 +991,21 @@ Final Gather Quality
 
     `unreal:postProcess:LumenFinalGatherQuality` · Default 1
 
+    <div class="hdue-figure" data-figure="tut-noise-lumen-quality"></div>
+
 Screen Traces
 :   Whether to use screen space traces for Lumen Global Illumination. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
     `unreal:postProcess:LumenFinalGatherScreenTraces` · Default on
 
+    <div class="hdue-figure" data-figure="ref-lumen-screen-traces"></div>
+
 Max Trace Distance
 :   Controls the maximum distance that Lumen should trace while solving lighting. Values that are too small will cause lighting to leak into large caves, while values that are large will increase GPU cost.
 
     `unreal:postProcess:LumenMaxTraceDistance` · Default 20000
+
+    <div class="hdue-figure" data-figure="ref-lumen-max-trace-distance"></div>
 
 Lumen Surface Cache Resolution
 :   Scale factor for Lumen Surface Cache resolution. Smaller values save GPU memory, at a cost in quality. Defaults to 0.5 for Scene Captures if not overridden.
@@ -875,15 +1027,21 @@ Diffuse Color Boost
 
     `unreal:postProcess:LumenDiffuseColorBoost` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-lumen-diffuse-color-boost"></div>
+
 Ambient Occlusion Intensity
 :   Allows control over the strength of Lumen's Short Range Ambient Occlusion.
 
     `unreal:postProcess:LumenAmbientOcclusionIntensity` · Default 1
 
+    <div class="hdue-figure" data-figure="ref-lumen-ao-intensity"></div>
+
 Skylight Leaking
 :   Controls what fraction of the skylight intensity should be allowed to leak. This can be useful as an art direction knob (non-physically based) to keep indoor areas from going fully black.
 
     `unreal:postProcess:LumenSkylightLeaking` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-lumen-skylight-leaking"></div>
 
 Skylight Leaking Tint
 :   Color tint for Lumen Skylight Leaking.
@@ -902,6 +1060,8 @@ Method
 
     `unreal:postProcess:ReflectionMethod` · Default `EReflectionMethod::Lumen` · Menu None, Lumen, Screen Space
 
+    <div class="hdue-figure" data-figure="ref-reflection-method"></div>
+
 #### Lumen Reflections
 
 Quality
@@ -914,6 +1074,8 @@ Screen Traces
 
     `unreal:postProcess:LumenReflectionsScreenTraces` · Default on
 
+    <div class="hdue-figure" data-figure="ref-lumen-reflection-screen-traces"></div>
+
 High Quality Translucency Reflections
 :   Whether to use high quality mirror reflections on the front layer of translucent surfaces. Other layers will use the lower quality Radiance Cache method that can only produce glossy reflections. Increases GPU cost when enabled.
 
@@ -923,6 +1085,8 @@ Max Roughness To Trace
 :   Sets the maximum roughness value for which Lumen still traces dedicated reflection rays. Higher values improve reflection quality, but greatly increase GPU cost.
 
     `unreal:postProcess:LumenMaxRoughnessToTraceReflections` · Default 0.4
+
+    <div class="hdue-figure" data-figure="tut-lumen-pt-roughness"></div>
 
 Max Reflection Bounces
 :   Sets the maximum number of recursive reflection bounces. 1 means a single reflection ray (no secondary reflections in mirrors). Currently only supported by Hardware Ray Tracing with Hit Lighting.
@@ -970,6 +1134,8 @@ Amount
 
     `unreal:postProcess:MotionBlurAmount` · Default 0.5
 
+    <div class="hdue-figure" data-figure="ref-motion-blur-amount"></div>
+
 Max
 :   max distortion caused by motion blur, in percent of the screen width, 0:off
 
@@ -991,6 +1157,8 @@ MegaLights
 :   Allows forcing MegaLights on or off for this volume, regardless of the project setting for MegaLights. MegaLights will stochastically sample lights, which allows many shadow casting lights to be rendered efficiently, with a consistent and low GPU cost. When MegaLights is enabled, other direct lighting algorithms like Deferred Shading will no longer be used, and other shadowing methods like Ray Traced Shadows, Distance Field Shadows and Shadow Maps will no longer be used. MegaLights requires Hardware Ray Tracing and Shader Model 6.
 
     `unreal:postProcess:bMegaLights` · Default on
+
+    <div class="hdue-figure" data-figure="ref-megalights"></div>
 
 MegaLights - High Quality Translucency
 :   Whether to use high quality direct lighting on the front layer of translucent surfaces. Other layers will use the lower quality Translucency Lighting Volume. Increases GPU cost when enabled.
@@ -1016,10 +1184,14 @@ Intensity
 
     `unreal:postProcess:AmbientOcclusionIntensity` · Default 0.5
 
+    <div class="hdue-figure" data-figure="ref-ssao-intensity"></div>
+
 Radius
 :   >0, in unreal units, bigger values means even distant surfaces affect the ambient occlusion
 
     `unreal:postProcess:AmbientOcclusionRadius` · Default 200
+
+    <div class="hdue-figure" data-figure="ref-ssao-radius"></div>
 
 Static Fraction
 :   0..1 0=no effect on static lighting .. 1=AO affects the stat lighting, 0 is free meaning no extra rendering pass
@@ -1083,6 +1255,8 @@ Enabled
 
     `unreal:postProcess:RayTracingAO` · Default off
 
+    <div class="hdue-figure" data-figure="ref-rtao"></div>
+
 Samples Per Pixel
 :   Sets the samples per pixel for ray tracing ambient occlusion.
 
@@ -1104,6 +1278,8 @@ Translucency Method
 :   Sets the translucency type
 
     `unreal:postProcess:TranslucencyType` · Default `ETranslucencyType::Raster` · Menu Raster, Ray Traced
+
+    <div class="hdue-figure" data-figure="opacity-and-glass-translucency-method"></div>
 
 Max Roughness
 :   Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.

@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:SceneFringeIntensity"
+ ],
  "base": {
   "/Render/Settings": [
    "bool unreal:tonemapper = 1"

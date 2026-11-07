@@ -14,11 +14,53 @@ hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means
 
 <div class="grid cards" markdown>
 
-- **[Installation](getting-started/installation.md)**: build the package, install it, check it loads.
-- **[Your first render](getting-started/first-render.md)**: the viewport, the render settings, husk.
-- **[Tutorials](tutorials/index.md)**: lighting a room, removing noise, Lumen or the Path Tracer, exposure, depth of field.
-- **[Render settings](rendering/render-settings.md)**: Realtime and Path Tracer, samples, warmup, profiles.
-- **[Render settings reference](reference/render-settings/index.md)**: every `unreal:*` setting with its default and UE's tooltip.
+-   :lucide-download:{ .lg .middle } **Installation**
+
+    ---
+
+    Build the package, install it in Houdini, check that it loads.
+
+    [:lucide-arrow-right: Install hdUE](getting-started/installation.md)
+
+-   :lucide-camera:{ .lg .middle } **Your first render**
+
+    ---
+
+    The Solaris viewport, the render settings, a husk render.
+
+    [:lucide-arrow-right: First render](getting-started/first-render.md)
+
+-   :lucide-graduation-cap:{ .lg .middle } **Tutorials**
+
+    ---
+
+    Lighting a room, removing noise, Lumen or the Path Tracer, exposure, depth of field.
+
+    [:lucide-arrow-right: Tutorials](tutorials/index.md)
+
+-   :lucide-sliders-horizontal:{ .lg .middle } **Render settings**
+
+    ---
+
+    Realtime and Path Tracer, samples, warmup, profiles.
+
+    [:lucide-arrow-right: Render settings](rendering/render-settings.md)
+
+-   :lucide-book-open:{ .lg .middle } **Render settings reference**
+
+    ---
+
+    Every `unreal:*` setting with its default, UE's tooltip and a picture of what it does.
+
+    [:lucide-arrow-right: Reference](reference/render-settings/index.md)
+
+-   :lucide-blocks:{ .lg .middle } **Houdini nodes**
+
+    ---
+
+    The hdUE LOPs and Substrate VOPs, with every parameter.
+
+    [:lucide-arrow-right: Node reference](reference/nodes/index.md)
 
 </div>
 

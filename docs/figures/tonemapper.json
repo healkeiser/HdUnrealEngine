@@ -1,6 +1,9 @@
 {
  "scene": "docs/lookdev.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:tonemapper"
+ ],
  "base": {},
  "values": [
   {

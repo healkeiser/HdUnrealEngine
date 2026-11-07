@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:BloomIntensity"
+ ],
  "base": {
   "/Render/Settings": [
    "bool unreal:tonemapper = 1"

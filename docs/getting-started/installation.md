@@ -25,9 +25,9 @@ On the machine that builds the package, you need the Unreal Engine 5.8.4 source 
 Run these from the root of the hdUE checkout, after a first build as described in [Building from source](../building.md):
 
 ```powershell
-.\scripts\Build-Backend.ps1 -Configuration Test
-.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly
+.\scripts\Build-Backend.ps1 -Configuration Test # (1)!
+.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json # (2)!
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly # (3)!
 ```
 
 1. `Build-Backend.ps1 -Configuration Test` builds Unreal Engine in Epic's Test configuration: Shipping's optimizations, with the console variables that hdUE's `unreal:cvar:*` settings need.

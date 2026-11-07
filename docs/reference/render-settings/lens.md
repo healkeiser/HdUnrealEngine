@@ -11,6 +11,8 @@ Houdini parameter `xn__unrealpostProcessBloomMethod_ombl`
 
 Preferred bloom algorithm. A different method may be used if the preferred method is not available on the target platform, e.g. due to performance limits.
 
+<div class="hdue-figure" data-figure="ref-bloom-method"></div>
+
 | Value | Label |
 |---|---|
 | `BM_SOG` | Standard |
@@ -22,6 +24,8 @@ Preferred bloom algorithm. A different method may be used if the preferred metho
 Houdini parameter `xn__unrealpostProcessBloomIntensity_krbl`
 
 Multiplier for all bloom contributions \1=0: off, 1(default), \11 brighter
+
+<div class="hdue-figure" data-figure="post-bloom"></div>
 
 ### Gaussian
 
@@ -45,6 +49,8 @@ minimum brightness the bloom starts having effect -1:all pixels affect bloom equ
 Houdini parameter `xn__unrealpostProcessBloomSizeScale_krbl`
 
 Scale for all bloom sizes
+
+<div class="hdue-figure" data-figure="ref-bloom-size-scale"></div>
 
 #### #1 Size { #unreal-postprocess-bloom1size }
 
@@ -139,6 +145,8 @@ Houdini parameter `xn__unrealpostProcessBloomConvolutionIntensity_h9bl`
 
 Multiplier for Convolution bloom contributions \1=0: off, 1(default), \11 brighter
 
+<div class="hdue-figure" data-figure="ref-bloom-convolution-intensity"></div>
+
 #### Scatter Dispersion { #unreal-postprocess-bloomconvolutionscatterdispersion }
 
 `unreal:postProcess:BloomConvolutionScatterDispersion` · Default `1` · Range 0 to 20  
@@ -159,6 +167,8 @@ Texture to replace default convolution bloom kernel. An image file, imported at 
 Houdini parameter `xn__unrealpostProcessBloomConvolutionSize_c1bl`
 
 Relative size of the convolution kernel image compared to the minor axis of the viewport
+
+<div class="hdue-figure" data-figure="ref-bloom-convolution-size"></div>
 
 #### Center { #unreal-postprocess-bloomconvolutioncenteruv }
 
@@ -204,6 +214,8 @@ Houdini parameter `xn__unrealpostProcessAutoExposureMethod_2xbl`
 
 Luminance computation method. hdUE renders with manual exposure, so the tone curve keeps the linear image's middle grey; Histogram or Basic turn on UE's auto exposure.
 
+<div class="hdue-figure" data-figure="post-metering-mode"></div>
+
 | Value | Label |
 |---|---|
 | `AEM_Histogram` | Auto Exposure Histogram |
@@ -238,12 +250,16 @@ Houdini parameter `xn__unrealpostProcessAutoExposureMinBrightness_h9bl`
 
 Auto-Exposure minimum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
 
+<div class="hdue-figure" data-figure="ref-min-brightness"></div>
+
 #### Max Brightness { #unreal-postprocess-autoexposuremaxbrightness }
 
 `unreal:postProcess:AutoExposureMaxBrightness` · Default `8` · Range -10 to 20  
 Houdini parameter `xn__unrealpostProcessAutoExposureMaxBrightness_h9bl`
 
 Auto-Exposure maximum adaptation. Eye Adaptation is disabled if Min = Max. Auto-exposure is implemented by choosing an exposure value for which the average luminance generates a pixel brightness equal to the Constant Calibration value. The Min/Max are expressed in pixel luminance (cd/m2) or in EV100 when using ExtendDefaultLuminanceRange (see project settings).
+
+<div class="hdue-figure" data-figure="ref-max-brightness"></div>
 
 #### Speed Up { #unreal-postprocess-autoexposurespeedup }
 
@@ -266,12 +282,16 @@ Houdini parameter `xn__unrealpostProcessAutoExposureLowPercent_l4bl`
 
 The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. \10, \1100, good values are in the range 70 .. 80
 
+<div class="hdue-figure" data-figure="ref-low-percent"></div>
+
 #### High Percent { #unreal-postprocess-autoexposurehighpercent }
 
 `unreal:postProcess:AutoExposureHighPercent` · Default `90` · Range 0 to 100 · Advanced  
 Houdini parameter `xn__unrealpostProcessAutoExposureHighPercent_75bl`
 
 The eye adaptation will adapt to a value extracted from the luminance histogram of the scene color. The value is defined as having x percent below this brightness. Higher values give bright spots on the screen more priority but can lead to less stable results. Lower values give the medium and darker values more priority but might cause burn out of bright spots. \10, \1100, good values are in the range 80 .. 95
+
+<div class="hdue-figure" data-figure="ref-high-percent"></div>
 
 #### Histogram Log Min { #unreal-postprocess-histogramlogmin }
 
@@ -296,12 +316,16 @@ Houdini parameter `xn__unrealpostProcessSceneFringeIntensity_c1bl`
 
 in percent, Scene chromatic aberration / color fringe (camera imperfection) to simulate an artifact that happens in real-world lens, mostly visible in the image corners.
 
+<div class="hdue-figure" data-figure="post-chromatic-aberration"></div>
+
 #### Start Offset { #unreal-postprocess-chromaticaberrationstartoffset }
 
 `unreal:postProcess:ChromaticAberrationStartOffset` · Default `0` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessChromaticAberrationStartOffset_micl`
 
 A normalized distance to the center of the framebuffer where the effect takes place.
+
+<div class="hdue-figure" data-figure="ref-chromatic-aberration-offset"></div>
 
 ## Dirt Mask
 
@@ -312,6 +336,8 @@ Houdini parameter `xn__unrealpostProcessBloomDirtMask_xpbl`
 
 Texture that defines the dirt on the camera lens where the light of very bright objects is scattered. An image file, imported at render time, or the path of a cooked texture in the runtime project (/Game/... or /Engine/...).
 
+<div class="hdue-figure" data-figure="ref-dirt-mask-texture"></div>
+
 #### Dirt Mask Intensity { #unreal-postprocess-bloomdirtmaskintensity }
 
 `unreal:postProcess:BloomDirtMaskIntensity` · Default `0` · Range 0 to 8  
@@ -319,12 +345,16 @@ Houdini parameter `xn__unrealpostProcessBloomDirtMaskIntensity_l4bl`
 
 BloomDirtMask intensity
 
+<div class="hdue-figure" data-figure="ref-dirt-mask-intensity"></div>
+
 #### Dirt Mask Tint { #unreal-postprocess-bloomdirtmasktint }
 
 `unreal:postProcess:BloomDirtMaskTint` · Default `0.5, 0.5, 0.5`  
 Houdini parameter `xn__unrealpostProcessBloomDirtMaskTint_gwbl`
 
 BloomDirtMask tint color
+
+<div class="hdue-figure" data-figure="ref-dirt-mask-tint"></div>
 
 ## Camera
 
@@ -349,6 +379,8 @@ Houdini parameter `xn__unrealpostProcessDepthOfFieldFstop_gwbl`
 
 Defines the opening of the camera lens, Aperture is 1/fstop, typical lens go down to f/1.2 (large opening), larger numbers reduce the DOF effect. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
 
+<div class="hdue-figure" data-figure="ref-camera-aperture"></div>
+
 #### Maximum Aperture (min F-stop) { #unreal-postprocess-depthoffieldminfstop }
 
 `unreal:postProcess:DepthOfFieldMinFstop` · Default `1.2` · Range 0 to 32 · Realtime only  
@@ -372,6 +404,8 @@ Houdini parameter `xn__unrealpostProcessLocalExposureMethod_pzbl`
 
 Local Exposure algorithm
 
+<div class="hdue-figure" data-figure="ref-local-exposure-method"></div>
+
 | Value | Label |
 |---|---|
 | `ELocalExposureMethod::Bilateral` | Bilateral |
@@ -384,12 +418,16 @@ Houdini parameter `xn__unrealpostProcessLocalExposureHighlightContrastScale_rqcl
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
 
+<div class="hdue-figure" data-figure="ref-local-exposure-highlights"></div>
+
 #### Shadow Contrast { #unreal-postprocess-localexposureshadowcontrastscale }
 
 `unreal:postProcess:LocalExposureShadowContrastScale` · Default `1` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessLocalExposureShadowContrastScale_vlcl`
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Contrast of the base layer is reduced based on this value. Value less than 1 will enable local exposure. Good values are usually in the range 0.6 .. 1.0.
+
+<div class="hdue-figure" data-figure="ref-local-exposure-shadows"></div>
 
 #### Highlight Contrast Curve { #unreal-postprocess-localexposurehighlightcontrastcurve }
 
@@ -425,6 +463,8 @@ Threshold used to determine which regions of the screen are considered shadows.
 Houdini parameter `xn__unrealpostProcessLocalExposureDetailStrength_qdcl`
 
 Local Exposure decomposes luminance of the frame into a base layer and a detail layer. Value different than 1 will enable local exposure. This value should be set to 1 in most cases.
+
+<div class="hdue-figure" data-figure="ref-local-exposure-detail"></div>
 
 #### Blurred Luminance Blend { #unreal-postprocess-localexposureblurredluminanceblend }
 
@@ -470,6 +510,8 @@ Houdini parameter `xn__unrealpostProcessLensFlareIntensity_2xbl`
 
 Brightness scale of the image cased lens flares (linear)
 
+<div class="hdue-figure" data-figure="post-lens-flares"></div>
+
 #### Tint { #unreal-postprocess-lensflaretint }
 
 `unreal:postProcess:LensFlareTint` · Default `1, 1, 1`  
@@ -477,12 +519,16 @@ Houdini parameter `xn__unrealpostProcessLensFlareTint_xpbl`
 
 Tint color for the image based lens flares.
 
+<div class="hdue-figure" data-figure="ref-lens-flare-tint"></div>
+
 #### BokehSize { #unreal-postprocess-lensflarebokehsize }
 
 `unreal:postProcess:LensFlareBokehSize` · Default `3` · Range 0 to 32  
 Houdini parameter `xn__unrealpostProcessLensFlareBokehSize_2xbl`
 
 Size of the Lens Blur (in percent of the view width) that is done with the Bokeh texture (note: performance cost is radius\1radius)
+
+<div class="hdue-figure" data-figure="ref-lens-flare-bokeh-size"></div>
 
 #### Threshold { #unreal-postprocess-lensflarethreshold }
 
@@ -507,12 +553,16 @@ Houdini parameter `xn__unrealpostProcessVignetteIntensity_gwbl`
 
 0..1 0=off/no vignette .. 1=strong vignette
 
+<div class="hdue-figure" data-figure="post-vignette"></div>
+
 #### Sharpen { #unreal-postprocess-sharpen }
 
 `unreal:postProcess:Sharpen` · Default `0` · Range 0 to 10  
 Houdini parameter `xn__unrealpostProcessSharpen_5fbl`
 
 Controls the strength of image sharpening applied during tonemapping.
+
+<div class="hdue-figure" data-figure="ref-sharpen"></div>
 
 #### Vignette Type { #unreal-postprocess-vignettetype }
 
@@ -571,6 +621,8 @@ Houdini parameter `xn__unrealpostProcessDepthOfFieldEnabled_pzbl`
 
 When false, post-process depth of field will not be used. When true, DoF may be used depending on lens and scalability settings.
 
+<div class="hdue-figure" data-figure="ref-dof-enabled"></div>
+
 #### Sensor Width (mm) { #unreal-postprocess-depthoffieldsensorwidth }
 
 `unreal:postProcess:DepthOfFieldSensorWidth` · Default `24.576` · Range 0.1 to 1000  
@@ -584,6 +636,8 @@ Width of the camera sensor to assume, in mm. Set from the USD camera (fStop, foc
 Houdini parameter `xn__unrealpostProcessDepthOfFieldSqueezeFactor_h9bl`
 
 This is the squeeze factor for the DOF, which emulates the properties of anamorphic lenses. Set from the USD camera (fStop, focusDistance, focalLength); this overrides it.
+
+<div class="hdue-figure" data-figure="ref-dof-squeeze"></div>
 
 #### Focal Distance { #unreal-postprocess-depthoffieldfocaldistance }
 
@@ -612,6 +666,8 @@ CircleDOF only: Depth blur radius in pixels at 1920x
 Houdini parameter `xn__unrealpostProcessDepthOfFieldPetzvalBokeh_u7bl`
 
 Simulate stretching in blur and bokeh. Positive values for sagittal (swirly bokeh), negative values for tangential.
+
+<div class="hdue-figure" data-figure="ref-dof-petzval"></div>
 
 #### Petzval Bokeh Falloff { #unreal-postprocess-depthoffieldpetzvalbokehfalloff }
 

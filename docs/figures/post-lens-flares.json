@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LensFlareIntensity"
+ ],
  "base": {
   "/Render/Settings": [
    "bool unreal:tonemapper = 1"

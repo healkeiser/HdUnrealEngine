@@ -73,20 +73,24 @@ over "World"
 {
     over "Asset"
     {
-        custom bool unreal:surface:wet:enabled = true
+        custom bool unreal:surface:wet:enabled = true # (1)!
         custom float unreal:surface:wet:amount = 0.8
         custom float unreal:surface:wet:roughness = 0.08
-        custom token unreal:surface:wet:maskPrimvar = "wetness"
+        custom token unreal:surface:wet:maskPrimvar = "wetness" # (2)!
 
         over "Panel"
         {
-            float[] primvars:wetness = [0, 0, 1, 1] (
+            float[] primvars:wetness = [0, 0, 1, 1] ( # (3)!
                 interpolation = "vertex"
             )
         }
     }
 }
 ```
+
+1. Authored on the ancestor `Asset`: every mesh below it is wet unless a nearer prim sets it off.
+2. The primvar's base name, without `primvars:`.
+3. The mask: 0 dry, 1 wet, clamped to 0..1.
 
 ## Recipes
 

@@ -1,6 +1,9 @@
 {
  "scene": "docs/fog.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:FogHeightFalloff"
+ ],
  "base": {},
  "values": [
   {

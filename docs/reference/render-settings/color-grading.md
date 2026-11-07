@@ -11,6 +11,8 @@ Houdini parameter `xn__unrealpostProcessTemperatureType_6sbl`
 
 Selects the type of temperature calculation. White Balance uses the Temperature value to control the virtual camera's White Balance. This is the default selection. Color Temperature uses the Temperature value to adjust the color temperature of the scene, which is the inverse of the White Balance operation.
 
+<div class="hdue-figure" data-figure="ref-temperature-type"></div>
+
 | Value | Label |
 |---|---|
 | `TEMP_WhiteBalance` | White Balance |
@@ -23,12 +25,16 @@ Houdini parameter `xn__unrealpostProcessWhiteTemp_fjbl`
 
 Controls the color temperature or white balance in degrees Kelvin which the scene considers as white light.
 
+<div class="hdue-figure" data-figure="post-white-temp"></div>
+
 #### Tint { #unreal-postprocess-whitetint }
 
 `unreal:postProcess:WhiteTint` · Default `0` · Range -1 to 1  
 Houdini parameter `xn__unrealpostProcessWhiteTint_fjbl`
 
 Controls the color of the scene along the magenta - green axis (orthogonal to the color temperature). This feature is equivalent to color tint in digital cameras.
+
+<div class="hdue-figure" data-figure="ref-white-tint"></div>
 
 ## Global
 
@@ -39,12 +45,16 @@ Houdini parameter `xn__unrealpostProcessColorSaturation_6sbl`
 
 Control the intensity of the color(hue) for the entire image.Higher values will result in more vibrant colors.
 
+<div class="hdue-figure" data-figure="post-saturation"></div>
+
 #### Contrast { #unreal-postprocess-colorcontrast }
 
 `unreal:postProcess:ColorContrast` · Default `1, 1, 1, 1` · Range 0 to 2  
 Houdini parameter `xn__unrealpostProcessColorContrast_xpbl`
 
 Control the range of light and dark values in your scene. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+
+<div class="hdue-figure" data-figure="ref-contrast"></div>
 
 #### Gamma { #unreal-postprocess-colorgamma }
 
@@ -53,6 +63,8 @@ Houdini parameter `xn__unrealpostProcessColorGamma_1kbl`
 
 Control the luminance curve of the scene. Raising or lowering this value will result brightening or darkening the mid-tones of the entire image.
 
+<div class="hdue-figure" data-figure="ref-gamma"></div>
+
 #### Gain { #unreal-postprocess-colorgain }
 
 `unreal:postProcess:ColorGain` · Default `1, 1, 1, 1` · Range 0 to 2  
@@ -60,12 +72,16 @@ Houdini parameter `xn__unrealpostProcessColorGain_fjbl`
 
 This value multiplies the colors of the image. Raising or lowering this value will result in brightening or darkening the entire scene.
 
+<div class="hdue-figure" data-figure="ref-gain"></div>
+
 #### Offset { #unreal-postprocess-coloroffset }
 
 `unreal:postProcess:ColorOffset` · Default `0, 0, 0, 0` · Range -1 to 1  
 Houdini parameter `xn__unrealpostProcessColorOffset_ombl`
 
 This value is added to the colors of the scene. Raising or lowering this value will result in the image being more or less washed-out.
+
+<div class="hdue-figure" data-figure="ref-offset"></div>
 
 ## Shadows
 
@@ -111,6 +127,8 @@ Houdini parameter `xn__unrealpostProcessColorCorrectionShadowsMax_h9bl`
 
 This value sets the threshold for what is considered to be the shadow region of the image.
 
+<div class="hdue-figure" data-figure="ref-shadows-max"></div>
+
 ## Midtones
 
 #### Saturation { #unreal-postprocess-colorsaturationmidtones }
@@ -120,12 +138,16 @@ Houdini parameter `xn__unrealpostProcessColorSaturationMidtones_75bl`
 
 Control the intensity of the colors (hue) in the mid-tone region of the image. Higher values will result in more vibrant colors.
 
+<div class="hdue-figure" data-figure="ref-saturation-midtones"></div>
+
 #### Contrast { #unreal-postprocess-colorcontrastmidtones }
 
 `unreal:postProcess:ColorContrastMidtones` · Default `1, 1, 1, 1` · Range 0 to 2  
 Houdini parameter `xn__unrealpostProcessColorContrastMidtones_y2bl`
 
 Control the range of light and dark values in the mid-tone region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+
+<div class="hdue-figure" data-figure="ref-contrast-midtones"></div>
 
 #### Gamma { #unreal-postprocess-colorgammamidtones }
 
@@ -134,6 +156,8 @@ Houdini parameter `xn__unrealpostProcessColorGammaMidtones_2xbl`
 
 Control the luminance curve of the mid-tone region of the image. Raising or lowering this value will result brightening or darkening the mid-tones of the image.
 
+<div class="hdue-figure" data-figure="ref-gamma-midtones"></div>
+
 #### Gain { #unreal-postprocess-colorgainmidtones }
 
 `unreal:postProcess:ColorGainMidtones` · Default `1, 1, 1, 1` · Range 0 to 2  
@@ -141,12 +165,16 @@ Houdini parameter `xn__unrealpostProcessColorGainMidtones_gwbl`
 
 This value multiplies the colors in the mid-tone region of the image. Raising or lowering this value will result in brightening or darkening the affected region.
 
+<div class="hdue-figure" data-figure="ref-gain-midtones"></div>
+
 #### Offset { #unreal-postprocess-coloroffsetmidtones }
 
 `unreal:postProcess:ColorOffsetMidtones` · Default `0, 0, 0, 0` · Range -1 to 1  
 Houdini parameter `xn__unrealpostProcessColorOffsetMidtones_pzbl`
 
 This value is added to the colors in the mid-tone region of the image. Raising or lowering this value will result in the mid-tones being more or less washed-out.
+
+<div class="hdue-figure" data-figure="ref-offset-midtones"></div>
 
 ## Highlights
 
@@ -157,12 +185,16 @@ Houdini parameter `xn__unrealpostProcessColorSaturationHighlights_h9bl`
 
 Control the intensity of the color (hue) for the highlights region of the image. Higher values will result in more vibrant colors.
 
+<div class="hdue-figure" data-figure="ref-saturation-highlights"></div>
+
 #### Contrast { #unreal-postprocess-colorcontrasthighlights }
 
 `unreal:postProcess:ColorContrastHighlights` · Default `1, 1, 1, 1` · Range 0 to 2  
 Houdini parameter `xn__unrealpostProcessColorContrastHighlights_75bl`
 
 Control the range of light and dark values in the highlights region. Lower values will reduce the difference between bright and dark areas while higher values will increase the difference between the bright and dark areas.
+
+<div class="hdue-figure" data-figure="ref-contrast-highlights"></div>
 
 #### Gamma { #unreal-postprocess-colorgammahighlights }
 
@@ -171,12 +203,16 @@ Houdini parameter `xn__unrealpostProcessColorGammaHighlights_c1bl`
 
 Control the luminance curve of the highlight region. Raising or lowering this value will result brightening or darkening the mid-tones of the highlight region.
 
+<div class="hdue-figure" data-figure="ref-gamma-highlights"></div>
+
 #### Gain { #unreal-postprocess-colorgainhighlights }
 
 `unreal:postProcess:ColorGainHighlights` · Default `1, 1, 1, 1` · Range 0 to 2  
 Houdini parameter `xn__unrealpostProcessColorGainHighlights_pzbl`
 
 This value multiplies the colors in the highlight region. Raising or lowering this value will result in brightening or darkening the affected region.
+
+<div class="hdue-figure" data-figure="ref-gain-highlights"></div>
 
 #### Offset { #unreal-postprocess-coloroffsethighlights }
 
@@ -185,12 +221,16 @@ Houdini parameter `xn__unrealpostProcessColorOffsetHighlights_y2bl`
 
 This value is added to the colors in the highlight region. Raising or lowering this value will result in the highlights being more or less washed-out.
 
+<div class="hdue-figure" data-figure="ref-offset-highlights"></div>
+
 #### HighlightsMin { #unreal-postprocess-colorcorrectionhighlightsmin }
 
 `unreal:postProcess:ColorCorrectionHighlightsMin` · Default `0.5` · Range -1 to 1  
 Houdini parameter `xn__unrealpostProcessColorCorrectionHighlightsMin_dfcl`
 
 This value sets the lower threshold for what is considered to be the highlight region of the image.
+
+<div class="hdue-figure" data-figure="ref-highlights-min"></div>
 
 #### HighlightsMax { #unreal-postprocess-colorcorrectionhighlightsmax }
 
@@ -222,12 +262,16 @@ Houdini parameter `xn__unrealpostProcessToneCurveAmount_6sbl`
 
 Allow effect of Tone Curve to be reduced (Set ToneCurveAmount and ExpandGamut to 0.0 to fully disable tone curve)
 
+<div class="hdue-figure" data-figure="ref-tone-curve-amount"></div>
+
 #### Scene Color Tint { #unreal-postprocess-scenecolortint }
 
 `unreal:postProcess:SceneColorTint` · Default `1, 1, 1`  
 Houdini parameter `xn__unrealpostProcessSceneColorTint_krbl`
 
 Scene tint color
+
+<div class="hdue-figure" data-figure="ref-scene-color-tint"></div>
 
 #### Color Grading LUT Intensity { #unreal-postprocess-colorgradingintensity }
 
@@ -252,6 +296,8 @@ Houdini parameter `xn__unrealpostProcessTonemappingMethod_gwbl`
 
 Controls the method of tonemapping.
 
+<div class="hdue-figure" data-figure="post-tonemapping-method"></div>
+
 | Value | Label |
 |---|---|
 | `ETonemappingMethod::Filmic` | Filmic |
@@ -264,12 +310,16 @@ Houdini parameter `xn__unrealpostProcessFilmSlope_fjbl`
 
 Controls the overall steepness of the tonemapper curve. Larger values increase scene contrast and smaller values reduce contrast.
 
+<div class="hdue-figure" data-figure="ref-film-slope"></div>
+
 #### Toe { #unreal-postprocess-filmtoe }
 
 `unreal:postProcess:FilmToe` · Default `0.55` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessFilmToe_5fbl`
 
 Controls the contrast of the dark end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
+
+<div class="hdue-figure" data-figure="ref-film-toe"></div>
 
 #### Shoulder { #unreal-postprocess-filmshoulder }
 
@@ -278,6 +328,8 @@ Houdini parameter `xn__unrealpostProcessFilmShoulder_bobl`
 
 Sometimes referred to as highlight rolloff. Controls the contrast of the bright end of the tonemapper curve. Larger values increase contrast and smaller values decrease contrast.
 
+<div class="hdue-figure" data-figure="ref-film-shoulder"></div>
+
 #### Black clip { #unreal-postprocess-filmblackclip }
 
 `unreal:postProcess:FilmBlackClip` · Default `0` · Range 0 to 1  
@@ -285,12 +337,16 @@ Houdini parameter `xn__unrealpostProcessFilmBlackClip_xpbl`
 
 Lowers the toe of the tonemapper curve by this amount. Increasing this value causes more of the scene to clip to black. For most purposes, this property should remain 0
 
+<div class="hdue-figure" data-figure="ref-film-black-clip"></div>
+
 #### White clip { #unreal-postprocess-filmwhiteclip }
 
 `unreal:postProcess:FilmWhiteClip` · Default `0.04` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessFilmWhiteClip_xpbl`
 
 Controls the height of the tonemapper curve. Raising this value can cause bright values to more quickly approach fully-saturated white.
+
+<div class="hdue-figure" data-figure="ref-film-white-clip"></div>
 
 ## Film Grain
 
@@ -301,12 +357,16 @@ Houdini parameter `xn__unrealpostProcessFilmGrainIntensity_2xbl`
 
 0..1 Film grain intensity to apply. LinearSceneColor \1= lerp(1.0, DecodedFilmGrainTexture, FilmGrainIntensity)
 
+<div class="hdue-figure" data-figure="post-film-grain"></div>
+
 #### Film Grain Intensity Shadows { #unreal-postprocess-filmgrainintensityshadows }
 
 `unreal:postProcess:FilmGrainIntensityShadows` · Default `1` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessFilmGrainIntensityShadows_h9bl`
 
 Control over the grain intensity in the regions of the image considered shadow areas.
+
+<div class="hdue-figure" data-figure="ref-film-grain-shadows"></div>
 
 #### Film Grain Intensity Midtones { #unreal-postprocess-filmgrainintensitymidtones }
 
@@ -315,12 +375,16 @@ Houdini parameter `xn__unrealpostProcessFilmGrainIntensityMidtones_3bcl`
 
 Control over the grain intensity in the mid-tone region of the image.
 
+<div class="hdue-figure" data-figure="ref-film-grain-midtones"></div>
+
 #### Film Grain Intensity Highlights { #unreal-postprocess-filmgrainintensityhighlights }
 
 `unreal:postProcess:FilmGrainIntensityHighlights` · Default `1` · Range 0 to 1  
 Houdini parameter `xn__unrealpostProcessFilmGrainIntensityHighlights_dfcl`
 
 Control over the grain intensity in the regions of the image considered highlight areas.
+
+<div class="hdue-figure" data-figure="ref-film-grain-highlights"></div>
 
 #### Film Grain Shadows Max { #unreal-postprocess-filmgrainshadowsmax }
 
@@ -349,6 +413,8 @@ Sets the upper bound used for Film Grain Highlight Intensity. This value should 
 Houdini parameter `xn__unrealpostProcessFilmGrainScale_krbl`
 
 Controls the size of the film grain. Size of texel of FilmGrainTexture on screen.
+
+<div class="hdue-figure" data-figure="ref-film-grain-scale"></div>
 
 #### Film Grain Texture { #unreal-postprocess-filmgraintexture }
 

@@ -120,7 +120,7 @@ Use Path Tracer mode with the Unreal Tonemapper off: the beauty and the lighting
 2. In comp, add them: diffuse + glossy + emission (+ volume).
 3. Grade each layer, then compare the sum with the beauty using a Difference.
 
-!!! note
+!!! note "Do the components add up?"
     Conformance tests check that direct and indirect diffuse add up to combined diffuse. The full sum against the beauty is not tested: check the difference on your shot before relying on it. In realtime mode, emission is in every component, so the components do not add up to the beauty.
 
 ### How to set up a comp-ready AOV set

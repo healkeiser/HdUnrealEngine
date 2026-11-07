@@ -198,25 +198,27 @@ Rect lights also take UE's barn doors: [Barn Door Angle](reference/light-propert
 
 ## Recipes
 
-**Sun and sky**:
+!!! example "Sun and sky"
 
-1. Distant Light: **Angle** 0.53, **Normalize Power** on, **Intensity** 1, **Exposure** 4.
-2. Dome Light: an HDRI sky in **Texture**, **Intensity** 1, **Exposure** 0.
-3. For UE's physical sky instead of the HDRI, deactivate the dome and turn on **Sky Atmosphere** ([Sky and clouds](environment/sky.md)): the distant light lights it.
+    1. Distant Light: **Angle** 0.53, **Normalize Power** on, **Intensity** 1, **Exposure** 4.
+    2. Dome Light: an HDRI sky in **Texture**, **Intensity** 1, **Exposure** 0.
+    3. For UE's physical sky instead of the HDRI, deactivate the dome and turn on **Sky Atmosphere** ([Sky and clouds](environment/sky.md)): the distant light lights it.
 
-**Soft studio key:**
+!!! example "Soft studio key"
 
-1. Rectangle Light, **Width** and **Height** 2, **Normalize Power** on.
-2. **Intensity** 1, **Exposure** 4.
-3. **Enable Color Temperature** on, **Color Temperature** 5600 for a daylight key.
+    1. Rectangle Light, **Width** and **Height** 2, **Normalize Power** on.
+    2. **Intensity** 1, **Exposure** 4.
+    3. **Enable Color Temperature** on, **Color Temperature** 5600 for a daylight key.
 
-**Light shafts in fog** (as in `samples/docs/fog.usda`):
+!!! example "Light shafts in fog"
 
-1. Render settings, Fog tab: **Exponential Height Fog** on, **Fog Density** 0.3, **Volumetric Fog** on.
-2. Sphere Light, **Radius** 0.05, **Spotlight** on, **Angle** 15, **Softness** 0.1.
-3. **Intensity** 1, **Exposure** 12.
-4. Unreal Engine tab: **Cast Volumetric Shadow** on, so objects in the beam cast shafts.
-5. Raise **Volumetric Scattering Intensity** for a brighter beam without brighter surfaces.
+    As in `samples/docs/fog.usda`.
+
+    1. Render settings, Fog tab: **Exponential Height Fog** on, **Fog Density** 0.3, **Volumetric Fog** on.
+    2. Sphere Light, **Radius** 0.05, **Spotlight** on, **Angle** 15, **Softness** 0.1.
+    3. **Intensity** 1, **Exposure** 12.
+    4. Unreal Engine tab: **Cast Volumetric Shadow** on, so objects in the beam cast shafts.
+    5. Raise **Volumetric Scattering Intensity** for a brighter beam without brighter surfaces.
 
 ## Troubleshooting
 

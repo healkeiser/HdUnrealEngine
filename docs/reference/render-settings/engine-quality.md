@@ -41,6 +41,8 @@ Houdini parameter `xn__unrealcvarsgShadowQuality_shbec`
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide).
 
+<div class="hdue-figure" data-figure="ref-shadow-quality"></div>
+
 | Value | Label |
 |---|---|
 | `0` | Low |
@@ -55,6 +57,8 @@ UE scalability group: applies the console variables of this quality level (Engin
 Houdini parameter `xn__unrealcvarsgGlobalIlluminationQuality_c1bec`
 
 UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide).
+
+<div class="hdue-figure" data-figure="engine-quality-gi"></div>
 
 | Value | Label |
 |---|---|
@@ -169,6 +173,8 @@ Render static meshes using Nanite. Console variable r.Nanite (process-wide).
 Houdini parameter `xn__unrealcvarrNaniteMaxPixelsPerEdge_tubebg`
 
 The triangle edge length that the Nanite runtime targets, measured in pixels. Console variable r.Nanite.MaxPixelsPerEdge (process-wide).
+
+<div class="hdue-figure" data-figure="nanite-pixels-per-edge"></div>
 
 ## Ray Tracing
 

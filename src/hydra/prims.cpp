@@ -1111,6 +1111,16 @@ public:
                 mesh.instanceIds.push_back(instancer ? int32_t(p) : -1);
             }
         mesh.instanceTimes = placed.instanceTimes;
+        if (auto fog = fogParticles(delegate, *static_cast<HdUEState*>(param))) {
+            mesh.material = fog->id;
+            auto& state = *static_cast<HdUEState*>(param);
+            std::lock_guard lock(state.mutex);
+            if (const auto previous = state.materials.find(fog->id);
+                previous == state.materials.end() || !(previous->second == *fog)) {
+                state.materials[fog->id] = *fog;
+                state.dirtyMaterials.insert(fog->id);
+            }
+        }
         HdUEStoreShape(delegate, GetId(), *static_cast<HdUEState*>(param), std::move(mesh));
         *bits = HdChangeTracker::Clean;
     }
@@ -1118,8 +1128,39 @@ public:
         auto* state = static_cast<HdUEState*>(param);
         state->erase(GetId().GetString());
         state->erase(GetId().GetString() + ".displayColor");
+        state->erase(GetId().GetString() + ".fog");
     }
 
+private:
+    // Fog particles: points with primvars:unreal:fog:extinction > 0 add density to UE's Volumetric Fog, one sphere of
+    // fog per point (its width), broken up by noise: UE's fog particles, a Volume-domain material on each particle
+    // (hdUE's M_HdUEFogParticle). Their own material binding and displayColor are ignored.
+    std::optional<HdUEMaterialData> fogParticles(HdSceneDelegate* delegate, const HdUEState& state) const {
+        const auto get = [&](const char* name, auto fallback) {
+            return value(delegate->Get(GetId(), TfToken(std::string("unreal:fog:") + name)), fallback);
+        };
+        const float extinction = get("extinction", 0.f);
+        if (!(extinction > 0)) return std::nullopt;
+        const double cm = state.setting<double>("metersPerUnit", 0.01) * 100;  // cm per scene unit
+        const auto albedo = get("albedo", GfVec3f(1));
+        const auto emissive = get("emissive", GfVec3f(0));
+        const auto offset = GfVec3f(get("noiseOffset", GfVec3f(0)) * float(cm));
+        HdUEMaterialData fog;
+        fog.id = GetId().GetString() + ".fog";
+        fog.nativeAsset = "/Game/HdUE/M_HdUEFogParticle.M_HdUEFogParticle";
+        fog.nativeParameters = {
+            {"Extinction", VtValue(extinction)},
+            {"Albedo", VtValue(albedo)},
+            {"Emissive", VtValue(emissive)},
+            {"NoiseSize", VtValue(float(get("noiseSize", float(100 / cm)) * cm))},  // 1 m by default
+            {"NoiseStrength", VtValue(get("noiseStrength", 0.f))},
+            {"NoiseOffset", VtValue(offset)},
+            {"EdgeSoftness", VtValue(get("edgeSoftness", 1.f))},
+        };
+        return fog;
+    }
+
+public:
 protected:
     void _InitRepr(const TfToken& token, HdDirtyBits*) override {
         _reprs.emplace_back(token, HdReprSharedPtr(new HdRepr()));

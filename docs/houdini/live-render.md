@@ -22,7 +22,7 @@ The render reacts to upstream LOP edits, as in the viewport. Click **Stop Render
 
 The File COP can start and stop the render itself. See SideFX's [Live rendering in Solaris](https://www.sidefx.com/docs/houdini22.0/solaris/support/liverender.html#copernicus).
 
-!!! note
+!!! note "What the tests check"
     hdUE's tests check that a Live Render converges with its AOVs. They do not check the image that reaches the File COP: check it in your scene.
 
 ## Render settings

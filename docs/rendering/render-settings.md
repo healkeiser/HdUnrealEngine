@@ -30,26 +30,35 @@ Lumen also approximates bounce light. In the Bistro, lit by its lamps, compare R
 
 ## Using render settings in Solaris
 
-1. Add an **hdUE Render Settings** LOP (TAB menu > hdUE > Rendering), or use any Render Settings LOP: with hdUE installed, it gets an **Unreal Engine** tab.
-2. Set the essential settings above the tabs: **Render Mode**, **Path Tracer Samples** or **Warmup Frames**, **Unreal Tonemapper** and **Exposure Compensation**.
-3. Find the rest in the tabs, laid out as UE's editor lays them out: Rendering, Lens, Color Grading, Lighting, Fog, Sky, Rendering Features, Engine Quality.
-4. On hdUE Render Settings, click **Show: Advanced** to see the settings UE's editor keeps behind its Advanced expanders. A notice under the strip names the changed settings that Essential hides.
+=== "Houdini"
 
-Each control authors nothing until you change it, as on Karma's render settings. Settings that one render mode ignores are hidden in that mode.
+    1. Add an **hdUE Render Settings** LOP (TAB menu > hdUE > Rendering), or use any Render Settings LOP: with hdUE installed, it gets an **Unreal Engine** tab.
+    2. Set the essential settings above the tabs: **Render Mode**, **Path Tracer Samples** or **Warmup Frames**, **Unreal Tonemapper** and **Exposure Compensation**.
+    3. Find the rest in the tabs, laid out as UE's editor lays them out: Rendering, Lens, Color Grading, Lighting, Fog, Sky, Rendering Features, Engine Quality.
+    4. On hdUE Render Settings, click **Show: Advanced** to see the settings UE's editor keeps behind its Advanced expanders. A notice under the strip names the changed settings that Essential hides.
 
-The viewport's **Display Options** have an **Unreal Engine** tab with the settings you change while working: render mode, samples, warmup, debug view, motion blur, Lumen, subdivision, the tonemapper and the main scalability groups. The **Unreal** menu in Houdini's main menu bar switches **Render Mode** too.
+    Each control authors nothing until you change it, as on Karma's render settings. Settings that one render mode ignores are hidden in that mode.
 
-Outside Houdini, author the attributes on the render settings prim:
+    The viewport's **Display Options** have an **Unreal Engine** tab with the settings you change while working: render mode, samples, warmup, debug view, motion blur, Lumen, subdivision, the tonemapper and the main scalability groups. The **Unreal** menu in Houdini's main menu bar switches **Render Mode** too.
 
-```usda
-def RenderSettings "Settings"
-{
-    token unreal:renderMode = "pathtraced"
-    int unreal:samplesPerPixel = 256
-    bool unreal:tonemapper = 1
-    float unreal:postProcess:AutoExposureBias = 1
-}
-```
+=== "USD"
+
+    Outside Houdini, author the attributes on the render settings prim:
+
+    ```usda
+    def RenderSettings "Settings"
+    {
+        token unreal:renderMode = "pathtraced" # (1)!
+        int unreal:samplesPerPixel = 256 # (2)!
+        bool unreal:tonemapper = 1 # (3)!
+        float unreal:postProcess:AutoExposureBias = 1 # (4)!
+    }
+    ```
+
+    1. **Render Mode**: the Path Tracer.
+    2. **Path Tracer Samples**.
+    3. **Unreal Tonemapper** on.
+    4. **Exposure Compensation**, in stops.
 
 Three families cover all 371 settings:
 

@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LocalExposureHighlightContrastScale"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LocalExposureHighlightContrastScale = 1"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LocalExposureHighlightContrastScale = 0.5"
+    ]
+   }
+  }
+ ]
+}

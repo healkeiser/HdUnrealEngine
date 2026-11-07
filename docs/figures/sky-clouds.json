@@ -1,6 +1,9 @@
 {
  "scene": "docs/lights.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:volumetricCloud"
+ ],
  "base": {
   "/scene/sky": [
    "(active = false)"

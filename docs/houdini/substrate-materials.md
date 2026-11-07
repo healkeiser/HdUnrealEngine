@@ -8,7 +8,7 @@ Substrate is Unreal Engine's material model: surfaces built from slabs, layered 
 ## Creating a material
 
 1. Add a **Material Library** LOP.
-2. Inside it, press TAB and choose **hdUE > hdUE Substrate Material Builder**.
+2. Inside it, press ++tab++ and choose **hdUE > hdUE Substrate Material Builder**.
     It starts with a **Substrate Slab** wired to the `surface` output.
 3. Dive into the builder and add hdUE Substrate nodes from the TAB menu (**hdUE** submenu), filed as UE's Material Editor palette files them: Substrate, Parameters, Constants, Math, Coordinates, Texture, Utility and Volume.
 4. On the Material Library LOP, assign the material to your geometry, as with any material.

@@ -293,6 +293,10 @@ struct HdUEMaterialData {
     // What the translation skipped, warned at upload (HdUEWarnMaterial) only when no cooked asset renders instead:
     // a batch host maps cooked assets after Sync.
     std::vector<std::string> warnings;
+    // A cooked UE material that renders instead of the translation, with its parameters in UE's units: hdUE's own
+    // (fog particles' M_HdUEFogParticle), where the host maps none (nativeMaterialAssets wins).
+    std::string nativeAsset;
+    std::vector<std::pair<std::string, VtValue>> nativeParameters;
     bool operator==(const HdUEMaterialData&) const = default;
 };
 // Warns, once per message, what a material's translation skipped.

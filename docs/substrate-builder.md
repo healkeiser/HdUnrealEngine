@@ -10,7 +10,7 @@ Use it for what UsdPreviewSurface and MaterialX cannot express: a water film ove
 ## Using it in Solaris
 
 1. Add a **Material Library** LOP.
-2. Inside it, press TAB and choose **hdUE > hdUE Substrate Material Builder**. It starts with a **Substrate Slab** wired to the **surface** output.
+2. Inside it, press ++tab++ and choose **hdUE > hdUE Substrate Material Builder**. It starts with a **Substrate Slab** wired to the **surface** output.
 3. Assign the material with the Material Library's **Geometry Path** or an **Assign Material** LOP.
 4. Edit values: the viewport updates at once. Add or rewire nodes: the status bar shows the compile, then the new material replaces the old one, typically within 10 to 20 seconds.
 

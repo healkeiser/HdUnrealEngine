@@ -21,15 +21,21 @@ Fog Density
 
     `unreal:heightFog:FogDensity` · Default 0.02
 
+    <div class="hdue-figure" data-figure="fog-density"></div>
+
 Fog Height Falloff
 :   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
     `unreal:heightFog:FogHeightFalloff` · Default 0.2
 
+    <div class="hdue-figure" data-figure="fog-height-falloff"></div>
+
 Second Fog Density
 :   Global density factor for this fog. Density 0 turns the second fog off.
 
     `unreal:heightFog:SecondFogData:FogDensity` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-second-fog-density"></div>
 
 Second Fog Height Falloff
 :   Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
@@ -45,6 +51,8 @@ Fog Inscattering Color
 :   Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
 
     `unreal:heightFog:FogInscatteringLuminance` · Default 0, 0, 0
+
+    <div class="hdue-figure" data-figure="fog-inscattering-color"></div>
 
 Sky Atmosphere Ambient Contribution Color Scale
 :   Color used to modulate the SkyAtmosphere component contribution to the non directional component of the fog. Only effective when r.SupportSkyAtmosphereAffectsHeightFog>0
@@ -132,25 +140,35 @@ Volumetric Fog
 
     `unreal:heightFog:bEnableVolumetricFog` · Default off
 
+    <div class="hdue-figure" data-figure="fog-volumetric"></div>
+
 Scattering Distribution
 :   Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
 
     `unreal:heightFog:VolumetricFogScatteringDistribution` · Default 0.2
+
+    <div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
 
 Albedo
 :   The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
 
     `unreal:heightFog:VolumetricFogAlbedo` · Default 1, 1, 1
 
+    <div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+
 Emissive
 :   Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
 
     `unreal:heightFog:VolumetricFogEmissive` · Default 0, 0, 0
 
+    <div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+
 Extinction Scale
 :   Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
 
     `unreal:heightFog:VolumetricFogExtinctionScale` · Default 1
+
+    <div class="hdue-figure" data-figure="fog-extinction-scale"></div>
 
 View Distance
 :   Distance over which volumetric fog should be computed, after the start distance. Larger values extend the effect into the distance but expose under-sampling artifacts in details.
@@ -161,6 +179,8 @@ Start Distance
 :   Distance from the camera that the volumetric fog will start, in world units.
 
     `unreal:heightFog:VolumetricFogStartDistance` · Default 0
+
+    <div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
 
 Near Fade In Distance
 :   Distance over which volumetric fog will fade in from the start distance.

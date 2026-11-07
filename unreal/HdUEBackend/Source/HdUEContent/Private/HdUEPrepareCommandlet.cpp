@@ -38,6 +38,11 @@
 #include "Materials/MaterialExpressionAbs.h"
 #include "Materials/MaterialExpressionSaturate.h"
 #include "Materials/MaterialExpressionOneMinus.h"
+#include "Materials/MaterialExpressionNoise.h"
+#include "Materials/MaterialExpressionObjectPositionWS.h"
+#include "Materials/MaterialExpressionObjectRadius.h"
+#include "Materials/MaterialExpressionDistance.h"
+#include "Materials/MaterialExpressionPower.h"
 #include "Materials/MaterialExpressionMaterialFunctionCall.h"
 #include "Materials/MaterialExpressionFunctionInput.h"
 #include "Materials/MaterialExpressionStaticBool.h"
@@ -698,6 +703,109 @@ UMaterial* CreateVolumeMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// Fog particle material: UE's way to add shaped density to Volumetric Fog, a Volume-domain material on primitives that
+// UE voxelizes into the fog grid (VolumetricFogVoxelization.cpp; a non-sprite primitive as a camera-facing quad over
+// its bounding sphere). Density fades from the primitive's centre to its bounds radius and is broken up by 3D noise in
+// world space, as UE's Volumetric Fog page builds its fog particles. Extinction is per metre, as a Local Fog Volume's
+// (UE divides those by 100 too: VolumetricFog.usf).
+UMaterial* CreateFogParticleMaterial() {
+    const FString Path = TEXT("/Game/HdUE/M_HdUEFogParticle");
+    UPackage* Package = CreatePackage(*Path);
+    auto* Material =
+        LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEFogParticle.M_HdUEFogParticle"), nullptr, LOAD_NoWarn);
+    if (Material && Material->MaterialDomain == MD_Volume) {
+        for (const auto& Expression : Material->GetExpressionCollection().Expressions)
+            if (const auto* Edge = Cast<UMaterialExpressionScalarParameter>(Expression);
+                Edge && Edge->ParameterName == TEXT("EdgeSoftness"))
+                return Material;
+    }
+    if (!Material) Material = NewObject<UMaterial>(Package, TEXT("M_HdUEFogParticle"), RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    Material->GetExpressionCollection().Empty();
+    TArray<UMaterialExpression*> Expressions;
+    const auto Add = [&](auto* Expression) {
+        Expressions.Add(Expression);
+        return Expression;
+    };
+    const auto Scalar = [&](const TCHAR* Name, float Value) {
+        auto* Parameter = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+        Parameter->ParameterName = Name;
+        Parameter->DefaultValue = Value;
+        return Parameter;
+    };
+    const auto Vector = [&](const TCHAR* Name, const FLinearColor& Value) {
+        auto* Parameter = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+        Parameter->ParameterName = Name;
+        Parameter->DefaultValue = Value;
+        return Parameter;
+    };
+    // Radial mask: 1 at the primitive's centre, 0 at its bounds radius, shaped by EdgeSoftness (higher: softer).
+    auto* World = Add(NewObject<UMaterialExpressionWorldPosition>(Material));
+    auto* Centre = Add(NewObject<UMaterialExpressionObjectPositionWS>(Material));
+    auto* Radius = Add(NewObject<UMaterialExpressionObjectRadius>(Material));
+    auto* Distance = Add(NewObject<UMaterialExpressionDistance>(Material));
+    Distance->A.Connect(0, World);
+    Distance->B.Connect(0, Centre);
+    auto* Relative = Add(NewObject<UMaterialExpressionDivide>(Material));
+    Relative->A.Connect(0, Distance);
+    Relative->B.Connect(0, Radius);
+    auto* Inside = Add(NewObject<UMaterialExpressionOneMinus>(Material));
+    Inside->Input.Connect(0, Relative);
+    auto* Clamped = Add(NewObject<UMaterialExpressionSaturate>(Material));
+    Clamped->Input.Connect(0, Inside);
+    auto* Mask = Add(NewObject<UMaterialExpressionPower>(Material));
+    Mask->Base.Connect(0, Clamped);
+    Mask->Exponent.Connect(0, Scalar(TEXT("EdgeSoftness"), 1.f));
+    // Noise: world position / NoiseSize (cm) + NoiseOffset, its output spread below 0 and above 1 so that at
+    // NoiseStrength 1 it leaves clear gaps and dense pockets.
+    auto* Shifted = Add(NewObject<UMaterialExpressionAdd>(Material));
+    Shifted->A.Connect(0, World);
+    Shifted->B.Connect(0, Vector(TEXT("NoiseOffset"), FLinearColor(0, 0, 0, 0)));
+    auto* Scaled = Add(NewObject<UMaterialExpressionDivide>(Material));
+    Scaled->A.Connect(0, Shifted);
+    Scaled->B.Connect(0, Scalar(TEXT("NoiseSize"), 100.f));
+    auto* Noise = Add(NewObject<UMaterialExpressionNoise>(Material));
+    Noise->Position.Connect(0, Scaled);
+    Noise->Scale = 1.f;
+    Noise->NoiseFunction = NOISEFUNCTION_GradientALU;
+    Noise->Levels = 4;
+    Noise->OutputMin = -0.5f;
+    Noise->OutputMax = 1.5f;
+    Noise->bTurbulence = false;
+    auto* One = Add(NewObject<UMaterialExpressionConstant>(Material));
+    One->R = 1.f;
+    auto* Broken = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+    Broken->A.Connect(0, One);
+    Broken->B.Connect(0, Noise);
+    Broken->Alpha.Connect(0, Scalar(TEXT("NoiseStrength"), 0.f));
+    auto* Coverage = Add(NewObject<UMaterialExpressionSaturate>(Material));
+    Coverage->Input.Connect(0, Broken);
+    // Extinction per cm = Extinction (per m) / 100 * mask * noise.
+    auto* PerCm = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    PerCm->A.Connect(0, Scalar(TEXT("Extinction"), 1.f));
+    PerCm->ConstB = 0.01f;
+    auto* Masked = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Masked->A.Connect(0, PerCm);
+    Masked->B.Connect(0, Mask);
+    auto* Extinction = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Extinction->A.Connect(0, Masked);
+    Extinction->B.Connect(0, Coverage);
+    // Emission per unit extinction, as a Local Fog Volume's FogEmissive (VolumetricFog.usf).
+    auto* Emissive = Add(NewObject<UMaterialExpressionMultiply>(Material));
+    Emissive->A.Connect(0, Vector(TEXT("Emissive"), FLinearColor(0, 0, 0, 0)));
+    Emissive->B.Connect(0, Extinction);
+    auto* Data = Material->GetEditorOnlyData();
+    // Legacy volume inputs, as M_HdUEVolume: albedo, extinction, emission.
+    Data->BaseColor.Connect(0, Vector(TEXT("Albedo"), FLinearColor(1, 1, 1, 1)));
+    Data->SubsurfaceColor.Connect(0, Extinction);
+    Data->EmissiveColor.Connect(0, Emissive);
+    Material->MaterialDomain = MD_Volume;
+    Material->BlendMode = BLEND_Additive;
+    Material->bUsedWithHeterogeneousVolumes = false;  // voxelized into Volumetric Fog, not ray marched on its own
+    for (UMaterialExpression* Expression : Expressions) Material->GetExpressionCollection().AddExpression(Expression);
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
 // Light function parent for unreal:lightFunction:texture: the texture over UE's light-function coordinates filters the
 // light, as a light function material made in the editor does; compatible with the Light Function Atlas, through which
 // MegaLights reads light functions.
@@ -901,7 +1009,7 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
                             Blend, LinearWhite, true, Thin, TwoSided, Virtual))
                         return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial() ||
-        !CreateLightFunctionMaterial() || !CreateSparseVolumeAssets())
+        !CreateFogParticleMaterial() || !CreateLightFunctionMaterial() || !CreateSparseVolumeAssets())
         return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);

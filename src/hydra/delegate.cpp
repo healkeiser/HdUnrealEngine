@@ -730,6 +730,18 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         HdueMaterialDesc desc{};
         desc.id = packet.own(data.id);
         desc.native_asset = packet.own(asset(nativeMaterials, id));
+        if (!*desc.native_asset && !data.nativeAsset.empty()) {
+            desc.native_asset = packet.own(data.nativeAsset);
+            std::vector<HdueMaterialParameter> parameters;
+            for (const auto& [name, value] : data.nativeParameters)
+                parameters.push_back(materialParameter(packet, name, value));
+            HdueMaterialUpdate update{};
+            update.struct_size = sizeof(update);
+            update.material_id = desc.id;
+            update.parameter_count = uint32_t(parameters.size());
+            update.parameters = packet.own(packet.parameters, std::move(parameters));
+            packet.materialUpdates.push_back(update);
+        }
         // A material mapped to a cooked asset renders as that asset, whatever hdUE makes of its network.
         if (!*desc.native_asset) HdUEWarnMaterial(data);
         for (int i = 0; i < 3; ++i) {

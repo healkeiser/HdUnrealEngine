@@ -1,0 +1,44 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:light:bCastCloudShadows"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1",
+   "bool unreal:volumetricCloud = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Off (default)",
+   "set": {
+    "/scene/sun": [
+     "bool unreal:light:bCastCloudShadows = 0"
+    ]
+   }
+  },
+  {
+   "caption": "On",
+   "set": {
+    "/scene/sun": [
+     "bool unreal:light:bCastCloudShadows = 1"
+    ]
+   }
+  }
+ ]
+}

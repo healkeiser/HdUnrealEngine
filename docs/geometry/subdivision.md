@@ -8,23 +8,30 @@ A Catmull-Clark cube at levels 0 to 3 (Realtime).
 
 ## Using subdivision in Solaris
 
-1. Make sure the mesh's **Subdivision Scheme** (`subdivisionScheme`) is `catmullClark` (USD's default) or `loop`. `bilinear` and `none` render as authored.
-2. On **hdUE Render Settings** (Rendering tab, **Show: Advanced**), set **Subdivision Level**. The viewport's Display Options have it too, on their Unreal Engine tab.
-3. To give some meshes their own level, add a **Render Geometry Settings** LOP on them or an ancestor and set **Subdivision Level** on its Unreal Engine tab.
+=== "Houdini"
 
-Outside Houdini:
+    1. Make sure the mesh's **Subdivision Scheme** (`subdivisionScheme`) is `catmullClark` (USD's default) or `loop`. `bilinear` and `none` render as authored.
+    2. On **hdUE Render Settings** (Rendering tab, **Show: Advanced**), set **Subdivision Level**. The viewport's Display Options have it too, on their Unreal Engine tab.
+    3. To give some meshes their own level, add a **Render Geometry Settings** LOP on them or an ancestor and set **Subdivision Level** on its Unreal Engine tab.
 
-```usda
-def RenderSettings "Settings"
-{
-    int unreal:subdivisionLevel = 3
-}
+=== "USD"
 
-def Mesh "hero"
-{
-    int primvars:unreal:subdivisionLevel = 4
-}
-```
+    Outside Houdini:
+
+    ```usda
+    def RenderSettings "Settings"
+    {
+        int unreal:subdivisionLevel = 3 # (1)!
+    }
+
+    def Mesh "hero"
+    {
+        int primvars:unreal:subdivisionLevel = 4 # (2)!
+    }
+    ```
+
+    1. The render setting: the level of every subdivision mesh.
+    2. The per-prim level. It replaces the render setting for this mesh, and on an ancestor for every mesh below it.
 
 ## Subdivision Level
 

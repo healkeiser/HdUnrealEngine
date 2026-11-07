@@ -31,6 +31,8 @@ Ground Albedo
 
     `unreal:skyAtmosphere:GroundAlbedo` · Default 0.401978, 0.401978, 0.401978
 
+    <div class="hdue-figure" data-figure="ref-ground-albedo"></div>
+
 #### Atmosphere
 
 Atmosphere Height
@@ -38,10 +40,14 @@ Atmosphere Height
 
     `unreal:skyAtmosphere:AtmosphereHeight` · Default 60
 
+    <div class="hdue-figure" data-figure="ref-atmosphere-height"></div>
+
 MultiScattering
 :   Factor applied to multiple scattering only (after the sun light has bounced around in the atmosphere at least once). Multiple scattering is evaluated using a dual scattering approach. A value of 2 is recommended to better represent default atmosphere when r.SkyAtmosphere.MultiScatteringLUT.HighQuality=0.
 
     `unreal:skyAtmosphere:MultiScatteringFactor` · Default 1
+
+    <div class="hdue-figure" data-figure="ref-multiscattering"></div>
 
 Trace Sample Count Scale
 :   Scale the atmosphere tracing sample count. Quality level scalability The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 0. The sample count is still clamped according to scalability setting to 'r.SkyAtmosphere.FastSkyLUT.SampleCountMax' when 'r.SkyAtmosphere.FastSkyLUT' is 1. The sample count is still clamped for aerial perspective according to 'r.SkyAtmosphere.AerialPerspectiveLUT.SampleCountMaxPerSlice'.
@@ -54,6 +60,8 @@ Rayleigh Scattering Scale
 :   Rayleigh scattering coefficient scale.
 
     `unreal:skyAtmosphere:RayleighScatteringScale` · Default 0.0331
+
+    <div class="hdue-figure" data-figure="ref-rayleigh-scale"></div>
 
 Rayleigh Scattering
 :   The Rayleigh scattering coefficients resulting from molecules in the air at an altitude of 0 kilometer.
@@ -72,6 +80,8 @@ Mie Scattering Scale
 
     `unreal:skyAtmosphere:MieScatteringScale` · Default 0.003996
 
+    <div class="hdue-figure" data-figure="sky-mie-scattering"></div>
+
 Mie Scattering
 :   The Mie scattering coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be scattered more.
 
@@ -82,6 +92,8 @@ Mie Absorption Scale
 
     `unreal:skyAtmosphere:MieAbsorptionScale` · Default 0.000444
 
+    <div class="hdue-figure" data-figure="ref-mie-absorption-scale"></div>
+
 Mie Absorption
 :   The Mie absorption coefficients resulting from particles in the air at an altitude of 0 kilometer. As it becomes higher, light will be absorbed more.
 
@@ -91,6 +103,8 @@ Mie Anisotropy
 :   A value of 0 mean light is uniformly scattered. A value closer to 1 means lights will scatter more forward, resulting in halos around light sources.
 
     `unreal:skyAtmosphere:MieAnisotropy` · Default 0.8
+
+    <div class="hdue-figure" data-figure="ref-mie-anisotropy"></div>
 
 Mie Exponential Distribution
 :   The altitude in kilometer at which Mie effects are reduced to 40%.
@@ -104,6 +118,8 @@ Absorption Scale
 
     `unreal:skyAtmosphere:OtherAbsorptionScale` · Default 0.001881
 
+    <div class="hdue-figure" data-figure="ref-ozone-absorption-scale"></div>
+
 Absorption
 :   Absorption coefficients for another atmosphere layer. Density increase from 0 to 1 between 10 to 25km and decreases from 1 to 0 between 25 to 40km. The default values represents ozone molecules absorption in the Earth atmosphere.
 
@@ -115,6 +131,8 @@ Sky Luminance Factor
 :   Scales the luminance of pixels representing the sky. This will impact the captured sky light.
 
     `unreal:skyAtmosphere:SkyLuminanceFactor` · Default 1, 1, 1
+
+    <div class="hdue-figure" data-figure="ref-sky-luminance-factor"></div>
 
 Sky And Aerial Perspective Luminance Factor
 :   Scales the luminance of pixels representing the sky and the aerial perspective. This will impact the captured sky light.

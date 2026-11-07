@@ -11,12 +11,16 @@ Houdini parameter `xn__unreallumenEnabled_e5a`
 
 Lumen global illumination and reflections in realtime mode. Per-light MegaLights is on the lights' Unreal Engine tab.
 
+<div class="hdue-figure" data-figure="ref-lumen-enabled"></div>
+
 #### Method { #unreal-postprocess-dynamicglobalilluminationmethod }
 
 `unreal:postProcess:DynamicGlobalIlluminationMethod` · Default Lumen · Realtime only  
 Houdini parameter `xn__unrealpostProcessDynamicGlobalIlluminationMethod_8jcl`
 
 Chooses the Dynamic Global Illumination method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
+
+<div class="hdue-figure" data-figure="global-illumination"></div>
 
 | Value | Label |
 |---|---|
@@ -32,12 +36,16 @@ Houdini parameter `xn__unrealpostProcessIndirectLightingColor_y2bl`
 
 Adjusts indirect lighting color. (1,1,1) is default. (0,0,0) to disable GI. The show flag 'Global Illumination' must be enabled to use this property.
 
+<div class="hdue-figure" data-figure="ref-indirect-lighting-color"></div>
+
 #### Indirect Lighting Intensity { #unreal-postprocess-indirectlightingintensity }
 
 `unreal:postProcess:IndirectLightingIntensity` · Default `1` · Range 0 to 4 · Realtime only · Advanced  
 Houdini parameter `xn__unrealpostProcessIndirectLightingIntensity_h9bl`
 
 Scales the indirect lighting contribution. A value of 0 disables GI. Default is 1. The show flag 'Global Illumination' must be enabled to use this property.
+
+<div class="hdue-figure" data-figure="ref-indirect-lighting-intensity"></div>
 
 ### Lumen Global Illumination
 
@@ -47,6 +55,8 @@ Scales the indirect lighting contribution. A value of 0 disables GI. Default is 
 Houdini parameter `xn__unrealpostProcessLumenRayLightingMode_c1bl`
 
 Controls how Lumen rays are lit when Lumen is using Hardware Ray Tracing. By default, Lumen uses the Surface Cache for best performance, but can be set to 'Hit Lighting' for higher quality.
+
+<div class="hdue-figure" data-figure="tut-lumen-pt-reflections"></div>
 
 | Value | Label |
 |---|---|
@@ -69,6 +79,8 @@ Houdini parameter `xn__unrealpostProcessLumenSceneDetail_tubl`
 
 Controls the size of instances that can be represented in Lumen Scene. Larger values will ensure small objects are represented, but increase GPU cost.
 
+<div class="hdue-figure" data-figure="ref-lumen-scene-detail"></div>
+
 #### Lumen Scene View Distance { #unreal-postprocess-lumensceneviewdistance }
 
 `unreal:postProcess:LumenSceneViewDistance` · Default `20000` · Range 1 to 2097152 · Realtime only  
@@ -83,6 +95,8 @@ Houdini parameter `xn__unrealpostProcessLumenFinalGatherQuality_75bl`
 
 Scales Lumen's Final Gather quality. Larger scales reduce noise, but greatly increase GPU cost.
 
+<div class="hdue-figure" data-figure="tut-noise-lumen-quality"></div>
+
 #### Screen Traces { #unreal-postprocess-lumenfinalgatherscreentraces }
 
 `unreal:postProcess:LumenFinalGatherScreenTraces` · Default On · Realtime only  
@@ -90,12 +104,16 @@ Houdini parameter `xn__unrealpostProcessLumenFinalGatherScreenTraces_dfcl`
 
 Whether to use screen space traces for Lumen Global Illumination. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
+<div class="hdue-figure" data-figure="ref-lumen-screen-traces"></div>
+
 #### Max Trace Distance { #unreal-postprocess-lumenmaxtracedistance }
 
 `unreal:postProcess:LumenMaxTraceDistance` · Default `20000` · Range 1 to 2097152 · Realtime only  
 Houdini parameter `xn__unrealpostProcessLumenMaxTraceDistance_y2bl`
 
 Controls the maximum distance that Lumen should trace while solving lighting. Values that are too small will cause lighting to leak into large caves, while values that are large will increase GPU cost.
+
+<div class="hdue-figure" data-figure="ref-lumen-max-trace-distance"></div>
 
 #### Lumen Surface Cache Resolution { #unreal-postprocess-lumensurfacecacheresolution }
 
@@ -110,6 +128,8 @@ Scale factor for Lumen Surface Cache resolution. Smaller values save GPU memory,
 Houdini parameter `xn__unrealcvarrLumenHardwareRayTracing_gwbebf`
 
 Uses Hardware Ray Tracing for Lumen features, when available. Lumen will fall back to Software Ray Tracing otherwise. Note: Hardware ray tracing has significant scene update costs for scenes with more than 100k instances. Console variable r.Lumen.HardwareRayTracing (process-wide).
+
+<div class="hdue-figure" data-figure="ref-lumen-hardware-ray-tracing"></div>
 
 #### Lumen Scene Lighting Update Speed { #unreal-postprocess-lumenscenelightingupdatespeed }
 
@@ -132,6 +152,8 @@ Houdini parameter `xn__unrealpostProcessLumenDiffuseColorBoost_l4bl`
 
 Allows brightening indirect lighting by calculating material diffuse color for indirect lighting. Values above 1 (original diffuse color) aren't physically correct, but they can be useful as an art direction knob to increase the amount of bounced light in the scene. Best to keep below 2 as it also causes reflections to be brighter than the scene.
 
+<div class="hdue-figure" data-figure="ref-lumen-diffuse-color-boost"></div>
+
 #### Ambient Occlusion Intensity { #unreal-postprocess-lumenambientocclusionintensity }
 
 `unreal:postProcess:LumenAmbientOcclusionIntensity` · Default `1` · Range 0 to 1 · Realtime only · Advanced  
@@ -139,12 +161,16 @@ Houdini parameter `xn__unrealpostProcessLumenAmbientOcclusionIntensity_micl`
 
 Allows control over the strength of Lumen's Short Range Ambient Occlusion.
 
+<div class="hdue-figure" data-figure="ref-lumen-ao-intensity"></div>
+
 #### Skylight Leaking { #unreal-postprocess-lumenskylightleaking }
 
 `unreal:postProcess:LumenSkylightLeaking` · Default `0` · Range 0 to 1 · Realtime only · Advanced  
 Houdini parameter `xn__unrealpostProcessLumenSkylightLeaking_c1bl`
 
 Controls what fraction of the skylight intensity should be allowed to leak. This can be useful as an art direction knob (non-physically based) to keep indoor areas from going fully black.
+
+<div class="hdue-figure" data-figure="ref-lumen-skylight-leaking"></div>
 
 #### Skylight Leaking Tint { #unreal-postprocess-lumenskylightleakingtint }
 
@@ -169,6 +195,8 @@ Houdini parameter `xn__unrealpostProcessReflectionMethod_tubl`
 
 Chooses the Reflection method. Not compatible with Forward Shading. Overrides unreal:lumenEnabled.
 
+<div class="hdue-figure" data-figure="ref-reflection-method"></div>
+
 | Value | Label |
 |---|---|
 | `EReflectionMethod::None` | None |
@@ -191,6 +219,8 @@ Houdini parameter `xn__unrealpostProcessLumenReflectionsScreenTraces_dfcl`
 
 Whether to use screen space traces for Lumen Reflections. Screen space traces bypass Lumen Scene and instead sample Scene Depth and Scene Color. This improves quality, as it bypasses Lumen Scene, but causes view dependent lighting.
 
+<div class="hdue-figure" data-figure="ref-lumen-reflection-screen-traces"></div>
+
 #### High Quality Translucency Reflections { #unreal-postprocess-lumenfrontlayertranslucencyreflections }
 
 `unreal:postProcess:LumenFrontLayerTranslucencyReflections` · Default Off · Realtime only  
@@ -204,6 +234,8 @@ Whether to use high quality mirror reflections on the front layer of translucent
 Houdini parameter `xn__unrealpostProcessLumenMaxRoughnessToTraceReflections_rqcl`
 
 Sets the maximum roughness value for which Lumen still traces dedicated reflection rays. Higher values improve reflection quality, but greatly increase GPU cost.
+
+<div class="hdue-figure" data-figure="tut-lumen-pt-roughness"></div>
 
 #### Max Reflection Bounces { #unreal-postprocess-lumenmaxreflectionbounces }
 
@@ -258,6 +290,8 @@ Houdini parameter `xn__unrealcvarrShadowVirtualEnable_xpbebgh`
 
 Enable Virtual Shadow Maps. Renders geometry into virtualized shadow depth maps for shadowing. Provides high - quality shadows for next - gen projects with simplified setup.High efficiency culling when used with Nanite. Console variable r.Shadow.Virtual.Enable (process-wide).
 
+<div class="hdue-figure" data-figure="ref-virtual-shadow-maps"></div>
+
 #### Ray Traced Shadows { #unreal-cvar-r-raytracing-shadows }
 
 `unreal:cvar:r:RayTracing:Shadows` · Default Off · Realtime only  
@@ -265,12 +299,16 @@ Houdini parameter `xn__unrealcvarrRayTracingShadows_ombebk`
 
 0: use traditional rasterized shadow map (default) 1: use ray tracing shadows Console variable r.RayTracing.Shadows (process-wide).
 
+<div class="hdue-figure" data-figure="ref-ray-traced-shadows"></div>
+
 #### Directional Resolution Bias { #unreal-cvar-r-shadow-virtual-resolutionlodbiasdirectional }
 
 `unreal:cvar:r:Shadow:Virtual:ResolutionLodBiasDirectional` · Default `-1.5` · Range -2 to 2 · Realtime only · Advanced  
 Houdini parameter `xn__unrealcvarrShadowVirtualResolutionLodBiasDirectional_rqcebgh`
 
 Bias applied to LOD calculations for directional lights. -1.0 doubles resolution, 1.0 halves it and so on. Console variable r.Shadow.Virtual.ResolutionLodBiasDirectional (process-wide).
+
+<div class="hdue-figure" data-figure="ref-vsm-directional-bias"></div>
 
 #### Local Resolution Bias { #unreal-cvar-r-shadow-virtual-resolutionlodbiaslocal }
 
@@ -285,6 +323,8 @@ Bias applied to LOD calculations for local lights. -1.0 doubles resolution, 1.0 
 Houdini parameter `xn__unrealcvarrShadowVirtualSMRTRayCountDirectional_micebghe`
 
 Ray count for shadow map tracing of directional lights. 0 = disabled. Console variable r.Shadow.Virtual.SMRT.RayCountDirectional (process-wide).
+
+<div class="hdue-figure" data-figure="tut-noise-shadow-rays"></div>
 
 #### Directional Samples per Ray { #unreal-cvar-r-shadow-virtual-smrt-samplesperraydirectional }
 

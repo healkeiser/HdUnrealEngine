@@ -9,6 +9,8 @@ Houdini parameter `xn__unrealheightFog_i0a`
 
 Place UE's Exponential Height Fog in the scene, as an Exponential Height Fog actor in a level. Turn on Volumetric Fog for lit, shadowed fog (light shafts); the Path Tracer renders the fog only with Volumetric Fog on. Lights scatter into it by their Volumetric Scattering Intensity.
 
+<div class="hdue-figure" data-figure="ref-height-fog"></div>
+
 #### Fog Height { #unreal-heightfogheight }
 
 `unreal:heightFogHeight` · Default `0` · Range -100 to 100  
@@ -25,6 +27,8 @@ Houdini parameter `xn__unrealheightFogFogDensity_shbj`
 
 Global density factor.
 
+<div class="hdue-figure" data-figure="fog-density"></div>
+
 #### Fog Height Falloff { #unreal-heightfog-fogheightfalloff }
 
 `unreal:heightFog:FogHeightFalloff` · Default `0.2` · Range 0.001 to 2  
@@ -32,12 +36,16 @@ Houdini parameter `xn__unrealheightFogFogHeightFalloff_krbj`
 
 Height density factor, controls how the density increases as height decreases. Smaller values make the visible transition larger.
 
+<div class="hdue-figure" data-figure="fog-height-falloff"></div>
+
 #### Second Fog Density { #unreal-heightfog-secondfogdata-fogdensity }
 
 `unreal:heightFog:SecondFogData:FogDensity` · Default `0` · Range 0 to 0.05  
 Houdini parameter `xn__unrealheightFogSecondFogDataFogDensity_y2bjn`
 
 Global density factor for this fog. Density 0 turns the second fog off.
+
+<div class="hdue-figure" data-figure="ref-second-fog-density"></div>
 
 #### Second Fog Height Falloff { #unreal-heightfog-secondfogdata-fogheightfalloff }
 
@@ -59,6 +67,8 @@ Height offset, relative to the actor position Z.
 Houdini parameter `xn__unrealheightFogFogInscatteringLuminance_l4bj`
 
 Note: when r.SupportExpFogMatchesVolumetricFog = 1, this value is ignored and the volumetric fog Emissive is used instead.
+
+<div class="hdue-figure" data-figure="fog-inscattering-color"></div>
 
 #### Sky Atmosphere Ambient Contribution Color Scale { #unreal-heightfog-skyatmosphereambientcontributioncolorscale }
 
@@ -178,12 +188,16 @@ Houdini parameter `xn__unrealheightFogbEnableVolumetricFog_2xbj`
 
 Whether to enable Volumetric fog. Scalability settings control the resolution of the fog simulation. Note that Volumetric fog currently does not support StartDistance, FogMaxOpacity and FogCutoffDistance. Volumetric fog also can't match exponential height fog in general as exponential height fog has non-physical behavior.
 
+<div class="hdue-figure" data-figure="fog-volumetric"></div>
+
 #### Scattering Distribution { #unreal-heightfog-volumetricfogscatteringdistribution }
 
 `unreal:heightFog:VolumetricFogScatteringDistribution` · Default `0.2` · Range -0.9 to 0.9  
 Houdini parameter `xn__unrealheightFogVolumetricFogScatteringDistribution_incj`
 
 Controls the scattering phase function - how much incoming light scatters in various directions. A distribution value of 0 scatters equally in all directions, while .9 scatters predominantly in the light direction. In order to have visible volumetric fog light shafts from the side, the distribution will need to be closer to 0.
+
+<div class="hdue-figure" data-figure="fog-scattering-distribution"></div>
 
 #### Albedo { #unreal-heightfog-volumetricfogalbedo }
 
@@ -192,6 +206,8 @@ Houdini parameter `xn__unrealheightFogVolumetricFogAlbedo_gwbj`
 
 The height fog particle reflectiveness used by volumetric fog. Water particles in air have an albedo near white, while dust has slightly darker value.
 
+<div class="hdue-figure" data-figure="ref-volumetric-fog-albedo"></div>
+
 #### Emissive { #unreal-heightfog-volumetricfogemissive }
 
 `unreal:heightFog:VolumetricFogEmissive` · Default `0, 0, 0` · Realtime only  
@@ -199,12 +215,16 @@ Houdini parameter `xn__unrealheightFogVolumetricFogEmissive_pzbj`
 
 Light emitted by height fog. This is a density so more light is emitted the further you are looking through the fog. In most cases skylight is a better choice, however right now volumetric fog does not support precomputed lighting, So stationary skylights are unshadowed and static skylights don't affect volumetric fog at all.
 
+<div class="hdue-figure" data-figure="ref-volumetric-fog-emissive"></div>
+
 #### Extinction Scale { #unreal-heightfog-volumetricfogextinctionscale }
 
 `unreal:heightFog:VolumetricFogExtinctionScale` · Default `1` · Range 0.1 to 10  
 Houdini parameter `xn__unrealheightFogVolumetricFogExtinctionScale_3bcj`
 
 Scales the height fog particle extinction amount used by volumetric fog. Values larger than 1 cause fog particles everywhere absorb more light.
+
+<div class="hdue-figure" data-figure="fog-extinction-scale"></div>
 
 #### View Distance { #unreal-heightfog-volumetricfogdistance }
 
@@ -219,6 +239,8 @@ Distance over which volumetric fog should be computed, after the start distance.
 Houdini parameter `xn__unrealheightFogVolumetricFogStartDistance_u7bj`
 
 Distance from the camera that the volumetric fog will start, in world units.
+
+<div class="hdue-figure" data-figure="ref-volumetric-fog-start-distance"></div>
 
 #### Near Fade In Distance { #unreal-heightfog-volumetricfognearfadeindistance }
 

@@ -11,6 +11,8 @@ Houdini parameter `xn__unrealcvarrAntiAliasingMethod_bobeb`
 
 Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide).
 
+<div class="hdue-figure" data-figure="ref-anti-aliasing"></div>
+
 | Value | Label |
 |---|---|
 | `0` | None |
@@ -24,6 +26,8 @@ Engine default (project setting) for AntiAliasingMethod is (postprocess volume/c
 Houdini parameter `xn__unrealcvarrScreenPercentage_1kbeb`
 
 To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, \10 and \1=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.\1=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
+
+<div class="hdue-figure" data-figure="ref-screen-percentage"></div>
 
 #### Lower Resolution While Moving { #unreal-cvar-r-hdue-interactiveresolution }
 
@@ -126,12 +130,16 @@ Houdini parameter `xn__unrealpostProcessPathTracingMaxBounces_y2bl`
 
 Sets the path tracing maximum bounces. Counts scattering events along a path: 0 shows only emission seen directly, 1 is direct light alone, N matches Karma's Diffuse Limit N - 1. One limit covers diffuse, specular, refraction and volume bounces.
 
+<div class="hdue-figure" data-figure="ref-pt-max-bounces"></div>
+
 #### Max Path Intensity { #unreal-postprocess-pathtracingmaxpathintensity }
 
 `unreal:postProcess:PathTracingMaxPathIntensity` · Default `24` · Range 1 to 65504 · Path Tracer only  
 Houdini parameter `xn__unrealpostProcessPathTracingMaxPathIntensity_qdcl`
 
 Sets the maximum intensity of indirect samples to reduce fireflies. Lowering this value reduces noise at the expense of accuracy. Increasing it is more accurate but may lead to more noise.
+
+<div class="hdue-figure" data-figure="tut-noise-fireflies"></div>
 
 #### Emissive Materials { #unreal-postprocess-pathtracingenableemissivematerials }
 
@@ -161,6 +169,8 @@ Houdini parameter `xn__unrealpostProcessPathTracingEnableDenoiser_h9bl`
 
 Run the currently loaded denoiser plugin on the last sample to remove noise from the output. Has no effect if a plug-in is not loaded.
 
+<div class="hdue-figure" data-figure="denoiser"></div>
+
 #### Denoiser Plugin { #unreal-cvar-r-pathtracing-denoiser-name }
 
 `unreal:cvar:r:PathTracing:Denoiser:Name` · Default NNE Denoiser · Path Tracer only  
@@ -179,6 +189,8 @@ Set the spatial denoiser name. It is the corresponding name registered by a deno
 Houdini parameter `xn__unrealcvarNNEDenoiserAsset_fjbel`
 
 Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide).
+
+<div class="hdue-figure" data-figure="denoising-model"></div>
 
 | Value | Label |
 |---|---|
@@ -247,12 +259,16 @@ Houdini parameter `xn__unrealpostProcessPathTracingIncludeDiffuse_h9bl`
 
 Should the render include diffuse lighting contributions?
 
+<div class="hdue-figure" data-figure="ref-pt-include-diffuse"></div>
+
 #### Indirect Diffuse { #unreal-postprocess-pathtracingincludeindirectdiffuse }
 
 `unreal:postProcess:PathTracingIncludeIndirectDiffuse` · Default On · Path Tracer only  
 Houdini parameter `xn__unrealpostProcessPathTracingIncludeIndirectDiffuse_incl`
 
 Should the render include indirect diffuse lighting contributions?
+
+<div class="hdue-figure" data-figure="ref-pt-include-indirect-diffuse"></div>
 
 #### Specular { #unreal-postprocess-pathtracingincludespecular }
 
@@ -261,12 +277,16 @@ Houdini parameter `xn__unrealpostProcessPathTracingIncludeSpecular_3bcl`
 
 Should the render include specular lighting contributions?
 
+<div class="hdue-figure" data-figure="ref-pt-include-specular"></div>
+
 #### Indirect Specular { #unreal-postprocess-pathtracingincludeindirectspecular }
 
 `unreal:postProcess:PathTracingIncludeIndirectSpecular` · Default On · Path Tracer only  
 Houdini parameter `xn__unrealpostProcessPathTracingIncludeIndirectSpecular_4ocl`
 
 Should the render include indirect specular lighting contributions?
+
+<div class="hdue-figure" data-figure="ref-pt-include-indirect-specular"></div>
 
 #### Volume { #unreal-postprocess-pathtracingincludevolume }
 
@@ -290,6 +310,8 @@ Should the render include volume lighting contributions?
 Houdini parameter `xn__unrealdebugView_i0a`
 
 Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
+
+<div class="hdue-figure" data-figure="debug-views-modes"></div>
 
 | Value | Label |
 |---|---|
@@ -329,6 +351,8 @@ Renders one of UE's viewport view modes instead of the lit image, as its View Mo
 Houdini parameter `xn__unrealsubdivisionLevel_wcb`
 
 Uniform refinement of catmullClark and loop meshes; each level has 4x the faces. 0, UE's USD Stage default, renders the cage; 3 matches Karma's surfaces closely.
+
+<div class="hdue-figure" data-figure="subdivision"></div>
 
 #### Require Nanite { #unreal-requirenanite }
 

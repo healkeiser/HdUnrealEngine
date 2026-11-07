@@ -34,6 +34,23 @@ def Volume "fog"
 }
 ```
 
+## Breaking up a volume with noise
+
+Real mist, smoke and haze are never uniform. A box or sphere of constant density looks like a solid object: it has hard edges and the same brightness everywhere. Shape the density field itself with noise, in SOPs, before it reaches Solaris. The noise then renders the same in Realtime, the Path Tracer and Karma, because hdUE renders whatever field it is given.
+
+1. **Volume** SOP: name `density`, the size of the region, an initial value of the density you want at its thickest (3 here: extinction per metre).
+2. **Volume Noise Fog** SOP: **Operation** Multiply, **Noise Type** Sparse Convolution, **Element Size** about the size of the pockets you want (0.6 m here). Set the range so part of it falls below 0 (Min -1.2, Max 1.8 here) and clamp at 0: those parts become clear air, which breaks up the volume's outline.
+3. **Convert VDB** (VDB, fog class), then a **SOP Import** LOP, or write the VDB and load it with a **Volume** LOP.
+
+The 4 x 3 m slab of `samples/docs/mist.usda`, lit by a low sun (Realtime). `scripts/build_docs_volumes.py` builds both volumes with these nodes:
+
+<div class="hdue-figure" data-figure="volumes-noise"></div>
+
+For cloud shapes, the **Cloud Noise** SOP and its billowy and wispy variants do the same job on a cloud's density.
+
+!!! note "Unreal Engine's own fog has no noise input"
+    UE's Exponential Height Fog and Local Fog Volumes are smooth by design: neither has a noise or texture input. In UE you break up fog with a heterogeneous volume (a VDB, as here) or with particles that use a Volume-domain material, which add density to Volumetric Fog. See [Breaking up the fog](fog.md#breaking-up-the-fog).
+
 ## Render modes
 
 | | Realtime | Path Tracer |

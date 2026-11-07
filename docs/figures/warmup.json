@@ -1,6 +1,9 @@
 {
  "scene": "cornell/cornell.usda",
  "display": "linear",
+ "settings": [
+  "unreal:warmupFrames"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"realtime\""

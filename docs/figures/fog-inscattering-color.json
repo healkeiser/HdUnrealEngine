@@ -1,6 +1,9 @@
 {
  "scene": "docs/fog.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:FogInscatteringLuminance"
+ ],
  "base": {
   "/Render/Settings": [
    "bool unreal:heightFog:bEnableVolumetricFog = 0"

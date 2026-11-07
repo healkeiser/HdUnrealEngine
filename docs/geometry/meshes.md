@@ -57,7 +57,7 @@ Not yet translated: instanced grooms, hair colour, root UVs and per-strand attri
 
 ## Points
 
-Points render as one sphere per point, sized by `widths` (the diameter; 0.1 when unauthored). Per-point `displayColor` colours them.
+Points render as one sphere per point, sized by `widths` (the diameter; 0.1 when unauthored). Per-point `displayColor` colours them. Points with `primvars:unreal:fog:extinction` render as fog instead: see [Breaking up the fog](../environment/fog.md#breaking-up-the-fog).
 
 ## Instancing
 

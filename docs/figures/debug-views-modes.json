@@ -1,6 +1,9 @@
 {
  "scene": "docs/bistro.usda",
  "display": "tonemapped",
+ "settings": [
+  "unreal:debugView"
+ ],
  "base": {},
  "values": [
   {

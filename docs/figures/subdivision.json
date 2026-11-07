@@ -1,6 +1,9 @@
 {
  "scene": "cornell/variants/subdivision.usda",
  "display": "linear",
+ "settings": [
+  "unreal:subdivisionLevel"
+ ],
  "base": {
   "/Render/Settings": [
    "token unreal:renderMode = \"realtime\""
