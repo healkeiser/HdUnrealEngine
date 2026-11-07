@@ -390,12 +390,18 @@
   const repository = document.querySelector(".md-header__source .md-source__repository");
   if (repository) new MutationObserver(facts).observe(repository, { childList: true, subtree: true });
 
-  // The pinned panel's frame (theme.css) starts under the header, whose height follows the tab bar and the font.
+  // The pinned panel's frame (theme.css) starts where the header ends: its height follows the tab bar and the font,
+  // and a banner above it (mike's, on a version that is not the latest) pushes it down until scrolled away.
   const header = document.querySelector(".md-header");
   if (header) {
-    const height = () => document.documentElement.style.setProperty("--hd-header", `${header.offsetHeight}px`);
-    new ResizeObserver(height).observe(header);
-    height();
+    const bottom = () =>
+      document.documentElement.style.setProperty(
+        "--hd-header",
+        `${Math.max(header.offsetHeight, header.getBoundingClientRect().bottom)}px`,
+      );
+    new ResizeObserver(bottom).observe(header);
+    addEventListener("scroll", bottom, { passive: true });
+    bottom();
   }
 
   // Instant navigation swaps pages without reloading scripts: rebuild on each page it shows, and let the new text rise
