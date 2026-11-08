@@ -1,0 +1,41 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:BloomSizeScale"
+ ],
+ "base": {
+  "/scene/key": [
+   "float inputs:exposure = 7"
+  ],
+  "/Render/Settings": [
+   "float unreal:postProcess:AutoExposureBias = -2.5"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomSizeScale = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomSizeScale = 4"
+    ]
+   }
+  },
+  {
+   "caption": "16",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:BloomSizeScale = 16"
+    ]
+   }
+  }
+ ]
+}

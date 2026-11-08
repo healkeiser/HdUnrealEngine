@@ -1,0 +1,70 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "No haze",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500"
+    ]
+   }
+  },
+  {
+   "caption": "Volumetric height fog",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500",
+     "bool unreal:heightFog = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Fog and dust in the beam",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500",
+     "bool unreal:heightFog = 1"
+    ]
+   }
+  }
+ ]
+}

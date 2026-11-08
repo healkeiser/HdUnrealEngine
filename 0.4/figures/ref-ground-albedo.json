@@ -1,0 +1,43 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:skyAtmosphere:GroundAlbedo"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.4, 0.4, 0.4 (default)",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:skyAtmosphere:GroundAlbedo = (0.401978, 0.401978, 0.401978)"
+    ]
+   }
+  },
+  {
+   "caption": "0.8, 0.4, 0.2",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:skyAtmosphere:GroundAlbedo = (0.8, 0.4, 0.2)"
+    ]
+   }
+  }
+ ]
+}

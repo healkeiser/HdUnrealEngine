@@ -1,0 +1,23 @@
+{
+ "scene": "docs/mist.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "uniform density",
+   "set": {
+    "/scene/mist/density": [
+     "asset filePath = @../../../samples/docs/mist_flat.vdb@"
+    ]
+   }
+  },
+  {
+   "caption": "Volume Noise Fog",
+   "set": {
+    "/scene/mist/density": [
+     "asset filePath = @../../../samples/docs/mist_noise.vdb@"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenFinalGatherScreenTraces"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:LumenFinalGatherScreenTraces = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:LumenFinalGatherScreenTraces = 0"
+    ]
+   }
+  }
+ ]
+}

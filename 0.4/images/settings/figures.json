@@ -1,0 +1,1062 @@
+{
+ "cameras-dof-render-mode": [
+  "realtime (default)",
+  "pathtraced"
+ ],
+ "cameras-exposure": [
+  "-1",
+  "0 (default)",
+  "1",
+  "2"
+ ],
+ "cameras-focus-distance": [
+  "2.4",
+  "3.6",
+  "6",
+  "8.4"
+ ],
+ "cameras-fstop": [
+  "0 (default)",
+  "1.4",
+  "2.8",
+  "5.6",
+  "11"
+ ],
+ "cameras-lens-distortion": [
+  "-0.2",
+  "0 (default)",
+  "0.2"
+ ],
+ "cm-tone-curve": [
+  "Off (default)",
+  "On"
+ ],
+ "debug-views-buffers": [
+  "Buffer: Base Color",
+  "Buffer: World Normal",
+  "Buffer: Roughness"
+ ],
+ "debug-views-modes": [
+  "Lit (default)",
+  "Unlit",
+  "Lighting Only",
+  "Detail Lighting",
+  "Reflections"
+ ],
+ "debug-views-scene": [
+  "Lumen: Lumen Scene",
+  "Lumen: Surface Cache",
+  "Virtual Shadow Map: Virtual Page",
+  "Light Complexity"
+ ],
+ "denoiser": [
+  "Off",
+  "NNE Denoiser (default)",
+  "NVIDIA OptiX"
+ ],
+ "denoising-model": [
+  "Fast",
+  "Balanced (default)",
+  "High Quality"
+ ],
+ "denoising-samples": [
+  "4",
+  "16",
+  "64"
+ ],
+ "displacement-height": [
+  "0 m",
+  "0.2 m",
+  "0.6 m"
+ ],
+ "effects-age": [
+  "1 frame",
+  "3 frames",
+  "1 s",
+  "4 s"
+ ],
+ "effects-render-mode": [
+  "Realtime",
+  "Path Tracer"
+ ],
+ "engine-quality-gi": [
+  "Low",
+  "High",
+  "Cinematic (husk default)"
+ ],
+ "first-render-tonemapper": [
+  "Off (default)",
+  "On"
+ ],
+ "fog-density": [
+  "0.02 (default)",
+  "0.3",
+  "1"
+ ],
+ "fog-extinction-scale": [
+  "0.3",
+  "1 (default)",
+  "4"
+ ],
+ "fog-height-falloff": [
+  "0.2 (default)",
+  "1",
+  "2"
+ ],
+ "fog-inscattering-color": [
+  "0, 0, 0 (default)",
+  "0.1, 0.12, 0.15"
+ ],
+ "fog-particles": [
+  "height fog only",
+  "fog particles, Noise Strength 0",
+  "fog particles, Noise Strength 1"
+ ],
+ "fog-scattering-distribution": [
+  "0",
+  "0.2 (default)",
+  "0.9"
+ ],
+ "fog-volumetric-shadow": [
+  "Off (default)",
+  "On"
+ ],
+ "fog-volumetric": [
+  "Off (default)",
+  "On"
+ ],
+ "global-illumination": [
+  "Realtime, Method None",
+  "Realtime, Method Lumen (default)",
+  "Path Tracer, 256 samples"
+ ],
+ "home-bistro-exterior": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "home-bistro-interior": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "lights-color-temperature": [
+  "2700",
+  "4000",
+  "6500 (default)",
+  "10000"
+ ],
+ "lights-distant-normalize": [
+  "0 (default)",
+  "1"
+ ],
+ "lights-dome-visible": [
+  "1 (default)",
+  "0"
+ ],
+ "lights-exposure": [
+  "0 (default)",
+  "2",
+  "4",
+  "6"
+ ],
+ "lights-indirect-intensity": [
+  "0",
+  "1 (default)",
+  "4"
+ ],
+ "lights-normalize": [
+  "0 (default)",
+  "1"
+ ],
+ "lights-size": [
+  "0.25 m",
+  "1 m (default)",
+  "2 m"
+ ],
+ "lights-spot-cone": [
+  "10",
+  "25",
+  "45"
+ ],
+ "lights-spot-softness": [
+  "0 (default)",
+  "0.2",
+  "0.6",
+  "1"
+ ],
+ "lights-sun-angle": [
+  "0.53 (default)",
+  "4",
+  "15"
+ ],
+ "lights-types": [
+  "RectLight",
+  "SphereLight",
+  "SphereLight + ShapingAPI",
+  "DistantLight"
+ ],
+ "lights-veach-render-mode": [
+  "realtime (default)",
+  "pathtraced"
+ ],
+ "lights-volumetric-scattering": [
+  "0.25",
+  "1 (default)",
+  "4"
+ ],
+ "lights-volumetric-shadow": [
+  "0 (default)",
+  "1"
+ ],
+ "materials-models": [
+  "UsdPreviewSurface",
+  "standard_surface, transmission 1",
+  "standard_surface, subsurface 1",
+  "standard_surface, sheen 1"
+ ],
+ "materialx-surfaces-coat": [
+  "0 (default)",
+  "0.5",
+  "1",
+  "1, coat_color (0.9, 0.6, 0.2)"
+ ],
+ "materialx-surfaces-sheen": [
+  "0 (default)",
+  "0.5",
+  "1"
+ ],
+ "materialx-surfaces-subsurface-scale": [
+  "0.005",
+  "0.02",
+  "0.08"
+ ],
+ "materialx-surfaces-subsurface": [
+  "0 (default)",
+  "0.5",
+  "1"
+ ],
+ "motion-blur-mode": [
+  "Realtime (Lumen)",
+  "Path Tracer, 512 samples"
+ ],
+ "motion-blur-samples": [
+  "2",
+  "4",
+  "16 (default)"
+ ],
+ "motion-blur-shutter": [
+  "0.25 frame",
+  "0.5 frame (scene)",
+  "1 frame"
+ ],
+ "motion-blur": [
+  "Off",
+  "On (default)"
+ ],
+ "nanite-pixels-per-edge": [
+  "1 (default)",
+  "4",
+  "8"
+ ],
+ "nanite-views": [
+  "Lit (default)",
+  "Nanite: Triangles",
+  "Nanite: Clusters"
+ ],
+ "opacity-and-glass-models": [
+  "Preview Surface, opacity 0.2",
+  "standard_surface, transmission 1"
+ ],
+ "opacity-and-glass-recipes": [
+  "Clear glass",
+  "Frosted glass",
+  "Green bottle glass"
+ ],
+ "opacity-and-glass-roughness": [
+  "0",
+  "0.15",
+  "0.3",
+  "0.5"
+ ],
+ "opacity-and-glass-translucency-method": [
+  "Raster (default)",
+  "Ray Traced",
+  "Path Tracer"
+ ],
+ "opacity-and-glass-transmission-depth": [
+  "0 (default)",
+  "0.02",
+  "0.1"
+ ],
+ "post-bloom": [
+  "0",
+  "0.675 (default)",
+  "2",
+  "8"
+ ],
+ "post-chromatic-aberration": [
+  "0 (default)",
+  "2",
+  "5"
+ ],
+ "post-exposure-compensation": [
+  "-2",
+  "-1",
+  "0 (default)",
+  "1",
+  "2"
+ ],
+ "post-film-grain": [
+  "0 (default)",
+  "0.3",
+  "0.8"
+ ],
+ "post-lens-flares": [
+  "0",
+  "1 (default)",
+  "4"
+ ],
+ "post-metering-mode": [
+  "Manual (default)",
+  "Auto Exposure Histogram"
+ ],
+ "post-saturation": [
+  "0",
+  "0.5",
+  "1 (default)",
+  "1.5"
+ ],
+ "post-tonemapping-method": [
+  "Filmic (default)",
+  "Standard ACES"
+ ],
+ "post-vignette": [
+  "0",
+  "0.4 (default)",
+  "1"
+ ],
+ "post-white-temp": [
+  "4000 K",
+  "6500 K (default)",
+  "9000 K"
+ ],
+ "preview-surface-clearcoat-roughness": [
+  "0.01 (default)",
+  "0.1",
+  "0.3"
+ ],
+ "preview-surface-clearcoat": [
+  "0 (default)",
+  "0.5",
+  "1"
+ ],
+ "preview-surface-diffuse-color": [
+  "(0.18, 0.18, 0.18) (default)",
+  "(0.8, 0.25, 0.08)",
+  "(0.05, 0.3, 0.8)"
+ ],
+ "preview-surface-emissive-color": [
+  "(0, 0, 0) (default)",
+  "(1, 0.3, 0.05)",
+  "(5, 1.5, 0.25)",
+  "(20, 6, 1)"
+ ],
+ "preview-surface-ior": [
+  "1.33",
+  "1.5 (default)",
+  "2.4"
+ ],
+ "preview-surface-metallic": [
+  "0 (default)",
+  "0.5",
+  "1"
+ ],
+ "preview-surface-opacity-threshold": [
+  "0 (default)",
+  "0.3",
+  "0.5"
+ ],
+ "preview-surface-opacity": [
+  "1 (default)",
+  "0.6",
+  "0.2"
+ ],
+ "preview-surface-recipes": [
+  "Mirror chrome",
+  "Rough aluminium",
+  "Plastic",
+  "Car paint",
+  "Emissive panel"
+ ],
+ "preview-surface-roughness": [
+  "0",
+  "0.2",
+  "0.5 (default)",
+  "0.8",
+  "1"
+ ],
+ "preview-surface-specular-workflow": [
+  "Metalness (default)",
+  "Specular, (0, 0, 0)",
+  "Specular, (0.04, 0.04, 0.04)",
+  "Specular, (1, 0.71, 0.29), black diffuse"
+ ],
+ "ref-anti-aliasing": [
+  "None",
+  "FXAA",
+  "TSR (default)"
+ ],
+ "ref-atmosphere-height": [
+  "20",
+  "60 (default)"
+ ],
+ "ref-bloom-convolution-intensity": [
+  "0.5",
+  "1 (default)",
+  "2"
+ ],
+ "ref-bloom-convolution-size": [
+  "0.5",
+  "1 (default)"
+ ],
+ "ref-bloom-method": [
+  "Standard (default)",
+  "Convolution"
+ ],
+ "ref-bloom-size-scale": [
+  "1",
+  "4 (default)",
+  "16"
+ ],
+ "ref-camera-aperture": [
+  "2",
+  "4 (default)",
+  "8"
+ ],
+ "ref-chromatic-aberration-offset": [
+  "0 (default)",
+  "0.5"
+ ],
+ "ref-cloud-bottom-altitude": [
+  "2",
+  "5 (default)"
+ ],
+ "ref-cloud-layer-height": [
+  "3",
+  "10 (default)"
+ ],
+ "ref-cloud-view-samples": [
+  "0.25",
+  "1 (default)",
+  "4"
+ ],
+ "ref-contrast-highlights": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-contrast-midtones": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-contrast": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-dirt-mask-intensity": [
+  "0 (default)",
+  "10",
+  "40"
+ ],
+ "ref-dirt-mask-texture": [
+  "(empty) (default)",
+  "lens_dirt.png"
+ ],
+ "ref-dirt-mask-tint": [
+  "0.5, 0.5, 0.5 (default)",
+  "1, 0.6, 0.3"
+ ],
+ "ref-dof-enabled": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-dof-petzval": [
+  "0 (default)",
+  "2"
+ ],
+ "ref-dof-squeeze": [
+  "1 (default)",
+  "2"
+ ],
+ "ref-film-black-clip": [
+  "0 (default)",
+  "0.02"
+ ],
+ "ref-film-grain-highlights": [
+  "1 (default)",
+  "0"
+ ],
+ "ref-film-grain-midtones": [
+  "1 (default)",
+  "0"
+ ],
+ "ref-film-grain-scale": [
+  "1, 1 (default)",
+  "3, 3"
+ ],
+ "ref-film-grain-shadows": [
+  "1 (default)",
+  "0"
+ ],
+ "ref-film-shoulder": [
+  "0",
+  "0.26 (default)",
+  "0.6"
+ ],
+ "ref-film-slope": [
+  "0.6",
+  "0.88 (default)",
+  "1"
+ ],
+ "ref-film-toe": [
+  "0.3",
+  "0.55 (default)",
+  "0.8"
+ ],
+ "ref-film-white-clip": [
+  "0",
+  "0.04 (default)",
+  "0.2"
+ ],
+ "ref-gain-highlights": [
+  "1, 1, 1, 1 (default)",
+  "1.2, 1, 0.8, 1",
+  "0.8, 0.9, 1.3, 1"
+ ],
+ "ref-gain-midtones": [
+  "1, 1, 1, 1 (default)",
+  "1.2, 1, 0.8, 1",
+  "0.8, 0.9, 1.3, 1"
+ ],
+ "ref-gain": [
+  "1, 1, 1, 1 (default)",
+  "1.2, 1, 0.8, 1",
+  "0.8, 0.9, 1.3, 1"
+ ],
+ "ref-gamma-highlights": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-gamma-midtones": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-gamma": [
+  "1, 1, 1, 0.7",
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 1.4"
+ ],
+ "ref-ground-albedo": [
+  "0.4, 0.4, 0.4 (default)",
+  "0.8, 0.4, 0.2"
+ ],
+ "ref-height-fog": [
+  "Off (default)",
+  "On"
+ ],
+ "ref-high-percent": [
+  "50",
+  "90 (default)"
+ ],
+ "ref-highlights-min": [
+  "0.5 (default)",
+  "0.2"
+ ],
+ "ref-indirect-lighting-color": [
+  "1, 1, 1 (default)",
+  "1, 0.7, 0.5"
+ ],
+ "ref-indirect-lighting-intensity": [
+  "0",
+  "1 (default)",
+  "2"
+ ],
+ "ref-lens-flare-bokeh-size": [
+  "1",
+  "3 (default)",
+  "8"
+ ],
+ "ref-lens-flare-tint": [
+  "1, 1, 1 (default)",
+  "1, 0.5, 0.2"
+ ],
+ "ref-lfv-albedo": [
+  "1, 1, 1 (default)",
+  "1, 0.5, 0.2"
+ ],
+ "ref-lfv-emissive": [
+  "0, 0, 0 (default)",
+  "0.2, 0.05, 0"
+ ],
+ "ref-lfv-height-density": [
+  "0.01",
+  "1 (default)"
+ ],
+ "ref-lfv-height-falloff": [
+  "100",
+  "1000 (default)"
+ ],
+ "ref-lfv-phase": [
+  "0",
+  "0.2 (default)",
+  "0.8"
+ ],
+ "ref-lfv-radial-density": [
+  "0.25",
+  "1 (default)",
+  "2"
+ ],
+ "ref-light-cast-cloud-shadows": [
+  "Off (default)",
+  "On"
+ ],
+ "ref-light-cloud-shadow-strength": [
+  "0.25",
+  "1 (default)"
+ ],
+ "ref-local-exposure-detail": [
+  "1 (default)",
+  "2"
+ ],
+ "ref-local-exposure-highlights": [
+  "1 (default)",
+  "0.5"
+ ],
+ "ref-local-exposure-method": [
+  "Bilateral (default)",
+  "Fusion"
+ ],
+ "ref-local-exposure-shadows": [
+  "1 (default)",
+  "0.5"
+ ],
+ "ref-low-percent": [
+  "10 (default)",
+  "70"
+ ],
+ "ref-lumen-ao-intensity": [
+  "0",
+  "1 (default)"
+ ],
+ "ref-lumen-diffuse-color-boost": [
+  "1 (default)",
+  "2"
+ ],
+ "ref-lumen-enabled": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-lumen-hardware-ray-tracing": [
+  "On (default)",
+  "Off (software)"
+ ],
+ "ref-lumen-max-trace-distance": [
+  "200",
+  "20000 (default)"
+ ],
+ "ref-lumen-reflection-screen-traces": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-lumen-scene-detail": [
+  "0.25",
+  "1 (default)",
+  "4"
+ ],
+ "ref-lumen-screen-traces": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-lumen-skylight-leaking": [
+  "0 (default)",
+  "0.3"
+ ],
+ "ref-max-brightness": [
+  "0.1",
+  "8 (default)"
+ ],
+ "ref-megalights": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-mie-absorption-scale": [
+  "0.000444 (default)",
+  "0.01"
+ ],
+ "ref-mie-anisotropy": [
+  "0.4",
+  "0.8 (default)",
+  "0.95"
+ ],
+ "ref-min-brightness": [
+  "0.03 (default)",
+  "1"
+ ],
+ "ref-motion-blur-amount": [
+  "0.25",
+  "0.5 (default)",
+  "1"
+ ],
+ "ref-multiscattering": [
+  "0",
+  "1 (default)"
+ ],
+ "ref-offset-highlights": [
+  "0, 0, 0, 0 (default)",
+  "0, 0, 0, 0.02",
+  "0, 0, 0.02, 0"
+ ],
+ "ref-offset-midtones": [
+  "0, 0, 0, 0 (default)",
+  "0, 0, 0, 0.02",
+  "0, 0, 0.02, 0"
+ ],
+ "ref-offset": [
+  "0, 0, 0, 0 (default)",
+  "0, 0, 0, 0.02",
+  "0, 0, 0.02, 0"
+ ],
+ "ref-ozone-absorption-scale": [
+  "0",
+  "0.001881 (default)",
+  "0.01"
+ ],
+ "ref-pt-include-diffuse": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-pt-include-indirect-diffuse": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-pt-include-indirect-specular": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-pt-include-specular": [
+  "On (default)",
+  "Off"
+ ],
+ "ref-pt-max-bounces": [
+  "1",
+  "2",
+  "32 (default)"
+ ],
+ "ref-ray-traced-shadows": [
+  "Off (default)",
+  "On"
+ ],
+ "ref-rayleigh-scale": [
+  "0.01",
+  "0.0331 (default)",
+  "0.1"
+ ],
+ "ref-reflection-method": [
+  "Lumen (default)",
+  "Screen Space",
+  "None"
+ ],
+ "ref-rtao": [
+  "Off (default)",
+  "On"
+ ],
+ "ref-saturation-highlights": [
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 0"
+ ],
+ "ref-saturation-midtones": [
+  "1, 1, 1, 1 (default)",
+  "1, 1, 1, 0"
+ ],
+ "ref-scene-color-tint": [
+  "1, 1, 1 (default)",
+  "1, 0.85, 0.7"
+ ],
+ "ref-screen-percentage": [
+  "25",
+  "50",
+  "100 (default)"
+ ],
+ "ref-second-fog-density": [
+  "0 (default)",
+  "0.5"
+ ],
+ "ref-shadow-quality": [
+  "Low",
+  "High",
+  "Epic (default)"
+ ],
+ "ref-shadows-max": [
+  "0.09 (default)",
+  "0.3"
+ ],
+ "ref-sharpen": [
+  "0 (default)",
+  "2",
+  "6"
+ ],
+ "ref-sky-atmosphere": [
+  "Off (default)",
+  "On"
+ ],
+ "ref-sky-luminance-factor": [
+  "1, 1, 1 (default)",
+  "1, 0.8, 0.6"
+ ],
+ "ref-ssao-intensity": [
+  "0",
+  "0.5 (default)",
+  "1"
+ ],
+ "ref-ssao-radius": [
+  "50",
+  "200 (default)",
+  "600"
+ ],
+ "ref-temperature-type": [
+  "White Balance (default), 4500 K",
+  "Color Temperature, 4500 K"
+ ],
+ "ref-tone-curve-amount": [
+  "0",
+  "0.5",
+  "1 (default)"
+ ],
+ "ref-virtual-shadow-maps": [
+  "On (default)",
+  "Off (shadow maps)"
+ ],
+ "ref-volumetric-fog-albedo": [
+  "1, 1, 1 (default)",
+  "1, 0.6, 0.3"
+ ],
+ "ref-volumetric-fog-emissive": [
+  "0, 0, 0 (default)",
+  "0.02, 0.01, 0"
+ ],
+ "ref-volumetric-fog-start-distance": [
+  "0 (default)",
+  "300"
+ ],
+ "ref-vsm-directional-bias": [
+  "-1.5 (default)",
+  "2"
+ ],
+ "ref-white-tint": [
+  "-0.5",
+  "0 (default)",
+  "0.5"
+ ],
+ "render-mode": [
+  "Realtime (Lumen)",
+  "Path Tracer, 512 samples"
+ ],
+ "render-settings-exposure": [
+  "-2",
+  "-1",
+  "0 (default)",
+  "+1",
+  "+2"
+ ],
+ "render-settings-tonemapper": [
+  "Off (default)",
+  "On"
+ ],
+ "render-settings-veach": [
+  "Realtime (Lumen)",
+  "Path Tracer, 256 samples"
+ ],
+ "samples": [
+  "4",
+  "16",
+  "64",
+  "256",
+  "1024"
+ ],
+ "sky-clouds": [
+  "Off (default)",
+  "On"
+ ],
+ "sky-mie-scattering": [
+  "0.003996 (default)",
+  "0.02",
+  "0.1"
+ ],
+ "sky-sun-elevation": [
+  "45\u00b0",
+  "15\u00b0",
+  "5\u00b0",
+  "1\u00b0"
+ ],
+ "subdivision": [
+  "0 (default)",
+  "1",
+  "2",
+  "3"
+ ],
+ "tonemapper": [
+  "Off (default)",
+  "On"
+ ],
+ "tut-dof-mb-dof-pt": [
+  "Realtime",
+  "Path Tracer"
+ ],
+ "tut-dof-mb-final": [
+  "fStop 2, focusDistance 6"
+ ],
+ "tut-dof-mb-focus": [
+  "focusDistance 2.4",
+  "focusDistance 6 (scene)",
+  "focusDistance 9.6"
+ ],
+ "tut-dof-mb-fstop": [
+  "fStop 0 (default)",
+  "fStop 8",
+  "fStop 2"
+ ],
+ "tut-dof-mb-pt": [
+  "Realtime",
+  "Path Tracer"
+ ],
+ "tut-dof-mb-samples": [
+  "Motion Samples 1",
+  "Motion Samples 4",
+  "Motion Samples 16 (default)"
+ ],
+ "tut-dof-mb-shutter": [
+  "Shutter 0.25 frame",
+  "Shutter 0.5 frame (scene)",
+  "Shutter 1 frame"
+ ],
+ "tut-exposure-auto": [
+  "Manual, compensation 0 (default)",
+  "Auto Exposure Histogram, compensation 1"
+ ],
+ "tut-exposure-bias": [
+  "-1",
+  "0 (default)",
+  "+1",
+  "+2"
+ ],
+ "tut-exposure-tonecurve": [
+  "Disable Tone Curve off (default)",
+  "Disable Tone Curve on"
+ ],
+ "tut-exposure-tonemapper": [
+  "Unreal Tonemapper off",
+  "Unreal Tonemapper on"
+ ],
+ "tut-interior-final": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-interior-grade": [
+  "Neutral",
+  "Film grain 0.12, White Temp 6000 K"
+ ],
+ "tut-interior-haze": [
+  "No haze",
+  "Volumetric height fog",
+  "Fog and dust in the beam"
+ ],
+ "tut-interior-key": [
+  "Lamps only",
+  "Lamps and the key spot"
+ ],
+ "tut-interior-lens": [
+  "Pinhole (fStop 0)",
+  "f/2.8, focused at 1.37 m"
+ ],
+ "tut-interior-practicals": [
+  "Lamps only"
+ ],
+ "tut-lumen-pt-bistro": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-lumen-pt-cornell": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-lumen-pt-lookdev": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-lumen-pt-reflections": [
+  "Realtime, Ray Lighting Mode Project Default",
+  "Realtime, Hit Lighting for Reflections",
+  "Path Tracer"
+ ],
+ "tut-lumen-pt-roughness": [
+  "Max Roughness To Trace 0.4 (default)",
+  "Max Roughness To Trace 1"
+ ],
+ "tut-lumen-pt-veach": [
+  "Realtime (Lumen)",
+  "Path Tracer"
+ ],
+ "tut-noise-fireflies": [
+  "Max Path Intensity 1000",
+  "Max Path Intensity 24 (default)",
+  "Max Path Intensity 4"
+ ],
+ "tut-noise-lumen-quality": [
+  "Final Gather Quality 0.25",
+  "Final Gather Quality 1 (default)",
+  "Final Gather Quality 2"
+ ],
+ "tut-noise-lumen-warmup": [
+  "1 warmup frames",
+  "8 warmup frames",
+  "64 warmup frames (default)"
+ ],
+ "tut-noise-pt-grain": [
+  "16 spp, denoiser off",
+  "512 spp, denoiser off",
+  "16 spp, denoiser on (default)"
+ ],
+ "tut-noise-shadow-pt": [
+  "16 spp",
+  "256 spp"
+ ],
+ "tut-noise-shadow-rays": [
+  "Directional Soft Shadow Rays 1",
+  "Directional Soft Shadow Rays 8 (default)"
+ ],
+ "viewport-interactive-samples": [
+  "8",
+  "2048 (default)"
+ ],
+ "volumes-emission": [
+  "Emission Intensity 0",
+  "1"
+ ],
+ "volumes-noise": [
+  "uniform density",
+  "Volume Noise Fog"
+ ],
+ "volumes-render-mode": [
+  "Realtime",
+  "Path Tracer"
+ ],
+ "warmup": [
+  "1",
+  "4",
+  "16",
+  "64 (default)"
+ ]
+}

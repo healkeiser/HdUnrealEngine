@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Shadow:Virtual:Enable"
+ ],
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:Shadow:Virtual:Enable = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off (shadow maps)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:Shadow:Virtual:Enable = 0"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenRayLightingMode"
+ ],
+ "base": {
+  "/scene/Looks/ball/S": [
+   "float inputs:metallic = 1",
+   "float inputs:roughness = 0.1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Realtime, Ray Lighting Mode Project Default",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"realtime\""
+    ]
+   }
+  },
+  {
+   "caption": "Realtime, Hit Lighting for Reflections",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"realtime\"",
+     "token unreal:postProcess:LumenRayLightingMode = \"ELumenRayLightingModeOverride::HitLightingForReflections\""
+    ]
+   }
+  },
+  {
+   "caption": "Path Tracer",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

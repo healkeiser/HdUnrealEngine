@@ -1,0 +1,26 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:light:bCastVolumetricShadow"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/spot": [
+     "bool unreal:light:bCastVolumetricShadow = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/spot": [
+     "bool unreal:light:bCastVolumetricShadow = 1"
+    ]
+   }
+  }
+ ]
+}

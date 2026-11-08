@@ -1,0 +1,31 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Lit (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"off\""
+    ]
+   }
+  },
+  {
+   "caption": "Nanite: Triangles",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"nanite:Triangles\""
+    ]
+   }
+  },
+  {
+   "caption": "Nanite: Clusters",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:debugView = \"nanite:Clusters\""
+    ]
+   }
+  }
+ ]
+}

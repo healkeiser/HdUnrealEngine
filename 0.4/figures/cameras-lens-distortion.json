@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:lensDistortion:K1"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "-0.2",
+   "set": {
+    "/scene/camera": [
+     "float unreal:lensDistortion:K1 = -0.2"
+    ]
+   }
+  },
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/camera": [
+     "float unreal:lensDistortion:K1 = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.2",
+   "set": {
+    "/scene/camera": [
+     "float unreal:lensDistortion:K1 = 0.2"
+    ]
+   }
+  }
+ ]
+}

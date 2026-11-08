@@ -1,0 +1,36 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/Looks/ball/S": [
+   "float inputs:roughness = 0.6",
+   "float inputs:clearcoat = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.01 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:clearcoatRoughness = 0.01"
+    ]
+   }
+  },
+  {
+   "caption": "0.1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:clearcoatRoughness = 0.1"
+    ]
+   }
+  },
+  {
+   "caption": "0.3",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:clearcoatRoughness = 0.3"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:AntiAliasingMethod"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "None",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:r:AntiAliasingMethod = \"0\""
+    ]
+   }
+  },
+  {
+   "caption": "FXAA",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:r:AntiAliasingMethod = \"1\""
+    ]
+   }
+  },
+  {
+   "caption": "TSR (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:r:AntiAliasingMethod = \"4\""
+    ]
+   }
+  }
+ ]
+}
