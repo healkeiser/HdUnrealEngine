@@ -125,6 +125,14 @@
   "Off (default)",
   "On"
  ],
+ "geometry-hair-render-mode": [
+  "realtime (default)",
+  "pathtraced"
+ ],
+ "geometry-hair-strands": [
+  "off: tubes (default)",
+  "on: UE hair strands"
+ ],
  "global-illumination": [
   "Realtime, Method None",
   "Realtime, Method Lumen (default)",
