@@ -118,6 +118,8 @@ A Mesh, Xform or Scope prim with `unreal:asset` renders a cooked UE asset from t
 
 The asset keeps its UE materials, material slots, pivot and centimetre dimensions; the prim's transform places it. Without an asset catalog the menu lists the staged runtime's levels and the assets named with UE's prefixes (`SM_`, `SK_`, `BP_`, `SVT_`).
 
+An asset from another UE project (a Marketplace pack, your game) is imported with the [hdUE Unreal Asset](reference/nodes/lop/hdueunrealasset.md) LOP: pick the project and the asset, press **Import**, and UE's editor cooks it into the running runtime in the background, without a restart. The LOP also creates the prim that places it.
+
 A Sparse Volume Texture (a VDB imported in UE's editor) renders as UE's Heterogeneous Volume, in both render modes. UE reads its VDB in centimetres, so a VDB written in metres needs a scale of 100 on the prim. For a VDB sequence, `primvars:unreal:volume:frame` picks the frame (0 is the first file); set it on the Render Geometry Settings LOP as **Volume Frame**, for example `$F - 1`.
 
 Skeletal meshes render in their reference pose. Blueprint gameplay, time synchronisation and World Partition are limited.
