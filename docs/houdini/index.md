@@ -91,6 +91,7 @@ The package adds these LOPs to the TAB menu under **hdUE**:
 | **hdUE Render Products** | hdUE > Rendering | Karma Render Products |
 | **hdUE Height Fog**, **hdUE Sky Atmosphere**, **hdUE Volumetric Cloud**, **hdUE Local Fog Volume** | hdUE > Visual Effects | |
 | **hdUE Post Process Volume**, **hdUE Decal** | hdUE > Visual Effects | |
+| **hdUE Unreal Asset** | hdUE > Scene | |
 | **hdUE Substrate Material Builder** | hdUE (in `/mat` and Material Library LOPs) | Karma Material Builder |
 
-The Visual Effects LOPs place Unreal Engine's scene components as USD prims, filed as UE's Place Actors panel files them. See [Fog](../environment/fog.md), [Sky and clouds](../environment/sky.md) and [Post-processing](../rendering/post-processing.md).
+The Visual Effects LOPs place Unreal Engine's scene components as USD prims, filed as UE's Place Actors panel files them. See [Fog](../environment/fog.md), [Sky and clouds](../environment/sky.md) and [Post-processing](../rendering/post-processing.md). The Unreal Asset LOP imports an asset from another UE project and places it: see [Game effects](../environment/effects.md).

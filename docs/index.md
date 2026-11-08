@@ -74,8 +74,8 @@ hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means
 | [Render output](output/aovs.md) | AOVs, Cryptomatte, alpha |
 | [Rendering](rendering/render-settings.md) | Render modes, denoising, motion blur, colour management, post-processing, engine quality, debug views |
 | [Cameras](cameras.md) and [Lights](lights.md) | UsdGeomCamera and UsdLux in UE: depth of field, lens distortion, units, IES, HDR environments |
-| [Materials](materials.md) | UsdPreviewSurface, MaterialX, Substrate, textures, glass |
+| [Materials](materials.md) | UsdPreviewSurface, MaterialX, Substrate, textures, glass, cooked UE assets |
 | [Geometry](geometry/meshes.md) | Meshes, curves, points, subdivision, displacement, Nanite |
-| [Environment](environment/volumes.md) | Volumes, fog, sky and clouds |
+| [Environment](environment/volumes.md) | Volumes, fog, sky and clouds, game effects (Niagara) |
 | [Reference](reference/render-settings/index.md) | Generated from the engine source: render settings, light properties, USD prim types, USD conformance |
 | [Developer](architecture.md) | Architecture, building from source, specifications |
