@@ -49,11 +49,7 @@ BasisCurves render as six-sided tubes, with flat caps on open curves.
 
 ## Hair
 
-Curves render as UE hair strands when you turn on **Hair Strands** (`primvars:unreal:groom`, Render Geometry Settings LOP > Unreal Engine tab) on the curves or an ancestor.
-
-hdUE builds a UE groom with UE's own groom builder from the curves' points and per-point `widths`: one group, guides from every strand, no simulation, with UE's default hair material. It renders in Realtime and in the Path Tracer.
-
-Not yet translated: instanced grooms, hair colour, root UVs and per-strand attributes.
+Curves render as UE hair strands when you turn on **Hair Strands** (`primvars:unreal:groom`) on them or an ancestor. See [Hair](hair.md).
 
 ## Points
 

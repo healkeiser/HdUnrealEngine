@@ -1,0 +1,50 @@
+#usda 1.0
+(
+    doc = """Hair: 12,000 strands (scripts/build_docs_hair.py) on a grey 25 cm head, on the light study's floor under its key light. Hair Strands (primvars:unreal:groom) on the curves renders them as UE hair; off, they are tubes."""
+    defaultPrim = "scene"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@./lights.usda@]
+)
+
+over "scene"
+{
+    over "ball" (active = false)
+    {
+    }
+
+    # The light study's box as a pedestal under the head.
+    over "box"
+    {
+        double3 xformOp:translate = (0, 0.25, 0)
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (0.22, 0.5, 0.22)
+    }
+
+    def Sphere "head" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        double radius = 0.25
+        rel material:binding = </scene/Looks/grey>
+        double3 xformOp:translate = (0, 0.75, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def BasisCurves "hair" (prepend references = @./hair_strands.usdc@)
+    {
+        bool primvars:unreal:groom = 1 (interpolation = "constant")
+        double3 xformOp:translate = (0, 0.75, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    over "camera"
+    {
+        # A portrait lens on the head, from the front and a little to the side.
+        float focalLength = 0.7
+        double3 xformOp:translate = (1.6, 1.0, 2.6)
+        float3 xformOp:rotateXYZ = (-4, 32, 0)
+    }
+}
