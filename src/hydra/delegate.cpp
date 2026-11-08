@@ -553,6 +553,10 @@ struct ScenePacket {
         volumeParameters.swap(state.volumeParameters);
         dirtyActors.swap(state.dirtyActors);
         dirtyGrooms.swap(state.dirtyGrooms);
+        // A groom takes its bound material's colour and roughness: edits to that material rebuild it.
+        if (!dirtyMaterials.empty())
+            for (const auto& [id, groom] : state.grooms)
+                if (dirtyMaterials.count(groom.material)) dirtyGrooms.insert(id);
         removedIds.swap(state.removed);
     }
     // Gives them back after a failed upload (state lock held). Sync may have erased or revived prims meanwhile:
@@ -605,6 +609,7 @@ struct ScenePacket {
     std::vector<HduePostProcessVolumeDesc> postProcessVolumes;
     std::vector<HdueDecalDesc> decals;
     std::vector<HdueGroomDesc> grooms;
+    std::deque<std::vector<HdueGroomAttribute>> groomAttributes;
     std::vector<HdueMaterialUpdate> materialUpdates;
     std::vector<HdueWetBinding> wet;
     std::vector<const char*> removed, removedAssets;
@@ -1464,20 +1469,30 @@ void prepareActors(HdUEState& state, ScenePacket& packet) {
     }
 }
 // Grooms reach UE in world space (cm, UE axes): their points through the curves' transform, widths scaled with it.
+// Instanced curves send their points in the prototype's own space and one UE transform per instance, as instanced
+// meshes do. The strands' material: a bound prepared hair material (the host's nativeMaterialAssets) as it is; else
+// hdUE's M_HdUEHair (UE's default hair material with switches) when the groom has a colour or roughness to show, its
+// groom_color/groom_roughness attributes or a bound translated material's base colour and roughness; else UE's
+// default hair material.
 void prepareGrooms(HdUEState& state, ScenePacket& packet) {
     if (packet.dirtyGrooms.empty()) return;
     const double cmPerUnit = state.setting<double>("metersPerUnit", .01) * 100;
+    const auto basis = sceneBasis(state), inverse = basis.GetInverse();
+    const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
+    const auto nativeParameters = state.setting<VtDictionary>("nativeMaterialParameters", {});
     for (const auto& id : packet.dirtyGrooms) {
         const auto it = state.grooms.find(id);
         if (it == state.grooms.end()) continue;
         const auto& groom = it->second;
+        const bool instanced = !groom.instances.empty();
+        const GfMatrix4d place = instanced ? GfMatrix4d(1) : groom.localToWorld;
         std::vector<float> points, widths;
         points.reserve(groom.points.size() * 3);
         for (const auto& p : groom.points) {
-            const auto ue = state.convert(groom.localToWorld.Transform(GfVec3d(p)));
+            const auto ue = state.convert(place.Transform(GfVec3d(p)));
             points.insert(points.end(), {float(ue[0]), float(ue[1]), float(ue[2])});
         }
-        const double scale = std::cbrt(std::abs(groom.localToWorld.ExtractRotationMatrix().GetDeterminant()));
+        const double scale = std::cbrt(std::abs(place.ExtractRotationMatrix().GetDeterminant()));
         for (const float w : groom.widths) widths.push_back(float(w * scale * cmPerUnit));
         HdueGroomDesc desc{};
         desc.struct_size = sizeof(desc);
@@ -1488,6 +1503,53 @@ void prepareGrooms(HdUEState& state, ScenePacket& packet) {
         desc.points = packet.own(packet.floats, std::move(points));
         desc.widths_cm = packet.own(packet.floats, std::move(widths));
         desc.curve_point_counts = packet.own(packet.indices, std::vector<uint32_t>(groom.counts));
+        desc.simulate = groom.simulate;
+        if (instanced) {
+            std::vector<double> matrices(groom.instances.size() * 16);
+            for (size_t i = 0; i < groom.instances.size(); ++i)
+                rowMajor(inverse * groom.instances[i] * basis, &matrices[i * 16]);
+            desc.instance_count = uint32_t(groom.instances.size());
+            desc.instance_transforms = packet.own(packet.doubles, std::move(matrices));
+        }
+        std::vector<HdueGroomAttribute> attributes;
+        bool attributeColor = false, attributeRoughness = false;
+        for (const auto& attribute : groom.attributes) {
+            HdueGroomAttribute a{};
+            a.name = packet.own(attribute.name);
+            a.scope = attribute.scope;
+            a.components = attribute.components;
+            a.integer = attribute.integer;
+            a.values = packet.own(packet.floats, std::vector<float>(attribute.values));
+            attributes.push_back(a);
+            attributeColor |= attribute.name == "groom_color";
+            attributeRoughness |= attribute.name == "groom_roughness";
+        }
+        desc.attribute_count = uint32_t(attributes.size());
+        desc.attributes = attributes.empty() ? nullptr : packet.own(packet.groomAttributes, std::move(attributes));
+        std::vector<HdueMaterialParameter> parameters;
+        const auto scalar = [&](const char* name, float v) {
+            parameters.push_back(materialParameter(packet, name, VtValue(v)));
+        };
+        if (const auto material = asset(nativeMaterials, groom.material); !material.empty()) {
+            desc.material = packet.own(material);
+            if (const auto fields = nativeParameters.find(groom.material);
+                fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>())
+                for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
+                    parameters.push_back(materialParameter(packet, name, value));
+        } else {
+            const auto bound = state.materials.find(groom.material);
+            if (bound != state.materials.end()) {
+                parameters.push_back(materialParameter(packet, "HdUEColor", VtValue(bound->second.color)));
+                scalar("HdUEUseColor", 1);
+                scalar("HdUERoughness", bound->second.roughness);
+                scalar("HdUEUseRoughness", 1);
+            }
+            if (attributeColor) scalar("HdUEUseColorAttribute", 1);
+            if (attributeRoughness) scalar("HdUEUseRoughnessAttribute", 1);
+            if (!parameters.empty()) desc.material = packet.own(std::string("/Game/HdUE/M_HdUEHair.M_HdUEHair"));
+        }
+        desc.parameter_count = uint32_t(parameters.size());
+        desc.parameters = parameters.empty() ? nullptr : packet.own(packet.parameters, std::move(parameters));
         packet.grooms.push_back(desc);
     }
 }

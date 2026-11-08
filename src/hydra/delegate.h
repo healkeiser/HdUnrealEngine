@@ -246,6 +246,15 @@ struct HdUEActorData {
 };
 // BasisCurves with unreal:groom: UE hair strands (a UGroomAsset built at runtime) instead of tube meshes. Points are
 // the curves' evaluated samples in their own space, widths per point in scene units, counts the points per curve.
+// One groom_* primvar of a groom, as UE's USD importer reads it (HdueGroomAttribute): per strand or per point
+// (HDUE_GROOM_*), components floats per element.
+struct HdUEGroomAttributeData {
+    std::string name;
+    uint32_t scope = 0, components = 1;
+    bool integer = false;
+    std::vector<float> values;
+    bool operator==(const HdUEGroomAttributeData&) const = default;
+};
 struct HdUEGroomData {
     std::string id;
     bool visible = true;
@@ -253,6 +262,10 @@ struct HdUEGroomData {
     std::vector<GfVec3f> points;
     std::vector<float> widths;
     std::vector<uint32_t> counts;
+    std::vector<HdUEGroomAttributeData> attributes;
+    std::string material;               // the bound material's id
+    std::vector<GfMatrix4d> instances;  // world placements under an instancer (HdUEInstancePlacements); empty: none
+    bool simulate = false;              // primvars:unreal:groom:simulate
     bool operator==(const HdUEGroomData&) const = default;
 };
 struct HdUETextureData {

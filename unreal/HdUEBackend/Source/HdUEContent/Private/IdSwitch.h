@@ -57,7 +57,7 @@ UMaterialExpression* IdEmission(UMaterial* Material, const FAdd& Add) {
 
 // The Substrate graph compiler's version; scripts/substrate_graph.py COMPILER_VERSION must match.
 // 3: ID switch.
-constexpr int32 HdUESubstrateCompilerVersion = 3;
+constexpr int32 HdUESubstrateCompilerVersion = 4;
 
 // Gives a finished Substrate material the HdUEIdPass switch (custom primitive data 5) the backend sets for ID passes
 // (Scene.cpp SetIdMode), so the mesh keeps its material instead of swapping to M_HdUEId. Call it before

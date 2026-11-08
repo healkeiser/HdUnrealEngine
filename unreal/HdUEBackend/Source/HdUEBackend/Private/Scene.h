@@ -132,7 +132,7 @@ private:
     };
     TMap<FString, FVolume> Volumes;
     struct FGroom {
-        AActor* Actor = nullptr;
+        TArray<AActor*> Actors;  // one per instance
         TStrongObjectPtr<class UGroomAsset> Asset;
     };
     TMap<FString, FGroom> Grooms;  // upsert_groom, by id

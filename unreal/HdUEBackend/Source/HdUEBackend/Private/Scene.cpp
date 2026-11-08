@@ -149,7 +149,8 @@ void FHdueScene::Remove(const FString& Id) {
     Lighting->Remove(Id);
     RemoveVolume(Id);
     if (FGroom* Groom = Grooms.Find(Id)) {
-        if (IsValid(Groom->Actor)) World->DestroyActor(Groom->Actor);
+        for (AActor* Actor : Groom->Actors)
+            if (IsValid(Actor)) World->DestroyActor(Actor);
         Grooms.Remove(Id);
     }
     if (AActor** Actor = Actors.Find(Id)) {
@@ -210,9 +211,39 @@ T* AddRootComponent(AActor* Actor, TFunctionRef<void(T&)> Configure, UClass* Cla
 }  // namespace
 
 // Curves as UE hair strands: the groom asset UE's importer would build, made from memory with UE's own builder
-// (GroomAsset.cpp BuildHairGroup_Strands): one group, guides generated from every strand (no simulation), so no
-// interpolation data; positions uncompressed, as a cooked runtime uploads its in-memory bulk data as is. Drawn by a
-// groom component with UE's default hair material.
+// (GroomAsset.cpp BuildHairGroup_Strands): one group, guides generated from every strand, so no interpolation data;
+// positions uncompressed, as a cooked runtime uploads its in-memory bulk data as is. Its groom_* attributes are the
+// ones UE's USD importer reads (USDGroomConversion.cpp ConvertPrimvar), for materials' Hair Attributes node. Drawn by
+// one groom component per instance, with the bound material (a slot of its own) or UE's default hair material.
+namespace {
+template <class T>
+T GroomValue(const HdueGroomAttribute& Attribute, uint32 Index) {
+    const float* V = Attribute.values + size_t(Index) * Attribute.components;
+    if constexpr (std::is_same_v<T, FVector3f>)
+        return FVector3f(V[0], Attribute.components > 1 ? V[1] : V[0], Attribute.components > 2 ? V[2] : V[0]);
+    else if constexpr (std::is_same_v<T, FVector2f>)
+        return FVector2f(V[0], Attribute.components > 1 ? V[1] : 0.f);
+    else if constexpr (std::is_same_v<T, int32>)
+        return int32(FMath::RoundToInt(V[0]));
+    else
+        return V[0];
+}
+template <class T>
+void SetGroomAttribute(FHairDescription& Description, const HdueGroomAttribute& Attribute, uint32 Count) {
+    const FName Name(UTF8_TO_TCHAR(Attribute.name));
+    if (Attribute.scope == HDUE_GROOM_VERTEX) {
+        auto& Attributes = Description.VertexAttributes();
+        if (!Attributes.HasAttribute(Name)) Attributes.RegisterAttribute<T>(Name, 1, T());
+        auto Ref = Attributes.GetAttributesRef<T>(Name);
+        for (uint32 I = 0; I < Count; ++I) Ref[FVertexID(int32(I))] = GroomValue<T>(Attribute, I);
+    } else {
+        auto& Attributes = Description.StrandAttributes();
+        if (!Attributes.HasAttribute(Name)) Attributes.RegisterAttribute<T>(Name, 1, T());
+        auto Ref = Attributes.GetAttributesRef<T>(Name);
+        for (uint32 I = 0; I < Count; ++I) Ref[FStrandID(int32(I))] = GroomValue<T>(Attribute, I);
+    }
+}
+}  // namespace
 bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
     const FString Id = UTF8_TO_TCHAR(Desc.id);
     FHairDescription Description;
@@ -227,6 +258,19 @@ bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
     for (uint32 I = 0; I < Desc.curve_count; ++I)
         SetHairStrandAttribute(Description, FStrandID(int32(I)), HairAttribute::Strand::VertexCount,
                                int32(Desc.curve_point_counts[I]));
+    for (uint32 A = 0; A < Desc.attribute_count; ++A) {
+        const HdueGroomAttribute& Attribute = Desc.attributes[A];
+        if (!Attribute.name || !Attribute.values || Attribute.components < 1 || Attribute.components > 3) continue;
+        const uint32 Count = Attribute.scope == HDUE_GROOM_VERTEX ? Desc.point_count : Desc.curve_count;
+        if (Attribute.integer)
+            SetGroomAttribute<int32>(Description, Attribute, Count);
+        else if (Attribute.components == 3)
+            SetGroomAttribute<FVector3f>(Description, Attribute, Count);
+        else if (Attribute.components == 2)
+            SetGroomAttribute<FVector2f>(Description, Attribute, Count);
+        else
+            SetGroomAttribute<float>(Description, Attribute, Count);
+    }
     TStrongObjectPtr<UGroomAsset> Asset(NewObject<UGroomAsset>(GetTransientPackage()));
     Asset->SetNumGroup(1);
     auto& Interpolation = Asset->GetHairGroupsInterpolation()[0];
@@ -248,6 +292,27 @@ bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
     FGroomBuilder::BuildClusterBulkData(Strands, Groups.Bounds.SphereRadius, Asset->GetHairGroupsLOD()[0],
                                         Platform.Strands.ClusterBulkData);
     Asset->GetHairGroupsRendering()[0].ShadowSettings.bUseHairRaytracingGeometry = true;  // the Path Tracer's strands
+    // The bound material, in a slot of its own; UGroomComponent::GetMaterial falls back to UE's default hair material
+    // for a material that cannot draw hair (IsHairMaterialCompatible).
+    if (Desc.material && *Desc.material) {
+        UMaterialInterface* Parent = LoadObject<UMaterialInterface>(nullptr, UTF8_TO_TCHAR(Desc.material));
+        const UMaterial* Base = Parent ? Parent->GetMaterial() : nullptr;
+        if (!Base || !Base->GetUsageByFlag(MATUSAGE_HairStrands)) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: groom %s material %hs is missing or not a hair material; using UE's default hair "
+                        "material"),
+                   *Id, Desc.material);
+        } else {
+            UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Parent, Asset.Get());
+            if (Desc.parameter_count &&
+                HdueApplyMaterialParameters(*Material, Desc.parameters, Desc.parameter_count, Error) != HDUE_OK)
+                return false;
+            FHairGroupsMaterial& Slot = Asset->GetHairGroupsMaterials().AddDefaulted_GetRef();
+            Slot.Material = Material;
+            Slot.SlotName = TEXT("hdUE");
+            Asset->GetHairGroupsRendering()[0].MaterialSlotName = Slot.SlotName;
+        }
+    }
     // No cards or meshes, but UGroomAsset::InitCardsResources/InitMeshesResources check their LOD arrays match the
     // group's LOD count (the editor's cache build sizes them the same way).
     const int32 LODCount = Asset->GetHairGroupsLOD()[0].LODs.Num();
@@ -260,15 +325,28 @@ bool FHdueScene::UpsertGroom(const HdueGroomDesc& Desc, FString& Error) {
         return false;
     }
     FGroom& Groom = Grooms.FindOrAdd(Id);
-    if (IsValid(Groom.Actor)) World->DestroyActor(Groom.Actor);
-    Groom.Actor = World->SpawnActor<AActor>();
-    AddRootComponent<UGroomComponent>(Groom.Actor, [&](UGroomComponent& Component) {
-        Component.SetGroomAsset(Asset.Get());
-        // UGroomComponent::PostLoad's call: a spawned component is never loaded.
-        Component.PrecachePSOs();
-    });
+    for (AActor* Actor : Groom.Actors)
+        if (IsValid(Actor)) World->DestroyActor(Actor);
+    Groom.Actors.Reset();
+    // Instances share the asset: one component each, placed by its transform (FTransform keeps no shear).
+    const uint32 Count = FMath::Max(1u, Desc.instance_count);
+    for (uint32 I = 0; I < Count; ++I) {
+        AActor* Actor = World->SpawnActor<AActor>();
+        AddRootComponent<UGroomComponent>(Actor, [&](UGroomComponent& Component) {
+            if (Desc.instance_count) {
+                FMatrix M;
+                for (int32 R = 0; R < 4; ++R)
+                    for (int32 C = 0; C < 4; ++C) M.M[R][C] = Desc.instance_transforms[I * 16 + R * 4 + C];
+                Component.SetWorldTransform(FTransform(M));
+            }
+            Component.SetGroomAsset(Asset.Get());
+            // UGroomComponent::PostLoad's call: a spawned component is never loaded.
+            Component.PrecachePSOs();
+        });
+        Actor->SetActorHiddenInGame(!Desc.visible);
+        Groom.Actors.Add(Actor);
+    }
     Groom.Asset = MoveTemp(Asset);
-    Groom.Actor->SetActorHiddenInGame(!Desc.visible);
     return true;
 }
 bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {

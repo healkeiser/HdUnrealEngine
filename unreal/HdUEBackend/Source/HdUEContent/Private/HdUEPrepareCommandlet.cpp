@@ -46,6 +46,7 @@
 #include "Materials/MaterialExpressionMaterialFunctionCall.h"
 #include "Materials/MaterialExpressionFunctionInput.h"
 #include "Materials/MaterialExpressionStaticBool.h"
+#include "Materials/MaterialExpressionHairAttributes.h"
 #include "Materials/MaterialFunction.h"
 #include "Engine/VolumeTexture.h"
 #include "AssetImportTask.h"
@@ -808,6 +809,70 @@ UMaterial* CreateFogParticleMaterial() {
     Material->PostEditChange();
     return SaveAsset(Material) ? Material : nullptr;
 }
+// Hair material for grooms with colour or roughness (HdueGroomDesc.material): UE's own default hair material
+// (/HairStrands/Materials/HairDefaultMaterial, the one UGroomComponent draws strands with) copied, its Base Color and
+// Roughness each passed through two switches that are off by default, so it renders as UE's until a groom turns them
+// on: HdUEUseColor/HdUEColor (a bound material's colour), then HdUEUseColorAttribute (the groom's own groom_color,
+// read by UE's Hair Attributes node, as a UE hair material reads it); the same for roughness.
+UMaterial* CreateHairMaterial() {
+    const FString Path = TEXT("/Game/HdUE/M_HdUEHair");
+    auto* Material = LoadObject<UMaterial>(nullptr, TEXT("/Game/HdUE/M_HdUEHair.M_HdUEHair"), nullptr, LOAD_NoWarn);
+    if (Material)
+        for (const auto& Expression : Material->GetExpressionCollection().Expressions)
+            if (const auto* Use = Cast<UMaterialExpressionScalarParameter>(Expression);
+                Use && Use->ParameterName == TEXT("HdUEUseRoughnessAttribute"))
+                return Material;
+    auto* Source = LoadObject<UMaterial>(
+        nullptr, TEXT("/HairStrands/Materials/HairDefaultMaterial.HairDefaultMaterial"), nullptr, LOAD_NoWarn);
+    if (!Source) {
+        UE_LOG(LogTemp, Error, TEXT("UE's default hair material is missing (HairStrands plugin)."));
+        return nullptr;
+    }
+    UPackage* Package = CreatePackage(*Path);
+    Material = DuplicateObject<UMaterial>(Source, Package, TEXT("M_HdUEHair"));
+    Material->SetFlags(RF_Public | RF_Standalone);
+    Material->PreEditChange(nullptr);
+    auto* Attributes = NewObject<UMaterialExpressionHairAttributes>(Material);
+    Material->GetExpressionCollection().AddExpression(Attributes);
+    const auto Add = [&](auto* Expression) {
+        Material->GetExpressionCollection().AddExpression(Expression);
+        return Expression;
+    };
+    const auto Scalar = [&](const TCHAR* Name, float Value) {
+        auto* Parameter = Add(NewObject<UMaterialExpressionScalarParameter>(Material));
+        Parameter->ParameterName = Name;
+        Parameter->DefaultValue = Value;
+        return Parameter;
+    };
+    // Input <- lerp(lerp(its source, Bound, UseBound), Hair Attributes output, UseAttribute).
+    const auto Switch = [&](FExpressionInput& Input, UMaterialExpression* Bound, const TCHAR* UseBound,
+                            int32 AttributeOutput, const TCHAR* UseAttribute) {
+        auto* First = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+        First->A = Input;
+        First->B.Connect(0, Bound);
+        First->Alpha.Connect(0, Scalar(UseBound, 0.f));
+        auto* Second = Add(NewObject<UMaterialExpressionLinearInterpolate>(Material));
+        Second->A.Connect(0, First);
+        Second->B.Connect(AttributeOutput, Attributes);
+        Second->Alpha.Connect(0, Scalar(UseAttribute, 0.f));
+        Input.Connect(0, Second);
+    };
+    auto* Data = Material->GetEditorOnlyData();
+    if (!Data->BaseColor.Expression || !Data->Roughness.Expression) {
+        UE_LOG(LogTemp, Error, TEXT("UE's default hair material has no Base Color or Roughness input to extend."));
+        return nullptr;
+    }
+    auto* Color = Add(NewObject<UMaterialExpressionVectorParameter>(Material));
+    Color->ParameterName = TEXT("HdUEColor");
+    Color->DefaultValue = FLinearColor(1, 1, 1, 1);
+    // UMaterialExpressionHairAttributes outputs: 7 BaseColor, 8 Roughness.
+    Switch(Data->BaseColor, Color, TEXT("HdUEUseColor"), 7, TEXT("HdUEUseColorAttribute"));
+    Switch(Data->Roughness, Scalar(TEXT("HdUERoughness"), 0.5f), TEXT("HdUEUseRoughness"), 8,
+           TEXT("HdUEUseRoughnessAttribute"));
+    Material->SetUsageByFlag(MATUSAGE_HairStrands, true);
+    Material->PostEditChange();
+    return SaveAsset(Material) ? Material : nullptr;
+}
 // Light function parent for unreal:lightFunction:texture: the texture over UE's light-function coordinates filters the
 // light, as a light function material made in the editor does; compatible with the Light Function Atlas, through which
 // MegaLights reads light functions.
@@ -1011,7 +1076,8 @@ int32 UHdUEPrepareCommandlet::Main(const FString& Params) {
                             Blend, LinearWhite, true, Thin, TwoSided, Virtual))
                         return 3;
     if (!Masked || !CreateAovMaterial() || !CreateIdMaterial() || !CreateVolumeMaterial() ||
-        !CreateFogParticleMaterial() || !CreateLightFunctionMaterial() || !CreateSparseVolumeAssets())
+        !CreateFogParticleMaterial() || !CreateLightFunctionMaterial() || !CreateHairMaterial() ||
+        !CreateSparseVolumeAssets())
         return 3;
     UMaterial* Glass = CreateGlass();
     UMaterial* Native = CreatePBR(TEXT("M_Native"), FLinearColor(0.05f, 0.15f, 0.8f), 0.6f, 0.15f);

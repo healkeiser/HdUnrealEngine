@@ -1319,6 +1319,75 @@ public:
         // unreal:groom: UE hair strands (UGroomAsset, HairStrands) from the evaluated samples, instead of tubes.
         const bool groom = value(delegate->Get(GetId(), TfToken("unreal:groom")), false);
         HdUEGroomData hair;
+        // A groom's groom_* primvars, as UE's USD importer reads them (USDGroomConversion.cpp): uniform and constant
+        // ones per strand, the others per point, evaluated at the curve's samples like its widths. displayColor stands
+        // in for groom_color when the curves have neither that nor a bound material, as it colours unbound meshes.
+        struct GroomSource {
+            std::string name;
+            VtArray<GfVec3d> values;
+            HdInterpolation domain;
+            uint32_t components;
+            bool integer;
+        };
+        std::vector<GroomSource> groomSources;
+        if (groom) {
+            for (int i = 0; i < HdInterpolationCount; ++i)
+                for (const auto& descriptor : delegate->GetPrimvarDescriptors(GetId(), HdInterpolation(i))) {
+                    const auto& name = descriptor.name.GetString();
+                    if (!TfStringStartsWith(name, "groom_")) continue;
+                    GroomSource source{name, {}, HdInterpolation(i), 1, false};
+                    const auto raw = delegate->Get(GetId(), descriptor.name);
+                    const auto fill = [&](const auto& array, uint32_t components, bool integer, auto convert) {
+                        source.components = components;
+                        source.integer = integer;
+                        for (const auto& v : array) source.values.push_back(convert(v));
+                    };
+                    if (raw.IsHolding<VtFloatArray>())
+                        fill(raw.UncheckedGet<VtFloatArray>(), 1, false, [](float v) { return GfVec3d(v, 0, 0); });
+                    else if (raw.IsHolding<VtDoubleArray>())
+                        fill(raw.UncheckedGet<VtDoubleArray>(), 1, false, [](double v) { return GfVec3d(v, 0, 0); });
+                    else if (raw.IsHolding<VtIntArray>())
+                        fill(raw.UncheckedGet<VtIntArray>(), 1, true, [](int v) { return GfVec3d(v, 0, 0); });
+                    else if (raw.IsHolding<VtVec2fArray>())
+                        fill(raw.UncheckedGet<VtVec2fArray>(), 2, false,
+                             [](const GfVec2f& v) { return GfVec3d(v[0], v[1], 0); });
+                    else if (raw.IsHolding<VtVec2dArray>())
+                        fill(raw.UncheckedGet<VtVec2dArray>(), 2, false,
+                             [](const GfVec2d& v) { return GfVec3d(v[0], v[1], 0); });
+                    else if (raw.IsHolding<VtVec3fArray>())
+                        fill(raw.UncheckedGet<VtVec3fArray>(), 3, false, [](const GfVec3f& v) { return GfVec3d(v); });
+                    else if (raw.IsHolding<VtVec3dArray>())
+                        fill(raw.UncheckedGet<VtVec3dArray>(), 3, false, [](const GfVec3d& v) { return v; });
+                    else if (raw.IsHolding<float>())
+                        fill(VtFloatArray{raw.UncheckedGet<float>()}, 1, false,
+                             [](float v) { return GfVec3d(v, 0, 0); });
+                    else if (raw.IsHolding<int>())
+                        fill(VtIntArray{raw.UncheckedGet<int>()}, 1, true, [](int v) { return GfVec3d(v, 0, 0); });
+                    else if (raw.IsHolding<GfVec3f>())
+                        fill(VtVec3fArray{raw.UncheckedGet<GfVec3f>()}, 3, false,
+                             [](const GfVec3f& v) { return GfVec3d(v); });
+                    else
+                        continue;  // strings (groom_group_name, ...) and other types: not read
+                    groomSources.push_back(std::move(source));
+                }
+            const bool hasColor = std::any_of(groomSources.begin(), groomSources.end(),
+                                              [](const GroomSource& s) { return s.name == "groom_color"; });
+            if (!hasColor && !displayColor.empty())
+                groomSources.push_back(
+                    {"groom_color", VtArray<GfVec3d>(displayColor.begin(), displayColor.end()), colorDomain, 3, false});
+            // UE's groom builder reads colour, roughness and AO per point only (GroomBuilder.cpp
+            // BuildHairDescriptionGroups): a per-curve or constant one is spread over its curve's points.
+            const auto perPoint = [](const GroomSource& s) {
+                return (s.domain != HdInterpolationUniform && s.domain != HdInterpolationConstant) ||
+                       s.name == "groom_color" || s.name == "groom_roughness" || s.name == "groom_ao";
+            };
+            for (const auto& source : groomSources)
+                hair.attributes.push_back({source.name,
+                                           perPoint(source) ? uint32_t(HDUE_GROOM_VERTEX) : uint32_t(HDUE_GROOM_STRAND),
+                                           source.components,
+                                           source.integer,
+                                           {}});
+        }
         // ponytail: 6-sided tubes per sample; dense grooms produce large meshes, camera-facing ribbons if that matters.
         for (size_t curveIndex = 0; curveIndex < counts.size(); ++curveIndex) {
             const size_t count = size_t(std::max(0, counts[curveIndex]));
@@ -1349,6 +1418,18 @@ public:
                     hair.widths.push_back(float(at(width, sample)));
                 }
                 hair.counts.push_back(uint32_t(curve.size()));
+                for (size_t a = 0; a < groomSources.size(); ++a) {
+                    const auto& source = groomSources[a];
+                    auto& out = hair.attributes[a];
+                    const auto values = primvar(source.values, source.domain, GfVec3d(0));
+                    const auto put = [&](const GfVec3d& v) {
+                        for (uint32_t c = 0; c < source.components; ++c) out.values.push_back(float(v[c]));
+                    };
+                    if (out.scope == HDUE_GROOM_STRAND)
+                        put(values.value);
+                    else
+                        for (const auto& sample : curve) put(at(values, sample));
+                }
                 continue;
             }
             // Parallel-transported frame along the curve; ribbons span the authored normal's binormal instead.
@@ -1426,6 +1507,9 @@ public:
             hair.id = mesh.id;
             hair.visible = mesh.visible;
             hair.localToWorld = mesh.transform;
+            hair.material = delegate->GetMaterialId(GetId()).GetString();
+            hair.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), mesh.transform);
+            hair.simulate = value(delegate->Get(GetId(), TfToken("unreal:groom:simulate")), false);
             const bool hadTubes = state->locked([&] { return state->meshes.count(hair.id) > 0; });
             if (hadTubes) state->erase(hair.id);  // its tubes, when unreal:groom was just turned on
             std::lock_guard lock(state->mutex);

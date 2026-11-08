@@ -13,6 +13,35 @@
 
 over "scene"
 {
+    over "Looks"
+    {
+        # A Substrate Builder hair material (prepared when bound): the hair page's colour figure binds it.
+        def Material "hair"
+        {
+            token outputs:surface.connect = </scene/Looks/hair/Preview.outputs:surface>
+            token outputs:unreal:surface.connect = </scene/Looks/hair/Graph/hair.outputs:out>
+            custom int unreal:substrate:version = 1
+
+            def "Graph"
+            {
+                def Shader "hair"
+                {
+                    uniform token info:id = "unreal:substrate:hair"
+                    color3f inputs:base_color = (0.05, 0.025, 0.012)
+                    float inputs:roughness = 0.35
+                    token outputs:out
+                }
+            }
+
+            def Shader "Preview"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.05, 0.025, 0.012)
+                token outputs:surface
+            }
+        }
+    }
+
     over "ball" (active = false)
     {
     }

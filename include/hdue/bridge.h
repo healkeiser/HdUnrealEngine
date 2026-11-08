@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 23u
+#define HDUE_ABI_VERSION 24u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -508,9 +508,18 @@ typedef HdueLocalFogVolumeDesc HduePostProcessVolumeDesc;
  * remove_asset removes it. */
 typedef HdueLocalFogVolumeDesc HdueDecalDesc;
 /* upsert_groom (ABI 16): curves as UE hair strands, a UGroomAsset built at runtime and drawn by a groom component (UE's
- * default hair material). points: point_count xyz in UE world centimeters; widths_cm per point; curve_point_counts per
- * curve, summing to point_count. Guides are generated from every strand (no simulation). apply_scene's removed_ids
- * removes it. */
+ * default hair material). points: point_count xyz in centimeters in UE axes, in world space or, with instances, in
+ * each instance's space; widths_cm per point; curve_point_counts per curve, summing to point_count. Guides are
+ * generated from every strand. apply_scene's removed_ids removes it. */
+enum { HDUE_GROOM_STRAND = 0, HDUE_GROOM_VERTEX = 1 };
+/* ABI 24: one groom attribute, as UE's USD importer reads a groom_* primvar (USDGroomConversion.cpp): its name
+ * (groom_color, groom_roughness, groom_ao, groom_root_uv, groom_clumpid, groom_id, ...), per strand or per point
+ * (HDUE_GROOM_*), components floats per element (1 to 3), integer when UE stores it as int32. */
+typedef struct HdueGroomAttribute {
+    const char* name;
+    uint32_t scope, components, integer, reserved;
+    const float* values;
+} HdueGroomAttribute;
 typedef struct HdueGroomDesc {
     uint32_t struct_size;
     uint32_t visible;
@@ -519,6 +528,20 @@ typedef struct HdueGroomDesc {
     const float* points;
     const float* widths_cm;
     const uint32_t* curve_point_counts;
+    /* ABI 24: the groom attributes. */
+    const HdueGroomAttribute* attributes;
+    uint32_t attribute_count;
+    /* ABI 24: instances, each a row-major 4x4 UE world transform (cm): the groom is built once and drawn once per
+       instance. 0: points are in world space, drawn once. */
+    uint32_t instance_count;
+    const double* instance_transforms;
+    /* ABI 24: a cooked material for the strands (a prepared hair material, or /Game/HdUE/M_HdUEHair) and its
+       parameters; null or empty: UE's default hair material. */
+    const char* material;
+    const HdueMaterialParameter* parameters;
+    uint32_t parameter_count;
+    /* ABI 24: UE's groom physics (the groom asset's simulation, guides from every strand): 1 simulates it. */
+    uint32_t simulate;
 } HdueGroomDesc;
 enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
 enum {

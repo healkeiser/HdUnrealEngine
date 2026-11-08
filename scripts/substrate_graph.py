@@ -345,9 +345,7 @@ USD_TYPES = {
 }
 # BSDFs UE's Substrate accepts only as the root of a material (MaterialExpressionSubstrate.cpp's topology checks).
 ROOT_ONLY = ("unlit", "hair", "eye", "water")
-COMPILER_VERSION = (
-    3  # HdUESubstrateCompilerVersion (IdSwitch.h) must match; 3: ID switch
-)
+COMPILER_VERSION = 4  # HdUESubstrateCompilerVersion (IdSwitch.h) must match; 3: ID switch; 4: hair strands usage
 ERROR_ATTRIBUTE = "unreal:substrate:authoringError"
 
 

@@ -125,6 +125,11 @@
   "Off (default)",
   "On"
  ],
+ "geometry-hair-colour": [
+  "UE's default hair material (default)",
+  "groom_color",
+  "a Substrate Hair material"
+ ],
  "geometry-hair-render-mode": [
   "realtime (default)",
   "pathtraced"

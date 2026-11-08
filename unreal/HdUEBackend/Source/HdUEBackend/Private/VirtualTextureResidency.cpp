@@ -41,7 +41,7 @@ void FHdueVirtualTextureResidency::Update(FRHICommandListImmediate& Commands) {
     if (Status().phase != HDUE_RESIDENCY_PREPARING) return;
     // The previous warm-up draw finished on the GPU: its feedback is mapped in this draw's VT update and its pages
     // produced there. Counted in draws the CPU queued ahead, the pages looked settled after 30 ms with 16 of them.
-    Commands.BlockUntilGPUIdle();
+    Commands.SubmitAndBlockUntilGPUIdle();
     FScopeLock Lock(&Mutex);
     Progress.preparation_ms = (FPlatformTime::Seconds() - Started) * 1000;
     ++Progress.preparation_frames;

@@ -1,5 +1,6 @@
 #include "HdUESubstrateCommandlet.h"
 #include "IdSwitch.h"
+#include "HairUsage.h"
 #include "HdUEImportMaterialXCommandlet.h"
 #include "Commandlets/Commandlet.h"
 #include "MaterialDomain.h"  // MD_Volume, MD_DeferredDecal
@@ -839,6 +840,7 @@ int32 CompileGraph(const FString& File, const FString& Report, bool WaitForShade
         // usage permutations (a graph without a MaterialX base drew UE's default material).
         Material->SetUsageByFlag(MATUSAGE_Nanite, true);
         Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
+        HdUESetHairUsage(Material);            // a Substrate Hair graph: grooms bound to it draw with it
         IdSwitch = HdUEAddIdSwitch(Material);  // false: ID passes swap this material to M_HdUEId
     }
     Material->PostEditChange();

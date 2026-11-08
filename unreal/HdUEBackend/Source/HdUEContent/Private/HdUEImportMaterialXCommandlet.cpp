@@ -1,6 +1,7 @@
 #include "HdUEImportMaterialXCommandlet.h"
 #include "WetMaterials.h"
 #include "IdSwitch.h"
+#include "HairUsage.h"
 #include "HdUEMaterialXAssetsPipeline.h"
 #include "InterchangeManager.h"
 #include "InterchangeSourceData.h"
@@ -339,6 +340,7 @@ int32 UHdUEImportMaterialXCommandlet::Main(const FString& Params) {
             Material->SetUsageByFlag(MATUSAGE_Nanite, true);
             // Cooked runtimes cannot compile usage permutations; Hydra instancers draw through ISMs.
             Material->SetUsageByFlag(MATUSAGE_InstancedStaticMeshes, true);
+            HdUESetHairUsage(Material);  // chiang_hair_bsdf: grooms bound to it draw with it
             Entry->SetNumberField(TEXT("normal_scale_corrections"), CorrectNormalScale(Material));
             Entry->SetNumberField(TEXT("place2d_rotation_corrections"), CorrectPlace2DRotation(Material));
             Entry->SetNumberField(TEXT("flakes"), ReplaceFlakeMarkers(Material));
