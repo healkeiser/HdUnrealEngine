@@ -169,6 +169,7 @@ Any other graph is imported in the background by UE's own MaterialX importer (In
 | `frame` | The frame at 24 fps |
 | `ambientocclusion` | 1: UE's Lumen and Path Tracer occlude the lighting themselves |
 | `disney_principled`, `thin_surface`, `generalized_schlick_edf`, a lone `thin_film` | The nearest node UE imports |
+| Graphs UE's importer fails on as written | Written as it reads them: a mix of displacement shaders as one displacement of the mixed height; a Standard Surface mixed with another shader carries its `base` weight in `base_color` (UE's importer reads any input named `base` as a Substrate layer's bottom); inputs it has no slot for (thin film on BSDFs, `color82`, `thin_walled` on `surface`) left out, with a warning when set |
 | Light shaders (`light`, `point_light`, `spot_light`, `directional_light`), `osl_set_ci`, arrays no node reads | Not imported: USD lights are UsdLux prims, and the others exist only in OSL or in no graph |
 
 `scripts/Test-MaterialXCoverage.ps1` checks this: it wires each of the 898 node definitions Houdini ships into a material, exports it, and lists what UE would not import (`-Export -One -Only ND_<name>` writes one document per node for UE's importer).
