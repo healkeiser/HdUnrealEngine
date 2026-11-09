@@ -412,6 +412,31 @@
     bottom();
   }
 
+  // The contents button is an empty label for a hidden checkbox: give it a name, a tooltip and focus. The theme's
+  // keyboard handler clicks a focused label on Enter; Space is left to us.
+  function contents() {
+    const button = document.querySelector('.md-sidebar-button[for="__toc"]');
+    if (!button || button.role) return;
+    Object.assign(button, { role: "button", tabIndex: 0, title: "On this page" });
+    button.setAttribute("aria-label", "On this page");
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== " ") return;
+      event.preventDefault();
+      button.click();
+    });
+  }
+
+  // A section picked in the contents, or Esc, closes them: on a phone they cover the page. Listeners on the document
+  // outlive navigation.
+  document.addEventListener("click", (event) => {
+    const toggle = document.getElementById("__toc");
+    if (toggle && event.target.closest(".md-sidebar--secondary .md-nav__link")) toggle.checked = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    const toggle = document.getElementById("__toc");
+    if (toggle && event.key === "Escape") toggle.checked = false;
+  });
+
   // Instant navigation swaps pages without reloading scripts: rebuild on each page it shows, and let the new text rise
   // in (not on the first load).
   let loaded = false;
@@ -422,6 +447,7 @@
     charts();
     facts();
     math();
+    contents();
     if (loaded) document.querySelector(".md-content__inner")?.classList.add("hdue-page-in");
     loaded = true;
   };
