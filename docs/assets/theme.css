@@ -651,34 +651,28 @@ html {
   background-color: var(--hd-raised);
 }
 
-/* On a phone the contents are a button in the other corner: the switch's twin, and a frosted card like the menus. */
+/* The contents' header button (hdue.js), where the contents column is gone; it replaces the theme's corner button,
+   which sat on the text. The contents open under the header as a frosted card like the menus. */
+.md-header .hdue-toc-button {
+  display: none;
+}
+.hdue-toc-button svg {
+  fill: none;
+  stroke: currentcolor;
+}
 @media screen and (max-width: 59.984375em) {
-  /* A list with a bullet per line: the theme's three bars read as the menu's button. */
-  .md-sidebar--secondary .md-sidebar-button {
-    --md-toc-icon: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"><path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/></svg>');
+  .md-header .hdue-toc-button:not([hidden]) {
+    display: inline-block;
   }
-  .md-sidebar--secondary {
-    right: 0.6rem;
-    bottom: 0.6rem;
-  }
-  .md-sidebar--secondary .md-sidebar-button {
-    padding: 0.35rem;
-    border-radius: var(--hd-radius);
-    color: var(--hd-text-muted);
-    background-color: var(--hd-frame);
-    box-shadow: inset 0 0 0 1px var(--hd-line);
-    backdrop-filter: none;
-  }
-  .md-sidebar--secondary .md-sidebar-button::after {
-    width: 1.2rem;
-    height: 1.2rem;
-  }
-  .md-sidebar--secondary .md-sidebar-button:is(:hover, :focus) {
-    color: var(--hd-text-strong);
-    background-color: var(--hd-raised);
+  .md-sidebar--secondary .md-sidebar-button__wrapper {
+    display: none;
   }
   .md-sidebar--secondary .md-sidebar__inner {
-    bottom: 2.4rem;
+    position: fixed;
+    top: calc(var(--hd-header, 3rem) + 0.4rem);
+    right: 0.6rem;
+    bottom: auto;
+    max-height: calc(100vh - var(--hd-header, 3rem) - 1rem);
     border-radius: 0.6rem;
     background-color: color-mix(in oklab, var(--hd-panel) 85%, transparent);
     backdrop-filter: blur(20px) saturate(1.6);
@@ -689,6 +683,7 @@ html {
   .md-sidebar--secondary .md-nav__title {
     background-color: transparent;
   }
+}
 }
 
 /* A new page's text rises in after an instant navigation (hdue.js). */
@@ -761,8 +756,7 @@ html {
   }
 }
 
-/* On a phone the text reads edge to edge on the panel's white, the header too: no ring, no inset. The
-   last line clears the contents button in the corner. */
+/* On a phone the text reads edge to edge on the panel's white, the header too: no ring, no inset. */
 @media screen and (max-width: 44.9375em) {
   .md-header,
   .md-main {
@@ -777,9 +771,6 @@ html {
   }
   .md-content::after {
     content: none;
-  }
-  .md-content__inner {
-    padding-bottom: 2.4rem;
   }
   /* The menu drawer is a full screen, not the theme's floating card. Its title row (the theme's label for the
      drawer's toggle) gets a close mark: the drawer hides the overlay that closes it elsewhere. */
@@ -835,6 +826,39 @@ html {
     margin: 0 0 0.4rem;
     padding: 0.2rem;
     scroll-padding-inline-start: 0.2rem;
+  }
+  /* A table's rows as cards: the first cell the title, the others under their column's header (hdue.js labels
+     them). Columns squeezed to the phone's width wrapped every few words. */
+  .md-typeset table:not([class]),
+  .md-typeset table:not([class]) :is(tbody, tr, td) {
+    display: block;
+  }
+  .md-typeset table:not([class]) {
+    border: 0;
+  }
+  .md-typeset table:not([class]) thead {
+    display: none;
+  }
+  .md-typeset table:not([class]) tr {
+    margin-bottom: 0.6rem;
+    padding: 0.3rem 0;
+    border: 1px solid var(--hd-line);
+    border-radius: 0.5rem;
+  }
+  .md-typeset table:not([class]) td {
+    padding: 0.3rem 0.8rem;
+    border: 0;
+  }
+  .md-typeset table:not([class]) td:first-child {
+    color: var(--hd-text-strong);
+    font-weight: 600;
+  }
+  .md-typeset table:not([class]) td:not(:first-child, [data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--hd-text-muted);
+    font-size: 0.6rem;
+    font-weight: 500;
   }
 }
 

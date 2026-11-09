@@ -321,13 +321,13 @@
     attributeFilter: ["data-md-color-scheme"],
   });
 
-  // The light and dark switch leaves the header for the page's corner (theme.css .hdue-palette), except on a phone,
-  // where a corner button would sit on the text. The header and the body outlive instant navigation and the theme
-  // bound its inputs at load, so moving the form keeps it working.
+  // The light and dark switch leaves the header for the page's corner (theme.css .hdue-palette), except where the
+  // menu is a drawer: there the corner is over the text. The header and the body outlive instant navigation and the
+  // theme bound its inputs at load, so moving the form keeps it working.
   const palette = document.querySelector('.md-header [data-md-component="palette"]');
   if (palette) {
     const [parent, next] = [palette.parentNode, palette.nextSibling];
-    const phone = matchMedia("(max-width: 44.9375em)");
+    const phone = matchMedia("(max-width: 76.2344em)");
     const place = () => {
       palette.classList.toggle("hdue-palette", !phone.matches);
       if (phone.matches) parent.insertBefore(palette, next);
@@ -412,24 +412,42 @@
     bottom();
   }
 
-  // The contents button is an empty label for a hidden checkbox: give it a name, a tooltip and focus. The theme's
-  // keyboard handler clicks a focused label on Enter; Space is left to us.
+  // Without the contents column the contents open from a header button beside search (theme.css .hdue-toc-button), not
+  // the theme's corner button over the text. It is a label for the theme's own toggle, so the theme's contents work
+  // unchanged; made once, since the header outlives instant navigation, and hidden on a page without contents. The
+  // theme's keyboard handler clicks a focused label on Enter; Space is left to us.
+  const tocButton = document.createElement("label");
+  Object.assign(tocButton, { htmlFor: "__toc", className: "md-header__button md-icon hdue-toc-button", tabIndex: 0 });
+  Object.assign(tocButton, { title: "On this page", hidden: true });
+  tocButton.setAttribute("role", "button");
+  tocButton.setAttribute("aria-label", "On this page");
+  tocButton.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="lucide" stroke-width="2" ' +
+    'stroke-linecap="round">' +
+    '<path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/></svg>';
+  tocButton.addEventListener("keydown", (event) => {
+    if (event.key !== " ") return;
+    event.preventDefault();
+    tocButton.click();
+  });
+  document.querySelector('.md-header label[for="__search"]')?.before(tocButton);
   function contents() {
-    const button = document.querySelector('.md-sidebar-button[for="__toc"]');
-    if (!button || button.role) return;
-    Object.assign(button, { role: "button", tabIndex: 0, title: "On this page" });
-    button.setAttribute("aria-label", "On this page");
-    button.addEventListener("keydown", (event) => {
-      if (event.key !== " ") return;
-      event.preventDefault();
-      button.click();
-    });
+    tocButton.hidden = !document.querySelector(".md-sidebar--secondary .md-nav__link");
+  }
+
+  // On a phone a table's rows read as cards (theme.css): each cell carries its column's header as a label.
+  function tableLabels() {
+    for (const table of document.querySelectorAll(".md-typeset table:not([class])")) {
+      const heads = [...table.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+      for (const row of table.querySelectorAll("tbody tr")) {
+        for (const cell of row.cells) cell.dataset.label = heads[cell.cellIndex] ?? "";
+      }
+    }
   }
 
   // A section picked in the contents, or Esc, closes them: on a phone they cover the page. Opening them moves the
   // focus to their first section; closing them by Esc or by their title returns it to the button. Listeners on the
   // document outlive navigation.
-  const tocButton = () => document.querySelector('.md-sidebar-button[for="__toc"]');
   document.addEventListener("click", (event) => {
     const toggle = document.getElementById("__toc");
     if (toggle && event.target.closest(".md-sidebar--secondary .md-nav__link")) toggle.checked = false;
@@ -438,13 +456,13 @@
     const toggle = document.getElementById("__toc");
     if (!toggle?.checked || event.key !== "Escape") return;
     toggle.checked = false;
-    tocButton()?.focus();
+    tocButton.focus();
   });
   document.addEventListener("change", (event) => {
     if (event.target.id !== "__toc") return;
     const first = document.querySelector(".md-sidebar--secondary .md-nav__link");
     if (event.target.checked) first?.focus({ preventScroll: true });
-    else tocButton()?.focus();
+    else tocButton.focus();
   });
 
   // Instant navigation swaps pages without reloading scripts: rebuild on each page it shows, and let the new text rise
@@ -458,6 +476,7 @@
     facts();
     math();
     contents();
+    tableLabels();
     if (loaded) document.querySelector(".md-content__inner")?.classList.add("hdue-page-in");
     loaded = true;
   };
