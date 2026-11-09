@@ -750,6 +750,12 @@ html {
   [dir="rtl"] [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
     transform: translateX(calc(-1 * var(--hd-drawer) - 0.4rem));
   }
+  /* The theme bleeds a page's top-level content tabs to the window's edges; the grey bar keeps the text's column. */
+  [dir] .md-content__inner > .tabbed-set .tabbed-labels {
+    margin: 0 0 0.4rem;
+    padding: 0.2rem;
+    scroll-padding-inline-start: 0.2rem;
+  }
 }
 
 /* Narrower screens keep the desktop's look without its columns: the text on a rounded panel over the frame's grey,
