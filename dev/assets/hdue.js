@@ -426,15 +426,25 @@
     });
   }
 
-  // A section picked in the contents, or Esc, closes them: on a phone they cover the page. Listeners on the document
-  // outlive navigation.
+  // A section picked in the contents, or Esc, closes them: on a phone they cover the page. Opening them moves the
+  // focus to their first section; closing them by Esc or by their title returns it to the button. Listeners on the
+  // document outlive navigation.
+  const tocButton = () => document.querySelector('.md-sidebar-button[for="__toc"]');
   document.addEventListener("click", (event) => {
     const toggle = document.getElementById("__toc");
     if (toggle && event.target.closest(".md-sidebar--secondary .md-nav__link")) toggle.checked = false;
   });
   document.addEventListener("keydown", (event) => {
     const toggle = document.getElementById("__toc");
-    if (toggle && event.key === "Escape") toggle.checked = false;
+    if (!toggle?.checked || event.key !== "Escape") return;
+    toggle.checked = false;
+    tocButton()?.focus();
+  });
+  document.addEventListener("change", (event) => {
+    if (event.target.id !== "__toc") return;
+    const first = document.querySelector(".md-sidebar--secondary .md-nav__link");
+    if (event.target.checked) first?.focus({ preventScroll: true });
+    else tocButton()?.focus();
   });
 
   // Instant navigation swaps pages without reloading scripts: rebuild on each page it shows, and let the new text rise
