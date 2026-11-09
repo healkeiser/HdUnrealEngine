@@ -787,11 +787,16 @@ html {
   }
 }
 
-/* On a phone the text reads edge to edge on the panel's white, under the frame's grey header: no ring, no inset. The
+/* On a phone the text reads edge to edge on the panel's white, the header too: no ring, no inset. The
    last line clears the contents button in the corner. */
 @media screen and (max-width: 44.9375em) {
+  .md-header,
   .md-main {
     background-color: var(--hd-panel);
+  }
+  /* The panel's hairline, where the text passes under the header. */
+  .md-header {
+    box-shadow: 0 1px 0 var(--hd-line);
   }
   .md-main__inner {
     padding: 0;
