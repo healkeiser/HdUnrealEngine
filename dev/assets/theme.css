@@ -710,7 +710,7 @@ html {
   }
 }
 
-/* At every width the panel stays put and its text scrolls: the window keeps the scroll (the theme follows it for
+/* Above a phone's width the panel stays put and its text scrolls: the window keeps the scroll (the theme follows it for
    "On this page"), and a frame pinned over the text column draws the panel's hairline and corners, with a ring of the
    frame's grey that hides the text beyond them. --hd-header is the header's height (hdue.js); the wide screen moves
    the edges to its sidebars. */
@@ -736,10 +736,53 @@ html {
   display: none;
 }
 
-/* On a phone the menu drawer is a full screen, not the theme's floating card: the window's edges, no corners or shadow.
-   Its title row (the theme's label for the drawer's toggle) gets a close mark: the drawer hides the overlay that closes
-   it elsewhere. */
+/* Narrower screens keep the desktop's look without its columns: the text on a rounded panel over the frame's grey,
+   the menu drawer on the frame's grey too. */
+@media screen and (max-width: 76.2344em) {
+  .md-main {
+    background-color: var(--hd-frame);
+  }
+  .md-main__inner {
+    margin-top: 0;
+    padding: 0 0.4rem 0.4rem;
+  }
+  .md-content {
+    background-color: var(--hd-panel);
+    overflow-x: clip;
+  }
+  .md-nav--primary,
+  .md-nav--primary .md-nav,
+  .md-nav--primary .md-nav__title,
+  .md-sidebar--primary {
+    background-color: var(--hd-frame);
+  }
+  .md-nav--primary .md-nav__source {
+    background-color: var(--hd-frame);
+  }
+}
+
+/* On a phone the text reads edge to edge on the panel's white, the header too: no ring, no inset. The
+   last line clears the contents button in the corner. */
 @media screen and (max-width: 44.9375em) {
+  .md-header,
+  .md-main {
+    background-color: var(--hd-panel);
+  }
+  /* The panel's hairline, where the text passes under the header. */
+  .md-header {
+    box-shadow: 0 1px 0 var(--hd-line);
+  }
+  .md-main__inner {
+    padding: 0;
+  }
+  .md-content::after {
+    content: none;
+  }
+  .md-content__inner {
+    padding-bottom: 2.4rem;
+  }
+  /* The menu drawer is a full screen, not the theme's floating card. Its title row (the theme's label for the
+     drawer's toggle) gets a close mark: the drawer hides the overlay that closes it elsewhere. */
   .md-sidebar--primary {
     top: 0;
     width: 100vw;
@@ -792,53 +835,6 @@ html {
     margin: 0 0 0.4rem;
     padding: 0.2rem;
     scroll-padding-inline-start: 0.2rem;
-  }
-}
-
-/* Narrower screens keep the desktop's look without its columns: the text on a rounded panel over the frame's grey,
-   the menu drawer on the frame's grey too. */
-@media screen and (max-width: 76.2344em) {
-  .md-main {
-    background-color: var(--hd-frame);
-  }
-  .md-main__inner {
-    margin-top: 0;
-    padding: 0 0.4rem 0.4rem;
-  }
-  .md-content {
-    background-color: var(--hd-panel);
-    overflow-x: clip;
-  }
-  .md-nav--primary,
-  .md-nav--primary .md-nav,
-  .md-nav--primary .md-nav__title,
-  .md-sidebar--primary {
-    background-color: var(--hd-frame);
-  }
-  .md-nav--primary .md-nav__source {
-    background-color: var(--hd-frame);
-  }
-}
-
-/* On a phone the text reads edge to edge on the panel's white, the header too: no ring, no inset. The
-   last line clears the contents button in the corner. */
-@media screen and (max-width: 44.9375em) {
-  .md-header,
-  .md-main {
-    background-color: var(--hd-panel);
-  }
-  /* The panel's hairline, where the text passes under the header. */
-  .md-header {
-    box-shadow: 0 1px 0 var(--hd-line);
-  }
-  .md-main__inner {
-    padding: 0;
-  }
-  .md-content::after {
-    content: none;
-  }
-  .md-content__inner {
-    padding-bottom: 2.4rem;
   }
 }
 
