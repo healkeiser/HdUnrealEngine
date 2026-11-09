@@ -653,6 +653,10 @@ html {
 
 /* On a phone the contents are a button in the other corner: the switch's twin, and a frosted card like the menus. */
 @media screen and (max-width: 59.984375em) {
+  /* A list with a bullet per line: the theme's three bars read as the menu's button. */
+  .md-sidebar--secondary .md-sidebar-button {
+    --md-toc-icon: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"><path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/></svg>');
+  }
   .md-sidebar--secondary {
     right: 0.6rem;
     bottom: 0.6rem;
@@ -755,7 +759,26 @@ html {
   [dir="rtl"] [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
     transform: translateX(-100vw);
   }
-  .md-nav--primary > .md-nav__title::after {
+  /* The contents fill the screen as the menu does, over the header; their title row closes them. */
+  .md-sidebar--secondary:has(#__toc:checked) {
+    z-index: 5;
+  }
+  .md-sidebar--secondary .md-sidebar__inner {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    max-height: none;
+    border-radius: 0;
+    background-color: var(--hd-frame);
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .md-sidebar--secondary .md-nav__title {
+    display: flex;
+    align-items: center;
+  }
+  .md-nav--primary > .md-nav__title::after,
+  .md-sidebar--secondary .md-nav__title::after {
     content: "";
     width: 1.2rem;
     height: 1.2rem;
