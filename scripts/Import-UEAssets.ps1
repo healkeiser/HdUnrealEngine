@@ -4,7 +4,7 @@
 # and writes the catalog of the project's assets. hdue_ue_import.publish then adds the cooked packages to a runtime.
 param(
     [Parameter(Mandatory = $true)][string]$ProjectPath,
-    [Parameter(Mandatory = $true)][string]$Packages,  # /Game/... package names, comma separated
+    [Parameter(Mandatory = $true)][string]$Packages, # /Game/... package names, comma separated
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
     [string]$EditorRoot = '',
     [switch]$SkipBuild
