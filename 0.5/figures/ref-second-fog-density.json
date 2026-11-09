@@ -1,0 +1,30 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:SecondFogData:FogDensity"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float unreal:heightFog:SecondFogData:FogHeightFalloff = 2"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:SecondFogData:FogDensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:SecondFogData:FogDensity = 0.5"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:Lumen:HardwareRayTracing"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:Lumen:HardwareRayTracing = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off (software)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:Lumen:HardwareRayTracing = 0"
+    ]
+   }
+  }
+ ]
+}

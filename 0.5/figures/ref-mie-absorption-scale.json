@@ -1,0 +1,43 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:skyAtmosphere:MieAbsorptionScale"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.000444 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:skyAtmosphere:MieAbsorptionScale = 0.000444"
+    ]
+   }
+  },
+  {
+   "caption": "0.01",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:skyAtmosphere:MieAbsorptionScale = 0.01"
+    ]
+   }
+  }
+ ]
+}

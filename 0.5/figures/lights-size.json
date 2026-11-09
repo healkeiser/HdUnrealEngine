@@ -1,0 +1,38 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "bool inputs:normalize = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.25 m",
+   "set": {
+    "/scene/key": [
+     "float inputs:width = 0.25",
+     "float inputs:height = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "1 m (default)",
+   "set": {
+    "/scene/key": [
+     "float inputs:width = 1",
+     "float inputs:height = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2 m",
+   "set": {
+    "/scene/key": [
+     "float inputs:width = 2",
+     "float inputs:height = 2"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "scene": "cornell/variants/displacement.usda",
+ "display": "linear",
+ "base": {},
+ "values": [
+  {
+   "caption": "0 m",
+   "set": {
+    "/cornell_box/bumpy/bumps": [
+     "float4 inputs:scale = (0, 0, 0, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "0.2 m",
+   "set": {
+    "/cornell_box/bumpy/bumps": [
+     "float4 inputs:scale = (0.2, 0.2, 0.2, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "0.6 m",
+   "set": {
+    "/cornell_box/bumpy/bumps": [
+     "float4 inputs:scale = (0.6, 0.6, 0.6, 1)"
+    ]
+   }
+  }
+ ]
+}

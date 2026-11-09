@@ -1,0 +1,19 @@
+{
+ "scene": "docs/hair.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "off: tubes (default)",
+   "set": {
+    "/scene/hair": [
+     "bool primvars:unreal:groom = 0 (interpolation = \"constant\")"
+    ]
+   }
+  },
+  {
+   "caption": "on: UE hair strands",
+   "set": {}
+  }
+ ]
+}

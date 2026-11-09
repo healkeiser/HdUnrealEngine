@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ReflectionMethod"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "Lumen (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:ReflectionMethod = \"EReflectionMethod::Lumen\""
+    ]
+   }
+  },
+  {
+   "caption": "Screen Space",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:ReflectionMethod = \"EReflectionMethod::ScreenSpace\""
+    ]
+   }
+  },
+  {
+   "caption": "None",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:ReflectionMethod = \"EReflectionMethod::None\""
+    ]
+   }
+  }
+ ]
+}

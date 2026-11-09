@@ -1,0 +1,41 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:localFogVolume:FogPhaseG"
+ ],
+ "base": {
+  "/scene/localFog": [
+   "(active = true)"
+  ],
+  "/Render/Settings": [
+   "float unreal:cvar:r:LocalFogVolume:GlobalStartDistance = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0",
+   "set": {
+    "/scene/localFog": [
+     "float unreal:localFogVolume:FogPhaseG = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.2 (default)",
+   "set": {
+    "/scene/localFog": [
+     "float unreal:localFogVolume:FogPhaseG = 0.2"
+    ]
+   }
+  },
+  {
+   "caption": "0.8",
+   "set": {
+    "/scene/localFog": [
+     "float unreal:localFogVolume:FogPhaseG = 0.8"
+    ]
+   }
+  }
+ ]
+}

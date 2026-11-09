@@ -1,0 +1,51 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:skyAtmosphere:MieAnisotropy"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.4",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:skyAtmosphere:MieAnisotropy = 0.4"
+    ]
+   }
+  },
+  {
+   "caption": "0.8 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:skyAtmosphere:MieAnisotropy = 0.8"
+    ]
+   }
+  },
+  {
+   "caption": "0.95",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:skyAtmosphere:MieAnisotropy = 0.95"
+    ]
+   }
+  }
+ ]
+}

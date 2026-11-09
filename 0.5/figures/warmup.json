@@ -1,0 +1,46 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "settings": [
+  "unreal:warmupFrames"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 4"
+    ]
+   }
+  },
+  {
+   "caption": "16",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 16"
+    ]
+   }
+  },
+  {
+   "caption": "64 (default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:warmupFrames = 64"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "scene": "cornell/variants/glossy.usda",
+ "display": "linear",
+ "settings": [
+  "unreal:postProcess:PathTracingMaxPathIntensity"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\"",
+   "int unreal:samplesPerPixel = 64",
+   "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Max Path Intensity 1000",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:PathTracingMaxPathIntensity = 1000"
+    ]
+   }
+  },
+  {
+   "caption": "Max Path Intensity 24 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:PathTracingMaxPathIntensity = 24"
+    ]
+   }
+  },
+  {
+   "caption": "Max Path Intensity 4",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:PathTracingMaxPathIntensity = 4"
+    ]
+   }
+  }
+ ]
+}

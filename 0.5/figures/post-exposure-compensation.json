@@ -1,0 +1,54 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:AutoExposureBias"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "-2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = -2"
+    ]
+   }
+  },
+  {
+   "caption": "-1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = -1"
+    ]
+   }
+  },
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureBias = 2"
+    ]
+   }
+  }
+ ]
+}

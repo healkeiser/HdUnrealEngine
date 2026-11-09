@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorGammaMidtones"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "1, 1, 1, 0.7",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGammaMidtones = (1, 1, 1, 0.7)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGammaMidtones = (1, 1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 1, 1, 1.4",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGammaMidtones = (1, 1, 1, 1.4)"
+    ]
+   }
+  }
+ ]
+}

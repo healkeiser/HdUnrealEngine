@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorCorrectionShadowsMax"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float4 unreal:postProcess:ColorSaturationShadows = (1, 1, 1, 0)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.09 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ColorCorrectionShadowsMax = 0.09"
+    ]
+   }
+  },
+  {
+   "caption": "0.3",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ColorCorrectionShadowsMax = 0.3"
+    ]
+   }
+  }
+ ]
+}
