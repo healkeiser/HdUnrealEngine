@@ -787,6 +787,23 @@ html {
   }
 }
 
+/* On a phone the text reads edge to edge on the panel's white, under the frame's grey header: no ring, no inset. The
+   last line clears the contents button in the corner. */
+@media screen and (max-width: 44.9375em) {
+  .md-main {
+    background-color: var(--hd-panel);
+  }
+  .md-main__inner {
+    padding: 0;
+  }
+  .md-content::after {
+    content: none;
+  }
+  .md-content__inner {
+    padding-bottom: 2.4rem;
+  }
+}
+
 /* The frame, where both sidebars show: the menu and the contents against the window's edges on the frame's grey,
    the text on a rounded panel between them, its column at a reading width. */
 @media screen and (min-width: 76.25em) {

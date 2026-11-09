@@ -321,12 +321,20 @@
     attributeFilter: ["data-md-color-scheme"],
   });
 
-  // The light and dark switch leaves the header for the page's corner (theme.css .hdue-palette). The body outlives
-  // instant navigation and the theme bound its inputs at load, so moving the form keeps it working.
+  // The light and dark switch leaves the header for the page's corner (theme.css .hdue-palette), except on a phone,
+  // where a corner button would sit on the text. The header and the body outlive instant navigation and the theme
+  // bound its inputs at load, so moving the form keeps it working.
   const palette = document.querySelector('.md-header [data-md-component="palette"]');
   if (palette) {
-    palette.classList.add("hdue-palette");
-    document.body.append(palette);
+    const [parent, next] = [palette.parentNode, palette.nextSibling];
+    const phone = matchMedia("(max-width: 44.9375em)");
+    const place = () => {
+      palette.classList.toggle("hdue-palette", !phone.matches);
+      if (phone.matches) parent.insertBefore(palette, next);
+      else document.body.append(palette);
+    };
+    phone.addEventListener("change", place);
+    place();
   }
 
   // A click on a diagram shows it full screen, scaled to fit (the theme draws it in a closed shadow root, so `zoom`
