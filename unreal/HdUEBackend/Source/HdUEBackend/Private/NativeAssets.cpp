@@ -203,12 +203,12 @@ void FHdueNativeAssets::Tick() {
         if (!E.Load || !E.Load->HasLoadCompleted()) continue;
         UObject* Asset = E.Load->GetLoadedAsset();
         if (E.Kind == HDUE_ASSET_UNKNOWN)  // an unregistered package: its object's class decides
-            E.Kind = Cast<UNiagaraSystem>(Asset)        ? HDUE_ASSET_EFFECT
-                     : Cast<UStaticMesh>(Asset)         ? HDUE_ASSET_STATIC_MESH
-                     : Cast<USkeletalMesh>(Asset)       ? HDUE_ASSET_SKELETAL_MESH
+            E.Kind = Cast<UNiagaraSystem>(Asset)         ? HDUE_ASSET_EFFECT
+                     : Cast<UStaticMesh>(Asset)          ? HDUE_ASSET_STATIC_MESH
+                     : Cast<USkeletalMesh>(Asset)        ? HDUE_ASSET_SKELETAL_MESH
                      : Cast<USparseVolumeTexture>(Asset) ? HDUE_ASSET_SPARSE_VOLUME
-                     : Cast<UClass>(Asset)              ? HDUE_ASSET_ACTOR
-                                                        : HDUE_ASSET_RESOURCE;
+                     : Cast<UClass>(Asset)               ? HDUE_ASSET_ACTOR
+                                                         : HDUE_ASSET_RESOURCE;
         E.Asset.Reset(Asset);
         AActor* A = nullptr;
         if (E.Kind == HDUE_ASSET_ACTOR) {
