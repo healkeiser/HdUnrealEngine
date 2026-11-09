@@ -623,9 +623,8 @@ html {
   color: var(--hd-text-muted);
 }
 
-/* The copyright at the panel's foot, where the footer is hidden (wide screens). */
+/* The copyright at the panel's foot, where the footer is hidden. */
 .hdue-copyright {
-  display: none;
   margin-top: 1.6rem;
   color: var(--hd-text-dim);
   font-size: 0.6rem;
@@ -707,6 +706,52 @@ html {
   }
 }
 
+/* At every width the panel stays put and its text scrolls: the window keeps the scroll (the theme follows it for
+   "On this page"), and a frame pinned over the text column draws the panel's hairline and corners, with a ring of the
+   frame's grey that hides the text beyond them. --hd-header is the header's height (hdue.js); the wide screen moves
+   the edges to its sidebars. */
+.md-content {
+  --hd-left: 0.4rem;
+  --hd-right: 0.4rem;
+}
+.md-content::after {
+  content: "";
+  position: fixed;
+  z-index: 1;
+  top: var(--hd-header, 3rem);
+  bottom: 0.4rem;
+  left: var(--hd-left);
+  right: var(--hd-right);
+  border: 1px solid var(--hd-line);
+  border-radius: 0.6rem;
+  box-shadow: 0 0 0 100vmax var(--hd-frame);
+  pointer-events: none;
+}
+/* The footer would sit under the ring: the panel's foot carries the copyright instead (overrides/main.html). */
+.md-footer {
+  display: none;
+}
+
+/* On a phone the menu drawer spans the window, less the theme's 0.4rem inset on each side. */
+@media screen and (max-width: 44.9375em) {
+  .md-sidebar--primary {
+    --hd-drawer: calc(100vw - 0.8rem);
+    width: var(--hd-drawer);
+  }
+  [dir="ltr"] .md-sidebar--primary {
+    left: calc(-1 * var(--hd-drawer));
+  }
+  [dir="rtl"] .md-sidebar--primary {
+    right: calc(-1 * var(--hd-drawer));
+  }
+  [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
+    transform: translateX(calc(var(--hd-drawer) + 0.4rem));
+  }
+  [dir="rtl"] [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
+    transform: translateX(calc(-1 * var(--hd-drawer) - 0.4rem));
+  }
+}
+
 /* Narrower screens keep the desktop's look without its columns: the text on a rounded panel over the frame's grey,
    the menu drawer on the frame's grey too. */
 @media screen and (max-width: 76.2344em) {
@@ -718,8 +763,6 @@ html {
     padding: 0 0.4rem 0.4rem;
   }
   .md-content {
-    border: 1px solid var(--hd-line);
-    border-radius: 0.6rem;
     background-color: var(--hd-panel);
     overflow-x: clip;
   }
@@ -781,9 +824,7 @@ html {
     background-color: var(--hd-frame);
     box-shadow: none;
   }
-  /* The panel stays put and its text scrolls: the window keeps the scroll (the theme follows it for "On this page"),
-     and a frame pinned over the text column draws the panel's hairline and corners, with a ring of the frame's grey
-     that hides the text beyond them. The sidebars sit above the ring. --hd-header is the header's height (hdue.js). */
+  /* The pinned panel's edges against the sidebars, which sit above its ring. */
   .md-content {
     --hd-left: 15rem;
     --hd-right: 15rem;
@@ -797,17 +838,7 @@ html {
     --hd-right: 0.6rem;
   }
   .md-content::after {
-    content: "";
-    position: fixed;
-    z-index: 1;
-    top: var(--hd-header, 5rem);
     bottom: 0.6rem;
-    left: var(--hd-left);
-    right: var(--hd-right);
-    border: 1px solid var(--hd-line);
-    border-radius: 0.6rem;
-    box-shadow: 0 0 0 100vmax var(--hd-frame);
-    pointer-events: none;
   }
   .md-sidebar {
     z-index: 2;
@@ -815,13 +846,6 @@ html {
   /* The last line clears the frame's foot. */
   .md-main__inner {
     padding-bottom: 0.6rem;
-  }
-  /* The footer would sit under the ring: the panel's foot carries the copyright instead (overrides/main.html). */
-  .md-footer {
-    display: none;
-  }
-  .hdue-copyright {
-    display: block;
   }
   .md-content__inner,
   .md-content > .md-path {
