@@ -215,6 +215,25 @@ class ExportTests(unittest.TestCase):
             },
         )
 
+    def test_unknown_terminal_nodedef_has_the_intended_error(self):
+        try:
+            import MaterialX  # noqa: F401
+        except ImportError:
+            self.skipTest("MaterialX is not installed")
+        from export_usd_materialx import record, write
+
+        _stage, m = material()
+        items = [record(m)]
+        graph = items[0]["graph"]
+        terminal = next(iter(graph["nodes"]))
+        graph["terminal"] = {"node": terminal}
+        graph["nodes"][terminal]["id"] = "ND_does_not_exist"
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(
+                ValueError, "Unknown MaterialX nodedef"
+            ):
+                write(items, Path(folder) / "out", "Live")
+
 
 class LibraryDependencies(unittest.TestCase):
     def load(self, record, change=False):

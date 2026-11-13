@@ -263,12 +263,15 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
         }
         terminal = graph.get("terminal", {}).get("node")
         # A node that is a material itself (Lama Surface's): it is the material UE imports, under the material's name.
-        if (
-            terminal
-            and library.getNodeDef(graph["nodes"][terminal]["id"]).getType()
-            == "material"
-        ):
-            names[terminal] = material_name
+        if terminal:
+            terminal_id = graph["nodes"][terminal]["id"]
+            terminal_definition = library.getNodeDef(terminal_id)
+            if terminal_definition is None:
+                raise ValueError(
+                    f"Unknown MaterialX nodedef: {terminal}: {terminal_id}"
+                )
+            if terminal_definition.getType() == "material":
+                names[terminal] = material_name
         exported = {}
         fields = []
         for path, node in graph["nodes"].items():
