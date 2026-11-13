@@ -136,7 +136,7 @@
             type    int
             size    1
             default { 3 }
-            menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+            menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
             help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide)."
             parmtag { "spare_category" "Scalability" }
             parmtag { "uiscope" "viewport" }
@@ -147,7 +147,7 @@
             type    int
             size    1
             default { 3 }
-            menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+            menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
             help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide)."
             parmtag { "spare_category" "Scalability" }
             parmtag { "uiscope" "viewport" }
@@ -158,7 +158,7 @@
             type    int
             size    1
             default { 3 }
-            menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+            menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
             help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ReflectionQuality (process-wide)."
             parmtag { "spare_category" "Scalability" }
             parmtag { "uiscope" "viewport" }
@@ -169,7 +169,7 @@
             type    int
             size    1
             default { 4 }
-            menu { "0" "None" "1" "FXAA" "2" "TAA" "4" "TSR" }
+            menu usetokenvalue { "0" "None" "1" "FXAA" "2" "TAA" "4" "TSR" }
             help    "Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide)."
             parmtag { "spare_category" "Anti-Aliasing" }
             parmtag { "uiscope" "viewport" }

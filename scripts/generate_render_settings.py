@@ -2177,7 +2177,9 @@ def ds_parm(setting, indent, viewport):
         items = " ".join(
             f"{ds_string(str(v))} {ds_string(l)}" for v, l in setting["menu"]
         )
-        lines.append(f"    menu {{ {items} }}")
+        # An int menu stores the item's position unless its token is the value (Houdini's "Use Token as Value").
+        keyword = "menu usetokenvalue" if kind == "intmenu" else "menu"
+        lines.append(f"    {keyword} {{ {items} }}")
     if setting["help"]:
         lines.append(f"    help    {ds_string(setting['help'])}")
     lines.append(

@@ -152,7 +152,7 @@
                 type    int
                 size    1
                 default { 4 }
-                menu { "0" "None" "1" "FXAA" "2" "TAA" "4" "TSR" }
+                menu usetokenvalue { "0" "None" "1" "FXAA" "2" "TAA" "4" "TSR" }
                 help    "Engine default (project setting) for AntiAliasingMethod is (postprocess volume/camera/game setting still can override) 0: off (no anti-aliasing) 1: Fast Approximate Anti-Aliasing (FXAA) 2: Temporal Anti-Aliasing (TAA) 3: Multisample Anti-Aliasing (MSAA, Only available on the desktop forward renderer) 4: Temporal Super-Resolution (TSR, Default) 5: Subpixel Morphological Anti-Aliasing (SMAA) Console variable r.AntiAliasingMethod (process-wide)."
                 parmtag { "spare_category" "Anti-Aliasing" }
                 parmtag { "usdvaluetype" "int" }
@@ -234,7 +234,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "Default" "6" "Preset F" "10" "Preset J" "11" "Preset K" "12" "Preset L" "13" "Preset M" }
+                menu usetokenvalue { "0" "Default" "6" "Preset F" "10" "Preset J" "11" "Preset K" "12" "Preset L" "13" "Preset M" }
                 help    "DLSS Super Resolution and DLAA model. Default lets DLSS pick per quality mode (K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance). Realtime mode only. Console variable r.NGX.DLSS.Preset (process-wide)."
                 parmtag { "spare_category" "Anti-Aliasing" }
                 parmtag { "usdvaluetype" "int" }
@@ -249,7 +249,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "Default" "4" "Preset D" "5" "Preset E" "6" "Preset F" }
+                menu usetokenvalue { "0" "Default" "4" "Preset D" "5" "Preset E" "6" "Preset F" }
                 help    "DLSS Ray Reconstruction model: D and E are transformer models (E the latest), F the default RR2 model. Realtime mode only. Console variable r.NGX.DLSSRR.Preset (process-wide)."
                 parmtag { "spare_category" "Anti-Aliasing" }
                 parmtag { "usdvaluetype" "int" }
@@ -293,7 +293,7 @@
                 type    int
                 size    1
                 default { -1 }
-                menu { "-1" "From Propagate Alpha" "0" "Off" "1" "On" }
+                menu usetokenvalue { "-1" "From Propagate Alpha" "0" "Off" "1" "On" }
                 help    "Upscales the alpha channel too; needs r.PostProcessing.PropagateAlpha, which the runtime enables. Realtime mode only. Console variable r.NGX.DLSS.EnableAlphaUpscaling (process-wide)."
                 parmtag { "spare_category" "Anti-Aliasing" }
                 parmtag { "usdvaluetype" "int" }
@@ -423,7 +423,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "Project Default (Balanced, Alpha)" "1" "Fast" "2" "Balanced" "3" "High Quality" "4" "Fast, Alpha" "5" "Balanced, Alpha" "6" "High Quality, Alpha" }
+                menu usetokenvalue { "0" "Project Default (Balanced, Alpha)" "1" "Fast" "2" "Balanced" "3" "High Quality" "4" "Fast, Alpha" "5" "Balanced, Alpha" "6" "High Quality, Alpha" }
                 help    "Open Image Denoise 2.3 network NNEDenoiser runs: Fast, Balanced or High Quality, with or without the alpha channel. The project default is Balanced with alpha (NNEDenoiserSettings). Console variable NNEDenoiser.Asset (process-wide)."
                 parmtag { "spare_category" "Path Tracing" }
                 parmtag { "usdvaluetype" "int" }
@@ -438,7 +438,7 @@
                 type    int
                 size    1
                 default { 2 }
-                menu { "0" "CPU" "1" "GPU" "2" "RDG" }
+                menu usetokenvalue { "0" "CPU" "1" "GPU" "2" "RDG" }
                 help    "Where NNEDenoiser runs its network: RDG (ONNX Runtime on DirectML inside UE's render graph, the default), GPU or CPU. Console variable NNEDenoiser.Runtime.Type (process-wide)."
                 parmtag { "spare_category" "Path Tracing" }
                 parmtag { "usdvaluetype" "int" }
@@ -3365,7 +3365,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "PCF" "1" "PCSS" }
+                menu usetokenvalue { "0" "PCF" "1" "PCSS" }
                 help    "Chooses the shadow filtering method. 0: Uniform PCF (default) 1: PCSS (experimental) Console variable r.Shadow.FilterMethod (process-wide)."
                 parmtag { "spare_category" "Shadows" }
                 parmtag { "usdvaluetype" "int" }
@@ -3387,7 +3387,7 @@
                 type    int
                 size    1
                 default { 128 }
-                menu { "32" "32" "64" "64" "128" "128" "256" "256" "512" "512" "1024" "1024" "2048" "2048" }
+                menu usetokenvalue { "32" "32" "64" "64" "128" "128" "256" "256" "512" "512" "1024" "1024" "2048" "2048" }
                 help    "Face size of the cubemap dome lights are baked into, for lighting, reflections and the background."
                 parmtag { "spare_category" "Lighting" }
                 parmtag { "uiscope" "viewport" }
@@ -4929,7 +4929,7 @@
                 type    int
                 size    1
                 default { 4 }
-                menu { "1" "1" "2" "2" "4" "4" }
+                menu usetokenvalue { "1" "1" "2" "2" "4" "4" }
                 help    "Number of samples per downsampled pixel for the opaque lighting pass. Final number of samples depends also on the downsampling mode. Supported values: 1, 2 and 4. Console variable r.MegaLights.NumSamplesPerPixel (process-wide)."
                 parmtag { "spare_category" "MegaLights" }
                 parmtag { "usdvaluetype" "int" }
@@ -4944,7 +4944,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "Ray Tracing" "1" "Virtual Shadow Maps" }
+                menu usetokenvalue { "0" "Ray Tracing" "1" "Virtual Shadow Maps" }
                 help    "The default shadowing method for MegaLights, unless over-ridden on the light component. 0 - Ray Tracing. Preferred method, which guarantees fixed MegaLights cost and correct area shadows, but is dependent on the BVH representation quality. 1 - Virtual Shadow Maps. Has a significant per light cost, but can cast shadows directly from the Nanite geometry using rasterization. Console variable r.MegaLights.DefaultShadowMethod (process-wide)."
                 parmtag { "spare_category" "MegaLights" }
                 parmtag { "usdvaluetype" "int" }
@@ -5525,7 +5525,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ViewDistanceQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5538,7 +5538,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.AntiAliasingQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5552,7 +5552,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadowQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5566,7 +5566,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.GlobalIlluminationQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5580,7 +5580,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ReflectionQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5594,7 +5594,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.PostProcessQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5607,7 +5607,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.TextureQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5620,7 +5620,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.EffectsQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5633,7 +5633,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.FoliageQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5646,7 +5646,7 @@
                 type    int
                 size    1
                 default { 3 }
-                menu { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
+                menu usetokenvalue { "0" "Low" "1" "Medium" "2" "High" "3" "Epic" "4" "Cinematic" }
                 help    "UE scalability group: applies the console variables of this quality level (Engine/Config/BaseScalability.ini). Variables set here explicitly take precedence. Console variable sg.ShadingQuality (process-wide)."
                 parmtag { "spare_category" "Scalability" }
                 parmtag { "usdvaluetype" "int" }
@@ -5714,7 +5714,7 @@
                 type    int
                 size    1
                 default { 0 }
-                menu { "0" "Fallback Mesh" "1" "Streamed Out Mesh" }
+                menu usetokenvalue { "0" "Fallback Mesh" "1" "Streamed Out Mesh" }
                 help    "0 - fallback mesh (default); 1 - streamed out mesh; 2 - use CLAS; Console variable r.RayTracing.Nanite.Mode (process-wide)."
                 parmtag { "spare_category" "Ray Tracing" }
                 parmtag { "usdvaluetype" "int" }
