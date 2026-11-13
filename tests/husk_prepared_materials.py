@@ -224,6 +224,11 @@ def main():
                 f"green/red {[round(float(ratio(m)), 4) for m in means.values()] if ok else means}",
             )
         )
+        if not ARGS.materialx_library:
+            print(
+                "SKIPPED: MaterialX library and wet-surface checks (no library under out/materialx)",
+                flush=True,
+            )
         if ARGS.materialx_library:
             # Every MaterialX material of the showcase uploads as its cooked asset (the scene trace names it).
             (temp / "materialx").mkdir()
@@ -334,7 +339,8 @@ def main():
                 f"exit {code}, sphere rgb {None if sphere is None else sphere.round(3).tolist()}, alpha {covered}",
             )
         )
-    sys.exit(0 if all(results) else 1)
+    skipped = not ARGS.materialx_library
+    sys.exit(0 if all(results) and not (skipped and ARGS.require_all) else 1)
 
 
 if __name__ == "__main__":
@@ -361,6 +367,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--materialx-library", default=newest("out/materialx/library.json")
+    )
+    parser.add_argument(
+        "--require-all",
+        action="store_true",
+        help="exit 1 when a check is skipped (no MaterialX library)",
     )
     ARGS = parser.parse_args()
     # A missing library is prepared (exported, cooked) and staged here, as the docs prepare them: a fresh checkout
