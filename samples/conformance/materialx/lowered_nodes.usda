@@ -43,6 +43,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "MatrixInverse: value",
+   "ratio": [
+    {
+     "region": [
+      -1.75,
+      3.25,
+      -0.75,
+      4.25
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.19,
+   "max": 0.21
+  },
+  {
    "name": "MatrixDeterminant: determinant of diag(0.5, 0.6, 1) times transpose of itself: 0.09",
    "color": {
     "region": [
@@ -60,6 +83,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "MatrixDeterminant: value",
+   "ratio": [
+    {
+     "region": [
+      0.75,
+      3.25,
+      1.75,
+      4.25
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.0855,
+   "max": 0.0945
+  },
+  {
    "name": "Integers: (2 + 3) as a float, times 0.1",
    "color": {
     "region": [
@@ -75,6 +121,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
     0.5
    ],
    "tol": 0.03
+  },
+  {
+   "name": "Integers: value",
+   "ratio": [
+    {
+     "region": [
+      3.25,
+      3.25,
+      4.25,
+      4.25
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.475,
+   "max": 0.525
   },
   {
    "name": "Booleans: (true and false, true or false, not false) as floats",
@@ -128,6 +197,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "CurveAdjust: value",
+   "ratio": [
+    {
+     "region": [
+      0.75,
+      0.75,
+      1.75,
+      1.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.38,
+   "max": 0.42
+  },
+  {
    "name": "Atan2: Houdini's MaterialX 1.38 atan2(1, 1) = pi / 4",
    "color": {
     "region": [
@@ -143,6 +235,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
     0.7854
    ],
    "tol": 0.03
+  },
+  {
+   "name": "Atan2: value",
+   "ratio": [
+    {
+     "region": [
+      3.25,
+      0.75,
+      4.25,
+      1.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.7461,
+   "max": 0.8247
   },
   {
    "name": "Frame: frame / 10 at frame 1 (24 fps)",
@@ -162,6 +277,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "Frame: value",
+   "ratio": [
+    {
+     "region": [
+      -4.25,
+      -1.75,
+      -3.25,
+      -0.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.095,
+   "max": 0.105
+  },
+  {
    "name": "AmbientOcclusion: ambientocclusion: 1 (UE occludes the lighting itself)",
    "color": {
     "region": [
@@ -179,6 +317,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "AmbientOcclusion: value",
+   "ratio": [
+    {
+     "region": [
+      -1.75,
+      -1.75,
+      -0.75,
+      -0.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.665,
+   "max": 0.735
+  },
+  {
    "name": "Flake3D: flake3d presence, flakes of 5 cm at coverage 0.5 (hdUE's import runs MaterialX's flake code): the mean of MaterialX's mx_flake over the region, 0.25 to 0.28 as the plane's orientation varies",
    "color": {
     "region": [
@@ -194,6 +355,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
     0.27
    ],
    "tol": 0.05
+  },
+  {
+   "name": "Flake3D: value",
+   "ratio": [
+    {
+     "region": [
+      0.75,
+      -1.75,
+      1.75,
+      -0.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.243,
+   "max": 0.297
   }
  ]
 }"""
@@ -209,6 +393,19 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
 
 def Scope "Looks"
 {
+    def Material "Reference"
+    {
+        token outputs:mtlx:surface.connect = </Looks/Reference/surface.outputs:out>
+        def Shader "surface"
+        {
+            uniform token info:id = "ND_standard_surface_surfaceshader"
+            float inputs:base = 0
+            float inputs:specular = 0
+            float inputs:emission = 1
+            color3f inputs:emission_color = (1, 1, 1)
+            token outputs:out
+        }
+    }
     # transformmatrix of creatematrix's columns (0,1,0), (1,0,0), (0,0,1): M * (0.2, 0.6, 0.9)
     def Material "MatrixTransform"
     {
@@ -219,14 +416,14 @@ def Scope "Looks"
             float3 inputs:in1 = (0, 1, 0)
             float3 inputs:in2 = (1, 0, 0)
             float3 inputs:in3 = (0, 0, 1)
-            float outputs:out
+            matrix3d outputs:out
         }
         def Shader "t"
         {
             uniform token info:id = "ND_transformmatrix_vector3"
             float3 inputs:in = (0.2, 0.6, 0.9)
             matrix3d inputs:mat.connect = </Looks/MatrixTransform/m.outputs:out>
-            float outputs:out
+            float3 outputs:out
         }
         def Shader "c"
         {
@@ -252,14 +449,14 @@ def Scope "Looks"
         {
             uniform token info:id = "ND_invertmatrix_matrix33"
             matrix3d inputs:in = ( (2, 0, 0), (0, 4, 0), (0, 0, 5) )
-            float outputs:out
+            matrix3d outputs:out
         }
         def Shader "t"
         {
             uniform token info:id = "ND_transformmatrix_vector3"
             float3 inputs:in = (0.4, 0.8, 1)
             matrix3d inputs:mat.connect = </Looks/MatrixInverse/inv.outputs:out>
-            float outputs:out
+            float3 outputs:out
         }
         def Shader "c"
         {
@@ -285,14 +482,14 @@ def Scope "Looks"
         {
             uniform token info:id = "ND_transpose_matrix33"
             matrix3d inputs:in = ( (0.5, 0, 0), (0, 0.6, 0), (0, 0, 1) )
-            float outputs:out
+            matrix3d outputs:out
         }
         def Shader "mul"
         {
             uniform token info:id = "ND_multiply_matrix33"
             matrix3d inputs:in1.connect = </Looks/MatrixDeterminant/tr.outputs:out>
             matrix3d inputs:in2 = ( (0.5, 0, 0), (0, 0.6, 0), (0, 0, 1) )
-            float outputs:out
+            matrix3d outputs:out
         }
         def Shader "d"
         {
@@ -325,7 +522,7 @@ def Scope "Looks"
             uniform token info:id = "ND_add_integer"
             int inputs:in1 = 2
             int inputs:in2 = 3
-            float outputs:out
+            int outputs:out
         }
         def Shader "f"
         {
@@ -365,20 +562,20 @@ def Scope "Looks"
             uniform token info:id = "ND_logical_and"
             bool inputs:in1 = 1
             bool inputs:in2 = 0
-            float outputs:out
+            bool outputs:out
         }
         def Shader "o"
         {
             uniform token info:id = "ND_logical_or"
             bool inputs:in1 = 1
             bool inputs:in2 = 0
-            float outputs:out
+            bool outputs:out
         }
         def Shader "n"
         {
             uniform token info:id = "ND_logical_not"
             bool inputs:in = 0
-            float outputs:out
+            bool outputs:out
         }
         def Shader "fa"
         {
@@ -584,6 +781,14 @@ def Scope "Looks"
     }
 }
 
+def Mesh "ReferenceQuad" (prepend apiSchemas = ["MaterialBindingAPI"])
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-4.75, -4.75, 0), (-2.75, -4.75, 0), (-2.75, -2.75, 0), (-4.75, -2.75, 0)]
+    uniform token subdivisionScheme = "none"
+    rel material:binding = </Looks/Reference>
+}
 def Mesh "MatrixTransformQuad" (prepend apiSchemas = ["MaterialBindingAPI"])
 {
     int[] faceVertexCounts = [4]

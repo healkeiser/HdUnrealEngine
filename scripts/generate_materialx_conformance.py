@@ -33,10 +33,12 @@ CASES = [
                     "in2": "float3 (1, 0, 0)",
                     "in3": "float3 (0, 0, 1)",
                 },
+                {"out": "matrix3d"},
             ),
             "t": (
                 "ND_transformmatrix_vector3",
                 {"in": "float3 (0.2, 0.6, 0.9)", "mat": "matrix3d <m>"},
+                {"out": "float3"},
             ),
             "c": ("ND_convert_vector3_color3", {"in": "float3 <t>"}),
         },
@@ -50,10 +52,12 @@ CASES = [
             "inv": (
                 "ND_invertmatrix_matrix33",
                 {"in": "matrix3d ( (2, 0, 0), (0, 4, 0), (0, 0, 5) )"},
+                {"out": "matrix3d"},
             ),
             "t": (
                 "ND_transformmatrix_vector3",
                 {"in": "float3 (0.4, 0.8, 1)", "mat": "matrix3d <inv>"},
+                {"out": "float3"},
             ),
             "c": ("ND_convert_vector3_color3", {"in": "float3 <t>"}),
         },
@@ -67,6 +71,7 @@ CASES = [
             "tr": (
                 "ND_transpose_matrix33",
                 {"in": "matrix3d ( (0.5, 0, 0), (0, 0.6, 0), (0, 0, 1) )"},
+                {"out": "matrix3d"},
             ),
             "mul": (
                 "ND_multiply_matrix33",
@@ -74,6 +79,7 @@ CASES = [
                     "in1": "matrix3d <tr>",
                     "in2": "matrix3d ( (0.5, 0, 0), (0, 0.6, 0), (0, 0, 1) )",
                 },
+                {"out": "matrix3d"},
             ),
             "d": ("ND_determinant_matrix33", {"in": "matrix3d <mul>"}),
             "c": ("ND_convert_float_color3", {"in": "float <d>"}),
@@ -85,7 +91,11 @@ CASES = [
         "Integers",
         "(2 + 3) as a float, times 0.1",
         {
-            "add": ("ND_add_integer", {"in1": "int 2", "in2": "int 3"}),
+            "add": (
+                "ND_add_integer",
+                {"in1": "int 2", "in2": "int 3"},
+                {"out": "int"},
+            ),
             "f": ("ND_convert_integer_float", {"in": "int <add>"}),
             "m": (
                 "ND_multiply_float",
@@ -100,9 +110,17 @@ CASES = [
         "Booleans",
         "(true and false, true or false, not false) as floats",
         {
-            "a": ("ND_logical_and", {"in1": "bool 1", "in2": "bool 0"}),
-            "o": ("ND_logical_or", {"in1": "bool 1", "in2": "bool 0"}),
-            "n": ("ND_logical_not", {"in": "bool 0"}),
+            "a": (
+                "ND_logical_and",
+                {"in1": "bool 1", "in2": "bool 0"},
+                {"out": "bool"},
+            ),
+            "o": (
+                "ND_logical_or",
+                {"in1": "bool 1", "in2": "bool 0"},
+                {"out": "bool"},
+            ),
+            "n": ("ND_logical_not", {"in": "bool 0"}, {"out": "bool"}),
             "fa": ("ND_convert_boolean_float", {"in": "bool <a>"}),
             "fo": ("ND_convert_boolean_float", {"in": "bool <o>"}),
             "fn": ("ND_convert_boolean_float", {"in": "bool <n>"}),
@@ -247,33 +265,80 @@ def material(name, shaders, output):
     return lines
 
 
+def quad(name, x, y, material_path):
+    return [
+        f'def Mesh "{name}Quad" (prepend apiSchemas = ["MaterialBindingAPI"])',
+        "{",
+        "    int[] faceVertexCounts = [4]",
+        "    int[] faceVertexIndices = [0, 1, 2, 3]",
+        f"    point3f[] points = [({x - 1}, {y - 1}, 0), ({x + 1}, {y - 1}, 0), ({x + 1}, {y + 1}, 0), ({x - 1}, {y + 1}, 0)]",
+        '    uniform token subdivisionScheme = "none"',
+        f"    rel material:binding = </Looks/{material_path}>",
+        "}",
+    ]
+
+
+def reference_material(name):
+    """The emissive Standard Surface of material() with a constant white emission: the value the ratio checks divide by."""
+    return [
+        f'    def Material "{name}"',
+        "    {",
+        f"        token outputs:mtlx:surface.connect = </Looks/{name}/surface.outputs:out>",
+        '        def Shader "surface"',
+        "        {",
+        '            uniform token info:id = "ND_standard_surface_surfaceshader"',
+        "            float inputs:base = 0",
+        "            float inputs:specular = 0",
+        "            float inputs:emission = 1",
+        "            color3f inputs:emission_color = (1, 1, 1)",
+        "            token outputs:out",
+        "        }",
+        "    }",
+    ]
+
+
 def main():
     # No "not translated" log check: these nodes are UE's import's to render, and hdUE warns while the import runs.
     checks = []
-    looks, quads = [], []
+    # The reference quad sits in the free row 3, column 0.
+    reference_x, reference_y = -3.75, 3.75 - 2.5 * 3
+    reference_box = [
+        reference_x - 0.5,
+        reference_y - 0.5,
+        reference_x + 0.5,
+        reference_y + 0.5,
+    ]
+    looks, quads = reference_material("Reference"), quad(
+        "Reference", reference_x, reference_y, "Reference"
+    )
     for index, (name, doc, shaders, output, expected) in enumerate(CASES):
         column, row = index % 4, index // 4
         x, y = -3.75 + 2.5 * column, 3.75 - 2.5 * row
         looks += [f"    # {doc}"] + material(name, shaders, output)
-        quads += [
-            f'def Mesh "{name}Quad" (prepend apiSchemas = ["MaterialBindingAPI"])',
-            "{",
-            "    int[] faceVertexCounts = [4]",
-            "    int[] faceVertexIndices = [0, 1, 2, 3]",
-            f"    point3f[] points = [({x - 1}, {y - 1}, 0), ({x + 1}, {y - 1}, 0), ({x + 1}, {y + 1}, 0), ({x - 1}, {y + 1}, 0)]",
-            '    uniform token subdivisionScheme = "none"',
-            f"    rel material:binding = </Looks/{name}>",
-            "}",
-        ]
+        quads += quad(name, x, y, name)
+        case_box = [x - 0.5, y - 0.5, x + 0.5, y + 0.5]
+        # The flake mean is statistical: its pattern depends on the plane's orientation in UE's space.
+        tol = 0.05 if name == "Flake3D" else 0.03
         checks.append(
             {
                 "name": f"{name}: {doc}",
-                "color": {"region": [x - 0.5, y - 0.5, x + 0.5, y + 0.5]},
+                "color": {"region": case_box},
                 "rgb": [round(v, 4) for v in expected],
-                # The flake mean is statistical: its pattern depends on the plane's orientation in UE's space.
-                "tol": 0.05 if name == "Flake3D" else 0.03,
+                "tol": tol,
             }
         )
+        value = expected[0]
+        if value > 0 and expected[0] == expected[1] == expected[2]:
+            # The colour check only sees the hue of a grey: the luma ratio to the white reference is its value.
+            ratio_tol = 0.1 if name == "Flake3D" else 0.05
+            checks.append(
+                {
+                    "name": f"{name}: value",
+                    "ratio": [{"region": case_box}, {"region": reference_box}],
+                    "min": round(value * (1 - ratio_tol), 4),
+                    "max": round(value * (1 + ratio_tol), 4),
+                }
+            )
     spec = {
         "schema": "MaterialX",
         "feature": "nodes UE's importer cannot translate as is",
