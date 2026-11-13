@@ -105,6 +105,10 @@ def dev_environment():
     os.environ["HOUDINI_PATH"] = f'{ROOT / "integrations" / "houdini"};&'
     os.environ["PXR_PLUGINPATH_NAME"] = str(build / "resources")
     os.environ["HDUE_HOUDINI_ENABLE"] = "1"
+    # An installed release package would load ahead of the dev build.
+    os.environ["HOUDINI_PACKAGE_SKIPLIST"] = ";".join(
+        filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
+    )
     os.environ["HDUE_RUNTIME_CONFIG"] = str(profile)
 
 

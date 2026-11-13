@@ -329,6 +329,10 @@ def environment(args):
     env.update(
         HFS=str(args.houdini),
         HOUDINI_PATH=f"{args.integrations};&",
+        # An installed release package would load ahead of the dev build.
+        HOUDINI_PACKAGE_SKIPLIST=";".join(
+            filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
+        ),
         PXR_PLUGINPATH_NAME=str(args.build / "resources"),
         HDUE_RUNTIME_CONFIG=str(args.runtime_config),
         HDUE_HOUDINI_ENABLE="1",

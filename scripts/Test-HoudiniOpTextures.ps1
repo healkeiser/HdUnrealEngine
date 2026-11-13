@@ -9,7 +9,11 @@ $ErrorActionPreference = 'Stop'
 $HoudiniRoot = Get-HdUELocalPath -Key houdini_root -Value $HoudiniRoot
 $TaskRoot = Split-Path -Parent $PSScriptRoot
 $RunOutput = New-HdUERun -Name houdini-op-textures -Path $OutputDirectory
+# An installed release package would load ahead of the dev build.
+$PreviousSkipList = $env:HOUDINI_PACKAGE_SKIPLIST
+$env:HOUDINI_PACKAGE_SKIPLIST = (@($env:HOUDINI_PACKAGE_SKIPLIST -split ';' | Where-Object { $_ }) + 'hdUE' | Select-Object -Unique) -join ';'
 & uv run -- (Join-Path $HoudiniRoot 'bin\hython.exe') (Join-Path $TaskRoot 'tests\houdini_op_textures.py')
+$env:HOUDINI_PACKAGE_SKIPLIST = $PreviousSkipList
 if ($LASTEXITCODE) { throw 'COP texture cache / LOP tests failed.' }
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -LogDirectory $RunOutput -TestKind optextures -TimeoutSeconds $TimeoutSeconds
 $Result = Get-Content -LiteralPath (Join-Path $RunOutput 'verified.json') -Raw | ConvertFrom-Json

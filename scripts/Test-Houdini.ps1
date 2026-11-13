@@ -13,6 +13,9 @@ $RunOutput = New-HdUERun -Name houdini -Path $OutputDirectory
 # Substrate Material Builder.
 # The repo's HDAs and Python come first, as in Launch-Houdini.ps1: an installed hdUE package would otherwise win.
 $PreviousHoudiniPath = $env:HOUDINI_PATH
+$PreviousSkipList = $env:HOUDINI_PACKAGE_SKIPLIST
+# An installed release package would load ahead of the dev build.
+$env:HOUDINI_PACKAGE_SKIPLIST = (@($env:HOUDINI_PACKAGE_SKIPLIST -split ';' | Where-Object { $_ }) + 'hdUE' | Select-Object -Unique) -join ';'
 $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($PreviousHoudiniPath) { $PreviousHoudiniPath } else { '&' })
 try {
     foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test', 'dialog_scripts_test', 'houdini_host_state_test') {
@@ -20,7 +23,7 @@ try {
         if ($LASTEXITCODE) { throw "$Test failed." }
     }
 }
-finally { $env:HOUDINI_PATH = $PreviousHoudiniPath }
+finally { $env:HOUDINI_PATH = $PreviousHoudiniPath; $env:HOUDINI_PACKAGE_SKIPLIST = $PreviousSkipList }
 & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -HoudiniRoot $HoudiniRoot -RuntimeConfig $RuntimeConfig -InputUsd (Join-Path $TaskRoot 'samples\smoke.usda') -LogDirectory $RunOutput -TestKind integration -TimeoutSeconds $TimeoutSeconds
 $Result = Get-Content -LiteralPath (Join-Path $RunOutput 'verified.json') -Raw | ConvertFrom-Json
 $Runtime = Get-Content -LiteralPath (Join-Path $RunOutput 'runtime-state.json') -Raw | ConvertFrom-Json

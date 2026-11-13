@@ -34,7 +34,7 @@ if (-not $LogDirectory) { $LogDirectory = New-HdUERun -Name houdini-session -Cre
 New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
 $Dll = Join-Path $DelegateBuild 'Release\hdUE_Houdini22.dll'
 if (-not (Test-Path -LiteralPath $Dll)) { throw 'Run Build-Houdini.ps1 first.' }
-$Names = @('HFS', 'PATH', 'PYTHONPATH', 'HOUDINI_PATH', 'PXR_PLUGINPATH_NAME', 'HOUDINI_USER_PREF_DIR', 'HOUDINI_NO_START_PAGE_SPLASH', 'HDUE_HOUDINI_ENABLE', 'HDUE_RUNTIME_CONFIG', 'HDUE_HOUDINI_INPUT', 'HDUE_HOUDINI_HIP', 'HDUE_HOUDINI_LOG_DIR', 'HDUE_HOUDINI_TEST', 'HDUE_MATERIALX_LIBRARY', 'HDUE_SUBSTRATE_LIBRARY')
+$Names = @('HFS', 'PATH', 'PYTHONPATH', 'HOUDINI_PATH', 'HOUDINI_PACKAGE_SKIPLIST', 'PXR_PLUGINPATH_NAME', 'HOUDINI_USER_PREF_DIR', 'HOUDINI_NO_START_PAGE_SPLASH', 'HDUE_HOUDINI_ENABLE', 'HDUE_RUNTIME_CONFIG', 'HDUE_HOUDINI_INPUT', 'HDUE_HOUDINI_HIP', 'HDUE_HOUDINI_LOG_DIR', 'HDUE_HOUDINI_TEST', 'HDUE_MATERIALX_LIBRARY', 'HDUE_SUBSTRATE_LIBRARY')
 $Previous = @{}; foreach ($Name in $Names) { $Previous[$Name] = [Environment]::GetEnvironmentVariable($Name, 'Process') }
 try {
     $env:HFS = $HoudiniRoot
@@ -42,6 +42,8 @@ try {
     $env:PYTHONPATH = '' # Houdini must use its own Python/USD, not standalone usdview.
     # The in-Houdini tests are not shipped: their folder is on HOUDINI_PATH only for test runs.
     $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($TestKind) { "$TaskRoot\tests\houdini;" }) + $(if ($Previous.HOUDINI_PATH) { $Previous.HOUDINI_PATH } else { '&' })
+    # An installed release package would load ahead of the dev build.
+    $env:HOUDINI_PACKAGE_SKIPLIST = (@($env:HOUDINI_PACKAGE_SKIPLIST -split ';' | Where-Object { $_ }) + 'hdUE' | Select-Object -Unique) -join ';'
     $env:PXR_PLUGINPATH_NAME = "$HoudiniRoot\bin\usd_plugins;$HoudiniRoot\houdini\dso\usd_plugins;$DelegateBuild\resources"
     $env:HDUE_MATERIALX_LIBRARY = if ($MaterialXLibrary) { [IO.Path]::GetFullPath($MaterialXLibrary) } else { '' }
     $env:HDUE_SUBSTRATE_LIBRARY = if ($SubstrateLibrary) { [IO.Path]::GetFullPath($SubstrateLibrary) } else { '' }
