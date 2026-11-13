@@ -548,7 +548,7 @@ def start_when_selected():
 def start():
     global _host, _failure
     if _host:
-        if not _host.running:
+        if not _host.running and not _host.closed:
             _host.resume()
         return _host
     try:

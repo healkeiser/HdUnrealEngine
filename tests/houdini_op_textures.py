@@ -111,15 +111,14 @@ class OpTextures(unittest.TestCase):
         )
         self.assertFalse(textures.cache().dirty("viewport"))
         self.assertEqual(source.stage().GetRootLayer().ExportToString(), before)
+        # The Image ROP exists only during an export.
         self.assertEqual(
-            len(
-                [
-                    n
-                    for n in hou.node("/out").children()
-                    if n.name().startswith("__hdue_texture_export")
-                ]
-            ),
-            1,
+            [
+                n
+                for n in hou.node("/out").children()
+                if n.name().startswith("__hdue_texture_export")
+            ],
+            [],
         )
         output.destroy()
         self.assertTrue(textures.cache().dirty("viewport"))
