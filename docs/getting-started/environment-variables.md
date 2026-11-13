@@ -7,7 +7,7 @@ Most installs need no variable set by hand: `Install.cmd` writes a Houdini packa
 | You want to | Use |
 | --- | --- |
 | Run hdUE at all | `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` (set by the package) |
-| Keep logs and the shader cache out of a shared install folder | `HDUE_USER_DIR` (set by the package) |
+| Keep Unreal Engine's logs and Nanite cache on another drive | `HDUE_USER_DIR` (default `%LOCALAPPDATA%\hdUE`) |
 | See where a frame's time goes | `HDUE_TRACE_TIMING`, `HDUE_TRACE_FILE` |
 | Check what reaches Unreal Engine | `HDUE_TRACE_SETTINGS`, `HDUE_TRACE_SCENE`, `HDUE_TRACE_PASS` |
 | Rule out a viewport or Nanite problem | `HDUE_GPU_FRAMES=0`, `HDUE_NANITE=0` |
@@ -51,10 +51,10 @@ $env:HDUE_TRACE_FILE = "$env:TEMP\hdue-trace.txt"
 houdini
 ```
 
-Record a GPU profile of 600 frames with Unreal Engine's CSV profiler (written to `Saved\Profiling` under `HDUE_USER_DIR`):
+Record a GPU profile of 600 frames with Unreal Engine's CSV profiler (written to `%LOCALAPPDATA%\hdUE\Saved\Profiling`):
 
 ```powershell
 $env:HDUE_UE_ARGS = '-csvGpuStats -csvCaptureFrames=600'
 ```
 
-Unreal Engine's own log is in `Saved\Logs` under `HDUE_USER_DIR` (**Unreal > Open Unreal Engine Logs** in Houdini). Its timestamps are in UTC.
+Unreal Engine's own log is in `%LOCALAPPDATA%\hdUE\Saved\Logs` (`Saved\Logs` under `HDUE_USER_DIR` when it is set; **Unreal > Open Unreal Engine Logs** in Houdini). Its timestamps are in UTC.

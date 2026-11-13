@@ -55,7 +55,7 @@ Set **Nanite Ray Tracing** to 1 to trace the full Nanite geometry streamed for t
 
 Building Nanite data is most of a scene's load time. hdUE caches each build on disk, as UE's derived data cache does for its static meshes:
 
-- The cache is `Saved/NaniteCache` under the runtime project, or under `HDUE_USER_DIR` when it is set.
+- The cache is `%LOCALAPPDATA%\hdUE\Saved\NaniteCache`, or `Saved/NaniteCache` under `HDUE_USER_DIR` when it is set.
 - A cache entry not used for a week is removed.
 - 450 meshes of 9,800 triangles: 10.5 s to build, 0.7 s from the cache (75 MB on disk).
 - NVIDIA's Da Vinci Workshop (617 million triangles, 6,750 meshes): 11 minutes in husk with an empty cache (3.6 GB written), 2 minutes from it, with a peak of 22 GB of memory.

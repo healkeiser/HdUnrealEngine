@@ -96,7 +96,7 @@ hdUE's part is about 70 ms of each; the rest is husk. For a cheaper beauty, set 
 | `-V 3` | Progress while rendering: Path Tracer samples or Realtime warmup, Unreal Engine startup, scene upload, textures and mesh builds with the time left. |
 | `-V 5` | Also the scene statistics after each frame. |
 
-husk's output also shows every Unreal Engine warning and error, each warning once. For every line of Unreal Engine's log, set `HDUE_UE_ARGS=-stdout`. The full log is in `Saved\Logs` under `HDUE_USER_DIR` ([Environment variables](../getting-started/environment-variables.md)).
+husk's output also shows every Unreal Engine warning and error, each warning once. For every line of Unreal Engine's log, set `HDUE_UE_ARGS=-stdout`. The full log is in `%LOCALAPPDATA%\hdUE\Saved\Logs` ([Environment variables](../getting-started/environment-variables.md)).
 
 ## Exit codes and failures
 

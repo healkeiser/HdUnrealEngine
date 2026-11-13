@@ -11,7 +11,7 @@ import traceback
 import webbrowser
 from pathlib import Path
 
-DOCS = "https://healkeiser.github.io/HdUnrealEngine/houdini/"
+DOCS = "https://healkeiser.github.io/HdUnrealEngine"
 CACHE_LABELS = {
     "texture": "Texture cache",
     "virtual_texture": "Virtual texture cache",
@@ -21,11 +21,14 @@ CACHE_LABELS = {
 
 
 def saved_directory(env, runtime_project=None):
-    """UE's Saved folder: under HDUE_USER_DIR (the package passes it as -userdir), else next to the runtime project,
-    as FPaths::ProjectSavedDir resolves it (ProjectUserDir() + Saved, Paths.cpp). None without either.
+    """UE's Saved folder, as the delegate passes -userdir (src/client/backend.cpp): HDUE_USER_DIR, else
+    %LOCALAPPDATA%/hdUE; without either, next to the runtime project, as FPaths::ProjectSavedDir resolves it
+    (ProjectUserDir() + Saved, Paths.cpp). None without any.
     """
     if env.get("HDUE_USER_DIR"):
         return Path(env["HDUE_USER_DIR"]) / "Saved"
+    if env.get("LOCALAPPDATA"):
+        return Path(env["LOCALAPPDATA"]) / "hdUE" / "Saved"
     if runtime_project:
         return Path(runtime_project).parent / "Saved"
     return None
@@ -203,8 +206,21 @@ def open_logs():
     open_folder(saved / "Logs")
 
 
+def docs_url(env):
+    """The Houdini pages of the guide for this build: the site keeps one folder per minor version (mike), the
+    package sets HDUE_VERSION (v0.5.0 -> 0.5); a development build gets the latest release's.
+    """
+    version = env.get("HDUE_VERSION", "").lstrip("v").split(".")
+    folder = (
+        ".".join(version[:2])
+        if len(version) >= 2 and all(v.isdigit() for v in version[:2])
+        else "latest"
+    )
+    return f"{DOCS}/{folder}/houdini/"
+
+
 def open_docs():
-    webbrowser.open(DOCS)
+    webbrowser.open(docs_url(os.environ))
 
 
 def open_cache(name):

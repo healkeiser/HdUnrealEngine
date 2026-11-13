@@ -188,7 +188,7 @@ UE starts once per process. Later delegates (the next viewport, husk `--restart-
   - Nanite builds: `Saved\NaniteCache` (`BuildNanite`, `Scene.cpp`), keyed by the builder's version and the mesh's content, entries unused for a week removed.
   - Block-compressed textures: `%LOCALAPPDATA%\hdUE\TextureCache` (`CachePath`, `Scene.cpp`), entries unused for a week removed.
   - Virtual textures: `%LOCALAPPDATA%\hdUE\VirtualTextureCache` (`VirtualTextureBuild.cpp`), manifests unused for a week removed with the chunks no other manifest names (a day's grace for chunks a running build has not named yet).
-  - UE's `Saved` (`Logs`, `Config`): under the runtime project, or under `HDUE_USER_DIR` when set.
+  - UE's `Saved` (`Logs`, `Config`, `NaniteCache`): `%LOCALAPPDATA%\hdUE\Saved`, where an installed UE game keeps it (`UserSettingsDir()`, `FPaths::ProjectUserDir`), or under `HDUE_USER_DIR` (`-userdir`, `src/client/backend.cpp`).
   - Houdini's host: its log directory (above) and exported `op:` texture images, removed on shutdown (`docs/houdini/index.md`).
 
 ## ABI

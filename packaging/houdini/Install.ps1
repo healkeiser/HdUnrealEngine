@@ -26,8 +26,6 @@ $Package = [ordered]@{
         @{HDUE = ($Root -replace '\\', '/') },
         @{HDUE_VERSION = "$($Runtime.hdue_version)" },
         @{HDUE_HOUDINI_ENABLE = '1' },
-        # UE's Saved folder (logs, shader caches) per user, so the install folder can be shared and read-only.
-        @{HDUE_USER_DIR = '$HOUDINI_USER_PREF_DIR/hdUE' },
         @{HDUE_RUNTIME_CONFIG = '$HDUE/runtime.json' },
         @{PXR_PLUGINPATH_NAME = [ordered]@{value = '$HDUE/plugin/resources'; method = 'append' } }
     )

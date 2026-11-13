@@ -80,14 +80,18 @@ The package adds an **Unreal** menu to Houdini's main menu bar, before **Windows
 
 ### Caches
 
-hdUE keeps four disk caches so a scene's second load is faster. Each process removes entries unused for a week. Clear a cache to reclaim its space at once, or after a problem you suspect comes from stale cache data.
+hdUE keeps four disk caches so a scene's second load is faster. They are per user and live on the system drive, outside synced folders. Each process removes entries unused for a week. Clear a cache to reclaim its space at once, or after a problem you suspect comes from stale cache data.
+
+The texture caches grow with the textures of the scenes you open, and can take tens of GB: on one development workstation, the texture cache held 12 GB and the virtual texture cache 35 GB. The Nanite cache stayed under 1 GB there.
 
 | Cache | Folder | Holds |
 | --- | --- | --- |
 | Texture | `%LOCALAPPDATA%\hdUE\TextureCache` | Block-compressed textures |
 | Virtual texture | `HDUE_VIRTUAL_TEXTURE_CACHE`, else `%LOCALAPPDATA%\hdUE\VirtualTextureCache` | UDIM virtual textures |
-| Nanite | `Saved\NaniteCache` under `HDUE_USER_DIR` | [Nanite](../geometry/nanite.md) mesh builds |
+| Nanite | `%LOCALAPPDATA%\hdUE\Saved\NaniteCache`, or `Saved\NaniteCache` under `HDUE_USER_DIR` | [Nanite](../geometry/nanite.md) mesh builds |
 | OCIO texture | `%TEMP%\hdue_ocio` | Textures converted to the OCIO working space |
+
+To move the virtual texture cache, the largest, to another drive, set `HDUE_VIRTUAL_TEXTURE_CACHE`; `HDUE_USER_DIR` moves the Nanite cache and Unreal Engine's logs. The texture cache stays in `%LOCALAPPDATA%\hdUE`.
 
 Clearing is refused once Unreal Engine has started in the session, because it reads the cache files while it runs. Restart Houdini and clear before you pick Unreal Engine. Files another process holds open (husk, another Houdini) are kept and listed.
 

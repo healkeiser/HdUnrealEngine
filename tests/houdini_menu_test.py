@@ -11,6 +11,24 @@ sys.path.insert(0, str(ROOT / "integrations/houdini/python3.13libs"))
 import hdue_menu
 
 
+class Docs(unittest.TestCase):
+    def test_the_installed_version_else_latest(self):
+        base = "https://healkeiser.github.io/HdUnrealEngine"
+        self.assertEqual(
+            hdue_menu.docs_url({"HDUE_VERSION": "v0.5.0"}),
+            f"{base}/0.5/houdini/",
+        )
+        self.assertEqual(
+            hdue_menu.docs_url({"HDUE_VERSION": "v0.6.0-3-gabc"}),
+            f"{base}/0.6/houdini/",
+        )
+        self.assertEqual(
+            hdue_menu.docs_url({"HDUE_VERSION": "d4a505f"}),
+            f"{base}/latest/houdini/",
+        )
+        self.assertEqual(hdue_menu.docs_url({}), f"{base}/latest/houdini/")
+
+
 class CacheFolders(unittest.TestCase):
     def test_defaults_follow_the_backend_and_delegate(self):
         local, temp = Path("/local"), Path("/temp")
@@ -23,7 +41,7 @@ class CacheFolders(unittest.TestCase):
             {
                 "texture": local / "hdUE/TextureCache",
                 "virtual_texture": local / "hdUE/VirtualTextureCache",
-                "nanite": Path("/runtime/HdUEBackend/Saved/NaniteCache"),
+                "nanite": local / "hdUE/Saved/NaniteCache",
                 "ocio": temp / "hdue_ocio",
             },
         )

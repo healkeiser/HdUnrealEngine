@@ -47,11 +47,14 @@ void Backend::boot(uint64_t instance, uint64_t window, const std::string& projec
     const auto show = env("HDUE_SHOW_WINDOW");
     // Frames are read back from render targets, so UE needs no visible window. No -stdout: the backend echoes UE's
     // errors and hdUE's warnings to the host's console (Bridge.cpp), and HDUE_UE_ARGS=-stdout every log line.
-    // HDUE_USER_DIR (set by the Houdini package): UE's Saved (logs, shader caches) per user, not in a possibly shared
-    // or read-only install folder.
+    // UE's Saved (logs, Nanite cache, config) per user in local app data, where an installed UE game keeps it
+    // (FPaths::ProjectUserDir: UserSettingsDir()/<project>), beside hdUE's texture caches: never in a possibly shared
+    // or read-only install folder or in the source tree. HDUE_USER_DIR moves it (a farm's shared disk).
     std::string arguments = (show.empty() || show == "0" || show == "false" ? "-RenderOffscreen" : "");
     arguments += " " + env("HDUE_UE_ARGS");
-    if (const auto user = env("HDUE_USER_DIR"); !user.empty()) arguments += " -userdir=\"" + user + "\"";
+    auto user = env("HDUE_USER_DIR");
+    if (user.empty() && !env("LOCALAPPDATA").empty()) user = env("LOCALAPPDATA") + "\\hdUE";
+    if (!user.empty()) arguments += " -userdir=\"" + user + "\"";
     HdueInitDesc init{};
     init.struct_size = sizeof(init);
     init.instance_handle = instance;

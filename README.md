@@ -297,21 +297,21 @@ The **[user guide](https://healkeiser.github.io/HdUnrealEngine/)** covers every 
 
 | Topic | Page |
 |-------|------|
-| Installing, a first render, environment variables | [Getting started](https://healkeiser.github.io/HdUnrealEngine/getting-started/installation/) |
-| Lighting a room, removing noise, Lumen or Path Tracer, exposure, depth of field | [Tutorials](https://healkeiser.github.io/HdUnrealEngine/tutorials/) |
-| Solaris viewport, husk, Live Render | [Houdini](https://healkeiser.github.io/HdUnrealEngine/houdini/) |
-| Render modes, denoising, motion blur, colour management, post-processing | [Rendering](https://healkeiser.github.io/HdUnrealEngine/rendering/render-settings/) |
-| Cameras, lights, materials, geometry, fog and sky | [Cameras](https://healkeiser.github.io/HdUnrealEngine/cameras/), [Lights](https://healkeiser.github.io/HdUnrealEngine/lights/), [Materials](https://healkeiser.github.io/HdUnrealEngine/materials/), [Geometry](https://healkeiser.github.io/HdUnrealEngine/geometry/meshes/), [Environment](https://healkeiser.github.io/HdUnrealEngine/environment/volumes/) |
-| Every `unreal:*` setting with UE's defaults and tooltips | [Render settings reference](https://healkeiser.github.io/HdUnrealEngine/reference/render-settings/) |
-| USD conformance: what each schema attribute does in hdUE | [USD conformance](https://healkeiser.github.io/HdUnrealEngine/conformance/) |
-| Architecture and the C ABI | [Architecture](https://healkeiser.github.io/HdUnrealEngine/architecture/) |
+| Installing, a first render, environment variables | [Getting started](https://healkeiser.github.io/HdUnrealEngine/latest/getting-started/installation/) |
+| Lighting a room, removing noise, Lumen or Path Tracer, exposure, depth of field | [Tutorials](https://healkeiser.github.io/HdUnrealEngine/latest/tutorials/) |
+| Solaris viewport, husk, Live Render | [Houdini](https://healkeiser.github.io/HdUnrealEngine/latest/houdini/) |
+| Render modes, denoising, motion blur, colour management, post-processing | [Rendering](https://healkeiser.github.io/HdUnrealEngine/latest/rendering/render-settings/) |
+| Cameras, lights, materials, geometry, fog and sky | [Cameras](https://healkeiser.github.io/HdUnrealEngine/latest/cameras/), [Lights](https://healkeiser.github.io/HdUnrealEngine/latest/lights/), [Materials](https://healkeiser.github.io/HdUnrealEngine/latest/materials/), [Geometry](https://healkeiser.github.io/HdUnrealEngine/latest/geometry/meshes/), [Environment](https://healkeiser.github.io/HdUnrealEngine/latest/environment/volumes/) |
+| Every `unreal:*` setting with UE's defaults and tooltips | [Render settings reference](https://healkeiser.github.io/HdUnrealEngine/latest/reference/render-settings/) |
+| USD conformance: what each schema attribute does in hdUE | [USD conformance](https://healkeiser.github.io/HdUnrealEngine/latest/conformance/) |
+| Architecture and the C ABI | [Architecture](https://healkeiser.github.io/HdUnrealEngine/latest/architecture/) |
 | What was measured | [VERIFICATION.md](VERIFICATION.md) |
 
 <!-- ENVIRONMENT VARIABLES -->
 ## Environment Variables
 
 <!-- --8<-- [start:environment-variables] -->
-The package file sets `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` and `HDUE_USER_DIR` (and `HDUE`, `HDUE_VERSION`); the rest are for development and debugging.
+The package file sets `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_ENABLE` (and `HDUE`, `HDUE_VERSION`); the rest are for development and debugging.
 
 | Variable | Description |
 |----------|-------------|
@@ -320,7 +320,7 @@ The package file sets `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` and `HDUE_USE
 | `HDUE_BACKEND_DLL` | Backend DLL, overriding the runtime profile |
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |
 | `HDUE_NANITE` | `0` builds regular static meshes instead of Nanite |
-| `HDUE_USER_DIR` | Where UE writes its logs and shader cache (set by the package) |
+| `HDUE_USER_DIR` | Where UE writes its logs and Nanite cache (default `%LOCALAPPDATA%\hdUE`) |
 | `HDUE_GPU_FRAMES` | `0` reads Houdini viewport frames back to the CPU instead of sharing GPU textures |
 | `HDUE_TRACE_PASS` | `1` prints one line per render pass to stderr |
 | `HDUE_TRACE_SETTINGS` | `1` prints every render setting the delegate receives |

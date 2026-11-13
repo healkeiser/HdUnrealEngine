@@ -175,7 +175,7 @@ Parameters that take a texture (Color Grading LUT, Dirt Mask Texture, Film Grain
 - an image file: EXR, HDR, PNG, JPG, TIF, TGA or BMP. A relative path resolves against the USD layer that authors it. 8-bit files are read as sRGB, float files as linear. Editing the file updates the render.
 - a cooked texture in the runtime project: `/Game/...` or `/Engine/...`.
 
-A file that cannot be read is skipped with a warning in the UE log (`out/runtime/Windows/HdUEBackend/Saved/Logs/`).
+A file that cannot be read is skipped with a warning in the UE log (`%LOCALAPPDATA%\hdUE\Saved\Logs`).
 
 ## Post-process materials
 

@@ -5,8 +5,9 @@ Unreal Engine 5.8 Hydra render delegate for Solaris, husk and the USD Render ROP
 
 Install
   1. Put this folder where it will stay. It may be shared and read-only:
-     UE writes its shader cache and logs per user, under
-     $HOUDINI_USER_PREF_DIR/hdUE (HDUE_USER_DIR).
+     UE writes its logs and caches per user, under
+     %LOCALAPPDATA%\hdUE. The texture caches there can
+     take tens of GB: see "Caches" in the Houdini viewport guide.
   2. Double-click Install.cmd (or run Install.ps1). It writes
      Documents\houdini22.0\packages\hdUE.json pointing at this folder.
   3. Restart Houdini. Pick "Unreal Engine" in the Solaris viewport
