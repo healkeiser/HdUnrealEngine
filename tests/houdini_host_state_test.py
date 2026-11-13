@@ -73,6 +73,11 @@ class HostState(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             integration.activate()
 
+    def test_retry_without_a_host_does_not_raise(self):
+        integration._host = None
+        integration.start = lambda: None
+        integration.retry_preparation()
+
 
 if __name__ == "__main__":
     unittest.main()

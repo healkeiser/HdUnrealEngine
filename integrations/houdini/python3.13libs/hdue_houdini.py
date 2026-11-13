@@ -817,8 +817,33 @@ def current_settings_node():
     return node
 
 
+RETRY_CALLBACK = "import hdue_houdini; hdue_houdini.retry_preparation()"
+
+
+def retry_preparation():
+    """The Retry material preparation button: starts the host when no viewer has yet."""
+    if _host is None:
+        start()
+    if _host is None:
+        message = "hdUE host is not running: " + (
+            _failure or "select Unreal Engine in a viewport"
+        )
+        _report(message)
+        if hou.isUIAvailable():
+            hou.ui.setStatusMessage(message, hou.severityType.Warning)
+        return
+    _host.live_preparation.retry()
+
+
 def configure_live_preparation(node):
     if node.parm("hdue_substrate_auto_prepare"):
+        # Nodes made by older versions call _host directly, which is None until a viewer selects hdUE.
+        group = node.parmTemplateGroup()
+        retry = group.find("hdue_substrate_retry")
+        if retry and retry.scriptCallback() != RETRY_CALLBACK:
+            retry.setScriptCallback(RETRY_CALLBACK)
+            group.replace("hdue_substrate_retry", retry)
+            node.setParmTemplateGroup(group)
         return
     group = node.parmTemplateGroup()
     group.append(
@@ -831,9 +856,7 @@ def configure_live_preparation(node):
     retry = hou.ButtonParmTemplate(
         "hdue_substrate_retry", "Retry material preparation"
     )
-    retry.setScriptCallback(
-        "import hdue_houdini; hdue_houdini._host.live_preparation.retry()"
-    )
+    retry.setScriptCallback(RETRY_CALLBACK)
     retry.setScriptCallbackLanguage(hou.scriptLanguage.Python)
     group.append(retry)
     node.setParmTemplateGroup(group)
