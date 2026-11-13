@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from hdue_batch import runtime_config
@@ -112,38 +113,78 @@ def merge_catalog(catalog, config_path, config):
         config_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
 
 
-def import_assets(project, paths, output=None):
+# One cook took about a minute; a hung editor must not hang Houdini forever.
+COOK_TIMEOUT_SECONDS = 1800
+CONTENT_EDITOR = (
+    ROOT / "unreal/HdUEBackend/Binaries/Win64/UnrealEditor-HdUEContent.dll"
+)
+CONTENT_SOURCE = ROOT / "unreal/HdUEBackend/Source/HdUEContent"
+
+
+def editor_is_current():
+    # The editor is rebuilt only when its source is newer.
+    if not CONTENT_EDITOR.is_file():
+        return False
+    built = CONTENT_EDITOR.stat().st_mtime
+    return all(
+        file.stat().st_mtime <= built
+        for file in CONTENT_SOURCE.rglob("*")
+        if file.is_file()
+    )
+
+
+def import_assets(project, paths, output=None, progress=None):
     """Cooks paths (cooked object paths) from project and publishes them into the running runtime. Returns the
     packages the runtime keeps an older copy of. Raises RuntimeError with the log's path when the cook fails.
+    progress is called about every 100 ms while the cook runs: an exception it raises (Houdini's Esc) kills the cook.
     """
     config_path = Path(os.environ["HDUE_RUNTIME_CONFIG"]).resolve()
     config = runtime_config()
     run = Path(
         output or ROOT / "out" / "imports" / Path(project).stem
     ).resolve()
+    run.mkdir(parents=True, exist_ok=True)
     packages = sorted({p.split(".")[0] for p in paths})
-    result = subprocess.run(
-        [
-            shutil.which("pwsh")
-            or "pwsh",  # PowerShell 7, as the build scripts
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(ROOT / "scripts/Import-UEAssets.ps1"),
-            "-ProjectPath",
-            str(project),
-            "-OutputDirectory",
-            str(run),
-            "-Packages",
-            ",".join(packages),
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode:
+    log = run / "import.log"
+    command = [
+        shutil.which("pwsh") or "pwsh",  # PowerShell 7, as the build scripts
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(ROOT / "scripts/Import-UEAssets.ps1"),
+        "-ProjectPath",
+        str(project),
+        "-OutputDirectory",
+        str(run),
+        "-Packages",
+        ",".join(packages),
+    ]
+    if editor_is_current():
+        command.append("-SkipBuild")
+    # A log file, not a pipe: a pipe nobody reads fills up and hangs the child.
+    with log.open("w", encoding="utf-8") as output_file:
+        process = subprocess.Popen(
+            command, stdout=output_file, stderr=subprocess.STDOUT
+        )
+        try:
+            deadline = time.monotonic() + COOK_TIMEOUT_SECONDS
+            while process.poll() is None:
+                if time.monotonic() > deadline:
+                    raise TimeoutError(
+                        f"Importing from {project} took longer than {COOK_TIMEOUT_SECONDS} s; log: {log}"
+                    )
+                if progress:
+                    progress()
+                time.sleep(0.1)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+    if process.returncode:
         raise RuntimeError(
-            f"Importing from {project} failed:\n{(result.stdout + result.stderr)[-2000:]}"
+            f"Importing from {project} failed (log: {log}):\n"
+            + log.read_text(encoding="utf-8", errors="replace")[-2000:]
         )
     windows = Path(config["runtime_project"]).parent.parent
     stale = publish(run / "cooked" / "Windows", windows)
@@ -169,8 +210,10 @@ def import_from_node(node):
         with hou.InterruptableOperation(
             f"Importing {asset.split('.')[-1]} from {Path(project).stem}",
             open_interrupt_dialog=True,
-        ):
-            stale = import_assets(project, [asset])
+        ) as operation:
+            stale = import_assets(
+                project, [asset], progress=operation.updateProgress
+            )
         if stale and hou.isUIAvailable():
             hou.ui.displayMessage(
                 f"{len(stale)} package(s) of this project changed since hdUE last cooked them; they render as before "
