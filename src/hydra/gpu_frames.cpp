@@ -53,6 +53,7 @@ bool HdUEGpuFrames::import(HdueGpuFrame& frame) {
     if (!ok) fail("Houdini's GL and UE's D3D12 run on different GPUs");
     const auto texture = [&](uint64_t handle, uint64_t bytes, GLenum format, Imported& out) {
         if (!ok || !handle) {
+            if (ok) fail("UE's shared frame has no handle");
             ok = false;
             return;
         }

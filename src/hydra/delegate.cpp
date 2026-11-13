@@ -356,7 +356,13 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             }
             if (task) {
                 const auto start = std::chrono::steady_clock::now();
-                task();
+                try {
+                    task();
+                } catch (const std::exception& e) {
+                    TF_RUNTIME_ERROR("hdUE UE-thread task: %s", e.what());
+                } catch (...) {
+                    TF_RUNTIME_ERROR("hdUE UE-thread task failed");
+                }
                 const double ms =
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
                 if (ms > 20) trace("hdUE slow task: %.1f ms\n", ms);
@@ -368,7 +374,15 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                     TF_RUNTIME_ERROR("hdUE tick: %s", e.what());
                 }
                 host.pumping = true;
-                for (auto& [key, pump] : host.pumps) pump();
+                for (auto& [key, pump] : host.pumps) {
+                    try {
+                        pump();
+                    } catch (const std::exception& e) {
+                        TF_RUNTIME_ERROR("hdUE UE-thread task: %s", e.what());
+                    } catch (...) {
+                        TF_RUNTIME_ERROR("hdUE UE-thread task failed");
+                    }
+                }
                 host.pumping = false;
                 const double ms =
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -2165,6 +2179,14 @@ class Pass final : public HdRenderPass {
     void publishAov(HdUERenderBuffer& target, HdUEAovFormat format, const HdueFrameInfo& frame,
                     std::vector<float> rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
+        if (!rgba.empty() && rgba.size() < count * 4) {
+            static std::once_flag warned;
+            std::call_once(warned, [&] {
+                TF_WARN("hdUE: an AOV frame holds %zu values for %ux%u pixels; it is not published", rgba.size(),
+                        frame.width, frame.height);
+            });
+            return;
+        }
         if (format == HdUEAovFormat::Int) {
             // Int32 buffers hold the integer bit patterns in the float storage.
             std::vector<float> out(count);
@@ -3624,7 +3646,13 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
         ++host.delegates;
         selfHosted_ = true;
         if (host.continuous)
-            host.post(rendererInfo);
+            host.post([state = state_, rendererInfo] {
+                try {
+                    rendererInfo();
+                } catch (const std::exception& e) {
+                    state->setError(e.what());  // Houdini's UI did not wait for the boot: shown in the viewport
+                }
+            });
         else
             host.run(rendererInfo);
     } else {
@@ -3642,7 +3670,13 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             ++host.delegates;
             selfHosted_ = true;
             if (host.continuous)
-                host.post(rendererInfo);
+                host.post([state = state_, rendererInfo] {
+                    try {
+                        rendererInfo();
+                    } catch (const std::exception& e) {
+                        state->setError(e.what());  // Houdini's UI did not wait for the boot: shown in the viewport
+                    }
+                });
             else
                 host.run(rendererInfo);
         } else {
