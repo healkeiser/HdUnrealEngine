@@ -14,7 +14,7 @@ The scene is the interior of Amazon Lumberyard Bistro (NVIDIA ORCA, CC BY 4.0), 
 
 1. In `/stage`, add a **Sublayer** LOP with **File** `$HDUE/samples/docs/bistro.usda`, and set its display flag.
 2. Pick **Unreal Engine** in the viewport's renderer menu, and the Bistro's `Camera` in its camera menu.
-3. Choose **Unreal > Create hdUE Render Settings**. Keep **Render Mode** on **Realtime (Lumen)** and check that **Unreal Tonemapper** is on.
+3. Choose **Unreal > Create hdUE Render Settings**. Keep **Render Mode** on **Realtime (Lumen)** and turn **Unreal Tonemapper** on (the Bistro's own settings have it on; the new LOP does not copy it and it is off by default).
 
 ## Practical lights
 

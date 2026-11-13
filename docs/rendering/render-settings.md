@@ -65,7 +65,7 @@ Lumen also approximates bounce light. In the Bistro, lit by its lamps, compare R
     3. **Unreal Tonemapper** on.
     4. **Exposure Compensation**, in stops.
 
-Three families cover all 371 settings:
+Three families cover every setting:
 
 - hdUE's own settings: `unreal:renderMode`, `unreal:samplesPerPixel`, `unreal:motionBlur`, ...
 - `unreal:postProcess:<Property>`: any property of UE's post-process settings (`FPostProcessSettings`), with UE's name.

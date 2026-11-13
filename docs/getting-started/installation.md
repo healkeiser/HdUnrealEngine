@@ -52,7 +52,7 @@ The result is in `out\package\`:
 
 ## Installing on a workstation
 
-1. Unzip the package folder where it will stay. A shared, read-only network folder works: each user's logs and shader cache go to their own Houdini preferences folder.
+1. Unzip the package folder where it will stay. A shared, read-only network folder works: each user's logs and shader cache go to `%LOCALAPPDATA%\hdUE` (or the folder in `HDUE_USER_DIR`).
 2. Close Houdini.
 3. Double-click `Install.cmd` in the package folder.
 4. Start Houdini.

@@ -267,7 +267,7 @@ class Host:
                             ] = (bool(preview.eval()) if preview else False)
                             # Read when materials sync, not part of their key: a sync of its own when the switch
                             # flips raced the wet-surface geometry upload ("Obsolete wet geometry revision" in
-                            # hdue_live_materials_test).
+                            # hdue_substrate_live_test).
                             self.live_preparation.enabled = auto_prepare(
                                 stage, node
                             )

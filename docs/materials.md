@@ -92,7 +92,7 @@ A cooked material replaces the translation for the materials it maps. A material
 - **Normal maps**: connect a raw texture to UsdPreviewSurface `normal` through `scale` (2, 2, 2, 1) and `bias` (-1, -1, -1, 0), or to MaterialX `normal` through a `normalmap` node. Both expect OpenGL maps (+Y up), as USD and MaterialX do.
 - **UDIMs**: write `<UDIM>` in a texture's file name (`wall.<UDIM>.exr`). hdUE builds a UE streaming virtual texture of the tiles it finds, with no preparation.
 
-Streamed texture data is cached on disk in `%LOCALAPPDATA%\hdUE\VirtualTextureCache` (or the folder in `HDUE_VIRTUAL_TEXTURE_CACHE`). The cache is never trimmed: delete the folder to reclaim space. A first load of a large scene writes tens of gigabytes there (41 GB for NVIDIA's Da Vinci Workshop).
+Streamed texture data is cached on disk in `%LOCALAPPDATA%\hdUE\VirtualTextureCache` (or the folder in `HDUE_VIRTUAL_TEXTURE_CACHE`). Each process removes sets unused for a week and chunks no set names (after a day's grace), and you can delete the folder to reclaim space at once. A first load of a large scene writes tens of gigabytes there (41 GB for NVIDIA's Da Vinci Workshop).
 
 In the Path Tracer, the first frames of a scene with UDIMs are a warm-up while UE streams the texture pages the camera sees. Accumulation starts once the pages stop changing.
 

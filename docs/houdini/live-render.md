@@ -5,7 +5,7 @@ The Live Render LOP renders the stage in the background while you edit it, and s
 ## Rendering with Live Render
 
 1. Add a **Live Render** LOP after your render settings.
-2. Set **Render Delegate** to **HdUnrealEngine**.
+2. Set **Render Delegate** to **Unreal Engine**.
 3. Set **Render Settings** to your render settings prim, or leave it empty to use the stage's default.
 4. Click **Start Render**.
 

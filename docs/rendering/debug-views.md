@@ -59,7 +59,7 @@ Buffer views are linear data, like AOVs. Use them to check that a USD or Materia
 | `vsm:mip`, `vsm:vpage`, `vsm:cache` | Virtual Shadow Map mip levels, virtual pages and cached pages | find blurry or flickering shadows; needs Virtual Shadow Maps on |
 | `nanite:Mask`, `nanite:Triangles`, `nanite:Clusters`, `nanite:Primitives`, `nanite:Instances`, `nanite:Overdraw` | Nanite's rendering data | check Nanite triangle density and coverage |
 
-Nanite views show only Nanite meshes: the meshes Houdini's viewport converts to Nanite, and native Nanite assets. In husk, meshes from the stage are not Nanite, so these views show nothing for them. See [Nanite](../geometry/nanite.md).
+Nanite views show only Nanite meshes: stage meshes with at least **Nanite Triangle Threshold** triangles (default 1,000,000), instancer prototypes, and native Nanite assets, in the viewport and in husk. In a scene of small meshes these views show nothing. See [Nanite](../geometry/nanite.md).
 
 <div class="hdue-figure" data-figure="debug-views-scene"></div>
 
@@ -76,7 +76,7 @@ hdUE runs a cooked UE runtime, not the editor, so some editor view modes are mis
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | The debug view does not change the image | **Render Mode** is Path Tracer | Switch to Realtime. |
-| A Nanite view is black or empty | no Nanite meshes in view (husk, or meshes not converted) | Use it in Houdini's viewport, or on native Nanite assets. |
+| A Nanite view is black or empty | no Nanite meshes in view (every mesh is below **Nanite Triangle Threshold**) | Lower the threshold ([Nanite](../geometry/nanite.md)), or use native Nanite assets. |
 | A virtual shadow map view is empty | Virtual Shadow Maps are off | Turn **Virtual Shadow Maps** on ([Lighting > Shadows](../reference/render-settings/lighting.md#unreal-cvar-r-shadow-virtual-enable)). |
 | A final husk render shows a debug view | **Debug View** left set on the render settings | Set it to **Lit**. |
 

@@ -83,7 +83,7 @@ As in UE, nothing emits unless you ask: UE's heterogeneous volumes emit what the
 
 ## Materials
 
-Without a material, volumes render with hdUE's default volume material. In Houdini's viewport, a bound Substrate Builder volume material replaces it; see [Substrate Builder](../substrate-builder.md). Other volume materials are not translated.
+Without a material, volumes render with hdUE's default volume material. In the viewport, husk and usdview, a bound Substrate Builder volume material replaces it; see [Substrate Builder](../substrate-builder.md). Other volume materials are not translated.
 
 ## Sparse Volume Textures
 

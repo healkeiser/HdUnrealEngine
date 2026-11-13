@@ -141,7 +141,7 @@ To render every camera in focus, turn on **Disable Depth of Field** (`disableDep
 </div>
 **Exposure F-Stop**, **Exposure ISO**, **Exposure Time** · `exposure:fStop` (1), `exposure:iso` (100), `exposure:time` (1)
 
-Each stop of **Exposure** doubles the image's brightness. hdUE combines the four attributes into one scale as USD defines it, so the exposure triplet works as on a real camera. With the **Unreal Tonemapper** on (the default), the camera's exposure adds to [Exposure Compensation](reference/render-settings/index.md#unreal-postprocess-autoexposurebias). With it off, it scales the beauty and leaves the other AOVs untouched, as Karma does.
+Each stop of **Exposure** doubles the image's brightness. hdUE combines the four attributes into one scale as USD defines it, so the exposure triplet works as on a real camera. With the **Unreal Tonemapper** on (it is off by default), the camera's exposure adds to [Exposure Compensation](reference/render-settings/index.md#unreal-postprocess-autoexposurebias). With it off, it scales the beauty and leaves the other AOVs untouched, as Karma does.
 
 <div class="hdue-figure" data-figure="cameras-exposure"></div>
 

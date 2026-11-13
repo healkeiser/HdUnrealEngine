@@ -98,7 +98,7 @@ The base name of a float primvar on the mesh that scales the coverage, for examp
 - Mask edits update the mesh's mask only, without re-sending its geometry.
 - A named primvar that is missing, has the wrong count or holds NaN is an error naming the prim.
 
-To see the mask, turn on **Preview Primvar mask** on the hdUE settings subnet: the wet meshes show their coverage in grey levels.
+To see the mask, turn on **Preview Primvar mask** on the `hdUE_settings` subnet (create it as described in [Substrate Builder](substrate-builder.md)): the wet meshes show their coverage in grey levels.
 
 ## In USD { #usd-authoring-contract }
 

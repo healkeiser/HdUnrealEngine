@@ -143,7 +143,7 @@ With **Prepare Edited Materials** off, an unprepared graph shows the library's m
 - The status bar shows each compile and its errors.
 - Edits made while a graph compiles are kept: the newest graph is compiled next, and value edits apply to the result.
 - Returning to a graph already compiled in this session does not compile again.
-- **Retry material preparation** (on the hdUE settings subnet) retries a failed graph after you fix its cause, such as a missing file.
+- **Retry material preparation** retries a failed graph after you fix its cause, such as a missing file. It sits on the `hdUE_settings` subnet, which no menu creates. In Houdini's Python shell, run `import hdue_houdini; hdue_houdini.settings_node(hou.node("/stage/<your display LOP>"))`: it adds a pass-through subnet below that node with the retry button, **Prepare graph edits automatically** and **Preview Primvar mask**. The button starts the hdUE host if no viewer has yet.
 
 ## Limits
 
@@ -158,7 +158,7 @@ With **Prepare Edited Materials** off, an unprepared graph shows the library's m
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| The viewport keeps the old material after a rewire | The graph is compiling, or failed | Read the status bar; fix the error, then **Retry material preparation** |
+| The viewport keeps the old material after a rewire | The graph is compiling, or failed | Read the status bar; fix the error, then **Retry material preparation** (see above for the subnet that holds it) |
 | The status bar reports a disconnected surface | A required input or the output is not connected | Reconnect it; preparation resumes |
 | A Normal Map connection is rejected | The Texture Sample is `srgb` | Set it to `raw` |
 | A normal map lights bumps from the wrong side | A DirectX map with **Flip Green** on | Turn **Flip Green** off |

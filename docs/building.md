@@ -60,7 +60,7 @@ Individual steps:
 .\scripts\Stage-Runtime.ps1     # cook and stage the runtime
 .\scripts\Build-Houdini.ps1     # Houdini delegate (no OpenUSD needed)
 .\scripts\Update-HoudiniRuntime.ps1 -RuntimeConfig .local\runtime.json -OutputConfig .local\runtime-houdini.json
-.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly  # licensees only: see docs/houdini/index.md
+.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-houdini.json -Zip -UnrealLicenseesOnly  # licensees only: see docs/getting-started/installation.md
 ```
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
@@ -86,7 +86,7 @@ The Streamline, Frame Generation, NIS and Movie Pipeline plugins are not needed.
 
 Fresh verification evidence is written under `out/`. A successful exit code alone is insufficient: tests require new images, metadata, and clean engine shutdown.
 
-C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools. Python uses Black and Ruff (`pyproject.toml`: 80 columns, Python 3.11+, Google docstrings): `uvx black scripts tests integrations` and `uvx ruff check --fix ...`. PowerShell uses `Invoke-Formatter` and PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`). `.editorconfig` sets whitespace for everything else. CI checks all of them, and lints the workflow with actionlint.
+C++ follows Google style with 4-space indents and 120 columns (`.clang-format`); format what you change with `git clang-format` or your editor's format-on-save. `.clang-tidy` enables the bug-prone and performance checks; CI runs it on the client library, and locally it needs a `compile_commands.json` (`cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` from a Visual Studio developer prompt). Both tools ship with Visual Studio's C++ Clang tools. Python uses Black and Ruff (`pyproject.toml`: 80 columns, Python 3.11+, Google docstrings): `uvx black@24.10.0 scripts tests integrations` and `uvx ruff@0.7.4 check --fix scripts tests integrations` (CI pins these versions; newer ones format differently). PowerShell uses `Invoke-Formatter` and PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`). `.editorconfig` sets whitespace for everything else. CI checks all of them, and lints the workflow with actionlint.
 
 ## Supported Houdini builds
 
@@ -104,7 +104,7 @@ GitHub runners cannot build Unreal Engine, so releases are built locally:
 2. `.\scripts\Verify.ps1 -WithUsdview` and `.\scripts\Test.ps1 -Suite all` on a clean tree.
 3. Render the gallery (`hython scripts/render_gallery.py --dev`). It fails when a scene's brightness against Karma CPU leaves its band (`scripts/check_gallery.py`, which CI also runs on the committed `docs/gallery.md`) or a Cornell hdUE render departs from its tile baseline (`tests/gallery_baselines.json`); after an intended change, check the images and store new baselines with `--bless`.
 4. `.\scripts\Build-Houdini.ps1`, `.\scripts\Build-Backend.ps1 -Configuration Test` and `.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes, a delegate built from another commit, and a backend that is not the current Test build (packages ship Test; see [houdini](getting-started/installation.md)).
-5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as `docs/houdini/index.md` describes.
+5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as [Installation](getting-started/installation.md) describes.
 
 ## Standalone rendering and usdview
 

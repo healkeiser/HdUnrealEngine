@@ -11,7 +11,7 @@ You will choose between a scene-linear image for compositing and UE's tone-mappe
 Use the Bistro, `$HDUE/samples/docs/bistro.usda` (see [Lighting an interior](lighting-an-interior.md#the-starting-scene) for the download): a night interior with a wide range of brightness, from the glowing lamp shades to the dark corners.
 
 1. In `/stage`, add a **Sublayer** LOP with **File** `$HDUE/samples/docs/bistro.usda` and set its display flag.
-2. Render with **Unreal Engine** through `camera`, and choose **Unreal > Create hdUE Render Settings**.
+2. Render with **Unreal Engine** through `Camera`, and choose **Unreal > Create hdUE Render Settings**.
 
 Set **Unreal Tonemapper** off on the LOP to start from the scene-linear image.
 
@@ -50,7 +50,7 @@ The camera's **Exposure** (`exposure`, in stops, on the Camera LOP) works with e
 - tonemapper off: it scales the beauty, as in Karma; AOVs are left unscaled;
 - tonemapper on: it is added to **Exposure Compensation**.
 
-1. On a **Camera** LOP in **Edit** mode for `/scene/camera`, set **Exposure** to 1.
+1. On a **Camera** LOP in **Edit** mode for `/BistroInterior/group13/Camera`, set **Exposure** to 1.
     With the tonemapper on, this is the same image as **Exposure Compensation** 1. Keep exposure on the camera when the shot also renders in Karma, so both renderers read the same value.
 
 ## Matching UE's editor
