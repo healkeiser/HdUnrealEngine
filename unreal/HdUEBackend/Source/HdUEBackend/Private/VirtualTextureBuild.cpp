@@ -51,13 +51,34 @@ namespace {
 // load counts as a use), and with it the chunks no other manifest names.
 constexpr uint32 ManifestVersion = 1;
 void SerializeManifest(FArchive& Ar, FTexturePlatformData& Platform, FVirtualTextureBuiltData& Data);
+// Only names this file writes: a chunk's hash (FSHAHash::ToString, 40 hex digits), a set's manifest, or a temporary
+// file (CreateTempFilename, .tmp). The folder can be any path HDUE_VIRTUAL_TEXTURE_CACHE names, so nothing else in it
+// is ever deleted.
+bool IsCacheFile(const FString& Name) {
+    if (Name.Len() == 2 * sizeof(FSHAHash::Hash)) {
+        bool Hex = true;
+        for (const TCHAR Char : Name) Hex &= FChar::IsHexDigit(Char);
+        if (Hex) return true;
+    }
+    return (Name.StartsWith(TEXT("vt_")) && Name.EndsWith(TEXT(".manifest"))) ||
+           ((Name.StartsWith(TEXT("chunk")) || Name.StartsWith(TEXT("manifest"))) && Name.EndsWith(TEXT(".tmp")));
+}
+// A drive root or the profile folder is a mistyped HDUE_VIRTUAL_TEXTURE_CACHE: the cache still works there, but is not
+// trimmed.
+bool IsUnsafeToTrim(const FString& Directory) {
+    FString Path = FPaths::ConvertRelativePathToFull(Directory),
+            Profile = FPlatformMisc::GetEnvironmentVariable(TEXT("USERPROFILE"));
+    FPaths::NormalizeDirectoryName(Path);
+    FPaths::NormalizeDirectoryName(Profile);
+    return Path.Len() <= 3 || FPaths::IsDrive(Path) || (!Profile.IsEmpty() && FPaths::IsSamePath(Path, Profile));
+}
 // shortcut: a session streaming a set for over a week can lose its chunks to another process's eviction; touch the
 // manifest per request if sessions run that long.
 void Evict(const FString& Directory) {
     const FDateTime Now = FDateTime::UtcNow();
     auto& Files = IFileManager::Get();
     TArray<FString> Manifests, Chunks;
-    Files.FindFiles(Manifests, *(Directory / TEXT("*.manifest")), true, false);
+    Files.FindFiles(Manifests, *(Directory / TEXT("vt_*.manifest")), true, false);
     TSet<FString> Named;
     for (const FString& Name : Manifests) {
         const FString Path = Directory / Name;
@@ -76,7 +97,7 @@ void Evict(const FString& Directory) {
     // A day's grace: another process writes a set's chunks before its manifest.
     Files.FindFiles(Chunks, *(Directory / TEXT("*")), true, false);
     for (const FString& Name : Chunks)
-        if (!Name.EndsWith(TEXT(".manifest")) && !Named.Contains(Name) &&
+        if (IsCacheFile(Name) && !Name.EndsWith(TEXT(".manifest")) && !Named.Contains(Name) &&
             Now - Files.GetTimeStamp(*(Directory / Name)) > FTimespan::FromDays(1))
             Files.Delete(*(Directory / Name), false, false, true);
 }
@@ -90,6 +111,10 @@ const FString& CacheDirectory() {
             UE_LOG(LogTemp, Warning,
                    TEXT("hdUE: cannot create the virtual texture cache %s; virtual textures stay in memory."), *Path);
             Path.Reset();
+        } else if (IsUnsafeToTrim(Path)) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: the virtual texture cache %s is a drive root or the profile folder; it is not trimmed."),
+                   *Path);
         } else
             Evict(Path);
 #if !WITH_EDITOR
