@@ -17,6 +17,9 @@ public class HdUEBackendTarget : TargetRules
         bCompileICU = true;
         // NaniteBuilder (a Developer module) builds Nanite data for the meshes hdUE creates at runtime.
         bBuildDeveloperTools = true;
+        // Packages ship the Test configuration, which compiles logging out by default (NO_LOGGING, Build.h): no log file,
+        // and none of UE's warnings and errors in husk's or Houdini's console.
+        bUseLoggingInShipping = true;
     }
 }
 
