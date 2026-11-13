@@ -548,7 +548,8 @@ def main():
             return 1
         result = dict(
             launcher.test_result,
-            passed=True,
+            # A check that recorded passed: false must win.
+            passed=launcher.test_result.get("passed", True),
             engine_shutdown=True,
             runtime_state=launcher.runtime.status().state,
             ue_initializations=launcher.runtime.initializations,

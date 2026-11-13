@@ -159,6 +159,8 @@ def check(folder, renders):
                     error=error,
                 )
             )
+    if not results:
+        raise AssertionError("no frames to check")
     result = dict(passed=True, checks=results)
     (renders / "texture-checks.json").write_text(
         json.dumps(result, indent=2), encoding="utf-8"
