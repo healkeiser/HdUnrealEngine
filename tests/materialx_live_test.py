@@ -2,6 +2,8 @@
 to the render-time translation and binds live-prepared ones, and the document the worker writes for UE.
 """
 
+import hashlib
+import json
 import sys
 import tempfile
 import unittest
@@ -9,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from materialx_controls import MaterialXLibrary, OfflineView
+from materialx_textures import file_identity
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import (
     graph_data,
@@ -211,6 +214,39 @@ class ExportTests(unittest.TestCase):
                 "/Looks/M/Mix.inputs:bg",
             },
         )
+
+
+class LibraryDependencies(unittest.TestCase):
+    def load(self, record, change=False):
+        with tempfile.TemporaryDirectory() as folder:
+            tex = Path(folder) / "tex.png"
+            tex.write_bytes(b"pixels")
+            library = Path(folder) / "library.json"
+            library.write_text(
+                json.dumps(
+                    dict(
+                        version=1,
+                        materials=[],
+                        dependencies={str(tex): record(tex)},
+                    )
+                )
+            )
+            if change:
+                tex.write_bytes(b"other pixels")
+            view = OfflineView(
+                Usd.Stage.CreateInMemory(), Usd.TimeCode.Default(), object()
+            )
+            MaterialXLibrary(str(library), view)
+
+    def test_stat_dependency_loads(self):
+        self.load(file_identity)
+
+    def test_changed_stat_dependency_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "MaterialX source changed"):
+            self.load(file_identity, change=True)
+
+    def test_sha256_dependency_still_loads(self):
+        self.load(lambda p: hashlib.sha256(p.read_bytes()).hexdigest())
 
 
 if __name__ == "__main__":

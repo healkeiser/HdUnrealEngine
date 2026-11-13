@@ -9,7 +9,7 @@ import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from materialx_textures import udim_tile_name, udim_tiles
+from materialx_textures import file_identity, udim_tile_name, udim_tiles
 
 
 def file_values(root):
@@ -52,7 +52,8 @@ def build(reports, destination):
                 raise ValueError(
                     f"Imported texture/source changed; import again: {file}"
                 )
-            dependencies[str(file)] = hashlib.sha256(data).hexdigest()
+            # The load-time check runs on the host's UI thread: size and time, as export_usd_materialx.record does.
+            dependencies[str(file)] = file_identity(file)
         dependencies[str(source)] = hashlib.sha256(source_bytes).hexdigest()
         root = ET.fromstring(
             source.read_text(encoding="utf-8-sig").replace(

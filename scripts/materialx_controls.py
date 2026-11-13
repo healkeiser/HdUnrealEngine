@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from materialx_textures import validate_texture_sets
+from materialx_textures import file_unchanged, validate_texture_sets
 from pxr import Gf, Sdf, UsdShade
 from usd_materialx_graph import (
     graph_data,
@@ -83,13 +83,9 @@ class MaterialXLibrary:
             raise ValueError("Unsupported MaterialX library version")
         validate_texture_sets(library.get("texture_sets", []))
         for name, expected in library["dependencies"].items():
-            path = Path(name)
-            if (
-                not path.is_file()
-                or hashlib.sha256(path.read_bytes()).hexdigest() != expected
-            ):
+            if not file_unchanged(name, expected):
                 raise ValueError(
-                    f"MaterialX source changed; import/cook again: {path}"
+                    f"MaterialX source changed; import/cook again: {name}"
                 )
         self.materials = {
             (str(Path(p["source"]).resolve()).casefold(), p["material"]): p
