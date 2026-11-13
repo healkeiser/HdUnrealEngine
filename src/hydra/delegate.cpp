@@ -3604,9 +3604,15 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
                 std::fprintf(stderr, "hdUE stage up axis of %s: %s\n", layer->GetIdentifier().c_str(),
                              TfStringify(axis).c_str());
         }
-    auto dll = state_->setting<std::string>("backendLibrary", TfGetenv("HDUE_BACKEND_DLL"));
+    // Scene render settings must not choose a DLL to load or a UE project to boot: a USD file could run code.
+    for (const char* key : {"backendLibrary", "runtimeProject"})
+        if (state_->settings.count(TfToken(key)))
+            TF_WARN(
+                "hdUE: render setting %s is ignored; the backend comes from HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG",
+                key);
+    auto dll = TfGetenv("HDUE_BACKEND_DLL");
     if (dll.empty()) dll = runtimeConfig("backend_dll");
-    if (dll.empty()) throw std::runtime_error("hdUE requires backendLibrary, HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
+    if (dll.empty()) throw std::runtime_error("hdUE requires HDUE_BACKEND_DLL or HDUE_RUNTIME_CONFIG");
     state_->backend = std::make_shared<hdue::Backend>(utf8Path(dll));
     auto& host = selfHost();
     const auto rendererInfo = [state = state_] {
@@ -3630,7 +3636,7 @@ HdUERenderDelegate::HdUERenderDelegate(const HdRenderSettingsMap& settings)
             // the viewport shows Hydra's progress until frames arrive.
             host.directory = hostDirectory;
             const bool wait = !houdiniUi();
-            startSelfHost(dll, state_->setting<std::string>("runtimeProject", runtimeConfig("runtime_project")), wait);
+            startSelfHost(dll, runtimeConfig("runtime_project"), wait);
             std::error_code ignored;
             std::filesystem::current_path(host.directory, ignored);
             ++host.delegates;
