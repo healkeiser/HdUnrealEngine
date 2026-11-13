@@ -11,6 +11,7 @@ out/materialx_coverage.json and prints the categories that fail, with the reason
     scripts/Test-MaterialXCoverage.ps1    # sets up OpenUSD's Python (as Import-UsdMaterialX.ps1), then runs this
 """
 
+import argparse
 import json
 import sys
 import tempfile
@@ -25,6 +26,7 @@ from export_usd_materialx import record, write  # noqa: E402
 from local_paths import local_path  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE = ROOT / "scripts" / "materialx_coverage_baseline.json"
 CHECKER = ROOT / "samples" / "docs" / "textures" / "checker.png"
 # UE 5.8's MaterialX importer (Engine/Plugins/Interchange/Runtime/Source/Import/Private/MaterialX/MaterialXUtils):
 # the categories it translates (MaterialXManager.cpp:130-385, MaterialXSurfaceShaderAbstract.cpp:1832-1872) and those
@@ -327,6 +329,7 @@ def main():
             )
             write(part, folder / name, name)
     out = ROOT / "out" / "materialx_coverage.json"
+    out.parent.mkdir(exist_ok=True)  # a fresh checkout has no out/
     out.write_text(json.dumps(results, indent=1), encoding="utf-8")
     by_category = {}
     for entry in results.values():
@@ -345,7 +348,31 @@ def main():
             f"{category}: {len(bad)}/{len(entries)} {bad[0]['status']}: {bad[0]['reason']}"
         )
     print(out)
+    return check_baseline(results)
+
+
+def check_baseline(results):
+    """1 when a nodedef the baseline lists as ok no longer is; --bless stores the current ok list instead."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--baseline", type=Path, default=BASELINE)
+    parser.add_argument("--bless", action="store_true")
+    args, _ = parser.parse_known_args()
+    ok = sorted(n for n, e in results.items() if e["status"] == "ok")
+    if args.bless:
+        args.baseline.write_text(
+            json.dumps(ok, indent=1) + "\n", encoding="utf-8"
+        )
+        print(f"baseline: {len(ok)} ok nodedefs written to {args.baseline}")
+        return 0
+    baselined = set(json.loads(args.baseline.read_text(encoding="utf-8")))
+    lost = sorted(baselined - set(ok))
+    gained = sorted(set(ok) - baselined)
+    if gained:
+        print(f"newly ok, run --bless: {', '.join(gained)}")
+    if lost:
+        print(f"no longer ok (was in {args.baseline.name}): {', '.join(lost)}")
+    return 1 if lost else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
