@@ -255,13 +255,13 @@ class Launcher(Usdviewq.Launcher):
     def show_camera_controls(self):
         QtWidgets.QMessageBox.information(
             self.controller._mainWindow,
-            "カメラ操作",
-            "ビューポート上で操作します。\n\n"
-            "メッシュの選択：左クリック（USD／cook済みUEメッシュ）\n"
-            "回転：Alt＋左ドラッグ\n"
-            "平行移動：Alt＋中ドラッグ\n"
-            "平行移動（中ボタンなし）：Ctrl＋Alt＋左ドラッグ\n"
-            "ズーム／前後移動：Alt＋右ドラッグ、またはホイール",
+            "Camera controls",
+            "Use these in the viewport.\n\n"
+            "Select a mesh: left click (USD and cooked UE meshes)\n"
+            "Tumble: Alt + left drag\n"
+            "Track: Alt + middle drag\n"
+            "Track (no middle button): Ctrl + Alt + left drag\n"
+            "Dolly: Alt + right drag, or the wheel",
         )
 
     def set_if_changed(self, key, value):
@@ -461,7 +461,7 @@ class Launcher(Usdviewq.Launcher):
                 if stats.get("nativeAssetLoading"):
                     self.asset_loading = True
                     self.controller.statusMessage(
-                        "hdUE: UEアセット準備待ち {}件 / 配置Prim {}件 — Path Tracer蓄積は準備完了後".format(
+                        "hdUE: Waiting for {} UE asset(s), {} placed prim(s); the Path Tracer accumulates once they are ready".format(
                             stats.get("nativeAssetLoading", 0),
                             stats.get("nativeAssetInstances", 0),
                         )
@@ -469,7 +469,7 @@ class Launcher(Usdviewq.Launcher):
                 elif self.asset_loading and not error:
                     self.asset_loading = False
                     self.controller.statusMessage(
-                        "hdUE: UEアセット準備完了 — {} Actors / {} Meshes".format(
+                        "hdUE: UE assets ready: {} actors, {} meshes".format(
                             stats.get("nativeActors", 0),
                             stats.get("nativeMeshes", 0),
                         )
@@ -477,7 +477,7 @@ class Launcher(Usdviewq.Launcher):
                 if stats.get("vtResidencyPhase") == 1:
                     self.residency_preparing = True
                     self.controller.statusMessage(
-                        "hdUE: UDIM準備中 — ページ {}/{}（Path Tracer 0 samples）".format(
+                        "hdUE: Preparing UDIM textures: page {} of {} (Path Tracer at 0 samples)".format(
                             stats.get("vtResidentPages", 0),
                             stats.get("vtRequiredPages", 0),
                         )
@@ -485,9 +485,9 @@ class Launcher(Usdviewq.Launcher):
                 elif self.residency_preparing and not error:
                     self.residency_preparing = False
                     self.controller.statusMessage(
-                        "hdUE: UDIM準備完了 — Path Tracer蓄積開始"
+                        "hdUE: UDIM textures ready; the Path Tracer starts accumulating"
                         if stats.get("vtResidencyPhase") == 2
-                        else "hdUE: リアルタイム描画"
+                        else "hdUE: Rendering in realtime"
                     )
                 if error and error != self.reported_error:
                     self.reported_error = error
