@@ -1,0 +1,51 @@
+#usda 1.0
+(
+    doc = """unreal:domeResolution is the face size of the cube dome lights are baked into; UE accepts a power of two
+from 32 to 2048. Scenes saved by older hdUE Render Settings LOPs stored the menu position (3 for 256) instead. hdUE must
+warn, use UE's 128, and keep every light: the backend rejects the whole light batch for a bad size, so the key light
+would vanish."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdRenderSettings",
+ "feature": "unreal:domeResolution (invalid, warned)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "warning names domeResolution",
+   "log": "hdUE warning:.*domeResolution",
+   "present": true
+  },
+  {
+   "name": "the key light still renders",
+   "value": {
+    "region": [
+     -0.5,
+     -0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "min": 0.5
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Render"
+{
+    over "Settings"
+    {
+        int unreal:domeResolution = 3
+    }
+}
+def Cube "Box"
+{
+    double size = 1.5
+}
