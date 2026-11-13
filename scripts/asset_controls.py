@@ -31,6 +31,7 @@ class AssetReferences:
         if not stage or not self.dirty:
             return
         refs = {}
+        invalid = []
         for prim in stage.Traverse():
             attr = prim.GetAttribute("unreal:asset")
             value = attr.Get() if attr else None
@@ -38,11 +39,12 @@ class AssetReferences:
                 if isinstance(value, Sdf.AssetPath):
                     value = value.path
                 if not isinstance(value, str):
-                    raise ValueError(
-                        f"unreal:asset requires a UE object path string at {prim.GetPath()}"
+                    invalid.append(
+                        f"{prim.GetPath()}: unreal:asset requires a UE object path string"
                     )
+                    continue
                 refs[str(prim.GetPath())] = value
-        self.warnings = [
+        self.warnings = invalid + [
             f"{path}: unavailable source script package {package} (its actors are omitted by cook)"
             for path, asset in refs.items()
             for package in self.catalog.get(asset, {}).get(

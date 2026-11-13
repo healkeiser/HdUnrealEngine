@@ -39,6 +39,29 @@ class AssetReferencesTest(unittest.TestCase):
         self.assertEqual(stage.GetSessionLayer().ExportToString(), before)
         self.assertFalse(stage.GetPrimAtPath("/Asset/__HdUEAssetProxy"))
 
+    def test_a_non_string_asset_is_a_warning_not_an_error(self):
+        stage = Usd.Stage.CreateInMemory()
+        UsdGeom.Xform.Define(stage, "/Bad").GetPrim().CreateAttribute(
+            "unreal:asset", Sdf.ValueTypeNames.Int
+        ).Set(3)
+        UsdGeom.Xform.Define(stage, "/Good").GetPrim().CreateAttribute(
+            "unreal:asset", Sdf.ValueTypeNames.String
+        ).Set("/Game/M.M")
+        model = SimpleNamespace(
+            stage=stage,
+            currentFrame=Usd.TimeCode.Default(),
+            signalStageReplaced=Signal(),
+            signalPrimsChanged=Signal(),
+        )
+        refs = AssetReferences(SimpleNamespace(_dataModel=model))
+        refs.catalog = {
+            "/Game/M.M": {"unavailable_script_packages": ["/Script/X"]}
+        }
+        refs.sync()
+        self.assertEqual(len(refs.warnings), 2)
+        self.assertIn("/Bad", refs.warnings[0])
+        self.assertIn("/Good", refs.warnings[1])
+
 
 if __name__ == "__main__":
     unittest.main()
