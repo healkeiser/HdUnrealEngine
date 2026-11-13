@@ -19,8 +19,8 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 002 | [Clamp motion-sample counts](002-clamp-motion-sample-counts.md) | main | P1 | S | — | DONE |
 | 003 | [Delegate thread and ABI boundary robustness](003-delegate-thread-and-abi-boundary-robustness.md) | main | P1 | S | — | DONE |
 | 004 | [MaterialX libraries accept stat dependencies](004-materialx-libraries-accept-stat-dependencies.md) | side | P1 | S | — | DONE (usdview check deferred) |
-| 005 | [Integer menus store their values](005-integer-menus-store-their-values.md) | main | P1 | S | — | TODO |
-| 006 | [Cache clears cannot delete user files](006-cache-clears-cannot-delete-user-files.md) | main | P1 | S | — | TODO |
+| 005 | [Integer menus store their values](005-integer-menus-store-their-values.md) | main | P1 | S | — | DONE |
+| 006 | [Cache clears cannot delete user files](006-cache-clears-cannot-delete-user-files.md) | main | P1 | S | — | DONE |
 | 007 | [Groom upload validation and actor lifetime](007-groom-upload-validation-and-actor-lifetime.md) | main | P1 | S | — | TODO |
 | 008 | [Python ABI mirrors checked in CI](008-python-abi-mirrors-checked-in-ci.md) | side | P1 | S | — | DONE |
 | 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE (materialx/* conformance pending) |
@@ -31,7 +31,7 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 014 | [Native picking on the UE thread](014-native-picking-on-the-ue-thread.md) | main | P2 | S-M | 003 | TODO |
 | 015 | [Released-mesh edits and re-pull convergence](015-released-mesh-edits-and-repull-convergence.md) | main | P2 | S-M | 010 | TODO |
 | 016 | [One bad item does not fail the scene](016-one-bad-item-does-not-fail-the-scene.md) | main | P2 | M | 010 | TODO |
-| 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (hython/Houdini checks pending) |
+| 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (manual Esc check pending) |
 | 018 | [Asset import writes shared files safely](018-asset-import-writes-shared-files-safely.md) | side | P2 | M | 017 | DONE (manual re-import check pending) |
 | 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | TODO |
 | 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | TODO |
