@@ -28,7 +28,7 @@ if ($LASTEXITCODE) { throw 'Project asset cook failed.' }
 if (-not $SkipBuild) { & "$PSScriptRoot\Build-Backend.ps1" -EngineRoot $EngineRoot -MaxParallelActions 8 }
 $Staging = Join-Path $Run 'runtime'
 & "$PSScriptRoot\Stage-Runtime.ps1" -EngineRoot $EngineRoot -OutputDirectory $Staging
-$SourceProject = if (Test-Path -LiteralPath $ProjectPath -PathType Container) { (Get-ChildItem -LiteralPath $ProjectPath -Filter *.uproject | Select-Object -First 1).FullName } else { (Resolve-Path -LiteralPath $ProjectPath).Path }
+$SourceProject = Resolve-HdUEUProject $ProjectPath
 @{
     version=1; source_project=$SourceProject;
     runtime_project=(Join-Path $Staging 'Windows\HdUEBackend\HdUEBackend.uproject');

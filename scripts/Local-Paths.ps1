@@ -32,6 +32,17 @@ function Get-HdUELocalPath {
     throw "Configure $Key in .local/paths.json, set $($Variables[$Key]), or pass the corresponding script parameter."
 }
 
+# The .uproject a script was given: the file itself, or the one inside a folder (an error unless it holds exactly one).
+function Resolve-HdUEUProject {
+    param([Parameter(Mandatory = $true)][string]$ProjectPath)
+    if (Test-Path -LiteralPath $ProjectPath -PathType Container) {
+        $Projects = @(Get-ChildItem -LiteralPath $ProjectPath -Filter *.uproject)
+        if ($Projects.Count -ne 1) { throw 'Specify one .uproject file.' }
+        $Projects[0].FullName
+    }
+    else { (Resolve-Path -LiteralPath $ProjectPath).Path }
+}
+
 # A fresh run directory: $Path, else out\<Name>\<timestamp>. Its parent exists; -Create also creates it (otherwise
 # the tool that fills it does, refusing an existing one).
 function New-HdUERun {

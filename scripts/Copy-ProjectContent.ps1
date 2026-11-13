@@ -2,12 +2,7 @@ param([Parameter(Mandatory = $true)][string]$ProjectPath, [Parameter(Mandatory =
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $TaskRoot = Split-Path -Parent $PSScriptRoot
-$SourceProject = if (Test-Path -LiteralPath $ProjectPath -PathType Container) {
-    $Projects = @(Get-ChildItem -LiteralPath $ProjectPath -Filter *.uproject)
-    if ($Projects.Count -ne 1) { throw 'Specify one .uproject file.' }
-    $Projects[0].FullName
-}
-else { (Resolve-Path -LiteralPath $ProjectPath).Path }
+$SourceProject = Resolve-HdUEUProject $ProjectPath
 $SourceContent = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $SourceProject) 'Content'))
 $Destination = [IO.Path]::GetFullPath((Join-Path $TaskRoot 'unreal\HdUEBackend\Content'))
 if ($SourceContent.TrimEnd('\') -eq $Destination.TrimEnd('\')) { throw 'Source and destination content must be different.' }
