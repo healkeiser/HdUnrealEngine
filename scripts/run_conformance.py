@@ -315,7 +315,8 @@ def run_scene(name, path, spec, mode, env, timeout):
 
 
 def status(entry):
-    if "error" in entry and not entry["checks"]:
+    # No check for this mode is a spec error: zero of zero would otherwise read as a pass.
+    if not entry["checks"]:
         return "error"
     passed = sum(c["pass"] for c in entry["checks"])
     if passed == len(entry["checks"]) and "error" not in entry:
@@ -436,7 +437,14 @@ def main():
     specs = {name: spec_of(path) for name, path in scenes(None)}
     failures, start = 0, time.perf_counter()
     print(f"{'scene':42} {'mode':10} {'s':>6}  result", flush=True)
-    for name, path in scenes(args.only):
+    selected = list(scenes(args.only))
+    if not selected:
+        print(
+            f"no scene matches --only {' '.join(args.only or [])}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    for name, path in selected:
         spec = specs[name]
         for mode in args.mode or spec.get("modes", MODES):
             entry = run_scene(name, path, spec, mode, env, args.timeout)
