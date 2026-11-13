@@ -233,6 +233,15 @@ class OpTextures(unittest.TestCase):
             red_pixels[:, 0].mean(), blue_pixels[:, 0].mean() * 5
         )
         self.assertLess(np.max(np.ptp(red_pixels[:, :3], axis=1)), 2)
+        # The Image ROP exists only during an export: nothing is left in the scene.
+        self.assertEqual(
+            [
+                n
+                for n in hou.node("/out").children()
+                if n.name().startswith("__hdue_texture_export")
+            ],
+            [],
+        )
 
 
 if __name__ == "__main__":

@@ -71,15 +71,16 @@ class Cache:
         self.directory = tempfile.TemporaryDirectory(prefix="hdue-cop-")
         self.entries = {}
         self.bindings = {}
-        self.exporter = None
+        # Older hdUE versions left this ROP in saved scenes.
+        with hou.undos.disabler():
+            for leftover in hou.node("/out").children():
+                if (
+                    leftover.name().startswith("__hdue_texture_export")
+                    and leftover.type().name() == "image"
+                ):
+                    leftover.destroy()
 
     def close(self):
-        if self.exporter:
-            try:
-                self.exporter.destroy()
-            except hou.ObjectWasDeleted:
-                pass
-            self.exporter = None
         self.entries.clear()
         self.bindings.clear()
         self.directory.cleanup()
@@ -133,30 +134,33 @@ class Cache:
         else:
             # The Image ROP understands Copernicus GPU layers, including selected
             # output ports, without a Python loop over millions of pixels.
-            if self.exporter is None:
-                self.exporter = hou.node("/out").createNode(
+            # Created for this export only: a node left in /out is saved into the user's scene.
+            with hou.undos.disabler():
+                rop = hou.node("/out").createNode(
                     "image", "__hdue_texture_export", run_init_scripts=False
                 )
-            rop = self.exporter
-            rop.parm("coppath").set(node.path())
-            rop.parm("copoutput").set(str(pending))
-            rop.parm("savebackground").set(0)
-            rop.parm("setudim").set("off")
-            rop.parm("setprecision").set(1)
-            rop.parm("precision").set("b32")
-            rop.parm("outputaovs").set(1)
-            if rop.parm("enabled1"):
-                rop.parm("enabled1").set(
-                    1
-                )  # Houdini 22.0.368's Image ROP has no per-AOV toggle
-            rop.parm("aov1").set("C")
-            rop.parm("useport1").set(1)
-            rop.parm("port1").set(output)
-            rop.parm("colorconversion").set("raw" if raw else "ocio")
-            if not raw:
-                # UE uses linear Rec.709. COP scene_linear can be ACEScg.
-                rop.parm("ociocolorspace").set("Linear Rec.709 (sRGB)")
-            rop.render(frame_range=(hou.frame(), hou.frame()))
+                try:
+                    rop.parm("coppath").set(node.path())
+                    rop.parm("copoutput").set(str(pending))
+                    rop.parm("savebackground").set(0)
+                    rop.parm("setudim").set("off")
+                    rop.parm("setprecision").set(1)
+                    rop.parm("precision").set("b32")
+                    rop.parm("outputaovs").set(1)
+                    if rop.parm("enabled1"):
+                        rop.parm("enabled1").set(
+                            1
+                        )  # Houdini 22.0.368's Image ROP has no per-AOV toggle
+                    rop.parm("aov1").set("C")
+                    rop.parm("useport1").set(1)
+                    rop.parm("port1").set(output)
+                    rop.parm("colorconversion").set("raw" if raw else "ocio")
+                    if not raw:
+                        # UE uses linear Rec.709. COP scene_linear can be ACEScg.
+                        rop.parm("ociocolorspace").set("Linear Rec.709 (sRGB)")
+                    rop.render(frame_range=(hou.frame(), hou.frame()))
+                finally:
+                    rop.destroy()
         if not pending.is_file():
             raise RuntimeError("COP texture did not produce an image: " + uri)
         # Immutable content paths invalidate Hydra/UE texture caches and let an
