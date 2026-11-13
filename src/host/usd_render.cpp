@@ -1,6 +1,7 @@
 #include "hdue/backend.hpp"
 #include <windows.h>
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/tf/setenv.h"
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/vt/dictionary.h"
@@ -283,7 +284,8 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
     const auto profiles = stat<VtDictionary>(prepared, "wetProfiles", {});
     for (const auto& [name, value] : prepared)
         if (name != "wetProfiles") settings[TfToken(name)] = value;
-    settings[TfToken("backendLibrary")] = VtValue(utf8(options.dll));
+    // The delegate loads the module this host booted; it takes the DLL only from the environment, not settings.
+    TfSetenv("HDUE_BACKEND_DLL", utf8(options.dll));
     settings[TfToken("metersPerUnit")] = VtValue(UsdGeomGetStageMetersPerUnit(stage));
     settings[TfToken("upAxis")] = VtValue(UsdGeomGetStageUpAxis(stage).GetString());
     settings[TfToken("samplesPerPixel")] = VtValue(64);
