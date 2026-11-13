@@ -6,6 +6,7 @@ imported inside the menu actions for the same reason.
 
 import ctypes
 import os
+import re
 import shutil
 import traceback
 import webbrowser
@@ -17,6 +18,35 @@ CACHE_LABELS = {
     "virtual_texture": "Virtual texture cache",
     "nanite": "Nanite cache",
     "ocio": "OCIO texture cache",
+}
+# The names VirtualTextureBuild.cpp writes: a chunk's SHA-1 (FSHAHash::ToString, 40 hex digits), a set's manifest, and
+# the private files both are written to before they move into place (FPaths::CreateTempFilename, .tmp).
+VIRTUAL_TEXTURE_FILE = re.compile(
+    r"[0-9A-Fa-f]{40}|vt_.*\.manifest|chunk.*\.tmp|manifest.*\.tmp"
+)
+
+
+def _inside(folder_name):
+    """Everything in a cache folder of a fixed hdUE name; a folder of any other name is refused."""
+
+    def owned(entry):
+        if entry.parent.name != folder_name:
+            raise ValueError(
+                f"Refusing to clear {entry.parent}: not an hdUE {folder_name} folder"
+            )
+        return True
+
+    return owned
+
+
+# Which entries clearing a cache may delete. HDUE_VIRTUAL_TEXTURE_CACHE can name any folder, so only the files hdUE
+# wrote there go; the other caches have fixed hdUE folder names.
+CACHE_FILES = {
+    "texture": _inside("TextureCache"),
+    "virtual_texture": lambda entry: entry.is_file()
+    and bool(VIRTUAL_TEXTURE_FILE.fullmatch(entry.name)),
+    "nanite": _inside("NaniteCache"),
+    "ocio": _inside("hdue_ocio"),
 }
 
 
@@ -88,12 +118,13 @@ def format_size(size):
             return f"{size:.1f} {unit}"
 
 
-def clear_folder(folder):
-    """Delete everything inside folder and keep the folder. Returns the paths that could not be deleted (files another
-    process still holds open: Windows refuses to delete them).
+def clear_folder(folder, owned):
+    """Delete the entries of folder that owned(entry) accepts (a CACHE_FILES rule) and keep the folder and the rest.
+    Returns the paths that could not be deleted (files another process still holds open: Windows refuses to delete
+    them).
     """
     folder = Path(folder)
-    # HDUE_VIRTUAL_TEXTURE_CACHE is user input: never empty a drive root or the home folder it might name by mistake.
+    # HDUE_VIRTUAL_TEXTURE_CACHE is user input: never touch a drive root or the home folder it might name by mistake.
     if folder.resolve() in (
         Path(folder.anchor).resolve(),
         Path.home().resolve(),
@@ -103,6 +134,8 @@ def clear_folder(folder):
     if not folder.is_dir():
         return failed
     for entry in folder.iterdir():
+        if not owned(entry):
+            continue
         try:
             if entry.is_dir() and not entry.is_symlink():
                 # onexc (Python 3.12+; Houdini 22 runs 3.13): keep going past held files.
@@ -270,12 +303,28 @@ def clear_caches(*names):
         suppress=hou.confirmType.NoConfirmType,
     ):
         return
-    failed = [
-        path for folder in chosen.values() for path in clear_folder(folder)
-    ]
+    failed, notes = [], []
+    for name, folder in chosen.items():
+        owned = CACHE_FILES[name]
+        failed += clear_folder(folder, owned)
+        # A shared folder: say what was left, so the user knows it holds more than hdUE's cache.
+        left = (
+            sum(1 for entry in folder.iterdir() if not owned(entry))
+            if folder.is_dir()
+            else 0
+        )
+        if left:
+            notes.append(
+                f"{left} files or folders hdUE did not write were left in {folder}."
+            )
     if failed:
-        hou.ui.displayMessage(
+        notes.insert(
+            0,
             f"{len(failed)} files are in use by another process (husk or another Houdini) and were kept.",
+        )
+    if notes:
+        hou.ui.displayMessage(
+            "\n".join(notes),
             severity=hou.severityType.Warning,
             title="hdUE caches",
             details="\n".join(map(str, failed)),
