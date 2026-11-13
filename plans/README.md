@@ -40,7 +40,7 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 023 | [Interactive performance: measure, then fix](023-interactive-performance-measure-then-fix.md) | main | P2 | M | 010 | TODO |
 | 024 | [Transform-only edits skip geometry](024-transform-only-edits-skip-geometry.md) | main | P3 | L | 010, 015 | TODO |
 | 025 | [Generators fail loudly and match their outputs](025-generators-fail-loudly-and-match-outputs.md) | main | P3 | M | 009, 013 | TODO |
-| 026 | [Docs match the code](026-docs-match-the-code.md) | side | P3 | S | 013, 017 | TODO |
+| 026 | [Docs match the code](026-docs-match-the-code.md) | side | P3 | S | 013, 017 | DONE (full conformance matrix refresh optional) |
 | 027 | [One material, one look on every path](027-one-material-one-look-on-every-path.md) | main | P3 | M | 011, 012 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
