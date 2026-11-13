@@ -6,6 +6,7 @@ checks a new render before it is committed. A black scene (brightness 0.00) can 
     python scripts/check_gallery.py
 """
 
+import math
 import re
 import sys
 from pathlib import Path
@@ -21,13 +22,15 @@ BANDS = {
 
 
 def rows(text):
-    """(title, Lumen ratio, Path Tracer ratio) per summary row; 'n/a' rows (display-referred images) are skipped."""
+    """(title, Lumen cell, Path Tracer cell) per summary row, as text; 'n/a' rows (display-referred images) are
+    skipped.
+    """
     for line in text.splitlines():
         match = re.match(
-            r"\| ([^*|][^|]*?) \|.*\| (\d+\.\d+) / (\d+\.\d+) \|$", line
+            r"\| ([^*|][^|]*?) \|.*\| ([^|/ ]+) / ([^|/ ]+) \|$", line
         )
         if match:
-            yield match[1], float(match[2]), float(match[3])
+            yield match[1], match[2], match[3]
 
 
 def check(page=ROOT / "docs" / "gallery.md"):
@@ -36,14 +39,22 @@ def check(page=ROOT / "docs" / "gallery.md"):
     found = list(rows(text))
     if not found:
         failures.append(f"{page}: no brightness table")
-    for title, *ratios in found:
-        for mode, ratio, (low, high) in zip(
+    for title, *cells in found:
+        for mode, cell, (low, high) in zip(
             ("Lumen", "Path Tracer"),
-            ratios,
+            cells,
             BANDS.get(title, DEFAULT),
             strict=True,
         ):
-            if not low <= ratio <= high:
+            try:
+                ratio = float(cell)
+            except ValueError:
+                ratio = math.nan
+            if not math.isfinite(ratio):
+                failures.append(
+                    f"{title}: brightness cell '{cell}' is not a finite number"
+                )
+            elif not low <= ratio <= high:
                 failures.append(
                     f"{title}: {mode} brightness {ratio:.2f}x Karma CPU, outside {low}-{high}"
                 )

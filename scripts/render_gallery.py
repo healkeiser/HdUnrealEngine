@@ -186,11 +186,18 @@ def husk(renderer, layer, output, frames=1):
             f"husk {renderer} {layer.name} failed:\n{result.stdout[-2000:]}{result.stderr[-2000:]}"
         )
     if env:
-        starts = [
+        traced = [
             float(line.split()[0])
             for line in (result.stdout + result.stderr).splitlines()
             if "hdUE setting changed: houdini:frame" in line
-        ][1:]
+        ]
+        if frames > 2 and len(traced) < 3:
+            # Wall time would include UE's startup and pass for a per-frame time.
+            raise RuntimeError(
+                f"husk {renderer} {layer.name}: {len(traced)} 'hdUE setting changed: houdini:frame' trace lines for "
+                f"{frames} frames (HDUE_TRACE_TIMING=1 prints them)"
+            )
+        starts = traced[1:]
         if len(starts) > 1:
             return (starts[-1] - starts[0]) / (len(starts) - 1) / 1000
     return elapsed
@@ -429,11 +436,17 @@ def panel_image(target, title, doc, panels):
 
 
 def hardware():
-    query = (
-        lambda command: subprocess.run(command, capture_output=True, text=True)
-        .stdout.strip()
-        .splitlines()
-    )
+
+    def query(command):
+        try:
+            return (
+                subprocess.run(command, capture_output=True, text=True)
+                .stdout.strip()
+                .splitlines()
+            )
+        except OSError:  # the tool is not installed: name what is found
+            return []
+
     gpu = query(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"])
     cpu = query(
         [
@@ -446,13 +459,19 @@ def hardware():
     return " and ".join(x[0].strip() for x in (gpu, cpu) if x)
 
 
+def finite(image):
+    if not np.isfinite(image).all():
+        raise ValueError("non-finite pixels")
+    return image
+
+
 def luminance(image):
-    return float((image @ np.array([0.2126, 0.7152, 0.0722])).mean())
+    return float((finite(image) @ np.array([0.2126, 0.7152, 0.0722])).mean())
 
 
 def tiles(image, rows=9, columns=16):
     """Mean luminance per tile: a small, noise-averaged picture of a render."""
-    lum = image @ np.array([0.2126, 0.7152, 0.0722])
+    lum = finite(image) @ np.array([0.2126, 0.7152, 0.0722])
     lum = lum[
         : len(lum) - len(lum) % rows, : lum.shape[1] - lum.shape[1] % columns
     ]
@@ -470,8 +489,14 @@ def check_baselines(bless):
         for key in TILE_LIMITS:
             path = OUT / f"{name}_{key}.exr"
             if not path.exists():
+                if not bless and key in stored.get(name, {}):
+                    failures.append(f"{name} {key}: render missing")
                 continue
-            current = tiles(pixels(path))
+            try:
+                current = tiles(pixels(path))
+            except ValueError as error:
+                failures.append(f"{name} {key}: {error} in {path}")
+                continue
             if bless:
                 stored.setdefault(name, {})[key] = np.round(current, 5).tolist()
             elif key not in stored.get(name, {}):
@@ -480,7 +505,7 @@ def check_baselines(bless):
                 base = np.array(stored[name][key])
                 error = np.abs(current - base) / (base + 0.05 * base.mean())
                 p95 = float(np.percentile(error, 95))
-                if p95 > TILE_LIMITS[key]:
+                if not p95 <= TILE_LIMITS[key]:  # also true for NaN
                     failures.append(
                         f"{name} {key}: 95th-percentile tile error {p95:.3f} > {TILE_LIMITS[key]}"
                     )
@@ -983,7 +1008,7 @@ def write_docs(machine):
         ],
     }
     (IMAGES / "gallery.json").write_text(
-        json.dumps(data, indent=1) + "\n", encoding="utf-8"
+        json.dumps(data, indent=1, allow_nan=False) + "\n", encoding="utf-8"
     )
     charts = (
         '<div class="hdue-chart" data-chart="times" role="img" '

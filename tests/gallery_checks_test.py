@@ -1,0 +1,86 @@
+"""The gallery checks fail on NaN, missing renders and unreadable brightness cells (no GPU or Houdini needed)."""
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import check_gallery
+import render_gallery
+
+HEADER = (
+    "| Scene | a | Brightness (Lumen / Path Tracer) |\n| --- | ---: | ---: |\n"
+)
+
+
+def page_failures(*rows):
+    with tempfile.TemporaryDirectory() as folder:
+        page = Path(folder) / "gallery.md"
+        page.write_text(HEADER + "\n".join(rows) + "\n", encoding="utf-8")
+        return check_gallery.check(page)
+
+
+class GalleryTable(unittest.TestCase):
+    def test_normal_row_is_parsed(self):
+        count, failures = page_failures("| Scene A | 1 s | 0.98 / 1.01 |")
+        self.assertEqual((count, failures), (1, []))
+
+    def test_nan_cell_fails(self):
+        _, failures = page_failures("| Scene A | 1 s | nan / 1.01 |")
+        self.assertEqual(len(failures), 1)
+        self.assertIn("not a finite number", failures[0])
+
+    def test_na_row_is_skipped(self):
+        count, failures = page_failures(
+            "| Scene A | 1 s | n/a |", "| Scene B | 1 s | 0.98 / 1.01 |"
+        )
+        self.assertEqual((count, failures), (1, []))
+
+
+class Baselines(unittest.TestCase):
+    def run_check(self, image, stored):
+        """check_baselines for one scene/key with render `image` (None: no render file) against `stored`."""
+        with tempfile.TemporaryDirectory() as folder:
+            out, baselines = Path(folder) / "out", Path(folder) / "b.json"
+            out.mkdir()
+            baselines.write_text(json.dumps(stored))
+            if image is not None:
+                (out / "S_k.exr").write_bytes(b"")
+            with (
+                mock.patch.object(render_gallery, "OUT", out),
+                mock.patch.object(render_gallery, "BASELINES", baselines),
+                mock.patch.object(
+                    render_gallery, "CORNELL_SCENES", [("S", 0, 0)]
+                ),
+                mock.patch.object(render_gallery, "TILE_LIMITS", {"k": 0.1}),
+                mock.patch.object(render_gallery, "pixels", lambda _: image),
+            ):
+                return render_gallery.check_baselines(False)
+
+    def setUp(self):
+        self.image = np.full((18, 32, 3), 0.5)
+        self.stored = {
+            "S": {"k": np.round(render_gallery.tiles(self.image), 5).tolist()}
+        }
+
+    def test_identical_image_passes(self):
+        self.assertEqual(self.run_check(self.image, self.stored), [])
+
+    def test_nan_image_fails(self):
+        image = self.image.copy()
+        image[0, 0, 0] = np.nan
+        self.assertEqual(len(self.run_check(image, self.stored)), 1)
+
+    def test_missing_render_with_baseline_fails(self):
+        failures = self.run_check(None, self.stored)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("render missing", failures[0])
+
+
+if __name__ == "__main__":
+    unittest.main()
