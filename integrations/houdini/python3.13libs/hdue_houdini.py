@@ -472,6 +472,15 @@ class Host:
         if redraw:
             viewer.curViewport().draw()
 
+    def resume(self):
+        """Restarts the tick after repeated errors stopped it; a closed host never restarts (UE ended with it)."""
+        if self.closed:
+            return False
+        self.failures = 0
+        self.running = True
+        self.timer.start(16)
+        return True
+
     def close(self):
         if self.closed:
             return
@@ -539,12 +548,15 @@ def start_when_selected():
 def start():
     global _host, _failure
     if _host:
+        if not _host.running:
+            _host.resume()
         return _host
     try:
         import hdue_substrate
 
         hdue_substrate.install()
         _host = Host()
+        _failure = None
         _note("hdUE host started (UE runs on its own thread)")
         input_usd = os.environ.get("HDUE_HOUDINI_INPUT")
         if input_usd:
@@ -784,7 +796,7 @@ def activate_saved_hip():
 def activate():
     if not _host:
         start()
-    if not _host or _failure:
+    if not _host or _host.closed or not _host.running:
         raise RuntimeError(_failure or "UE not ready")
     viewer = scene_viewer()
     names = viewer.hydraRenderers()
