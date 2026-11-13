@@ -4,8 +4,10 @@ content (never replacing a file it already has, which a running UE may have load
 catalog. UE then loads them by path when a prim names them, without a restart.
 """
 
+import contextlib
 import filecmp
 import json
+import msvcrt
 import os
 import shutil
 import subprocess
@@ -93,24 +95,55 @@ def publish(cooked, windows):
     return stale
 
 
+def _write_atomic(path, text):
+    # Readers (husk, the delegate, Update-HoudiniRuntime.ps1) must never see half a file.
+    pending = path.with_name(path.name + ".pending")
+    pending.write_text(text, encoding="utf-8")
+    os.replace(pending, path)
+
+
+@contextlib.contextmanager
+def _locked(config_path):
+    """Serialises imports' read-modify-write of the catalog and the profile (a lock file next to the profile)."""
+    with open(config_path.with_name(config_path.name + ".lock"), "a+b") as lock:
+        lock.seek(0)
+        # LK_LOCK retries for about 10 s, then raises OSError.
+        msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+        try:
+            yield
+        finally:
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 def merge_catalog(catalog, config_path, config):
     """Adds the import's catalog entries to the runtime's asset catalog (made, and named in the profile, if it has
-    none), so the Native Asset menus and the bounds proxies know them.
+    none), so the Native Asset menus and the bounds proxies know them. The profile and the catalog are re-read and
+    rewritten atomically under a lock, so a concurrent import keeps its entries and a starting husk reads whole files.
     """
-    path = config.get("asset_catalog")
-    if path:
-        target = Path(path)
-        current = json.loads(target.read_text(encoding="utf-8-sig"))
-    else:
-        target = Path(config["runtime_project"]).parent / "hdue_catalog.json"
-        current = {"version": 1, "assets": {}}
     added = json.loads(Path(catalog).read_text(encoding="utf-8-sig"))["assets"]
-    current["assets"] = {**added, **current["assets"]}
-    target.write_text(json.dumps(current, indent=1), encoding="utf-8")
-    if not path:
+    with _locked(config_path):
         profile = json.loads(config_path.read_text(encoding="utf-8-sig"))
-        profile["asset_catalog"] = str(target)
-        config_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+        path = profile.get("asset_catalog")
+        if path:
+            # Relative paths resolve against the profile's folder (runtime_config, the delegate).
+            target = (config_path.parent / path).resolve()
+            current = json.loads(target.read_text(encoding="utf-8-sig"))
+        else:
+            target = (
+                Path(config["runtime_project"]).parent / "hdue_catalog.json"
+            )
+            current = {"version": 1, "assets": {}}
+        current["assets"] = {**added, **current["assets"]}
+        _write_atomic(target, json.dumps(current, indent=1))
+        if not path:
+            try:
+                # Packages write profiles with relative paths; a moved package must keep working.
+                value = os.path.relpath(target, config_path.parent)
+            except ValueError:  # another drive
+                value = str(target)
+            profile["asset_catalog"] = value
+            _write_atomic(config_path, json.dumps(profile, indent=2))
 
 
 # One cook took about a minute; a hung editor must not hang Houdini forever.
