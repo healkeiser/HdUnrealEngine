@@ -192,7 +192,7 @@ Already handled, do not redo: sheared-instance baking is capped by `HdUEBakesShe
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Build backend | `.\scripts\Build-Backend.ps1` | exit 0 (~40 s incremental) |
-| Stage backend for a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan019.json` | exit 0; the default profile untouched |
+| Stage backend for a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan019.json` | exit 0; the default profile untouched |
 | Stage as default (at the end) | `.\scripts\Update-HoudiniRuntime.ps1 -SetDefault` | exit 0 |
 | Build delegate (Houdini closed) | `.\scripts\Build-Houdini.ps1` | exit 0; ctest passes |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | `Suite unit passed.` |

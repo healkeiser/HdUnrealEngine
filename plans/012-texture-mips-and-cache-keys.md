@@ -141,7 +141,7 @@ Conventions: comments explain why, one line where possible; UE-side code uses UE
 | Stage it (Houdini may stay open) | `.\scripts\Update-HoudiniRuntime.ps1 -SetDefault` | exit 0, prints the hashed DLL name |
 | Build the delegate (Houdini closed) | `.\scripts\Build-Houdini.ps1` | exit 0 |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | "Suite unit passed." |
-| Conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only textures/* texture/* materialx/* preview_surface/*` | exit 0 |
+| Conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only textures/* texture/* materialx/* preview_surface/*` | exit 0 |
 | Format | `uvx --from clang-format==19.1.5 clang-format -i <files>` | no output |
 
 (`samples/conformance/` has both `texture/` and `textures/`: `textures/` holds the image files, `texture/` the texture scenes. Check `ls samples/conformance/texture` before running.)
@@ -183,7 +183,7 @@ Create `samples/conformance/texture/data_mips.usda` (copy the header form of `sa
 - Check `"data texture mips average linearly"`: `"ratio"` of `[-3, -0.5, -2, 0.5]` over `[2, -0.5, 3, 0.5]`, `"min": 0.9, "max": 1.1`. Linear averaging gives 0.5 / 0.502 ≈ 1.0; today's sRGB-weighted averaging gives about 188/255 ≈ 0.74 against 0.502, a ratio near 1.47.
 - Doc string: explain the expected value and that the Path Tracer averages texels per pixel anyway, so this check discriminates in realtime mode.
 
-**Verify**: build nothing yet; run `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only texture/data_mips --mode realtime` → the check fails with a ratio well above 1.1 (about 1.4).
+**Verify**: build nothing yet; run `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only texture/data_mips --mode realtime` → the check fails with a ratio well above 1.1 (about 1.4).
 
 ### Step 2: Tag decoded images with the slot's encoding
 

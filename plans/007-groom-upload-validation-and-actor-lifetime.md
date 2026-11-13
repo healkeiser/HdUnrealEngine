@@ -146,10 +146,10 @@ Do not change the ABI layout or `HDUE_ABI_VERSION`. This plan only adds checks a
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
 | Build the backend | `.\scripts\Build-Backend.ps1` | exit 0 (~40 s incremental) |
-| Stage it without touching the default profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan007.json` | exit 0, the profile file exists |
+| Stage it without touching the default profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan007.json` | exit 0, the profile file exists |
 | Build the standalone host and smoke test | `.\scripts\Build-Host.ps1` | exit 0, ctest passes |
-| Native backend smoke test | `.\scripts\Test-Backend.ps1 -RuntimeConfig H:\github\hdUE\.local\runtime-plan007.json` | prints `Verified real UE output: ...` |
-| Groom conformance | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-plan007.json --only points_curves/*` | `0 failing runs` |
+| Native backend smoke test | `.\scripts\Test-Backend.ps1 -RuntimeConfig <repo>\.local\runtime-plan007.json` | prints `Verified real UE output: ...` |
+| Groom conformance | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-plan007.json --only points_curves/*` | `0 failing runs` |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror unreal/HdUEBackend/Source/HdUEBackend/Private/Bridge.cpp unreal/HdUEBackend/Source/HdUEBackend/Private/Scene.cpp src/host/backend_smoke.cpp` | exit 0, no output |
 
 ## Scope
@@ -224,12 +224,12 @@ In `src/host/backend_smoke.cpp`, inside the per-cycle session block, before `bac
 
 Find the exact field names in `include/hdue/bridge.h` (`HdueGroomDesc`, lines 520-545; `HdueSceneBatch`). Include `<cmath>` is already present.
 
-**Verify**: `.\scripts\Build-Host.ps1` → exit 0. Then `.\scripts\Build-Backend.ps1`, `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan007.json`, and `.\scripts\Test-Backend.ps1 -RuntimeConfig H:\github\hdUE\.local\runtime-plan007.json` → `Verified real UE output: ...`, no `check` failure message.
+**Verify**: `.\scripts\Build-Host.ps1` → exit 0. Then `.\scripts\Build-Backend.ps1`, `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan007.json`, and `.\scripts\Test-Backend.ps1 -RuntimeConfig <repo>\.local\runtime-plan007.json` → `Verified real UE output: ...`, no `check` failure message.
 
 ### Step 5: Run the groom conformance scenes and a Cornell render
 
 **Verify**:
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-plan007.json --only points_curves/*` → `0 failing runs` (this includes `groom.usda` and `groom_attributes.usda`, whose instanced curtain uses `instance_transforms`).
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-plan007.json --only points_curves/*` → `0 failing runs` (this includes `groom.usda` and `groom_attributes.usda`, whose instanced curtain uses `instance_transforms`).
 - Render the Cornell box with husk against the new profile and against the previous profile (`.local\runtime-houdini.json`), as `AGENTS.md` asks for every change. The two images match (no geometry in Cornell uses grooms).
 - The format check in "Commands you will need" exits 0.
 

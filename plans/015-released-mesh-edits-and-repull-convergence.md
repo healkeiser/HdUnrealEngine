@@ -156,8 +156,8 @@ excerpts above.
 | Build the Houdini delegate (Houdini closed; runs ctest) | `.\scripts\Build-Houdini.ps1` | exit 0 |
 | Build the standalone delegate | `.\scripts\Build-Host.ps1` | exit 0 |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror src/hydra/delegate.cpp src/hydra/prims.cpp src/hydra/materials.cpp` | no output |
-| One conformance scene | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only preview_surface/displacement_animated` | "0 failing runs" |
-| Touched areas | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only preview_surface/* points_curves/* mesh/* native_instancing/*` | "0 failing runs" |
+| One conformance scene | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only preview_surface/displacement_animated` | "0 failing runs" |
+| Touched areas | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only preview_surface/* points_curves/* mesh/* native_instancing/*` | "0 failing runs" |
 | Streaming test (husk) | `hython tests\husk_streaming.py` (see its docstring for arguments) | exit 0 |
 | In-Houdini (scene upload) | `.\scripts\Launch-Houdini.ps1 -TestKind integration`, then `-TestKind recreation` | each exits 0 |
 
@@ -207,7 +207,7 @@ same regions), with these differences:
 
 Run it on the current build with `HDUE_TRACE_SCENE=1` set in the environment:
 
-`hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only preview_surface/displacement_animated`
+`hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only preview_surface/displacement_animated`
 
 **Verify**: the frame-2 "displaced" check FAILS in at least one mode, and husk's output (in the
 run's log under `out/conformance/`) contains "hdUE released the geometry of" for frame 1.
@@ -300,12 +300,12 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
 **Verify**:
 - clang-format check → no output.
 - `.\scripts\Build-Houdini.ps1` → exit 0; `.\scripts\Build-Host.ps1` → exit 0.
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only preview_surface/displacement_animated` → "0 failing runs" in both modes; with `HDUE_TRACE_SCENE=1` the frame-2 log shows "hdUE re-pulls" or a full upload of `/Quad`.
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only preview_surface/displacement_animated` → "0 failing runs" in both modes; with `HDUE_TRACE_SCENE=1` the frame-2 log shows "hdUE re-pulls" or a full upload of `/Quad`.
 
 ### Step 6: Regression runs
 
 **Verify**:
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only preview_surface/* points_curves/* mesh/* native_instancing/*` → "0 failing runs".
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only preview_surface/* points_curves/* mesh/* native_instancing/*` → "0 failing runs".
 - `hython tests\husk_streaming.py ...` → exit 0 (read its docstring for the arguments; it checks
   streaming uploads during Sync).
 - `.\scripts\Launch-Houdini.ps1 -TestKind integration` and `-TestKind recreation` → exit 0.

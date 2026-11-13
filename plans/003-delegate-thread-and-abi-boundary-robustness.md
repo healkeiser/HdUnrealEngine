@@ -145,7 +145,7 @@ Google style, 4 spaces, 120 columns.
 | Build the standalone delegate | `.\scripts\Build-Host.ps1` | exit 0 |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror src/hydra/delegate.cpp src/hydra/gpu_frames.cpp` | no output |
 | In-Houdini tests touched (viewport frames, recreation) | `.\scripts\Launch-Houdini.ps1 -TestKind integration` then `-TestKind recreation` | each exits 0 |
-| AOV conformance | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only render_settings/*` | "0 failing runs" |
+| AOV conformance | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only render_settings/*` | "0 failing runs" |
 
 ## Scope
 
@@ -252,7 +252,7 @@ console) shows the boot error message (the missing project). Close Houdini.
 **Verify**:
 - `.\scripts\Launch-Houdini.ps1 -TestKind integration` → exits 0.
 - `.\scripts\Launch-Houdini.ps1 -TestKind recreation` → exits 0.
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only render_settings/*` → "0 failing runs" (covers AOV and Cryptomatte output).
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only render_settings/*` → "0 failing runs" (covers AOV and Cryptomatte output).
 - A Cornell husk render matches the previous build's.
 
 ## Test plan

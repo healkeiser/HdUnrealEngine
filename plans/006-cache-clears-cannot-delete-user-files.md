@@ -229,7 +229,7 @@ In `VirtualTextureBuild.cpp`, `Evict`: delete a non-manifest file only when its 
 bool IsCacheFile(const FString& Name) { ... }
 ```
 
-Then guard `CacheDirectory()`: if the resolved path is a drive root (`FPaths::IsDrive` or a path of length <= 3 like `C:/`) or the user's profile folder (`FPlatformProcess::UserDir()`'s parent, or `USERPROFILE`), log a warning and do not call `Evict` (the cache still works; it is just not trimmed).
+Then guard `CacheDirectory()`: if the resolved path is a drive root (`FPaths::IsDrive` or a path of length <= 3 like a bare drive root) or the user's profile folder (`FPlatformProcess::UserDir()`'s parent, or `USERPROFILE`), log a warning and do not call `Evict` (the cache still works; it is just not trimmed).
 
 **Verify**:
 - `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror unreal/HdUEBackend/Source/HdUEBackend/Private/VirtualTextureBuild.cpp` → no output, exit 0.

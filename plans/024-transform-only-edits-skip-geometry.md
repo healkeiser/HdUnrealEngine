@@ -247,7 +247,7 @@ The delegate sends an actor whenever its `HdUEActorData` changes, and a transfor
 | Stage side runtime | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig $PWD\.local\xform-runtime.json` | exit 0 |
 | Build delegate + unit tests | `.\scripts\Build-Houdini.ps1` (Houdini closed) | exit 0, ctest passes |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | `Suite unit passed.` |
-| Conformance | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\xform-runtime.json --only instancer/* native_instancing/* volume/* points_curves/* shade/*` | `0 failing runs` |
+| Conformance | `hython scripts\run_conformance.py --runtime-config <repo>\.local\xform-runtime.json --only instancer/* native_instancing/* volume/* points_curves/* shade/*` | `0 failing runs` |
 | In-Houdini | `.\scripts\Launch-Houdini.ps1 -TestKind <kind>` (`integration`, `selection`, `decal`, `volume-material`, `materials`) | exit 0 |
 | Timeline | `$env:HDUE_TRACE_TIMING = 1`, `$env:HDUE_TRACE_SCENE = 1` | per-upload lines on stderr |
 | Format | `uvx --from clang-format==19.1.5 clang-format -i <file>` | no diff |

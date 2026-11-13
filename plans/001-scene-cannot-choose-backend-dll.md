@@ -107,10 +107,10 @@ Never silence a warning to clean a log.
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror src/hydra/delegate.cpp src/host/usd_render.cpp` | no output, exit 0 |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | ends with `Suite unit passed.` |
 | Hydra suite (GPU) | `.\scripts\Test.ps1 -Suite hydra` | exit 0 (runs `usd_render` through `Verify.ps1`) |
-| Targeted conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only render_settings/*` | `0 failing runs` |
+| Targeted conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only render_settings/*` | `0 failing runs` |
 
-`<houdini_root>` is the `houdini_root` value in `.local/paths.json` (for example
-`C:/Program Files/Side Effects Software/Houdini 22.0.368`). husk is `<houdini_root>\bin\husk.exe`.
+`<houdini_root>` is the `houdini_root` value in `.local/paths.json` (the Houdini
+22.0.368 install folder). husk is `<houdini_root>\bin\husk.exe`.
 
 ## Scope
 
@@ -145,14 +145,14 @@ Write `probe.usda` there:
 ```usda
 #usda 1.0
 (
-    subLayers = [@H:/github/hdUE/samples/conformance/common/stage.usda@]
+    subLayers = [@<repo>/samples/conformance/common/stage.usda@]
 )
 
 over "Render"
 {
     over "Settings"
     {
-        string unreal:backendLibrary = "C:/hdue-plan001-does-not-exist/probe.dll"
+        string unreal:backendLibrary = "<$env:TEMP>/hdue-plan001-does-not-exist/probe.dll"
     }
 }
 ```
@@ -161,7 +161,7 @@ Run husk on it with the settings trace on (the profile path is the `runtime_conf
 
 ```powershell
 $env:HDUE_TRACE_SETTINGS = '1'
-$env:HDUE_RUNTIME_CONFIG = 'H:\github\hdUE\.local\runtime-houdini.json'
+$env:HDUE_RUNTIME_CONFIG = '<repo>\.local\runtime-houdini.json'
 & "<houdini_root>\bin\husk.exe" --renderer HdUnrealEngine -f 1 -n 1 -o "$env:TEMP\hdue-plan001\probe.exr" "$env:TEMP\hdue-plan001\probe.usda" 2>&1 | Tee-Object "$env:TEMP\hdue-plan001\before.log"
 ```
 

@@ -121,7 +121,7 @@ Conventions: comments explain why; C++ follows `.clang-format` (Google, 4 spaces
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
 | Build the backend | `.\scripts\Build-Backend.ps1` | exit 0 |
-| Stage to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan022.json` | exit 0 |
+| Stage to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan022.json` | exit 0 |
 | One conformance scene | `hython scripts\run_conformance.py --runtime-config <absolute profile path> --only render_settings/screen_percentage` | per-check results, `0 failing runs` when fixed |
 | Area conformance | `hython scripts\run_conformance.py --runtime-config <absolute profile path> --only lux/*` and `--only render_settings/*` | `0 failing runs` |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror unreal/HdUEBackend/Source/HdUEBackend/Private/EnvironmentBackground.cpp unreal/HdUEBackend/Source/HdUEBackend/Private/Bridge.cpp` | exit 0 |
@@ -170,7 +170,7 @@ Add a short `doc` string saying what the scene shows (both hemispheres where the
 
 Run it on the current build (default profile):
 
-**Verify**: `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only render_settings/screen_percentage` → in realtime, check 2 (`bottom ... red`) **fails** and at least one depth check fails. Also open the beauty EXR it wrote (the script prints the output folder) and confirm by eye that the bottom of the frame is not red.
+**Verify**: `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only render_settings/screen_percentage` → in realtime, check 2 (`bottom ... red`) **fails** and at least one depth check fails. Also open the beauty EXR it wrote (the script prints the output folder) and confirm by eye that the bottom of the frame is not red.
 
 ### Step 2: Size the background pass by the render rectangle
 
@@ -193,12 +193,12 @@ AddDrawTexturePass(GraphBuilder, View, Source, Target, View.UnscaledViewRect.Min
 
 where `RenderSize` is computed from `Job->ScreenFraction` exactly as in Step 2. Point sampling, because averaging depths across an edge invents surfaces that do not exist. Comment why, in one line.
 
-**Verify**: `.\scripts\Build-Backend.ps1` → exit 0, then `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan022.json` → exit 0.
+**Verify**: `.\scripts\Build-Backend.ps1` → exit 0, then `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan022.json` → exit 0.
 
 ### Step 4: The scene now passes, and nothing else changed
 
 **Verify**:
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-plan022.json --only render_settings/screen_percentage` → `0 failing runs`.
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-plan022.json --only render_settings/screen_percentage` → `0 failing runs`.
 - `--only lux/*` → `0 failing runs` (the dome scenes, at 100 %, must be unchanged).
 - `--only render_settings/*` → `0 failing runs` (includes `depth_var.usda`).
 - A Cornell husk render with the side profile matches the one with the default profile (Cornell has no dome background).

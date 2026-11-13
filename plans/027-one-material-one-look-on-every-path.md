@@ -33,7 +33,7 @@ A material can move from one path to the other when a user adds one node. Today 
 
 ## Current state
 
-Paths: `<engine_root>` is `engine_root` in `.local/paths.json`; UE plugin sources are under `<engine_root>/Engine/Plugins`. The OpenUSD spec quoted is the local OpenUSD 26.11 mirror, `C:/Users/valen/.claude/plugins/data/vfx-healkeiser/openusd-26-11/docs/openusd/spec_usdpreviewsurface.md`.
+Paths: `<engine_root>` is `engine_root` in `.local/paths.json`; UE plugin sources are under `<engine_root>/Engine/Plugins`. The OpenUSD spec quoted is the local OpenUSD 26.11 mirror, OpenUSD 26.11 docs `spec_usdpreviewsurface.md` (openusd.org/release).
 
 ### D1. Wrap mode of `UsdUVTexture` when `wrapS`/`wrapT` are not authored
 
@@ -142,7 +142,7 @@ Recommendation (no decision needed): make `needs_import` return True for these c
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | "Suite unit passed." |
 | Delegate (Houdini closed) | `.\scripts\Build-Houdini.ps1` | exit 0 |
 | Backend | `.\scripts\Build-Backend.ps1`; `.\scripts\Update-HoudiniRuntime.ps1 -SetDefault` | exit 0 |
-| Conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only materialx/* preview_surface/* texture/* shade/*` | exit 0 |
+| Conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only materialx/* preview_surface/* texture/* shade/*` | exit 0 |
 | MaterialX coverage | `.\scripts\Test-MaterialXCoverage.ps1` | exit 0 |
 | Python format/lint | `uvx black@24.10.0 scripts tests integrations`; `uvx ruff@0.7.4 check scripts tests integrations` | no changes needed / "All checks passed!" |
 

@@ -31,7 +31,7 @@ hdUE's UI, schema and docs are generated from the UE source by `scripts/generate
 
 ### Render settings generator (`scripts/generate_render_settings.py`)
 
-Run as `python scripts/generate_render_settings.py` (engine root from `.local/paths.json` key `engine_root`; here `H:/hdUE/UE_5.8.4_src`). It writes the `HdUnrealEngine_*.ds` generated blocks, `resources/generatedSchema.usda`, `docs/reference/**`, and `src/hydra/light_properties.h` (and, after plan 013, `src/hydra/render_setting_defaults.h`).
+Run as `python scripts/generate_render_settings.py` (engine root from `.local/paths.json` key `engine_root`). It writes the `HdUnrealEngine_*.ds` generated blocks, `resources/generatedSchema.usda`, `docs/reference/**`, and `src/hydra/light_properties.h` (and, after plan 013, `src/hydra/render_setting_defaults.h`).
 
 **(a) Deprecated enumerators are dropped, but the settings that only show for them are kept, always hidden.** `parse_enums` (lines 1156–1188) skips items containing `UE_DEPRECATED`:
 

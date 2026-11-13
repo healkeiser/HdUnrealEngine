@@ -169,7 +169,7 @@ The current tables are `README.md` (gallery section, around lines 84-99) and `do
 | Strict docs build | `zensical build --clean --strict` | exit 0, no warnings about links |
 | Find a phrase | `git grep -n "<phrase>" -- docs README.md VERIFICATION.md` | the expected lines |
 | Format the one Python comment edit | `uvx black@24.10.0 --check integrations/houdini/python3.13libs/hdue_houdini.py` | `1 file would be left unchanged` |
-| Optional full conformance run | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --matrix` | updates the matrix between the `<!-- matrix:start -->` markers; over an hour |
+| Optional full conformance run | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --matrix` | updates the matrix between the `<!-- matrix:start -->` markers; over an hour |
 
 `zensical build` writes the `site/` folder, which `.gitignore:42` ignores (`/site/`), so it never shows in `git status`.
 

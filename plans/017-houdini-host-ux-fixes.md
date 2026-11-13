@@ -50,7 +50,7 @@ committed one by one.
 
 ## Current state
 
-Paths below are relative to the repo root `H:\github\hdUE`. `P` means
+Paths below are relative to the repo root `<repo>`. `P` means
 `integrations/houdini/python3.13libs`.
 
 ### Fix 1 — sticky host failure (`P/hdue_houdini.py`)
@@ -262,23 +262,23 @@ in-memory stage and has no test expecting the `ValueError`.
 
 The camera-help dialog (lines 255-266, opened by the "Camera controls..." menu
 action) and four status messages (lines 461-490) are in Japanese. No test or
-doc matches these strings (`grep -rln 準備 tests docs` finds nothing). English
+doc matches these strings (a search of `tests` and `docs` for any of them finds nothing). English
 meanings:
 
-| Line | Japanese | English |
-|---|---|---|
-| 258 | カメラ操作 | Camera controls |
-| 259 | ビューポート上で操作します。 | Use these in the viewport. |
-| 260 | メッシュの選択：左クリック（USD／cook済みUEメッシュ） | Select a mesh: left click (USD and cooked UE meshes) |
-| 261 | 回転：Alt＋左ドラッグ | Tumble: Alt + left drag |
-| 262 | 平行移動：Alt＋中ドラッグ | Track: Alt + middle drag |
-| 263 | 平行移動（中ボタンなし）：Ctrl＋Alt＋左ドラッグ | Track (no middle button): Ctrl + Alt + left drag |
-| 264 | ズーム／前後移動：Alt＋右ドラッグ、またはホイール | Dolly: Alt + right drag, or the wheel |
-| 464 | UEアセット準備待ち {}件 / 配置Prim {}件 — Path Tracer蓄積は準備完了後 | Waiting for {} UE asset(s), {} placed prim(s); the Path Tracer accumulates once they are ready |
-| 472 | UEアセット準備完了 — {} Actors / {} Meshes | UE assets ready: {} actors, {} meshes |
-| 480 | UDIM準備中 — ページ {}/{}（Path Tracer 0 samples） | Preparing UDIM textures: page {} of {} (Path Tracer at 0 samples) |
-| 488 | UDIM準備完了 — Path Tracer蓄積開始 | UDIM textures ready; the Path Tracer starts accumulating |
-| 490 | リアルタイム描画 | Rendering in realtime |
+| Line | English (the Japanese original is on that line of `scripts/usdview_hdue.py`) |
+|---|---|
+| 258 | Camera controls |
+| 259 | Use these in the viewport. |
+| 260 | Select a mesh: left click (USD and cooked UE meshes) |
+| 261 | Tumble: Alt + left drag |
+| 262 | Track: Alt + middle drag |
+| 263 | Track (no middle button): Ctrl + Alt + left drag |
+| 264 | Dolly: Alt + right drag, or the wheel |
+| 464 | Waiting for {} UE asset(s), {} placed prim(s); the Path Tracer accumulates once they are ready |
+| 472 | UE assets ready: {} actors, {} meshes |
+| 480 | Preparing UDIM textures: page {} of {} (Path Tracer at 0 samples) |
+| 488 | UDIM textures ready; the Path Tracer starts accumulating |
+| 490 | Rendering in realtime |
 
 ### Fix 9 — two `.uproject` resolvers
 

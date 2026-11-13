@@ -129,7 +129,7 @@ namespace scope are prefixed `HdUE` (see `HdUERelativeMotion` at `prims.cpp:285`
 | Build the standalone delegate (OpenUSD 26.03; runs its ctest) | `.\scripts\Build-Host.ps1` | exit 0 |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror src/hydra/prims.cpp` | no output, exit 0 |
 | Unit suite (no GPU) | `.\scripts\Test.ps1 -Suite unit` | exit 0, "Suite unit passed." |
-| Targeted conformance | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only geom/* instancer/* camera/motion_blur render_settings/*Motion* render_settings/instantaneousShutter` | "0 failing runs" |
+| Targeted conformance | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only geom/* instancer/* camera/motion_blur render_settings/*Motion* render_settings/instantaneousShutter` | "0 failing runs" |
 
 `hython` is `<houdini_root>\bin\hython.exe`; `houdini_root` is in `.local/paths.json`.
 
@@ -273,7 +273,7 @@ The doc string explains in plain sentences: 41 samples inside the ±1 frame wind
 
 ### Step 6: Run the targeted conformance set
 
-**Verify**: `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only geom/* instancer/* camera/motion_blur` → "0 failing runs", and `geom/dense_motion_samples` passes in both realtime and pathtraced.
+**Verify**: `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only geom/* instancer/* camera/motion_blur` → "0 failing runs", and `geom/dense_motion_samples` passes in both realtime and pathtraced.
 
 ### Step 7: Cornell check
 

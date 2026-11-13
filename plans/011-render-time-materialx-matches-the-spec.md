@@ -160,7 +160,7 @@ Translation choices follow the repo rule: what Unreal does first (its USD import
 |---|---|---|
 | Build the delegate (Houdini closed) | `.\scripts\Build-Houdini.ps1` | exit 0; its ctest run passes |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | ends with "Suite unit passed." |
-| Targeted conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only materialx/*` | exit 0, 0 failing runs |
+| Targeted conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only materialx/*` | exit 0, 0 failing runs |
 | Shading conformance | same, `--only preview_surface/* shade/*` | exit 0 |
 | Format C++ | `uvx --from clang-format==19.1.5 clang-format -i src/hydra/materials.cpp` | no output |
 
@@ -215,7 +215,7 @@ Create `samples/conformance/materialx/node_inputs.usda`:
 
 All nodes used here are in the render-time list (`scripts/usd_materialx_graph.py:207-222`, `RUNTIME_NODES`), so husk translates them at render time and does not prepare them.
 
-**Verify**: `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only materialx/standard_surface_defaults materialx/node_inputs` → the runner exits 1. In realtime, `"base defaults to 1 (1.0.1)"` measures about 0.8, `"tiledimage subtracts uvoffset"` reads red, `"multiply's in1 defaults to 0"` is near 1, `"normalmap reads its vector2 scale"` is near 1. The `"not translated"` checks pass. (If any of these already passes, see STOP conditions.)
+**Verify**: `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only materialx/standard_surface_defaults materialx/node_inputs` → the runner exits 1. In realtime, `"base defaults to 1 (1.0.1)"` measures about 0.8, `"tiledimage subtracts uvoffset"` reads red, `"multiply's in1 defaults to 0"` is near 1, `"normalmap reads its vector2 scale"` is near 1. The `"not translated"` checks pass. (If any of these already passes, see STOP conditions.)
 
 ### Step 2: Subtract uvoffset in tiledimage
 
@@ -292,7 +292,7 @@ Update the comment to `n = (2 texel - 1) * (kx, ky, 1); ND_normalmap_vector2 sca
 
 **Verify**, all of these:
 - `.\scripts\Test.ps1 -Suite unit` → "Suite unit passed."
-- `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-houdini.json --only materialx/* preview_surface/* shade/*` → exit 0, 0 failing runs, both modes.
+- `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <repo>\.local\runtime-houdini.json --only materialx/* preview_surface/* shade/*` → exit 0, 0 failing runs, both modes.
 - Cornell husk render compared with the previous build (AGENTS.md "Verification is tiered"): render `samples/cornell/cornell.usda` with husk (`husk --renderer "Unreal Engine" ...`) before and after; the images differ only where a material authors `standard_surface` without `base`/`base_color` (`git grep -n ND_standard_surface samples/cornell` — if no hit, the two renders must match within noise).
 
 ## Test plan

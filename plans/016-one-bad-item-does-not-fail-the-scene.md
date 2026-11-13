@@ -221,12 +221,12 @@ Recommended and implemented here: **interactive hosts render without the failed 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
 | Build the backend | `.\scripts\Build-Backend.ps1` | exit 0 |
-| Stage it to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan016.json` | exit 0 |
+| Stage it to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan016.json` | exit 0 |
 | Build the standalone host (delegate + self-test) | `.\scripts\Build-Host.ps1` | exit 0, ctest passes |
 | Build the Houdini delegate | `.\scripts\Build-Houdini.ps1` (Houdini must be closed) | exit 0, ctest passes |
-| Hydra self-test | `.\scripts\Test-Hydra.ps1 -SelfTest -RuntimeConfig H:\github\hdUE\.local\runtime-plan016.json` | `Verified Hydra/UE output: ...` |
+| Hydra self-test | `.\scripts\Test-Hydra.ps1 -SelfTest -RuntimeConfig <repo>\.local\runtime-plan016.json` | `Verified Hydra/UE output: ...` |
 | Unit suite | `.\scripts\Test.ps1 -Suite unit` | `Suite unit passed.` |
-| Targeted conformance | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\runtime-plan016.json --only shade/*` then `--only volume/*` then `--only points_curves/*` | `0 failing runs` each |
+| Targeted conformance | `hython scripts\run_conformance.py --runtime-config <repo>\.local\runtime-plan016.json --only shade/*` then `--only volume/*` then `--only points_curves/*` | `0 failing runs` each |
 | Format check | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror src/hydra/delegate.cpp src/host/usd_render.cpp unreal/HdUEBackend/Source/HdUEBackend/Private/Scene.cpp unreal/HdUEBackend/Source/HdUEBackend/Private/Bridge.cpp` | exit 0 |
 
 `Test-Hydra.ps1` takes `-RuntimeConfig <profile>` (its first lines) and uses `out\runtime` when it is omitted.
@@ -318,7 +318,7 @@ In `src/host/usd_render.cpp`, in the self-test right after the native-assets cap
 
 Each `capture` adds one frame per cycle. In `scripts/Test-Hydra.ps1` line 58, raise `$PerCycle += 15` by the number of captures you added (2 → `+= 17`), so the evidence check still counts frames exactly.
 
-**Verify**: `.\scripts\Build-Host.ps1`, then `.\scripts\Test-Hydra.ps1 -SelfTest -RuntimeConfig H:\github\hdUE\.local\runtime-plan016.json *>&1 | Tee-Object -FilePath $env:TEMP\plan016-selftest.txt` → ends with `Verified Hydra/UE output`. `Select-String -Path $env:TEMP\plan016-selftest.txt -Pattern "skips material parameter"` finds the Tf warning for the empty value. `Select-String -Path "$env:LOCALAPPDATA\hdUE\Saved\Logs\HdUEBackend.log" -Pattern "DoesNotExist"` finds the backend's skipped-mesh warning (the UE log; timestamps are UTC).
+**Verify**: `.\scripts\Build-Host.ps1`, then `.\scripts\Test-Hydra.ps1 -SelfTest -RuntimeConfig <repo>\.local\runtime-plan016.json *>&1 | Tee-Object -FilePath $env:TEMP\plan016-selftest.txt` → ends with `Verified Hydra/UE output`. `Select-String -Path $env:TEMP\plan016-selftest.txt -Pattern "skips material parameter"` finds the Tf warning for the empty value. `Select-String -Path "$env:LOCALAPPDATA\hdUE\Saved\Logs\HdUEBackend.log" -Pattern "DoesNotExist"` finds the backend's skipped-mesh warning (the UE log; timestamps are UTC).
 
 ### Step 7: Regression runs
 
@@ -326,7 +326,7 @@ Each `capture` adds one frame per cycle. In `scripts/Test-Hydra.ps1` line 58, ra
 - `.\scripts\Test.ps1 -Suite unit` → `Suite unit passed.`
 - Conformance `--only shade/*`, `--only volume/*`, `--only points_curves/*` against the side profile → `0 failing runs` each.
 - A Cornell husk render with the side profile matches the one with the default profile.
-- Interactive check of Step 5: `.\scripts\Launch-Houdini.ps1 -RuntimeConfig H:\github\hdUE\.local\runtime-plan016.json -InputUsd <scratch .usda>` where the scratch scene is the Cornell box plus one `Xform` with `string primvars:unreal:asset = "/Game/HdUE/DoesNotExist.DoesNotExist"`. The viewport renders the Cornell box, and `Select-String -Path "$env:LOCALAPPDATA\hdUE\Saved\Logs\HdUEBackend.log" -Pattern "rendering without it"` finds the warning. Close Houdini afterwards. Keep the scratch scene out of the repo.
+- Interactive check of Step 5: `.\scripts\Launch-Houdini.ps1 -RuntimeConfig <repo>\.local\runtime-plan016.json -InputUsd <scratch .usda>` where the scratch scene is the Cornell box plus one `Xform` with `string primvars:unreal:asset = "/Game/HdUE/DoesNotExist.DoesNotExist"`. The viewport renders the Cornell box, and `Select-String -Path "$env:LOCALAPPDATA\hdUE\Saved\Logs\HdUEBackend.log" -Pattern "rendering without it"` finds the warning. Close Houdini afterwards. Keep the scratch scene out of the repo.
 - The format check exits 0.
 
 ## Test plan

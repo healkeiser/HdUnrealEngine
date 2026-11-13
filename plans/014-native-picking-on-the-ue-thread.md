@@ -127,7 +127,7 @@ Conventions: C++ Google style, 4 spaces, 120 columns; UE code in `unreal/` follo
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Build the backend (~40 s incremental) | `.\scripts\Build-Backend.ps1` | exit 0 |
-| Stage it without touching the default profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\out\plan014\runtime.json` | exit 0, profile written |
+| Stage it without touching the default profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\out\plan014\runtime.json` | exit 0, profile written |
 | Build the Houdini delegate (Houdini closed) | `.\scripts\Build-Houdini.ps1` | exit 0 |
 | Build the standalone delegate + smoke host | `.\scripts\Build-Host.ps1` | exit 0 |
 | Backend smoke test (native picking contract) | `.\scripts\Test-Backend.ps1` | exit 0 |
@@ -229,11 +229,11 @@ across actors. Add `#include "Components/InstancedStaticMeshComponent.h"`.
 
 **Verify**:
 - clang-format check from the table → no output.
-- `.\scripts\Build-Backend.ps1` → exit 0; `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\out\plan014\runtime.json` → exit 0.
+- `.\scripts\Build-Backend.ps1` → exit 0; `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\out\plan014\runtime.json` → exit 0.
 - `.\scripts\Build-Host.ps1` → exit 0; `.\scripts\Test-Backend.ps1` → exit 0 (its native-picking
   checks, including "Native picking ignored the UE owner thread", still pass).
 - `.\scripts\Build-Houdini.ps1` → exit 0.
-- `.\scripts\Test-Usdview.ps1 -Check smoke -RuntimeConfig H:\github\hdUE\out\plan014\runtime.json` → exit 0
+- `.\scripts\Test-Usdview.ps1 -Check smoke -RuntimeConfig <repo>\out\plan014\runtime.json` → exit 0
   (the inline UE path still picks).
 - A Cornell husk render matches the previous build's.
 

@@ -112,7 +112,7 @@ The `subdivisionLevel` handler (`delegate.cpp:4055-4059`) also marks every Rprim
 
 `GatherVirtualTextures` (`Scene.cpp:85-114`) walks every actor, mesh component and material and calls `GetUsedTextures`. The warm-up (`VirtualTextureResidency.cpp:39-44`, `:79-80`) calls `Commands.SubmitAndBlockUntilGPUIdle()` per draw and needs `r.vt.FeedbackLatency + 2` stable draws. With no virtual-texture textures the phase is READY at once (`VirtualTextureResidency.cpp:19`), so only scenes with UDIM/virtual textures pay it.
 
-UE's own viewport Path Tracer drops its samples and starts again on a camera move, with no blocking warm-up (UE 5.8 docs: `C:/Users/valen/.claude/plugins/data/vfx-healkeiser/unreal-5-8/docs/pages/path-tracer-in-unreal-engine.md:64-68`). Offline renders must keep the warm-up (Movie Render Queue warms up too).
+UE's own viewport Path Tracer drops its samples and starts again on a camera move, with no blocking warm-up (UE 5.8 docs: UE 5.8 docs page `path-tracer-in-unreal-engine.md` (dev.epicgames.com, Unreal Engine 5.8):64-68`). Offline renders must keep the warm-up (Movie Render Queue warms up too).
 
 ### D. Native-asset scene status rebuilt on every Execute
 
@@ -162,7 +162,7 @@ The texture swaps right above use a time budget instead (`Scene.cpp:1709`: `for 
             C->SetMaxSimTime(600);  // a seek reaches its age within one tick, however far
 ```
 
-UE's default is 33 ms per tick (`H:/hdUE/UE_5.8.4_src/Engine/Plugins/FX/Niagara/Source/Niagara/Private/NiagaraComponent.cpp:650`, `MaxSimTime(33.0f / 1000.0f)`). Sequencer does not override it (no `SetMaxSimTime` under `Niagara/Private/MovieScene`). The wall-clock limit is applied in `NiagaraSystemSimulation.cpp:1109-1129`. But an effect's entry becomes READY two frames after it is placed (`NativeAssets.cpp:187-192`, the `Settle` lambda), not when the seek is done. So with UE's default, a husk frame could render before the effect reaches its age. That must be fixed together with the time limit.
+UE's default is 33 ms per tick (`<engine_root>/Engine/Plugins/FX/Niagara/Source/Niagara/Private/NiagaraComponent.cpp:650`, `MaxSimTime(33.0f / 1000.0f)`). Sequencer does not override it (no `SetMaxSimTime` under `Niagara/Private/MovieScene`). The wall-clock limit is applied in `NiagaraSystemSimulation.cpp:1109-1129`. But an effect's entry becomes READY two frames after it is placed (`NativeAssets.cpp:187-192`, the `Settle` lambda), not when the seek is done. So with UE's default, a husk frame could render before the effect reaches its age. That must be fixed together with the time limit.
 
 ### H. The dome cubemap is built on one thread
 
@@ -193,7 +193,7 @@ The lock covers the existence check, read, convert and write (`:188-254`). Write
 
 ### Not a finding: the per-draw streaming flush in offline realtime
 
-`Bridge.cpp:1332-1344` runs `UpdateResourceStreaming(..., true)` and `BlockTillAllRequestsFinished` before every offline realtime draw, warm-up included. Movie Render Queue does the same: `UMoviePipeline::RenderFrame` calls `FlushAsyncEngineSystems()` on every engine tick (`H:/hdUE/UE_5.8.4_src/Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineRendering.cpp:174`), and that flushes the streaming managers (`:658-664`). Unreal is the benchmark: **do not change this**.
+`Bridge.cpp:1332-1344` runs `UpdateResourceStreaming(..., true)` and `BlockTillAllRequestsFinished` before every offline realtime draw, warm-up included. Movie Render Queue does the same: `UMoviePipeline::RenderFrame` calls `FlushAsyncEngineSystems()` on every engine tick (`<engine_root>/Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineRendering.cpp:174`), and that flushes the streaming managers (`:658-664`). Unreal is the benchmark: **do not change this**.
 
 ### Conventions
 
@@ -209,7 +209,7 @@ The lock covers the existence check, read, convert and write (`:188-254`). Write
 | Stage a side runtime | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig $PWD\.local\perf-runtime.json` | exit 0; prints the hashed DLL path |
 | Build delegate | `.\scripts\Build-Houdini.ps1` (Houdini closed) | exit 0; its ctest step passes |
 | Unit tests | `.\scripts\Test.ps1 -Suite unit` | `Suite unit passed.` |
-| Conformance (targeted) | `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\perf-runtime.json --only <area>/*` (areas: the folders of `samples/conformance`, e.g. `preview_surface`, `materialx`, `texture`, `lux`, `volume`, `render_settings`) | `0 failing runs` |
+| Conformance (targeted) | `hython scripts\run_conformance.py --runtime-config <repo>\.local\perf-runtime.json --only <area>/*` (areas: the folders of `samples/conformance`, e.g. `preview_surface`, `materialx`, `texture`, `lux`, `volume`, `render_settings`) | `0 failing runs` |
 | Timeline | set `$env:HDUE_TRACE_TIMING = 1` before husk or Houdini | per-request lines on stderr |
 | In-Houdini test | `.\scripts\Launch-Houdini.ps1 -TestKind <kind>` (kinds in `tests/houdini/python3.13libs/hdue_tests.py`) | exit 0 |
 | Format | `uvx --from clang-format==19.1.5 clang-format -i <file>`; `uvx black@24.10.0 <file>`; `uvx ruff@0.7.4 check <file>` | no diff / no findings |
@@ -233,8 +233,8 @@ The image check passes when the mean absolute difference is below 1% of the mean
 
 ## Suggested executor toolkit
 
-- Read UE's own code before changing behaviour that UE also has. The engine root is `engine_root` in `.local/paths.json` (`H:/hdUE/UE_5.8.4_src`).
-- The UE 5.8 docs mirror: `C:/Users/valen/.claude/plugins/data/vfx-healkeiser/unreal-5-8/docs/` (grep `index.tsv` first).
+- Read UE's own code before changing behaviour that UE also has. The engine root is `engine_root` in `.local/paths.json`.
+- The UE 5.8 docs mirror: the UE 5.8 documentation (dev.epicgames.com; a local mirror, if you have one) (grep `index.tsv` first).
 
 ## Scope
 
@@ -313,7 +313,7 @@ Record every measurement in `out/perf/measurements.md` (untracked), one table ro
 3. Measure: interactive Path Tracer camera orbit on a scene with a UDIM texture. UDIM scenes: `samples/conformance/texture/udim.usda` and `samples/conformance/materialx/udim.usda`. Measure the time from request to first sample (`HDUE_TRACE_TIMING`).
 
 **Keep threshold**: time to first sample during camera moves drops by at least 30%.
-**Verify**: `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\perf-runtime.json --only texture/* materialx/* --mode pathtraced` → `0 failing runs`. Cornell image check in Path Tracer mode passes.
+**Verify**: `hython scripts\run_conformance.py --runtime-config <repo>\.local\perf-runtime.json --only texture/* materialx/* --mode pathtraced` → `0 failing runs`. Cornell image check in Path Tracer mode passes.
 
 ### Step 4: Item D, cached asset scene counts
 
@@ -326,7 +326,7 @@ Record every measurement in `out/perf/measurements.md` (untracked), one table ro
 ### Step 5: Item G, UE's Niagara time limit, and READY only when the seek is done
 
 1. Remove `C->SetMaxSimTime(600);` (`NativeAssets.cpp:276`) so UE's 33 ms default applies, and update the comment to cite `NiagaraComponent.cpp:650`.
-2. In `FHdueNativeAssets::Tick`, keep an effect entry in LOADING until its component has reached its desired age. Find the public getter in `H:/hdUE/UE_5.8.4_src/Engine/Plugins/FX/Niagara/Source/Niagara/Classes/NiagaraComponent.h` (look for `GetAge`, `IsSeeking` or similar). If no public getter exists, STOP and report. The 120 s timeout (`NativeAssets.cpp:182-186`) still applies.
+2. In `FHdueNativeAssets::Tick`, keep an effect entry in LOADING until its component has reached its desired age. Find the public getter in `<engine_root>/Engine/Plugins/FX/Niagara/Source/Niagara/Classes/NiagaraComponent.h` (look for `GetAge`, `IsSeeking` or similar). If no public getter exists, STOP and report. The 120 s timeout (`NativeAssets.cpp:182-186`) still applies.
 3. Measure: `samples/docs/effects.usda`, a husk render of frames 1 and 100 in one process. Time the frame-100 request, and check the UE thread never blocks more than 100 ms per tick (`hdUE slow task`/`slow tick` lines from `HDUE_TRACE_TIMING`).
 
 **Keep threshold**: no tick over 100 ms during the seek, and the frame-100 image matches the frame-100 image from the base build (image check).
@@ -386,7 +386,7 @@ Run the full verification of the kept steps together.
 **Verify**:
 - `.\scripts\Build-Backend.ps1`, `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig $PWD\.local\perf-runtime.json` and `.\scripts\Build-Houdini.ps1` → exit 0.
 - `.\scripts\Test.ps1 -Suite unit` → passed.
-- `hython scripts\run_conformance.py --runtime-config H:\github\hdUE\.local\perf-runtime.json --only preview_surface/* materialx/* texture/* lux/* render_settings/* volume/*` → `0 failing runs`.
+- `hython scripts\run_conformance.py --runtime-config <repo>\.local\perf-runtime.json --only preview_surface/* materialx/* texture/* lux/* render_settings/* volume/*` → `0 failing runs`.
 - The Cornell image check passes in both modes.
 
 ## Test plan

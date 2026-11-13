@@ -127,7 +127,7 @@ HDUE_USER_DIR moves it (a farm's shared disk)." `docs/getting-started/environmen
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Build backend | `.\scripts\Build-Backend.ps1` | exit 0 |
-| Stage to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig H:\github\hdUE\.local\runtime-plan021.json` | exit 0 |
+| Stage to a side profile | `.\scripts\Update-HoudiniRuntime.ps1 -OutputConfig <repo>\.local\runtime-plan021.json` | exit 0 |
 | Stage as default (end) | `.\scripts\Update-HoudiniRuntime.ps1 -SetDefault` | exit 0 |
 | Targeted conformance | `& "<houdini_root>\bin\hython.exe" scripts\run_conformance.py --runtime-config <absolute profile path> --only texture/*` | `0 failing runs` |
 | Format | `uvx --from clang-format==19.1.5 clang-format --dry-run --Werror <changed files>` | exit 0 |
