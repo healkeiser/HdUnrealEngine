@@ -14,7 +14,14 @@ The Scene Viewer rendering with **Unreal Engine** (Path Tracer, 512 samples), th
 
 The first time in a session, Unreal Engine starts inside Houdini; the image appears a few seconds later. It then stays loaded until Houdini exits, so switching back to Unreal Engine is immediate.
 
-Switching to another renderer and back keeps hdUE's scene (meshes, materials, textures) only while both renderers use the same viewport lighting. Houdini keeps the lighting menu (**Headlight Only**, **High Quality Lighting**, ...) per renderer, and when a switch changes the lighting mode it restarts the Hydra renderer (`HUSD_Imaging::setLightingMode`, then `resetImagingEngine`): hdUE starts again from an empty scene and uploads the whole stage, which on a large stage takes minutes. With the native viewport (**Houdini GL**, which Vulkan uses) on **Headlight Only** and Unreal Engine on **High Quality Lighting**, every switch back rebuilds the scene; pick the same lighting for both. A hip file saves the choice per renderer (`sceneviewconfig -m "<lighting>" "<renderer>"`).
+!!! warning "Use the same viewport lighting for every renderer"
+    Switching to another renderer and back keeps hdUE's scene (meshes, materials, textures) only while both renderers use the same viewport lighting. Houdini keeps the lighting menu (**Headlight Only**, **High Quality Lighting**, ...) per renderer, and when a switch changes the lighting it restarts the Hydra renderer: hdUE starts again from an empty scene and uploads the whole stage, which on a large stage takes minutes.
+
+    For example, with the native viewport (Houdini VK) on **Headlight Only** and Unreal Engine on **High Quality Lighting**, every switch back to Unreal Engine rebuilds the scene. To avoid it:
+
+    1. Switch the viewer to Houdini VK.
+    2. In the viewport's lighting menu, pick the lighting Unreal Engine uses (**High Quality Lighting** by default).
+    3. Save the hip file: it keeps the choice per renderer.
 
 One Houdini session renders one hdUE image at a time: one viewport, or one [Live Render](live-render.md).
 
