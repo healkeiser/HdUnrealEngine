@@ -301,6 +301,22 @@ HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& 
         delegate->SampleTransform(id, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples, times, values);
     return HdUERelativeMotion(times, values, count, current, left);
 }
+// SamplePrimvar returns how many samples a primvar has, which can exceed the capacity it fills (sceneDelegate.h); the
+// array overload fetches them all. Past HdUEMaxMotionSamples they are resampled at even times over the same span.
+HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> HdUESamplePrimvar(HdSceneDelegate* delegate, const SdfPath& id,
+                                                                   const TfToken& name) {
+    HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> all;
+    delegate->SamplePrimvar(id, name, -HdUEMotionWindow, HdUEMotionWindow, &all);
+    if (all.count <= HdUEMaxMotionSamples) return all;
+    HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> even;
+    even.Resize(HdUEMaxMotionSamples);
+    const float first = all.times[0], last = all.times[all.count - 1];
+    for (size_t i = 0; i < HdUEMaxMotionSamples; ++i) {
+        even.times[i] = first + (last - first) * float(i) / float(HdUEMaxMotionSamples - 1);
+        even.values[i] = all.Resample(even.times[i]);
+    }
+    return even;
+}
 // UsdGeomMotionAPI motion:blurScale (inherited), which UsdImaging publishes as blurScale.
 float HdUEBlurScale(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto scale = delegate->Get(id, HdTokens->blurScale);
@@ -402,27 +418,21 @@ public:
     // another one's time is resampled there as Hydra resamples (HdResampleRawTimeSamples); PointInstancer primvars
     // usually share their times, which it returns exactly.
     void SampledMotion(const SdfPath& prototype, size_t count, HdUEMeshData& mesh) const {
-        struct Samples {
-            size_t n = 0;
-            float times[HdUEMaxMotionSamples];
-            VtValue values[HdUEMaxMotionSamples];
-        };
-        std::map<TfToken, Samples> sampled;
+        std::map<TfToken, HdTimeSampleArray<VtValue, HdUEMaxMotionSamples>> sampled;
         std::set<float> times{0.f};
         for (const auto& name : {HdInstancerTokens->instanceTranslations, HdInstancerTokens->instanceRotations,
                                  HdInstancerTokens->instanceScales, HdInstancerTokens->instanceTransforms}) {
-            Samples s;
-            s.n = GetDelegate()->SamplePrimvar(GetId(), name, -HdUEMotionWindow, HdUEMotionWindow, HdUEMaxMotionSamples,
-                                               s.times, s.values);
-            if (std::all_of(s.values, s.values + s.n, [&](const VtValue& v) { return v == s.values[0]; })) continue;
-            times.insert(s.times, s.times + s.n);
+            auto s = HdUESamplePrimvar(GetDelegate(), GetId(), name);
+            const auto first = s.values.begin(), end = s.values.begin() + s.count;
+            if (std::all_of(first, end, [&](const VtValue& v) { return v == s.values[0]; })) continue;
+            times.insert(s.times.begin(), s.times.begin() + s.count);
             sampled[name] = std::move(s);
         }
         if (sampled.empty()) return;
         std::vector<std::vector<GfMatrix4d>> samples;
         for (const float t : times) {
             std::map<TfToken, VtValue> at;
-            for (const auto& [name, s] : sampled) at[name] = HdResampleRawTimeSamples(t, s.n, s.times, s.values);
+            for (const auto& [name, s] : sampled) at[name] = s.Resample(t);
             const auto instances = ComputeInstanceTransforms(prototype, &at);
             if (instances.size() != count) return;
             auto& out = samples.emplace_back();
@@ -763,13 +773,10 @@ public:
         }
         {
             // Deformation blur from time-sampled points of the same count, else from per-point velocities.
-            float times[HdUEMaxMotionSamples];
-            VtValue samples[HdUEMaxMotionSamples];
-            const size_t count = delegate->SamplePrimvar(GetId(), HdTokens->points, -HdUEMotionWindow, HdUEMotionWindow,
-                                                         HdUEMaxMotionSamples, times, samples);
+            const auto sampled = HdUESamplePrimvar(delegate, GetId(), HdTokens->points);
             bool moves = false;
-            for (size_t k = 0; k < count && count > 1; ++k) {
-                auto sample = value(samples[k], VtVec3fArray());
+            for (size_t k = 0; k < sampled.count && sampled.count > 1; ++k) {
+                auto sample = value(sampled.values[k], VtVec3fArray());
                 if (subdivision) sample = subdivision->refine(sample, HdInterpolationVertex);
                 if (sample.size() != points.size()) {
                     mesh.deformTimes.clear();
@@ -783,7 +790,7 @@ public:
                     offsets.push_back(sample[point] - points[point]);
                     moves = moves || offsets.back() != GfVec3f(0);
                 }
-                mesh.deformTimes.push_back(times[k]);
+                mesh.deformTimes.push_back(sampled.times[k]);
             }
             if (!moves) {
                 mesh.deformTimes.clear();
