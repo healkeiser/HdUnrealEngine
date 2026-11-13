@@ -9,6 +9,7 @@ from pathlib import Path
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
 ABI_VERSION = 24  # HDUE_ABI_VERSION
+API_FUNCTIONS = 45  # entries in HdueApi (tests/abi_layout.c; tests/abi_mirror_test.py checks the names)
 Task = C.CFUNCTYPE(
     None, C.py_object
 )  # hdue_run_on_ue_thread's task, called with the Python callable to run
@@ -109,7 +110,7 @@ class Runtime:
         if (C.sizeof(InitDesc), C.sizeof(Status), C.sizeof(Api)) != (
             48,
             552,
-            8 + 8 * (len(Api._fields_) - 2),
+            8 + 8 * API_FUNCTIONS,
         ):
             raise RuntimeError("hdUE requires the Windows x64 ABI")
         self.owner = threading.get_ident()
