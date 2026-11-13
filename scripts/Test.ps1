@@ -26,6 +26,8 @@ if ($Suite -in 'unit', 'all') {
     if ($LASTEXITCODE) { throw 'houdini_menu_test failed.' }
     & uv run --python 3.13 python (Join-Path $TaskRoot 'tests\hdue_ue_import_test.py')
     if ($LASTEXITCODE) { throw 'hdue_ue_import_test failed.' }
+    & uv run --python 3.13 python (Join-Path $TaskRoot 'tests\houdini_viewport_test.py')
+    if ($LASTEXITCODE) { throw 'houdini_viewport_test failed.' }
     # The committed gallery: every scene's brightness within its band, every linked image present.
     & uv run --python 3.11 python (Join-Path $PSScriptRoot 'check_gallery.py')
     if ($LASTEXITCODE) { throw 'Gallery check failed.' }

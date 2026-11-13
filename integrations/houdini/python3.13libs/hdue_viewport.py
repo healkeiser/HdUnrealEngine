@@ -217,7 +217,10 @@ class Viewport:
                 else:
                     parameters[p].type = 1
                     vector = list(value)
-                    vector.extend([0.0] * (4 - len(vector)))
+                    # Alpha 1, as delegate.cpp and material_api.py send it.
+                    vector.extend([0.0] * (3 - len(vector)))
+                    if len(vector) == 3:
+                        vector.append(1.0)
                     for component in range(4):
                         parameters[p].value[component] = vector[component]
             bindings[index] = Material(
