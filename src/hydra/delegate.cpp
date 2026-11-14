@@ -1232,14 +1232,10 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     // UE bakes a power-of-two cube from 32 to 2048 (Lighting.cpp rejects the whole light batch otherwise); older
     // hdUE Render Settings LOPs authored the menu position instead of the value.
     if (requested < 32 || requested > 2048 || (requested & (requested - 1))) {
-        static std::once_flag warned;
-        std::call_once(warned, [&] {
-            TF_WARN(
-                "hdUE: domeResolution %d is not a power of two from 32 to 2048 (older scenes stored the menu "
-                "position); using 128",
-                requested);
-        });
-        requested = 128;
+        warnOnce("hdUE: domeResolution " + std::to_string(requested) +
+                 " is not a power of two from 32 to 2048 (older scenes stored the menu position); using " +
+                 std::to_string(HdUESettingDefaults::domeResolution));
+        requested = HdUESettingDefaults::domeResolution;
     }
     const auto domeResolution = uint32_t(requested);
     const auto extend = [&](const LightDesc& legacy, const HdUELightData* source) {
