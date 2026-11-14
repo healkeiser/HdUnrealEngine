@@ -5,4 +5,4 @@ class FRDGBuilder;
 class FRDGTexture;
 class FSceneView;
 void HdUEDrawEnvironment(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* SceneColor,
-                         FRDGTexture* SceneDepth, FRHITexture* Environment, float Scale);
+                         FRDGTexture* SceneDepth, FRHITexture* Environment, float Scale, float ScreenFraction);

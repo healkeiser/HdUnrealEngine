@@ -29,7 +29,7 @@ public:
 IMPLEMENT_GLOBAL_SHADER(FHdueEnvironmentCS, "/HdUE/Environment.usf", "MainCS", SF_Compute);
 
 void HdUEDrawEnvironment(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* SceneColor,
-                         FRDGTexture* SceneDepth, FRHITexture* Environment, float Scale) {
+                         FRDGTexture* SceneDepth, FRHITexture* Environment, float Scale, float ScreenFraction) {
     if (!SceneColor || !SceneDepth || !Environment) return;
     FRDGTextureRef Destination = SceneColor;
     if (!EnumHasAnyFlags(SceneColor->Desc.Flags, TexCreate_UAV)) {
@@ -42,8 +42,14 @@ void HdUEDrawEnvironment(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDG
     Parameters->ClipToTranslatedWorld = FMatrix44f(View.ViewMatrices.GetInvTranslatedViewProjectionMatrix());
     Parameters->TranslatedEye =
         FVector3f(View.ViewMatrices.GetViewOrigin() + View.ViewMatrices.GetPreViewTranslation());
+    // After the base pass the scene textures are at the render resolution (FViewInfo::ViewRect: the output times the
+    // screen percentage, rounded up per axis as UE's ApplyResolutionFraction does), so the dispatch, UV and depth test
+    // cover that rectangle.
+    // shortcut: ignores lens-distortion overscan (as SharedFrames.cpp does); use FViewInfo::ViewRect if overscanned
+    // frames show a shifted sky.
     Parameters->ViewMin = View.UnscaledViewRect.Min;
-    Parameters->ViewSize = View.UnscaledViewRect.Size();
+    Parameters->ViewSize = FIntPoint(FMath::CeilToInt(View.UnscaledViewRect.Width() * ScreenFraction),
+                                     FMath::CeilToInt(View.UnscaledViewRect.Height() * ScreenFraction));
     Parameters->InverseViewSize = FVector2f(1.f / Parameters->ViewSize.X, 1.f / Parameters->ViewSize.Y);
     Parameters->RadianceScale = Scale;
     Parameters->Depth = SceneDepth;

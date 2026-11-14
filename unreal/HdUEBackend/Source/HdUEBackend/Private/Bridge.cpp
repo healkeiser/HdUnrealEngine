@@ -276,7 +276,7 @@ public:
         if (!Job->Environment.IsValid() || !SceneTextures) return;
         HdUEDrawEnvironment(GraphBuilder, View, RenderTargets.Output[0].GetTexture(),
                             SceneTextures->GetParameters()->SceneDepthTexture, Job->Environment.GetReference(),
-                            Job->EnvironmentScale);
+                            Job->EnvironmentScale, Job->ScreenFraction);
     }
     void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View,
                                          const FPostProcessingInputs& Inputs) override {
@@ -301,7 +301,12 @@ public:
         auto Desc = FRDGTextureDesc::Create2D(Size, PF_R32_FLOAT, FClearValueBinding::None,
                                               TexCreate_ShaderResource | TexCreate_RenderTargetable);
         FRDGTextureRef Target = GraphBuilder.CreateTexture(Desc, TEXT("Hdue.DeviceDepth"));
-        AddDrawTexturePass(GraphBuilder, View, Source, Target, View.UnscaledViewRect.Min, FIntPoint::ZeroValue, Size);
+        // The scene depth covers the render rectangle (see HdUEDrawEnvironment), resampled to the output size with
+        // point sampling: averaging depths across an edge would invent surfaces.
+        const FIntPoint RenderSize(FMath::CeilToInt(View.UnscaledViewRect.Width() * Job->ScreenFraction),
+                                   FMath::CeilToInt(View.UnscaledViewRect.Height() * Job->ScreenFraction));
+        AddDrawTexturePass(GraphBuilder, View, Source, Target, View.UnscaledViewRect.Min, RenderSize,
+                           FIntPoint::ZeroValue, Size, TStaticSamplerState<SF_Point>::GetRHI());
         auto& Readback = Session->DepthReadbacks[Job->Slot];
         if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueDepth"));
         AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Target);
