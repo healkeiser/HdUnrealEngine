@@ -35,8 +35,6 @@
     "husk.metadata": {
       "float OpenEXR:frame": "$frame",
       "float OpenEXR:FramesPerSecond": "$fps",
-      "string OpenEXR:husk:command": "$command_line",
-      "string OpenEXR:husk:usd_file": "$usdfile",
       "string OpenEXR:Software": "hdUE (Unreal Engine 5.8) $husk_version",
       "string OpenEXR:cryptomatte/3ae39a5/name": "${render_stats.CryptoObject_name}",
       "string OpenEXR:cryptomatte/3ae39a5/hash": "${render_stats.CryptoObject_hash}",
