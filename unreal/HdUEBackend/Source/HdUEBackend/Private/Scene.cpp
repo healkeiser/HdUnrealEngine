@@ -1104,9 +1104,11 @@ bool VirtualMaterial(const HdueMaterialDesc& Desc) {
 // One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), the clip value its
 // mips keep the coverage of (other uses of the file keep plain mips), and whether it is virtual.
 FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot, float Coverage, bool Virtual) {
-    return FString::Printf(TEXT("%s|%s|%d|%d|%g%s"), *File, TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"),
-                           int32(TextureWrap(Texture, 0)), int32(TextureWrap(Texture, 1)), Coverage,
-                           Virtual ? TEXT("|vt") : TEXT(""));
+    // The file's time and size: an image overwritten in place loads again when its material is next sent.
+    const FFileStatData Stat = IFileManager::Get().GetStatData(*File);
+    return FString::Printf(TEXT("%s|%lld|%lld|%s|%d|%d|%g%s"), *File, Stat.ModificationTime.GetTicks(), Stat.FileSize,
+                           TextureSRGB(Texture, Slot) ? TEXT("srgb") : TEXT("raw"), int32(TextureWrap(Texture, 0)),
+                           int32(TextureWrap(Texture, 1)), Coverage, Virtual ? TEXT("|vt") : TEXT(""));
 }
 // Inputs the Preview Surface parents read through <Slot>Mask; the others (colour, normal) read RGB.
 bool ScalarSlot(int32 Slot) { return !hdue_texture_is_color(Slot) && Slot != HDUE_TEXTURE_NORMAL; }
