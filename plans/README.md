@@ -39,9 +39,9 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 022 | [Environment background and depth at render resolution](022-environment-background-and-depth-at-render-resolution.md) | main | P2 | S | — | TODO |
 | 023 | [Interactive performance: measure, then fix](023-interactive-performance-measure-then-fix.md) | main | P2 | M | 010 | TODO |
 | 024 | [Transform-only edits skip geometry](024-transform-only-edits-skip-geometry.md) | main | P3 | L | 010, 015 | TODO |
-| 025 | [Generators fail loudly and match their outputs](025-generators-fail-loudly-and-match-outputs.md) | main | P3 | M | 009, 013 | TODO |
+| 025 | [Generators fail loudly and match their outputs](025-generators-fail-loudly-and-match-outputs.md) | main | P3 | M | 009, 013 | DONE (`1538498`..`9f60f6d`) |
 | 026 | [Docs match the code](026-docs-match-the-code.md) | side | P3 | S | 013, 017 | DONE (full conformance matrix refresh optional) |
-| 027 | [One material, one look on every path](027-one-material-one-look-on-every-path.md) | main | P3 | M | 011, 012 | TODO |
+| 027 | [One material, one look on every path](027-one-material-one-look-on-every-path.md) | main | P3 | M | 011, 012 | DONE (`27ee453`..`258bfc9`; D3 live parameters and D6 `opacityMode` are follow-ups) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -62,7 +62,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 - 019 Step 3: which console variables a scene file may still set (`bridge.h` documents `set_post_process` as accepting any cvar). **Decided (2026-11-14): scenes keep setting any console variable**, as UE's Movie Render Queue lets a render configuration set any cvar (Unreal is the benchmark); 019 closes the memory-safety risk instead, by refusing scene-set properties that are not editable (`CPF_Edit`).
 - 020 Step 4: whether husk stops auto-preparing materials for scenes by default. **Decided (2026-11-14): keep the default.** husk preparing unprepared Substrate graphs is a deliberate feature (`7830f22`), and the setting comes from the hdUE Render Settings LOP; the exploit (finding `pwsh` through the current directory) is fixed by 020's process-launch steps.
-- 027 Part A: default UsdUVTexture wrap (UE's repeat vs the spec's black) and where scene-linear colours are converted.
+- 027 Part A: default UsdUVTexture wrap (UE's repeat vs the spec's black) and where scene-linear colours are converted. **Decided (2026-11-14):** D1 option (b), unauthored `wrapS`/`wrapT` repeat and `useMetadata` clamps as UE's USD importer reads them, an authored `black` stays true black; D3 option (a), colours convert from `scene_linear` to linear Rec.709 everywhere with the same OCIO processor (done for varying vertex and instance colours and prepared MaterialX colours; live native-material parameters are a follow-up below).
 
 ## Follow-ups found during execution
 
@@ -76,6 +76,12 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - Plan 019's probe: `unreal:heightFog:InscatteringColorCubemap = /Script/Engine.Default__TextureCube` crashed the previous backend in `SetupFogUniformParameters` (the class default object has no resource); object values now load from `/Game/` and `/Engine/` only.
 - Plan 021: the Nanite cache writer keeps an existing entry (another task may have written it), so a damaged entry was rebuilt on every load and never replaced; a rejected entry is now deleted. The virtual texture manifest's array counts are now bounded by the file's size before allocation (a damaged count could allocate gigabytes, in eviction too).
 - `zensical build --strict` reports four warnings under `docs/audit/` with zensical 0.0.61; check with the pinned 0.1.0 that CI uses.
+- Plan 027 D3: colour parameters the host sets live on prepared or cooked UE materials (`delegate.cpp` `materialParameter`) are not converted from `scene_linear`: they arrive as `GfVec3f`/`GfVec4f` without a colour role, and `bind_usd_materialx_library.py` records MaterialX `color3` and `vector3` bindings alike as `vector`. Keep the colour role in the binding, then convert in the host (PyOpenColorIO) or the delegate.
+- Plan 027 D6: `opacityMode` is not read. UE's USD importer passes it as an `OpacityMode` parameter, but no UE 5.8.4 USDCore reference material has that parameter, so UE renders as hdUE does; a parent-material switch would need content and ABI changes.
+- Plan 027 D5: `.rat` (and other formats UE cannot decode) only warn; converting them through OIIO, as `HdUELinearRec709Texture` already reads images, is still open.
+- Plan 027 D4: a MaterialX `texcoord` with `index` other than 0 keeps the render-time translation (UV set 0) with a warning, because the export refuses it; the Bistro's `coat_IOR` materials and the MaterialX showcase's anisotropy balls now go to preparation.
+- Plan 025 (side lane) left two regenerations for the main lane: `samples/substrate/contrast.usda` and `textures.usda` (the fixed generators now differ from them by more than the light and texture-path fixes: relative references, explicit `connect = None` blocks, SS_Coat as a nested MaterialX shader; replacing them needs the Substrate scenes' GPU checks), and the gallery charts' second-run SVG diff (needs `out/gallery/results.json`).
+- The Cornell gallery's `glossy` Lumen render fails its baseline (95th-percentile tile error 0.349 > 0.3, Lumen brightness 1.18x Karma's, band 0.65-1.15) with a render from before plan 027 as well as after it (Path Tracer unchanged, 0.000 %): an older regression to look at, or a baseline to re-bless.
 
 ## Findings considered and rejected
 

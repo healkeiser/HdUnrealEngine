@@ -22,6 +22,21 @@
 - **Category**: bug (design)
 - **Planned at**: commit `6fe3e12`, 2026-11-13
 
+## Decisions
+
+Step A1 facts (2026-11-14):
+
+1. **OCIO**: Houdini 22.0.368 sets `OCIO` to its `packages/ocio/houdini-config-v3.0.0_aces-v2.0_ocio-v2.5.ocio` (config `cg-config-v3.0.0_aces-v2.0_ocio-v2.5`). Its `scene_linear` role is `Linear Rec.709 (sRGB)`, so by default nothing converts; an ACEScg config (`ocio://cg-config-v2.2.0_aces-v1.3_ocio-v2.4`) does. PyOpenColorIO 2.5.0 is in hython (and husk), not in the `uv` Python that writes the prepared MaterialX document.
+2. **opacityMode**: UE's USD importer passes it as an `OpacityMode` parameter (`USDShadeConversion.cpp:2363-2366`), but no UE 5.8.4 USDCore reference material (`Runtime/USDCore/Content/Materials/UsdPreviewSurface*.uasset`) has such a parameter: their name tables list `Opacity`, `OpacityMask`, `OpacityTexture`, `UseOpacityTexture`, ... and no `OpacityMode`. hdUE's parents (`M_PreviewSurface*`) have none either. Reading it would need a new parent-material switch (content and ABI): a follow-up, not implemented (STOP condition).
+3. **ImageWrapper**: `EImageFormat` (`IImageWrapper.h`) is PNG, JPEG, GrayscaleJPEG, BMP, ICO, EXR, ICNS, TGA, HDR, TIFF, DDS, UEJPEG, GrayscaleUEJPEG. `GetImageFormatFromExtension` (`ImageWrapperModule.cpp:243-301`) maps `png jpg jpeg uej bmp ico exr icns tga hdr tif tiff tx dds` (`tx` as TIFF). `FImageUtils::LoadImage` detects the format from the bytes; the delegate checks the extension against that list.
+
+Maintainer decisions (2026-11-14):
+
+- **D1**: option (b). Unauthored `wrapS`/`wrapT` repeat, as UE's USD importer does; an authored `useMetadata` clamps, as there; an authored `black` stays true black (the spec's mode, which UE's importer clamps).
+- **D3**: option (a). Convert from the OCIO `scene_linear` role to linear Rec.709 everywhere: prepared MaterialX export, live native-material parameters, varying vertex colours, with the same OCIO processor. Done for vertex and instance colours and the prepared export (computed by the host in `export_usd_materialx.record`, which has PyOpenColorIO). Live native-material parameters stop at Step B6's condition: `delegate.cpp` `materialParameter` gets a `GfVec3f`/`GfVec4f` with no colour role, and `bind_usd_materialx_library.py` records MaterialX `color3` and `vector3` inputs alike as `vector`. Follow-up: keep the colour role in the binding and convert in the host or the delegate.
+- **D4 texcoord index**: a `texcoord` with `index` other than 0 keeps the render-time translation with a warning instead of going to preparation: the export refuses it (`export_usd_materialx.write`, "Only UV set 0 is supported"), because hdUE's meshes carry the material's UV primvars, not numbered sets. The other D4 cases go to preparation; no conformance scene changes path (scan of every `samples/` material), while the Bistro's `coat_IOR` materials and the showcase's anisotropy balls now do.
+- **D6 opacityMode**: not implemented (fact 2); UE 5.8 renders it as hdUE does.
+
 ## Why this matters
 
 hdUE has two ways to turn a USD material into a UE material:
