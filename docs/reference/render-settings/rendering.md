@@ -276,7 +276,7 @@ Should the render include volume lighting contributions?
 
 <dl class="hdue-facts"><div><dt>Default</dt><dd>Lit</dd></div><div><dt>USD attribute</dt><dd><code>unreal:debugView</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealdebugView_i0a</code></dd></div><span class="hdue-badge">Realtime only</span><span class="hdue-badge">Advanced</span></dl>
 
-Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
+Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with Virtual Shadow Maps on). Nanite views show only Nanite meshes: those at or above Nanite Triangle Threshold, instancer prototypes and native Nanite assets, in the viewport and in husk. Buffer views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime beauty only: AOVs are unaffected.
 
 <div class="hdue-figure" data-figure="debug-views-modes"></div>
 

@@ -861,7 +861,8 @@ HDUE = [
         "off",
         "Renders one of UE's viewport view modes instead of the lit image, as its View Mode menu does: GBuffer "
         "channels, Nanite triangles and clusters, the Lumen scene and surface cache, Virtual Shadow Map pages (with "
-        "Virtual Shadow Maps on). Nanite views show Nanite meshes: the viewport's, and native Nanite assets. Buffer "
+        "Virtual Shadow Maps on). Nanite views show only Nanite meshes: those at or above Nanite Triangle "
+        "Threshold, instancer prototypes and native Nanite assets, in the viewport and in husk. Buffer "
         "views are linear data; the others are display-referred, like the Unreal Tonemapper's output. Realtime "
         "beauty only: AOVs are unaffected.",
         menu=DEBUG_VIEWS,
