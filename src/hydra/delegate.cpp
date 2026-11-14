@@ -408,23 +408,31 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
 }
 }  // namespace
 bool HdUEAssetBoundsCm(const std::string& asset, GfVec3d& min, GfVec3d& max) {
-    // The catalog read once per file: the adapter asks for every asset prim of a stage.
+    // The runtime profile and its catalog read once per version of their files: the adapter asks for every asset prim
+    // of a stage (the profile was parsed per prim, also when it names no catalog), and an import during the session
+    // adds assets to the catalog, or names a new catalog in the profile (hdue_ue_import.merge_catalog).
     static std::mutex mutex;
     static std::string cachedProfile, path, cachedPath;
+    static std::filesystem::file_time_type profileTime, cachedTime;
     static JsValue cached;
     std::lock_guard lock(mutex);
-    // The runtime profile read once per HDUE_RUNTIME_CONFIG value too: it was opened and parsed per asset prim.
-    if (const auto profile = TfGetenv("HDUE_RUNTIME_CONFIG"); profile != cachedProfile || path.empty()) {
+    std::error_code ignored;
+    const auto profile = TfGetenv("HDUE_RUNTIME_CONFIG");
+    if (const auto time = std::filesystem::last_write_time(utf8Path(profile), ignored);
+        profile != cachedProfile || time != profileTime) {
         cachedProfile = profile;
+        profileTime = time;
         path = runtimeConfig("asset_catalog");
     }
     if (path.empty()) return false;
-    if (path != cachedPath) {
+    const auto time = std::filesystem::last_write_time(utf8Path(path), ignored);
+    if (path != cachedPath || time != cachedTime) {
         std::ifstream file(utf8Path(path));
         std::stringstream text;
         text << file.rdbuf();
         cached = JsParseString(text.str());
         cachedPath = path;
+        cachedTime = time;
     }
     if (!cached.IsObject()) return false;
     const auto& assets = cached.GetJsObject().find("assets");
