@@ -363,6 +363,45 @@ int run(int argc, wchar_t** argv) {
                 render(backend, session, request, options, options.output / (prefix + "-pathtraced-edited.pfm"),
                        metrics, comma);
             }
+            // Bad groom descriptors are rejected, and a groom survives a reset. Last cycle only: the reset sweeps the
+            // map's fixtures, which the earlier cycles render.
+            if (cycle + 1 == options.cycles) {
+                const float groom_points[] = {0, 0, 0, 0, 0, 10};
+                const float widths[] = {0.1f, 0.1f}, nan_widths[] = {0.1f, std::nanf("")};
+                const uint32_t curve_points[] = {2};
+                HdueGroomDesc groom{};
+                groom.struct_size = sizeof(groom);
+                groom.id = "smoke_groom";
+                groom.visible = 1;
+                groom.point_count = 2;
+                groom.curve_count = 1;
+                groom.points = groom_points;
+                groom.widths_cm = widths;
+                groom.curve_point_counts = curve_points;
+                backend.require(backend.api().upsert_groom(session, &groom), "valid groom");
+                HdueGroomDesc bad = groom;
+                bad.attribute_count = 1;
+                check(backend.api().upsert_groom(session, &bad) == HDUE_INVALID_ARGUMENT,
+                      "Groom without its attribute array was accepted");
+                bad = groom;
+                bad.instance_count = 2;
+                check(backend.api().upsert_groom(session, &bad) == HDUE_INVALID_ARGUMENT,
+                      "Groom without its instance transforms was accepted");
+                const std::vector<double> transforms(70000 * 16, 0.0);
+                bad.instance_count = 70000;
+                bad.instance_transforms = transforms.data();
+                check(backend.api().upsert_groom(session, &bad) == HDUE_INVALID_ARGUMENT,
+                      "Groom with 70000 instances was accepted");
+                bad = groom;
+                bad.widths_cm = nan_widths;
+                check(backend.api().upsert_groom(session, &bad) == HDUE_INVALID_ARGUMENT,
+                      "Groom with a NaN width was accepted");
+                HdueSceneBatch reset{};
+                reset.struct_size = sizeof(reset);
+                reset.reset_scene = 1;
+                backend.require(backend.api().apply_scene(session, &reset), "groom reset");
+                backend.require(backend.api().upsert_groom(session, &groom), "groom after reset");
+            }
             backend.require(backend.api().destroy_session(session), "destroy_session");
             check(backend.api().destroy_session(session) == HDUE_INVALID_ARGUMENT,
                   "Destroyed session remained accessible");
