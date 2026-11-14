@@ -11,6 +11,7 @@ from pathlib import Path
 import hdue_houdini as integration
 import numpy as np
 from hdue_houdini_test import Test as ViewportTest
+from hdue_menu import saved_directory
 
 _test = None
 DLSS = "xn__unrealcvarrNGXDLSSEnable"  # set_render_setting takes the encoded name without its suffix
@@ -20,7 +21,7 @@ RAY_RECONSTRUCTION = "xn__unrealcvarrHdUEDLSSRayReconstruction"
 def ue_logs_since(start):
     """The runtime project's UE logs written since start (other hosts may share the folder)."""
     profile = json.loads(Path(os.environ["HDUE_RUNTIME_CONFIG"]).read_text())
-    logs = Path(profile["runtime_project"]).parent / "Saved" / "Logs"
+    logs = saved_directory(os.environ, profile["runtime_project"]) / "Logs"
     return "".join(
         log.read_text(encoding="utf-8", errors="replace")
         for log in logs.glob("*.log")

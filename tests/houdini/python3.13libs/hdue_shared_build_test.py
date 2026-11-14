@@ -24,6 +24,7 @@ from pathlib import Path
 
 import hdue_houdini as integration
 from hdue_houdini_test import Test as ViewportTest
+from hdue_menu import saved_directory
 from surface_api import SurfaceApi
 
 _test = None
@@ -151,7 +152,7 @@ def session_log():
     since = datetime.fromtimestamp(start, UTC).strftime("[%Y.%m.%d-%H.%M.%S")
     found = ""
     for log in (
-        Path(profile["runtime_project"]).parent / "Saved" / "Logs"
+        saved_directory(os.environ, profile["runtime_project"]) / "Logs"
     ).glob("*.log"):
         try:
             if log.stat().st_mtime < start:
