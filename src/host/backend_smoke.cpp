@@ -187,7 +187,10 @@ int run(int argc, wchar_t** argv) {
         desc.project_path = project.c_str();
         desc.map_path = "/Game/HdUETest";
         // Headless unless asked: frames are read back from render targets, so no window needs to appear.
-        if (!options.visible) desc.extra_arguments = "-RenderOffscreen";
+        // A full garbage collection every frame (UEngine::ConditionalCollectGarbage), so objects the backend frees
+        // are gone at the next tick: a raw pointer kept to them (the groom check below) reads freed memory.
+        desc.extra_arguments = options.visible ? "-DPCVars=gc.CollectGarbageEveryFrame=1"
+                                               : "-RenderOffscreen -DPCVars=gc.CollectGarbageEveryFrame=1";
         const auto started = Clock::now();
         backend.initialize(desc);
         const double init_ms = seconds(started) * 1000;
@@ -400,6 +403,13 @@ int run(int argc, wchar_t** argv) {
                 reset.struct_size = sizeof(reset);
                 reset.reset_scene = 1;
                 backend.require(backend.api().apply_scene(session, &reset), "groom reset");
+                // Free the actors the reset destroyed before the groom is uploaded again: UE collects garbage in the
+                // world's tick (gc.CollectGarbageEveryFrame asks for a full purge in one tick and runs it in the
+                // next), and a realtime request makes the world tick again (path-traced requests pause it).
+                request.mode = HDUE_REALTIME;
+                request.generation = generation++;
+                backend.require(backend.api().request_render(session, &request), "realtime request after reset");
+                for (int tick = 0; tick < 3; ++tick) backend.require(backend.api().tick(), "tick after groom reset");
                 backend.require(backend.api().upsert_groom(session, &groom), "groom after reset");
             }
             backend.require(backend.api().destroy_session(session), "destroy_session");
