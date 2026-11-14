@@ -166,6 +166,21 @@ def editor_is_current():
     )
 
 
+def _kill_tree(process):
+    """Ends the cook and its children: kill() alone ends only PowerShell, and Build.bat/UBT or the editor would run on."""
+    try:
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass  # taskkill is missing or hung: kill() below still ends PowerShell
+    process.kill()
+    process.wait()
+
+
 def import_assets(project, paths, output=None, progress=None):
     """Cooks paths (cooked object paths) from project and publishes them into the running runtime. Returns the
     packages the runtime keeps an older copy of. Raises RuntimeError with the log's path when the cook fails.
@@ -219,8 +234,7 @@ def import_assets(project, paths, output=None, progress=None):
                 time.sleep(0.1)
         finally:
             if process.poll() is None:
-                process.kill()
-                process.wait()
+                _kill_tree(process)
     if process.returncode:
         raise RuntimeError(
             f"Importing from {project} failed (log: {log}):\n"

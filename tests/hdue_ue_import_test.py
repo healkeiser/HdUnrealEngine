@@ -23,6 +23,7 @@ class FakeProcess:
         self.polls_before_exit = polls_before_exit
         self.returncode = None
         self.killed = False
+        self.pid = 4242
 
     def poll(self):
         self.polls += 1
@@ -60,6 +61,7 @@ class ImportAssets(unittest.TestCase):
                 },
             ),
             mock.patch.object(hdue_ue_import, "publish", lambda *a: []),
+            mock.patch.object(hdue_ue_import.subprocess, "run"),
             mock.patch.object(hdue_ue_import, "merge_catalog", lambda *a: None),
             mock.patch.dict(
                 os.environ, {"HDUE_RUNTIME_CONFIG": str(temp / "runtime.json")}
@@ -109,6 +111,50 @@ class ImportAssets(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             self.run_import(process, interrupt)
         self.assertTrue(process.killed)
+
+    def test_a_timeout_kills_the_whole_process_tree(self):
+        process = FakeProcess(polls_before_exit=10**9)
+        with (
+            mock.patch.object(hdue_ue_import, "COOK_TIMEOUT_SECONDS", -1),
+            mock.patch.object(hdue_ue_import.subprocess, "run") as run,
+            self.assertRaises(TimeoutError),
+        ):
+            self.run_import(process)
+        self.assertEqual(
+            run.call_args.args[0], ["taskkill", "/PID", "4242", "/T", "/F"]
+        )
+        self.assertTrue(process.killed)
+
+    def test_a_missing_taskkill_still_kills_the_shell(self):
+        process = FakeProcess(polls_before_exit=10**9)
+        with (
+            mock.patch.object(hdue_ue_import, "COOK_TIMEOUT_SECONDS", -1),
+            mock.patch.object(
+                hdue_ue_import.subprocess, "run", side_effect=OSError
+            ),
+            self.assertRaises(TimeoutError),
+        ):
+            self.run_import(process)
+        self.assertTrue(process.killed)
+
+    def test_a_non_zero_exit_raises_with_the_log_tail(self):
+        process = FakeProcess()
+        process.poll = lambda: 3
+        process.returncode = 3
+        log = Path(self.temp.name) / "run/import.log"
+
+        def popen(command, stdout, **kwargs):
+            stdout.write("cook exploded")
+            stdout.flush()
+            return process
+
+        with (
+            mock.patch.object(hdue_ue_import.subprocess, "Popen", popen),
+            self.assertRaisesRegex(RuntimeError, "cook exploded"),
+        ):
+            hdue_ue_import.import_assets(
+                "p/p.uproject", ["/Game/A.A"], output=log.parent
+            )
 
 
 class Folder(unittest.TestCase):
