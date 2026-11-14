@@ -331,14 +331,19 @@ def main():
         if value > 0 and expected[0] == expected[1] == expected[2]:
             # The colour check only sees the hue of a grey: the luma ratio to the white reference is its value.
             ratio_tol = 0.1 if name == "Flake3D" else 0.05
-            checks.append(
-                {
-                    "name": f"{name}: value",
-                    "ratio": [{"region": case_box}, {"region": reference_box}],
-                    "min": round(value * (1 - ratio_tol), 4),
-                    "max": round(value * (1 + ratio_tol), 4),
-                }
-            )
+            check = {
+                "name": f"{name}: value",
+                "ratio": [{"region": case_box}, {"region": reference_box}],
+                "min": round(value * (1 - ratio_tol), 4),
+                "max": round(value * (1 + ratio_tol), 4),
+            }
+            if name == "Flake3D":
+                # Path Tracer only: the flakes (5 cm) are smaller than a pixel (8 cm at 128 px), and UE's realtime
+                # anti-aliasing (TSR) averages them with weights 1 / (luma + 4) (TSRColorSpace.ush HdrWeightY,
+                # TSRUpdateHistory.usf), which darkens the mean of a pattern finer than a pixel by an amount that
+                # depends on its brightness. With anti-aliasing off at 1024 px, realtime reads MaterialX's mean.
+                check["modes"] = ["pathtraced"]
+            checks.append(check)
     spec = {
         "schema": "MaterialX",
         "feature": "nodes UE's importer cannot translate as is",

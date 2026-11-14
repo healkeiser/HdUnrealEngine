@@ -377,7 +377,10 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
     }
    ],
    "min": 0.243,
-   "max": 0.297
+   "max": 0.297,
+   "modes": [
+    "pathtraced"
+   ]
   }
  ]
 }"""
