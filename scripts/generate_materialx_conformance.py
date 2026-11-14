@@ -18,7 +18,7 @@ OUT = (
 # Rec. 709 luma, the weights run_conformance.py measures with.
 LUMA = (0.2126, 0.7152, 0.0722)
 # Cases that are not grey but still get a value check: their luma against the white reference's (1).
-LUMA_CHECKED = ("Booleans", "Swizzle")
+LUMA_CHECKED = ("MatrixTransform", "Booleans", "Swizzle")
 
 
 def color(*values):

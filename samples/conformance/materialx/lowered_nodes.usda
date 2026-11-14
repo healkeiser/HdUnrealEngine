@@ -26,6 +26,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "MatrixTransform: value",
+   "ratio": [
+    {
+     "region": [
+      -4.25,
+      3.25,
+      -3.25,
+      4.25
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.3188,
+   "max": 0.3524
+  },
+  {
    "name": "MatrixInverse: inverse of diag(2, 4, 5) applied to (0.4, 0.8, 1)",
    "color": {
     "region": [
