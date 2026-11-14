@@ -58,6 +58,11 @@ class ImportAssets(unittest.TestCase):
             mock.patch.object(hdue_ue_import, "ROOT", temp),
             mock.patch.object(hdue_ue_import, "SOURCE_ROOT", self.source_root),
             mock.patch.object(
+                hdue_ue_import,
+                "PLUGINS_ROOT",
+                temp / "unreal/HdUEBackend/Plugins",
+            ),
+            mock.patch.object(
                 hdue_ue_import, "PROJECT_FILE", self.project_file
             ),
             mock.patch.object(
@@ -119,25 +124,43 @@ class ImportAssets(unittest.TestCase):
         os.utime(file, (time.time() - seconds, time.time() - seconds))
 
     def built(self):
+        """A DLL built now, after every source and plugin file (all 300 s old)."""
         self.dll.write_text("dll")
-        self.age(self.source_file, 100)
+        for file in (self.source_root.parent / "Plugins").rglob("*"):
+            if file.is_file():
+                self.age(file, 300)
+        for file in self.source_root.rglob("*"):
+            if file.is_file():
+                self.age(file, 300)
 
-    def test_any_source_file_of_either_module_or_the_project_rebuilds(self):
-        for relative in (
-            "HdUEBackend/Bridge.cpp",
-            "HdUEBackend.Target.cs",
-            "HdUEContent/HdUEContent.Build.cs",
+    def test_any_source_file_of_either_module_a_plugin_or_the_project_rebuilds(
+        self,
+    ):
+        plugins = self.source_root.parent / "Plugins"
+        output = plugins / "DLSS/Binaries/Win64/UnrealEditor-DLSS.dll"
+        output.parent.mkdir(parents=True)
+        output.write_text("dll")
+        for file in (
+            self.source_root / "HdUEBackend/Bridge.cpp",
+            self.source_root / "HdUEBackend.Target.cs",
+            self.source_root / "HdUEContent/HdUEContent.Build.cs",
+            plugins / "DLSS/Source/DLSS/Private/DLSS.cpp",
+            plugins / "DLSS/DLSS.uplugin",
         ):
-            with self.subTest(relative):
-                file = self.source_root / relative
+            with self.subTest(file.name):
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_text("//")
-                self.age(file, 100)
                 self.built()
                 self.assertTrue(hdue_ue_import.editor_is_current())
-                self.age(self.dll, 150)  # the file is now newer than the DLL
+                # Only this file is newer than the DLL: every other one is older.
+                self.age(self.dll, 150)
+                self.age(file, 100)
                 self.assertFalse(hdue_ue_import.editor_is_current())
-                self.age(file, 300)
+        # A plugin's build output, newer than the DLL, is not a source.
+        self.built()
+        self.age(self.dll, 150)
+        self.age(output, 100)
+        self.assertTrue(hdue_ue_import.editor_is_current())
         self.built()
         for file in self.source_root.rglob("*"):
             if file.is_file():

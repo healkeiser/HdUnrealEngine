@@ -176,6 +176,8 @@ CONTENT_EDITOR = PROJECT_DIR / "Binaries/Win64/UnrealEditor-HdUEContent.dll"
 # Both modules, the targets and the .Build.cs files: any of them changes what the editor needs to be.
 SOURCE_ROOT = PROJECT_DIR / "Source"
 PROJECT_FILE = PROJECT_DIR / "HdUEBackend.uproject"
+# The project's plugins (DLSS, Streamline) build into the same editor.
+PLUGINS_ROOT = PROJECT_DIR / "Plugins"
 
 
 def _build_id(modules_file):
@@ -200,12 +202,21 @@ def _engine_modules_file():
 
 def editor_is_current():
     """Whether the project's editor build can be skipped: its DLL exists, nothing under Source (either module,
-    *.Target.cs, *.Build.cs) or the .uproject is newer, and it was built by the engine now configured (same BuildId).
+    *.Target.cs, *.Build.cs), the project's plugins or the .uproject is newer, and it was built by the engine now
+    configured (same BuildId).
     """
     if not CONTENT_EDITOR.is_file():
         return False
     built = CONTENT_EDITOR.stat().st_mtime
     sources = [PROJECT_FILE, *SOURCE_ROOT.rglob("*")]
+    for folder, children, files in os.walk(PLUGINS_ROOT):
+        # A plugin's build output and content change with every build or import, not what the editor needs to be.
+        children[:] = [
+            c
+            for c in children
+            if c not in ("Binaries", "Intermediate", "Saved", "Content")
+        ]
+        sources += [Path(folder) / f for f in files]
     if any(f.is_file() and f.stat().st_mtime > built for f in sources):
         return False
     engine = _engine_modules_file()
