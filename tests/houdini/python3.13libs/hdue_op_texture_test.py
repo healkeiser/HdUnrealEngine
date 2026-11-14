@@ -13,6 +13,7 @@ from hdue_solaris_probe import Probe
 from pxr import UsdGeom
 
 _test = None
+SAMPLES = 64  # the Path Tracer checks below require exactly this many samples
 
 
 class Test(Probe):
@@ -72,8 +73,10 @@ class Test(Probe):
                         ):
                             break
             yield
-        if mode and frame.completed_samples != 64:
-            raise AssertionError("Path Tracer did not converge at 64 samples")
+        if mode and frame.completed_samples != SAMPLES:
+            raise AssertionError(
+                f"Path Tracer did not converge at {SAMPLES} samples"
+            )
         self.frames.append(
             dict(
                 label=label,
@@ -109,6 +112,9 @@ class Test(Probe):
             yield
         state = yield from self.completed("01-red-lumen", 0)
         captures.append((yield from self.capture(viewer, "01-red-lumen")))
+        # The test checks texture updates, not image quality: UE's default of 2048 samples would take ~15 s per
+        # path-traced step. Authored on the same Render Settings LOP as the mode, so it holds for every later step.
+        integration.set_render_setting("xn__unrealsamplesPerPixel", SAMPLES)
         integration.set_mode("pathtraced")
         state = yield from self.completed(
             "02-red-pathtraced", 1, state["generation"]
