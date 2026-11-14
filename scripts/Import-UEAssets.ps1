@@ -2,6 +2,7 @@
 # into hdUE's UE project (the source project is not changed), cooks only the given packages and what they reference
 # with their shader code inline (as live materials are, so a running runtime loads them without a shader library),
 # and writes the catalog of the project's assets. hdue_ue_import.publish then adds the cooked packages to a runtime.
+#Requires -Version 7
 param(
     [Parameter(Mandatory = $true)][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$Packages, # /Game/... package names, comma separated

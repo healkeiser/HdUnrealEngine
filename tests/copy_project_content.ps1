@@ -13,7 +13,7 @@ function Set-Asset([string]$Project, [string]$Relative, [string]$Text) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
     Set-Content -LiteralPath $File -Value $Text -NoNewline
     $script:Count++
-    (Get-Item -LiteralPath $File).LastWriteTimeUtc = [DateTime]::UtcNow.AddSeconds($script:Count * 10)  # robocopy compares times
+    (Get-Item -LiteralPath $File).LastWriteTimeUtc = [DateTime]::UtcNow.AddSeconds($script:Count * 10)  # a differing size or time is what makes a file a candidate for replacement
 }
 function Copy-Content([string]$Project) {
     $script:Count++
@@ -58,6 +58,16 @@ try {
     Assert-Content 'HdUE\M_Own.uasset' 'own 1'
     Set-Asset R 'HdUE\M_Own.uasset' 'own version 2'
     Assert-Refusal R "hdUE's own asset"
+    # A replacement that fails (the file is held open) still leaves the new files that were copied before it recorded.
+    New-Project T
+    Set-Asset T 'Meshes\SM_T1.uasset' 't1'
+    Copy-Content T
+    Set-Asset T 'Meshes\SM_T1.uasset' 't1 version 2'
+    Set-Asset T 'Meshes\SM_T2.uasset' 't2'
+    $Held = [IO.File]::Open((Join-Path $Destination 'Meshes\SM_T1.uasset'), 'Open', 'Read', 'Read')
+    try { Copy-Content T; throw 'A held file was replaced' } catch { if ($_.Exception.Message -eq 'A held file was replaced') { throw } } finally { $Held.Dispose() }
+    $Recorded = Get-Content -LiteralPath (Join-Path $Fixture 'Dest\Saved\hdue-imported-content.json') -Raw | ConvertFrom-Json -AsHashtable
+    if (-not $Recorded.ContainsKey('Meshes\SM_T2.uasset')) { throw 'A new file copied before a failed replacement was not recorded' }
     Write-Output 'PASS content copy: own re-copy replaces; other projects, workspace edits, unrecorded files and HdUE content are refused'
 }
 finally {

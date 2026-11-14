@@ -160,6 +160,16 @@ class ImportAssets(unittest.TestCase):
         built.unlink()  # a project that never recorded its build
         self.assertFalse(hdue_ue_import.editor_is_current())
 
+    def test_windows_powershell_5_is_refused(self):
+        with (
+            mock.patch(
+                "powershell_lookup.powershell_executable",
+                return_value="powershell.exe",
+            ),
+            self.assertRaisesRegex(RuntimeError, "PowerShell 7"),
+        ):
+            self.run_import(FakeProcess())
+
     def test_an_interrupt_kills_the_cook(self):
         process = FakeProcess(polls_before_exit=100)
 

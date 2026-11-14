@@ -246,9 +246,10 @@ def import_assets(project, paths, output=None, progress=None):
     from powershell_lookup import powershell_executable
 
     powershell = powershell_executable()
-    if not powershell:
+    # The scripts use PowerShell 7 APIs; the lookup may fall back to Windows PowerShell 5.1.
+    if not powershell or Path(powershell).stem.lower() != "pwsh":
         raise RuntimeError(
-            "PowerShell 7 or Windows PowerShell is required to import UE assets"
+            "PowerShell 7 (pwsh) is required to import UE assets; Windows PowerShell 5.1 cannot run the import scripts"
         )
     command = [
         powershell,
