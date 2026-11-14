@@ -27,10 +27,10 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | DONE |
 | 011 | [Render-time MaterialX matches the spec](011-render-time-materialx-matches-the-spec.md) | main | P1 | S | — | DONE |
 | 012 | [Texture mips and cache keys](012-texture-mips-and-cache-keys.md) | main | P1 | S | — | DONE |
-| 013 | [Generate hdUE setting defaults once](013-generate-hdue-setting-defaults-once.md) | main | P2 | M | 005 | TODO |
-| 014 | [Native picking on the UE thread](014-native-picking-on-the-ue-thread.md) | main | P2 | S-M | 003 | TODO |
-| 015 | [Released-mesh edits and re-pull convergence](015-released-mesh-edits-and-repull-convergence.md) | main | P2 | S-M | 010 | TODO |
-| 016 | [One bad item does not fail the scene](016-one-bad-item-does-not-fail-the-scene.md) | main | P2 | M | 010 | TODO |
+| 013 | [Generate hdUE setting defaults once](013-generate-hdue-setting-defaults-once.md) | main | P2 | M | 005 | DONE |
+| 014 | [Native picking on the UE thread](014-native-picking-on-the-ue-thread.md) | main | P2 | S-M | 003 | DONE |
+| 015 | [Released-mesh edits and re-pull convergence](015-released-mesh-edits-and-repull-convergence.md) | main | P2 | S-M | 010 | DONE |
+| 016 | [One bad item does not fail the scene](016-one-bad-item-does-not-fail-the-scene.md) | main | P2 | M | 010 | DONE |
 | 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (manual Esc check pending) |
 | 018 | [Asset import writes shared files safely](018-asset-import-writes-shared-files-safely.md) | side | P2 | M | 017 | DONE (manual re-import check pending) |
 | 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | TODO |
