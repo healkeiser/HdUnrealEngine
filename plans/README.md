@@ -25,8 +25,8 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 008 | [Python ABI mirrors checked in CI](008-python-abi-mirrors-checked-in-ci.md) | side | P1 | S | — | DONE |
 | 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE (it found Flake3D realtime too dark: under investigation) |
 | 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | DONE (follow-ups: lighting and shared-builds test bugs) |
-| 011 | [Render-time MaterialX matches the spec](011-render-time-materialx-matches-the-spec.md) | main | P1 | S | — | TODO |
-| 012 | [Texture mips and cache keys](012-texture-mips-and-cache-keys.md) | main | P1 | S | — | TODO |
+| 011 | [Render-time MaterialX matches the spec](011-render-time-materialx-matches-the-spec.md) | main | P1 | S | — | DONE |
+| 012 | [Texture mips and cache keys](012-texture-mips-and-cache-keys.md) | main | P1 | S | — | DONE |
 | 013 | [Generate hdUE setting defaults once](013-generate-hdue-setting-defaults-once.md) | main | P2 | M | 005 | TODO |
 | 014 | [Native picking on the UE thread](014-native-picking-on-the-ue-thread.md) | main | P2 | S-M | 003 | TODO |
 | 015 | [Released-mesh edits and re-pull convergence](015-released-mesh-edits-and-repull-convergence.md) | main | P2 | S-M | 010 | TODO |
@@ -34,7 +34,7 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (manual Esc check pending) |
 | 018 | [Asset import writes shared files safely](018-asset-import-writes-shared-files-safely.md) | side | P2 | M | 017 | DONE (manual re-import check pending) |
 | 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | TODO |
-| 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | TODO |
+| 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | DONE (husk EXR header and Test.ps1 houdini checks pending) |
 | 021 | [Validate cache files on read](021-validate-cache-files-on-read.md) | main | P3 | M | 012 | TODO |
 | 022 | [Environment background and depth at render resolution](022-environment-background-and-depth-at-render-resolution.md) | main | P2 | S | — | TODO |
 | 023 | [Interactive performance: measure, then fix](023-interactive-performance-measure-then-fix.md) | main | P2 | M | 010 | TODO |
