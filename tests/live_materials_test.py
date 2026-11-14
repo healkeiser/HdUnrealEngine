@@ -416,6 +416,26 @@ class PowerShellLookupTests(unittest.TestCase):
     def test_powershell_never_from_current_directory(self):
         self.assertIsNone(self.run_lookup(False))
 
+    def test_unset_install_variables_do_not_search_current_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scene = Path(tmp)
+            (scene / "pwsh.exe").write_bytes(b"")
+            relative = scene / "PowerShell/7/pwsh.exe"
+            system = scene / "System32/WindowsPowerShell/v1.0/powershell.exe"
+            for exe in (relative, system):
+                exe.parent.mkdir(parents=True)
+                exe.write_bytes(b"")
+            old = os.getcwd()
+            os.chdir(scene)
+            try:
+                with patch.dict(os.environ, {"PATH": ""}):
+                    os.environ.pop("ProgramFiles", None)
+                    os.environ.pop("SystemRoot", None)
+                    found = powershell_executable()
+            finally:
+                os.chdir(old)
+        self.assertIsNone(found)
+
     def test_powershell_from_system_folder(self):
         found = self.run_lookup(True)
         self.assertTrue(found.endswith("powershell.exe"))

@@ -12,14 +12,25 @@ def powershell_executable():
     count: shutil.which on Windows searches the current directory first, and
     husk's current directory is often the scene's folder.
     """
-    candidates = [
-        Path(os.environ.get("ProgramFiles", "")) / "PowerShell/7/pwsh.exe"
-    ]
+
+    def installed(variable, relative):
+        root = os.environ.get(variable, "")
+        # A relative path would resolve against the current directory.
+        return [Path(root) / relative] if Path(root).is_absolute() else []
+
     found = shutil.which("pwsh")
-    if found and Path(found).resolve().parent != Path.cwd().resolve():
-        candidates.append(Path(found))
-    candidates.append(
-        Path(os.environ.get("SystemRoot", ""))
-        / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    on_path = (
+        [Path(found)]
+        if found
+        and Path(found).is_absolute()
+        and Path(found).resolve().parent != Path.cwd().resolve()
+        else []
+    )
+    candidates = (
+        installed("ProgramFiles", "PowerShell/7/pwsh.exe")
+        + on_path
+        + installed(
+            "SystemRoot", "System32/WindowsPowerShell/v1.0/powershell.exe"
+        )
     )
     return next((str(c) for c in candidates if c.is_file()), None)
