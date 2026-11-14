@@ -36,9 +36,10 @@ class RenderSettingDefaults(unittest.TestCase):
     def test_cpp_reads_use_the_header(self):
         names = "|".join(SETTINGS)
         read = re.compile(rf'setting<[^>]+>\(\s*"({names})",\s*([^\n]*)')
-        literal = []
+        literal, found = [], 0
         for file, text in sources().items():
             for match in read.finditer(text):
+                found += 1
                 name, default = match.groups()
                 # viewerLightIntensity reads double with a float read of the same setting as its fallback.
                 nested = re.match(
@@ -51,6 +52,10 @@ class RenderSettingDefaults(unittest.TestCase):
                 ):
                     line = text.count("\n", 0, match.start()) + 1
                     literal.append(f"{file}:{line}: {name}")
+        # A pattern that stopped matching the reads (a renamed setting<>) would check nothing.
+        self.assertGreater(
+            found, 0, "no setting<T>(name, default) read matched"
+        )
         self.assertEqual(literal, [])
 
     def test_descriptors_use_the_header(self):
