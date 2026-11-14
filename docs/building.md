@@ -65,6 +65,20 @@ Individual steps:
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
 
+### Test tiers
+
+`.\scripts\Test.ps1 -Suite <name>` runs one tier:
+
+- `unit` (the default): needs only `uv`, and is what CI runs. Repository scope, the Python tests, the committed gallery's brightness bands.
+- `native`: the C++ tests (`ctest`) of the standalone and Houdini builds that exist. It does not rebuild; it fails if neither build exists.
+- `hydra`: `Verify.ps1 -SkipBuild -WithUsdview`: native UE and Hydra renders, usdview, camera and buffer checks.
+- `houdini`: the in-Houdini tests, the prim LOP tests and husk's prepared-material and streaming tests.
+- `conformance`: `run_conformance.py` on the scenes named by `-Only <area>/*` (for example `-Only materials/*`). It refuses to run without `-Only`, because the full set takes over an hour.
+- `extended`: the in-Houdini kinds no other tier starts, each on its own scene. It prints what it does not run.
+- `all`: `unit`, `native`, `hydra` and `houdini`. It says that conformance and extended were not run.
+
+Dev runs must test the dev build, not an installed hdUE package. `Launch-Houdini.ps1`, `Test-Houdini.ps1`, `run_conformance.py` and `render_gallery.py` add `hdUE` to `HOUDINI_PACKAGE_SKIPLIST` (comma-separated, so existing entries stay). `render_gallery.py --dev` also uses the runtime profile in `.local`, even when an installed package set `HDUE_RUNTIME_CONFIG`.
+
 ### PSOs
 
 UE compiles a pipeline state object (PSO) the first time a draw or dispatch needs one. hdUE ships no recorded PSO cache: material PSOs are precached when meshes are created (UE's runtime PSO precaching; a mesh appears once its PSOs are ready, UE's default `r.PSOPrecache.ProxyCreationStrategy`), and the GPU driver keeps every compiled PSO in its own disk cache across runs. A bundled cache, recorded by rendering representative scenes, only covered the passes the recording happened to render and needed recording again after every shader change; with a warm driver cache it changed nothing measurable (`texture/udim`, two runs per mode: realtime 8.2/7.2 s with it, 6.9/6.8 s without; Path Tracer 6.9/7.0 s with, 7.2/7.2 s without).
@@ -118,6 +132,10 @@ The launcher owns UE initialization, Tick, and shutdown on the UI thread. Use it
 
 Camera controls include orbit, pan, and dolly. Continuous updates are coalesced. Lumen retains its ViewState during camera motion; scene, material, time, resolution, and Path Tracer request changes reset accumulation.
 
-The launcher supplies its own CPU picking path for generic meshes and supported native geometry, separate from the Hydra ID AOVs. Native CPU picking requires readable, resident LOD0 data and rejects unsupported material deformation or Nanite overrides.
+Picking in usdview uses the delegate's `unreal:pickRay` command, separate from the Hydra ID AOVs. The delegate tests generic USD meshes itself. Native assets are tested by the backend on UE's thread, the same in every host. A native asset needs readable, resident LOD0 data (Allow CPU Access and Never Stream on the cooked mesh) and opaque materials without deformation. Nanite meshes are picked through their LOD0 fallback geometry; Nanite override materials are not supported.
+
+- An asset that cannot be picked (a material that is not opaque or deforms, or LOD0 data that is not readable) fails the pick only when the ray reaches its bounds nearer than the hit. An unpickable asset behind the hit, or off the ray, changes nothing.
+- Instanced native assets are tested where they are drawn, at each instance's transform.
+- If the scene changes while the pick runs, the pick fails with "The scene changed during the pick". Pick again.
 
 `hdue_usd_render` renders a USD file to PFM without a GUI (`--prim-id` also writes the `primId` AOV).

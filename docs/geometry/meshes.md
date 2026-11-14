@@ -18,6 +18,21 @@ hdUE renders the geometry of your USD stage as UE geometry: meshes, curves and h
 
 Meshes keep their points, face-varying UVs, normals and colours. A mesh hdUE cannot convert (broken indices, or more than about 715 million vertices) is skipped with a warning naming it in the UE log; the rest of the scene renders.
 
+**What warns and is skipped.** These problems do not fail the scene. hdUE logs a warning that names the prim, material or setting, and the rest of the scene renders:
+
+- A material parameter value of a type hdUE cannot map is skipped. Native material parameters for a material with no cooked asset, or that are not a dictionary, are skipped as a whole.
+- A material with no ID, or with a non-finite opacity, is skipped. So is a material whose asset is missing from the runtime. Meshes bound to it keep its previous version if it had one, else they draw UE's default material, so the problem shows.
+- A wet mask primvar that fails to read gives that mesh no wet effect.
+- A non-finite **Viewer Light Intensity** uses the default. A value outside 0-100 is clamped to that range.
+- A **Environment Cube Resolution** that is not a power of two from 32 to 2048 falls back to the default.
+
+These cases are skipped with a warning in interactive hosts (Houdini's viewport), but fail the frame in husk, so an offline render never delivers an image without a mesh it needs:
+
+- A static mesh `unreal:asset` (**Native Asset**) that is missing from the runtime, or that has no Nanite data while **Require Nanite** is on.
+- An `unreal:asset` of another type (Skeletal Mesh, Blueprint, Level, Sparse Volume Texture, Niagara System) that fails to load.
+
+See [Materials](../materials.md) for the native asset cases.
+
 **Normals.** Authored normals are kept (`primvars:normals` wins over `normals`). Missing normals are generated smooth, so faces that share a point share its normal. For hard edges, author face-varying normals or split the points. Subdivision meshes ignore authored normals, as USD specifies.
 
 **Materials on faces.** A GeomSubset of family `materialBind` binds a material to some faces. Faces in no subset keep the mesh's material. Overlapping or invalid subsets are rejected.

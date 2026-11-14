@@ -17,15 +17,18 @@ hython scripts/run_conformance.py [--only AREA/FEATURE|PATTERN ...] [--mode real
 
 It renders every scene with husk (`HdUnrealEngine`) in each mode, one husk at a time with a timeout,
 prints a pass/fail table, writes `out/conformance/report.json` and, with `--matrix`, rewrites the matrix below. It
-exits 1 when a check fails or a render does not finish. Each run takes about 5-12 s (UE startup dominates), so the
-whole set (both modes) takes about 35 minutes; use `--only` and `--mode` while iterating. A scene's
-`"husk"` list adds husk options (render_settings/render_pass renders `--pass Pass`).
+exits 1 when a check fails, a render does not finish, or a scene has no check for a mode it runs (zero of zero is an
+error, not a pass). An `--only` that matches no scene exits 2. Each run takes about 5-12 s (UE startup dominates), so
+the whole set (181 scenes, 361 runs) takes over an hour; use `--only` and `--mode` while iterating. A scene's
+`"husk"` list adds husk options (render_settings/render_pass renders `--pass Pass`); its `"modes"` list limits the
+modes it renders (`render_settings/ambient_cubemap` is realtime only).
 
 ## How scenes are built
 
 - Every scene sublayers [common/stage.usda](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/conformance/common/stage.usda): metres, Y up, a camera at
   z = 10 whose frame is exactly x, y in [-5, 5] on the z = 0 plane, a normalized distant key light (4 lux), and
-  128 x 128 render settings with two products: the beauty and the `primId`/`instanceId` AOVs.
+  128 x 128 render settings with two products: the beauty and the `primId`/`instanceId` AOVs. It sets `unreal:autoViewerLight = 0`, so the
+  headlight never lights a scene that has no lights of its own.
 - Small textures they read are in [textures](https://github.com/healkeiser/HdUnrealEngine/tree/main/samples/conformance/textures).
 - Lights author `intensity` 1 and set brightness with `exposure` (except the scene that tests `intensity`).
 - The runner writes a root layer per scene and mode (stage metadata, the scene as a sublayer, `unreal:renderMode`).
@@ -40,10 +43,13 @@ view units (-5..5, y up).
 | Kind | Passes when |
 | --- | --- |
 | `value` | the stat lies in `[min, max]` (or `equals`) |
-| `ratio` | stat(a) / stat(b) lies in `[min, max]` |
+| `ratio` | stat(a) / stat(b) lies in `[min, max]`; two black probes (0 / 0) fail instead of reading as 1 |
 | `color` | the region's mean RGB, normalized to sum 1, is within `tol` of `rgb` normalized |
 | `log` | the regex is found (or, with `"present": false`, absent) in husk's output |
 | `metadata` | the frame's image metadata value named `metadata` matches the regex `match` |
+
+Any check can carry `"modes": ["realtime"]` or `["pathtraced"]` to apply to that mode only, and `"note"`, a sentence for
+readers that the runner ignores (it says why a limit is what it is).
 
 Stats: `luma` (mean, default), `max`, `alpha`, `coverage` (alpha > 0.5), `soft` (0.05 < alpha < 0.95),
 `partial` (luma between 5% and 95% of the region's maximum: filtered edges), `bbox_aspect`, `bbox_height`, `width`,
@@ -55,8 +61,8 @@ none compares with another renderer.
 
 ## Support matrix
 
-Last full run: this branch at `5ebd75f` (its Houdini plugin, `.local/runtime-houdini.json`), 150 scenes x
-2 modes: all 150 pass in both modes (133 at `0e0ecf2`). Each fix below follows, in order: what UE does (its USD
+Last full run: the mid-point run at `8e389b6` (2026-11-14): 181 scenes, 361 runs, 0 failing. The run before it was at
+`5ebd75f` with 150 scenes (133 at `0e0ecf2`). Each fix below follows, in order: what UE does (its USD
 importer and runtime), else the USD spec, else other renderers.
 
 ### Gaps found
