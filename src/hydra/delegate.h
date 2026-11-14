@@ -314,7 +314,10 @@ struct HdUEMaterialData {
     std::vector<std::pair<std::string, VtValue>> nativeParameters;
     bool operator==(const HdUEMaterialData&) const = default;
 };
-// Warns, once per message, what a material's translation skipped.
+// A Tf warning once per message text: scene preparation, which issues these for items it skips, runs on every Execute.
+// A message names the prim or material it is about, so one about another is warned too.
+void HdUEWarnOnce(const std::string& message);
+// Warns, once per message and material, what a material's translation skipped.
 void HdUEWarnMaterial(const HdUEMaterialData& data);
 // A setting's value as the backend reads UE properties from text: USD booleans as True/False, asset paths resolved,
 // everything else as USD prints it (vectors as "(x, y, z)", which fill a UE struct's fields in order).

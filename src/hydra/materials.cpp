@@ -46,12 +46,6 @@ GfVec4f vec4(const VtValue& v) {
     return v.IsHolding<GfVec4f>() ? v.UncheckedGet<GfVec4f>() : GfVec4f(value(v, 1.f));
 }
 GfVec4f mul(const GfVec4f& a, const GfVec4f& b) { return GfCompMult(a, b); }
-void warnOnce(const std::string& message) {
-    static std::mutex mutex;
-    static std::set<std::string> warned;
-    std::lock_guard lock(mutex);
-    if (warned.insert(message).second) TF_WARN("hdUE: %s", message.c_str());
-}
 HdMaterialNetwork2 network(HdSceneDelegate* delegate, const SdfPath& id) {
     const auto resource = delegate->GetMaterialResource(id);
     if (resource.IsHolding<HdMaterialNetwork2>()) return resource.UncheckedGet<HdMaterialNetwork2>();
@@ -741,7 +735,7 @@ public:
 }  // namespace
 
 void HdUEWarnMaterial(const HdUEMaterialData& data) {
-    for (const auto& message : data.warnings) warnOnce(message);
+    for (const auto& message : data.warnings) HdUEWarnOnce("hdUE: " + data.id + ": " + message);
 }
 
 // The UV primvars a material reads (its meshes' UV sets, uvPrimvars) and the vec3 primvar it reads as vertex colours

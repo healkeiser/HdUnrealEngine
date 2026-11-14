@@ -187,13 +187,6 @@ void batchWarning(const std::string& message) {
     std::fprintf(stderr, "hdUE warning: %s\n", message.c_str());
     std::fflush(stderr);
 }
-// A Tf warning once per message: scene preparation, which issues these for items it skips, runs on every Execute.
-void warnOnce(const std::string& message) {
-    static std::mutex warnedMutex;
-    static std::set<std::string> warned;
-    std::lock_guard lock(warnedMutex);
-    if (warned.insert(message).second) TF_WARN("%s", message.c_str());
-}
 // husk shows no Tf warning of a render delegate, even at -V 6: hdUE's own (issued from its sources) also go through
 // batchWarning, once per message. Houdini's UI and other hosts keep their Tf output.
 class HdUEBatchWarnings final : public TfDiagnosticMgr::Delegate {
@@ -252,6 +245,12 @@ void ueRun(const std::function<void()>& f) {
     f();
 }
 }  // namespace
+void HdUEWarnOnce(const std::string& message) {
+    static std::mutex warnedMutex;
+    static std::set<std::string> warned;
+    std::lock_guard lock(warnedMutex);
+    if (warned.insert(message).second) TF_WARN("%s", message.c_str());
+}
 // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
 TfToken HdUEBeauty(const TfToken& name) {
     return name == TfToken("Ci") || name == TfToken("C") || name == TfToken("beauty") ? HdAovTokens->color : name;
@@ -613,9 +612,22 @@ void rowMajor(const GfMatrix4d& m, double* out) {
     for (int r = 0; r < 4; ++r)
         for (int c = 0; c < 4; ++c) out[r * 4 + c] = m[r][c];
 }
-// A UE material parameter from a host value; none (with a warning) for a type UE parameters cannot hold.
-std::optional<HdueMaterialParameter> materialParameter(ScenePacket& packet, const std::string& name,
-                                                       const VtValue& value) {
+// A UE material parameter of material from a host value; none (with a warning) for a type UE parameters cannot hold.
+// A colour the host marks as authored in the OCIO scene_linear role ({"sceneLinearColor": value},
+// materialx_controls.py) is converted to UE's linear Rec.709, as the render-time translation converts authored colours.
+std::optional<HdueMaterialParameter> materialParameter(ScenePacket& packet, const std::string& material,
+                                                       const std::string& name, const VtValue& value) {
+    if (value.IsHolding<VtDictionary>()) {
+        const auto& marked = value.UncheckedGet<VtDictionary>();
+        if (const auto color = marked.find("sceneLinearColor");
+            marked.size() == 1 && color != marked.end() &&
+            (color->second.IsHolding<GfVec3f>() || color->second.IsHolding<GfVec4f>())) {
+            auto p = materialParameter(packet, material, name, color->second);
+            const auto linear = HdUEFromSceneLinear(GfVec3f(p->value[0], p->value[1], p->value[2]));
+            for (int c = 0; c < 3; ++c) p->value[c] = linear[c];
+            return p;
+        }
+    }
     HdueMaterialParameter p{};
     p.name = packet.own(name);
     if (value.IsHolding<float>() || value.IsHolding<double>() || value.IsHolding<int>() || value.IsHolding<int64_t>() ||
@@ -646,7 +658,8 @@ std::optional<HdueMaterialParameter> materialParameter(ScenePacket& packet, cons
         p.type = HDUE_PARAMETER_TEXTURE;
         p.texture_asset = packet.own(value.UncheckedGet<std::string>());
     } else {
-        warnOnce("hdUE skips material parameter " + name + ": unsupported value type " + value.GetTypeName());
+        HdUEWarnOnce("hdUE skips parameter " + name + " of material " + material + ": unsupported value type " +
+                     value.GetTypeName());
         return std::nullopt;
     }
     return p;
@@ -685,8 +698,8 @@ HdUEImage displacementImage(const std::string& file) {
     // the backend uses), so a bad header cannot ask for tens of GB.
     if (spec.width <= 0 || spec.height <= 0 || spec.width > 16384 || spec.height > 16384 ||
         source->GetBytesPerPixel() <= 0) {
-        warnOnce("hdUE skips the displacement image " + file + ": " + std::to_string(spec.width) + "x" +
-                 std::to_string(spec.height) + " is outside 1-16384");
+        HdUEWarnOnce("hdUE skips the displacement image " + file + ": " + std::to_string(spec.width) + "x" +
+                     std::to_string(spec.height) + " is outside 1-16384");
         return image;
     }
     std::vector<uint8_t> raw(size_t(spec.width) * spec.height * source->GetBytesPerPixel());
@@ -729,7 +742,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
             desc.native_asset = packet.own(data.nativeAsset);
             std::vector<HdueMaterialParameter> parameters;
             for (const auto& [name, value] : data.nativeParameters)
-                if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
+                if (const auto p = materialParameter(packet, data.id, name, value)) parameters.push_back(*p);
             HdueMaterialUpdate update{};
             update.struct_size = sizeof(update);
             update.material_id = desc.id;
@@ -798,13 +811,13 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         const auto entry = overrides.find(id);
         if (entry == overrides.end()) continue;
         if (asset(nativeMaterials, id).empty() || !entry->second.IsHolding<VtDictionary>()) {
-            warnOnce("hdUE skips the native material parameters of " + id +
-                     ": it has no cooked material, or its parameters are not a dictionary");
+            HdUEWarnOnce("hdUE skips the native material parameters of " + id +
+                         ": it has no cooked material, or its parameters are not a dictionary");
             continue;
         }
         std::vector<HdueMaterialParameter> parameters;
         for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
-            if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
+            if (const auto p = materialParameter(packet, id, name, value)) parameters.push_back(*p);
         HdueMaterialUpdate update{};
         update.struct_size = sizeof(update);
         update.material_id = packet.own(id);
@@ -821,7 +834,7 @@ void addParameterUpdate(ScenePacket& packet, const VtDictionary& overrides, cons
     if (entry == overrides.end() || !entry->second.IsHolding<VtDictionary>()) return;
     std::vector<HdueMaterialParameter> parameters;
     for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
-        if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
+        if (const auto p = materialParameter(packet, material, name, value)) parameters.push_back(*p);
     if (parameters.empty()) return;
     HdueMaterialUpdate update{};
     update.struct_size = sizeof(update);
@@ -1235,10 +1248,10 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
         state.setting<float>("viewerLightIntensity", float(HdUESettingDefaults::viewerLightIntensity)));
     // The setting's documented range is 0-100.
     if (!std::isfinite(viewerIntensity)) {
-        warnOnce("hdUE uses the default viewerLightIntensity: the value is not finite");
+        HdUEWarnOnce("hdUE uses the default viewerLightIntensity: the value is not finite");
         viewerIntensity = HdUESettingDefaults::viewerLightIntensity;
     } else if (viewerIntensity < 0 || viewerIntensity > 100) {
-        warnOnce("hdUE clamps viewerLightIntensity " + std::to_string(viewerIntensity) + " to 0-100");
+        HdUEWarnOnce("hdUE clamps viewerLightIntensity " + std::to_string(viewerIntensity) + " to 0-100");
         viewerIntensity = std::clamp(viewerIntensity, 0., 100.);
     }
     int sceneLights = 0;
@@ -1257,9 +1270,9 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
     // UE bakes a power-of-two cube from 32 to 2048 (Lighting.cpp rejects the whole light batch otherwise); older
     // hdUE Render Settings LOPs authored the menu position instead of the value.
     if (requested < 32 || requested > 2048 || (requested & (requested - 1))) {
-        warnOnce("hdUE: domeResolution " + std::to_string(requested) +
-                 " is not a power of two from 32 to 2048 (older scenes stored the menu position); using " +
-                 std::to_string(HdUESettingDefaults::domeResolution));
+        HdUEWarnOnce("hdUE: domeResolution " + std::to_string(requested) +
+                     " is not a power of two from 32 to 2048 (older scenes stored the menu position); using " +
+                     std::to_string(HdUESettingDefaults::domeResolution));
         requested = HdUESettingDefaults::domeResolution;
     }
     const auto domeResolution = uint32_t(requested);
@@ -1418,7 +1431,8 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
                 fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>()) {
                 std::vector<HdueMaterialParameter> parameters;
                 for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
-                    if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
+                    if (const auto p = materialParameter(packet, volume.material, name, value))
+                        parameters.push_back(*p);
                 desc.parameter_count = uint32_t(parameters.size());
                 desc.parameters = packet.own(packet.parameters, std::move(parameters));
             }
@@ -1555,18 +1569,19 @@ void prepareGrooms(HdUEState& state, ScenePacket& packet) {
         desc.attributes = attributes.empty() ? nullptr : packet.own(packet.groomAttributes, std::move(attributes));
         std::vector<HdueMaterialParameter> parameters;
         const auto scalar = [&](const char* name, float v) {
-            parameters.push_back(*materialParameter(packet, name, VtValue(v)));  // a float: always a parameter
+            parameters.push_back(*materialParameter(packet, groom.material, name, VtValue(v)));  // always a parameter
         };
         if (const auto material = asset(nativeMaterials, groom.material); !material.empty()) {
             desc.material = packet.own(material);
             if (const auto fields = nativeParameters.find(groom.material);
                 fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>())
                 for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
-                    if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
+                    if (const auto p = materialParameter(packet, groom.material, name, value)) parameters.push_back(*p);
         } else {
             const auto bound = state.materials.find(groom.material);
             if (bound != state.materials.end()) {
-                parameters.push_back(*materialParameter(packet, "HdUEColor", VtValue(bound->second.color)));
+                parameters.push_back(
+                    *materialParameter(packet, groom.material, "HdUEColor", VtValue(bound->second.color)));
                 scalar("HdUEUseColor", 1);
                 scalar("HdUERoughness", bound->second.roughness);
                 scalar("HdUEUseRoughness", 1);
@@ -1601,7 +1616,7 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
             // A mask that failed to read stays failed: that mesh gets no wet binding. One not read yet is waited for
             // (HdUERefreshWetMasks fills it on a later Execute).
             if (const auto error = data.maskErrors.find(maskName); error != data.maskErrors.end()) {
-                warnOnce(data.bindingPath + ": " + error->second);
+                HdUEWarnOnce(data.bindingPath + ": " + error->second);
                 continue;
             }
             throw std::runtime_error(data.bindingPath + ": Wet mask not synchronized: " + maskName);
@@ -2175,16 +2190,19 @@ class Pass final : public HdRenderPass {
     // motion since then.
     bool velocityPriming_ = false, velocityPrimed_ = false;
     std::atomic<bool> aovsDone_{true};  // also true while no AOV is bound
+    // An AOV frame too short to publish, in a batch host (husk): Execute fails the frame with it.
+    std::string shortAov_;
     void publishAov(HdUERenderBuffer& target, HdUEAovFormat format, const HdueFrameInfo& frame,
-                    std::vector<float> rgba) const {
+                    std::vector<float> rgba) {
         const size_t count = size_t(frame.width) * frame.height;
-        // Only the Int path reads an empty frame (as no prim, -1); the others index every pixel.
+        // Only the Int path reads an empty frame (as no prim, -1); the others index every pixel. The buffer keeps its
+        // previous contents.
         if ((format != HdUEAovFormat::Int || !rgba.empty()) && rgba.size() < count * 4) {
-            static std::once_flag warned;
-            std::call_once(warned, [&] {
-                TF_WARN("hdUE: an AOV frame holds %zu values for %ux%u pixels; it is not published", rgba.size(),
-                        frame.width, frame.height);
-            });
+            const auto message = "hdUE does not publish AOV " + target.GetId().GetString() + ": its frame holds " +
+                                 std::to_string(rgba.size()) + " values for " + std::to_string(frame.width) + "x" +
+                                 std::to_string(frame.height) + " pixels";
+            HdUEWarnOnce(message);
+            if (!selfHost().continuous) shortAov_ = message;
             return;
         }
         if (format == HdUEAovFormat::Int) {
@@ -2960,7 +2978,7 @@ public:
                 // Houdini's viewport renders without a failed native asset (the backend does the same for interactive
                 // hosts); husk fails the frame rather than deliver a picture missing it.
                 if (assets.failed && selfHost().continuous)
-                    warnOnce(std::string("hdUE renders without a failed native asset: ") + assets.message);
+                    HdUEWarnOnce(std::string("hdUE renders without a failed native asset: ") + assets.message);
                 else if (assets.failed) {
                     s.setError(assets.message);
                     s.assetRequestPending = true;
@@ -3005,7 +3023,7 @@ public:
                 request.samples_per_pixel = uint32_t(s.samplesPerPixel());
                 // At most 65536, the backend's limit on samples: each warm-up frame is a full render.
                 const int warmup = s.setting<int>("warmupFrames", HdUESettingDefaults::warmupFrames);
-                if (warmup > 65536) warnOnce("hdUE clamps warmupFrames " + std::to_string(warmup) + " to 65536");
+                if (warmup > 65536) HdUEWarnOnce("hdUE clamps warmupFrames " + std::to_string(warmup) + " to 65536");
                 request.warmup_frames = uint32_t(std::clamp(warmup, 1, 65536));
                 request.lumen_enabled = s.setting<bool>("lumenEnabled", HdUESettingDefaults::lumenEnabled);
                 request.time_seconds = s.setting<double>("timeSeconds", 0);
@@ -3207,6 +3225,14 @@ public:
                         else {
                             aovInFlight_ = false;
                             ++aovSlot_;
+                        }
+                        // husk fails the frame rather than write a buffer that missed its frame, as for a failed
+                        // native asset; Houdini's viewport keeps drawing.
+                        if (!shortAov_.empty()) {
+                            s.setError(std::exchange(shortAov_, {}));
+                            converged_ = true;
+                            aovsDone_ = true;
+                            return;
                         }
                     }
                 } else if (polled != HDUE_PENDING && polled != HDUE_OK)
