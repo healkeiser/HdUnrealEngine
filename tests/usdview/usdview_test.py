@@ -9,6 +9,7 @@ from pxr.Usdviewq.common import PickModes
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
 PLUGIN = "HdUnrealEngine"
+SAMPLES = 64  # the steps below require at least this many completed samples
 
 
 class SmokeTest:
@@ -53,6 +54,11 @@ class SmokeTest:
         self, label, previous_generation=0, samples=0, require_red=True
     ):
         start = time.monotonic()
+        # The test checks behaviour, not image quality: UE's default of 2048 samples would take ~15 s per step and
+        # overrun the deadline. Set on every wait because a renderer recreated by a plugin switch restarts from defaults.
+        if self.view.GetCurrentRendererId() == PLUGIN:
+            if self.view.GetRendererSetting("samplesPerPixel") != SAMPLES:
+                self.view.SetRendererSetting("samplesPerPixel", SAMPLES)
         self.view.updateGL()
         while True:
             stats = self.stats()
