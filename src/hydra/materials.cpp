@@ -266,7 +266,8 @@ private:
             }
             source.image = &node;
             // The images UE decodes (ImageWrapperModule.cpp GetImageFormatFromExtension, FImageUtils::LoadImage); any
-            // other (Houdini's .rat, .tex, ...) leaves the input at its constant. Host images (op:) export as PNG.
+            // other (Houdini's .rat, .tex, ...) leaves the input at its constant. Host images (op:) export as EXR
+            // (hdue_op_textures.py).
             static const std::set<std::string> decodable{"png",  "jpg", "jpeg", "uej", "bmp",  "ico", "exr",
                                                          "icns", "tga", "hdr",  "tif", "tiff", "tx",  "dds"};
             if (!HdUEHostTexture(t.file) && !decodable.count(TfStringToLower(TfStringGetSuffix(t.file))))
