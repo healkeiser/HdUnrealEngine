@@ -1277,8 +1277,11 @@ void FHdueScene::BindMaterials() {
         AActor** Actor = Actors.Find(Entry.Key);
         if (!Actor || !IsValid(*Actor)) continue;
         auto* Component = (*Actor)->FindComponentByClass<UMeshComponent>();
-        if (const auto* Material = Materials.Find(Entry.Value)) {
-            UMaterialInterface* Desired = MeshMaterial(Entry.Key);
+        // A mesh bound to a material that is missing (skipped by Apply with a warning) draws UE's default material, so
+        // the problem shows, rather than the material it had before (nullptr: no override).
+        const auto* Material = Materials.Find(Entry.Value);
+        UMaterialInterface* Desired = Material ? MeshMaterial(Entry.Key) : nullptr;
+        if (Material) {
             if (const auto* Wet = WetBindings.Find(Entry.Key);
                 Wet && (*Wet)->Base == Material->Get() && (*Wet)->Revision == GeometryRevisions.FindRef(Entry.Key))
                 Desired = (*Wet)->Material.Get();
@@ -1289,10 +1292,11 @@ void FHdueScene::BindMaterials() {
             if (Static && Static->GetStaticMesh() && Static->GetStaticMesh()->HasValidNaniteData() &&
                 IsTranslucentBlendMode(*Desired) && !TranslucentStatic.Contains(Entry.Key))
                 continue;
-            if (Component->GetMaterial(0) != Desired) Component->SetMaterial(0, Desired);
-            if (auto* Instances = Cast<UInstancedStaticMeshComponent>(Component))
-                SplitVolumeInstances(**Actor, *Instances, Desired);
         }
+        // UMeshComponent::SetMaterial returns early when the override is already the one asked for.
+        if (Component->GetMaterial(0) != Desired) Component->SetMaterial(0, Desired);
+        if (auto* Instances = Cast<UInstancedStaticMeshComponent>(Component))
+            SplitVolumeInstances(**Actor, *Instances, Desired);
     }
 }
 // UE voxelizes a Volume-domain primitive into Volumetric Fog over the primitive's bounding sphere
@@ -2249,7 +2253,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             }
         }
         if (!Material) {
-            // Its previous material (if any) stays bound; meshes without one draw UE's default material.
+            // Its previous version (if any) stays bound; meshes bound to an ID without one draw UE's default material
+            // (BindMaterials).
             UE_LOG(LogTemp, Warning,
                    TEXT("hdUE: skipped material %s: asset %s missing. Prepare/cook content or check the native asset "
                         "path."),
