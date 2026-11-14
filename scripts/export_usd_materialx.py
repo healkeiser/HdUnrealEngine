@@ -10,6 +10,9 @@ import hashlib
 import json
 import os
 import re
+import sys
+import tempfile
+import uuid
 from pathlib import Path
 
 from materialx_lowering import lower, lower_flakes, lower_primvars
@@ -20,7 +23,7 @@ from materialx_textures import (
     udim_tiles,
 )
 from pxr import Sdf, Usd, UsdShade
-from usd_materialx_graph import graph_data, image_color_space
+from usd_materialx_graph import graph_data, image_color_space, reaches_color
 
 # The node-graph categories UE 5.8's MaterialX importer translates whole instead of expanding them (CategoriesToSkip,
 # Engine/Plugins/Interchange/Runtime/Source/Import/Private/MaterialX/MaterialXUtils/MaterialXManager.cpp).
@@ -163,18 +166,19 @@ def inline_materials(stage):
         yield material
 
 
+# UE's working space, by its name in OCIO's built-in config (color_management.cpp Rec709).
+REC709 = "Linear Rec.709 (sRGB)"
+
+
 @functools.cache
-def _from_scene_linear():
-    """The OCIO processor from the config's scene_linear role to linear Rec.709, as the delegate converts authored
-    colours (color_management.cpp management(), HdUEFromSceneLinear); None when nothing converts: colour management
-    off, scene_linear already linear Rec.709, or no PyOpenColorIO (a standalone Python, whose delegate converts none).
+def _color_management():
+    """(PyOpenColorIO, the config, its scene_linear colour space's name, the processor from it to linear Rec.709), as
+    the delegate reads them (color_management.cpp management()); None when nothing converts: colour management off,
+    no scene_linear role, or no PyOpenColorIO (a standalone Python, whose delegate converts none).
     """
-    if os.environ.get("HDUE_COLOR_MANAGEMENT", "1").lower() not in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    ):
+    # As TfGetenvBool reads it: unset or empty is the default (on).
+    switch = os.environ.get("HDUE_COLOR_MANAGEMENT", "")
+    if switch and switch.lower() not in ("1", "true", "yes", "on"):
         return None
     try:
         import PyOpenColorIO as ocio
@@ -186,11 +190,125 @@ def _from_scene_linear():
         if scene is None:
             return None
         processor = ocio.Config.GetProcessorToBuiltinColorSpace(
-            config, scene.getName(), "Linear Rec.709 (sRGB)"
+            config, scene.getName(), REC709
         ).getDefaultCPUProcessor()
     except ocio.Exception:
         return None  # the delegate warns and converts none either
-    return None if processor.isNoOp() else processor
+    return ocio, config, scene.getName(), processor
+
+
+def _from_scene_linear():
+    """The OCIO processor from the config's scene_linear role to linear Rec.709, as the delegate converts authored
+    colours (HdUEFromSceneLinear); None when nothing converts (scene_linear already linear Rec.709 included).
+    """
+    management = _color_management()
+    return (
+        None if management is None or management[3].isNoOp() else management[3]
+    )
+
+
+# Bump with color_management.cpp's kConversion: a converted image of another version is not reused.
+CONVERSION = 1
+
+
+def _linear_rec709(file, tiles, space):
+    """A colour image as the delegate converts it (color_management.cpp HdUELinearRec709Texture): from its colour
+    space, or the scene_linear role for an untagged float image (EXR, HDR), to linear Rec.709, as half-float EXRs in
+    the folder the delegate caches its conversions in. Returns the converted file (a tile's, or the pattern of a UDIM
+    set) and None when the image is used as is: no colour management, a raw, data or sRGB-encoded space (decoded as
+    sRGB), an untagged 8-bit image, a space the config does not have, or one that is already linear Rec.709. Raises
+    ValueError naming the image when it cannot be converted. Keep in step with color_management.cpp.
+    """
+    management = _color_management()
+    if management is None:
+        return None
+    ocio, config, scene, _ = management
+    lower = (space or "").lower()
+    floating = Path(file).suffix.lower() in (".exr", ".hdr")
+    unnamed = lower in ("", "auto")
+    srgb = "srgb" in lower and "lin" not in lower
+    if "raw" in lower or lower == "data" or srgb or (unnamed and not floating):
+        return None
+    source_name = scene if unnamed else space
+    try:
+        source = config.getColorSpace(source_name)
+        if source is None:
+            print(
+                f"hdUE: the OCIO config has no colour space {source_name}; {file} is used as is",
+                file=sys.stderr,
+            )
+            return None
+        if source.isData():
+            return None
+        processor = ocio.Config.GetProcessorToBuiltinColorSpace(
+            config, source.getName(), REC709
+        ).getDefaultCPUProcessor()
+    except ocio.Exception as error:
+        raise ValueError(f"{file}: {source_name}: {error}") from error
+    if processor.isNoOp():
+        return None
+    images = (
+        {"." + str(k): v for k, v in tiles["tiles"].items()}
+        if tiles
+        else {"": file}
+    )
+    key = hashlib.sha256(
+        "|".join(
+            [file, source_name, scene, config.getCacheID(), str(CONVERSION)]
+            + [k + file_identity(v) for k, v in images.items()]
+        ).encode()
+    ).hexdigest()[:32]
+    folder = Path(tempfile.gettempdir()) / "hdue_ocio"
+    folder.mkdir(exist_ok=True)
+    converted = {}
+    for tile, image in images.items():
+        cached = folder / f"{key}{tile}.exr"
+        if not cached.is_file():
+            _convert_image(image, cached, processor, source_name)
+        converted[image] = str(cached)
+    if tiles and file == tiles["pattern"]:
+        return str(folder / f"{key}.<UDIM>.exr")
+    return converted[file]
+
+
+def _convert_image(source, cached, processor, space):
+    """One image into cached through processor: read as float (an 8-bit image in a linear space would band), its
+    first three channels converted, written as a half-float EXR beside and renamed (another process may share the
+    folder), as color_management.cpp's converted() does.
+    """
+    try:
+        import OpenImageIO as oiio
+    except ImportError as error:
+        raise ValueError(
+            f"{source} needs converting from {space} to linear Rec.709, and this Python has no OpenImageIO"
+        ) from error
+    image = oiio.ImageBuf(source)
+    if not image.read(0, 0, True, oiio.FLOAT) or image.nchannels < 3:
+        raise ValueError(
+            f"Cannot read {source} to convert it from {space} to linear Rec.709: {image.geterror()}"
+        )
+    import numpy
+
+    pixels = image.get_pixels(oiio.FLOAT)
+    rgb = numpy.ascontiguousarray(pixels[..., :3], dtype=numpy.float32)
+    processor.applyRGB(rgb)
+    pixels[..., :3] = rgb
+    image.set_pixels(image.roi, pixels)
+    pending = cached.with_name(f"{cached.stem}.{uuid.uuid4().hex}.pending.exr")
+    try:
+        if not image.write(str(pending), oiio.HALF):
+            raise ValueError(
+                f"Cannot write {source} converted from {space}: {image.geterror()}"
+            )
+        try:
+            os.replace(pending, cached)
+        except PermissionError:
+            if (
+                not cached.is_file()
+            ):  # else another process wrote the same image
+                raise
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def record(
@@ -206,13 +324,41 @@ def record(
     """
     stage = material.GetPrim().GetStage()
     graph = graph or graph_data(material, time)
-    textures, dependencies = {}, {}
-    for node in graph["nodes"].values():
+    textures, dependencies, spaces = {}, {}, {}
+    normal_images = _image_roles(graph)
+
+    def shading(path):
+        # A shading node's outputs are closures (surfaceshader, BSDF, ...), which USD types as tokens.
+        outputs = UsdShade.Shader(stage.GetPrimAtPath(path)).GetOutputs()
+        return any(str(o.GetTypeName()) == "token" for o in outputs)
+
+    def input_type(path, name):
+        port = UsdShade.Shader(stage.GetPrimAtPath(path)).GetInput(name)
+        return str(port.GetTypeName()) if port else ""
+
+    for path, node in graph["nodes"].items():
         for item in node["inputs"].values():
             value = item.get("value")
             if not isinstance(value, dict) or "asset" not in value:
                 continue
             filename, tiles = texture_path(stage, item, time, embedded)
+            # Decoded as the render-time translation decodes the slot it drives: a normal map raw, an image reaching a
+            # colour input converted to linear Rec.709 from its colour space (or sRGB-decoded), any other as data.
+            kind = (
+                "normal"
+                if path in normal_images
+                else (
+                    "color"
+                    if reaches_color(graph, path, shading, input_type)
+                    else "data"
+                )
+            )
+            space = image_color_space(
+                item.get("colorspace"),
+                kind,
+                item["attribute"],
+                Path(filename).suffix.lower() in (".exr", ".hdr"),
+            )
             for source_file in (
                 list(tiles["tiles"].values()) if tiles else [filename]
             ):
@@ -227,9 +373,17 @@ def record(
                     if identities is not None:
                         identities[key] = identity
                 dependencies[key] = identity
+            if kind == "color" and (
+                converted := _linear_rec709(
+                    filename, tiles, item.get("colorspace")
+                )
+            ):
+                filename, space = converted, ""
+            spaces[item["attribute"]] = space
             textures[item["attribute"]] = [filename, tiles]
-    # Colour constants in linear Rec.709, as the render-time translation converts them; the worker that writes the
-    # document has no OCIO. shortcut: prepared materials are matched without the config; re-prepare after changing it.
+    # Colour constants (and colour images, above) in linear Rec.709, as the render-time translation converts them; the
+    # worker that writes the document has no OCIO. shortcut: prepared materials are matched without the config;
+    # re-prepare after changing it.
     colors = {}
     if convert := _from_scene_linear():
         for node in graph["nodes"].values():
@@ -247,6 +401,7 @@ def record(
         textures=textures,
         dependencies=dependencies,
         colors=colors,
+        spaces=spaces,
     )
 
 
@@ -411,18 +566,7 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                         raise ValueError(
                             f"Separate normal/color source files are required for UE texture sampling: {filename}"
                         )
-                    kind = (
-                        "normal"
-                        if normal
-                        else (
-                            "color"
-                            if exported[path].getType() in ("color3", "color4")
-                            else "data"
-                        )
-                    )
-                    colorspace = image_color_space(
-                        item.get("colorspace"), kind, item["attribute"]
-                    )
+                    colorspace = source["spaces"][item["attribute"]]
                     value = filename.replace("\\", "/")
                     if colorspace:
                         port.setColorSpace(colorspace)

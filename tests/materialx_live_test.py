@@ -15,6 +15,7 @@ from materialx_controls import MaterialXLibrary, OfflineView
 from materialx_textures import file_identity
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import (
+    COLOR_SURFACE_INPUTS,
     RUNTIME_SURFACE_INPUTS,
     graph_data,
     graph_signature,
@@ -203,6 +204,55 @@ class NeedsImportTests(unittest.TestCase):
                 names, set(RUNTIME_SURFACE_INPUTS[surface]), surface
             )
 
+    def test_colour_inputs_match_materials_cpp(self):
+        # The inputs readMaterialX and readPreviewSurface read through SurfaceReader::color.
+        source = (
+            Path(__file__).resolve().parents[1] / "src/hydra/materials.cpp"
+        ).read_text(encoding="utf-8")
+
+        def body(start, end):
+            text = source[source.index(start) :]
+            return text[: text.index(end)]
+
+        fields = [
+            name.strip()
+            for group in re.findall(
+                r"Input<\w+>\s+([\w,\s]+);",
+                body("struct MaterialXSurface {", "};"),
+            )
+            for name in group.split(",")
+        ] + ["normal"]
+        colors = re.findall(
+            r"\bcolor\(s\.(\w+),", body("void readMaterialX(", "\n}\n")
+        )
+        for surface, table in (
+            ("ND_standard_surface_surfaceshader", "standardSurface{"),
+            ("ND_open_pbr_surface_surfaceshader", "openPbr{"),
+        ):
+            names = dict(
+                zip(
+                    fields,
+                    re.findall(
+                        r'"(\w+)"', body("MaterialXSurface " + table, "};")
+                    ),
+                    strict=True,
+                )
+            )
+            self.assertEqual(
+                set(COLOR_SURFACE_INPUTS[surface]),
+                {names[f] for f in colors},
+                surface,
+            )
+        self.assertEqual(
+            set(COLOR_SURFACE_INPUTS["ND_UsdPreviewSurface_surfaceshader"]),
+            set(
+                re.findall(
+                    r'r\.color\("(\w+)"',
+                    body("void readPreviewSurface(", "\n}\n"),
+                )
+            ),
+        )
+
 
 class ImageColorSpaceTests(unittest.TestCase):
     def test_names_decode_as_at_render_time(self):
@@ -220,6 +270,11 @@ class ImageColorSpaceTests(unittest.TestCase):
         ):
             self.assertEqual(image_color_space(space, "color"), color, space)
             self.assertEqual(image_color_space(space, "data"), data, space)
+        # Float images (EXR, HDR) are linear at render time whatever slot they drive.
+        for space in ("", "auto"):
+            self.assertEqual(
+                image_color_space(space, "color", floating=True), ""
+            )
 
     def test_normal_maps_are_raw(self):
         for space in ("", "auto", "raw", "lin_rec709", "lin_srgb"):

@@ -283,6 +283,72 @@ RUNTIME_SURFACE_INPUTS = {
 }
 
 
+# The surface inputs materials.cpp reads as colours (SurfaceReader::color: readPreviewSurface, readMaterialX): their
+# images are converted from their colour space, and an untagged 8-bit one drives a colour slot, which decodes as sRGB
+# (bridge.h hdue_texture_is_color). Keep in step with materials.cpp.
+COLOR_SURFACE_INPUTS = {
+    "ND_standard_surface_surfaceshader": (
+        "base_color",
+        "specular_color",
+        "coat_color",
+        "sheen_color",
+        "subsurface_color",
+        "emission_color",
+        "transmission_color",
+    ),
+    "ND_open_pbr_surface_surfaceshader": (
+        "base_color",
+        "specular_color",
+        "coat_color",
+        "fuzz_color",
+        "subsurface_color",
+        "emission_color",
+        "transmission_color",
+    ),
+    "ND_UsdPreviewSurface_surfaceshader": (
+        "diffuseColor",
+        "emissiveColor",
+        "specularColor",
+    ),
+}
+
+
+def reaches_color(graph, path, shading, input_type):
+    """Whether node path drives a colour input of a shading node downstream, through any nodes: one of
+    COLOR_SURFACE_INPUTS, or on a shading node the render-time translation does not read (Lama's, ...) a colour-typed
+    input. shading(path): whether a node is a shading node (a BSDF, a surface: where the walk stops); input_type(path,
+    name): an input's USD type name.
+    """
+    consumers = {}
+    for consumer, node in graph["nodes"].items():
+        for name, item in node["inputs"].items():
+            if "node" in item:
+                consumers.setdefault(item["node"], []).append((consumer, name))
+    pending, seen = [path], {path}
+    while pending:
+        for consumer, name in consumers.get(pending.pop(), ()):
+            if shading(consumer):
+                identity = graph["nodes"][consumer]["id"]
+                table = next(
+                    (
+                        names
+                        for prefix, names in COLOR_SURFACE_INPUTS.items()
+                        if identity.startswith(prefix)
+                    ),
+                    None,
+                )
+                if (
+                    name in table
+                    if table is not None
+                    else input_type(consumer, name).startswith("color")
+                ):
+                    return True
+            elif consumer not in seen:
+                seen.add(consumer)
+                pending.append(consumer)
+    return False
+
+
 def _uv_transform(nodes, image):
     """What materials.cpp's uvTransform reads for an image: its tiling, or the transform node on its coordinates
     (None: the coordinates as they are).
@@ -400,8 +466,9 @@ def structure_key(graph):
 # when any of them changes what UE imports: published live materials of another version stop matching and age out
 # (live_materials.clean).
 # 5: image colour spaces as the render-time translation decodes them (image_color_space). 6: colour values converted
-# from the OCIO scene_linear role (export_usd_materialx.record).
-IMPORT_VERSION = 6
+# from the OCIO scene_linear role (export_usd_materialx.record). 7: an image's decoding chosen by the surface input it
+# reaches (reaches_color), colour images converted from their OCIO colour space and untagged float images linear.
+IMPORT_VERSION = 7
 
 
 def request_key(graph):
@@ -410,13 +477,15 @@ def request_key(graph):
     return hashlib.sha256(f"{IMPORT_VERSION}:{signature}".encode()).hexdigest()
 
 
-def image_color_space(space, kind, where=""):
+def image_color_space(space, kind, where="", floating=False):
     """The colour space an image file is exported with for UE's MaterialX importer, as hdUE's render-time translation
     decodes it: names it reads as sRGB-encoded (color_management.cpp HdUESRGBColorSpace: "srgb" without "lin") become
-    srgb_texture, the one name UE's importer decodes as sRGB (MaterialXSurfaceShaderAbstract.h:474-476); an untagged or
-    auto colour image is sRGB, as the render-time translation decodes 8-bit colour slots; untagged data stays linear
-    (the document's lin_rec709). kind is "color", "data" or "normal"; a normal map is raw, and sRGB-encoded normals
-    are refused (where names the input). Keep in step with color_management.cpp.
+    srgb_texture, the one name UE's importer decodes as sRGB (MaterialXSurfaceShaderAbstract.h:475-477); an untagged or
+    auto 8-bit colour image is sRGB, as the render-time translation decodes 8-bit colour slots (Scene.cpp TextureSRGB);
+    untagged data and untagged float images (floating: EXR, HDR) stay linear (the document's lin_rec709). kind is
+    "color" (the image reaches a colour input: reaches_color), "data" or "normal"; a normal map is raw, and
+    sRGB-encoded normals are refused (where names the input). Colour images in another space are converted before
+    (export_usd_materialx.record). Keep in step with color_management.cpp.
     """
     lower = (space or "").lower()
     srgb = "srgb" in lower and "lin" not in lower
@@ -426,6 +495,6 @@ def image_color_space(space, kind, where=""):
                 f"normalmap image must use raw/linear data: {where or space}"
             )
         return "raw"
-    if srgb or (kind == "color" and lower in ("", "auto")):
+    if srgb or (kind == "color" and lower in ("", "auto") and not floating):
         return "srgb_texture"
     return "" if lower == "auto" else space or ""

@@ -31,6 +31,9 @@ if ($Suite -in 'unit', 'all') {
         & uv run --python 3.11 --with usd-core==26.11 --with numpy==2.4.6 --with MaterialX==1.39.4 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }
+    # Prepared images' colour spaces as the delegate converts them, with OCIO 2.5 (hython's) and OpenImageIO.
+    & uv run --python 3.11 --with usd-core==26.11 --with numpy==2.4.6 --with MaterialX==1.39.4 --with OpenImageIO==3.2.2.0 --with opencolorio==2.5.0 python (Join-Path $TaskRoot 'tests\materialx_color_space_test.py')
+    if ($LASTEXITCODE) { throw 'materialx_color_space_test failed.' }
     foreach ($Test in 'conformance_status_test') {
         & uv run --python 3.11 --with usd-core==26.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
