@@ -42,8 +42,8 @@ try {
     $env:PYTHONPATH = '' # Houdini must use its own Python/USD, not standalone usdview.
     # The in-Houdini tests are not shipped: their folder is on HOUDINI_PATH only for test runs.
     $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($TestKind) { "$TaskRoot\tests\houdini;" }) + $(if ($Previous.HOUDINI_PATH) { $Previous.HOUDINI_PATH } else { '&' })
-    # An installed release package would load ahead of the dev build.
-    $env:HOUDINI_PACKAGE_SKIPLIST = (@($env:HOUDINI_PACKAGE_SKIPLIST -split ';' | Where-Object { $_ }) + 'hdUE' | Select-Object -Unique) -join ';'
+    # An installed release package would load ahead of the dev build (the list is comma-separated).
+    $env:HOUDINI_PACKAGE_SKIPLIST = Get-HdUEPackageSkipList
     $env:PXR_PLUGINPATH_NAME = "$HoudiniRoot\bin\usd_plugins;$HoudiniRoot\houdini\dso\usd_plugins;$DelegateBuild\resources"
     $env:HDUE_MATERIALX_LIBRARY = if ($MaterialXLibrary) { [IO.Path]::GetFullPath($MaterialXLibrary) } else { '' }
     $env:HDUE_SUBSTRATE_LIBRARY = if ($SubstrateLibrary) { [IO.Path]::GetFullPath($SubstrateLibrary) } else { '' }

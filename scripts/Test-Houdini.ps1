@@ -14,8 +14,8 @@ $RunOutput = New-HdUERun -Name houdini -Path $OutputDirectory
 # The repo's HDAs and Python come first, as in Launch-Houdini.ps1: an installed hdUE package would otherwise win.
 $PreviousHoudiniPath = $env:HOUDINI_PATH
 $PreviousSkipList = $env:HOUDINI_PACKAGE_SKIPLIST
-# An installed release package would load ahead of the dev build.
-$env:HOUDINI_PACKAGE_SKIPLIST = (@($env:HOUDINI_PACKAGE_SKIPLIST -split ';' | Where-Object { $_ }) + 'hdUE' | Select-Object -Unique) -join ';'
+# An installed release package would load ahead of the dev build (the list is comma-separated).
+$env:HOUDINI_PACKAGE_SKIPLIST = Get-HdUEPackageSkipList
 $env:HOUDINI_PATH = "$TaskRoot\integrations\houdini;" + $(if ($PreviousHoudiniPath) { $PreviousHoudiniPath } else { '&' })
 try {
     foreach ($Test in 'houdini_cook', 'asset_controls_test', 'scene_space_test', 'render_outputs_test', 'shading_change_test', 'substrate_builder_test', 'dialog_scripts_test', 'houdini_host_state_test', 'houdini_embedded_materials') {

@@ -25,7 +25,7 @@ import numpy as np
 import OpenImageIO as oiio
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from local_paths import local_path
+from local_paths import local_path, package_skiplist
 from render_gallery import override_layer, stage_metadata
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -329,10 +329,8 @@ def environment(args):
     env.update(
         HFS=str(args.houdini),
         HOUDINI_PATH=f"{args.integrations};&",
-        # An installed release package would load ahead of the dev build.
-        HOUDINI_PACKAGE_SKIPLIST=";".join(
-            filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
-        ),
+        # An installed release package would load ahead of the dev build (the list is comma-separated).
+        HOUDINI_PACKAGE_SKIPLIST=package_skiplist(),
         PXR_PLUGINPATH_NAME=str(args.build / "resources"),
         HDUE_RUNTIME_CONFIG=str(args.runtime_config),
         HDUE_HOUDINI_ENABLE="1",

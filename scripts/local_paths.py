@@ -44,6 +44,19 @@ def local_path(key):
     )
 
 
+def package_skiplist():
+    """HOUDINI_PACKAGE_SKIPLIST with hdUE added: Houdini reads it comma-separated, so ';' entries of old values are split."""
+    entries = (
+        os.environ.get("HOUDINI_PACKAGE_SKIPLIST", "")
+        .replace(";", ",")
+        .split(",")
+    )
+    unique = {
+        e.strip().lower(): e.strip() for e in entries + ["hdUE"] if e.strip()
+    }
+    return ",".join(unique.values())
+
+
 def relaunch(script, **env):
     """Run script again in hython with HDUE_BUILD_HDA=1 and env, and exit with its code."""
     hython = local_path("houdini_root") / "bin/hython.exe"

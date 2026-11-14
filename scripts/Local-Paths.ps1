@@ -61,6 +61,12 @@ function Build-HdUEEditor {
     if ($LASTEXITCODE) { throw 'HdUEBackendEditor build failed.' }
 }
 
+function Get-HdUEPackageSkipList {
+    # Houdini reads HOUDINI_PACKAGE_SKIPLIST comma-separated; ';' entries of old values are split too.
+    $Entries = @($env:HOUDINI_PACKAGE_SKIPLIST -split '[,;]' | Where-Object { $_.Trim() }) + 'hdUE'
+    ($Entries | Group-Object { $_.Trim().ToLowerInvariant() } | ForEach-Object { $_.Group[0].Trim() }) -join ','
+}
+
 function Restore-HdUEEnvironment {
     param([Parameter(Mandatory = $true)][hashtable]$Snapshot)
     foreach ($Name in $Snapshot.Keys) {

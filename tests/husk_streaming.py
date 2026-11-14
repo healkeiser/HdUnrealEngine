@@ -19,7 +19,7 @@ import OpenImageIO as oiio
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from local_paths import local_path  # noqa: E402
+from local_paths import local_path, package_skiplist  # noqa: E402
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -45,10 +45,8 @@ def husk(out, extra_env):
         os.environ,
         HFS=str(houdini),
         HOUDINI_PATH=f"{ROOT / 'integrations/houdini'};&",
-        # An installed release package would load ahead of the dev build.
-        HOUDINI_PACKAGE_SKIPLIST=";".join(
-            filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
-        ),
+        # An installed release package would load ahead of the dev build (the list is comma-separated).
+        HOUDINI_PACKAGE_SKIPLIST=package_skiplist(),
         PXR_PLUGINPATH_NAME=str(ROOT / "build/houdini/resources"),
         HDUE_RUNTIME_CONFIG=str(ARGS.runtime_config.resolve()),
         HDUE_HOUDINI_ENABLE="1",

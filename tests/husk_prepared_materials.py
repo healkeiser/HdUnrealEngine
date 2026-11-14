@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from local_paths import local_path
+from local_paths import local_path, package_skiplist
 
 
 def husk(scene, settings, out, extra_layers="", trace=False):
@@ -47,10 +47,8 @@ def husk(scene, settings, out, extra_layers="", trace=False):
         os.environ,
         HFS=str(houdini),
         HOUDINI_PATH=f"{ROOT / 'integrations/houdini'};&",
-        # An installed release package would load ahead of the dev build.
-        HOUDINI_PACKAGE_SKIPLIST=";".join(
-            filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
-        ),
+        # An installed release package would load ahead of the dev build (the list is comma-separated).
+        HOUDINI_PACKAGE_SKIPLIST=package_skiplist(),
         PXR_PLUGINPATH_NAME=str(ROOT / "build/houdini/resources"),
         HDUE_RUNTIME_CONFIG=str(ARGS.runtime_config),
         HDUE_HOUDINI_ENABLE="1",

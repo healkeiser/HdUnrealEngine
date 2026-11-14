@@ -27,7 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import OpenImageIO as oiio
-from local_paths import local_path
+from local_paths import local_path, package_skiplist
 
 # The docs site holds docs/ only: links to the rest of the repository go to GitHub.
 SOURCE = "https://github.com/healkeiser/HdUnrealEngine/blob/main/"
@@ -105,10 +105,8 @@ def dev_environment():
     os.environ["HOUDINI_PATH"] = f'{ROOT / "integrations" / "houdini"};&'
     os.environ["PXR_PLUGINPATH_NAME"] = str(build / "resources")
     os.environ["HDUE_HOUDINI_ENABLE"] = "1"
-    # An installed release package would load ahead of the dev build.
-    os.environ["HOUDINI_PACKAGE_SKIPLIST"] = ";".join(
-        filter(None, [os.environ.get("HOUDINI_PACKAGE_SKIPLIST"), "hdUE"])
-    )
+    # An installed release package would load ahead of the dev build (the list is comma-separated).
+    os.environ["HOUDINI_PACKAGE_SKIPLIST"] = package_skiplist()
     os.environ["HDUE_RUNTIME_CONFIG"] = str(profile)
 
 
