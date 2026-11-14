@@ -2137,7 +2137,8 @@ class Pass final : public HdRenderPass {
     void publishAov(HdUERenderBuffer& target, HdUEAovFormat format, const HdueFrameInfo& frame,
                     std::vector<float> rgba) const {
         const size_t count = size_t(frame.width) * frame.height;
-        if (!rgba.empty() && rgba.size() < count * 4) {
+        // Only the Int path reads an empty frame (as no prim, -1); the others index every pixel.
+        if ((format != HdUEAovFormat::Int || !rgba.empty()) && rgba.size() < count * 4) {
             static std::once_flag warned;
             std::call_once(warned, [&] {
                 TF_WARN("hdUE: an AOV frame holds %zu values for %ux%u pixels; it is not published", rgba.size(),
