@@ -19,6 +19,13 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/UnrealType.h"
 
+// The properties UE's Details panel lets a user edit on a placed instance. Scene text sets only these, never internal
+// state (object pointers, attachment, render state) a scene file has no business reaching.
+bool HdueSceneEditable(const FProperty* Property) {
+    return Property && Property->HasAnyPropertyFlags(CPF_Edit) &&
+           !Property->HasAnyPropertyFlags(CPF_EditConst | CPF_DisableEditOnInstance | CPF_Transient);
+}
+
 // Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
 // numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Shared with
 // set_post_process (Bridge.cpp), compiled in the editor target too.
@@ -463,7 +470,7 @@ bool FHdueLighting::UpdateLocal(const FDefinition& Definition, FString& Error) {
     // component is not registered yet, so its scene proxy is created with them.
     for (const auto& [Name, Text] : Definition.Properties) {
         FProperty* Property = Light->GetClass()->FindPropertyByName(*Name);
-        if (!Property || !Property->HasAnyPropertyFlags(CPF_Edit) || !ImportPropertyValue(Property, Text, Light))
+        if (!HdueSceneEditable(Property) || !ImportPropertyValue(Property, Text, Light))
             UE_LOG(LogTemp, Warning, TEXT("hdUE light %s: %s = '%s' skipped (no such %s property, or a bad value)"),
                    *Definition.Id, *Name, *Text, *Light->GetClass()->GetName());
     }

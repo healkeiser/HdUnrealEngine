@@ -17,6 +17,9 @@ class FProperty;
 
 // Sets one property of Container from text, as set_post_process reads its values (Bridge.cpp).
 bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container);
+// Whether scene text may set Property: UE's Details panel edits it on an instance (CPF_Edit, not EditConst,
+// DisableEditOnInstance or Transient). Every scene-facing FindPropertyByName goes through it first.
+bool HdueSceneEditable(const FProperty* Property);
 
 class FHdueLighting {
 public:

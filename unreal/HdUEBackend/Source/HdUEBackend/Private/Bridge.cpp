@@ -1797,12 +1797,12 @@ static void SetSceneComponent(FSession& Session, const FString& Prefix, UClass* 
         if (FString Struct; Value.Key.Split(TEXT(":"), &Struct, &Field)) Name = Struct;
         FProperty* Property = Class->FindPropertyByName(*Name);
         void* Container = Scene;
-        if (Property && !Field.IsEmpty()) {
+        if (HdueSceneEditable(Property) && !Field.IsEmpty()) {  // both the struct and its field must be editable
             const auto* Struct = CastField<FStructProperty>(Property);
             Container = Struct ? Struct->ContainerPtrToValuePtr<void>(Scene) : nullptr;
             Property = Struct ? Struct->Struct->FindPropertyByName(*Field) : nullptr;
         }
-        if (!Property || !ImportPropertyValue(Property, Value.Value, Container))
+        if (!HdueSceneEditable(Property) || !ImportPropertyValue(Property, Value.Value, Container))
             UE_LOG(LogTemp, Warning, TEXT("hdUE: %s setting %s = '%s' skipped (unknown property or value)"), *Prefix,
                    *Value.Key, *Value.Value);
     }
@@ -1842,7 +1842,7 @@ HdueResult HDUE_CALL UpsertLocalFogVolume(HdueSession Handle, const HdueLocalFog
     for (uint32 Index = 0; Index < Desc->count; ++Index) {
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
         FProperty* Property = ULocalFogVolumeComponent::StaticClass()->FindPropertyByName(*Name);
-        if (!Property || !ImportPropertyValue(Property, Text, Fog))
+        if (!HdueSceneEditable(Property) || !ImportPropertyValue(Property, Text, Fog))
             UE_LOG(LogTemp, Warning,
                    TEXT("hdUE: local fog volume setting %s = '%s' skipped (unknown property or value)"), *Name, *Text);
     }
@@ -1865,7 +1865,8 @@ HdueResult HDUE_CALL UpsertLocalFogVolume(HdueSession Handle, const HdueLocalFog
 // One FPostProcessSettings property from its text, with its bOverride_ flag set (UE blends only overridden ones).
 static bool ImportPostProcessSetting(FPostProcessSettings& Settings, const FString& Name, const FString& Text) {
     FProperty* Property = FPostProcessSettings::StaticStruct()->FindPropertyByName(*Name);
-    if (!Property || Name.StartsWith(TEXT("bOverride_")) || !ImportPropertyValue(Property, Text, &Settings))
+    if (!HdueSceneEditable(Property) || Name.StartsWith(TEXT("bOverride_")) ||
+        !ImportPropertyValue(Property, Text, &Settings))
         return false;
     if (auto* Override = CastField<FBoolProperty>(
             FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name))))
@@ -1929,7 +1930,7 @@ HdueResult HDUE_CALL UpsertPostProcessVolume(HdueSession Handle, const HduePostP
         } else if (Name.StartsWith(TEXT("Settings:"))) {
             Done = ImportPostProcessSetting(Volume->Settings, Name.RightChop(9), Text);
         } else if (FProperty* Property = UPostProcessComponent::StaticClass()->FindPropertyByName(*Name);
-                   Property && Name != TEXT("Settings")) {
+                   HdueSceneEditable(Property) && Name != TEXT("Settings")) {
             Done = ImportPropertyValue(Property, Text, Volume);
         }
         if (!Done)
@@ -1975,7 +1976,7 @@ HdueResult HDUE_CALL UpsertDecal(HdueSession Handle, const HdueDecalDesc* Desc) 
         const FString Name = UTF8_TO_TCHAR(Desc->names[Index]), Text = UTF8_TO_TCHAR(Desc->values[Index]);
         Properties += FString::Printf(TEXT(" %s=%s"), *Name, *Text);
         FProperty* Property = UDecalComponent::StaticClass()->FindPropertyByName(*Name);
-        if (!Property || Name == TEXT("DecalSize") || !ImportPropertyValue(Property, Text, Decal))
+        if (!HdueSceneEditable(Property) || Name == TEXT("DecalSize") || !ImportPropertyValue(Property, Text, Decal))
             UE_LOG(LogTemp, Warning, TEXT("hdUE: decal setting %s = '%s' skipped (unknown property or value)"), *Name,
                    *Text);
     }
@@ -2043,7 +2044,8 @@ HdueResult HDUE_CALL SetPostProcess(HdueSession Handle, const HduePostProcessDes
         auto* Override = CastField<FBoolProperty>(
             FPostProcessSettings::StaticStruct()->FindPropertyByName(*(TEXT("bOverride_") + Name)));
         // A texture property takes an image file too: anything that is not a cooked path (/Game/..., /Engine/...).
-        const auto* Object = CastField<FObjectPropertyBase>(Property);
+        // A non-editable one falls through to ImportPostProcessSetting, which refuses it with a warning.
+        const auto* Object = HdueSceneEditable(Property) ? CastField<FObjectPropertyBase>(Property) : nullptr;
         if (Object && Object->PropertyClass->IsChildOf(UTexture::StaticClass()) && !Text.IsEmpty() &&
             (!Text.StartsWith(TEXT("/")) || FPaths::FileExists(Text))) {
             Files.Add(Name);
