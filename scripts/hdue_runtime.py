@@ -20,11 +20,11 @@ class InitDesc(C.Structure):
     _fields_ = [
         ("struct_size", U32),
         ("flags", U32),  # HDUE_INIT_*
-        ("instance", U64),
-        ("window", U64),
-        ("project", C.c_char_p),
-        ("map", C.c_char_p),
-        ("arguments", C.c_char_p),
+        ("instance_handle", U64),
+        ("window_handle", U64),
+        ("project_path", C.c_char_p),
+        ("map_path", C.c_char_p),
+        ("extra_arguments", C.c_char_p),
     ]
 
 
@@ -41,7 +41,7 @@ class Status(C.Structure):
             "engine_patch",
             "render_mode_mask",
         )
-    ] + [("video_memory", U64), ("message", C.c_char * 512)]
+    ] + [("dedicated_video_memory_bytes", U64), ("message", C.c_char * 512)]
 
 
 class Api(C.Structure):
