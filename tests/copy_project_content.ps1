@@ -68,7 +68,24 @@ try {
     try { Copy-Content T; throw 'A held file was replaced' } catch { if ($_.Exception.Message -eq 'A held file was replaced') { throw } } finally { $Held.Dispose() }
     $Recorded = Get-Content -LiteralPath (Join-Path $Fixture 'Dest\Saved\hdue-imported-content.json') -Raw | ConvertFrom-Json -AsHashtable
     if (-not $Recorded.ContainsKey('Meshes\SM_T2.uasset')) { throw 'A new file copied before a failed replacement was not recorded' }
-    Write-Output 'PASS content copy: own re-copy replaces; other projects, workspace edits, unrecorded files and HdUE content are refused'
+    # An import waits while another holds the manifest's lock, then keeps the other's entries.
+    New-Project U
+    Set-Asset U 'Meshes\SM_U.uasset' 'u'
+    $Lock = [IO.File]::Open((Join-Path $Fixture 'Dest\Saved\hdue-imported-content.json.lock'), 'OpenOrCreate', 'ReadWrite', 'ReadWrite')
+    $Lock.Lock(0, 1)
+    $Job = Start-Job -ScriptBlock { & $using:Script -ProjectPath (Join-Path $using:Fixture 'U\U.uproject') -OutputDirectory (Join-Path $using:Fixture 'runU') -Destination $using:Destination }
+    try {
+        Start-Sleep -Seconds 3
+        if (Test-Path -LiteralPath (Join-Path $Destination 'Meshes\SM_U.uasset')) { throw 'An import copied while another held the manifest lock' }
+        $Recorded['Meshes\SM_Other.uasset'] = @{ source_project = 'other'; sha256 = '0' }
+        $Recorded | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Fixture 'Dest\Saved\hdue-imported-content.json') -Encoding utf8
+    }
+    finally { $Lock.Dispose() }
+    $Job | Wait-Job -Timeout 60 | Receive-Job | Out-Null
+    $Recorded = Get-Content -LiteralPath (Join-Path $Fixture 'Dest\Saved\hdue-imported-content.json') -Raw | ConvertFrom-Json -AsHashtable
+    if (-not ($Recorded.ContainsKey('Meshes\SM_U.uasset') -and $Recorded.ContainsKey('Meshes\SM_Other.uasset'))) { throw 'An import dropped the entries written while it waited for the lock' }
+    if (Get-ChildItem -LiteralPath $Destination -Recurse -Filter '*.pending' | Where-Object Name -NotLike 'SM_T1*') { throw 'A completed copy left a .pending file' }
+    Write-Output 'PASS content copy: own re-copy replaces; other projects, workspace edits, unrecorded files and HdUE content are refused; imports wait for the manifest lock'
 }
 finally {
     if (-not $Fixture.StartsWith([IO.Path]::GetTempPath(), [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the temp folder' }
