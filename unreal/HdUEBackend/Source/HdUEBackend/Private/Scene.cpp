@@ -64,6 +64,13 @@
 
 FHdueLoadCounters GHdueLoad;
 
+template <typename T>
+static bool HdueAllFinite(const T* Values, uint64 Count) {
+    for (uint64 I = 0; I < Count; ++I)
+        if (!FMath::IsFinite(Values[I])) return false;
+    return true;
+}
+
 FHdueScene::FHdueScene(UWorld* InWorld, bool InInteractive)
     : Assets(InWorld), Lighting(MakeUnique<FHdueLighting>(InWorld)), World(InWorld), Interactive(InInteractive) {}
 FHdueScene::~FHdueScene() {
@@ -471,6 +478,10 @@ void FHdueScene::ApplyLinks() {
 void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Matrices) {
     AActor* Actor = Actors.FindRef(Id);
     if (!IsValid(Actor) || !Count) return;
+    if (!HdueAllFinite(Matrices, uint64(Count) * 16)) {
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: transforms of %s skipped: a matrix has a non-finite value."), *Id);
+        return;
+    }
     const auto ToTransform = [&](uint32 Index) {
         FMatrix Matrix;
         for (int R = 0; R < 4; ++R)
@@ -1978,6 +1989,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                                    : nullptr;
         for (uint32 I = 0; !Problem && I < Mesh.index_count; ++I)
             if (Mesh.indices[I] >= Mesh.vertex_count) Problem = TEXT("index out of range");
+        // NaN or infinite values would reach UE's bounds and builds; the other uploads (grooms, volumes, lights, native
+        // assets) refuse them too.
+        if (!Problem &&
+            (!HdueAllFinite(Mesh.positions, uint64(Mesh.vertex_count) * 3) ||
+             (Mesh.instance_transforms ? !HdueAllFinite(Mesh.instance_transforms, uint64(Mesh.instance_count) * 16)
+                                       : !HdueAllFinite(Mesh.transform, 16))))
+            Problem = TEXT("non-finite position or matrix");
         if (!Problem) return;
         ValidMeshes[Index] = false;
         UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped mesh %s (%u vertices, %u indices): %s."),
