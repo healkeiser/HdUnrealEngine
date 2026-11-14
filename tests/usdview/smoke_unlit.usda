@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    doc = """The usdview scene check's input (scene_check.py exercises viewer lighting on an unlit USD): the smoke scene
+without its key light, so hdUE's Light Unlit Scenes and the camera light are what light it."""
+    defaultPrim = "World"
+    upAxis = "Z"
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    endTimeCode = 1
+    subLayers = [@../../samples/smoke.usda@]
+)
+
+over "KeyLight" (active = false)
+{
+}

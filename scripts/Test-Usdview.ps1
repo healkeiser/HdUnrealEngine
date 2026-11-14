@@ -23,7 +23,7 @@ if ($Check -eq 'glass' -and -not $GlassProfile) { throw '-Check glass requires -
 if ($Check -eq 'assets' -and -not $RuntimeConfig) { throw '-Check assets requires -RuntimeConfig.' }
 $Run = New-HdUERun -Name "usdview-$Check" -Path $OutputDirectory
 $Launch = @{OpenUsdRoot=$OpenUsdRoot; TestOutput=$Run; InputUsd=$InputUsd; MaterialXLibrary=$Library; GlassProfile=$GlassProfile; RuntimeConfig=$RuntimeConfig
-    CameraPath=@{smoke = '/Camera'; camera = '/Camera'; materialx = '/Camera'; textures = '/Camera'; residency = '/Camera'; assets = '/Cameras/Level' }[$Check]
+    CameraPath=@{smoke = '/Camera'; camera = '/Camera'; scene = '/Camera'; materialx = '/Camera'; textures = '/Camera'; residency = '/Camera'; assets = '/Cameras/Level' }[$Check]
 }
 $Arguments = @('--defaultsettings')
 if ($Check -ne 'smoke') { $Arguments += @('--hdue-check', $Check) }

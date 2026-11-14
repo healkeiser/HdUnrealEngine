@@ -150,8 +150,9 @@ if ($Suite -eq 'extended') {
     if ($RuntimeConfig) { $HuskArguments += @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) }
     & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
     if ($LASTEXITCODE) { Write-Output 'extended: FAILED husk prepared materials'; $Failed += 'husk-prepared-materials' }
-    # The usdview scene check (edits, reopening, the USD file unchanged) on the Cornell box.
-    & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check scene -InputUsd (Join-Path $TaskRoot 'samples\cornell\cornell.usda') -RuntimeConfig $RuntimeConfig -OutputDirectory (Join-Path $Run 'usdview-scene')
+    # The usdview scene check (edits, reopening, the USD file unchanged) on the smoke scene without its light: it
+    # exercises viewer lighting, which lights only a scene that has none.
+    & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check scene -InputUsd (Join-Path $TaskRoot 'tests\usdview\smoke_unlit.usda') -RuntimeConfig $RuntimeConfig -OutputDirectory (Join-Path $Run 'usdview-scene')
     if ($Failed) { throw "Extended in-Houdini tests failed: $($Failed -join ', ') ($Run)" }
     $Ran += 'extended'
 }
