@@ -60,8 +60,10 @@ enum {
 
 /* Every descriptor is caller-owned. Set struct_size to sizeof(the descriptor).
  * Strings are UTF-8 and are copied during the call. No UE/pxr/STL type, native
- * allocation or exception crosses this ABI. All calls except get_api execute
- * on the thread that called initialize. One engine lifetime per process. */
+ * allocation or exception crosses this ABI. Calls run on the thread that called
+ * initialize, except get_api, get_status, get_load_status, poll_frame, poll_aov,
+ * copy_frame, copy_depth, copy_aov_buffer and acquire_gpu_frame, which any
+ * thread may call. One engine lifetime per process. */
 /* HdueInitDesc.flags. INTERACTIVE: a viewport (Houdini's UI) that renders while the user works: meshes are drawn
  * first and their Lumen cards and Nanite data built in the background, frames are paced for navigation and do not
  * wait for PSOs or texture streaming. Without it, the offline profile (husk): everything is built before the frame. */

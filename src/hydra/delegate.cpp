@@ -4314,7 +4314,7 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
         return true;
     }
     if (command != TfToken("unreal:pickRay")) return false;
-    std::lock_guard lock(state_->mutex);
+    std::unique_lock lock(state_->mutex);
     auto& result = state_->pickResult;
     result = {{"hit", VtValue(false)}, {"path", VtValue(std::string())}, {"error", VtValue(std::string())}};
     const auto argument = [&](const char* key) {
@@ -4362,24 +4362,14 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
             result["error"] = VtValue(std::string("Native picking requires the current scene to be submitted to UE"));
             return true;
         }
-        const auto& api = state_->backend->api();
         // Native materials can change culling or deform even a generic USD
         // mesh. Validate them before returning any hit in the scene.
+        std::map<std::string, HduePickMaterialInfo> materials;  // the ones not checked yet
         for (const auto& [id, mesh] : state_->meshes) {
             if (!mesh.visible) continue;
             const auto path = asset(nativeMaterials, mesh.material);
             if (path.empty() || state_->pickMaterialFlags.count(path)) continue;
-            HduePickMaterialInfo info{};
-            info.struct_size = sizeof(info);
-            const auto code = api.get_pick_material_info(path.c_str(), &info);
-            if (code != HDUE_OK || !(info.flags & HDUE_PICK_MATERIAL_OPAQUE) ||
-                (info.flags & HDUE_PICK_MATERIAL_DEFORMED)) {
-                result["error"] = VtValue(
-                    code == HDUE_OK ? std::string("Picking requires opaque native materials without deformation")
-                                    : state_->backend->status_message());
-                return true;
-            }
-            state_->pickMaterialFlags[path] = info.flags;
+            materials[path].struct_size = sizeof(HduePickMaterialInfo);
         }
         const double scale = state_->setting<double>("metersPerUnit", 0.01) * 100;
         if (!(scale > 0) || !std::isfinite(scale)) return false;
@@ -4395,15 +4385,46 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
         HdueNativeHit hit{};
         hit.struct_size = sizeof(hit);
         std::vector<char> objectId(256);
-        auto code = api.pick_native(state_->session, &ray, &hit, objectId.data(), uint32_t(objectId.size()));
-        if (code == HDUE_BUFFER_TOO_SMALL && hit.required_id_bytes > objectId.size()) {
-            objectId.resize(hit.required_id_bytes);
-            code = api.pick_native(state_->session, &ray, &hit, objectId.data(), uint32_t(objectId.size()));
+        const auto backend = state_->backend;
+        const auto session = state_->session;
+        const uint64_t revision = state_->revision;
+        std::optional<std::string> error;
+        // The backend takes calls on UE's owner thread only (hdUE's own in husk and Houdini). That thread's
+        // executeOnce takes state_->mutex, so the lock is released across the hop.
+        lock.unlock();
+        try {
+            ueRun([&] {
+                const auto& api = backend->api();
+                for (auto& [path, info] : materials) {
+                    const auto code = api.get_pick_material_info(path.c_str(), &info);
+                    if (code != HDUE_OK || !(info.flags & HDUE_PICK_MATERIAL_OPAQUE) ||
+                        (info.flags & HDUE_PICK_MATERIAL_DEFORMED)) {
+                        error = code == HDUE_OK
+                                    ? std::string("Picking requires opaque native materials without deformation")
+                                    : backend->status_message();
+                        return;
+                    }
+                }
+                auto code = api.pick_native(session, &ray, &hit, objectId.data(), uint32_t(objectId.size()));
+                if (code == HDUE_BUFFER_TOO_SMALL && hit.required_id_bytes > objectId.size()) {
+                    objectId.resize(hit.required_id_bytes);
+                    code = api.pick_native(session, &ray, &hit, objectId.data(), uint32_t(objectId.size()));
+                }
+                if (code != HDUE_OK) error = backend->status_message();
+            });
+        } catch (const std::exception& e) {
+            error = e.what();
         }
-        if (code != HDUE_OK) {
-            result["error"] = VtValue(state_->backend->status_message());
+        lock.lock();
+        if (state_->session != session || state_->revision != revision) {
+            result["error"] = VtValue(std::string("The scene changed during the pick"));
             return true;
         }
+        if (error) {
+            result["error"] = VtValue(*error);
+            return true;
+        }
+        for (const auto& [path, info] : materials) state_->pickMaterialFlags[path] = info.flags;
         if (hit.hit) {
             const auto mesh = state_->meshes.find(objectId.data());
             if (mesh == state_->meshes.end()) {
