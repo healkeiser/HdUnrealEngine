@@ -857,7 +857,7 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
 // Block-compressed textures cached in %LOCALAPPDATA%/hdUE/TextureCache, keyed by the file, its time and size, and what
 // the materials read: reloading a scene skips decoding its images, most of a texture load. Entries unused for a week go
 // when a process first uses the cache, as the Nanite cache's do (a hit counts as a use).
-constexpr int32 CacheVersion = 2;
+constexpr int32 CacheVersion = 3;  // 3: data textures mip linearly (TagGamma); every key names its LOD strip.
 FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB, const FCookLODBias& LOD) {
     static const FString Root = [] {
         const FString Folder = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
@@ -875,8 +875,7 @@ FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Textur
         FString::Printf(TEXT("%s|%lld|%lld|%d|%d|%d|%d"), *FPaths::ConvertRelativePathToFull(File),
                         Stat.ModificationTime.GetTicks(), Stat.FileSize, SRGB, Texture.Read, Texture.Vector,
                         CacheVersion) +
-        (Texture.Coverage > 0.f ? FString::Printf(TEXT("|coverage up %g"), Texture.Coverage) : FString()) +
-        (LOD.Bias ? LOD.Key() : FString());  // keys of unbiased textures stay as they were
+        (Texture.Coverage > 0.f ? FString::Printf(TEXT("|coverage up %g"), Texture.Coverage) : FString()) + LOD.Key();
     return Root / FString::Printf(TEXT("%016llx.bin"),
                                   CityHash64(reinterpret_cast<const char*>(*Key), Key.Len() * sizeof(TCHAR)));
 }
