@@ -44,7 +44,7 @@ How UE draws translucent surfaces in Realtime. **Raster** draws them over the sc
 
 <div class="hdue-figure" data-figure="opacity-and-glass-translucency-method"></div>
 
-With Ray Traced, its section shows UE's own settings: [Max Roughness](../reference/render-settings/rendering-features.md#unreal-postprocess-raytracingtranslucencymaxroughness) (default 0.6), [Max. Refraction Rays](../reference/render-settings/rendering-features.md#unreal-postprocess-raytracingtranslucencyrefractionrays) (default 3) and the shadow type. Ray Traced costs more GPU time than Raster.
+With Ray Traced, its section shows UE's own settings: [Max. Primary Hit Events](../reference/render-settings/rendering-features.md#unreal-postprocess-raytracingtranslucencymaxprimaryhitevents) (default 4), [Max. Secondary Hit Events](../reference/render-settings/rendering-features.md#unreal-postprocess-raytracingtranslucencymaxsecondaryhitevents) (default 2) and [Use Ray Traced Refraction](../reference/render-settings/rendering-features.md#unreal-postprocess-raytracingtranslucencyuseraytracedrefraction) (default off: refraction stays a screen-space effect). Ray Traced costs more GPU time than Raster.
 
 ## Specular Roughness
 
