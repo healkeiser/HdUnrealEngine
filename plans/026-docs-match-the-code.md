@@ -165,7 +165,7 @@ The current tables are `README.md` (gallery section, around lines 84-99) and `do
 
 | Purpose | Command | Expected on success |
 |---|---|---|
-| Install the docs tool (once) | `uv tool install zensical==0.1.0` | exit 0 |
+| Install the docs tool (once) | `uv tool install zensical` | exit 0 |
 | Strict docs build | `zensical build --clean --strict` | exit 0, no warnings about links |
 | Find a phrase | `git grep -n "<phrase>" -- docs README.md VERIFICATION.md` | the expected lines |
 | Format the one Python comment edit | `uvx black@24.10.0 --check integrations/houdini/python3.13libs/hdue_houdini.py` | `1 file would be left unchanged` |

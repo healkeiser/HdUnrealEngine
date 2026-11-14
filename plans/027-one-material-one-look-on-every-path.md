@@ -238,7 +238,7 @@ If option (a): convert colour-typed values in `export_usd_materialx.write` with 
 
 Update `docs/materials/preview-surface.md` (wrap default, opacityMode) and `docs/materials/materialx-surfaces.md` (colour spaces, what goes to preparation) with the decided behaviour and the sources cited. Plain, short sentences, matching the surrounding prose.
 
-**Verify**: `uvx zensical build --clean --strict` if zensical is installed locally (`uv tool install zensical==0.1.0`) → exit 0; otherwise `git diff --stat docs/` shows only those two files.
+**Verify**: `uvx zensical build --clean --strict` if zensical is installed locally (`uv tool install zensical`) → exit 0; otherwise `git diff --stat docs/` shows only those two files.
 
 ## Test plan
 

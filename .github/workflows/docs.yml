@@ -21,10 +21,11 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-      # Zensical's fork of mike (not on PyPI), pinned; it imports zensical.config and runs `zensical build`.
+      # Zensical is not pinned: it moves fast and the guide follows its latest release. Zensical's fork of mike (not on
+      # PyPI) stays pinned to a commit; it imports zensical.config and runs `zensical build`.
       - run: |
-          uv tool install zensical==0.1.0
-          uv tool install --with zensical==0.1.0 git+https://github.com/squidfunk/mike.git@2d4ad799442f4592db8ad53b179bfb33db8c69ac
+          uv tool install zensical
+          uv tool install --with zensical git+https://github.com/squidfunk/mike.git@2d4ad799442f4592db8ad53b179bfb33db8c69ac
       # The strict build fails on broken links before mike publishes anything.
       - run: zensical build --clean --strict
       - run: |
