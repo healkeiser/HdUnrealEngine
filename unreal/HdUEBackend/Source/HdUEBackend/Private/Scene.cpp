@@ -1347,8 +1347,15 @@ void FHdueScene::BindMaterials() {
                 IsTranslucentBlendMode(*Desired) && !TranslucentStatic.Contains(Entry.Key))
                 continue;
         }
-        // UMeshComponent::SetMaterial returns early when the override is already the one asked for.
-        if (Component->GetMaterial(0) != Desired) {
+        // Compared with the override slot: a static mesh's GetMaterial falls back to its asset's material
+        // (StaticMeshComponentHelper.h), so a cooked mesh (nativeMeshAssets) whose material is missing (Desired
+        // nullptr) never matched and made the ID targets stale on every switch. A dynamic mesh's GetMaterial has no
+        // fallback and it keeps no override.
+        UMaterialInterface* Bound = Component->IsA<UBaseDynamicMeshComponent>() ? Component->GetMaterial(0)
+                                    : Component->OverrideMaterials.IsValidIndex(0)
+                                        ? Component->OverrideMaterials[0].Get()
+                                        : nullptr;
+        if (Bound != Desired) {
             Component->SetMaterial(0, Desired);
             IdTargetsStale = true;
         }
