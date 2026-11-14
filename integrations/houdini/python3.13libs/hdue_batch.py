@@ -158,10 +158,32 @@ def _warn_once(message):
         print(message, file=sys.stderr, flush=True)
 
 
+def materials_animated_steps(stage):
+    """Whether a material, shader or hdUE wet opinion has time samples, as a cooperative walk (cooperative.Job). Only
+    those attributes are read: every attribute of every mesh (points, normals, primvars) was most of the walk.
+    """
+    from pxr import Usd, UsdShade
+
+    for prim in stage.Traverse():
+        yield
+        if prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.Shader):
+            attributes = prim.GetAttributes()
+        else:
+            attributes = prim.GetAuthoredPropertiesInNamespace(
+                ["unreal", "surface", "wet"]
+            )
+        if any(
+            isinstance(attr, Usd.Attribute) and attr.ValueMightBeTimeVarying()
+            for attr in attributes
+        ):
+            return True
+    return False
+
+
 def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
     """The three settings for stage at time, from the MaterialX and Substrate Builder libraries (library_file), as the
-    viewport host applies them, and whether they are the same at every time (no prepared material and no wet surface:
-    material bindings cannot be animated). With prepare (the render setting unreal:substrateAutoPrepare), Substrate
+    viewport host applies them, and whether they are the same at every time (no material, shader or wet opinion is
+    time-sampled: material bindings cannot be animated). With prepare (the render setting unreal:substrateAutoPrepare), Substrate
     Builder graphs the library lacks, and MaterialX graphs hdUE cannot translate at render time, are prepared first,
     as the viewport prepares them. Raises ValueError with the
     library's message when a material is unprepared (and not prepared) or stale.
@@ -216,9 +238,11 @@ def resolve(stage, time, materialx_file="", substrate_file="", prepare=True):
             "surfaceEffects",
         )
     }
-    # shortcut: a wet-surface switch animated on from off is missed after an empty first frame; resolve per frame
-    # whenever surface_effects can report an animated attribute.
-    result["static"] = not any(result.values())
+    # The same at every frame unless a material, shader or wet opinion is time-sampled (a wet switch animated on from
+    # off included), as the viewport host decides when to prepare again.
+    from cooperative import run
+
+    result["static"] = not run(materials_animated_steps(stage))
     return result
 
 

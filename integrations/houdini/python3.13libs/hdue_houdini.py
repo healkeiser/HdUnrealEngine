@@ -14,7 +14,7 @@ import traceback
 from pathlib import Path
 
 import hou
-from hdue_batch import library_file, runtime_config
+from hdue_batch import library_file, materials_animated_steps, runtime_config
 from pxr import Plug, Sdf, Tf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -327,7 +327,7 @@ class Host:
         """Material preparation as one cooperative walk: whether materials are animated, then the prepared
         materials' sync. Returns (animated, applied new settings).
         """
-        animated = yield from _materials_animated_steps(stage)
+        animated = yield from materials_animated_steps(stage)
         changed = yield from self.prepared_materials.sync_steps(
             stage,
             Usd.TimeCode(hou.frame()),
@@ -686,26 +686,6 @@ def _display_cooking():
         return bool(display and display.needsToCook())
     except (hou.Error, AttributeError):
         return False
-
-
-def _materials_animated_steps(stage):
-    """Whether a material, shader or hdUE wet opinion has time samples, as a cooperative walk (cooperative.Job). Only
-    those attributes are read: every attribute of every mesh (points, normals, primvars) was most of the walk.
-    """
-    for prim in stage.Traverse():
-        yield
-        if prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.Shader):
-            attributes = prim.GetAttributes()
-        else:
-            attributes = prim.GetAuthoredPropertiesInNamespace(
-                ["unreal", "surface", "wet"]
-            )
-        if any(
-            isinstance(attr, Usd.Attribute) and attr.ValueMightBeTimeVarying()
-            for attr in attributes
-        ):
-            return True
-    return False
 
 
 def _settings_values(settings):
