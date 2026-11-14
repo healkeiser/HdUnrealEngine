@@ -18,13 +18,13 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 001 | [Scene content cannot choose the backend DLL or UE project](001-scene-cannot-choose-backend-dll.md) | main | P1 | S | — | DONE |
 | 002 | [Clamp motion-sample counts](002-clamp-motion-sample-counts.md) | main | P1 | S | — | DONE |
 | 003 | [Delegate thread and ABI boundary robustness](003-delegate-thread-and-abi-boundary-robustness.md) | main | P1 | S | — | DONE |
-| 004 | [MaterialX libraries accept stat dependencies](004-materialx-libraries-accept-stat-dependencies.md) | side | P1 | S | — | DONE (usdview check deferred) |
+| 004 | [MaterialX libraries accept stat dependencies](004-materialx-libraries-accept-stat-dependencies.md) | side | P1 | S | — | DONE |
 | 005 | [Integer menus store their values](005-integer-menus-store-their-values.md) | main | P1 | S | — | DONE |
 | 006 | [Cache clears cannot delete user files](006-cache-clears-cannot-delete-user-files.md) | main | P1 | S | — | DONE |
-| 007 | [Groom upload validation and actor lifetime](007-groom-upload-validation-and-actor-lifetime.md) | main | P1 | S | — | TODO |
+| 007 | [Groom upload validation and actor lifetime](007-groom-upload-validation-and-actor-lifetime.md) | main | P1 | S | — | DONE |
 | 008 | [Python ABI mirrors checked in CI](008-python-abi-mirrors-checked-in-ci.md) | side | P1 | S | — | DONE |
-| 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE (materialx/* conformance pending) |
-| 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | TODO |
+| 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE (it found Flake3D realtime too dark: under investigation) |
+| 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | DONE (follow-ups: lighting and shared-builds test bugs) |
 | 011 | [Render-time MaterialX matches the spec](011-render-time-materialx-matches-the-spec.md) | main | P1 | S | — | TODO |
 | 012 | [Texture mips and cache keys](012-texture-mips-and-cache-keys.md) | main | P1 | S | — | TODO |
 | 013 | [Generate hdUE setting defaults once](013-generate-hdue-setting-defaults-once.md) | main | P2 | M | 005 | TODO |
@@ -61,8 +61,16 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 ## Decisions the plans stop and ask about
 
 - 019 Step 3: which console variables a scene file may still set (`bridge.h` documents `set_post_process` as accepting any cvar).
-- 020 Step 4: whether husk stops auto-preparing materials for scenes by default.
+- 020 Step 4: whether husk stops auto-preparing materials for scenes by default. **Decided (2026-11-14): keep the default.** husk preparing unprepared Substrate graphs is a deliberate feature (`7830f22`), and the setting comes from the hdUE Render Settings LOP; the exploit (finding `pwsh` through the current directory) is fixed by 020's process-launch steps.
 - 027 Part A: default UsdUVTexture wrap (UE's repeat vs the spec's black) and where scene-linear colours are converted.
+
+## Follow-ups found during execution
+
+- Plan 009's new value checks found `materialx/lowered_nodes` Flake3D too dark in realtime (0.194 against 0.243-0.297; the Path Tracer passes). Under investigation; not a test to loosen.
+- Plan 010 ran test kinds no runner ran before and found older test bugs: `lighting` reuses the smoke test's red-cube check on a scene whose cube is not red; `shared-builds` reads UE's log from `<runtime_project>\Saved\Logs`, but since `4c51d6f` UE writes it under `%LOCALAPPDATA%\hdUE\Saved\Logs`.
+- The free-view `selection` kind fails on a portrait-only monitor (narrow viewport); environment, not code.
+- The usdview smoke check timed out once (path-traced frames ~31 s each) and passed later; watch it.
+- `zensical build --strict` reports four warnings under `docs/audit/` with zensical 0.0.61; check with the pinned 0.1.0 that CI uses.
 
 ## Findings considered and rejected
 
