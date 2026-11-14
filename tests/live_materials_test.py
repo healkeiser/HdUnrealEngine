@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from live_materials import LivePreparation
+from powershell_lookup import powershell_executable
 from prepare_substrate import publish
 from substrate_graph import COMPILER_VERSION, signature
 
@@ -157,7 +158,7 @@ class LiveTests(unittest.TestCase):
         # settled (to start the preparation) and once a preparation finished (to bind it).
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.powershell_executable", return_value="pwsh"),
             patch("live_materials.subprocess.Popen", side_effect=Process),
         ):
             root = Path(folder)
@@ -188,7 +189,7 @@ class LiveTests(unittest.TestCase):
     def test_single_flight_latest_graph_cache_failure_and_retry(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.powershell_executable", return_value="pwsh"),
             patch(
                 "live_materials.subprocess.Popen", side_effect=Process
             ) as popen,
@@ -255,7 +256,7 @@ class LiveTests(unittest.TestCase):
         # finished. That job must count, or the same material is prepared a second time.
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.powershell_executable", return_value="pwsh"),
             patch("live_materials.subprocess.Popen", side_effect=Process),
         ):
             root = Path(folder)
@@ -295,7 +296,7 @@ class LiveTests(unittest.TestCase):
     def test_worker_does_not_inherit_gui_usd_startup_environment(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("live_materials.shutil.which", return_value="pwsh"),
+            patch("live_materials.powershell_executable", return_value="pwsh"),
             patch(
                 "live_materials.subprocess.Popen", side_effect=Process
             ) as popen,
@@ -331,7 +332,7 @@ class LiveTests(unittest.TestCase):
     def test_unavailable_worker_is_latched_until_retry(self):
         with (
             tempfile.TemporaryDirectory() as folder,
-            patch("live_materials.shutil.which", return_value=None),
+            patch("live_materials.powershell_executable", return_value=None),
         ):
             manager = LivePreparation(
                 Path(folder) / "runtime/HdUEBackend.uproject",
@@ -384,6 +385,41 @@ class LiveTests(unittest.TestCase):
                 publish(output, project, destination)
             with self.assertRaises(ValueError):
                 publish(output, project, "/Game/HdUE/Live/../../Outside")
+
+
+class PowerShellLookupTests(unittest.TestCase):
+    def run_lookup(self, with_system):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scene = root / "scene"
+            scene.mkdir()
+            (scene / "pwsh.exe").write_bytes(b"")
+            (root / "pf").mkdir()
+            system = root / "sys"
+            if with_system:
+                exe = system / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                exe.parent.mkdir(parents=True)
+                exe.write_bytes(b"")
+            env = dict(
+                ProgramFiles=str(root / "pf"),
+                SystemRoot=str(system),
+                PATH="",
+            )
+            old = os.getcwd()
+            os.chdir(scene)
+            try:
+                with patch.dict(os.environ, env, clear=True):
+                    return powershell_executable()
+            finally:
+                os.chdir(old)
+
+    def test_powershell_never_from_current_directory(self):
+        self.assertIsNone(self.run_lookup(False))
+
+    def test_powershell_from_system_folder(self):
+        found = self.run_lookup(True)
+        self.assertTrue(found.endswith("powershell.exe"))
+        self.assertIn("WindowsPowerShell", found)
 
 
 if __name__ == "__main__":

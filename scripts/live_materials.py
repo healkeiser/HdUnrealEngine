@@ -17,6 +17,7 @@ import time
 import uuid
 from pathlib import Path
 
+from powershell_lookup import powershell_executable
 from substrate_graph import COMPILER_VERSION, signature
 
 
@@ -426,7 +427,7 @@ class LivePreparation:
         return "Materials: Preparing the edited materials in the background"
 
     def _start(self, key, records):
-        executable = shutil.which("pwsh") or shutil.which("powershell")
+        executable = powershell_executable()
         if not executable:
             self.phase = "failed"
             self.message = (
@@ -444,6 +445,8 @@ class LivePreparation:
             executable,
             "-NoProfile",
             "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             str(self.root / "scripts/Prepare-LiveMaterials.ps1"),
             "-GraphJob",

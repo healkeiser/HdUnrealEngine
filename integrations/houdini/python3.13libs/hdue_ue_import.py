@@ -179,8 +179,15 @@ def import_assets(project, paths, output=None, progress=None):
     run.mkdir(parents=True, exist_ok=True)
     packages = sorted({p.split(".")[0] for p in paths})
     log = run / "import.log"
+    from powershell_lookup import powershell_executable
+
+    powershell = powershell_executable()
+    if not powershell:
+        raise RuntimeError(
+            "PowerShell 7 or Windows PowerShell is required to import UE assets"
+        )
     command = [
-        shutil.which("pwsh") or "pwsh",  # PowerShell 7, as the build scripts
+        powershell,
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
