@@ -12,7 +12,7 @@ The figures on this page use the shader ball (`samples/docs/lookdev.usda`) in Re
 2. Wire textures with **MaterialX Image** nodes, as below.
 3. Assign the material. A material with both a MaterialX output and a Preview Surface output renders from its MaterialX graph.
 
-If a graph uses a node outside the list below, UE's MaterialX importer prepares it in the background ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)). Until it is ready, that input renders at its constant value, with a warning naming the node.
+If a graph uses a node outside the list below, two images read through different UV transforms, a **Place 2D** input driven by another node, or a surface input the sections below do not list (`diffuse_roughness`, `coat_IOR`, `specular_anisotropy`, `thin_film_*`, ...), UE's MaterialX importer prepares it in the background ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)). Until it is ready, that input renders at its constant value, or has no effect, with a warning. A **MaterialX Texture Coordinate** with an index other than 0 reads UV set 0, with a warning: hdUE's meshes carry the material's UV primvars, not numbered sets.
 
 ## Base
 
@@ -193,7 +193,7 @@ hdUE translates a MaterialX graph at render time when each input reads at most o
 - **A wet surface:** a water film is a clear coat. `coat` 1 (or a grunge map, for puddles), `coat_IOR` 1.33, `coat_roughness` 0.03, `coat_color` (0.7, 0.7, 0.72) to darken what is under the water, as wet stone darkens. Lower the surface's own roughness too.
 - **Grime over any texture:** a coat of `coat_IOR` 1.0 reflects nothing and only tints what is under it. Feed `coat_color` from a `mix` between white and a dirt colour, driven by a grime map read in a second UV set (`geompropvalue` `uv2`): the dirt varies over the whole building instead of repeating with the texture's tile.
 
-Both are used on the Bistro street (`scripts/convert_bistro.py`).
+Both are used on the Bistro street (`scripts/convert_bistro.py`). `coat_IOR` is not read at render time, so these materials go to UE's importer; until they are prepared, the coat keeps its default IOR and reflects more than its `coat_IOR` says.
 
 ## Troubleshooting
 

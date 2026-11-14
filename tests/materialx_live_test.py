@@ -4,6 +4,7 @@ to the render-time translation and binds live-prepared ones, and the document th
 
 import hashlib
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ from materialx_controls import MaterialXLibrary, OfflineView
 from materialx_textures import file_identity
 from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import (
+    RUNTIME_SURFACE_INPUTS,
     graph_data,
     graph_signature,
     image_color_space,
@@ -143,6 +145,63 @@ class NeedsImportTests(unittest.TestCase):
         self.assertTrue(
             needs_import(self.graph(surface="ND_gltf_pbr_surfaceshader"))
         )
+
+    def test_what_the_render_time_translation_would_drop(self):
+        place = ("ND_place2d_vector2", {"scale": {"value": [2.0, 2.0]}})
+        tiled = ("ND_tiledimage_color3", {"uvtiling": {"value": [3.0, 3.0]}})
+        image = ("ND_image_color3", {"texcoord": {"node": "/N0"}})
+        plain = ("ND_image_float", {})
+        # One image through a place2d: one UV transform, translated.
+        self.assertFalse(needs_import(self.graph(place, image)))
+        # Two images on two transforms (or one transformed, one not): render time has one per material.
+        self.assertTrue(needs_import(self.graph(place, image, plain)))
+        self.assertTrue(needs_import(self.graph(place, image, tiled)))
+        # Two images on the same transform stay translated.
+        self.assertFalse(needs_import(self.graph(place, image, image)))
+        # A place2d input driven by a node: render time reads only constants.
+        self.assertTrue(
+            needs_import(
+                self.graph(
+                    ("ND_place2d_vector2", {"offset": {"node": "/N1"}}),
+                    ("ND_constant_vector2", {}),
+                )
+            )
+        )
+
+    def test_surface_inputs_the_translation_does_not_read(self):
+        for surface, unread in (
+            ("ND_standard_surface_surfaceshader", "coat_IOR"),
+            ("ND_open_pbr_surface_surfaceshader", "specular_anisotropy"),
+        ):
+            graph = self.graph(surface=surface)
+            graph["nodes"]["/S"]["inputs"] = {
+                "base_color": {"value": [1, 0, 0]}
+            }
+            self.assertFalse(needs_import(graph), surface)
+            graph["nodes"]["/S"]["inputs"][unread] = {"value": 1.33}
+            self.assertTrue(needs_import(graph), surface)
+            # Declared without a value: nothing to read.
+            graph["nodes"]["/S"]["inputs"][unread] = {"value": None}
+            self.assertFalse(needs_import(graph), surface)
+        # Preview Surface reads its own inputs (readPreviewSurface).
+        graph = self.graph(surface="ND_UsdPreviewSurface_surfaceshader")
+        graph["nodes"]["/S"]["inputs"] = {"opacityMode": {"value": "presence"}}
+        self.assertFalse(needs_import(graph))
+
+    def test_surface_inputs_match_materials_cpp(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "src/hydra/materials.cpp"
+        ).read_text(encoding="utf-8")
+        for surface, table in (
+            ("ND_standard_surface_surfaceshader", "standardSurface{"),
+            ("ND_open_pbr_surface_surfaceshader", "openPbr{"),
+        ):
+            body = source[source.index("MaterialXSurface " + table) :]
+            body = body[: body.index("};")]
+            names = set(re.findall(r'"(\w+)"', body))
+            self.assertEqual(
+                names, set(RUNTIME_SURFACE_INPUTS[surface]), surface
+            )
 
 
 class ImageColorSpaceTests(unittest.TestCase):

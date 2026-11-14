@@ -197,6 +197,17 @@ public:
     bool read(const char* input, T& out, int slot) {
         return read(input, out, &data_.textures[slot]);
     }
+    // A warning for each authored input of the shader not in read: the translation drops it (usd_materialx_graph's
+    // needs_import sends such graphs to UE's importer when a library can prepare them).
+    void warnUnread(const std::set<std::string>& read) const {
+        std::set<std::string> authored;
+        for (const auto& [name, value] : shader_.parameters) authored.insert(name.GetString());
+        for (const auto& [name, links] : shader_.inputConnections) authored.insert(name.GetString());
+        for (const auto& name : authored)
+            if (!read.count(name) && name.find(':') == std::string::npos)  // colorSpace:<input> metadata
+                data_.warnings.push_back(TfStringPrintf("%s input %s is not translated; it has no effect",
+                                                        shader_.nodeTypeId.GetText(), name.c_str()));
+    }
     // Colours: authored in the OCIO scene_linear role, while UE works in linear Rec.709.
     bool color(const char* input, GfVec3f& out, HdUETextureData* texture = nullptr) {
         const bool textured = read(input, out, texture, true);
@@ -365,6 +376,10 @@ private:
         for (int hop = 0; st && hop < 2; ++hop) {
             const auto node = network_.nodes.find(st->upstreamNode);
             if (node == network_.nodes.end()) break;
+            if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_texcoord_") &&
+                value(param(node->second, "index"), 0) != 0)
+                // UE meshes carry the material's UV primvars as sets 0, 1, ... (uvPrimvars), not MaterialX's indices.
+                data_.warnings.push_back("texcoord index other than 0 is not translated; textures read UV set 0");
             if (const auto name = uvPrimvar(node->second); !name.IsEmpty()) {
                 const auto set = size_t(std::find(uvNames_.begin(), uvNames_.end(), name) - uvNames_.begin());
                 if (set < 4) return uint32_t(set);
@@ -574,6 +589,31 @@ void readMaterialX(SurfaceReader& r, HdUEMaterialData& data, const MaterialXSurf
     read(s.thinWalled, data.thinWalled);
     GfVec3f normal(0, 0, 1);
     r.read(s.normal, normal, HDUE_TEXTURE_NORMAL);
+    r.warnUnread({s.base.name,
+                  s.baseColor.name,
+                  s.metalness.name,
+                  s.specular.name,
+                  s.specularColor.name,
+                  s.specularRoughness.name,
+                  s.ior.name,
+                  s.coat.name,
+                  s.coatColor.name,
+                  s.coatRoughness.name,
+                  s.sheen.name,
+                  s.sheenColor.name,
+                  s.sheenRoughness.name,
+                  s.subsurface.name,
+                  s.subsurfaceColor.name,
+                  s.subsurfaceRadius.name,
+                  s.subsurfaceScale.name,
+                  s.transmission.name,
+                  s.emission.name,
+                  s.emissionColor.name,
+                  s.opacity.name,
+                  s.thinWalled.name,
+                  s.transmissionColor.name,
+                  s.transmissionDepth.name,
+                  s.normal});
 }
 // The shader behind the surface terminal; else, for networks without terminals, the first known surface.
 const HdMaterialNode2* surface(const HdMaterialNetwork2& network) {

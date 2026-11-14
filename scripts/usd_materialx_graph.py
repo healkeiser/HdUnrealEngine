@@ -223,6 +223,89 @@ RUNTIME_NODES = (
 )
 
 
+# The surface inputs materials.cpp's readMaterialX reads (its standardSurface and openPbr tables); any other authored
+# input has no effect at render time. Keep in step with materials.cpp.
+RUNTIME_SURFACE_INPUTS = {
+    "ND_standard_surface_surfaceshader": (
+        "base",
+        "base_color",
+        "metalness",
+        "specular",
+        "specular_color",
+        "specular_roughness",
+        "specular_IOR",
+        "coat",
+        "coat_color",
+        "coat_roughness",
+        "sheen",
+        "sheen_color",
+        "sheen_roughness",
+        "subsurface",
+        "subsurface_color",
+        "subsurface_radius",
+        "subsurface_scale",
+        "transmission",
+        "transmission_color",
+        "transmission_depth",
+        "emission",
+        "emission_color",
+        "opacity",
+        "thin_walled",
+        "normal",
+    ),
+    "ND_open_pbr_surface_surfaceshader": (
+        "base_weight",
+        "base_color",
+        "base_metalness",
+        "specular_weight",
+        "specular_color",
+        "specular_roughness",
+        "specular_ior",
+        "coat_weight",
+        "coat_color",
+        "coat_roughness",
+        "fuzz_weight",
+        "fuzz_color",
+        "fuzz_roughness",
+        "subsurface_weight",
+        "subsurface_color",
+        "subsurface_radius",
+        "subsurface_radius_scale",
+        "transmission_weight",
+        "transmission_color",
+        "transmission_depth",
+        "emission_luminance",
+        "emission_color",
+        "geometry_opacity",
+        "geometry_thin_walled",
+        "geometry_normal",
+    ),
+}
+
+
+def _uv_transform(nodes, image):
+    """What materials.cpp's uvTransform reads for an image: its tiling, or the transform node on its coordinates
+    (None: the coordinates as they are).
+    """
+    if image["id"].startswith("ND_tiledimage_"):
+        place = image
+    else:
+        link = image["inputs"].get(
+            "st" if image["id"] == "UsdUVTexture" else "texcoord", {}
+        )
+        place = nodes.get(link.get("node"))
+        if not place or not place["id"].startswith(
+            ("UsdTransform2d", "ND_place2d_")
+        ):
+            return None
+    values = {
+        name: item.get("value")
+        for name, item in place["inputs"].items()
+        if name not in ("in", "texcoord", "file")
+    }
+    return place["id"] + json.dumps(values, sort_keys=True)
+
+
 def needs_import(graph):
     """Whether hdUE's render-time translation cannot express graph (a node it would leave at its constant, or a
     surface it does not read), so UE's MaterialX importer must prepare it.
@@ -231,7 +314,23 @@ def needs_import(graph):
     # Volumes have no render-time translation; a displacement does when it is MaterialX's displacement node.
     if "volume" in graph or "terminal" not in graph:
         return True
-    if not nodes[graph["terminal"]["node"]]["id"].startswith(RUNTIME_SURFACES):
+    surface = nodes[graph["terminal"]["node"]]
+    if not surface["id"].startswith(RUNTIME_SURFACES):
+        return True
+    for prefix, read in RUNTIME_SURFACE_INPUTS.items():
+        if surface["id"].startswith(prefix) and any(
+            name not in read
+            and ("node" in item or item.get("value") is not None)
+            for name, item in surface["inputs"].items()
+        ):
+            return True
+    # One UV transform per material at render time, from the first textured input.
+    images = [
+        n
+        for n in nodes.values()
+        if n["id"].startswith(("ND_image_", "ND_tiledimage_", "UsdUVTexture"))
+    ]
+    if len({_uv_transform(nodes, n) for n in images}) > 1:
         return True
     terminals = {graph["terminal"]["node"]}
     if "displacement" in graph:
@@ -256,6 +355,14 @@ def needs_import(graph):
                 "node" in node["inputs"].get(i, {}) for i in ("fg", "bg", "mix")
             )
             if sum(driven) != 1:
+                return True
+        elif identity.startswith(("ND_place2d_", "UsdTransform2d")):
+            # The render-time translation reads a transform's inputs as constants.
+            if any(
+                "node" in item
+                for name, item in node["inputs"].items()
+                if name not in ("texcoord", "in")
+            ):
                 return True
         elif not identity.startswith(RUNTIME_NODES):
             return True
