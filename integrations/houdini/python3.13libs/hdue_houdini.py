@@ -1081,7 +1081,7 @@ def _settings_prim(stage):
     )
 
 
-def render_settings_node(input_node, mode="realtime", samples=64):
+def render_settings_node(input_node, mode="realtime"):
     """An hdUE Render Settings LOP (otls/hdue_rendersettings.hda) at /Render/rendersettings (Houdini's default path), the
     stage's default render settings. A loaded scene's own render settings prim gives it its camera and hdUE mode and samples.
     """
@@ -1121,13 +1121,13 @@ def render_settings_node(input_node, mode="realtime", samples=64):
     )
     # A stage without a camera keeps none: the default path made the LOP report "/cameras/camera1 missing from input".
     node.parm("camera").set(str(camera.GetPath()) if camera else "")
-    for name, value in (("renderMode", mode), ("samplesPerPixel", samples)):
+    # Samples come from the scene only; otherwise the LOP keeps its default, UE's 2048.
+    for name, value in (("renderMode", mode), ("samplesPerPixel", None)):
         attr = existing.GetAttribute("unreal:" + name) if existing else None
-        _render_property(
-            node,
-            "xn__unreal" + name,
-            attr.Get() if attr and attr.HasAuthoredValue() else value,
-        )
+        if attr and attr.HasAuthoredValue():
+            value = attr.Get()
+        if value is not None:
+            _render_property(node, "xn__unreal" + name, value)
     return node
 
 
@@ -1180,7 +1180,8 @@ def render_options(stage):
         attr = prim.GetAttribute("unreal:" + name) if prim else None
         return attr.Get() if attr and attr.HasAuthoredValue() else default
 
-    return get("renderMode", "realtime"), get("samplesPerPixel", 64)
+    # HDUE's samplesPerPixel (generate_render_settings.py)
+    return get("renderMode", "realtime"), get("samplesPerPixel", 2048)
 
 
 def libraries(stage, node=None):

@@ -65,7 +65,7 @@ assert not stage.GetPrimAtPath("/Native/__HdUEAssetProxy")
 assert not stage.GetPrimAtPath(
     "/Render/rendersettings"
 ), "hdUE settings must leave render settings to Render Settings LOPs"
-assert integration.render_options(stage) == ("realtime", 64)
+assert integration.render_options(stage) == ("realtime", 2048)
 render = integration.render_settings_node(node)
 assert not render.errors(), render.errors()
 settings = render.stage().GetPrimAtPath("/Render/rendersettings")
@@ -73,7 +73,7 @@ assert (
     render.stage().GetMetadata("renderSettingsPrimPath")
     == "/Render/rendersettings"
 )
-assert integration.render_options(render.stage()) == ("realtime", 64)
+assert integration.render_options(render.stage()) == ("realtime", 2048)
 assert not settings.GetAttribute(
     "unreal:lumenEnabled"
 ).HasAuthoredValue(), "settings at their defaults must not author"
@@ -90,7 +90,7 @@ assert (
 ), "a changed setting authors"
 render.parm(hou.text.encode("unreal:lumenEnabled")).set(1)
 integration._render_property(render, "xn__unrealrenderMode", "pathtraced")
-assert integration.render_options(render.stage()) == ("pathtraced", 64)
+assert integration.render_options(render.stage()) == ("pathtraced", 2048)
 
 # A scene with its own render settings: the node's prim becomes the default, with the scene's camera and hdUE values.
 authored = Path(tempfile.mkdtemp()) / "authored_settings.usda"
@@ -120,7 +120,7 @@ assert [
 edited.parm(hou.text.encode("unreal:renderMode")).set("realtime")
 assert integration.render_options(edited.stage()) == (
     "realtime",
-    64,
+    2048,
 ), "the default value renders, not the scene prim (samples apply to the Path Tracer only)"
 
 # Native assets need no viewport overrides: the delegate makes their bounds meshes (HdUE_NativeAssetSceneIndex), and
