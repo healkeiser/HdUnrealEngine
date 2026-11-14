@@ -600,14 +600,26 @@ void rowMajor(const GfMatrix4d& m, double* out) {
     for (int r = 0; r < 4; ++r)
         for (int c = 0; c < 4; ++c) out[r * 4 + c] = m[r][c];
 }
-HdueMaterialParameter materialParameter(ScenePacket& packet, const std::string& name, const VtValue& value) {
+// A UE material parameter from a host value; none (with a warning) for a type UE parameters cannot hold.
+std::optional<HdueMaterialParameter> materialParameter(ScenePacket& packet, const std::string& name,
+                                                       const VtValue& value) {
     HdueMaterialParameter p{};
     p.name = packet.own(name);
-    if (value.IsHolding<float>() || value.IsHolding<double>() || value.IsHolding<int>()) {
+    if (value.IsHolding<float>() || value.IsHolding<double>() || value.IsHolding<int>() || value.IsHolding<int64_t>() ||
+        value.IsHolding<bool>()) {
         p.type = HDUE_PARAMETER_SCALAR;
         p.value[0] = value.IsHolding<float>()    ? value.UncheckedGet<float>()
                      : value.IsHolding<double>() ? float(value.UncheckedGet<double>())
-                                                 : float(value.UncheckedGet<int>());
+                     : value.IsHolding<int>()    ? float(value.UncheckedGet<int>())
+                     : value.IsHolding<bool>()   ? float(value.UncheckedGet<bool>())
+                                                 : float(value.UncheckedGet<int64_t>());
+    } else if (value.IsHolding<GfVec2f>() || value.IsHolding<GfVec2d>()) {
+        // UE material parameters are scalars or 4-vectors: a 2-vector parameter reads the first two components.
+        p.type = HDUE_PARAMETER_VECTOR;
+        p.value[3] = 1;
+        const auto v =
+            value.IsHolding<GfVec2f>() ? GfVec2d(value.UncheckedGet<GfVec2f>()) : value.UncheckedGet<GfVec2d>();
+        for (int c = 0; c < 2; ++c) p.value[c] = float(v[c]);
     } else if (value.IsHolding<GfVec3f>() || value.IsHolding<GfVec3d>()) {
         p.type = HDUE_PARAMETER_VECTOR;
         p.value[3] = 1;
@@ -620,8 +632,10 @@ HdueMaterialParameter materialParameter(ScenePacket& packet, const std::string& 
     } else if (value.IsHolding<std::string>()) {
         p.type = HDUE_PARAMETER_TEXTURE;
         p.texture_asset = packet.own(value.UncheckedGet<std::string>());
-    } else
-        throw std::runtime_error("Unsupported native material parameter value: " + name);
+    } else {
+        warnOnce("hdUE skips material parameter " + name + ": unsupported value type " + value.GetTypeName());
+        return std::nullopt;
+    }
     return p;
 }
 // The file for a texture path: host images (op:, opdef:) through the host's map, empty until it exported them.
@@ -694,7 +708,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
             desc.native_asset = packet.own(data.nativeAsset);
             std::vector<HdueMaterialParameter> parameters;
             for (const auto& [name, value] : data.nativeParameters)
-                parameters.push_back(materialParameter(packet, name, value));
+                if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
             HdueMaterialUpdate update{};
             update.struct_size = sizeof(update);
             update.material_id = desc.id;
@@ -766,7 +780,7 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
             throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
         std::vector<HdueMaterialParameter> parameters;
         for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
-            parameters.push_back(materialParameter(packet, name, value));
+            if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
         HdueMaterialUpdate update{};
         update.struct_size = sizeof(update);
         update.material_id = packet.own(id);
@@ -783,7 +797,7 @@ void addParameterUpdate(ScenePacket& packet, const VtDictionary& overrides, cons
     if (entry == overrides.end() || !entry->second.IsHolding<VtDictionary>()) return;
     std::vector<HdueMaterialParameter> parameters;
     for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
-        parameters.push_back(materialParameter(packet, name, value));
+        if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
     if (parameters.empty()) return;
     HdueMaterialUpdate update{};
     update.struct_size = sizeof(update);
@@ -1366,7 +1380,7 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
                 fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>()) {
                 std::vector<HdueMaterialParameter> parameters;
                 for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
-                    parameters.push_back(materialParameter(packet, name, value));
+                    if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
                 desc.parameter_count = uint32_t(parameters.size());
                 desc.parameters = packet.own(packet.parameters, std::move(parameters));
             }
@@ -1502,18 +1516,18 @@ void prepareGrooms(HdUEState& state, ScenePacket& packet) {
         desc.attributes = attributes.empty() ? nullptr : packet.own(packet.groomAttributes, std::move(attributes));
         std::vector<HdueMaterialParameter> parameters;
         const auto scalar = [&](const char* name, float v) {
-            parameters.push_back(materialParameter(packet, name, VtValue(v)));
+            parameters.push_back(*materialParameter(packet, name, VtValue(v)));  // a float: always a parameter
         };
         if (const auto material = asset(nativeMaterials, groom.material); !material.empty()) {
             desc.material = packet.own(material);
             if (const auto fields = nativeParameters.find(groom.material);
                 fields != nativeParameters.end() && fields->second.IsHolding<VtDictionary>())
                 for (const auto& [name, value] : fields->second.UncheckedGet<VtDictionary>())
-                    parameters.push_back(materialParameter(packet, name, value));
+                    if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
         } else {
             const auto bound = state.materials.find(groom.material);
             if (bound != state.materials.end()) {
-                parameters.push_back(materialParameter(packet, "HdUEColor", VtValue(bound->second.color)));
+                parameters.push_back(*materialParameter(packet, "HdUEColor", VtValue(bound->second.color)));
                 scalar("HdUEUseColor", 1);
                 scalar("HdUERoughness", bound->second.roughness);
                 scalar("HdUEUseRoughness", 1);
