@@ -1497,6 +1497,7 @@ void prepareGrooms(HdUEState& state, ScenePacket& packet) {
     if (packet.dirtyGrooms.empty()) return;
     const double cmPerUnit = state.setting<double>("metersPerUnit", .01) * 100;
     const auto basis = sceneBasis(state), inverse = basis.GetInverse();
+    const auto convert = state.converter();  // once: each call reads two settings under the settings lock
     const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
     const auto nativeParameters = state.setting<VtDictionary>("nativeMaterialParameters", {});
     for (const auto& id : packet.dirtyGrooms) {
@@ -1508,7 +1509,7 @@ void prepareGrooms(HdUEState& state, ScenePacket& packet) {
         std::vector<float> points, widths;
         points.reserve(groom.points.size() * 3);
         for (const auto& p : groom.points) {
-            const auto ue = state.convert(place.Transform(GfVec3d(p)));
+            const auto ue = convert(place.Transform(GfVec3d(p)));
             points.insert(points.end(), {float(ue[0]), float(ue[1]), float(ue[2])});
         }
         const double scale = std::cbrt(std::abs(place.ExtractRotationMatrix().GetDeterminant()));
