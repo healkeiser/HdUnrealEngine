@@ -270,7 +270,11 @@ def verify(check, frames, log):
         )
     if "ratio" in check:
         a, b = (measure(frames, p) for p in check["ratio"])
-        value = a / b if b else float("inf") if a else 1.0
+        if (
+            not a and not b
+        ):  # 0/0 is no ratio: it would read as 1.0 and pass a window around 1
+            return "both probes are black", False
+        value = a / b if b else float("inf")
     else:
         value = measure(frames, check["value"])
     if "equals" in check:
