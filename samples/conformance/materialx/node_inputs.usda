@@ -57,6 +57,18 @@ right, a flat normal)."""
    "max": 0.15
   },
   {
+   "name": "multiply's in2 default leaves the control quad white (not a black render)",
+   "value": {
+    "region": [
+     2,
+     -0.5,
+     3,
+     0.5
+    ]
+   },
+   "min": 0.05
+  },
+  {
    "name": "normalmap reads its vector2 scale",
    "ratio": [
     {
@@ -77,6 +89,18 @@ right, a flat normal)."""
     }
    ],
    "max": 0.6
+  },
+  {
+   "name": "the flat-normal quad is lit (not a black render)",
+   "value": {
+    "region": [
+     2,
+     -3.5,
+     3,
+     -2.5
+    ]
+   },
+   "min": 0.05
   }
  ]
 }"""
