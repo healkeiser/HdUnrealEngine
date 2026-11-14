@@ -591,6 +591,8 @@ public:
     void Sync(HdSceneDelegate* delegate, HdRenderParam* param, HdDirtyBits* bits, const TfToken&) override {
         const MeshSyncTimer timer;
         auto* state = static_cast<HdUEState*>(param);
+        // An error ends a re-pull too: IsConverged waits for repull to empty.
+        const auto giveUp = [&] { state->locked([&] { state->repull.erase(GetId().GetString()); }); };
         // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry.
         if (!emitted_.empty() && GetInstancerId().IsEmpty() &&
             !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
@@ -738,6 +740,7 @@ public:
                 mesh.indices);
         } catch (const std::invalid_argument& error) {
             TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+            giveUp();
             return;
         }
         const size_t vertices = mesh.sourceCorners.size();
@@ -751,6 +754,7 @@ public:
                 smooth = HdUEComputeSmoothNormals(points, triangles);
             } catch (const std::invalid_argument& error) {
                 TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+                giveUp();
                 return;
             }
         // A subdivision surface takes its limit normals, turned to the side its faces wind toward.
@@ -826,6 +830,7 @@ public:
             parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters);
         } catch (const std::invalid_argument& error) {
             TF_RUNTIME_ERROR("%s at %s", error.what(), GetId().GetText());
+            giveUp();
             return;
         }
         // Hashed before the lock: the parts' arrays are final here (the shear companion only splits instances).
