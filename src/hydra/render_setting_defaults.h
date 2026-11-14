@@ -10,6 +10,7 @@ inline constexpr bool tonemapper = false;
 inline constexpr bool disableToneCurve = false;
 inline constexpr const char* debugView = "off";
 inline constexpr int subdivisionLevel = 0;
+inline constexpr int maxSubdivisionLevel = 6;
 inline constexpr bool requireNanite = false;
 inline constexpr int naniteTriangleThreshold = 1000000;
 inline constexpr bool cullBackface = true;

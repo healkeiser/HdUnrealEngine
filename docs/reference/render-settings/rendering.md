@@ -320,6 +320,12 @@ Uniform refinement of catmullClark and loop meshes; each level has 4x the faces.
 
 <div class="hdue-figure" data-figure="subdivision"></div>
 
+#### Max Subdivision Level { #unreal-maxsubdivisionlevel }
+
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>6</code></dd></div><div><dt>Range</dt><dd>0 to 8</dd></div><div><dt>USD attribute</dt><dd><code>unreal:maxSubdivisionLevel</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealmaxSubdivisionLevel_shb</code></dd></div><span class="hdue-badge">Advanced</span></dl>
+
+The highest level a Subdivision Level (the render setting or a prim's primvars:unreal:subdivisionLevel) refines to; higher ones are clamped, with a warning. Each level has 4x the faces, so a high level can exhaust memory. 6, the default, is the maximum of UE's USD importer (USD.Subdiv.MaxSubdivLevel).
+
 #### Require Nanite { #unreal-requirenanite }
 
 <dl class="hdue-facts"><div><dt>Default</dt><dd>Off</dd></div><div><dt>USD attribute</dt><dd><code>unreal:requireNanite</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealrequireNanite_06a</code></dd></div><span class="hdue-badge">Advanced</span></dl>

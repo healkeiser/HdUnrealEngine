@@ -647,6 +647,20 @@
                 disablewhen R"({ xn__unrealsubdivisionLevel_control_xpb == block } { xn__unrealsubdivisionLevel_control_xpb == none })"
                 parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
             }
+            HDUE_CONTROL("xn__unrealmaxSubdivisionLevel_control_tub", "Max Subdivision Level")
+            parm {
+                name    "xn__unrealmaxSubdivisionLevel_shb"
+                label   "Max Subdivision Level"
+                type    int
+                size    1
+                default { 6 }
+                range   { 0! 8 }
+                help    "The highest level a Subdivision Level (the render setting or a prim's primvars:unreal:subdivisionLevel) refines to; higher ones are clamped, with a warning. Each level has 4x the faces, so a high level can exhaust memory. 6, the default, is the maximum of UE's USD importer (USD.Subdiv.MaxSubdivLevel)."
+                parmtag { "spare_category" "Geometry" }
+                parmtag { "usdvaluetype" "int" }
+                disablewhen R"({ xn__unrealmaxSubdivisionLevel_control_tub == block } { xn__unrealmaxSubdivisionLevel_control_tub == none })"
+                parmtag { "hdue::essential_hidewhen" "{ hdue_show == 0 }" }
+            }
             HDUE_CONTROL("xn__unrealrequireNanite_control_1kb", "Require Nanite")
             parm {
                 name    "xn__unrealrequireNanite_06a"

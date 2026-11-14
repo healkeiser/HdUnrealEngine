@@ -3929,30 +3929,32 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
 // Prefixed families (postProcess:*, heightFog:*, skyAtmosphere:*, volumetricCloud:*, cvar:*) and dictionaries set by
 // the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
-    return {{"Render mode", TfToken("renderMode"), VtValue(std::string(HdUESettingDefaults::renderMode))},
-            {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(HdUESettingDefaults::samplesPerPixel)},
-            {"Warmup frames", TfToken("warmupFrames"), VtValue(HdUESettingDefaults::warmupFrames)},
-            {"Lumen", TfToken("lumenEnabled"), VtValue(HdUESettingDefaults::lumenEnabled)},
-            {"Viewer light intensity", TfToken("viewerLightIntensity"),
-             VtValue(float(HdUESettingDefaults::viewerLightIntensity))},
-            {"Environment cube resolution", TfToken("domeResolution"), VtValue(HdUESettingDefaults::domeResolution)},
-            {"Scene lights", TfToken("sceneLightsEnabled"), VtValue(true)},
-            {"Viewer light without scene lights", TfToken("autoViewerLight"),
-             VtValue(HdUESettingDefaults::autoViewerLight)},
-            {"Motion blur", TfToken("motionBlur"), VtValue(HdUESettingDefaults::motionBlur)},
-            {"Motion blur samples", TfToken("motionSamples"), VtValue(HdUESettingDefaults::motionSamples)},
-            {"Subdivision level", TfToken("subdivisionLevel"), VtValue(HdUESettingDefaults::subdivisionLevel)},
-            {"Tonemapper", TfToken("tonemapper"), VtValue(HdUESettingDefaults::tonemapper)},
-            {"Disable tone curve", TfToken("disableToneCurve"), VtValue(HdUESettingDefaults::disableToneCurve)},
-            {"Debug view", TfToken("debugView"), VtValue(std::string(HdUESettingDefaults::debugView))},
-            {"Require Nanite", TfToken("requireNanite"), VtValue(HdUESettingDefaults::requireNanite)},
-            {"Nanite triangle threshold", TfToken("naniteTriangleThreshold"),
-             VtValue(HdUESettingDefaults::naniteTriangleThreshold)},
-            {"Cull Backface", TfToken("cullBackface"), VtValue(HdUESettingDefaults::cullBackface)},
-            {"Exponential height fog", TfToken("heightFog"), VtValue(HdUESettingDefaults::heightFog)},
-            {"Height fog height", TfToken("heightFogHeight"), VtValue(HdUESettingDefaults::heightFogHeight)},
-            {"Sky atmosphere", TfToken("skyAtmosphere"), VtValue(HdUESettingDefaults::skyAtmosphere)},
-            {"Volumetric cloud", TfToken("volumetricCloud"), VtValue(HdUESettingDefaults::volumetricCloud)}};
+    return {
+        {"Render mode", TfToken("renderMode"), VtValue(std::string(HdUESettingDefaults::renderMode))},
+        {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(HdUESettingDefaults::samplesPerPixel)},
+        {"Warmup frames", TfToken("warmupFrames"), VtValue(HdUESettingDefaults::warmupFrames)},
+        {"Lumen", TfToken("lumenEnabled"), VtValue(HdUESettingDefaults::lumenEnabled)},
+        {"Viewer light intensity", TfToken("viewerLightIntensity"),
+         VtValue(float(HdUESettingDefaults::viewerLightIntensity))},
+        {"Environment cube resolution", TfToken("domeResolution"), VtValue(HdUESettingDefaults::domeResolution)},
+        {"Scene lights", TfToken("sceneLightsEnabled"), VtValue(true)},
+        {"Viewer light without scene lights", TfToken("autoViewerLight"),
+         VtValue(HdUESettingDefaults::autoViewerLight)},
+        {"Motion blur", TfToken("motionBlur"), VtValue(HdUESettingDefaults::motionBlur)},
+        {"Motion blur samples", TfToken("motionSamples"), VtValue(HdUESettingDefaults::motionSamples)},
+        {"Subdivision level", TfToken("subdivisionLevel"), VtValue(HdUESettingDefaults::subdivisionLevel)},
+        {"Max subdivision level", TfToken("maxSubdivisionLevel"), VtValue(HdUESettingDefaults::maxSubdivisionLevel)},
+        {"Tonemapper", TfToken("tonemapper"), VtValue(HdUESettingDefaults::tonemapper)},
+        {"Disable tone curve", TfToken("disableToneCurve"), VtValue(HdUESettingDefaults::disableToneCurve)},
+        {"Debug view", TfToken("debugView"), VtValue(std::string(HdUESettingDefaults::debugView))},
+        {"Require Nanite", TfToken("requireNanite"), VtValue(HdUESettingDefaults::requireNanite)},
+        {"Nanite triangle threshold", TfToken("naniteTriangleThreshold"),
+         VtValue(HdUESettingDefaults::naniteTriangleThreshold)},
+        {"Cull Backface", TfToken("cullBackface"), VtValue(HdUESettingDefaults::cullBackface)},
+        {"Exponential height fog", TfToken("heightFog"), VtValue(HdUESettingDefaults::heightFog)},
+        {"Height fog height", TfToken("heightFogHeight"), VtValue(HdUESettingDefaults::heightFogHeight)},
+        {"Sky atmosphere", TfToken("skyAtmosphere"), VtValue(HdUESettingDefaults::skyAtmosphere)},
+        {"Volumetric cloud", TfToken("volumetricCloud"), VtValue(HdUESettingDefaults::volumetricCloud)}};
 }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
@@ -4113,7 +4115,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         HdUETimeFromFrame(*state_);
         ++state_->requestSettingsRevision;
     }
-    if (key == TfToken("subdivisionLevel") && state_->renderIndex) {
+    if ((key == TfToken("subdivisionLevel") || key == TfToken("maxSubdivisionLevel")) && state_->renderIndex) {
         for (const auto& id : state_->renderIndex->GetRprimIds())
             state_->renderIndex->GetChangeTracker().MarkRprimDirty(id, HdChangeTracker::DirtyTopology);
         ++state_->revision;

@@ -890,6 +890,20 @@ HDUE = [
         advanced=True,
     ),
     hdue(
+        "maxSubdivisionLevel",
+        "Max Subdivision Level",
+        "Rendering|Geometry",
+        "int",
+        # UE's USD importer: cvar USD.Subdiv.MaxSubdivLevel (USDGeomMeshConversion.cpp GMaxSubdivLevel).
+        6,
+        "The highest level a Subdivision Level (the render setting or a prim's primvars:unreal:subdivisionLevel) "
+        "refines to; higher ones are clamped, with a warning. Each level has 4x the faces, so a high level can "
+        "exhaust memory. 6, the default, is the maximum of UE's USD importer (USD.Subdiv.MaxSubdivLevel).",
+        range=(0, 8, True, False),
+        category="Geometry",
+        advanced=True,
+    ),
+    hdue(
         "requireNanite",
         "Require Nanite",
         "Rendering|Geometry",

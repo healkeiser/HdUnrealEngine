@@ -586,9 +586,10 @@ class Mesh final : public HdMesh {
                     delegate->GetIndexedPrimvar(GetId(), name, &indices);
                     if (!indices.empty()) fvarIndices.push_back(indices);
                 }
-            // UE's USD importer refines at most GMaxSubdivLevel = 6 levels (cvar USD.Subdiv.MaxSubdivLevel,
-            // USDGeomMeshConversion.cpp:119): each level multiplies the faces by 4, so 10 would hang the host.
-            constexpr int maxLevel = 6;
+            // As UE's USD importer caps it (cvar USD.Subdiv.MaxSubdivLevel, default 6): each level multiplies the
+            // faces by 4, so 10 would hang the host.
+            const int maxLevel =
+                std::max(0, state.setting<int>("maxSubdivisionLevel", HdUESettingDefaults::maxSubdivisionLevel));
             if (level > maxLevel) {
                 static std::mutex warnedMutex;
                 static std::set<SdfPath> warned;
