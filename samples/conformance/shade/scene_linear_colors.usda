@@ -2,14 +2,18 @@
 (
     doc = """Colours are authored in the OCIO config's scene_linear role and UE renders in linear Rec.709: hdUE converts
 a constant displayColor (frame 1) and varying vertex displayColors of the same value (frame 2; one corner differs by
-1e-4 so the colours vary) alike, so both frames render one colour. With Houdini's default config (scene_linear is
-linear Rec.709) nothing converts; run it with an ACEScg config (OCIO=ocio://cg-config-v2.2.0_aces-v1.3_ocio-v2.4) to
-check the conversion."""
+1e-4 so the colours vary) alike, so both frames render one colour. It renders with OCIO's ACES config ("env": its
+scene_linear is ACEScg), where (0.6, 0.2, 0.1) converts to about (0.89, 0.15, 0.075): left unconverted, the varying
+colours would read 0.67, 1.34 and 1.33 of the constant's per channel. Under Houdini's default config (scene_linear is
+linear Rec.709) nothing would convert and the checks would pass whatever hdUE did."""
     customLayerData = {
         string conformance = """{
  "schema": "OCIO scene_linear",
  "feature": "varying vertex colours convert as constant colours do",
  "frames": 2,
+ "env": {
+  "OCIO": "ocio://cg-config-v2.2.0_aces-v1.3_ocio-v2.4"
+ },
  "checks": [
   {
    "name": "varying vertex colours red = constant displayColor's",

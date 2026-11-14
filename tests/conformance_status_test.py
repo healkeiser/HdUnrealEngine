@@ -5,6 +5,8 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import run_conformance
 
@@ -27,6 +29,24 @@ class Status(unittest.TestCase):
 
     def test_none_passing(self):
         self.assertEqual(run_conformance.status(entry(False)), "fail")
+
+
+class SplitBlocks(unittest.TestCase):
+    def measure(self, image):
+        return run_conformance.measure(
+            {1: {"depth": image}}, {"aov": "depth", "stat": "split_blocks"}
+        )
+
+    def test_a_half_size_image_repeated_in_blocks_has_none(self):
+        half = np.arange(16, dtype=np.float32).reshape(4, 4)
+        self.assertEqual(self.measure(half.repeat(2, 0).repeat(2, 1)), 0.0)
+
+    def test_an_edge_off_the_block_grid_splits_its_blocks(self):
+        image = np.zeros((8, 8), dtype=np.float32)
+        image[:, 3:] = (
+            1  # columns 2-3 hold both values in each of 4 rows of blocks
+        )
+        self.assertEqual(self.measure(image), 4 / 16)
 
 
 class Ratio(unittest.TestCase):

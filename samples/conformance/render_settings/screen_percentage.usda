@@ -3,8 +3,9 @@
     doc = """At r.ScreenPercentage 50 UE renders at half the output size and upscales after its post-process inputs.
 hdUE's HDRI background and depth AOV run before that upscale, so they must cover the render-resolution rectangle: the
 dome's blue upper hemisphere fills the top of the frame and its red lower hemisphere the bottom, and the depth AOV
-puts the near cube nearer than the far one, both nearer than the background, where they are. Realtime only: the Path
-Tracer always renders at 100 %."""
+puts the near cube nearer than the far one, both nearer than the background, where they are. That 50 % applies shows
+in the depth AOV: rendered at 64 x 64, it reaches the 128 x 128 output as 2 x 2 blocks of one value (at 100 % the
+cubes' edges split about 1 % of the blocks). Realtime only: the Path Tracer always renders at 100 %."""
     customLayerData = {
         string conformance = """{
  "schema": "UE screen percentage",
@@ -14,6 +15,14 @@ Tracer always renders at 100 %."""
   "realtime"
  ],
  "checks": [
+  {
+   "name": "50 % applies: the depth AOV is rendered at 64 x 64 and repeated in 2 x 2 blocks",
+   "value": {
+    "aov": "depth",
+    "stat": "split_blocks"
+   },
+   "max": 0
+  },
   {
    "name": "top of the frame is the blue sky",
    "color": {
@@ -128,20 +137,11 @@ over "Render"
         rel products = [</Render/Beauty>, </Render/Depth>]
         float unreal:cvar:r:ScreenPercentage = 50
     }
+    # The depth var is common/stage.usda's.
     def RenderProduct "Depth"
     {
         token productName = "depth.$F4.exr"
         rel orderedVars = </Render/Vars/depth>
-    }
-    over "Vars"
-    {
-        def RenderVar "depth"
-        {
-            uniform token dataType = "float"
-            uniform string sourceName = "depth"
-            uniform token sourceType = "raw"
-            string driver:parameters:aov:name = "depth"
-        }
     }
 }
 def Cube "Near"

@@ -11,8 +11,8 @@ would vanish."""
  "frames": 1,
  "checks": [
   {
-   "name": "warning names domeResolution",
-   "log": "hdUE warning:.*domeResolution",
+   "name": "warning names domeResolution and the fallback, 128",
+   "log": "hdUE warning:.*domeResolution 3 .*using 128",
    "present": true
   },
   {

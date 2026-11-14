@@ -6,7 +6,8 @@ checks each scene's expected results and prints a pass/fail table; writes out/co
         [--houdini HFS] [--build DIR] [--integrations DIR] [--runtime-config FILE] [--timeout SECONDS]
 
 Each scene's customLayerData["conformance"] is a JSON string: what the spec says is in the layer's doc string, what
-to verify is "checks" (see `measure` and `verify`), extra husk options are "husk" (render_settings/render_pass).
+to verify is "checks" (see `measure` and `verify`), extra husk options are "husk" (render_settings/render_pass), and
+environment variables set for that scene's renders only are "env" (shade/scene_linear_colors: an ACES OCIO config).
 Exits 1 when a check fails or a render does not finish.
 """
 
@@ -211,6 +212,15 @@ def measure(frames, probe):
                 ((pixels[..., 1] > 0.01) & (pixels[..., 1] < 0.99)).mean()
             ),
         }[stat]()
+    if stat == "split_blocks":
+        # Share of the aligned 2 x 2 pixel blocks holding more than one value: none in an image rendered at half the
+        # output size and enlarged by repeating pixels (render_settings/screen_percentage's depth).
+        blocks = pixels[: pixels.shape[0] // 2 * 2, : pixels.shape[1] // 2 * 2]
+        blocks = blocks.reshape(
+            blocks.shape[0] // 2, 2, blocks.shape[1] // 2, 2, -1
+        )
+        split = blocks.max(axis=(1, 3)) != blocks.min(axis=(1, 3))
+        return float(split.any(axis=-1).mean())
     if "channel" in probe:
         # float64: a depth background at the float32 maximum overflowed a float32 sum.
         return float(pixels[..., probe["channel"]].mean(dtype=np.float64))
@@ -288,7 +298,13 @@ def run_scene(name, path, spec, mode, env, timeout):
     frames = spec.get("frames", 1)
     out = OUT / name / mode
     seconds, log, error = render(
-        path, mode, frames, out, env, timeout, spec.get("husk", ())
+        path,
+        mode,
+        frames,
+        out,
+        {**env, **spec.get("env", {})},
+        timeout,
+        spec.get("husk", ()),
     )
     entry = {"seconds": round(seconds, 1), "checks": []}
     loaded = {}
