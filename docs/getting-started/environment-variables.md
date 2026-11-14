@@ -7,7 +7,7 @@ Most installs need no variable set by hand: `Install.cmd` writes a Houdini packa
 | You want to | Use |
 | --- | --- |
 | Run hdUE at all | `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` (set by the package) |
-| Keep Unreal Engine's logs and Nanite cache on another drive | `HDUE_USER_DIR` (default `%LOCALAPPDATA%\hdUE`) |
+| Keep Unreal Engine's logs and Nanite cache on another drive | `HDUE_USER_DIR` (default `%LOCALAPPDATA%\hdUE`), a folder only you (or the render account) can write |
 | See where a frame's time goes | `HDUE_TRACE_TIMING`, `HDUE_TRACE_FILE` |
 | Check what reaches Unreal Engine | `HDUE_TRACE_SETTINGS`, `HDUE_TRACE_SCENE`, `HDUE_TRACE_PASS` |
 | Rule out a viewport or Nanite problem | `HDUE_GPU_FRAMES=0`, `HDUE_NANITE=0` |
@@ -32,7 +32,7 @@ These are read too, and not set by the package:
 | `HDUE_TRACE_FILE` | File that receives the `HDUE_TRACE_TIMING` output instead of the console. Houdini's UI shows no console output, so set it there |
 | `HDUE_UE_ARGS` | Arguments appended to Unreal Engine's command line. `-stdout` echoes every UE log line to the console |
 | `HDUE_SHOW_WINDOW` | `1` opens Unreal Engine's window; by default it renders offscreen |
-| `HDUE_VIRTUAL_TEXTURE_CACHE` | Folder for the UDIM virtual texture cache, instead of `%LOCALAPPDATA%\hdUE\VirtualTextureCache` |
+| `HDUE_VIRTUAL_TEXTURE_CACHE` | Folder for the UDIM virtual texture cache, instead of `%LOCALAPPDATA%\hdUE\VirtualTextureCache`. Use a folder only the user or render account using it can write: hdUE trusts what it reads back from there |
 
 ## Examples
 

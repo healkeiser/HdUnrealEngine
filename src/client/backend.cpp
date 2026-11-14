@@ -49,7 +49,8 @@ void Backend::boot(uint64_t instance, uint64_t window, const std::string& projec
     // errors and hdUE's warnings to the host's console (Bridge.cpp), and HDUE_UE_ARGS=-stdout every log line.
     // UE's Saved (logs, Nanite cache, config) per user in local app data, where an installed UE game keeps it
     // (FPaths::ProjectUserDir: UserSettingsDir()/<project>), beside hdUE's texture caches: never in a possibly shared
-    // or read-only install folder or in the source tree. HDUE_USER_DIR moves it (a farm's shared disk).
+    // or read-only install folder or in the source tree. HDUE_USER_DIR moves it (another drive), only ever to a folder
+    // one user or one farm account writes: the backend trusts the caches it reads back from there.
     std::string arguments = (show.empty() || show == "0" || show == "false" ? "-RenderOffscreen" : "");
     arguments += " " + env("HDUE_UE_ARGS");
     auto user = env("HDUE_USER_DIR");

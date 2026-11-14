@@ -68,7 +68,7 @@ In Houdini's viewport, background builds start only while their memory fits. The
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| First husk frame takes minutes | Nanite data is being built; the cache is empty | Render again: later renders read the cache. Keep `Saved/NaniteCache` on the farm, or point `HDUE_USER_DIR` at a shared disk |
+| First husk frame takes minutes | Nanite data is being built; the cache is empty | Render again: later renders read the cache. Keep each render account's `Saved/NaniteCache` between jobs (`HDUE_USER_DIR` can move it to another drive); do not share one folder between accounts, as hdUE trusts what it reads back |
 | Meshes pop in one by one in the viewport | Nanite builds are swapped in as they finish | Wait for the viewport to settle |
 | A mesh looks faceted in the Path Tracer but smooth in Realtime | The mesh is Nanite (at or above **Nanite Triangle Threshold**, or an instancer prototype), and ray tracing sees its fallback mesh | Raise **Nanite Triangle Threshold** above the mesh's triangle count |
 | Foliage looks thinner in the Path Tracer than in Realtime | Ray tracing sees the fallback mesh of an instanced or very dense mesh | Set **Nanite Ray Tracing** to 1 (its normals can show faint streaks in glossy reflections) |
