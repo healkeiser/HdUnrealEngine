@@ -15,6 +15,12 @@ OUT = (
 )
 
 
+# Rec. 709 luma, the weights run_conformance.py measures with.
+LUMA = (0.2126, 0.7152, 0.0722)
+# Cases that are not grey but still get a value check: their luma against the white reference's (1).
+LUMA_CHECKED = ("Booleans", "Swizzle")
+
+
 def color(*values):
     return "(" + ", ".join(f"{v:g}" for v in values) + ")"
 
@@ -319,17 +325,25 @@ def main():
         case_box = [x - 0.5, y - 0.5, x + 0.5, y + 0.5]
         # The flake mean is statistical: its pattern depends on the plane's orientation in UE's space.
         tol = 0.05 if name == "Flake3D" else 0.03
+        # Flake3D's value is the ratio check below (Path Tracer only): in realtime this check sees only its hue.
+        hue_only = " (hue only: realtime's anti-aliasing darkens the flakes)"
         checks.append(
             {
-                "name": f"{name}: {doc}",
+                "name": f"{name}{hue_only if name == 'Flake3D' else ''}: {doc}",
                 "color": {"region": case_box},
                 "rgb": [round(v, 4) for v in expected],
                 "tol": tol,
             }
         )
-        value = expected[0]
-        if value > 0 and expected[0] == expected[1] == expected[2]:
-            # The colour check only sees the hue of a grey: the luma ratio to the white reference is its value.
+        grey = expected[0] == expected[1] == expected[2]
+        value = (
+            expected[0]
+            if grey
+            else sum(w * v for w, v in zip(LUMA, expected, strict=True))
+        )
+        if value > 0 and (grey or name in LUMA_CHECKED):
+            # The colour check only sees the hue (the normalized colour): the luma ratio to the white reference is
+            # its value, so a dim or black render of the right hue fails.
             ratio_tol = 0.1 if name == "Flake3D" else 0.05
             check = {
                 "name": f"{name}: value",

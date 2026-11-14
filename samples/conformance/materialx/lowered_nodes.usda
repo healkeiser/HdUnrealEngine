@@ -163,6 +163,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "tol": 0.03
   },
   {
+   "name": "Booleans: value",
+   "ratio": [
+    {
+     "region": [
+      -4.25,
+      0.75,
+      -3.25,
+      1.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.748,
+   "max": 0.8268
+  },
+  {
    "name": "Swizzle: Houdini's MaterialX 1.38 swizzle bgr of (0.1, 0.5, 0.9)",
    "color": {
     "region": [
@@ -178,6 +201,29 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
     0.1
    ],
    "tol": 0.03
+  },
+  {
+   "name": "Swizzle: value",
+   "ratio": [
+    {
+     "region": [
+      -1.75,
+      0.75,
+      -0.75,
+      1.75
+     ]
+    },
+    {
+     "region": [
+      -4.25,
+      -4.25,
+      -3.25,
+      -3.25
+     ]
+    }
+   ],
+   "min": 0.5284,
+   "max": 0.584
   },
   {
    "name": "CurveAdjust: curveadjust of 0.25 through the knots (0, 0), (0.5, 0.8), (1, 1): linear, 0.4",
@@ -340,7 +386,7 @@ importer (scripts/materialx_lowering.py), each on an emissive quad showing a val
    "max": 0.735
   },
   {
-   "name": "Flake3D: flake3d presence, flakes of 5 cm at coverage 0.5 (hdUE's import runs MaterialX's flake code): the mean of MaterialX's mx_flake over the region, 0.25 to 0.28 as the plane's orientation varies",
+   "name": "Flake3D (hue only: realtime's anti-aliasing darkens the flakes): flake3d presence, flakes of 5 cm at coverage 0.5 (hdUE's import runs MaterialX's flake code): the mean of MaterialX's mx_flake over the region, 0.25 to 0.28 as the plane's orientation varies",
    "color": {
     "region": [
      0.75,
