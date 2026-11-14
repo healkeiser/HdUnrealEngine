@@ -8,6 +8,7 @@
 #include <atomic>
 #include <mutex>
 #include <optional>
+#include <set>
 #if defined(HDUE_HOUDINI)
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
@@ -584,7 +585,19 @@ class Mesh final : public HdMesh {
                     delegate->GetIndexedPrimvar(GetId(), name, &indices);
                     if (!indices.empty()) fvarIndices.push_back(indices);
                 }
-            shape.subdivision = HdUESubdivision::Create(shape.topology, level, std::move(fvarIndices));
+            // UE's USD importer refines at most GMaxSubdivLevel = 6 levels (cvar USD.Subdiv.MaxSubdivLevel,
+            // USDGeomMeshConversion.cpp:119): each level multiplies the faces by 4, so 10 would hang the host.
+            constexpr int maxLevel = 6;
+            if (level > maxLevel) {
+                static std::mutex warnedMutex;
+                static std::set<SdfPath> warned;
+                std::lock_guard lock(warnedMutex);
+                if (warned.insert(GetId()).second)
+                    TF_WARN("hdUE clamps the subdivision level %d of %s to UE's maximum, %d", level, GetId().GetText(),
+                            maxLevel);
+            }
+            shape.subdivision =
+                HdUESubdivision::Create(shape.topology, std::min(level, maxLevel), std::move(fvarIndices));
         }
         if (shape.subdivision) {
             points = shape.subdivision->refine(points, HdInterpolationVertex);
@@ -1365,6 +1378,10 @@ public:
         for (size_t curveIndex = 0; curveIndex < counts.size(); ++curveIndex) {
             const size_t count = size_t(std::max(0, counts[curveIndex]));
             std::vector<size_t> vertices;
+            if (!indices.empty() && offset + count > indices.size()) {
+                TF_RUNTIME_ERROR("Invalid curve index at %s", GetId().GetText());
+                return;
+            }
             for (size_t i = 0; i < count; ++i) {
                 const size_t vertex = indices.empty() ? offset + i : size_t(indices[offset + i]);
                 if (vertex >= points.size()) {

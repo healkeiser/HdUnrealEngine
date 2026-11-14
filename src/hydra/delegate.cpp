@@ -668,6 +668,14 @@ HdUEImage displacementImage(const std::string& file) {
     spec.width = source->GetWidth();
     spec.height = source->GetHeight();
     spec.format = source->GetFormat();
+    // The header's size is allocated before reading: refuse what no GPU texture could hold (16384, the D3D12 2D limit
+    // the backend uses), so a bad header cannot ask for tens of GB.
+    if (spec.width <= 0 || spec.height <= 0 || spec.width > 16384 || spec.height > 16384 ||
+        source->GetBytesPerPixel() <= 0) {
+        warnOnce("hdUE skips the displacement image " + file + ": " + std::to_string(spec.width) + "x" +
+                 std::to_string(spec.height) + " is outside 1-16384");
+        return image;
+    }
     std::vector<uint8_t> raw(size_t(spec.width) * spec.height * source->GetBytesPerPixel());
     spec.data = raw.data();
     const auto type = HioGetHioType(spec.format);
@@ -2958,8 +2966,10 @@ public:
                                    ? HDUE_PATH_TRACED
                                    : HDUE_REALTIME;
                 request.samples_per_pixel = uint32_t(s.samplesPerPixel());
-                request.warmup_frames =
-                    uint32_t(std::max(1, s.setting<int>("warmupFrames", HdUESettingDefaults::warmupFrames)));
+                // At most 65536, the backend's limit on samples: each warm-up frame is a full render.
+                const int warmup = s.setting<int>("warmupFrames", HdUESettingDefaults::warmupFrames);
+                if (warmup > 65536) warnOnce("hdUE clamps warmupFrames " + std::to_string(warmup) + " to 65536");
+                request.warmup_frames = uint32_t(std::clamp(warmup, 1, 65536));
                 request.lumen_enabled = s.setting<bool>("lumenEnabled", HdUESettingDefaults::lumenEnabled);
                 request.time_seconds = s.setting<double>("timeSeconds", 0);
                 const auto camera = view.GetInverse();
