@@ -19,6 +19,7 @@
 #include "TextureResource.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RHIGlobals.h"
+#include "Misc/PackageName.h"
 #include "UObject/UnrealType.h"
 
 // The properties UE's Details panel lets a user edit on a placed instance. Scene text sets only these, never internal
@@ -29,14 +30,19 @@ bool HdueSceneEditable(const FProperty* Property) {
 }
 
 // Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
-// numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Other mount
-// points are refused: a scene names content, not engine internals. Shared with set_post_process (Bridge.cpp), compiled
-// in the editor target too.
+// numbers, objects as paths of content UE's Details panel offers, loaded here; empty or None clears an object. Content
+// is what a mounted content root holds (/Game, /Engine, an enabled plugin's /Niagara, /HairStrands, ...); a class
+// property also takes a native class (/Script/...), as UE's class picker lists them. Read-only roots (/Script for
+// objects, whose class default objects have no render resources, /Temp, /Config, /Memory) are refused. Shared with
+// set_post_process (Bridge.cpp), compiled in the editor target too.
 bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container) {
     void* Value = Property->ContainerPtrToValuePtr<void>(Container);
     if (const auto* Object = CastField<FObjectPropertyBase>(Property)) {
         const bool None = Text.IsEmpty() || Text == TEXT("None");
-        if (!None && !Text.StartsWith(TEXT("/Game/")) && !Text.StartsWith(TEXT("/Engine/"))) return false;
+        const FString Package = FPackageName::ObjectPathToPackageName(Text);
+        if (!None && !FPackageName::IsValidLongPackageName(Package) &&
+            !(CastField<FClassProperty>(Property) && FPackageName::IsScriptPackage(Package)))
+            return false;
         UObject* Loaded = None ? nullptr : LoadObject<UObject>(nullptr, *Text);
         if (!None && (!Loaded || !Loaded->IsA(Object->PropertyClass))) return false;
         // A class property holds a UClass: it must also derive from the class the property names (UE's class picker).
