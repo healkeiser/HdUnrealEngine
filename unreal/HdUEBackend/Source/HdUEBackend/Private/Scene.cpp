@@ -1954,7 +1954,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         return false;
     }
     // Validate mesh array bounds before mutating the scene. An invalid mesh is skipped (and its previous version
-    // removed) with a warning naming it; the rest of the batch still applies. Arrays are int32-addressed in UE.
+    // removed) with a warning naming it; the rest of the batch still applies, as it does past a material without an ID
+    // or asset and a native mesh asset that is missing. Arrays are int32-addressed in UE.
     TArray<bool> ValidMeshes;
     ValidMeshes.Init(true, int32(Batch.mesh_count));
     ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
@@ -2114,8 +2115,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
         const auto& Desc = Batch.materials[Index];
         if (!Desc.id) {
-            Error = TEXT("Material has no ID.");
-            return false;
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped a material without an ID."));
+            continue;
         }
         UMaterialInterface* Material = nullptr;
         if (Desc.native_asset && *Desc.native_asset) {
@@ -2239,8 +2240,13 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             }
         }
         if (!Material) {
-            Error = TEXT("Material asset missing. Prepare/cook content or check the native asset path.");
-            return false;
+            // Its previous material (if any) stays bound; meshes without one draw UE's default material.
+            UE_LOG(LogTemp, Warning,
+                   TEXT("hdUE: skipped material %s: asset %s missing. Prepare/cook content or check the native asset "
+                        "path."),
+                   UTF8_TO_TCHAR(Desc.id),
+                   Desc.native_asset && *Desc.native_asset ? UTF8_TO_TCHAR(Desc.native_asset) : TEXT("(none)"));
+            continue;
         }
         // A replaced material can still be referenced by frames in flight on the render thread (ray-tracing instance
         // gathering crashed on a material edit); keep it until the next Apply.
@@ -2406,21 +2412,27 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Instanced ? (R == C) : Desc.transform[R * 4 + C];
         Actor->SetActorTransform(FTransform(Matrix));
         UStaticMesh* InstanceMesh = nullptr;
+        // A native asset that cannot draw drops the mesh (and the actor spawned above), with a warning naming it.
+        const auto SkipNative = [&](const TCHAR* Problem) {
+            Remove(Id);
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped mesh %s (native asset %s): %s."), *Id,
+                   UTF8_TO_TCHAR(Desc.native_asset), Problem);
+        };
         if (Native && Instanced) {
             InstanceMesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(Desc.native_asset));
             if (!InstanceMesh) {
-                Error = TEXT("Native StaticMesh not found in cooked content.");
-                return false;
+                SkipNative(TEXT("StaticMesh not found in cooked content"));
+                continue;
             }
         } else if (Native) {
             auto* Mesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(Desc.native_asset));
             if (!Mesh) {
-                Error = TEXT("Native StaticMesh not found in cooked content.");
-                return false;
+                SkipNative(TEXT("StaticMesh not found in cooked content"));
+                continue;
             }
             if ((Desc.flags & HDUE_MESH_REQUIRE_NANITE) && !Mesh->HasValidNaniteData()) {
-                Error = TEXT("Native asset has no cooked Nanite data.");
-                return false;
+                SkipNative(TEXT("no cooked Nanite data"));
+                continue;
             }
             UE_LOG(LogTemp, Log, TEXT("hdUE native mesh %s: NaniteData=%d"), *Mesh->GetPathName(),
                    Mesh->HasValidNaniteData());
