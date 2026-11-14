@@ -221,7 +221,11 @@ int run(int argc, wchar_t** argv) {
         std::ofstream metrics(options.output / "metrics.json");
         check(bool(metrics), "Cannot write metrics");
         metrics << "{\n  \"backend\":\"Unreal Engine 5.8.4 / UELibrary\",\n  \"hidden_window\":"
-                << (options.visible ? "false" : "true") << ",\n  \"initialization_ms\":" << init_ms
+                << (options.visible ? "false" : "true") << ",\n  \"initialization_ms\":"
+                << init_ms
+                // Every frame's timings include a full garbage collection (gc.CollectGarbageEveryFrame above): they
+                // compare only with runs that force it too.
+                << ",\n  \"gc_every_frame\":true"
                 << ",\n  \"dedicated_video_memory_bytes\":" << status.dedicated_video_memory_bytes
                 << ",\n  \"substrate_enabled\":true,\n  \"adaptive_gbuffer\":true,\n  \"substrate_closure_budget\":"
                 << renderer_info.project_closures_per_pixel
