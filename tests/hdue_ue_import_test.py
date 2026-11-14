@@ -48,10 +48,23 @@ class ImportAssets(unittest.TestCase):
         source.mkdir(parents=True)
         self.source_file = source / "Module.cpp"
         self.source_file.write_text("//")
+        self.source_root = source.parent
+        self.project_file = temp / "HdUEBackend.uproject"
+        self.project_file.write_text("{}")
+        os.utime(self.project_file, (time.time() - 200, time.time() - 200))
         self.dll = temp / "UnrealEditor-HdUEContent.dll"
+        self.engine_modules = None
         patches = [
             mock.patch.object(hdue_ue_import, "ROOT", temp),
-            mock.patch.object(hdue_ue_import, "CONTENT_SOURCE", source),
+            mock.patch.object(hdue_ue_import, "SOURCE_ROOT", self.source_root),
+            mock.patch.object(
+                hdue_ue_import, "PROJECT_FILE", self.project_file
+            ),
+            mock.patch.object(
+                hdue_ue_import,
+                "_engine_modules_file",
+                lambda: self.engine_modules,
+            ),
             mock.patch.object(hdue_ue_import, "CONTENT_EDITOR", self.dll),
             mock.patch.object(
                 hdue_ue_import,
@@ -101,6 +114,51 @@ class ImportAssets(unittest.TestCase):
         self.dll.write_text("dll")
         os.utime(self.dll, (time.time() - 100, time.time() - 100))
         self.assertNotIn("-SkipBuild", self.run_import(FakeProcess()))
+
+    def age(self, file, seconds):
+        os.utime(file, (time.time() - seconds, time.time() - seconds))
+
+    def built(self):
+        self.dll.write_text("dll")
+        self.age(self.source_file, 100)
+
+    def test_any_source_file_of_either_module_or_the_project_rebuilds(self):
+        for relative in (
+            "HdUEBackend/Bridge.cpp",
+            "HdUEBackend.Target.cs",
+            "HdUEContent/HdUEContent.Build.cs",
+        ):
+            with self.subTest(relative):
+                file = self.source_root / relative
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("//")
+                self.age(file, 100)
+                self.built()
+                self.assertTrue(hdue_ue_import.editor_is_current())
+                self.age(self.dll, 150)  # the file is now newer than the DLL
+                self.assertFalse(hdue_ue_import.editor_is_current())
+                self.age(file, 300)
+        self.built()
+        for file in self.source_root.rglob("*"):
+            if file.is_file():
+                self.age(file, 100)
+        self.assertTrue(hdue_ue_import.editor_is_current())
+        self.age(self.project_file, -10)
+        self.assertFalse(hdue_ue_import.editor_is_current())
+
+    def test_a_different_engine_build_id_rebuilds(self):
+        self.built()
+        self.assertTrue(hdue_ue_import.editor_is_current())
+        engine = Path(self.temp.name) / "engine.modules"
+        self.engine_modules = engine
+        built = self.dll.with_name("UnrealEditor.modules")
+        built.write_text('{"BuildId": "1"}')
+        engine.write_text('{"BuildId": "1"}')
+        self.assertTrue(hdue_ue_import.editor_is_current())
+        engine.write_text('{"BuildId": "2"}')
+        self.assertFalse(hdue_ue_import.editor_is_current())
+        built.unlink()  # a project that never recorded its build
+        self.assertFalse(hdue_ue_import.editor_is_current())
 
     def test_an_interrupt_kills_the_cook(self):
         process = FakeProcess(polls_before_exit=100)

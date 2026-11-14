@@ -148,22 +148,48 @@ def merge_catalog(catalog, config_path, config):
 
 # One cook took about a minute; a hung editor must not hang Houdini forever.
 COOK_TIMEOUT_SECONDS = 1800
-CONTENT_EDITOR = (
-    ROOT / "unreal/HdUEBackend/Binaries/Win64/UnrealEditor-HdUEContent.dll"
-)
-CONTENT_SOURCE = ROOT / "unreal/HdUEBackend/Source/HdUEContent"
+PROJECT_DIR = ROOT / "unreal/HdUEBackend"
+CONTENT_EDITOR = PROJECT_DIR / "Binaries/Win64/UnrealEditor-HdUEContent.dll"
+# Both modules, the targets and the .Build.cs files: any of them changes what the editor needs to be.
+SOURCE_ROOT = PROJECT_DIR / "Source"
+PROJECT_FILE = PROJECT_DIR / "HdUEBackend.uproject"
+
+
+def _build_id(modules_file):
+    try:
+        return json.loads(Path(modules_file).read_text(encoding="utf-8-sig"))[
+            "BuildId"
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _engine_modules_file():
+    """The engine's UnrealEditor.modules (its BuildId), or None when the editor root is not configured."""
+    from local_paths import local_path
+
+    try:
+        root = local_path("editor_root")
+    except SystemExit:
+        return None
+    return root / "Engine/Binaries/Win64/UnrealEditor.modules"
 
 
 def editor_is_current():
-    # The editor is rebuilt only when its source is newer.
+    """Whether the project's editor build can be skipped: its DLL exists, nothing under Source (either module,
+    *.Target.cs, *.Build.cs) or the .uproject is newer, and it was built by the engine now configured (same BuildId).
+    """
     if not CONTENT_EDITOR.is_file():
         return False
     built = CONTENT_EDITOR.stat().st_mtime
-    return all(
-        file.stat().st_mtime <= built
-        for file in CONTENT_SOURCE.rglob("*")
-        if file.is_file()
-    )
+    sources = [PROJECT_FILE, *SOURCE_ROOT.rglob("*")]
+    if any(f.is_file() and f.stat().st_mtime > built for f in sources):
+        return False
+    engine = _engine_modules_file()
+    if engine is None or not engine.is_file():
+        return True  # nothing to compare with; the build itself reports a missing engine
+    project = _build_id(CONTENT_EDITOR.with_name("UnrealEditor.modules"))
+    return project is not None and project == _build_id(engine)
 
 
 def _kill_tree(process):
