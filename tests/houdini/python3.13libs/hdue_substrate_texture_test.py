@@ -17,10 +17,7 @@ class Test(MaterialTest):
         viewer = integration.scene_viewer()
         for _ in range(40):
             yield
-        while not self.host.prepared_materials.applied:
-            if self.host.material_error:
-                raise ValueError(self.host.material_error)
-            yield
+        yield from self.prepared()
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(0)

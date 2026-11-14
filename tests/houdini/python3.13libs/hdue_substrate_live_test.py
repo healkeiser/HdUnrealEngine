@@ -40,10 +40,7 @@ class Test(MaterialTest):
         viewer = integration.scene_viewer()
         for _ in range(40):
             yield
-        while not self.host.prepared_materials.applied:
-            if self.host.material_error:
-                raise ValueError(self.host.material_error)
-            yield
+        yield from self.prepared()
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(1)
@@ -52,6 +49,8 @@ class Test(MaterialTest):
         self.pid = os.getpid()
         original = yield from self.image("01-before-topology-edit", 0)
         live = self.host.live_preparation
+        # The jobs before the edits: the scene's own graph, prepared at startup unless a library held it.
+        started, completed = live.started, live.completed
         tint = network.createNode(
             hdue_substrate.type_name("constant_color"), "live_tint"
         )
@@ -59,7 +58,7 @@ class Test(MaterialTest):
         network.node("base").setInput(0, tint)
         # UE ticks on its own thread; what preparation must not block is Houdini's UI, which advances this test.
         passes = 0
-        for _ in self.ready(1):
+        for _ in self.ready(completed + 1):
             passes += 1
             yield
         added = yield from self.image(
@@ -73,7 +72,7 @@ class Test(MaterialTest):
             raise AssertionError(
                 "Houdini's UI did not run during background preparation"
             )
-        started = live.started
+        edits = live.started
         tint.parmTuple("value").set((0.02, 0.6, 0.04))
         edited = yield from self.image(
             "03-added-node-live-value", 0, self.frames[-1]["generation"]
@@ -82,7 +81,7 @@ class Test(MaterialTest):
             raise AssertionError(
                 "Generated parameters on the new material did not update live"
             )
-        if live.started != started:
+        if live.started != edits:
             raise AssertionError(
                 "A live parameter value unnecessarily recompiled the graph"
             )
@@ -105,13 +104,16 @@ class Test(MaterialTest):
         while not self.host.material_error:
             yield
         while (
-            live.completed < 3
+            live.completed < completed + 3
             or self.host.material_error
             or self.api.status()["error"]
         ):
             if live.phase == "failed":
                 raise AssertionError(live.message)
-            if live.completed == 2 and self.api.status()["frame"]["frame_id"]:
+            if (
+                live.completed == completed + 2
+                and self.api.status()["frame"]["frame_id"]
+            ):
                 raise AssertionError(
                     "A superseded shader was published as the latest edit"
                 )
@@ -119,7 +121,7 @@ class Test(MaterialTest):
         yield from self.image(
             "05-latest-topology-pathtraced", 1, self.frames[-1]["generation"]
         )
-        if live.started != 3:
+        if live.started != started + 3:
             raise AssertionError(
                 "Topology jobs were not single-flight/coalesced: "
                 + repr(live.status())

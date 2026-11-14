@@ -140,6 +140,19 @@ class Test(ViewportTest):
         if self.frames[-1]["meshes"] != self.frames[0]["meshes"]:
             raise AssertionError("Stale subset partitions survived restoration")
 
+    def prepared(self):
+        """Waits until the host has applied its materials. A graph no library holds is prepared in the background
+        first (live_materials.LivePreparation), and its progress shows as the host's material error until it binds:
+        only a failed preparation, or an error with nothing being prepared, fails.
+        """
+        live = self.host.live_preparation
+        while not self.host.prepared_materials.applied:
+            if live.phase == "failed":
+                raise AssertionError(live.message)
+            if self.host.material_error and not (live.wanted or live.active):
+                raise ValueError(self.host.material_error)
+            yield
+
     def capture(self, name):
         path = self.output / name
         yield from flipbook(path)
