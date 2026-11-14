@@ -23,6 +23,8 @@ if ($Suite -in 'unit', 'all') {
     if ($LASTEXITCODE) { throw 'Repository scope failed.' }
     & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\render_setting_defaults_test.py')
     if ($LASTEXITCODE) { throw 'render_setting_defaults_test failed.' }
+    & uv run --python 3.11 python (Join-Path $TaskRoot 'tests\generated_files_test.py')
+    if ($LASTEXITCODE) { throw 'generated_files_test failed.' }
     & (Join-Path $TaskRoot 'tests\local_paths.ps1')
     & (Join-Path $TaskRoot 'tests\copy_project_content.ps1')
     foreach ($Test in 'live_materials_test', 'materialx_live_test', 'materialx_textures_cache_test', 'scene_space_test', 'substrate_graph_test', 'surface_effects_test', 'asset_controls_test', 'abi_mirror_test', 'materialx_lowering_test') {
