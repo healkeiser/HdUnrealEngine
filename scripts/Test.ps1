@@ -4,14 +4,13 @@
 param(
     [ValidateSet('unit', 'native', 'hydra', 'houdini', 'conformance', 'extended', 'all')][string]$Suite = 'unit',
     [string]$RuntimeConfig = '',
-    # conformance: the scene patterns (run_conformance.py --only), e.g. materials/*.
+    # conformance: the scene patterns (run_conformance.py --only), e.g. materialx/*.
     [string[]]$Only = @(),
     # native: the standalone build folder (Build-Host.ps1's); the Houdini build is houdini_build_root.
     [string]$BuildRoot = '',
-    # extended: the cooked MaterialX and prepared Substrate libraries the kinds' scenes bind (Import-MaterialX.ps1,
-    # Prepare-Substrate.ps1); empty: the runtime profile's materialx_library and substrate_library.
-    [string]$MaterialXLibrary = '',
-    [string]$SubstrateLibrary = ''
+    # extended: the folder of the prepared libraries the kinds' scenes and husk_prepared_materials.py bind (default
+    # out\): materialx, materialx-wet, substrate\decal-* and substrate\volume-* (docs/building.md has the commands).
+    [string]$LibraryRoot = ''
 )
 $ErrorActionPreference = 'Stop'
 $TaskRoot = Split-Path -Parent $PSScriptRoot
@@ -100,14 +99,30 @@ if ($Suite -eq 'extended') {
         'decal'              = 'samples\decal\decal.usda'
         'references'         = 'samples\materialx\showcase_solaris.usda'
     }
+    # The prepared libraries the kinds bind (the newest Substrate one of each scene); a missing one fails its kind.
+    $Root = if ($LibraryRoot) { [IO.Path]::GetFullPath($LibraryRoot) } else { Join-Path $TaskRoot 'out' }
+    function Get-Library([string]$Pattern) {
+        $Found = Get-ChildItem -Path (Join-Path $Root $Pattern) -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+        if ($Found) { $Found.FullName } else { Join-Path $Root $Pattern }
+    }
+    $MaterialX = Get-Library 'materialx\library.json'
+    $Libraries = @{
+        'materials'          = @{ MaterialXLibrary = $MaterialX }
+        'references'         = @{ MaterialXLibrary = $MaterialX }
+        # The Substrate Builder graphs layer over the showcase's MaterialX materials (substrate-builder.md).
+        'substrate'          = @{ MaterialXLibrary = $MaterialX; SubstrateLibrary = Get-Library 'substrate\showcase-*\library.json' }
+        'substrate-textures' = @{ MaterialXLibrary = $MaterialX }
+        'substrate-live'     = @{ MaterialXLibrary = $MaterialX }
+        'surfaces'           = @{ MaterialXLibrary = Get-Library 'materialx-wet\library.json' }
+        'volume-material'    = @{ SubstrateLibrary = Get-Library 'substrate\volume-*\library.json' }
+        'decal'              = @{ SubstrateLibrary = Get-Library 'substrate\decal-*\library.json' }
+    }
     $Failed = @()
     foreach ($Kind in $Scenes.Keys) {
         $Output = Join-Path $Run $Kind
-        # references: the MaterialX showcase's cooked library by default (Import-MaterialX.ps1 -Source
-        # samples\materialx\standard_surface.mtlx,samples\materialx\open_pbr_surface.mtlx -OutputDirectory out\materialx).
-        $Library = if ($Kind -eq 'references' -and -not $MaterialXLibrary) { Join-Path $TaskRoot 'out\materialx\library.json' } else { $MaterialXLibrary }
+        $Library = if ($Libraries[$Kind]) { $Libraries[$Kind] } else { @{} }
         try {
-            if ($Kind -eq 'references' -and -not (Test-Path -LiteralPath $Library)) { throw "No cooked MaterialX library at $Library; run Import-MaterialX.ps1." }
+            foreach ($File in $Library.Values) { if (-not (Test-Path -LiteralPath $File)) { throw "No prepared library at $File (docs/building.md, Extended tier)." } }
             $Source = if ($Scenes[$Kind]) { @{ InputUsd = Join-Path $TaskRoot $Scenes[$Kind] } } else {
                 # The texture Builder's editable HIP (substrate-builder.md), made from the directly textured scene.
                 $Hip = Join-Path $Run 'substrate-textures.hip'
@@ -118,7 +133,7 @@ if ($Suite -eq 'extended') {
                 }
                 @{ HipFile = $Hip }
             }
-            & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $RuntimeConfig -MaterialXLibrary $Library -SubstrateLibrary $SubstrateLibrary @Source -LogDirectory $Output -TestKind $Kind
+            & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $RuntimeConfig @Library @Source -LogDirectory $Output -TestKind $Kind
             $Result = Get-Content -LiteralPath (Join-Path $Output 'verified.json') -Raw | ConvertFrom-Json
             if (-not $Result.passed) { throw 'verified.json does not say passed' }
             if ($Kind -eq 'references' -and ($Result.frames.Count -lt 4 -or $Result.captures.Count -lt 2 -or -not $Result.material_stats)) { throw 'Incomplete reference evidence' }
@@ -129,6 +144,12 @@ if ($Suite -eq 'extended') {
             $Failed += $Kind
         }
     }
+    # Prepared materials in husk (decal, volume and MaterialX libraries, a stale graph failing the frame): every check
+    # runs (--require-all), with the libraries above (a missing one is not prepared and staged here).
+    $HuskArguments = @('--require-all', '--materialx-library', $MaterialX, '--wet-library', $Libraries['surfaces'].MaterialXLibrary, '--decal-library', $Libraries['decal'].SubstrateLibrary, '--volume-library', $Libraries['volume-material'].SubstrateLibrary)
+    if ($RuntimeConfig) { $HuskArguments += @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) }
+    & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
+    if ($LASTEXITCODE) { Write-Output 'extended: FAILED husk prepared materials'; $Failed += 'husk-prepared-materials' }
     # The usdview scene check (edits, reopening, the USD file unchanged) on the Cornell box.
     & (Join-Path $PSScriptRoot 'Test-Usdview.ps1') -Check scene -InputUsd (Join-Path $TaskRoot 'samples\cornell\cornell.usda') -RuntimeConfig $RuntimeConfig -OutputDirectory (Join-Path $Run 'usdview-scene')
     if ($Failed) { throw "Extended in-Houdini tests failed: $($Failed -join ', ') ($Run)" }
@@ -145,11 +166,8 @@ if ($Suite -in 'houdini', 'all') {
         if ($LASTEXITCODE) { throw 'Prim LOP tests failed.' }
     }
     finally { Restore-HdUEEnvironment -Snapshot $Previous }  # the caller's shell keeps its own profile
-    # Prepared materials in husk (decal, volume and MaterialX libraries, a stale graph failing the frame).
-    $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
-    & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
-    if ($LASTEXITCODE) { throw 'husk prepared-material tests failed.' }
     # Streamed scene uploads (a batch per mesh) render as the whole-scene upload.
+    $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
     & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_streaming.py') @HuskArguments
     if ($LASTEXITCODE) { throw 'husk streaming test failed.' }
     $Ran += 'houdini'

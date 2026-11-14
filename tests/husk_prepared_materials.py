@@ -1,12 +1,14 @@
 """Prepared materials in husk, as in Houdini's viewport (hdue_batch.resolve through the delegate):
 
     python tests/husk_prepared_materials.py [--runtime-config <profile>] [--decal-library <library.json>]
-        [--volume-library <library.json>] [--materialx-library <library.json>]
+        [--volume-library <library.json>] [--materialx-library <library.json>] [--wet-library <library.json>]
+        [--require-all]
 
 The libraries are Prepare-Substrate.ps1's for samples/decal/decal.usda and samples/volume_material/volume_material.usda
-(staged with Stage-Runtime.ps1), and Import-MaterialX.ps1's for samples/materialx; by default the newest under out/
-(out/substrate/decal-*, out/substrate/volume-*, out/materialx), and .local/runtime-houdini.json. A missing decal or
-volume library is prepared, and the runtime staged, first; without a MaterialX library its checks are skipped.
+(staged with Stage-Runtime.ps1), and Import-MaterialX.ps1's for samples/materialx, plain and with -WetProfile (the wet
+showcase binds the wet variants); by default the newest under out/ (out/substrate/decal-*, out/substrate/volume-*,
+out/materialx, out/materialx-wet), and .local/runtime-houdini.json. A missing decal or volume library is prepared, and
+the runtime staged, first; without a MaterialX library its checks are skipped, which --require-all makes a failure.
 Checks: the decal paints the wall; a volume material's albedo edit tints the fog; MaterialX materials render their
 cooked assets; a procedural MaterialX graph hdUE cannot translate renders translated without automatic preparation, and
 is prepared through UE's MaterialX importer with it; a graph changed since its preparation fails the frame with the
@@ -49,7 +51,7 @@ def husk(scene, settings, out, extra_layers="", trace=False):
         HOUDINI_PATH=f"{ROOT / 'integrations/houdini'};&",
         # An installed release package would load ahead of the dev build (the list is comma-separated).
         HOUDINI_PACKAGE_SKIPLIST=package_skiplist(),
-        PXR_PLUGINPATH_NAME=str(ROOT / "build/houdini/resources"),
+        PXR_PLUGINPATH_NAME=str(local_path("houdini_build_root") / "resources"),
         HDUE_RUNTIME_CONFIG=str(ARGS.runtime_config),
         HDUE_HOUDINI_ENABLE="1",
         HDUE_TRACE_SCENE="1" if trace else "",
@@ -228,7 +230,12 @@ def main():
         )
         if not ARGS.materialx_library:
             print(
-                "SKIPPED: MaterialX library and wet-surface checks (no library under out/materialx)",
+                "SKIPPED: MaterialX library check (no library under out/materialx)",
+                flush=True,
+            )
+        if not ARGS.wet_library:
+            print(
+                "SKIPPED: wet-surface check (no library under out/materialx-wet)",
                 flush=True,
             )
         if ARGS.materialx_library:
@@ -251,8 +258,10 @@ def main():
                     f"exit {code}, {len(native)} materials as cooked assets",
                 )
             )
-            # The wet surface bindings (surfaceEffects) resolve in husk too.
+        if ARGS.wet_library:
+            # The wet surface bindings (surfaceEffects) resolve in husk too, from the library with the wet variants.
             (temp / "wet").mkdir()
+            setting = f'string unreal:materialxLibrary = "{Path(ARGS.wet_library).as_posix()}"'
             code, log, _ = husk(
                 ROOT / "samples/wet_surface/showcase.usda",
                 [setting, mode, "rel camera = </Camera>"],
@@ -341,7 +350,7 @@ def main():
                 f"exit {code}, sphere rgb {None if sphere is None else sphere.round(3).tolist()}, alpha {covered}",
             )
         )
-    skipped = not ARGS.materialx_library
+    skipped = not (ARGS.materialx_library and ARGS.wet_library)
     sys.exit(0 if all(results) and not (skipped and ARGS.require_all) else 1)
 
 
@@ -371,9 +380,12 @@ if __name__ == "__main__":
         "--materialx-library", default=newest("out/materialx/library.json")
     )
     parser.add_argument(
+        "--wet-library", default=newest("out/materialx-wet/library.json")
+    )
+    parser.add_argument(
         "--require-all",
         action="store_true",
-        help="exit 1 when a check is skipped (no MaterialX library)",
+        help="exit 1 when a check is skipped (no MaterialX or wet library)",
     )
     ARGS = parser.parse_args()
     # A missing library is prepared (exported, cooked) and staged here, as the docs prepare them: a fresh checkout

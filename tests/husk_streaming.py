@@ -47,7 +47,7 @@ def husk(out, extra_env):
         HOUDINI_PATH=f"{ROOT / 'integrations/houdini'};&",
         # An installed release package would load ahead of the dev build (the list is comma-separated).
         HOUDINI_PACKAGE_SKIPLIST=package_skiplist(),
-        PXR_PLUGINPATH_NAME=str(ROOT / "build/houdini/resources"),
+        PXR_PLUGINPATH_NAME=str(local_path("houdini_build_root") / "resources"),
         HDUE_RUNTIME_CONFIG=str(ARGS.runtime_config.resolve()),
         HDUE_HOUDINI_ENABLE="1",
         **extra_env,

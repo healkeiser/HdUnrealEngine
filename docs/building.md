@@ -72,9 +72,18 @@ Individual steps:
 - `unit` (the default): needs only `uv`, and is what CI runs. Repository scope, the Python tests, the committed gallery's brightness bands.
 - `native`: the C++ tests (`ctest`) of the standalone and Houdini builds that exist. It does not rebuild; it fails if neither build exists.
 - `hydra`: `Verify.ps1 -SkipBuild -WithUsdview`: native UE and Hydra renders, usdview, camera and buffer checks.
-- `houdini`: the in-Houdini tests, the prim LOP tests and husk's prepared-material and streaming tests.
+- `houdini`: the in-Houdini tests, the prim LOP tests and husk's streaming test.
 - `conformance`: `run_conformance.py` on the scenes named by `-Only <area>/*` (for example `-Only materialx/*`). It refuses to run without `-Only`, because the full set takes over an hour.
-- `extended`: the in-Houdini kinds no other tier starts, each on its own scene. It prints what it does not run.
+- `extended`: the in-Houdini kinds no other tier starts, each on its own scene, and husk's prepared-material test with every check required. It prints what it does not run. Its kinds and husk bind prepared libraries under `out\` (`-LibraryRoot` for another folder), each prepared from this checkout's samples (a library records its source files); a missing one fails the kind that needs it:
+
+    ```powershell
+    .\scripts\Import-MaterialX.ps1 -Source samples\materialx\standard_surface.mtlx,samples\materialx\open_pbr_surface.mtlx -OutputDirectory out\materialx
+    .\scripts\Import-MaterialX.ps1 -Source samples\materialx\standard_surface.mtlx -WetProfile -OutputDirectory out\materialx-wet
+    .\scripts\Prepare-Substrate.ps1 -InputUsd samples\decal\decal.usda -OutputDirectory out\substrate\decal-<date>
+    .\scripts\Prepare-Substrate.ps1 -InputUsd samples\volume_material\volume_material.usda -OutputDirectory out\substrate\volume-<date>
+    .\scripts\Prepare-Substrate.ps1 -InputUsd samples\substrate\showcase.usda -MaterialXLibrary out\materialx\library.json -OutputDirectory out\substrate\showcase-<date>
+    .\scripts\Stage-Runtime.ps1; .\scripts\Update-HoudiniRuntime.ps1 -SetDefault   # the cooked packages reach the runtime
+    ```
 - `all`: `unit`, `native` (when a build exists), `hydra` and `houdini`. It says which of them did not run, and that conformance and extended were not run.
 
 Dev runs must test the dev build, not an installed hdUE package. `Launch-Houdini.ps1`, `Test-Houdini.ps1`, `run_conformance.py` and `render_gallery.py` add `hdUE` to `HOUDINI_PACKAGE_SKIPLIST` (comma-separated, so existing entries stay). `render_gallery.py --dev` also uses the runtime profile in `.local`, even when an installed package set `HDUE_RUNTIME_CONFIG`.
