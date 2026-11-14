@@ -1,0 +1,131 @@
+#usda 1.0
+(
+    doc = """Mipmaps of a data texture (sourceColorSpace raw) average its stored values, as UE's texture build filters
+non-sRGB textures. Both quads emit their texture with every light off. The left one reads a one-texel 0/255 checker:
+at about 26 pixels for 256 texels it samples a mip around level 3, the checker's average, 0.5. The right one reads a
+flat 128/255. Averaging the checker in linear light, as for an sRGB colour image, gives about 188/255 instead (a ratio
+near 1.47). The Path Tracer averages texels per pixel anyway, so the check discriminates in realtime mode."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdPreviewSurface",
+ "feature": "data texture mipmaps",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "data texture mips average linearly",
+   "ratio": [
+    {
+     "region": [
+      -3,
+      -0.5,
+      -2,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      2,
+      -0.5,
+      3,
+      0.5
+     ]
+    }
+   ],
+   "min": 0.9,
+   "max": 1.1
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+over "Lights"
+{
+    over "key" (
+        active = false
+    )
+    {
+    }
+}
+def Material "Checker"
+{
+    token outputs:surface.connect = </Checker/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 0, 0)
+            color3f inputs:emissiveColor.connect = </Checker/tex.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "tex"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/checker_1px.png@
+        float2 inputs:st.connect = </Checker/st.outputs:result>
+        token inputs:sourceColorSpace = "raw"
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Grey"
+{
+    token outputs:surface.connect = </Grey/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 0, 0)
+            color3f inputs:emissiveColor.connect = </Grey/tex.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "tex"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.png@
+        float2 inputs:st.connect = </Grey/st.outputs:result>
+        token inputs:sourceColorSpace = "raw"
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "CheckerQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-3.5, -1, 0), (-1.5, -1, 0), (-1.5, 1, 0), (-3.5, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Checker>
+}
+def Mesh "GreyQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.5, -1, 0), (3.5, -1, 0), (3.5, 1, 0), (1.5, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Grey>
+}
