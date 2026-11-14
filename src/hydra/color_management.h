@@ -30,4 +30,8 @@ bool HdUESRGBColorSpace(const std::string& space);
 // (<UDIM> in the name) has each tile converted and returns the converted pattern. Converted files live in
 // %TEMP%/hdue_ocio; entries unused for a week are removed.
 std::string HdUELinearRec709Texture(const std::string& file, const std::string& space = {});
+// An image file UE can decode: file itself when UE reads its format, else (Houdini builds) a cached copy converted
+// through Houdini's image library (Houdini's .rat, .pic, ...), each tile of a UDIM pattern under the converted pattern;
+// empty when it cannot be made readable.
+std::string HdUEDecodableTexture(const std::string& file);
 PXR_NAMESPACE_CLOSE_SCOPE

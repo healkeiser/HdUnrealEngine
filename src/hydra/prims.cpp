@@ -1832,6 +1832,10 @@ public:
         if (texture.IsHolding<SdfAssetPath>()) {
             const auto& file = texture.UncheckedGet<SdfAssetPath>();
             data.texture = file.GetResolvedPath().empty() ? file.GetAssetPath() : file.GetResolvedPath();
+            // A dome's .rat (Houdini's own HDRIs) renders from a converted copy, as material images do.
+            if (!data.texture.empty() && !HdUEHostTexture(data.texture))
+                if (auto readable = HdUEDecodableTexture(data.texture); !readable.empty())
+                    data.texture = std::move(readable);
         }
         const auto format = value(get("texture:format"), TfToken("automatic"));
         data.textureFormat = format == TfToken("automatic") ? HDUE_ENVIRONMENT_AUTOMATIC

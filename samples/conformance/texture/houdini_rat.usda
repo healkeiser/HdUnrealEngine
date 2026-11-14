@@ -1,0 +1,284 @@
+#usda 1.0
+(
+    doc = """Houdini's .rat images, a format UE's image readers do not decode (ImageWrapperModule.cpp): each renders as the
+same image in a format UE reads. Top: an 8-bit grey 128 .rat read raw (0.502) beside the same PNG read raw; a copy
+linearised on the way would read 0.216. Middle: a half-float 0.25 .rat read raw beside a constant 0.25; a copy written
+as 8-bit sRGB would read 0.25 only after decoding. Bottom: the red | blue .rat (8-bit sRGB) shows red | blue. An image
+left unread would leave diffuseColor at its fallback (0.18)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "a .rat file (Houdini's format, which UE does not read)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "every image is read",
+   "log": "UE cannot read",
+   "present": false
+  },
+  {
+   "name": "8-bit .rat raw / PNG raw = 1",
+   "ratio": [
+    {
+     "region": [
+      -4,
+      2,
+      -1,
+      4
+     ]
+    },
+    {
+     "region": [
+      1,
+      2,
+      4,
+      4
+     ]
+    }
+   ],
+   "min": 0.9,
+   "max": 1.1
+  },
+  {
+   "name": "half-float .rat raw / constant = 1",
+   "ratio": [
+    {
+     "region": [
+      -4,
+      -1,
+      -1,
+      1
+     ]
+    },
+    {
+     "region": [
+      1,
+      -1,
+      4,
+      1
+     ]
+    }
+   ],
+   "min": 0.9,
+   "max": 1.1
+  },
+  {
+   "name": "red | blue .rat: left red",
+   "color": {
+    "region": [
+     -4,
+     -4,
+     -1,
+     -2
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "red | blue .rat: right blue",
+   "color": {
+    "region": [
+     1,
+     -4,
+     4,
+     -2
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "RatRaw"
+{
+    token outputs:surface.connect = </RatRaw/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </RatRaw/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.rat@
+        token inputs:sourceColorSpace = "raw"
+        float2 inputs:st.connect = </RatRaw/st.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "PngRaw"
+{
+    token outputs:surface.connect = </PngRaw/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </PngRaw/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray128.png@
+        token inputs:sourceColorSpace = "raw"
+        float2 inputs:st.connect = </PngRaw/st.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "RatHalf"
+{
+    token outputs:surface.connect = </RatHalf/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </RatHalf/t.outputs:rgb>
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/gray_half.rat@
+        token inputs:sourceColorSpace = "raw"
+        float2 inputs:st.connect = </RatHalf/st.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Material "Constant"
+{
+    token outputs:surface.connect = </Constant/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.25, 0.25, 0.25)
+            int inputs:useSpecularWorkflow = 1
+            color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+}
+def Material "RatColor"
+{
+    token outputs:surface.connect = </RatColor/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor.connect = </RatColor/t.outputs:rgb>
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.rat@
+        float2 inputs:st.connect = </RatColor/st.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "RatRawQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, 1.5, 0), (-0.5, 1.5, 0), (-0.5, 4.5, 0), (-4.5, 4.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </RatRaw>
+}
+def Mesh "PngRawQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(0.5, 1.5, 0), (4.5, 1.5, 0), (4.5, 4.5, 0), (0.5, 4.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </PngRaw>
+}
+def Mesh "RatHalfQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, -1.5, 0), (-0.5, -1.5, 0), (-0.5, 1.5, 0), (-4.5, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </RatHalf>
+}
+def Mesh "ConstantQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(0.5, -1.5, 0), (4.5, -1.5, 0), (4.5, 1.5, 0), (0.5, 1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        rel material:binding = </Constant>
+}
+def Mesh "RatColorQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4.5, -4.5, 0), (4.5, -4.5, 0), (4.5, -1.5, 0), (-4.5, -1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </RatColor>
+}

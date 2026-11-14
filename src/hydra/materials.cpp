@@ -259,16 +259,18 @@ private:
                 return;
             }
             source.image = &node;
-            // The images UE decodes (ImageWrapperModule.cpp GetImageFormatFromExtension, FImageUtils::LoadImage); any
-            // other (Houdini's .rat, .tex, ...) leaves the input at its constant. Host images (op:) export as EXR
-            // (hdue_op_textures.py).
-            static const std::set<std::string> decodable{"png",  "jpg", "jpeg", "uej", "bmp",  "ico", "exr",
-                                                         "icns", "tga", "hdr",  "tif", "tiff", "tx",  "dds"};
-            if (!HdUEHostTexture(t.file) && !decodable.count(TfStringToLower(TfStringGetSuffix(t.file))))
-                data_.warnings.push_back(TfStringPrintf(
-                    "UE cannot read %s (it reads PNG, JPEG, EXR, HDR, TGA, BMP, TIFF and DDS); inputs it drives use "
-                    "their constant",
-                    t.file.c_str()));
+            // Images UE does not decode (Houdini's .rat, ...) render from a converted copy; one that cannot be
+            // converted leaves the input at its constant. Host images (op:) export as EXR (hdue_op_textures.py).
+            if (!HdUEHostTexture(t.file)) {
+                if (auto readable = HdUEDecodableTexture(t.file); !readable.empty())
+                    t.file = std::move(readable);
+                else
+                    data_.warnings.push_back(TfStringPrintf(
+                        "UE cannot read %s (it reads PNG, JPEG, EXR, HDR, TGA, BMP, TIFF and DDS, and hdUE converts "
+                        "the other formats Houdini reads, in Houdini's processes only); inputs it drives use their "
+                        "constant",
+                        t.file.c_str()));
+            }
             // UsdUVTexture's sourceColorSpace (raw, sRGB, auto), else the file's colorSpace metadata, which Hydra
             // passes as colorSpace:file, as it does MaterialX's colorspace attribute (srgb_texture, lin_rec709,
             // acescg, ...). It selects sRGB decoding of 8-bit texels (auto: by slot) and, for colour inputs, the OCIO

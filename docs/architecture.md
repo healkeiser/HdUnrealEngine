@@ -122,7 +122,7 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 
 ### hdUE's parallel work
 
-- **Delegate (host side).** Hydra syncs prims on its own TBB workers (`HdRenderIndex::SyncAll`); prims write into `HdUEState` under its mutex. `prepareMeshes` converts points, normals and UV sets with `WorkParallelForN`; `HdUEToSceneLinear` (OCIO) and the render buffers' copies (`render_buffer.cpp`) use it too. Colour textures in another colour space are converted once through OCIO into EXRs under `%TEMP%\hdue_ocio`.
+- **Delegate (host side).** Hydra syncs prims on its own TBB workers (`HdRenderIndex::SyncAll`); prims write into `HdUEState` under its mutex. `prepareMeshes` converts points, normals and UV sets with `WorkParallelForN`; `HdUEToSceneLinear` (OCIO) and the render buffers' copies (`render_buffer.cpp`) use it too. Colour textures in another colour space are converted once through OCIO into EXRs under `%TEMP%\hdue_ocio`, and images UE does not decode (Houdini's `.rat`, ...) through Houdini's image library (`IMG_File`) into PNGs or EXRs there (`HdUEDecodableTexture`).
 - **Backend (UE side).** `ApplyScene` builds static meshes with `ParallelFor` over the batch (`Scene.cpp`); texture block compression and readback conversion use `ParallelFor`. Interactive hosts launch Lumen card and Nanite builds as `UE::Tasks` at `BackgroundLow` priority (`HdueConversion`), one per set of identical meshes, which `TickConversions` swaps in on the game thread; a scene being destroyed waits for its running builds. Offline hosts build them inline before the frame.
 
 ## One frame
@@ -184,7 +184,7 @@ UE starts once per process. Later delegates (the next viewport, husk `--restart-
 - **On disk.**
   - Shaders: the cooked shader archives in `<runtime>\HdUEBackend\Content` and `GlobalShaderCache-PCD3D_SM6.bin`; nothing is compiled at run time.
   - PSOs: none bundled (`docs/building.md`, "PSOs"). UE's own PSO disk cache is off (`r.D3D12.PSO.DiskCache=0` in the log); the NVIDIA driver keeps its own shader cache (*inferred*).
-  - Converted OCIO textures: `%TEMP%\hdue_ocio`, entries unused for a week removed (`color_management.h`).
+  - Converted textures (OCIO colour spaces, formats UE does not decode): `%TEMP%\hdue_ocio`, entries unused for a week removed (`color_management.h`).
   - Nanite builds: `Saved\NaniteCache` (`BuildNanite`, `Scene.cpp`), keyed by the builder's version and the mesh's content, entries unused for a week removed.
   - Block-compressed textures: `%LOCALAPPDATA%\hdUE\TextureCache` (`CachePath`, `Scene.cpp`), entries unused for a week removed.
   - Virtual textures: `%LOCALAPPDATA%\hdUE\VirtualTextureCache` (`VirtualTextureBuild.cpp`), manifests unused for a week removed with the chunks no other manifest names (a day's grace for chunks a running build has not named yet).

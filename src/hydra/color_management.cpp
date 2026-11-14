@@ -5,6 +5,9 @@
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
 #if defined(HDUE_HOUDINI)
+#include <IMG/IMG_File.h>
+#include <IMG/IMG_Plane.h>
+#include <IMG/IMG_Stat.h>
 #include <OpenColorIO/OpenColorIO.h>
 #include <OpenImageIO/imagebuf.h>
 #include <chrono>
@@ -103,6 +106,89 @@ const ColorManagement& management() {
     });
     return result;
 }
+#if defined(HDUE_HOUDINI)
+// file converted into hdUE's texture cache (%TEMP%/hdue_ocio) by write(source, pending path), each tile of a UDIM
+// pattern (<UDIM> in the name) under the same pattern, as files of the extension extensionOf gives for its first image;
+// key names the conversion, the sources' times its input. Returns the converted file or pattern, file itself when it
+// has no image to read, or empty when one cannot be converted.
+std::string cachedConversion(const std::string& file, const std::string& key,
+                             const std::function<std::string(const std::string&)>& extensionOf,
+                             const std::function<bool(const std::string&, const std::string&)>& write) {
+    const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
+    static std::mutex convert;
+    std::lock_guard lock(convert);
+    std::error_code error;
+    // UE copies textures when they load, so the cache only saves converting again. Each process first evicts the
+    // conversions it has not used for a week, and a hit counts as a use.
+    static std::once_flag evict;
+    std::call_once(evict, [&] {
+        const auto expired = std::filesystem::file_time_type::clock::now() - std::chrono::hours(24 * 7);
+        for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+            std::error_code ignored;
+            if (entry.last_write_time(ignored) < expired) std::filesystem::remove(entry.path(), ignored);
+        }
+    });
+    std::filesystem::create_directories(folder, error);
+    std::string extension;
+    // One image into cached, unless it is there already.
+    const auto converted = [&](const std::string& source, const std::filesystem::path& cached) {
+        std::error_code missing;
+        if (std::filesystem::exists(cached, missing)) {
+            std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), missing);
+            return true;
+        }
+        // Written beside, then renamed: another process (husk on a farm node) shares the folder and must never read a
+        // half-written file.
+        const auto pending = cached.parent_path() /
+                             (cached.stem().string() + "." +
+                              std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()) ^
+                                             uint64_t(std::chrono::steady_clock::now().time_since_epoch().count())) +
+                              ".pending" + extension);
+        if (write(source, pending.string())) {
+            std::error_code renamed;
+            std::filesystem::rename(pending, cached, renamed);
+            if (!renamed || std::filesystem::exists(cached, missing)) {  // another process won the race: same image
+                std::filesystem::remove(pending, missing);
+                return true;
+            }
+        }
+        std::filesystem::remove(pending, missing);
+        return false;
+    };
+    // The images: the file, or each tile of a UDIM pattern (four digits in place of <UDIM>), converted under the
+    // same pattern.
+    std::vector<std::pair<std::string, std::string>> images;  // source, tile number (empty: not a UDIM set)
+    const auto token = file.find("<UDIM>");
+    if (token == std::string::npos) {
+        images.emplace_back(file, "");
+    } else {
+        const std::filesystem::path prefix(file.substr(0, token));
+        const auto head = prefix.filename().string(), tail = file.substr(token + 6);
+        for (const auto& entry : std::filesystem::directory_iterator(prefix.parent_path(), error)) {
+            const auto name = entry.path().filename().string();
+            if (name.size() != head.size() + 4 + tail.size() || name.compare(0, head.size(), head) ||
+                name.compare(name.size() - tail.size(), tail.size(), tail))
+                continue;
+            const auto digits = name.substr(head.size(), 4);
+            if (std::all_of(digits.begin(), digits.end(), [](char c) { return c >= '0' && c <= '9'; }))
+                images.emplace_back(entry.path().string(), digits);
+        }
+    }
+    std::string stamps;
+    for (const auto& [source, tile] : images) {
+        const auto stamp = std::filesystem::last_write_time(source, error);
+        if (error) return file;
+        stamps += "|" + tile + std::to_string(stamp.time_since_epoch().count());
+    }
+    if (images.empty()) return file;
+    extension = extensionOf(images.front().first);
+    if (extension.empty()) return {};
+    const auto name = std::to_string(std::hash<std::string>{}(file + "|" + key + stamps));
+    for (const auto& [source, tile] : images)
+        if (!converted(source, folder / (name + (tile.empty() ? "" : "." + tile) + extension))) return {};
+    return (folder / (name + (token == std::string::npos ? "" : ".<UDIM>") + extension)).string();
+}
+#endif
 }  // namespace
 bool HdUESceneLinearIsRec709() { return management().identity; }
 void HdUEToSceneLinear(std::vector<float>& rgba) {
@@ -180,98 +266,58 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
         TF_WARN("hdUE: %s: %s", from.c_str(), error.what());
         return file;
     }
-    const auto folder = std::filesystem::temp_directory_path() / "hdue_ocio";
-    static std::mutex convert;
-    std::lock_guard lock(convert);
-    std::error_code error;
-    // UE copies textures when they load, so the cache only saves converting again. Each process first evicts the
-    // conversions it has not used for a week, and a hit counts as a use.
-    static std::once_flag evict;
-    std::call_once(evict, [&] {
-        const auto expired = std::filesystem::file_time_type::clock::now() - std::chrono::hours(24 * 7);
-        for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
-            std::error_code ignored;
-            if (entry.last_write_time(ignored) < expired) std::filesystem::remove(entry.path(), ignored);
-        }
-    });
-    std::filesystem::create_directories(folder, error);
-    // One image into cached, an EXR, unless it is there already.
-    const auto converted = [&](const std::string& source, const std::filesystem::path& cached) {
-        std::error_code missing;
-        if (std::filesystem::exists(cached, missing)) {
-            std::filesystem::last_write_time(cached, std::filesystem::file_time_type::clock::now(), missing);
-            return true;
-        }
-        // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept
-        // 8-bit.
+    // Read as float: an 8-bit image in a linear space (acescg, lin_rec709 primaries aside) would band if kept 8-bit.
+    const auto write = [&](const std::string& source, const std::string& pending) {
         OIIO::ImageBuf image(source);
-        const bool read =
-            image.read(0, 0, true, OIIO::TypeDesc::FLOAT) && image.localpixels() && image.nchannels() >= 3;
-        if (read) {
-            const auto& spec = image.spec();
-            const auto pixel = std::ptrdiff_t(spec.nchannels * sizeof(float));
-            OCIO::PackedImageDesc pixels(image.localpixels(), spec.width, spec.height * spec.depth,
-                                         std::min(spec.nchannels, 4), OCIO::BIT_DEPTH_F32, sizeof(float), pixel,
-                                         pixel * spec.width);
-            processor->apply(pixels);
-        }
-        // Written beside, then renamed: another process (husk on a farm node) shares the folder and must never read a
-        // half-written file.
-        const auto pending = cached.parent_path() /
-                             (cached.stem().string() + "." +
-                              std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()) ^
-                                             uint64_t(std::chrono::steady_clock::now().time_since_epoch().count())) +
-                              ".pending.exr");
-        if (read && image.write(pending.string(), OIIO::TypeDesc::HALF)) {
-            std::error_code renamed;
-            std::filesystem::rename(pending, cached, renamed);
-            if (!renamed || std::filesystem::exists(cached, missing)) {  // another process won the race: same image
-                std::filesystem::remove(pending, missing);
-                return true;
-            }
-        }
-        std::filesystem::remove(pending, missing);
-        TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", source.c_str(), from.c_str());
-        return false;
+        if (!image.read(0, 0, true, OIIO::TypeDesc::FLOAT) || !image.localpixels() || image.nchannels() < 3)
+            return false;
+        const auto& spec = image.spec();
+        const auto pixel = std::ptrdiff_t(spec.nchannels * sizeof(float));
+        OCIO::PackedImageDesc pixels(image.localpixels(), spec.width, spec.height * spec.depth,
+                                     std::min(spec.nchannels, 4), OCIO::BIT_DEPTH_F32, sizeof(float), pixel,
+                                     pixel * spec.width);
+        processor->apply(pixels);
+        return image.write(pending, OIIO::TypeDesc::HALF);
     };
-    // The images: the file, or each tile of a UDIM pattern (four digits in place of <UDIM>), converted under the
-    // same pattern.
-    std::vector<std::pair<std::string, std::string>> images;  // source, tile number (empty: not a UDIM set)
-    const auto token = file.find("<UDIM>");
-    if (token == std::string::npos) {
-        images.emplace_back(file, "");
-    } else {
-        const std::filesystem::path prefix(file.substr(0, token));
-        const auto head = prefix.filename().string(), tail = file.substr(token + 6);
-        for (const auto& entry : std::filesystem::directory_iterator(prefix.parent_path(), error)) {
-            const auto name = entry.path().filename().string();
-            if (name.size() != head.size() + 4 + tail.size() || name.compare(0, head.size(), head) ||
-                name.compare(name.size() - tail.size(), tail.size(), tail))
-                continue;
-            const auto digits = name.substr(head.size(), 4);
-            if (std::all_of(digits.begin(), digits.end(), [](char c) { return c >= '0' && c <= '9'; }))
-                images.emplace_back(entry.path().string(), digits);
-        }
-    }
-    std::string stamps;
-    for (const auto& [source, tile] : images) {
-        const auto stamp = std::filesystem::last_write_time(source, error);
-        if (error) return file;
-        stamps += "|" + tile + std::to_string(stamp.time_since_epoch().count());
-    }
-    if (images.empty()) return file;
     // The config's identity and this conversion's version: another config with the same space names (ACES 1 and 2),
     // or a change to the conversion below, must not reuse an EXR. Bump kConversion when the conversion changes.
     constexpr int kConversion = 1;
-    const auto key =
-        std::to_string(std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + "|" + m.config->getCacheID() +
-                                                "|" + std::to_string(kConversion) + stamps));
-    for (const auto& [source, tile] : images)
-        if (!converted(source, folder / (key + (tile.empty() ? "" : "." + tile) + ".exr"))) return file;
-    return (folder / (key + (token == std::string::npos ? "" : ".<UDIM>") + ".exr")).string();
+    const auto converted = cachedConversion(
+        file, from + "|" + m.sceneLinear + "|" + m.config->getCacheID() + "|" + std::to_string(kConversion),
+        [](const std::string&) { return std::string(".exr"); }, write);
+    if (converted.empty()) {
+        TF_WARN("hdUE: could not convert %s from %s to linear Rec.709; using it as is", file.c_str(), from.c_str());
+        return file;
+    }
+    return converted;
 #else
     (void)space;
     return file;
 #endif
+}
+std::string HdUEDecodableTexture(const std::string& file) {
+    // The images UE decodes (ImageWrapperModule.cpp GetImageFormatFromExtension, FImageUtils::LoadImage).
+    static const std::set<std::string> decodable{"png",  "jpg", "jpeg", "uej", "bmp",  "ico", "exr",
+                                                 "icns", "tga", "hdr",  "tif", "tiff", "tx",  "dds"};
+    if (decodable.count(TfStringToLower(TfStringGetSuffix(file)))) return file;
+#if defined(HDUE_HOUDINI)
+    // Any other (Houdini's .rat and .pic, Photoshop, SGI, ...) through Houdini's image library, as Karma reads them
+    // (Houdini's OpenImageIO has no .rat reader). Integer images become PNG and float ones EXR, so the texels stay as
+    // stored and the material's sRGB or linear decoding applies as to the original: IMG converts the colour space
+    // between integer and float files (an 8-bit .rat written as EXR would be linearised).
+    const auto extensionOf = [](const std::string& source) {
+        const auto image = IMG_File::open(source.c_str());
+        if (!image) return std::string();
+        const auto type = image->getStat().getPlane()->getDataType();
+        return std::string(type == IMG_FLOAT || type == IMG_HALF ? ".exr" : ".png");
+    };
+    const auto write = [](const std::string& source, const std::string& pending) {
+        return IMG_File::copyToFile(source.c_str(), pending.c_str());
+    };
+    // Bump the version when the conversion changes.
+    const auto converted = cachedConversion(file, "decodable|1", extensionOf, write);
+    if (!converted.empty() && decodable.count(TfStringToLower(TfStringGetSuffix(converted)))) return converted;
+#endif
+    return {};
 }
 PXR_NAMESPACE_CLOSE_SCOPE
