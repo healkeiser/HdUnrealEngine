@@ -73,9 +73,9 @@ Individual steps:
 - `native`: the C++ tests (`ctest`) of the standalone and Houdini builds that exist. It does not rebuild; it fails if neither build exists.
 - `hydra`: `Verify.ps1 -SkipBuild -WithUsdview`: native UE and Hydra renders, usdview, camera and buffer checks.
 - `houdini`: the in-Houdini tests, the prim LOP tests and husk's prepared-material and streaming tests.
-- `conformance`: `run_conformance.py` on the scenes named by `-Only <area>/*` (for example `-Only materials/*`). It refuses to run without `-Only`, because the full set takes over an hour.
+- `conformance`: `run_conformance.py` on the scenes named by `-Only <area>/*` (for example `-Only materialx/*`). It refuses to run without `-Only`, because the full set takes over an hour.
 - `extended`: the in-Houdini kinds no other tier starts, each on its own scene. It prints what it does not run.
-- `all`: `unit`, `native`, `hydra` and `houdini`. It says that conformance and extended were not run.
+- `all`: `unit`, `native` (when a build exists), `hydra` and `houdini`. It says which of them did not run, and that conformance and extended were not run.
 
 Dev runs must test the dev build, not an installed hdUE package. `Launch-Houdini.ps1`, `Test-Houdini.ps1`, `run_conformance.py` and `render_gallery.py` add `hdUE` to `HOUDINI_PACKAGE_SKIPLIST` (comma-separated, so existing entries stay). `render_gallery.py --dev` also uses the runtime profile in `.local`, even when an installed package set `HDUE_RUNTIME_CONFIG`.
 

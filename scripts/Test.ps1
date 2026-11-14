@@ -156,6 +156,7 @@ if ($Suite -in 'houdini', 'all') {
 }
 if ($Suite -eq 'all') {
     # The long tiers run only when named: say so, so "all passed" is not read as everything.
-    Write-Output "Suite all passed ($($Ran -join ', ')). Not run: conformance (-Suite conformance -Only <area>/*), extended (-Suite extended)."
+    $Skipped = if ('native' -notin $Ran) { 'native (no build), ' } else { '' }
+    Write-Output "Suite all passed ($($Ran -join ', ')). Not run: $($Skipped)conformance (-Suite conformance -Only <area>/*), extended (-Suite extended)."
 }
 else { Write-Output "Suite $Suite passed." }

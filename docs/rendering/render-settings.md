@@ -134,6 +134,11 @@ husk and the USD Render ROP render with an offline profile, like Movie Render Qu
 
 Settings you author win over both profiles.
 
+A value hdUE cannot use does not fail the render. hdUE logs a warning that names the setting and renders with:
+
+- the default, for a non-finite **Viewer Light Intensity**; a value outside 0-100 is clamped to that range;
+- the default (128), for an **Environment Cube Resolution** that is not a power of two from 32 to 2048.
+
 ## All settings
 
 The [render settings reference](../reference/render-settings/index.md) lists every setting with its attribute, default, range and UE's tooltip, tab by tab: [Rendering](../reference/render-settings/rendering.md), [Lens](../reference/render-settings/lens.md), [Color Grading](../reference/render-settings/color-grading.md), [Lighting](../reference/render-settings/lighting.md), [Fog](../reference/render-settings/fog.md), [Sky](../reference/render-settings/sky.md), [Rendering Features](../reference/render-settings/rendering-features.md), [Engine Quality](../reference/render-settings/engine-quality.md).

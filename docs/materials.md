@@ -116,7 +116,7 @@ A Mesh, Xform or Scope prim with `unreal:asset` renders a cooked UE asset from t
 
     1. The asset's UE object path in the runtime project.
 
-The asset keeps its UE materials, material slots, pivot and centimetre dimensions; the prim's transform places it. A static mesh missing from the runtime, or without Nanite data under **Require Nanite**, fails a husk frame; Houdini's viewport draws the scene without it and warns. Without an asset catalog the menu lists the staged runtime's levels and the assets named with UE's prefixes (`SM_`, `SK_`, `BP_`, `SVT_`).
+The asset keeps its UE materials, material slots, pivot and centimetre dimensions; the prim's transform places it. A static mesh missing from the runtime, or without Nanite data under **Require Nanite**, fails a husk frame; Houdini's viewport draws the scene without it and warns. Without an asset catalog the menu lists the staged runtime's levels and the assets named with UE's prefixes (`SM_`, `SK_`, `BP_`, `SVT_`, `NS_`).
 
 An asset from another UE project (a Marketplace pack, your game) is imported with the [hdUE Unreal Asset](reference/nodes/lop/hdueunrealasset.md) LOP: pick the project and the asset, press **Import**, and UE's editor cooks it into the running runtime in the background, without a restart. The LOP also creates the prim that places it.
 

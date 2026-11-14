@@ -23,8 +23,6 @@ Meshes keep their points, face-varying UVs, normals and colours. A mesh hdUE can
 - A material parameter value of a type hdUE cannot map is skipped. Native material parameters for a material with no cooked asset, or that are not a dictionary, are skipped as a whole.
 - A material with no ID, or with a non-finite opacity, is skipped. So is a material whose asset is missing from the runtime. Meshes bound to it keep its previous version if it had one, else they draw UE's default material, so the problem shows.
 - A wet mask primvar that fails to read gives that mesh no wet effect.
-- A non-finite **Viewer Light Intensity** uses the default. A value outside 0-100 is clamped to that range.
-- A **Environment Cube Resolution** that is not a power of two from 32 to 2048 falls back to the default.
 
 These cases are skipped with a warning in interactive hosts (Houdini's viewport), but fail the frame in husk, so an offline render never delivers an image without a mesh it needs:
 
