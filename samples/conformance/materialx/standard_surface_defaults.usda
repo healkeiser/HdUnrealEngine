@@ -4,7 +4,8 @@
 ND_standard_surface_surfaceshader): base 1 and base_color (0.8, 0.8, 0.8). Version 1.0.0
 (ND_standard_surface_surfaceshader_100) had base 0.8 and base_color 1. A material authoring only base_color (top left)
 matches one authoring base 1 too (top right); one authoring only base 0.5 (bottom left) matches one authoring
-base_color 0.8 too (bottom right)."""
+base_color 0.8 too (bottom right). Position alone moves the top pair's ratio to about 0.95 (view-dependent specular,
+the same with the materials swapped), hence 0.9-1.1; 1.0.0's defaults read 0.76 and 1.26."""
     customLayerData = {
         string conformance = """{
  "schema": "MaterialX",
@@ -36,8 +37,8 @@ base_color 0.8 too (bottom right)."""
      ]
     }
    ],
-   "min": 0.95,
-   "max": 1.05
+   "min": 0.9,
+   "max": 1.1
   },
   {
    "name": "base_color defaults to 0.8 (1.0.1)",
@@ -59,8 +60,8 @@ base_color 0.8 too (bottom right)."""
      ]
     }
    ],
-   "min": 0.95,
-   "max": 1.05
+   "min": 0.9,
+   "max": 1.1
   }
  ]
 }"""

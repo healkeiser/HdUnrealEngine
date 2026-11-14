@@ -430,8 +430,9 @@ struct MaterialXSurface {
     Input<float> transmissionDepth;
     const char* normal;
 };
-const MaterialXSurface standardSurface{{"base", .8f},
-                                       {"base_color", GfVec3f(1)},
+// MaterialX 1.0.1, the default version (bxdf/standard_surface.mtlx): base 1, base_color 0.8.
+const MaterialXSurface standardSurface{{"base", 1.f},
+                                       {"base_color", GfVec3f(.8f)},
                                        {"metalness", 0},
                                        {"specular", 1},
                                        {"specular_color", GfVec3f(1)},
@@ -455,6 +456,13 @@ const MaterialXSurface standardSurface{{"base", .8f},
                                        {"transmission_color", GfVec3f(1)},
                                        {"transmission_depth", 0},
                                        "normal"};
+// 1.0.0 (ND_standard_surface_surfaceshader_100) differs only in base 0.8 and base_color 1.
+const MaterialXSurface standardSurface100 = [] {
+    auto s = standardSurface;
+    s.base.fallback = .8f;
+    s.baseColor.fallback = GfVec3f(1);
+    return s;
+}();
 // OpenPBR's subsurface_radius is the scalar distance and subsurface_radius_scale the per-channel colour.
 const MaterialXSurface openPbr{{"base_weight", 1},
                                {"base_color", GfVec3f(.8f)},
@@ -597,7 +605,9 @@ bool readSurface(const HdMaterialNetwork2& network, const HdMaterialNode2& shade
     if (type == "UsdPreviewSurface" || type == "ND_UsdPreviewSurface_surfaceshader")
         readPreviewSurface(reader, data);
     else if (TfStringStartsWith(type, "ND_standard_surface_surfaceshader"))
-        readMaterialX(reader, data, standardSurface);
+        readMaterialX(
+            reader, data,
+            TfStringStartsWith(type, "ND_standard_surface_surfaceshader_100") ? standardSurface100 : standardSurface);
     else if (TfStringStartsWith(type, "ND_open_pbr_surface_surfaceshader"))
         readMaterialX(reader, data, openPbr);
     else
