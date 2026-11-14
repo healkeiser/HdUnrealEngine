@@ -505,6 +505,20 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             next = capture("native-assets-no-lumen");
             changed(previous, next, "Lumen GI/reflections enabled versus disabled");
             raw->SetRenderSetting(TfToken("lumenEnabled"), VtValue(true));
+            // One bad item does not fail the scene: parameter types UE cannot hold as they are (a bool and a 2-vector,
+            // on M_Native's own Metallic and BaseColor, convert; an empty value is skipped with a warning), and a mesh
+            // mapped to a missing cooked StaticMesh (skipped by the backend with a warning) both render.
+            VtDictionary mixed{
+                {"Metallic", VtValue(true)}, {"BaseColor", VtValue(GfVec2f(.5f, .25f))}, {"HdUEEmpty", VtValue()}};
+            raw->SetRenderSetting(TfToken("nativeMaterialParameters"),
+                                  VtValue(VtDictionary{{"/Looks/Red", VtValue(mixed)}}));
+            capture("native-parameters-mixed");
+            raw->SetRenderSetting(TfToken("nativeMaterialParameters"), VtValue(VtDictionary()));
+            auto missing = nativeMesh;
+            missing["/World/Cube"] = VtValue(std::string("/Game/HdUE/DoesNotExist.DoesNotExist"));
+            raw->SetRenderSetting(TfToken("nativeMeshAssets"), VtValue(missing));
+            capture("native-mesh-missing");
+            raw->SetRenderSetting(TfToken("nativeMeshAssets"), VtValue(nativeMesh));
             raw->SetRenderSetting(TfToken("renderMode"), VtValue(std::string("pathtraced")));
             previous = capture("native-assets-pathtraced");
             stage->GetPrimAtPath(SdfPath("/World/Cube")).SetActive(false);
