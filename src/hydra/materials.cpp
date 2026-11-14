@@ -304,7 +304,10 @@ private:
             upstream("in");
         } else if (starts("ND_multiply_") && (!connection(node, "in1") || !connection(node, "in2"))) {
             const char* driven = connection(node, "in1") ? "in1" : "in2";
-            affine(vec4(param(node, driven[2] == '1' ? "in2" : "in1")), GfVec4f(0));
+            const char* other = driven[2] == '1' ? "in2" : "in1";
+            const auto factor = param(node, other);
+            // MaterialX defaults: in1 0, in2 1 (stdlib_defs.mtlx ND_multiply_*); Hydra passes authored inputs only.
+            affine(factor.IsEmpty() ? GfVec4f(other[2] == '1' ? 0.f : 1.f) : vec4(factor), GfVec4f(0));
             upstream(driven);
         } else if (starts("ND_mix_") && type.find("shader") == std::string::npos && !TfStringEndsWith(type, "df") &&
                    int(!!connection(node, "fg")) + !!connection(node, "bg") + !!connection(node, "mix") == 1) {
