@@ -2524,6 +2524,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             // the Hydra instanceId (3) for M_HdUEId's instance pass.
             Instances->SetNumCustomDataFloats(4);
             Instances->AddInstances(Transforms, false, true);
+            // AddInstances only invalidates the cached bounds: a pick right after this edit (PickNative) reads Bounds.
+            Instances->UpdateBounds();
             for (uint32 I = 0; I < Desc.instance_count; ++I) {
                 float Data[4] = {1.f, 1.f, 1.f, float(Desc.instance_ids ? Desc.instance_ids[I] : int32(I))};
                 if (Desc.instance_colors) FMemory::Memcpy(Data, Desc.instance_colors + I * 3, sizeof(float) * 3);

@@ -105,6 +105,18 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
     const FVector3d Direction =
         FVector3d(Request.direction[0], Request.direction[1], Request.direction[2]).GetSafeNormal();
     double Nearest = Request.maximum_cm;
+    // The nearest component the ray reaches that cannot be picked (its materials or its geometry), at the distance the
+    // ray enters its bounds: it fails the pick only when nothing pickable is hit before it (after the loop), whatever
+    // order the actors come in.
+    double Blocked = TNumericLimits<double>::Max();
+    HdueResult BlockedCode = HDUE_OK;
+    FString BlockedError;
+    const auto Unpickable = [&](double Distance, HdueResult Code, const FString& Problem) {
+        if (Distance >= Blocked) return;
+        Blocked = Distance;
+        BlockedCode = Code;
+        BlockedError = Problem;
+    };
     for (const auto& Entry : Actors) {
         AActor* Actor = Entry.Value;
         if (!IsValid(Actor) || Actor->IsHidden()) continue;
@@ -115,25 +127,35 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
         if (!Source || !Source->IsAsset()) continue;
         // Only a component the ray can reach decides the pick: an unpickable asset elsewhere must not fail it.
         const FBox Bounds = Static->Bounds.GetBox();
-        if (!FMath::LineBoxIntersection(Bounds, Origin, Origin + Direction * Nearest, Direction * Nearest)) continue;
+        FVector BoundsHit, BoundsNormal;
+        float BoundsTime = 0;
+        if (!FMath::LineExtentBoxIntersection(Bounds, Origin, Origin + Direction * Nearest, FVector::ZeroVector,
+                                              BoundsHit, BoundsNormal, BoundsTime))
+            continue;
+        const double Enters = BoundsTime * Nearest;
         TArray<uint32> MaterialFlags;
-        for (int32 I = 0; I < Static->GetNumMaterials(); ++I) {
+        HdueResult Code = HDUE_OK;
+        FString Problem;
+        for (int32 I = 0; I < Static->GetNumMaterials() && Code == HDUE_OK; ++I) {
             uint32 Flags = 0;
-            const auto Code = InspectMaterial(Static->GetMaterial(I), Flags, Error);
-            if (Code != HDUE_OK) return Code;
-            if (!(Flags & HDUE_PICK_MATERIAL_OPAQUE) || (Flags & HDUE_PICK_MATERIAL_DEFORMED)) {
-                Error = FString::Printf(TEXT("Picking requires opaque materials without vertex/displacement "
-                                             "deformation (%s)."),
-                                        *Source->GetPathName());
-                return HDUE_NOT_SUPPORTED;
+            Code = InspectMaterial(Static->GetMaterial(I), Flags, Problem);
+            if (Code == HDUE_OK && (!(Flags & HDUE_PICK_MATERIAL_OPAQUE) || (Flags & HDUE_PICK_MATERIAL_DEFORMED))) {
+                Code = HDUE_NOT_SUPPORTED;
+                Problem = FString::Printf(TEXT("Picking requires opaque materials without vertex/displacement "
+                                               "deformation (%s)."),
+                                          *Source->GetPathName());
             }
             MaterialFlags.Add(Flags);
+        }
+        if (Code != HDUE_OK) {
+            Unpickable(Enters, Code, Problem);
+            continue;
         }
         auto& Geometry = NativePickGeometry.FindOrAdd(Source->GetPathName());
         if (!Geometry) Geometry = MakeShared<FNativePickGeometry>(Source);
         if (!Geometry->Error.IsEmpty()) {
-            Error = Geometry->Error;
-            return HDUE_NOT_SUPPORTED;
+            Unpickable(Enters, HDUE_NOT_SUPPORTED, Geometry->Error);
+            continue;
         }
         const auto Test = [&](const FMatrix& LocalToWorld) {
             if (FMath::Abs(LocalToWorld.Determinant()) < UE_SMALL_NUMBER) return;
@@ -186,6 +208,10 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
         } else {
             Test(Static->GetComponentTransform().ToMatrixWithScale());
         }
+    }
+    if (BlockedCode != HDUE_OK && Blocked < Nearest) {
+        Error = BlockedError;
+        return BlockedCode;
     }
     return HDUE_OK;
 }
