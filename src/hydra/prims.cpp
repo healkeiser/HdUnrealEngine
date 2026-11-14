@@ -627,9 +627,10 @@ public:
                         HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag)) &&
             MoveInstances(delegate, *state, bits))
             return;
-        // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry.
+        // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry (Varying: an animated
+        // transform in husk).
         if (!emitted_.empty() && GetInstancerId().IsEmpty() &&
-            !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
+            !(*bits & ~(HdChangeTracker::Varying | HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
                         HdChangeTracker::DirtyRenderTag))) {
             const auto transform = delegate->GetTransform(GetId());
             const bool visible = delegate->GetVisible(GetId());

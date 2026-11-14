@@ -1657,6 +1657,17 @@ void convertDeferred(ScenePacket& packet) {
     for (size_t i = 0; i < descs.size(); ++i)
         addMesh(packet, packet.deferred[i].mesh.id, packet.deferred[i].nativeAsset, descs[i]);
 }
+// The meshes Hydra synced since the last submit that sent geometry or moves (HDUE_TRACE_TIMING).
+void traceMeshSyncs() {
+    double syncMs = 0, lockMs = 0;
+    int syncs = 0;
+    HdUETakeMeshSyncStats(syncMs, syncs, lockMs);
+    if (syncs)
+        trace(
+            "hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads, %.1f ms of it "
+            "waiting for the state lock, %.1f ms for uploads\n",
+            syncs, syncMs, lockMs, streamWaitMicroseconds.exchange(0) / 1000.0);
+}
 // Without the state lock: only the backend and the packet (the UE thread owns the session).
 void sendScene(const HdUEState& state, ScenePacket& packet) {
     const auto& backend = *state.backend;
@@ -1682,14 +1693,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         trace("hdUE scene submit: UE apply %.1f ms (%u meshes: %llu vertices, %llu triangles; %u materials)\n",
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count(),
               batch.mesh_count, (unsigned long long)vertices, (unsigned long long)triangles, batch.material_count);
-        double syncMs = 0, lockMs = 0;
-        int syncs = 0;
-        HdUETakeMeshSyncStats(syncMs, syncs, lockMs);
-        if (syncs)
-            trace(
-                "hdUE mesh sync since last submit: %d meshes, %.1f ms summed over Hydra threads, %.1f ms of it "
-                "waiting for the state lock, %.1f ms for uploads\n",
-                syncs, syncMs, lockMs, streamWaitMicroseconds.exchange(0) / 1000.0);
+        traceMeshSyncs();
     }
     if (!packet.extendedLights.empty() || packet.sendLinks) {
         HdueLightBatch update{sizeof(HdueLightBatch), uint32_t(packet.extendedLights.size()),
@@ -1720,6 +1724,7 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         backend.require(api.set_transforms(session, packet.moves.data(), uint32_t(packet.moves.size())),
                         "set_transforms");
         trace("hdUE scene submit: %zu meshes moved, geometry kept\n", packet.moves.size());
+        traceMeshSyncs();
     }
     for (const auto& id : packet.removedIds) backend.require(api.remove_asset(session, id.c_str()), "remove_asset");
     for (const auto* id : packet.removedAssets) backend.require(api.remove_asset(session, id), "remove_asset");
