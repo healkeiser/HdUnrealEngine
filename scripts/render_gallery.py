@@ -50,6 +50,10 @@ BASELINES = ROOT / "tests" / "gallery_baselines.json"
 # 95th-percentile relative tile error allowed against the baseline: Lumen's temporal GI varies between runs, the
 # Path Tracer's tiles agree within 1%.
 TILE_LIMITS = {"lumen": 0.3, "pathtraced": 0.05}
+# The largest tile error allowed: the percentile lets 7 of the 144 tiles be anything, so a light or a material
+# regressing in a small region would pass it. Measured on the Cornell gallery (all scenes but Lumen's glossy, a
+# known failure): Lumen at most 0.27 (ies), the Path Tracer 0.09 (subdivision); a black tile reads about 0.95.
+TILE_MAX_LIMITS = {"lumen": 0.5, "pathtraced": 0.15}
 
 # name, title, layer (relative to samples/cornell); captions come from each layer's doc string.
 CORNELL_SCENES = [
@@ -512,6 +516,10 @@ def check_baselines(bless):
                 if not p95 <= TILE_LIMITS[key]:  # also true for NaN
                     failures.append(
                         f"{name} {key}: 95th-percentile tile error {p95:.3f} > {TILE_LIMITS[key]}"
+                    )
+                elif not error.max() <= TILE_MAX_LIMITS[key]:
+                    failures.append(
+                        f"{name} {key}: largest tile error {error.max():.3f} > {TILE_MAX_LIMITS[key]}"
                     )
     if bless:
         BASELINES.write_text(json.dumps(stored, separators=(",", ":")) + "\n")

@@ -59,6 +59,9 @@ class Baselines(unittest.TestCase):
                     render_gallery, "CORNELL_SCENES", [("S", 0, 0)]
                 ),
                 mock.patch.object(render_gallery, "TILE_LIMITS", {"k": 0.1}),
+                mock.patch.object(
+                    render_gallery, "TILE_MAX_LIMITS", {"k": 0.5}
+                ),
                 mock.patch.object(render_gallery, "pixels", lambda _: image),
             ):
                 return render_gallery.check_baselines(False)
@@ -76,6 +79,14 @@ class Baselines(unittest.TestCase):
         image = self.image.copy()
         image[0, 0, 0] = np.nan
         self.assertEqual(len(self.run_check(image, self.stored)), 1)
+
+    def test_a_black_block_of_tiles_fails(self):
+        # Six of the 144 tiles (2 x 3, each 2 x 2 pixels): under the 95th percentile, over the largest error.
+        image = self.image.copy()
+        image[0:4, 0:6] = 0
+        failures = self.run_check(image, self.stored)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("largest tile error", failures[0])
 
     def test_missing_render_with_baseline_fails(self):
         failures = self.run_check(None, self.stored)
