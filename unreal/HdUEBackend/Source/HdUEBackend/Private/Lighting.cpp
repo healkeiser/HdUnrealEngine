@@ -1,4 +1,5 @@
 #include "Lighting.h"
+#include "Async/ParallelFor.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/PointLightComponent.h"
@@ -640,19 +641,22 @@ bool FHdueLighting::RebuildEnvironment(FString& Error) {
         const auto Inverse = Frame(D).Inverse();
         const FLinearColor Weight(D.color[0] * D.intensity, D.color[1] * D.intensity, D.color[2] * D.intensity, 0);
         const FImage* Image = Dome->File.IsEmpty() ? nullptr : Images[Dome->File].Image.Get();
-        for (int32 Face = 0; Face < 6; ++Face)
-            for (uint32 Y = 0; Y < Resolution; ++Y)
-                for (uint32 X = 0; X < Resolution; ++X) {
-                    const FVector Local = Inverse
-                                              .TransformVector(CubeDirection(Face, 2 * (X + .5) / Resolution - 1,
-                                                                             2 * (Y + .5) / Resolution - 1))
-                                              .GetSafeNormal();
-                    auto Color = Image ? SampleLatlong(*Image, Local) : FLinearColor::White;
-                    Color.R = FMath::Max(0.f, Color.R);
-                    Color.G = FMath::Max(0.f, Color.G);
-                    Color.B = FMath::Max(0.f, Color.B);
-                    Pixels[(int64(Face) * Resolution + Y) * Resolution + X] += Color * Weight;
-                }
+        // One row of one face per iteration: each texel is written by one iteration, the domes one after another.
+        ParallelFor(6 * int32(Resolution), [&](int32 Row) {
+            const int32 Face = Row / int32(Resolution);
+            const uint32 Y = uint32(Row) % Resolution;
+            for (uint32 X = 0; X < Resolution; ++X) {
+                const FVector Local = Inverse
+                                          .TransformVector(CubeDirection(Face, 2 * (X + .5) / Resolution - 1,
+                                                                         2 * (Y + .5) / Resolution - 1))
+                                          .GetSafeNormal();
+                auto Color = Image ? SampleLatlong(*Image, Local) : FLinearColor::White;
+                Color.R = FMath::Max(0.f, Color.R);
+                Color.G = FMath::Max(0.f, Color.G);
+                Color.B = FMath::Max(0.f, Color.B);
+                Pixels[int64(Row) * Resolution + X] += Color * Weight;
+            }
+        });
     }
     for (const auto& Color : Pixels) {
         if (!FMath::IsFinite(Color.R) || !FMath::IsFinite(Color.G) || !FMath::IsFinite(Color.B)) {
