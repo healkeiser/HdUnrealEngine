@@ -18,7 +18,7 @@ from materialx_textures import (
     udim_tiles,
 )
 from pxr import Sdf, Usd, UsdShade
-from usd_materialx_graph import graph_data
+from usd_materialx_graph import graph_data, image_color_space
 
 # The node-graph categories UE 5.8's MaterialX importer translates whole instead of expanding them (CategoriesToSkip,
 # Engine/Plugins/Interchange/Runtime/Source/Import/Private/MaterialX/MaterialXUtils/MaterialXManager.cpp).
@@ -363,22 +363,23 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                         raise ValueError(
                             f"Separate normal/color source files are required for UE texture sampling: {filename}"
                         )
-                    colorspace = item.get("colorspace")
-                    if normal:
-                        if colorspace not in (
-                            None,
-                            "",
-                            "raw",
-                            "lin_rec709",
-                            "lin_rec709_scene",
-                        ):
-                            raise ValueError(
-                                f"normalmap image must use raw/linear data: {item['attribute']}"
-                            )
-                        colorspace = "raw"
+                    kind = (
+                        "normal"
+                        if normal
+                        else (
+                            "color"
+                            if exported[path].getType() in ("color3", "color4")
+                            else "data"
+                        )
+                    )
+                    colorspace = image_color_space(
+                        item.get("colorspace"), kind, item["attribute"]
+                    )
                     value = filename.replace("\\", "/")
                     if colorspace:
-                        port.setColorSpace(str(colorspace))
+                        port.setColorSpace(colorspace)
+                    else:
+                        port.removeAttribute("colorspace")
                 port.setValueString(_value_text(value))
                 fields.append(
                     dict(

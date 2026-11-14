@@ -16,6 +16,7 @@ from pxr import Sdf, Usd, UsdShade
 from usd_materialx_graph import (
     graph_data,
     graph_signature,
+    image_color_space,
     needs_import,
     request_key,
     structure_key,
@@ -142,6 +143,31 @@ class NeedsImportTests(unittest.TestCase):
         self.assertTrue(
             needs_import(self.graph(surface="ND_gltf_pbr_surfaceshader"))
         )
+
+
+class ImageColorSpaceTests(unittest.TestCase):
+    def test_names_decode_as_at_render_time(self):
+        # (authored, colour image, data image): what UE's importer is given. sRGB-encoded names (HdUESRGBColorSpace)
+        # and untagged colour images are srgb_texture, the one name it decodes as sRGB; the rest stays linear.
+        for space, color, data in (
+            ("", "srgb_texture", ""),
+            ("auto", "srgb_texture", ""),
+            ("srgb_texture", "srgb_texture", "srgb_texture"),
+            ("sRGB - Texture", "srgb_texture", "srgb_texture"),
+            ("srgb_tx", "srgb_texture", "srgb_texture"),
+            ("lin_srgb", "lin_srgb", "lin_srgb"),
+            ("raw", "raw", "raw"),
+            ("lin_rec709", "lin_rec709", "lin_rec709"),
+        ):
+            self.assertEqual(image_color_space(space, "color"), color, space)
+            self.assertEqual(image_color_space(space, "data"), data, space)
+
+    def test_normal_maps_are_raw(self):
+        for space in ("", "auto", "raw", "lin_rec709", "lin_srgb"):
+            self.assertEqual(image_color_space(space, "normal"), "raw", space)
+        for space in ("srgb_texture", "sRGB - Texture", "srgb_tx"):
+            with self.assertRaises(ValueError):
+                image_color_space(space, "normal")
 
 
 class LibraryTests(unittest.TestCase):

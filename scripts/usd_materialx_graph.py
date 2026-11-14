@@ -292,10 +292,32 @@ def structure_key(graph):
 # (HdUEImportMaterialXCommandlet.cpp), materialx_lowering.py's rewrites and export_usd_materialx.py's output. Bump it
 # when any of them changes what UE imports: published live materials of another version stop matching and age out
 # (live_materials.clean).
-IMPORT_VERSION = 4
+# 5: image colour spaces as the render-time translation decodes them (image_color_space).
+IMPORT_VERSION = 5
 
 
 def request_key(graph):
     """The exact identity of a graph to prepare, values included, independent of the material's path."""
     signature = graph_signature(rebase_graph(graph, graph["material"], "/M"))
     return hashlib.sha256(f"{IMPORT_VERSION}:{signature}".encode()).hexdigest()
+
+
+def image_color_space(space, kind, where=""):
+    """The colour space an image file is exported with for UE's MaterialX importer, as hdUE's render-time translation
+    decodes it: names it reads as sRGB-encoded (color_management.cpp HdUESRGBColorSpace: "srgb" without "lin") become
+    srgb_texture, the one name UE's importer decodes as sRGB (MaterialXSurfaceShaderAbstract.h:474-476); an untagged or
+    auto colour image is sRGB, as the render-time translation decodes 8-bit colour slots; untagged data stays linear
+    (the document's lin_rec709). kind is "color", "data" or "normal"; a normal map is raw, and sRGB-encoded normals
+    are refused (where names the input). Keep in step with color_management.cpp.
+    """
+    lower = (space or "").lower()
+    srgb = "srgb" in lower and "lin" not in lower
+    if kind == "normal":
+        if srgb:
+            raise ValueError(
+                f"normalmap image must use raw/linear data: {where or space}"
+            )
+        return "raw"
+    if srgb or (kind == "color" and lower in ("", "auto")):
+        return "srgb_texture"
+    return "" if lower == "auto" else space or ""
