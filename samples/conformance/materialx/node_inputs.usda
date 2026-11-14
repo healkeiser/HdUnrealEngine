@@ -1,0 +1,300 @@
+#usda 1.0
+(
+    doc = """MaterialX node inputs as the stdlib defines them (stdlib_ng.mtlx, stdlib_defs.mtlx). tiledimage reads
+texcoord * uvtiling - uvoffset (NG_tiledimage_color3): the red | blue texture offset by (0.25, 0) shows blue in its
+left quarter (top). multiply's unauthored in1 is 0 and in2 is 1 (ND_multiply_color3): white multiplied by a default in1
+is black (middle left), by a default in2 stays white (middle right). normalmap_vector2's scale is a vector2: the map
+that tilts normals 60 degrees away from the key light darkens at scale (1, 1) (bottom left) and not at (0, 0) (bottom
+right, a flat normal)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "MaterialX",
+ "feature": "tiledimage uvoffset, multiply defaults, normalmap vector2 scale",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "no MaterialX node left untranslated",
+   "log": "not translated",
+   "present": false
+  },
+  {
+   "name": "tiledimage subtracts uvoffset",
+   "color": {
+    "region": [
+     -3.8,
+     2.6,
+     -3.2,
+     3.4
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "multiply's in1 defaults to 0",
+   "ratio": [
+    {
+     "region": [
+      -3,
+      -0.5,
+      -2,
+      0.5
+     ]
+    },
+    {
+     "region": [
+      2,
+      -0.5,
+      3,
+      0.5
+     ]
+    }
+   ],
+   "max": 0.15
+  },
+  {
+   "name": "normalmap reads its vector2 scale",
+   "ratio": [
+    {
+     "region": [
+      -3,
+      -3.5,
+      -2,
+      -2.5
+     ]
+    },
+    {
+     "region": [
+      2,
+      -3.5,
+      3,
+      -2.5
+     ]
+    }
+   ],
+   "max": 0.6
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Tiled"
+{
+    token outputs:mtlx:surface.connect = </Tiled/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Tiled/image.outputs:out>
+        token outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_tiledimage_color3"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:texcoord.connect = </Tiled/uv.outputs:out>
+        float2 inputs:uvoffset = (0.25, 0)
+        color3f outputs:out
+    }
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "MulDefault"
+{
+    token outputs:mtlx:surface.connect = </MulDefault/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </MulDefault/mul.outputs:out>
+        token outputs:out
+    }
+    def Shader "mul"
+    {
+        uniform token info:id = "ND_multiply_color3"
+        color3f inputs:in2.connect = </MulDefault/image.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @../textures/white.png@
+        float2 inputs:texcoord.connect = </MulDefault/uv.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "MulControl"
+{
+    token outputs:mtlx:surface.connect = </MulControl/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </MulControl/mul.outputs:out>
+        token outputs:out
+    }
+    def Shader "mul"
+    {
+        uniform token info:id = "ND_multiply_color3"
+        color3f inputs:in1.connect = </MulControl/image.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @../textures/white.png@
+        float2 inputs:texcoord.connect = </MulControl/uv.outputs:out>
+        color3f outputs:out
+    }
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "NormalScaled"
+{
+    token outputs:mtlx:surface.connect = </NormalScaled/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color = (0.8, 0.8, 0.8)
+        float3 inputs:normal.connect = </NormalScaled/normalmap.outputs:out>
+        token outputs:out
+    }
+    def Shader "normalmap"
+    {
+        uniform token info:id = "ND_normalmap_vector2"
+        float3 inputs:in.connect = </NormalScaled/image.outputs:out>
+        float2 inputs:scale = (1, 1)
+        float3 outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_vector3"
+        asset inputs:file = @../textures/normal_tilt60.png@
+        float2 inputs:texcoord.connect = </NormalScaled/uv.outputs:out>
+        float3 outputs:out
+    }
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Material "NormalFlat"
+{
+    token outputs:mtlx:surface.connect = </NormalFlat/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color = (0.8, 0.8, 0.8)
+        float3 inputs:normal.connect = </NormalFlat/normalmap.outputs:out>
+        token outputs:out
+    }
+    def Shader "normalmap"
+    {
+        uniform token info:id = "ND_normalmap_vector2"
+        float3 inputs:in.connect = </NormalFlat/image.outputs:out>
+        float2 inputs:scale = (0, 0)
+        float3 outputs:out
+    }
+    def Shader "image"
+    {
+        uniform token info:id = "ND_image_vector3"
+        asset inputs:file = @../textures/normal_tilt60.png@
+        float2 inputs:texcoord.connect = </NormalFlat/uv.outputs:out>
+        float3 outputs:out
+    }
+    def Shader "uv"
+    {
+        uniform token info:id = "ND_geompropvalue_vector2"
+        string inputs:geomprop = "st"
+        float2 outputs:out
+    }
+}
+def Mesh "TiledQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-4, 2, 0), (4, 2, 0), (4, 4, 0), (-4, 4, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </Tiled>
+}
+def Mesh "MulDefaultQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-3.5, -1, 0), (-1.5, -1, 0), (-1.5, 1, 0), (-3.5, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </MulDefault>
+}
+def Mesh "MulControlQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.5, -1, 0), (3.5, -1, 0), (3.5, 1, 0), (1.5, 1, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </MulControl>
+}
+def Mesh "NormalScaledQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-3.5, -4, 0), (-1.5, -4, 0), (-1.5, -2, 0), (-3.5, -2, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </NormalScaled>
+}
+def Mesh "NormalFlatQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.5, -4, 0), (3.5, -4, 0), (3.5, -2, 0), (1.5, -2, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </NormalFlat>
+}

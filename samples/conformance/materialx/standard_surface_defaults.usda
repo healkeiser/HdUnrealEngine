@@ -1,0 +1,169 @@
+#usda 1.0
+(
+    doc = """standard_surface's defaults are MaterialX 1.0.1's, the default version (bxdf/standard_surface.mtlx,
+ND_standard_surface_surfaceshader): base 1 and base_color (0.8, 0.8, 0.8). Version 1.0.0
+(ND_standard_surface_surfaceshader_100) had base 0.8 and base_color 1. A material authoring only base_color (top left)
+matches one authoring base 1 too (top right); one authoring only base 0.5 (bottom left) matches one authoring
+base_color 0.8 too (bottom right)."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "MaterialX",
+ "feature": "standard_surface defaults (1.0.1)",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "no MaterialX node left untranslated",
+   "log": "not translated",
+   "present": false
+  },
+  {
+   "name": "base defaults to 1 (1.0.1)",
+   "ratio": [
+    {
+     "region": [
+      -3,
+      2,
+      -2,
+      3
+     ]
+    },
+    {
+     "region": [
+      2,
+      2,
+      3,
+      3
+     ]
+    }
+   ],
+   "min": 0.95,
+   "max": 1.05
+  },
+  {
+   "name": "base_color defaults to 0.8 (1.0.1)",
+   "ratio": [
+    {
+     "region": [
+      -3,
+      -3,
+      -2,
+      -2
+     ]
+    },
+    {
+     "region": [
+      2,
+      -3,
+      3,
+      -2
+     ]
+    }
+   ],
+   "min": 0.95,
+   "max": 1.05
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "ColorOnly"
+{
+    token outputs:mtlx:surface.connect = </ColorOnly/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color = (0.5, 0.5, 0.5)
+        token outputs:out
+    }
+}
+def Material "ColorExplicit"
+{
+    token outputs:mtlx:surface.connect = </ColorExplicit/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        float inputs:base = 1
+        color3f inputs:base_color = (0.5, 0.5, 0.5)
+        token outputs:out
+    }
+}
+def Material "BaseOnly"
+{
+    token outputs:mtlx:surface.connect = </BaseOnly/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        float inputs:base = 0.5
+        token outputs:out
+    }
+}
+def Material "BaseExplicit"
+{
+    token outputs:mtlx:surface.connect = </BaseExplicit/S.outputs:out>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        float inputs:base = 0.5
+        color3f inputs:base_color = (0.8, 0.8, 0.8)
+        token outputs:out
+    }
+}
+def Mesh "ColorOnlyQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-3.5, 1.5, 0), (-1.5, 1.5, 0), (-1.5, 3.5, 0), (-3.5, 3.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </ColorOnly>
+}
+def Mesh "ColorExplicitQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.5, 1.5, 0), (3.5, 1.5, 0), (3.5, 3.5, 0), (1.5, 3.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </ColorExplicit>
+}
+def Mesh "BaseOnlyQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-3.5, -3.5, 0), (-1.5, -3.5, 0), (-1.5, -1.5, 0), (-3.5, -1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </BaseOnly>
+}
+def Mesh "BaseExplicitQuad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(1.5, -3.5, 0), (3.5, -3.5, 0), (3.5, -1.5, 0), (1.5, -1.5, 0)]
+        uniform token subdivisionScheme = "none"
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </BaseExplicit>
+}
