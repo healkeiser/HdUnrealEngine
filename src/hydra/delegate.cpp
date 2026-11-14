@@ -2396,10 +2396,12 @@ public:
     // library's message, as the viewport shows it.
     void resolvePreparedMaterials() {
         auto& s = *state_;
+        // Scene-controlled text reaches Python as hex-encoded bytes, so no character can end the string or add code.
         const auto quoted = [](const std::string& text) {
-            std::string out = "'";
-            for (const char c : text) out += c == '\\' || c == '\'' ? std::string("\\") + c : std::string(1, c);
-            return out + "'";
+            static const char* digits = "0123456789abcdef";
+            std::string hex;
+            for (const unsigned char c : text) hex += {digits[c >> 4], digits[c & 15]};
+            return "bytes.fromhex('" + hex + "').decode('utf-8')";
         };
         // The libraries and whether unprepared Substrate Builder graphs are prepared first (as the viewport does).
         const auto libraries = quoted(s.setting<std::string>("materialxLibrary", "")) + ", " +
