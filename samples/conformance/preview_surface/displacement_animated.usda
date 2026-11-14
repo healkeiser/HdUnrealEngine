@@ -39,7 +39,21 @@ projects 10/9 larger: its edge passes x = 2.1, where the undisplaced quad ends a
    "min": 0.9
   },
   {
-   "name": "body",
+   "name": "frame 1 body renders",
+   "value": {
+    "frame": 1,
+    "region": [
+     -1,
+     -1,
+     1,
+     1
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.9
+  },
+  {
+   "name": "frame 2 body renders",
    "value": {
     "frame": 2,
     "region": [
