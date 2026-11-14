@@ -5,6 +5,7 @@ output places the editable Builder inside Material Library.
 """
 
 import argparse
+import math
 import os
 import sys
 from pathlib import Path
@@ -93,12 +94,15 @@ def generate(output, hip=None, runtime_config=None, single=False):
     camera.CreateVerticalApertureAttr(20.25)
     camera.CreateFocalLengthAttr(40 if single else 50)
     camera.CreateClippingRangeAttr(Gf.Vec2f(1, 5000))
-    for name, eye, intensity, size in [
-        ("Key", Gf.Vec3d(-100, -250, 350), 12, (120, 40)),
-        ("Fill", Gf.Vec3d(250, -100, 180), 1, (140, 200)),
+    # Intensity 1 and brightness in exposure (AGENTS.md): the key light is 12 times the fill's.
+    for name, eye, exposure, size in [
+        ("Key", Gf.Vec3d(-100, -250, 350), round(math.log2(12), 3), (120, 40)),
+        ("Fill", Gf.Vec3d(250, -100, 180), None, (140, 200)),
     ]:
         light = UsdLux.RectLight.Define(stage, "/Lights/" + name)
-        light.CreateIntensityAttr(intensity)
+        light.CreateIntensityAttr(1)
+        if exposure is not None:
+            light.CreateExposureAttr(exposure)
         light.CreateWidthAttr(size[0])
         light.CreateHeightAttr(size[1])
         light.AddTransformOp().Set(

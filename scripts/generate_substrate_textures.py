@@ -41,7 +41,10 @@ def example_graph(folder):
         return dict(
             type="texture",
             inputs={"uv": {"node": "uv"}},
-            properties={"file": str(folder / file), "color_space": space},
+            properties={
+                "file": (folder / file).as_posix(),
+                "color_space": space,
+            },
         )
 
     return dict(
@@ -212,12 +215,15 @@ def generate(folder, hip=None, runtime_config=None):
     camera.CreateVerticalApertureAttr(20.25)
     camera.CreateFocalLengthAttr(40)
     camera.CreateClippingRangeAttr(Gf.Vec2f(1, 5000))
-    for name, pos, intensity, size in [
-        ("Key", Gf.Vec3d(-100, -250, 350), 12, (120, 40)),
-        ("Fill", Gf.Vec3d(250, -100, 180), 1, (140, 200)),
+    # Intensity 1 and brightness in exposure (AGENTS.md): the key light is 12 times the fill's.
+    for name, pos, exposure, size in [
+        ("Key", Gf.Vec3d(-100, -250, 350), round(math.log2(12), 3), (120, 40)),
+        ("Fill", Gf.Vec3d(250, -100, 180), None, (140, 200)),
     ]:
         light = UsdLux.RectLight.Define(stage, "/Lights/" + name)
-        light.CreateIntensityAttr(intensity)
+        light.CreateIntensityAttr(1)
+        if exposure is not None:
+            light.CreateExposureAttr(exposure)
         light.CreateWidthAttr(size[0])
         light.CreateHeightAttr(size[1])
         light.AddTransformOp().Set(
