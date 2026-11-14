@@ -1173,7 +1173,7 @@ def parse_enums(*sources):
                 if (
                     not match
                     or "UE_DEPRECATED" in item
-                    or "Hidden" in item
+                    or re.search(r"UMETA\s*\([^)]*Hidden", item)
                     or match.group(1).endswith("MAX")
                 ):
                     continue
@@ -1832,6 +1832,19 @@ def parse_properties(
         if reason:
             skipped.append((name, reason))
             continue
+        translucency = meta.get("TranslucencyType")
+        # A setting shown only for an enumerator hdUE drops (deprecated ones) could never be shown or applied.
+        if translucency and not any(
+            v.endswith(f"::{translucency}")
+            for v, _ in enums.get("ETranslucencyType", [])
+        ):
+            skipped.append(
+                (
+                    name,
+                    f"only shown for the deprecated {translucency} translucency method",
+                )
+            )
+            continue
         enum = enums.get(enum_name, [])
         default, note = overrides.get(name, (None, None))
         value = (
@@ -1873,7 +1886,6 @@ def parse_properties(
                 + " "
                 + note
             ).strip()
-        translucency = meta.get("TranslucencyType")
         settings.append(
             dict(
                 attribute=prefix + name,

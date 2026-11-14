@@ -4612,39 +4612,6 @@ Sets the translucency type
 </div>
 
 <div class="hdue-param" markdown>
-<div class="hdue-param__name">Max Roughness</div>
-<div class="hdue-param__body" markdown>
-
-Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.
-
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxRoughness</code></dd></div><div><dt>Default</dt><dd>0.6</dd></div></dl>
-
-</div>
-</div>
-
-<div class="hdue-param" markdown>
-<div class="hdue-param__name">Max. Refraction Rays</div>
-<div class="hdue-param__body" markdown>
-
-Sets the maximum number of ray tracing refraction rays.
-
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefractionRays</code></dd></div><div><dt>Default</dt><dd>3</dd></div></dl>
-
-</div>
-</div>
-
-<div class="hdue-param" markdown>
-<div class="hdue-param__name">Samples Per Pixel</div>
-<div class="hdue-param__body" markdown>
-
-Sets the samples per pixel for ray traced translucency.
-
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencySamplesPerPixel</code></dd></div><div><dt>Default</dt><dd>1</dd></div></dl>
-
-</div>
-</div>
-
-<div class="hdue-param" markdown>
 <div class="hdue-param__name">Max. Primary Hit Events</div>
 <div class="hdue-param__body" markdown>
 
@@ -4662,28 +4629,6 @@ Maximum number of hit events allowed on primary ray paths
 Maximum number of hit events allowed on secondary ray paths
 
 <dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents</code></dd></div><div><dt>Default</dt><dd>2</dd></div></dl>
-
-</div>
-</div>
-
-<div class="hdue-param" markdown>
-<div class="hdue-param__name">Shadows</div>
-<div class="hdue-param__body" markdown>
-
-Sets the translucency shadows type.
-
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyShadows</code></dd></div><div><dt>Default</dt><dd><code>EReflectedAndRefractedRayTracedShadows::Hard_shadows</code></dd></div><div><dt>Menu</dt><dd>Disabled, Hard Shadows, Area Shadows</dd></div></dl>
-
-</div>
-</div>
-
-<div class="hdue-param" markdown>
-<div class="hdue-param__name">Refraction</div>
-<div class="hdue-param__body" markdown>
-
-Sets whether refraction should be enabled or not (if not rays will not scatter and only travel in the same direction as before the intersection event).
-
-<dl class="hdue-facts"><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefraction</code></dd></div><div><dt>Default</dt><dd>On</dd></div></dl>
 
 </div>
 </div>

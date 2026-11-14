@@ -244,24 +244,6 @@ Sets the translucency type
 | `ETranslucencyType::Raster` | Raster |
 | `ETranslucencyType::RayTraced` | Ray Traced |
 
-#### Max Roughness { #unreal-postprocess-raytracingtranslucencymaxroughness }
-
-<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0.6</code></dd></div><div><dt>Range</dt><dd>0.01 to 1</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxRoughness</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxRoughness_4ocl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
-
-Sets the maximum roughness until which ray tracing translucency will be visible (lower value is faster). Translucency contribution is smoothly faded when close to roughness threshold. This parameter behaves similarly to ScreenSpaceReflectionMaxRoughness.
-
-#### Max. Refraction Rays { #unreal-postprocess-raytracingtranslucencyrefractionrays }
-
-<dl class="hdue-facts"><div><dt>Default</dt><dd><code>3</code></dd></div><div><dt>Range</dt><dd>0 to 50</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefractionRays</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyRefractionRays_escl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
-
-Sets the maximum number of ray tracing refraction rays.
-
-#### Samples Per Pixel { #unreal-postprocess-raytracingtranslucencysamplesperpixel }
-
-<dl class="hdue-facts"><div><dt>Default</dt><dd><code>1</code></dd></div><div><dt>Range</dt><dd>1 to 65536</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencySamplesPerPixel</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencySamplesPerPixel_0tcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
-
-Sets the samples per pixel for ray traced translucency.
-
 #### Max. Primary Hit Events { #unreal-postprocess-raytracingtranslucencymaxprimaryhitevents }
 
 <dl class="hdue-facts"><div><dt>Default</dt><dd><code>4</code></dd></div><div><dt>Range</dt><dd>1 to 64</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxPrimaryHitEvents</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxPrimaryHitEvents_j0cl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
@@ -273,24 +255,6 @@ Maximum number of hit events allowed on primary ray paths
 <dl class="hdue-facts"><div><dt>Default</dt><dd><code>2</code></dd></div><div><dt>Range</dt><dd>0 to 64</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyMaxSecondaryHitEvents</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyMaxSecondaryHitEvents_s3cl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
 
 Maximum number of hit events allowed on secondary ray paths
-
-#### Shadows { #unreal-postprocess-raytracingtranslucencyshadows }
-
-<dl class="hdue-facts"><div><dt>Default</dt><dd>Hard Shadows</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyShadows</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyShadows_zgcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
-
-Sets the translucency shadows type.
-
-| Value | Label |
-|---|---|
-| `EReflectedAndRefractedRayTracedShadows::Disabled` | Disabled |
-| `EReflectedAndRefractedRayTracedShadows::Hard_shadows` | Hard Shadows |
-| `EReflectedAndRefractedRayTracedShadows::Area_shadows` | Area Shadows |
-
-#### Refraction { #unreal-postprocess-raytracingtranslucencyrefraction }
-
-<dl class="hdue-facts"><div><dt>Default</dt><dd>On</dd></div><div><dt>USD attribute</dt><dd><code>unreal:postProcess:RayTracingTranslucencyRefraction</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealpostProcessRayTracingTranslucencyRefraction_vlcl</code></dd></div><span class="hdue-badge">Realtime only</span></dl>
-
-Sets whether refraction should be enabled or not (if not rays will not scatter and only travel in the same direction as before the intersection event).
 
 #### Use Ray Traced Refraction { #unreal-postprocess-raytracingtranslucencyuseraytracedrefraction }
 
