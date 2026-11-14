@@ -22,6 +22,7 @@ public:
                                  const HdueResidencyOptions& Options);
     void Update(FRHICommandListImmediate& Commands);  // Render Thread, before each warm-up draw, outside a VT update.
     HdueResidencyStatus Status() const;
+    void Reuse(uint64 Generation);  // a later request keeps this warm-up: its status reports that request's generation
 
 private:
     TArray<TStrongObjectPtr<UTexture2D>> Textures;

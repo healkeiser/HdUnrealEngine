@@ -32,6 +32,10 @@ HdueResidencyStatus FHdueVirtualTextureResidency::Status() const {
     FScopeLock Lock(&Mutex);
     return Progress;
 }
+void FHdueVirtualTextureResidency::Reuse(uint64 Generation) {
+    FScopeLock Lock(&Mutex);
+    Progress.generation = Generation;
+}
 void FHdueVirtualTextureResidency::Fail(const FString& Message) {
     Progress.phase = HDUE_RESIDENCY_FAILED;
     HdueCopyMessage(Progress.message, Message);

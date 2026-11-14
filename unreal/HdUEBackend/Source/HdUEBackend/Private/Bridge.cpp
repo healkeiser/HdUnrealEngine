@@ -853,9 +853,10 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
         // Tracer restarts its samples on a camera move without one (path-tracer-in-unreal-engine.md); offline
         // renders warm up for every request, as Movie Render Queue does. A scene edit releases the residency.
         if (IsInteractive() && Warmed && Warmed->Status().phase == HDUE_RESIDENCY_READY &&
-            Used == Session->ResidencyTextures)
+            Used == Session->ResidencyTextures) {
             Session->Residency = Warmed;
-        else {
+            Warmed->Reuse(Request->generation);
+        } else {
             Session->ResidencyTextures = MoveTemp(Used);
             Session->Residency = MakeShared<FHdueVirtualTextureResidency, ESPMode::ThreadSafe>(
                 MoveTemp(Textures), Request->generation, Session->ResidencyOptions);
