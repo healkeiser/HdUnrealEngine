@@ -558,6 +558,7 @@ def start():
         _host = Host()
         _failure = None
         _note("hdUE host started (UE runs on its own thread)")
+        upgrade_settings_node()
         input_usd = os.environ.get("HDUE_HOUDINI_INPUT")
         if input_usd:
             open_usd(input_usd)
@@ -815,6 +816,18 @@ def current_settings_node():
         inputs = node.inputs()
         node = inputs[0] if inputs else None
     return node
+
+
+def upgrade_settings_node():
+    """Gives the open hdUE_settings node the current Retry callback (nodes of older versions call _host directly)."""
+    try:
+        node = current_settings_node()
+        if node:
+            configure_live_preparation(node)
+    except (hou.Error, AttributeError, RuntimeError):
+        _report(
+            traceback.format_exc()
+        )  # an upgrade that fails must not stop the host
 
 
 RETRY_CALLBACK = "import hdue_houdini; hdue_houdini.retry_preparation()"

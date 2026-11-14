@@ -6,6 +6,7 @@ import sys
 import tempfile
 import types
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +37,9 @@ class HostState(unittest.TestCase):
             integration._failure,
             integration.scene_viewer,
             integration.start,
+            integration.current_settings_node,
+            integration.configure_live_preparation,
+            integration.Host,
         )
 
     def tearDown(self):
@@ -44,6 +48,9 @@ class HostState(unittest.TestCase):
             integration._failure,
             integration.scene_viewer,
             integration.start,
+            integration.current_settings_node,
+            integration.configure_live_preparation,
+            integration.Host,
         ) = self.saved
 
     def test_start_resumes_a_stopped_host(self):
@@ -72,6 +79,43 @@ class HostState(unittest.TestCase):
         integration._host = host(running=False, closed=True)
         with self.assertRaises(RuntimeError):
             integration.activate()
+
+    def test_starting_the_host_upgrades_an_older_settings_node(self):
+        integration._host = None
+        node, configured = object(), []
+        integration.Host = lambda: host(running=True, closed=False)
+        integration.current_settings_node = lambda: node
+        integration.configure_live_preparation = configured.append
+        with (
+            unittest.mock.patch.dict(
+                os.environ, {"HDUE_HOUDINI_INPUT": "", "HDUE_HOUDINI_HIP": ""}
+            ),
+            unittest.mock.patch.dict(
+                sys.modules,
+                {"hdue_substrate": types.SimpleNamespace(install=lambda: None)},
+            ),
+        ):
+            integration.start()
+        self.assertEqual(configured, [node])
+
+    def test_a_failing_upgrade_does_not_stop_the_host(self):
+        integration._host = None
+        integration.Host = lambda: host(running=True, closed=False)
+
+        def broken():
+            raise RuntimeError("no viewer")
+
+        integration.current_settings_node = broken
+        with (
+            unittest.mock.patch.dict(
+                os.environ, {"HDUE_HOUDINI_INPUT": "", "HDUE_HOUDINI_HIP": ""}
+            ),
+            unittest.mock.patch.dict(
+                sys.modules,
+                {"hdue_substrate": types.SimpleNamespace(install=lambda: None)},
+            ),
+        ):
+            self.assertIsNotNone(integration.start())
 
     def test_retry_without_a_host_does_not_raise(self):
         integration._host = None
