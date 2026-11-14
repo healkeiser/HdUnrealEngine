@@ -33,9 +33,9 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 016 | [One bad item does not fail the scene](016-one-bad-item-does-not-fail-the-scene.md) | main | P2 | M | 010 | DONE |
 | 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (manual Esc check pending) |
 | 018 | [Asset import writes shared files safely](018-asset-import-writes-shared-files-safely.md) | side | P2 | M | 017 | DONE (manual re-import check pending) |
-| 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | TODO |
+| 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | DONE (Step 6: not reachable, no change) |
 | 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | DONE |
-| 021 | [Validate cache files on read](021-validate-cache-files-on-read.md) | main | P3 | M | 012 | TODO |
+| 021 | [Validate cache files on read](021-validate-cache-files-on-read.md) | main | P3 | M | 012 | DONE |
 | 022 | [Environment background and depth at render resolution](022-environment-background-and-depth-at-render-resolution.md) | main | P2 | S | — | TODO |
 | 023 | [Interactive performance: measure, then fix](023-interactive-performance-measure-then-fix.md) | main | P2 | M | 010 | TODO |
 | 024 | [Transform-only edits skip geometry](024-transform-only-edits-skip-geometry.md) | main | P3 | L | 010, 015 | TODO |
@@ -72,6 +72,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - `tests/husk_prepared_materials.py` fails two checks on this machine because the newest local Substrate libraries under `out/substrate` (2026-11-03) were built by an older compiler version: re-prepare them before relying on that test.
 - The free-view `selection` kind fails on a portrait-only monitor (narrow viewport); environment, not code.
 - The usdview smoke check timed out because the Path Tracer default became UE's 2048 samples (`fe2ad87`); it now sets its own 64 (`3c8f7d1`), as does the live COP texture test (`bbf3a2c`).
+- Plan 019 Step 6: a `/Script/...` path in `unreal:asset` cannot spawn an engine class. UE's `DoesPackageExist` returns false for script packages (`PackageName.cpp`, `InternalDoesPackageExistEx`), and the cooked registry lists `/Script/Engine.StaticMeshActor` as a `Class`, which `FHdueNativeAssets::Upsert` reports as "a resource (Class), not a placeable Actor/mesh/Level" (checked with husk). No code change.
+- Plan 019's probe: `unreal:heightFog:InscatteringColorCubemap = /Script/Engine.Default__TextureCube` crashed the previous backend in `SetupFogUniformParameters` (the class default object has no resource); object values now load from `/Game/` and `/Engine/` only.
+- Plan 021: the Nanite cache writer keeps an existing entry (another task may have written it), so a damaged entry was rebuilt on every load and never replaced; a rejected entry is now deleted. The virtual texture manifest's array counts are now bounded by the file's size before allocation (a damaged count could allocate gigabytes, in eviction too).
 - `zensical build --strict` reports four warnings under `docs/audit/` with zensical 0.0.61; check with the pinned 0.1.0 that CI uses.
 
 ## Findings considered and rejected
@@ -79,7 +82,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - `render_gallery.py` writes `results.json`, `README.md` and `gallery.md` non-atomically: single-user tool, git restores them.
 - HDAs change bytes on every rebuild: binary format, unavoidable.
 - `Runtime.State` and `Session->Width/Height` read without a lock (`Bridge.cpp`): formally a data race, harmless on x64, the `DepthPixels.Num()` check catches a mismatch.
-- `set_post_process` accepting any console variable: documented as by design in `include/hdue/bridge.h`; only the scene-originated path is restricted (plan 019).
+- `set_post_process` accepting any console variable: documented as by design in `include/hdue/bridge.h`; scenes keep it too (plan 019 Step 3 decision: Movie Render Queue lets a render configuration set any cvar).
 - NURBS resampling knot vector one element short (`implicit_surfaces.cpp:173-176`): the approximating scene index draws the hull without reading knots.
 - Render-buffer pointer reuse skipping GPU setup (`delegate.cpp:2120-2138, 2826`): low confidence; left for a reproduction before any fix.
 - Blocking texture-streaming flush on every offline realtime warm-up draw (`Bridge.cpp:1332-1344`): Movie Render Queue does the same on every tick (`MoviePipelineRendering.cpp:174`), so hdUE matches Unreal.
