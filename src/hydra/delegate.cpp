@@ -410,11 +410,15 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
 bool HdUEAssetBoundsCm(const std::string& asset, GfVec3d& min, GfVec3d& max) {
     // The catalog read once per file: the adapter asks for every asset prim of a stage.
     static std::mutex mutex;
-    static std::string cachedPath;
+    static std::string cachedProfile, path, cachedPath;
     static JsValue cached;
-    const auto path = runtimeConfig("asset_catalog");
-    if (path.empty()) return false;
     std::lock_guard lock(mutex);
+    // The runtime profile read once per HDUE_RUNTIME_CONFIG value too: it was opened and parsed per asset prim.
+    if (const auto profile = TfGetenv("HDUE_RUNTIME_CONFIG"); profile != cachedProfile || path.empty()) {
+        cachedProfile = profile;
+        path = runtimeConfig("asset_catalog");
+    }
+    if (path.empty()) return false;
     if (path != cachedPath) {
         std::ifstream file(utf8Path(path));
         std::stringstream text;
