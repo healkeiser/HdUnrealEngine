@@ -776,8 +776,11 @@ void prepareMaterials(HdUEState& state, ScenePacket& packet) {
         if (state.materials.find(id) == state.materials.end()) continue;
         const auto entry = overrides.find(id);
         if (entry == overrides.end()) continue;
-        if (asset(nativeMaterials, id).empty() || !entry->second.IsHolding<VtDictionary>())
-            throw std::runtime_error("Native material parameters require a mapped cooked material and a dictionary");
+        if (asset(nativeMaterials, id).empty() || !entry->second.IsHolding<VtDictionary>()) {
+            warnOnce("hdUE skips the native material parameters of " + id +
+                     ": it has no cooked material, or its parameters are not a dictionary");
+            continue;
+        }
         std::vector<HdueMaterialParameter> parameters;
         for (const auto& [name, value] : entry->second.UncheckedGet<VtDictionary>())
             if (const auto p = materialParameter(packet, name, value)) parameters.push_back(*p);
@@ -1202,11 +1205,17 @@ struct LightDesc {
     float height_cm;
 };
 void prepareLights(HdUEState& state, ScenePacket& packet) {
-    const double viewerIntensity = state.setting<double>(
+    double viewerIntensity = state.setting<double>(
         "viewerLightIntensity",
         state.setting<float>("viewerLightIntensity", float(HdUESettingDefaults::viewerLightIntensity)));
-    if (!std::isfinite(viewerIntensity) || viewerIntensity < 0 || viewerIntensity > 100)
-        throw std::runtime_error("viewerLightIntensity must be between 0 and 100");
+    // The setting's documented range is 0-100.
+    if (!std::isfinite(viewerIntensity)) {
+        warnOnce("hdUE uses the default viewerLightIntensity: the value is not finite");
+        viewerIntensity = HdUESettingDefaults::viewerLightIntensity;
+    } else if (viewerIntensity < 0 || viewerIntensity > 100) {
+        warnOnce("hdUE clamps viewerLightIntensity " + std::to_string(viewerIntensity) + " to 0-100");
+        viewerIntensity = std::clamp(viewerIntensity, 0., 100.);
+    }
     int sceneLights = 0;
     for (const auto& [id, light] : state.lights)
         if (active(light)) {
@@ -1559,10 +1568,13 @@ void prepareSurfaceEffects(HdUEState& state, ScenePacket& packet) {
         const auto maskName = HdUEWetValue<std::string>(fields, "maskPrimvar", "");
         const auto mask = data.masks.find(maskName);
         if (!maskName.empty() && mask == data.masks.end()) {
-            const auto error = data.maskErrors.find(maskName);
-            throw std::runtime_error(
-                data.bindingPath + ": " +
-                (error != data.maskErrors.end() ? error->second : "Wet mask not synchronized: " + maskName));
+            // A mask that failed to read stays failed: that mesh gets no wet binding. One not read yet is waited for
+            // (HdUERefreshWetMasks fills it on a later Execute).
+            if (const auto error = data.maskErrors.find(maskName); error != data.maskErrors.end()) {
+                warnOnce(data.bindingPath + ": " + error->second);
+                continue;
+            }
+            throw std::runtime_error(data.bindingPath + ": Wet mask not synchronized: " + maskName);
         }
         HdueWetBinding binding{};
         binding.struct_size = sizeof(binding);
