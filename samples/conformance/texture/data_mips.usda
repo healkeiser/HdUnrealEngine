@@ -4,7 +4,7 @@
 non-sRGB textures. Both quads emit their texture with every light off. The left one reads a one-texel 0/255 checker:
 at about 26 pixels for 256 texels it samples a mip around level 3, the checker's average, 0.5. The right one reads a
 flat 128/255. Averaging the checker in linear light, as for an sRGB colour image, gives about 188/255 instead (a ratio
-near 1.47). The Path Tracer averages texels per pixel anyway, so the check discriminates in realtime mode."""
+near 1.47). Both modes read the mip: sRGB-weighted mips measured 1.47 in realtime and path traced alike."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdPreviewSurface",
