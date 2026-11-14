@@ -81,6 +81,13 @@ FHdueScene::~FHdueScene() {
     GHdueLoad.MeshBuildsDone += uint32(PendingStatic.Num());
     for (auto& Entry : Actors)
         if (IsValid(Entry.Value)) World->DestroyActor(Entry.Value);
+    // A session's grooms and volumes must not outlive it: Houdini recreates its renderer, and the next session's
+    // actors would draw beside them.
+    for (const auto& Entry : Volumes)
+        if (IsValid(Entry.Value.Actor)) World->DestroyActor(Entry.Value.Actor);
+    for (const auto& Entry : Grooms)
+        for (AActor* Actor : Entry.Value.Actors)
+            if (IsValid(Actor)) World->DestroyActor(Actor);
 }
 TArray<TStrongObjectPtr<UTexture2D>> FHdueScene::GatherVirtualTextures() const {
     TSet<const UMaterialInterface*> Seen;  // materials are shared by many meshes: their textures are listed once
@@ -1987,6 +1994,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         for (const auto& Entry : Volumes)
             if (IsValid(Entry.Value.Actor)) World->DestroyActor(Entry.Value.Actor);
         Volumes.Empty();
+        // The Fixtures sweep above already destroyed the groom actors (a UGroomComponent is a UMeshComponent);
+        // Grooms would otherwise keep raw pointers to actors the garbage collector frees.
+        for (const auto& Entry : Grooms)
+            for (AActor* Actor : Entry.Value.Actors)
+                if (IsValid(Actor)) World->DestroyActor(Actor);
+        Grooms.Empty();
         WetBindings.Empty();
         GeometryRevisions.Empty();
     }
