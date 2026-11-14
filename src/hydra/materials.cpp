@@ -332,7 +332,9 @@ private:
     // The texture coordinate transform an image applies; false when it reads no coordinates, so a later image may.
     bool uvTransform(const HdMaterialNode2& image, std::array<float, 6>& out) const {
         if (TfStringStartsWith(image.nodeTypeId.GetString(), "ND_tiledimage_")) {
-            out = uvAffine(value(param(image, "uvtiling"), GfVec2f(1)), 0, value(param(image, "uvoffset"), GfVec2f(0)));
+            // MaterialX NG_tiledimage: texcoord * uvtiling - uvoffset (stdlib_ng.mtlx).
+            out =
+                uvAffine(value(param(image, "uvtiling"), GfVec2f(1)), 0, -value(param(image, "uvoffset"), GfVec2f(0)));
             return true;
         }
         const auto* st = connection(image, image.nodeTypeId == TfToken("UsdUVTexture") ? "st" : "texcoord");
