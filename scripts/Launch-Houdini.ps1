@@ -26,6 +26,10 @@ if (-not $RuntimeConfig) {
     if (-not $RuntimeConfig -or -not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Run Update-HoudiniRuntime.ps1 or specify an updated -RuntimeConfig with the depth extension.' }
 }
 if (-not (Test-Path -LiteralPath $RuntimeConfig)) { throw 'Specify a prepared -RuntimeConfig.' }
+# Opening the scene (-InputUsd) or the HIP is what selects hdUE in the Scene Viewer; optextures builds its own scene.
+if ($TestKind -and $TestKind -ne 'optextures' -and -not $InputUsd -and -not $HipFile) {
+    throw "-TestKind $TestKind needs -InputUsd or -HipFile: without a scene nothing selects hdUE, and the test only times out."
+}
 if ($HipFile) {
     if ($InputUsd) { throw 'Choose either -HipFile or -InputUsd.' }
     $HipFile = (Resolve-Path -LiteralPath $HipFile).Path
