@@ -540,7 +540,7 @@ typedef struct HdueGroomDesc {
     const char* material;
     const HdueMaterialParameter* parameters;
     uint32_t parameter_count;
-    /* ABI 24: UE's groom physics (the groom asset's simulation, guides from every strand): 1 simulates it. */
+    /* ABI 24: reserved for UE's groom physics; not implemented, the backend ignores it (docs/geometry/hair.md). */
     uint32_t simulate;
 } HdueGroomDesc;
 enum { HDUE_DOME_LIGHT = 4, HDUE_DISK_LIGHT = 5, HDUE_CYLINDER_LIGHT = 6 };
