@@ -12,7 +12,7 @@ The figures on this page use the shader ball (`samples/docs/lookdev.usda`) in Re
 2. Wire textures with **MaterialX Image** nodes, as below.
 3. Assign the material. A material with both a MaterialX output and a Preview Surface output renders from its MaterialX graph.
 
-If a graph uses a node outside the list below, two images read through different UV transforms, a **Place 2D** input driven by another node, or a surface input the sections below do not list (`diffuse_roughness`, `coat_IOR`, `specular_anisotropy`, `thin_film_*`, ...), UE's MaterialX importer prepares it in the background ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)). Until it is ready, that input renders at its constant value, or has no effect, with a warning. A **MaterialX Texture Coordinate** with an index other than 0 reads UV set 0, with a warning: hdUE's meshes carry the material's UV primvars, not numbered sets.
+If a graph uses a node outside the list below, two images read through different UV transforms, a **Place 2D** input driven by another node, or a surface input the sections below do not list (`diffuse_roughness`, `coat_IOR`, `specular_anisotropy`, `thin_film_*`, ...) set to anything but its MaterialX default, UE's MaterialX importer prepares it in the background ([automatic import](../materials.md#automatic-import-of-untranslatable-graphs)). Until it is ready, that input renders at its constant value, or has no effect, with a warning. A **MaterialX Texture Coordinate** with an index other than 0 reads UV set 0, with a warning: hdUE's meshes carry the material's UV primvars, not numbered sets.
 
 ## Base
 

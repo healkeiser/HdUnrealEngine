@@ -1,5 +1,6 @@
 """Read a composed UsdShade graph without loading MaterialX into the viewer."""
 
+import functools
 import hashlib
 import json
 import math
@@ -372,6 +373,48 @@ def _uv_transform(nodes, image):
     return place["id"] + json.dumps(values, sort_keys=True)
 
 
+@functools.cache
+def _nodedef_defaults(identity):
+    """A nodedef's input defaults from MaterialX's standard libraries, loaded as export_usd_materialx.definitions
+    loads them, and only when an unread input is authored; empty without MaterialX's Python (every authored input then
+    counts).
+    """
+    try:
+        import MaterialX as mx
+    except ImportError:
+        return {}
+    library = mx.createDocument()
+    mx.loadLibraries(
+        mx.getDefaultDataLibraryFolders(),
+        mx.getDefaultDataSearchPath(),
+        library,
+    )
+    nodedef = library.getNodeDef(identity)
+    if nodedef is None:
+        return {}
+    values = {}
+    for port in nodedef.getActiveInputs():
+        value = port.getValue()
+        if value is not None:
+            values[port.getName()] = (
+                list(value.asTuple()) if hasattr(value, "asTuple") else value
+            )
+    return values
+
+
+def _same(value, default):
+    """Whether an authored value (USD's float precision) equals a nodedef default."""
+    if isinstance(value, list) and isinstance(default, list):
+        return len(value) == len(default) and all(
+            _same(a, b) for a, b in zip(value, default, strict=True)
+        )
+    if isinstance(value, bool) or isinstance(default, bool):
+        return value == default
+    if isinstance(value, (int, float)) and isinstance(default, (int, float)):
+        return math.isclose(value, default, rel_tol=1e-6, abs_tol=1e-9)
+    return value == default
+
+
 def needs_import(graph):
     """Whether hdUE's render-time translation cannot express graph (a node it would leave at its constant, or a
     surface it does not read), so UE's MaterialX importer must prepare it.
@@ -386,7 +429,14 @@ def needs_import(graph):
     for prefix, read in RUNTIME_SURFACE_INPUTS.items():
         if surface["id"].startswith(prefix) and any(
             name not in read
-            and ("node" in item or item.get("value") is not None)
+            and (
+                "node" in item
+                or item.get("value") is not None
+                # An input authored at its nodedef's default (Houdini writes coat_IOR 1.5) changes nothing.
+                and not _same(
+                    item["value"], _nodedef_defaults(surface["id"]).get(name)
+                )
+            )
             for name, item in surface["inputs"].items()
         ):
             return True

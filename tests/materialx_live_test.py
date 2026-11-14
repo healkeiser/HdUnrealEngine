@@ -184,6 +184,26 @@ class NeedsImportTests(unittest.TestCase):
             # Declared without a value: nothing to read.
             graph["nodes"]["/S"]["inputs"][unread] = {"value": None}
             self.assertFalse(needs_import(graph), surface)
+        # Authored at the nodedef's default (USD's float precision): nothing changes, nothing to prepare.
+        for surface, name, value in (
+            ("ND_standard_surface_surfaceshader", "coat_IOR", 1.5),
+            ("ND_standard_surface_surfaceshader", "specular_anisotropy", 0.0),
+            (
+                "ND_standard_surface_surfaceshader",
+                "transmission_scatter",
+                [0, 0, 0],
+            ),
+            (
+                "ND_open_pbr_surface_surfaceshader",
+                "coat_ior",
+                1.600000023841858,
+            ),
+        ):
+            graph = self.graph(surface=surface)
+            graph["nodes"]["/S"]["inputs"] = {name: {"value": value}}
+            self.assertFalse(needs_import(graph), name)
+            graph["nodes"]["/S"]["inputs"] = {name: {"node": "/N0"}}
+            self.assertTrue(needs_import(graph), name)
         # Preview Surface reads its own inputs (readPreviewSurface).
         graph = self.graph(surface="ND_UsdPreviewSurface_surfaceshader")
         graph["nodes"]["/S"]["inputs"] = {"opacityMode": {"value": "presence"}}
