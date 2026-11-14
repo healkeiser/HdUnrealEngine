@@ -298,9 +298,12 @@ private:
             source.channel = value(param(node, "index"), 0);
             upstream("in");
         } else if (starts("ND_normalmap")) {
-            // Tangent-space decode, xy scaled by the node's scale: n = (2 texel - 1) * (k, k, 1).
-            const float k = value(param(node, "scale"), 1.f);
-            affine(GfVec4f(2 * k, 2 * k, 2, 1), GfVec4f(-k, -k, -1, 0));
+            // Tangent-space decode, xy scaled by the node's scale: n = (2 texel - 1) * (kx, ky, 1);
+            // ND_normalmap_vector2 scales x and y separately.
+            const auto authored = param(node, "scale");
+            const auto k =
+                authored.IsHolding<GfVec2f>() ? authored.UncheckedGet<GfVec2f>() : GfVec2f(value(authored, 1.f));
+            affine(GfVec4f(2 * k[0], 2 * k[1], 2, 1), GfVec4f(-k[0], -k[1], -1, 0));
             upstream("in");
         } else if (starts("ND_multiply_") && (!connection(node, "in1") || !connection(node, "in2"))) {
             const char* driven = connection(node, "in1") ? "in1" : "in2";
