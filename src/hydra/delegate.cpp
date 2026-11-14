@@ -1045,7 +1045,6 @@ void addMesh(ScenePacket& packet, const std::string& id, const std::string& nati
     if (HdUETraceScene())
         TF_STATUS("hdUE mesh %s material=%s vertices=%u", desc->id, desc->material_id, desc->vertex_count);
 }
-bool releasable(const HdUEState& state, const HdUEMeshData& m);
 // Moves a mesh's arrays into `to`, a copy of the rest of it, and leaves the mesh released (HdUEReleaseGeometry).
 void takeGeometry(HdUEMeshData& mesh, HdUEMeshData& to) {
     HdUEMeshData arrays;
@@ -1140,7 +1139,7 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         // A mesh that frees its arrays once uploaded hands them to the packet now, released in the state (finishScene
         // skips it): it converts after the lock is released. The rest (wet, deforming, displaced; any in usdview) keep
         // their arrays and convert here.
-        if (releasable(state, data) && !packet.points.count(id) && !packet.instances.count(id)) {
+        if (HdUEReleasable(state, data) && !packet.points.count(id) && !packet.instances.count(id)) {
             auto& deferred = packet.deferred.emplace_back();
             deferred.nativeAsset = nativeAsset;
             deferred.visible = visible;
@@ -1751,10 +1750,6 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         trace("hdUE scene submit: %zu material parameter updates in %.1f ms\n", packet.materialUpdates.size(),
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updatesStart).count());
 }
-// HdUEReleasableMesh (scene_bookkeeping.h) for this process's UE host.
-bool releasable(const HdUEState& state, const HdUEMeshData& m) {
-    return HdUEReleasableMesh(state, m, selfHost().worker.joinable());
-}
 // Under the state lock again: records what reached UE.
 void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceStatus& surface) {
     for (const auto& id : packet.removedIds) {
@@ -1773,7 +1768,7 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
         // Not a mesh released when taken (prepareMeshes), nor a newer version Sync stored during the send: that one
         // uploads with the next batch.
         if (auto mesh = state.meshes.find(id); mesh != state.meshes.end() && !mesh->second.released &&
-                                               !state.dirtyMeshes.count(id) && releasable(state, mesh->second)) {
+                                               !state.dirtyMeshes.count(id) && HdUEReleasable(state, mesh->second)) {
             releasedBytes += HdUEReleaseGeometry(mesh->second);
             ++released;
         }
@@ -1872,7 +1867,10 @@ void submit(HdUEState& state, std::map<std::string, std::vector<GfVec3f>> points
     state.setStage("Rendering");
 }
 }  // namespace
-bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh) { return releasable(state, mesh); }
+// HdUEReleasableMesh (scene_bookkeeping.h) for this process's UE host; tests link their own (scene_bookkeeping.cpp).
+bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh) {
+    return HdUEReleasableMesh(state, mesh, selfHost().worker.joinable());
+}
 // UE instances are FTransforms, which cannot hold shear (a rotated prototype under a non-uniform instance scale): a
 // generic instanced mesh's sheared instances move into a mesh of their own, which prepareMeshes bakes into its
 // vertices as a sheared non-instanced mesh is baked. The prototype then uploads, moves and releases as any instanced
