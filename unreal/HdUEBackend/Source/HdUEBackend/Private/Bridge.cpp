@@ -193,6 +193,7 @@ struct FSession {
     bool DepthEnabled = false;
     HdueResidencyOptions ResidencyOptions{sizeof(HdueResidencyOptions), 0, 120.0};
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
+    TArray<const UTexture2D*> ResidencyTextures;  // the virtual textures Residency warms up
     bool Preparing = false;
     bool CompileWait = false;  // an offline draw of this request waited for PSOs or render proxies (RenderAndReadBack)
     bool RestartNext = false;  // the next Draw restarts the accumulation (RestartAccumulation) before its view
@@ -792,6 +793,7 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
             UE_LOG(LogTemp, Warning, TEXT("hdUE: native asset %s failed; rendering without it."), *AssetFailure);
         }
     }
+    const auto Warmed = Session->Residency;  // kept below for a camera move whose textures are resident already
     ReleaseResidency(Session);
     // A moving realtime camera needs Lumen's persistent temporal history. Scene and light edits at the same time cancel
     // HasRequest and reset it: the request converges again, and a viewport stops drawing once it has (a kept history
@@ -844,9 +846,21 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     Session->RequestedAt = FPlatformTime::Seconds();
     Runtime.Error.Empty();
     if (Request->mode == HDUE_PATH_TRACED) {
-        Session->Residency = MakeShared<FHdueVirtualTextureResidency, ESPMode::ThreadSafe>(
-            Session->Scene->GatherVirtualTextures(), Request->generation, Session->ResidencyOptions);
-        Session->Preparing = Session->Residency->Status().phase != HDUE_RESIDENCY_READY;
+        auto Textures = Session->Scene->GatherVirtualTextures();
+        TArray<const UTexture2D*> Used;
+        for (const auto& Texture : Textures) Used.Add(Texture.Get());
+        // A camera move in an interactive host keeps the pages its last warm-up made resident, as UE's viewport Path
+        // Tracer restarts its samples on a camera move without one (path-tracer-in-unreal-engine.md); offline
+        // renders warm up for every request, as Movie Render Queue does. A scene edit releases the residency.
+        if (IsInteractive() && Warmed && Warmed->Status().phase == HDUE_RESIDENCY_READY &&
+            Used == Session->ResidencyTextures)
+            Session->Residency = Warmed;
+        else {
+            Session->ResidencyTextures = MoveTemp(Used);
+            Session->Residency = MakeShared<FHdueVirtualTextureResidency, ESPMode::ThreadSafe>(
+                MoveTemp(Textures), Request->generation, Session->ResidencyOptions);
+            Session->Preparing = Session->Residency->Status().phase != HDUE_RESIDENCY_READY;
+        }
     }
     Runtime.World->SetShouldTick(Request->mode == HDUE_REALTIME);
     SetCVar(TEXT("r.PathTracing.SamplesPerPixel"), int32(Request->samples_per_pixel));
