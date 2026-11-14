@@ -122,6 +122,14 @@ class HostState(unittest.TestCase):
         integration.start = lambda: None
         integration.retry_preparation()
 
+    def test_retry_after_the_host_closed_prepares_nothing(self):
+        closed = host(running=False, closed=True)
+        closed.live_preparation = unittest.mock.Mock()
+        integration._host = closed
+        integration.start = lambda: closed
+        integration.retry_preparation()
+        closed.live_preparation.retry.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

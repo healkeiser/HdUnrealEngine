@@ -814,12 +814,16 @@ RETRY_CALLBACK = "import hdue_houdini; hdue_houdini.retry_preparation()"
 
 
 def retry_preparation():
-    """The Retry material preparation button: starts the host when no viewer has yet."""
+    """The Retry material preparation button: starts the host when no viewer has yet. A closed host (UE ended with
+    it, once per process) prepares nothing more.
+    """
     if _host is None:
         start()
-    if _host is None:
+    if _host is None or _host.closed:
         message = "hdUE host is not running: " + (
-            _failure or "select Unreal Engine in a viewport"
+            "UE has shut down in this Houdini session; restart Houdini"
+            if _host
+            else _failure or "select Unreal Engine in a viewport"
         )
         _report(message)
         if hou.isUIAvailable():
