@@ -93,11 +93,14 @@ def Xform "World"
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
 
+    # Its position changes nothing in the lighting; it keeps the Sun's handle off the instancer, which a click at the
+    # instancer's centre picked instead in a narrow (portrait-monitor) viewport while the Sun sat at the origin.
     def DistantLight "Sun"
     {
         float inputs:intensity = 1
         float inputs:exposure = 1
+        double3 xformOp:translate = (0, 4, 0)
         float3 xformOp:rotateXYZ = (-50, 30, 0)
-        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
     }
 }
