@@ -1711,6 +1711,12 @@ def write_schema(*settings):
             "    uniform token[] xformOpOrder",
         ]
         for setting in properties:
+            if setting["kind"] not in USD_TYPES or (
+                setting["kind"] == "float" and setting["size"] > 1
+            ):
+                raise SystemExit(
+                    f"{setting['attribute']}: the schema cannot write a {setting['kind']} of size {setting['size']}"
+                )
             lines += [
                 f"    {USD_TYPES[setting['kind']]} {setting['attribute']} = {value(setting)} (",
                 f"        displayName = {json.dumps(setting['label'])}",

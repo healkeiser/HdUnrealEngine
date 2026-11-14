@@ -1147,6 +1147,12 @@ def property_templates(setting):
     import hou
     from generate_render_settings import USD_TYPES, houdini_name
 
+    if setting["kind"] not in ("toggle", "string", "color", "int", "float") or (
+        setting["kind"] == "float" and setting["size"] > 1
+    ):
+        raise SystemExit(
+            f"{setting['attribute']}: no parameter for a {setting['kind']} of size {setting['size']}"
+        )
     usd_type = USD_TYPES[setting["kind"]]
     name = houdini_name(setting["attribute"])
     control = houdini_name(setting["attribute"] + "_control")
