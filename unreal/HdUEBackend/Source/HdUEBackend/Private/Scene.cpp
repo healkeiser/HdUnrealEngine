@@ -2133,8 +2133,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             }
         } else {
             if (!FMath::IsFinite(Desc.base_color[3])) {
-                Error = TEXT("Material opacity must be finite.");
-                return false;
+                // Skipped like a material whose asset is missing (below): the rest of the batch still applies.
+                UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped material %s: its opacity is not finite."),
+                       UTF8_TO_TCHAR(Desc.id));
+                continue;
             }
             const float Opacity = FMath::Clamp(Desc.base_color[3], 0.f, 1.f);
             const auto HasTexture = [&](int32 Slot) { return Desc.textures[Slot].file && *Desc.textures[Slot].file; };
