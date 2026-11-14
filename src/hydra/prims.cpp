@@ -948,50 +948,54 @@ protected:
 // Points and curves become triangle meshes: one shared sphere instanced per point, and a capped tube
 // per curve. They keep one material (bound, or constant displayColor/displayOpacity).
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
-    std::lock_guard lock(state.mutex);
-    if (mesh.material.empty()) {
-        const auto material = displayColorMaterial(delegate, id, mesh, HdUEMeshLightEmission(delegate, id));
-        mesh.material = material.id;
-        const auto previous = state.materials.find(material.id);
-        if (previous == state.materials.end() || previous->second.color != material.color ||
-            previous->second.opacity != material.opacity || previous->second.emissive != material.emissive ||
-            previous->second.vertexColor != material.vertexColor) {
-            state.materials[material.id] = material;
-            state.dirtyMaterials.insert(material.id);
+    {
+        std::lock_guard lock(state.mutex);
+        if (mesh.material.empty()) {
+            const auto material = displayColorMaterial(delegate, id, mesh, HdUEMeshLightEmission(delegate, id));
+            mesh.material = material.id;
+            const auto previous = state.materials.find(material.id);
+            if (previous == state.materials.end() || previous->second.color != material.color ||
+                previous->second.opacity != material.opacity || previous->second.emissive != material.emissive ||
+                previous->second.vertexColor != material.vertexColor) {
+                state.materials[material.id] = material;
+                state.dirtyMaterials.insert(material.id);
+            }
         }
+        HdUEStoreShearCompanion(state, mesh);
+        // A prim Houdini deleted and re-created (a Hydra rebuild) is compared with its last data, as Mesh::Sync does.
+        auto previous = state.meshes.find(mesh.id);
+        const bool revived = previous == state.meshes.end() && state.erasedMeshes.count(mesh.id);
+        if (revived) previous = state.erasedMeshes.find(mesh.id);
+        const auto missing = revived ? state.erasedMeshes.end() : state.meshes.end();
+        mesh.geometryHash = HdUEGeometryHash(mesh);
+        const bool sameGeometry = previous != missing && previous->second.geometryHash == mesh.geometryHash;
+        // unreal:groom just turned off: the groom goes (its removal stays queued) and the tubes upload.
+        const bool wasGroom = state.grooms.erase(mesh.id) > 0;
+        state.dirtyGrooms.erase(mesh.id);
+        const bool changed =
+            !sameGeometry || wasGroom || state.fullUploads.count(mesh.id) ||
+            previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
+            previous->second.visible != mesh.visible || previous->second.renderTag != mesh.renderTag ||
+            previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
+            previous->second.instanceColors != mesh.instanceColors;
+        mesh.pickMesh = sameGeometry ? previous->second.pickMesh : nullptr;  // built on first pick
+        const bool relinked = previous != missing && previous->second.categories != mesh.categories;
+        const auto key = mesh.id;
+        state.meshes[key] = std::move(mesh);
+        state.erasedMeshes.erase(key);
+        state.fullUploads.erase(key);
+        if (wasGroom)
+            state.removed.insert(key);  // the backend applies removals before the batch's meshes
+        else
+            state.removed.erase(key);
+        state.repull.erase(state.meshes[key].sourceId);
+        if (changed) {
+            if (state.dirtyMeshes.insert(key).second) state.pendingBytes += HdUEMeshBytes(state.meshes[key]);
+            ++state.revision;
+        } else if (relinked)
+            ++state.revision;
     }
-    HdUEStoreShearCompanion(state, mesh);
-    // A prim Houdini deleted and re-created (a Hydra rebuild) is compared with its last data, as Mesh::Sync does.
-    auto previous = state.meshes.find(mesh.id);
-    const bool revived = previous == state.meshes.end() && state.erasedMeshes.count(mesh.id);
-    if (revived) previous = state.erasedMeshes.find(mesh.id);
-    const auto missing = revived ? state.erasedMeshes.end() : state.meshes.end();
-    mesh.geometryHash = HdUEGeometryHash(mesh);
-    const bool sameGeometry = previous != missing && previous->second.geometryHash == mesh.geometryHash;
-    // unreal:groom just turned off: the groom goes (its removal stays queued) and the tubes upload.
-    const bool wasGroom = state.grooms.erase(mesh.id) > 0;
-    state.dirtyGrooms.erase(mesh.id);
-    const bool changed = !sameGeometry || wasGroom || state.fullUploads.count(mesh.id) ||
-                         previous->second.transform != mesh.transform || previous->second.material != mesh.material ||
-                         previous->second.visible != mesh.visible || previous->second.renderTag != mesh.renderTag ||
-                         previous->second.instanced != mesh.instanced || previous->second.instances != mesh.instances ||
-                         previous->second.instanceColors != mesh.instanceColors;
-    mesh.pickMesh = sameGeometry ? previous->second.pickMesh : nullptr;  // built on first pick
-    const bool relinked = previous != missing && previous->second.categories != mesh.categories;
-    const auto key = mesh.id;
-    state.meshes[key] = std::move(mesh);
-    state.erasedMeshes.erase(key);
-    state.fullUploads.erase(key);
-    if (wasGroom)
-        state.removed.insert(key);  // the backend applies removals before the batch's meshes
-    else
-        state.removed.erase(key);
-    state.repull.erase(state.meshes[key].sourceId);
-    if (changed) {
-        state.dirtyMeshes.insert(key);
-        ++state.revision;
-    } else if (relinked)
-        ++state.revision;
+    HdUEStreamMeshes(state);  // as Mesh::Sync: a large point or curve scene uploads while Hydra still syncs it
 }
 HdUEMeshData HdUEShapeBase(HdRprim& prim, HdSceneDelegate* delegate) {
     HdUEMeshData mesh;

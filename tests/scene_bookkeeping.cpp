@@ -2,7 +2,7 @@
 // change to it shows here. Plans 015 and 016 change this code and update these expectations with it.
 //
 // Not covered here, because the code lives outside scene_bookkeeping.h (prims.cpp): an error return in Mesh::Sync
-// leaves the id in repull, and HdUEStoreShape does not add to pendingBytes (both known gaps, plan 015).
+// erases the id from repull, and HdUEStoreShape adds a dirtied shape's bytes to pendingBytes (plan 015).
 #include "scene_bookkeeping.h"
 #include <iostream>
 #include <stdexcept>
