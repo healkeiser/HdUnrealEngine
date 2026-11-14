@@ -3,7 +3,9 @@
     doc = """Points and instance positions cached every 0.05 frame have 41 samples inside hdUE's one-frame-either-side
 motion window, more than the 16 it keeps. Before this was fixed, the samples past the 16th were read past the end of a
 16-entry array. The bottom quad's points and the top cube instance move 2 units per frame along +X with the shutter
-open from -0.5 to 0.5 frames: both smear 1 unit each side, and the quad's centre stays covered."""
+open from -0.5 to 0.5 frames: both smear 1 unit each side, and the quad's centre stays covered. This scene
+guards against that crash: rendering it at all proves the samples are no longer read past the array, and the
+checks show the smear stops at x = 1.5 (the strips beyond x = 1.7 stay empty)."""
     customLayerData = {
         string conformance = """{
  "schema": "UsdGeomPrimvarsAPI",
@@ -49,6 +51,32 @@ open from -0.5 to 0.5 frames: both smear 1 unit each side, and the quad's centre
     "stat": "alpha"
    },
    "min": 0.4
+  },
+  {
+   "name": "dense deforming mesh does not smear past the shutter window",
+   "value": {
+    "region": [
+     1.7,
+     -2.2,
+     2.5,
+     -1.8
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.05
+  },
+  {
+   "name": "dense instancer does not smear past the shutter window",
+   "value": {
+    "region": [
+     1.7,
+     1.8,
+     2.5,
+     2.2
+    ],
+    "stat": "alpha"
+   },
+   "max": 0.05
   }
  ]
 }"""
