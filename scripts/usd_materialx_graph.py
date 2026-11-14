@@ -289,8 +289,9 @@ def structure_key(graph):
 
 
 # What UE's import makes of a graph besides the graph itself: hdUE's corrections after Interchange
-# (HdUEImportMaterialXCommandlet.cpp). Bump it with them: published live materials of another version stop matching
-# and age out (live_materials.clean).
+# (HdUEImportMaterialXCommandlet.cpp), materialx_lowering.py's rewrites and export_usd_materialx.py's output. Bump it
+# when any of them changes what UE imports: published live materials of another version stop matching and age out
+# (live_materials.clean).
 IMPORT_VERSION = 4
 
 
