@@ -3,6 +3,7 @@
 #include "instancing.h"
 #include "picking.h"
 #include "placement.h"
+#include "render_setting_defaults.h"
 #include "pxr/pxr.h"
 #include <chrono>
 #include <condition_variable>
@@ -501,24 +502,27 @@ struct HdUEState : HdRenderParam {
     }
     // Path Tracer samples, capped while interactive so tumbling and playback keep up (all samples once still).
     int samplesPerPixel() const {
-        const int samples = std::max(1, setting<int>("samplesPerPixel", 2048));
+        const int samples = std::max(1, setting<int>("samplesPerPixel", HdUESettingDefaults::samplesPerPixel));
         return interactive() ? std::min(samples, 8) : samples;  // ponytail: fixed cap; a setting if users ask
     }
     // unreal:debugView, which replaces the realtime beauty only.
     std::string debugView() const {
-        return setting<std::string>("renderMode", "realtime") == "realtime" ? setting<std::string>("debugView", "off")
-                                                                            : "off";
+        return setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "realtime"
+                   ? setting<std::string>("debugView", HdUESettingDefaults::debugView)
+                   : "off";
     }
     // UE's tonemapper draws the beauty (unreal:tonemapper, or a debug view drawn for display as UE's viewport does):
     // the camera exposure goes in before it. Buffer debug views stay linear data.
     bool toneMapped() const {
         const auto view = debugView();
-        return setting<bool>("tonemapper", false) || (view != "off" && !view.starts_with("buffer:"));
+        return setting<bool>("tonemapper", HdUESettingDefaults::tonemapper) ||
+               (view != "off" && !view.starts_with("buffer:"));
     }
     // The camera exposure scales the beauty (not a debug view's data).
     bool exposed() const { return !toneMapped() && debugView() == "off"; }
     Converter converter() const {
-        return {setting<double>("metersPerUnit", 0.01) * 100, setting<std::string>("upAxis", "Y") == "Z"};
+        return {setting<double>("metersPerUnit", 0.01) * 100,
+                setting<std::string>("upAxis", HdUESettingDefaults::upAxis) == "Z"};
     }
     GfVec3d convert(const GfVec3d& point, bool direction = false) const { return converter()(point, direction); }
 };

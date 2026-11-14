@@ -46,6 +46,8 @@ def Scope "Render"
         uniform int2 resolution = (128, 128)
         rel products = [</Render/Beauty>, </Render/Ids>]
         int unreal:samplesPerPixel = 16
+        # The scenes test USD lights only, as --headlight none does for husk's own light (run_conformance.py).
+        bool unreal:autoViewerLight = 0
         int unreal:warmupFrames = 8
         # The checks measure the renderer's own samples; denoising 16 samples moves coverage and brightness.
         bool unreal:postProcess:PathTracingEnableDenoiser = 0

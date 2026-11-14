@@ -1026,11 +1026,15 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
     const auto basis = sceneBasis(state);
     // Single-sided meshes (USD doubleSided off) render their front faces only, as UE's USD importer does;
     // unreal:cullBackface = 0 renders both sides, as Karma (karma:object:cull_backface defaults to off).
-    const bool cullBackface = state.setting<bool>("cullBackface", true);
+    const bool cullBackface = state.setting<bool>("cullBackface", HdUESettingDefaults::cullBackface);
     const auto inverse = basis.GetInverse();
-    packet.conversion = {state.converter(), basis,
-                         inverse,           state.setting<bool>("requireNanite", false),
-                         cullBackface,      state.setting<int64_t>("naniteTriangleThreshold", 1000000)};
+    packet.conversion = {
+        state.converter(),
+        basis,
+        inverse,
+        state.setting<bool>("requireNanite", HdUESettingDefaults::requireNanite),
+        cullBackface,
+        state.setting<int64_t>("naniteTriangleThreshold", HdUESettingDefaults::naniteTriangleThreshold)};
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
     // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
     for (const auto& id : packet.movedMeshes) {
@@ -1177,8 +1181,9 @@ struct LightDesc {
     float height_cm;
 };
 void prepareLights(HdUEState& state, ScenePacket& packet) {
-    const double viewerIntensity =
-        state.setting<double>("viewerLightIntensity", state.setting<float>("viewerLightIntensity", 4.f));
+    const double viewerIntensity = state.setting<double>(
+        "viewerLightIntensity",
+        state.setting<float>("viewerLightIntensity", float(HdUESettingDefaults::viewerLightIntensity)));
     if (!std::isfinite(viewerIntensity) || viewerIntensity < 0 || viewerIntensity > 100)
         throw std::runtime_error("viewerLightIntensity must be between 0 and 100");
     int sceneLights = 0;
@@ -1189,10 +1194,11 @@ void prepareLights(HdUEState& state, ScenePacket& packet) {
             else if (state.setting<bool>("sceneLightsEnabled", true))
                 ++sceneLights;
         }
-    packet.autoLight = state.setting<bool>("autoViewerLight", false) && !sceneLights && !packet.cameraLights &&
-                       !state.nativeAssets.lights;
+    // On by default, as Houdini's UI and usdview show it; scenes that must render unlit author it off.
+    packet.autoLight = state.setting<bool>("autoViewerLight", HdUESettingDefaults::autoViewerLight) && !sceneLights &&
+                       !packet.cameraLights && !state.nativeAssets.lights;
     const double units = state.setting<double>("metersPerUnit", .01) * 100;
-    int requested = state.setting<int>("domeResolution", 128);
+    int requested = state.setting<int>("domeResolution", HdUESettingDefaults::domeResolution);
     // UE bakes a power-of-two cube from 32 to 2048 (Lighting.cpp rejects the whole light batch otherwise); older
     // hdUE Render Settings LOPs authored the menu position instead of the value.
     if (requested < 32 || requested > 2048 || (requested & (requested - 1))) {
@@ -2126,7 +2132,7 @@ class Pass final : public HdRenderPass {
             return;
         }
         const bool vector = format != HdUEAovFormat::Float;
-        const bool zUp = state_->setting<std::string>("upAxis", "Y") == "Z";
+        const bool zUp = state_->setting<std::string>("upAxis", HdUESettingDefaults::upAxis) == "Z";
         std::vector<float> out(count * (vector ? 3 : 1));
         for (size_t i = 0; i < count; ++i) {
             const float* p = &rgba[i * 4];
@@ -2404,9 +2410,10 @@ public:
             return "bytes.fromhex('" + hex + "').decode('utf-8')";
         };
         // The libraries and whether unprepared Substrate Builder graphs are prepared first (as the viewport does).
-        const auto libraries = quoted(s.setting<std::string>("materialxLibrary", "")) + ", " +
-                               quoted(s.setting<std::string>("substrateLibrary", "")) + ", " +
-                               (s.setting<bool>("substrateAutoPrepare", true) ? "True" : "False");
+        const auto libraries =
+            quoted(s.setting<std::string>("materialxLibrary", HdUESettingDefaults::materialxLibrary)) + ", " +
+            quoted(s.setting<std::string>("substrateLibrary", HdUESettingDefaults::substrateLibrary)) + ", " +
+            (s.setting<bool>("substrateAutoPrepare", HdUESettingDefaults::substrateAutoPrepare) ? "True" : "False");
         const double frame = s.setting<double>("houdini:frame", 1.);
         const auto stage = HdUEBatchStage();
         std::string error;
@@ -2683,7 +2690,8 @@ public:
             std::vector<std::pair<HdUERenderBuffer*, uint32_t>> aovs;
             std::vector<CryptoVar> crypto;
             std::vector<BufferVar> bufferVars;
-            const bool pathTraced = s.setting<std::string>("renderMode", "realtime") == "pathtraced";
+            const bool pathTraced =
+                s.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced";
             extraBeauties_.clear();
             std::vector<HdRenderBuffer*> bound;  // alive buffers, by binding
             for (auto* b : pass->buffers) bound.push_back(HdUERenderBuffer::alive(b) ? b : nullptr);
@@ -2912,11 +2920,13 @@ public:
                 HdueRenderRequest request{};
                 request.struct_size = sizeof(request);
                 request.generation = std::max(s.generation, s.aovGeneration) + 1;
-                request.mode =
-                    s.setting<std::string>("renderMode", "realtime") == "pathtraced" ? HDUE_PATH_TRACED : HDUE_REALTIME;
+                request.mode = s.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
+                                   ? HDUE_PATH_TRACED
+                                   : HDUE_REALTIME;
                 request.samples_per_pixel = uint32_t(s.samplesPerPixel());
-                request.warmup_frames = uint32_t(std::max(1, s.setting<int>("warmupFrames", 64)));
-                request.lumen_enabled = s.setting<bool>("lumenEnabled", true);
+                request.warmup_frames =
+                    uint32_t(std::max(1, s.setting<int>("warmupFrames", HdUESettingDefaults::warmupFrames)));
+                request.lumen_enabled = s.setting<bool>("lumenEnabled", HdUESettingDefaults::lumenEnabled);
                 request.time_seconds = s.setting<double>("timeSeconds", 0);
                 const auto camera = view.GetInverse();
                 const auto eye = s.convert(camera.ExtractTranslation());
@@ -2939,7 +2949,8 @@ public:
                     TF_STATUS("hdUE camera %s eye=(%g,%g,%g) target=(%g,%g,%g) fov=%g size=%ux%u units=%g axis=%s",
                               pass->camera ? pass->cameraId.GetText() : "none", eye[0], eye[1], eye[2], target[0],
                               target[1], target[2], request.horizontal_fov_degrees, s.width, s.height,
-                              s.setting<double>("metersPerUnit", .01), s.setting<std::string>("upAxis", "Y").c_str());
+                              s.setting<double>("metersPerUnit", .01),
+                              s.setting<std::string>("upAxis", HdUESettingDefaults::upAxis).c_str());
                 const double cmPerUnit = s.setting<double>("metersPerUnit", 0.01) * 100;
                 request.near_clip_cm = pass->camera ? float(pass->nearClip * cmPerUnit) : 0.1f;
                 if (pass->camera && std::isfinite(pass->farClip) && pass->farClip > pass->nearClip)
@@ -3154,7 +3165,8 @@ public:
                     // rather than onto display values.
                     applyMotion(s, 0);
                     // Motion blur needs a shutter, sub-frames and something moving.
-                    const int samples = std::max(1, s.setting<int>("motionSamples", 16));
+                    const int samples =
+                        std::max(1, s.setting<int>("motionSamples", HdUESettingDefaults::motionSamples));
                     // UsdRenderSettings disableMotionBlur (and the deprecated instantaneousShutter) close the shutter.
                     const bool shutter = pass->camera && pass->shutterClose > pass->shutterOpen &&
                                          !s.setting<bool>("disableMotionBlur", false) &&
@@ -3164,14 +3176,18 @@ public:
                                             return std::any_of(s.meshes.begin(), s.meshes.end(),
                                                                [](const auto& entry) { return entry.second.moving(); });
                                         }));
-                    subframes_ = s.setting<bool>("motionBlur", true) && shutter && moving && samples > 1 ? samples : 1;
+                    subframes_ = s.setting<bool>("motionBlur", HdUESettingDefaults::motionBlur) && shutter && moving &&
+                                         samples > 1
+                                     ? samples
+                                     : 1;
                     std::vector<std::string> names, values, materials;
                     const bool tonemapper = s.toneMapped();  // debug views are drawn for display, as in UE's viewport
                     // Movie Render Queue's Disable Tone Curve: UE's post-processing without its film curve, linear.
                     // UE forces it when OCIO does the display (MoviePipelineColorSetting.cpp), as an ACES or AgX
                     // default view does here.
                     const bool toneCurve =
-                        tonemapper && !s.setting<bool>("disableToneCurve", false) && !HdUEViewTransformsDisplay();
+                        tonemapper && !s.setting<bool>("disableToneCurve", HdUESettingDefaults::disableToneCurve) &&
+                        !HdUEViewTransformsDisplay();
                     // unreal:heightFog places UE's Exponential Height Fog (volumetric fog included),
                     // unreal:heightFog:<UExponentialHeightFogComponent property> sets it, and unreal:heightFogHeight
                     // (scene units along the up axis) is where its density is FogDensity.
@@ -3196,22 +3212,27 @@ public:
                             values.push_back(value);
                         }
                     }
-                    const bool heightFog = s.setting<bool>("heightFog", false) && !placed.count("HeightFog");
+                    const bool heightFog =
+                        s.setting<bool>("heightFog", HdUESettingDefaults::heightFog) && !placed.count("HeightFog");
                     if (heightFog) {
                         const double heightCm =
-                            s.setting<double>("heightFogHeight", 0) * s.setting<double>("metersPerUnit", .01) * 100;
+                            s.setting<double>("heightFogHeight", HdUESettingDefaults::heightFogHeight) *
+                            s.setting<double>("metersPerUnit", .01) * 100;
                         names.insert(names.end(), {"HeightFog", "HeightFog:RelativeLocation"});
                         values.insert(values.end(), {"True", "0 0 " + TfStringify(heightCm)});
                     }
                     // unreal:skyAtmosphere and unreal:volumetricCloud place UE's Sky Atmosphere and Volumetric Cloud
                     // the same way, with unreal:skyAtmosphere:<property> and unreal:volumetricCloud:<property>.
-                    static constexpr std::pair<const char*, const char*> components[] = {
-                        {"heightFog", "HeightFog"},
-                        {"skyAtmosphere", "SkyAtmosphere"},
-                        {"volumetricCloud", "VolumetricCloud"}};
+                    static constexpr struct {
+                        const char* setting;
+                        const char* ue;
+                        bool fallback;
+                    } components[] = {{"heightFog", "HeightFog", HdUESettingDefaults::heightFog},
+                                      {"skyAtmosphere", "SkyAtmosphere", HdUESettingDefaults::skyAtmosphere},
+                                      {"volumetricCloud", "VolumetricCloud", HdUESettingDefaults::volumetricCloud}};
                     std::map<std::string, std::string> enabled;  // setting prefix "<name>:" -> UE name
-                    for (const auto& [setting, ue] : components)
-                        if (s.setting<bool>(setting, false) && !placed.count(ue)) {
+                    for (const auto& [setting, ue, fallback] : components)
+                        if (s.setting<bool>(setting, fallback) && !placed.count(ue)) {
                             enabled[std::string(setting) + ":"] = ue;
                             if (std::string(ue) != "HeightFog") {  // HeightFog is above, with its height
                                 names.push_back(ue);
@@ -3264,7 +3285,9 @@ public:
                                 materials.push_back(m.GetString());
                         else
                             for (const auto& m :
-                                 TfStringTokenize(s.setting<std::string>("postProcessMaterials", ""), " ,;"))
+                                 TfStringTokenize(s.setting<std::string>("postProcessMaterials",
+                                                                         HdUESettingDefaults::postProcessMaterials),
+                                                  " ,;"))
                                 materials.push_back(m);
                     }
                     std::vector<const char*> namePtrs, valuePtrs, materialPtrs;
@@ -3836,27 +3859,30 @@ TfToken HdUERenderDelegate::GetMaterialBindingPurpose() const {
 // Prefixed families (postProcess:*, heightFog:*, skyAtmosphere:*, volumetricCloud:*, cvar:*) and dictionaries set by
 // the Houdini host are not listed.
 HdRenderSettingDescriptorList HdUERenderDelegate::GetRenderSettingDescriptors() const {
-    return {{"Render mode", TfToken("renderMode"), VtValue(std::string("realtime"))},
-            {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(2048)},
-            {"Warmup frames", TfToken("warmupFrames"), VtValue(64)},
-            {"Lumen", TfToken("lumenEnabled"), VtValue(true)},
-            {"Viewer light intensity", TfToken("viewerLightIntensity"), VtValue(4.f)},
-            {"Environment cube resolution", TfToken("domeResolution"), VtValue(128)},
+    return {{"Render mode", TfToken("renderMode"), VtValue(std::string(HdUESettingDefaults::renderMode))},
+            {"Samples per pixel", TfToken("samplesPerPixel"), VtValue(HdUESettingDefaults::samplesPerPixel)},
+            {"Warmup frames", TfToken("warmupFrames"), VtValue(HdUESettingDefaults::warmupFrames)},
+            {"Lumen", TfToken("lumenEnabled"), VtValue(HdUESettingDefaults::lumenEnabled)},
+            {"Viewer light intensity", TfToken("viewerLightIntensity"),
+             VtValue(float(HdUESettingDefaults::viewerLightIntensity))},
+            {"Environment cube resolution", TfToken("domeResolution"), VtValue(HdUESettingDefaults::domeResolution)},
             {"Scene lights", TfToken("sceneLightsEnabled"), VtValue(true)},
-            {"Viewer light without scene lights", TfToken("autoViewerLight"), VtValue(false)},
-            {"Motion blur", TfToken("motionBlur"), VtValue(true)},
-            {"Motion blur samples", TfToken("motionSamples"), VtValue(16)},
-            {"Subdivision level", TfToken("subdivisionLevel"), VtValue(0)},
-            {"Tonemapper", TfToken("tonemapper"), VtValue(false)},
-            {"Disable tone curve", TfToken("disableToneCurve"), VtValue(false)},
-            {"Debug view", TfToken("debugView"), VtValue(std::string("off"))},
-            {"Require Nanite", TfToken("requireNanite"), VtValue(false)},
-            {"Nanite triangle threshold", TfToken("naniteTriangleThreshold"), VtValue(1000000)},
-            {"Cull Backface", TfToken("cullBackface"), VtValue(true)},
-            {"Exponential height fog", TfToken("heightFog"), VtValue(false)},
-            {"Height fog height", TfToken("heightFogHeight"), VtValue(0.0)},
-            {"Sky atmosphere", TfToken("skyAtmosphere"), VtValue(false)},
-            {"Volumetric cloud", TfToken("volumetricCloud"), VtValue(false)}};
+            {"Viewer light without scene lights", TfToken("autoViewerLight"),
+             VtValue(HdUESettingDefaults::autoViewerLight)},
+            {"Motion blur", TfToken("motionBlur"), VtValue(HdUESettingDefaults::motionBlur)},
+            {"Motion blur samples", TfToken("motionSamples"), VtValue(HdUESettingDefaults::motionSamples)},
+            {"Subdivision level", TfToken("subdivisionLevel"), VtValue(HdUESettingDefaults::subdivisionLevel)},
+            {"Tonemapper", TfToken("tonemapper"), VtValue(HdUESettingDefaults::tonemapper)},
+            {"Disable tone curve", TfToken("disableToneCurve"), VtValue(HdUESettingDefaults::disableToneCurve)},
+            {"Debug view", TfToken("debugView"), VtValue(std::string(HdUESettingDefaults::debugView))},
+            {"Require Nanite", TfToken("requireNanite"), VtValue(HdUESettingDefaults::requireNanite)},
+            {"Nanite triangle threshold", TfToken("naniteTriangleThreshold"),
+             VtValue(HdUESettingDefaults::naniteTriangleThreshold)},
+            {"Cull Backface", TfToken("cullBackface"), VtValue(HdUESettingDefaults::cullBackface)},
+            {"Exponential height fog", TfToken("heightFog"), VtValue(HdUESettingDefaults::heightFog)},
+            {"Height fog height", TfToken("heightFogHeight"), VtValue(HdUESettingDefaults::heightFogHeight)},
+            {"Sky atmosphere", TfToken("skyAtmosphere"), VtValue(HdUESettingDefaults::skyAtmosphere)},
+            {"Volumetric cloud", TfToken("volumetricCloud"), VtValue(HdUESettingDefaults::volumetricCloud)}};
 }
 namespace {
 // Ids whose entry differs between two id-keyed setting dictionaries (an unset setting is an empty one) and that name
@@ -3923,10 +3949,11 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     // value a host sends does not re-upload a scene it already matches.
     const auto previousDictionary = state_->setting<VtDictionary>(key.GetText(), {});
     const double previousUnits = state_->setting<double>("metersPerUnit", 0.01);
-    const std::string previousAxis = state_->setting<std::string>("upAxis", "Y");
-    const bool previousNanite = state_->setting<bool>("requireNanite", false);
-    const int64_t previousThreshold = state_->setting<int64_t>("naniteTriangleThreshold", 1000000);
-    const bool previousCull = state_->setting<bool>("cullBackface", true);
+    const std::string previousAxis = state_->setting<std::string>("upAxis", HdUESettingDefaults::upAxis);
+    const bool previousNanite = state_->setting<bool>("requireNanite", HdUESettingDefaults::requireNanite);
+    const int64_t previousThreshold =
+        state_->setting<int64_t>("naniteTriangleThreshold", HdUESettingDefaults::naniteTriangleThreshold);
+    const bool previousCull = state_->setting<bool>("cullBackface", HdUESettingDefaults::cullBackface);
     const bool previousInteractive = state_->interactive();
     if (value.IsEmpty())
         state_->settings.erase(key);
@@ -4030,11 +4057,15 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     const bool sceneSpaceChanged =
         (key == TfToken("metersPerUnit") && state_->setting<double>("metersPerUnit", 0.01) != previousUnits) ||
-        (key == TfToken("upAxis") && state_->setting<std::string>("upAxis", "Y") != previousAxis) ||
-        (key == TfToken("requireNanite") && state_->setting<bool>("requireNanite", false) != previousNanite) ||
+        (key == TfToken("upAxis") &&
+         state_->setting<std::string>("upAxis", HdUESettingDefaults::upAxis) != previousAxis) ||
+        (key == TfToken("requireNanite") &&
+         state_->setting<bool>("requireNanite", HdUESettingDefaults::requireNanite) != previousNanite) ||
         (key == TfToken("naniteTriangleThreshold") &&
-         state_->setting<int64_t>("naniteTriangleThreshold", 1000000) != previousThreshold);
-    if (key == TfToken("cullBackface") && state_->setting<bool>("cullBackface", true) != previousCull) {
+         state_->setting<int64_t>("naniteTriangleThreshold", HdUESettingDefaults::naniteTriangleThreshold) !=
+             previousThreshold);
+    if (key == TfToken("cullBackface") &&
+        state_->setting<bool>("cullBackface", HdUESettingDefaults::cullBackface) != previousCull) {
         for (const auto& [id, v] : state_->meshes) state_->dirtyMeshes.insert(id);
         ++state_->revision;
     }
@@ -4179,7 +4210,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     const auto spp = state.samplesPerPixel();
     std::string progress =
         !error.empty() ? "Error: " + error
-        : state.setting<std::string>("renderMode", "realtime") == "pathtraced"
+        : state.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
             ? "Path Tracer: " + std::to_string(std::min(int(state.lastFrame.completed_samples), spp)) + "/" +
                   std::to_string(spp) + " samples"
         : state.lastFrame.converged ? "Realtime: converged"
@@ -4262,7 +4293,8 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"completedSamples", VtValue(int(state.lastFrame.completed_samples))},
         {"percentDone",
          VtValue(state.lastFrame.converged ? 100.f
-                 : state.lastFrame.frame_id && state.setting<std::string>("renderMode", "realtime") == "pathtraced"
+                 : state.lastFrame.frame_id &&
+                         state.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
                      ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) / float(state.samplesPerPixel()))
                      : 0.f)},
         {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
@@ -4379,8 +4411,9 @@ bool HdUERenderDelegate::InvokeCommand(const TfToken& command, const HdCommandAr
                 return true;
             }
             const auto fromUE = [&](const double* v) {
-                return state_->setting<std::string>("upAxis", "Y") == "Z" ? GfVec3d(v[0], -v[1], v[2])
-                                                                          : GfVec3d(v[1], v[2], -v[0]);
+                return state_->setting<std::string>("upAxis", HdUESettingDefaults::upAxis) == "Z"
+                           ? GfVec3d(v[0], -v[1], v[2])
+                           : GfVec3d(v[1], v[2], -v[0]);
             };
             maximum = hit.distance_cm / scale;
             store(mesh->second.scenePath, fromUE(hit.point) / scale, fromUE(hit.normal).GetNormalized(), maximum,
