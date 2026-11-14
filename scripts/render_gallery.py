@@ -100,6 +100,8 @@ SETS = {  # out folder, images folder, README markers
 
 
 def dev_environment():
+    # An installed release package sets HDUE_RUNTIME_CONFIG in hython to its own profile; the dev profile must win.
+    os.environ.pop("HDUE_RUNTIME_CONFIG", None)
     profile = local_path("runtime_config")
     build = local_path("houdini_build_root")
     os.environ["HOUDINI_PATH"] = f'{ROOT / "integrations" / "houdini"};&'

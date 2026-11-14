@@ -1,6 +1,7 @@
 """The gallery checks fail on NaN, missing renders and unreadable brightness cells (no GPU or Houdini needed)."""
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -80,6 +81,24 @@ class Baselines(unittest.TestCase):
         failures = self.run_check(None, self.stored)
         self.assertEqual(len(failures), 1)
         self.assertIn("render missing", failures[0])
+
+
+class DevEnvironment(unittest.TestCase):
+    def test_dev_profile_wins_over_inherited_release_profile(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = Path(folder) / "paths.json"
+            paths.write_text(
+                json.dumps({"runtime_config": "dev-runtime.json"}),
+                encoding="utf-8",
+            )
+            env = {
+                "HDUE_RUNTIME_CONFIG": "release-runtime.json",
+                "HDUE_LOCAL_CONFIG": str(paths),
+            }
+            with mock.patch.dict("os.environ", env):
+                render_gallery.dev_environment()
+                profile = Path(os.environ["HDUE_RUNTIME_CONFIG"])
+        self.assertEqual(profile, (Path(folder) / "dev-runtime.json").resolve())
 
 
 if __name__ == "__main__":
