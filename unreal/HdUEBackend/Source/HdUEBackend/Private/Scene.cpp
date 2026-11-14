@@ -1552,12 +1552,17 @@ TSharedPtr<Nanite::FResources> BuildNanite(const HdueMeshDesc& Desc, TUniquePtr<
             TArray<uint32> Indices;
             SerializeRaw(Reader, Vertices);
             SerializeRaw(Reader, Indices);
-            if (!Reader.IsError() && Reader.AtEnd() && Indices.Num() >= 3) {
+            // The fallback mesh's GPU buffers are built from these indices: each must name a stored vertex.
+            if (!Reader.IsError() && Reader.AtEnd() && Indices.Num() >= 3 && !Vertices.IsEmpty() &&
+                !Algo::AnyOf(Indices, [&](uint32 Index) { return Index >= uint32(Vertices.Num()); })) {
                 Fallback = FallbackRenderData(Vertices, Indices);
                 IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a hit counts as a use (eviction)
                 return Resources;
             }
         }
+        // Deleted, or the writer below would keep it (it keeps an existing entry) and every load would rebuild.
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: Nanite cache entry %s is damaged; rebuilding it."), *Path);
+        IFileManager::Get().Delete(*Path, false, false, true);
         *Resources = Nanite::FResources();
     }
     Nanite::IBuilderModule::FInputMeshData Input;
