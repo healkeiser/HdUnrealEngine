@@ -2915,7 +2915,11 @@ public:
                     converged_ = false;
                     return;
                 }
-                if (assets.failed) {
+                // Houdini's viewport renders without a failed native asset (the backend does the same for interactive
+                // hosts); husk fails the frame rather than deliver a picture missing it.
+                if (assets.failed && selfHost().continuous)
+                    warnOnce(std::string("hdUE renders without a failed native asset: ") + assets.message);
+                else if (assets.failed) {
                     s.setError(assets.message);
                     s.assetRequestPending = true;
                     converged_ = true;

@@ -777,7 +777,16 @@ HdueResult HDUE_CALL RequestRender(HdueSession Handle, const HdueRenderRequest* 
     // goes on (and the Path Tracer's world stops ticking again below).
     Session->Scene->Assets.SetTime(Request->time_seconds);
     if (Session->Scene->Assets.Loading(AssetFailure)) return Pending(TEXT("native assets"));
-    if (!AssetFailure.IsEmpty()) return Fail(HDUE_ENGINE_ERROR, *AssetFailure);
+    // An interactive host renders without a failed asset; an offline render fails its frame rather than deliver a
+    // picture missing it.
+    if (!AssetFailure.IsEmpty() && !IsInteractive()) return Fail(HDUE_ENGINE_ERROR, *AssetFailure);
+    if (!AssetFailure.IsEmpty()) {
+        static FString Logged;  // once per distinct failure: requests come every frame
+        if (Logged != AssetFailure) {
+            Logged = AssetFailure;
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: native asset %s failed; rendering without it."), *AssetFailure);
+        }
+    }
     ReleaseResidency(Session);
     // A moving realtime camera needs Lumen's persistent temporal history. Scene and light edits at the same time cancel
     // HasRequest and reset it: the request converges again, and a viewport stops drawing once it has (a kept history
