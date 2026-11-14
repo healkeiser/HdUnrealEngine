@@ -1,6 +1,7 @@
 #include "delegate.h"
 #include "depth.h"
 #include "surface_settings.h"
+#include "scene_bookkeeping.h"
 #include "color_management.h"
 #include "instancing.h"
 #include "displacement.h"
@@ -507,7 +508,7 @@ struct MeshConversion {
 // One scene upload, with copies of everything its descriptors point to. prepareScene fills it under the state lock;
 // sendScene hands it to UE without the lock, so Hydra Sync and Houdini's UI never wait for UE's apply (seconds on
 // large scenes); finishScene records the result under the lock again.
-struct ScenePacket {
+struct ScenePacket : HdUESceneSets {
     // Owned storage. Deques: their elements never move, so descriptor pointers into them stay valid.
     std::deque<std::string> text;
     std::deque<std::vector<float>> floats;
@@ -528,86 +529,19 @@ struct ScenePacket {
         return store.emplace_back(std::move(values)).data();
     }
     std::mutex ownMutex;
-    // What this upload covers; Sync may dirty more meanwhile, for the next upload.
-    std::set<std::string> dirtyMeshes, movedMeshes, dirtyMaterials, dirtyLights, dirtyVolumes, dirtyActors, dirtyGrooms,
-        removedIds;
-    std::set<std::string> volumeParameters;  // volumes whose bound material's parameters alone changed
-    // Meshes in dirtyMeshes only because their material changed: they go through update_meshes, released or not.
-    std::set<std::string> materialMeshes;
     // Motion blur: deforming meshes uploaded with their points at a sub-frame time instead of their stored points, and
     // sheared-instance companions (bakedInstances) baked at the sub-frame's instance matrices.
     std::map<std::string, std::vector<GfVec3f>> points;
     std::map<std::string, std::vector<GfMatrix4d>> instances;
-    // Takes the state's dirty sets (state lock held): the dirty meshes up to meshBudget bytes of stored geometry (at
-    // least one), the other sets whole.
-    void take(HdUEState& state, uint64_t meshBudget) {
-        uint64_t bytes = 0;
-        for (auto it = state.dirtyMeshes.begin();
-             it != state.dirtyMeshes.end() && (dirtyMeshes.empty() || bytes < meshBudget);) {
-            if (const auto mesh = state.meshes.find(*it); mesh != state.meshes.end())
-                bytes += HdUEMeshBytes(mesh->second);
-            dirtyMeshes.insert(*it);
-            it = state.dirtyMeshes.erase(it);
-        }
-        this->bytes = bytes;
-        movedMeshes.swap(state.movedMeshes);
-        dirtyMaterials.swap(state.dirtyMaterials);
-        // A material changed in place can change blend mode, and with it the backend's Nanite choice for the static
-        // meshes drawn with it: its meshes go through update_meshes, which asks for the geometry of those built for
-        // the other blend mode (FHdueScene::UpdateMeshes). Meshes Sync dirtied upload in full anyway.
-        if (!dirtyMaterials.empty())
-            for (const auto& [id, mesh] : state.meshes)
-                if (dirtyMaterials.count(mesh.material) && mesh.sceneAsset.empty() && !dirtyMeshes.count(id) &&
-                    !state.dirtyMeshes.count(id)) {
-                    dirtyMeshes.insert(id);
-                    materialMeshes.insert(id);
-                }
-        dirtyLights.swap(state.dirtyLights);
-        dirtyVolumes.swap(state.dirtyVolumes);
-        volumeParameters.swap(state.volumeParameters);
-        dirtyActors.swap(state.dirtyActors);
-        dirtyGrooms.swap(state.dirtyGrooms);
-        // A groom takes its bound material's colour and roughness: edits to that material rebuild it.
-        if (!dirtyMaterials.empty())
-            for (const auto& [id, groom] : state.grooms)
-                if (dirtyMaterials.count(groom.material)) dirtyGrooms.insert(id);
-        removedIds.swap(state.removed);
-    }
-    // Gives them back after a failed upload (state lock held). Sync may have erased or revived prims meanwhile:
-    // only prims that still exist stay dirty, and only prims still gone stay removed.
+    // Gives the sets back after a failed upload (HdUESceneSets::giveBack), with the meshes it released when taken.
     void giveBack(HdUEState& state) const {
-        const auto restore = [](const std::set<std::string>& from, std::set<std::string>& to, const auto& prims) {
-            for (const auto& id : from)
-                if (prims.count(id)) to.insert(id);
-        };
         std::set<std::string> taken;
-        for (const auto& deferred : this->deferred) {
-            taken.insert(deferred.mesh.id);
-            // Released when taken but never reached UE: its arrays come back with the next Sync, uploaded in full.
-            if (const auto mesh = state.meshes.find(deferred.mesh.id);
-                mesh != state.meshes.end() && mesh->second.released) {
-                state.fullUploads.insert(mesh->first);
-                state.repull.insert(mesh->second.sourceId);
-            }
-        }
-        for (const auto& id : dirtyMeshes)
-            if (state.meshes.count(id) && !taken.count(id)) state.dirtyMeshes.insert(id);
-        restore(movedMeshes, state.movedMeshes, state.meshes);
-        restore(dirtyMaterials, state.dirtyMaterials, state.materials);
-        restore(dirtyLights, state.dirtyLights, state.lights);
-        restore(dirtyVolumes, state.dirtyVolumes, state.volumes);
-        restore(volumeParameters, state.volumeParameters, state.volumes);
-        restore(dirtyActors, state.dirtyActors, state.actors);
-        restore(dirtyGrooms, state.dirtyGrooms, state.grooms);
-        for (const auto& id : removedIds)
-            if (!state.meshes.count(id) && !state.materials.count(id) && !state.lights.count(id) &&
-                !state.volumes.count(id) && !state.actors.count(id) && !state.grooms.count(id))
-                state.removed.insert(id);
+        for (const auto& deferred : this->deferred) taken.insert(deferred.mesh.id);
+        HdUESceneSets::giveBack(state, taken);
     }
     uint64_t revision = 0;
     bool firstBatch = false;
     bool stream = false;  // a streaming batch during Sync (HdUEStreamMeshes)
-    uint64_t bytes = 0;   // stored geometry of the meshes it takes
     // Descriptors.
     std::vector<HdueMeshDesc> meshes;
     std::vector<HdueMeshTransform> moves;  // movedMeshes, through set_transforms after apply_scene
@@ -1738,20 +1672,9 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
 }
-// Whether a generic mesh's geometry arrays can be freed once UE has it (finishScene): change detection compares its
-// geometryHash, update_meshes carries material, visibility and sidedness changes, and an upload that needs the arrays
-// again re-syncs the mesh from Hydra. Kept where something reads them after the upload: deformation blur (pointsAt),
-// wet masks and surfaces, displacement dicing and usdview's ray picks. A mesh that becomes wet later is re-pulled
-// (prepareSurfaceEffects).
+// HdUEReleasableMesh (scene_bookkeeping.h) for this process's UE host.
 bool releasable(const HdUEState& state, const HdUEMeshData& m) {
-    const auto& host = selfHost();
-    // A moving sheared-instance companion keeps its arrays: motion blur bakes it again per sub-frame.
-    if (!host.worker.joinable() || !m.deformTimes.empty() || !m.masks.empty() || (m.bakedInstances && m.moving()) ||
-        (state.wetBindings && !HdUEWetSettings(*state.wetBindings, m).empty()))
-        return false;
-    const auto material = state.materials.find(m.material);
-    return material == state.materials.end() ||
-           (material->second.textures[HDUE_TEXTURE_DISPLACEMENT].file.empty() && material->second.displacement == 0);
+    return HdUEReleasableMesh(state, m, selfHost().worker.joinable());
 }
 // Under the state lock again: records what reached UE.
 void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceStatus& surface) {
@@ -1962,23 +1885,6 @@ void HdUEDropShearCompanion(HdUEState& state, const std::string& prototype) {
     state.fullUploads.erase(id);
     state.removed.insert(id);
     ++state.revision;
-}
-uint64_t HdUEReleaseGeometry(HdUEMeshData& m) {
-    const uint64_t bytes = HdUEMeshBytes(m);
-    m.releasedTriangles = uint32_t(m.indices.size() / 3);
-    // Swapped with empty vectors: `v = {}` is assign(initializer_list), which keeps the capacity, so released meshes
-    // kept all their memory (NVIDIA's Da Vinci Workshop: about 30 GB).
-    const auto drop = [](auto& v) { std::decay_t<decltype(v)>().swap(v); };
-    drop(m.points);
-    drop(m.normals);
-    drop(m.uv);
-    drop(m.uvSets);
-    drop(m.colors);
-    drop(m.indices);
-    drop(m.sourceCorners);
-    m.pickMesh = nullptr;
-    m.released = true;
-    return bytes;
 }
 // Streaming: a scene too large to hold twice uploads while Hydra still syncs it. Mesh::Sync calls this after storing
 // a mesh; once 1 GB of stored geometry waits, hdUE's UE thread uploads it in batches (finishScene frees what it

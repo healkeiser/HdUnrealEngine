@@ -174,9 +174,9 @@ void HdUEStoreShearCompanion(HdUEState& state, HdUEMeshData& prototype);
 void HdUEDropShearCompanion(HdUEState& state, const std::string& prototype);
 // Uploads dirty meshes while Hydra still syncs a large scene (husk, hython); delegate.cpp. Call without the state lock.
 void HdUEStreamMeshes(HdUEState& state);
-// Whether a mesh's arrays can be freed once UE has it, and freeing them (delegate.cpp). Under the state lock.
+// Whether a mesh's arrays can be freed once UE has it (delegate.cpp; freeing them: scene_bookkeeping.h). Under the
+// state lock.
 bool HdUEReleasable(const HdUEState& state, const HdUEMeshData& mesh);
-uint64_t HdUEReleaseGeometry(HdUEMeshData& mesh);
 // Whether placing an uploaded mesh at transform needs no new geometry: a non-instanced mesh uploaded in local space,
 // moved without shear (HdUEShears). The motion extension then moves its UE actor.
 inline bool HdUEPlacedOnly(const HdUEMeshData& mesh, const GfMatrix4d& transform) {
