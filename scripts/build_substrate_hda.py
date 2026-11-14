@@ -467,6 +467,7 @@ def connector(network, name, kind, value_type, default=None):
 def help_page(kind, summary, group, inputs):
     """The node's help card (wiki markup): summary, inputs and parameters with their help."""
     from hdue_substrate import type_name
+    from substrate_graph import NODES
 
     lines = [
         f"= {NODES[kind]['label']} =",
@@ -500,6 +501,7 @@ def help_page(kind, summary, group, inputs):
 
 def finish(asset, kind, summary, group, inputs, keyword):
     from hdue_substrate import type_name
+    from substrate_graph import NODES, outputs
 
     definition = asset.type().definition()
     # VOP asset creation generates parameters from the connectors and resets numeric defaults.
@@ -514,15 +516,15 @@ def finish(asset, kind, summary, group, inputs, keyword):
         else "generic"
     )
     script = definition.sections()["DialogScript"].contents()
-    definition.addSection(
-        "DialogScript",
-        re.sub(
-            r"(\n    label\s.*\n)",
-            rf"\1    rendermask\thdUE\n    externalshader 1\n    shadertype\t{shader_type}\n",
-            script,
-            count=1,
-        ),
+    script, count = re.subn(
+        r"(\n    label\s.*\n)",
+        rf"\1    rendermask\thdUE\n    externalshader 1\n    shadertype\t{shader_type}\n",
+        script,
+        count=1,
     )
+    if count != 1:
+        raise SystemExit(f"{kind}: no label line to add the render mask after")
+    definition.addSection("DialogScript", script)
     definition.addSection("FunctionName", type_name(kind))
     # Type Properties' VopNet mask, which TAB menu masks test.
     definition.setExtraInfo(f"shadertype={shader_type} vopnetmask='{keyword}' ")
@@ -540,6 +542,7 @@ def finish(asset, kind, summary, group, inputs, keyword):
 def build():
     import hou
     from hdue_substrate import HDA, type_name
+    from substrate_graph import NODES, outputs
 
     HDA.unlink(missing_ok=True)
     scratch = hou.node("/mat").createNode("subnet", "hdue_definition_build")
@@ -591,17 +594,18 @@ def build():
     with tempfile.TemporaryDirectory() as expanded:
         subprocess.run([hotl, "-x", expanded, HDA], check=True)
         index = Path(expanded) / "INDEX__SECTION"
-        index.write_text(
-            re.sub(r"(?m)^(Subnet:\s*)true$", r"\1false", index.read_text())
+        text, count = re.subn(
+            r"(?m)^(Subnet:\s*)true$", r"\1false", index.read_text()
         )
+        if not count:
+            raise SystemExit("no Subnet: true entry in the library index")
+        index.write_text(text)
         subprocess.run([hotl, "-l", expanded, HDA], check=True)
     print(f"{HDA}: {len(NODES)} node types")
 
 
 if __name__ == "__main__":
     if os.environ.get("HDUE_BUILD_HDA"):
-        from substrate_graph import NODES, outputs
-
         build()
     else:
         from local_paths import relaunch

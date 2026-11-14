@@ -66,9 +66,16 @@ def aov_table():
     """(name, kind, USD data type, description) per row of the delegate's AOV table."""
     text = (ROOT / "src/hydra/aov_table.h").read_text(encoding="utf-8")
     text = text[text.index("HdUEAovTable[]") :]
+    rows = TABLE_ROW.findall(text)
+    # A row TABLE_ROW cannot read would be missing from the AOV list and the docs, without an error.
+    if len(rows) != text.count("HdUEAovKind::"):
+        raise SystemExit(
+            f"aov_table.h: read {len(rows)} rows but it names {text.count('HdUEAovKind::')} AOV kinds; "
+            "update TABLE_ROW"
+        )
     return [
         (name, kind, DATA_TYPES[fmt], "".join(re.findall(r'"([^"]*)"', doc)))
-        for name, kind, fmt, doc in TABLE_ROW.findall(text)
+        for name, kind, fmt, doc in rows
     ]
 
 
@@ -530,10 +537,16 @@ def build():
         )
     )
     output.addParmTemplate(aovs)
+    placed = False
     for tab in tabs:
         if tab.label() == "Engine Quality":
             group.append(output)
+            placed = True
         group.append(tab)
+    if not placed:
+        raise SystemExit(
+            'no "Engine Quality" tab to put the Image Output tab before'
+        )
     for first, _ in JOINS:  # a range's minimum and maximum on one row
         template = group.find(encode("unreal:postProcess:" + first))
         template.setJoinWithNext(True)
@@ -788,12 +801,14 @@ def save(
         script = saved.sections()["DialogScript"]
         contents = script.contents()
         for i, text in enumerate(input_labels, 1):
-            contents = re.sub(
+            contents, count = re.subn(
                 rf'^(\s*inputlabel\s+{i}\s+)"[^"]*"',
                 lambda m, text=text: f'{m.group(1)}"{text}"',
                 contents,
                 flags=re.M,
             )
+            if count != 1:
+                raise SystemExit(f"inputlabel {i} not found in {hda.name}")
         script.setContents(contents)
     shutil.rmtree(hda.parent / "backup", ignore_errors=True)
     print(
@@ -1338,15 +1353,18 @@ def build_prim_lop(
     )
     handles = "".join(re.findall(r"^\s*bindhandle .*\n", sphere_script, re.M))
     script = hou.hda.definitionsInFile(str(hda))[0].sections()["DialogScript"]
-    script.setContents(
-        re.sub(
-            r"^(\s*label\s+.*\n)",
-            lambda m: m.group(1) + handles,
-            script.contents(),
-            count=1,
-            flags=re.M,
-        )
+    contents, count = re.subn(
+        r"^(\s*label\s+.*\n)",
+        lambda m: m.group(1) + handles,
+        script.contents(),
+        count=1,
+        flags=re.M,
     )
+    if count != 1 or not handles:
+        raise SystemExit(
+            f"Sphere LOP handles or the label line not found for {hda.name}"
+        )
+    script.setContents(contents)
     shutil.rmtree(hda.parent / "backup", ignore_errors=True)
 
 
