@@ -302,6 +302,18 @@ class MergeCatalog(Folder):
         )
         self.assertIn("asset_catalog", json.loads(self.profile.read_text()))
 
+    def test_a_catalog_another_profile_made_is_read_before_merging(self):
+        catalog = self.write(
+            self.project.parent / "hdue_catalog.json",
+            json.dumps({"version": 1, "assets": {"Old": {"v": 0}}}),
+        )
+        hdue_ue_import.merge_catalog(
+            self.added(A={"v": 1}), self.profile, self.config
+        )
+        self.assertEqual(
+            sorted(json.loads(catalog.read_text())["assets"]), ["A", "Old"]
+        )
+
     def test_an_existing_entry_wins_over_a_re_imported_one(self):
         catalog = self.write(
             self.root / "catalog.json",

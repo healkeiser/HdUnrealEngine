@@ -133,7 +133,12 @@ def merge_catalog(catalog, config_path, config):
             target = (
                 Path(config["runtime_project"]).parent / "hdue_catalog.json"
             )
-            current = {"version": 1, "assets": {}}
+            # Another profile may share this runtime project and have made the catalog already.
+            current = (
+                json.loads(target.read_text(encoding="utf-8-sig"))
+                if target.is_file()
+                else {"version": 1, "assets": {}}
+            )
         current["assets"] = {**added, **current["assets"]}
         _write_atomic(target, json.dumps(current, indent=1))
         if not path:
