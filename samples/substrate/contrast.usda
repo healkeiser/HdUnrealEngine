@@ -64,13 +64,20 @@ def Xform "World"
 
 def "Looks"
 {
-    def Material "SS_Coat" (
-        prepend references = @../materialx/standard_surface.mtlx@</MaterialX/Materials/SS_Coat>
-    )
+    def Material "SS_Coat"
     {
-        float inputs:coat = 0
-        float inputs:specular_roughness = 0.65
+        token outputs:mtlx:surface.connect = </Looks/SS_Coat/MaterialX.outputs:surface>
         token outputs:surface.connect = </Looks/SS_Coat/Preview.outputs:surface>
+
+        def Shader "MaterialX"
+        {
+            uniform token info:implementationSource = "sourceAsset"
+            uniform asset info:mtlx:sourceAsset = @../materialx/standard_surface.mtlx@
+            uniform token info:mtlx:sourceAsset:subIdentifier = "SS_Coat"
+            float inputs:coat = 0
+            float inputs:specular_roughness = 0.65
+            token outputs:surface
+        }
 
         def Shader "Preview"
         {
@@ -93,7 +100,9 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "WaterRoughness"
+                string inputs:parameter_name.connect = None
                 float inputs:value = 0.08
+                float inputs:value.connect = None
                 float outputs:out
             }
 
@@ -101,10 +110,24 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo = (0, 0, 0)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
                 color3f inputs:f0 = (0.020059312, 0.020059312, 0.020059312)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
                 color3f inputs:mfp = (1000000, 1000000, 1000000)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
                 float inputs:roughness.connect = </Looks/WaterCoating/Graph/roughness.outputs:out>
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
                 string inputs:subsurface = "simple_volume"
+                string inputs:subsurface.connect = None
                 token outputs:out
             }
 
@@ -112,7 +135,9 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "Coverage"
+                string inputs:parameter_name.connect = None
                 float inputs:value = 1
+                float inputs:value.connect = None
                 float outputs:out
             }
 
@@ -127,7 +152,9 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:primvar"
                 float inputs:default = 1
+                float inputs:default.connect = None
                 string inputs:primvar = "wetness"
+                string inputs:primvar.connect = None
                 float outputs:out
             }
 
@@ -159,7 +186,9 @@ def "Looks"
                 uniform token info:id = "unreal:substrate:vertical"
                 token inputs:base.connect = </Looks/WaterCoating/Graph/base.outputs:out>
                 bool inputs:parameter_blending = 0
+                bool inputs:parameter_blending.connect = None
                 float inputs:thickness = 0.01
+                float inputs:thickness.connect = None
                 token inputs:top.connect = </Looks/WaterCoating/Graph/weight.outputs:out>
                 token outputs:out
             }

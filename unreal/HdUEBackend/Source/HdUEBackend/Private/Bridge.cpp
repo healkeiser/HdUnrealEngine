@@ -1507,6 +1507,12 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
 HdueResult HDUE_CALL Tick() {
     HDUE_RETURN_UNLESS_READY();
     if (UELibrary_Tick() != 0) return Fail(HDUE_ENGINE_ERROR, TEXT("UELibrary_Tick failed."));
+    // UE collects garbage at the end of UWorld::Tick (LevelTick.cpp), which UGameEngine::Tick skips for a world that
+    // should not tick (GameEngine.cpp): the Path Tracer's, so destroyed objects stayed until the next realtime request.
+    // UE's editor ticks its world every frame while its viewport path traces (LEVELTICK_ViewportsOnly,
+    // EditorEngine.cpp), so its collection runs on UE's own schedule (gc.TimeBetweenPurgingPendingKillObjects); this
+    // runs the same step. Collection frees only unreachable objects, so the accumulation keeps its samples.
+    if (Runtime.World && !Runtime.World->ShouldTick()) GEngine->ConditionalCollectGarbage();
     const auto Session = Runtime.Session;
     if (Session) {
         Session->Scene->Assets.Tick();
