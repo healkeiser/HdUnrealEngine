@@ -1564,8 +1564,9 @@ HdueResult HDUE_CALL UpsertVolume(HdueSession Handle, const HdueVolumeDesc* Desc
     HDUE_RETURN_UNLESS_READY();
     if (!ValidSession(Handle) || !Sized(Desc) || !Desc->id) return HDUE_INVALID_ARGUMENT;
     const uint64 Count = uint64(Desc->width) * Desc->height * Desc->depth;
+    // A null density keeps the grid UE has (FHdueScene::UpsertVolume checks there is one of this size).
     if (Desc->width > 2048 || Desc->height > 2048 || Desc->depth > 2048 || Count > (uint64(1) << 28) ||
-        (Count && !Desc->density) || !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0)
+        !FMath::IsFinite(Desc->extinction_scale) || Desc->extinction_scale < 0)
         return HDUE_INVALID_ARGUMENT;
     for (double Value : Desc->transform)
         if (!FMath::IsFinite(Value)) return HDUE_INVALID_ARGUMENT;

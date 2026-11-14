@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 24u
+#define HDUE_ABI_VERSION 25u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -461,7 +461,8 @@ typedef struct HduePostProcessDesc {
  * [i, i+1] x [j, j+1] x [k, k+1] of the volume's local space, which transform
  * (row-major, row vectors) maps to UE world centimeters. Extinction per cm is
  * density * extinction_scale. The descriptor and its arrays are caller-owned and
- * copied. */
+ * copied. ABI 25: a null density with the dimensions of the grid UE already has for this id keeps its density and
+ * emission grids (a placement, visibility or material edit); emission_intensity and temperature_scale still apply. */
 typedef struct HdueVolumeDesc {
     uint32_t struct_size;
     uint32_t visible;

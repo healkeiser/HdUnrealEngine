@@ -361,6 +361,8 @@ struct HdUEState : HdRenderParam {
     std::map<std::string, HdUEMaterialData> materials;
     std::map<std::string, HdUELightData> lights;
     std::map<std::string, HdUEVolumeData> volumes;
+    // The density array each volume's last upload sent: an upload of the same array keeps UE's grid (prepareVolumes).
+    std::map<std::string, VtFloatArray> volumeGrids;
     std::map<std::string, HdUEActorData> actors;
     std::map<std::string, HdUEGroomData> grooms;
     std::map<std::string, HdUEMotionSamples> cameraMotion;  // absolute camera transforms by camera id

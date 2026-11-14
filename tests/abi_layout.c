@@ -25,7 +25,7 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 208, "RenderRequest C ABI layout");
-_Static_assert(HDUE_ABI_VERSION == 24u, "ABI 24: one function table, no extension tables");
+_Static_assert(HDUE_ABI_VERSION == 25u, "ABI 25: one function table, no extension tables");
 _Static_assert(sizeof(HdueLoadStatus) == 32, "Load status C ABI layout");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 48, "Scene batch C ABI layout");

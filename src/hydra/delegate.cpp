@@ -564,6 +564,7 @@ struct ScenePacket : HdUESceneSets {
     std::vector<HdueLight> extendedLights;
     std::vector<HdueAssetDesc> sceneAssets;
     std::vector<HdueVolumeDesc> volumes;
+    std::vector<std::pair<std::string, VtFloatArray>> volumeGrids;  // recorded in the state once sent (finishScene)
     std::vector<HdueLocalFogVolumeDesc> localFogs;
     std::vector<HduePostProcessVolumeDesc> postProcessVolumes;
     std::vector<HdueDecalDesc> decals;
@@ -1382,7 +1383,14 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         desc.width = volume.width;
         desc.height = volume.height;
         desc.depth = volume.depth;
-        desc.density = packet.own(packet.floats, std::vector<float>(volume.density.begin(), volume.density.end()));
+        // The grid UE has from the last upload (the same array: a placement, visibility or material edit) stays there
+        // (ABI 25); copying it again took about 60 ms per move of a 256^3 grid.
+        const auto sent = state.volumeGrids.find(id);
+        const bool keep = !packet.firstBatch && volume.width && sent != state.volumeGrids.end() &&
+                          sent->second.IsIdentical(volume.density);
+        if (!keep)
+            desc.density = packet.own(packet.floats, std::vector<float>(volume.density.begin(), volume.density.end()));
+        packet.volumeGrids.emplace_back(id, volume.density);
         const auto m = volume.localToWorld * basis;
         rowMajor(m, desc.transform);
         for (int c = 0; c < 3; ++c) desc.albedo[c] = volume.albedo[c];
@@ -1391,8 +1399,9 @@ void prepareVolumes(HdUEState& state, ScenePacket& packet) {
         const double voxelCm = std::cbrt(std::abs(m.ExtractRotationMatrix().GetDeterminant()));
         desc.extinction_scale = float(perCentimeter * voxelCm);
         if (volume.emission.size() == volume.density.size() && !volume.emission.empty()) {
-            desc.emission =
-                packet.own(packet.floats, std::vector<float>(volume.emission.begin(), volume.emission.end()));
+            if (!keep)  // loaded with the density: kept with it
+                desc.emission =
+                    packet.own(packet.floats, std::vector<float>(volume.emission.begin(), volume.emission.end()));
             desc.emission_intensity = volume.emissionIntensity;
             desc.temperature_scale = volume.temperatureScale;
         }
@@ -1767,6 +1776,9 @@ void finishScene(HdUEState& state, const ScenePacket& packet, const HdueSurfaceS
     if (released && HdUETraceScene())
         std::fprintf(stderr, "hdUE released the geometry of %d uploaded meshes (%.1f MB)\n", released,
                      releasedBytes / 1048576.);
+    if (packet.firstBatch) state.volumeGrids.clear();  // reset_scene removed them
+    for (const auto& [id, grid] : packet.volumeGrids) state.volumeGrids[id] = grid;
+    for (const auto& id : packet.removedIds) state.volumeGrids.erase(id);
     state.submittedMeshes += packet.meshes.size();
     state.submittedMaterials += packet.materials.size();
     state.materialParameterUpdates += packet.materialUpdates.size();

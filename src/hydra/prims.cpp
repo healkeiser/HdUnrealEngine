@@ -1657,9 +1657,9 @@ public:
             *bits = HdChangeTracker::Clean;
         };
         // Visibility, purpose, transform, material and instance edits keep the loaded grid instead of reading the file
-        // again.
+        // again. Varying only marks a prim Hydra saw change in consecutive frames (husk sets it on animated prims).
         if (gridToLocal_ && !emitted_.empty() &&
-            !(*bits & ~(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag |
+            !(*bits & ~(HdChangeTracker::Varying | HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag |
                         HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyMaterialId |
                         HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex))) {
             std::lock_guard lock(state->mutex);

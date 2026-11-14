@@ -8,7 +8,7 @@ from pathlib import Path
 
 U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
-ABI_VERSION = 24  # HDUE_ABI_VERSION
+ABI_VERSION = 25  # HDUE_ABI_VERSION
 API_FUNCTIONS = 45  # entries in HdueApi (tests/abi_layout.c; tests/abi_mirror_test.py checks the names)
 Task = C.CFUNCTYPE(
     None, C.py_object

@@ -388,6 +388,14 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
             TEXT("Volume material /Game/HdUE/M_HdUEVolume is missing; run Prepare-Content.ps1 and stage the runtime.");
         return false;
     }
+    // A null density keeps the grids already filled (the delegate sends them only when they change).
+    const bool Keep = Count && !Desc.density;
+    if (const FVolume* Kept = Volumes.Find(Id);
+        Keep && (!Kept || !Kept->Texture || Kept->Texture->GetSizeX() != int32(Desc.width) ||
+                 Kept->Texture->GetSizeY() != int32(Desc.height) || Kept->Texture->GetSizeZ() != int32(Desc.depth))) {
+        Error = TEXT("No density grid of this size to keep for volume ") + Id;
+        return false;
+    }
     FVolume& Volume = Volumes.FindOrAdd(Id);
     if (!IsValid(Volume.Actor)) {
         Volume.Actor = World->SpawnActor<AActor>();
@@ -415,14 +423,15 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
         Texture->UpdateResource();
         return Texture;
     };
-    if (Count) {
+    if (Count && !Keep) {
         UVolumeTexture* Texture = Fill(Volume.Texture, Desc.density);
         if (!Texture) {
             Error = TEXT("Cannot create the volume texture.");
             return false;
         }
         Volume.Material->SetTextureParameterValue(TEXT("Density"), Texture);
-    }
+    } else if (Keep)  // into the instance again: a material edit may have made a new one
+        Volume.Material->SetTextureParameterValue(TEXT("Density"), Volume.Texture.Get());
     // Emission: UE's BlackBody of the field times its intensity (M_HdUEVolume); intensity 0 without a field.
     if (Count && Desc.emission) {
         UVolumeTexture* Texture = Fill(Volume.Emission, Desc.emission);
@@ -431,6 +440,10 @@ bool FHdueScene::UpsertVolume(const HdueVolumeDesc& Desc, FString& Error) {
             return false;
         }
         Volume.Material->SetTextureParameterValue(TEXT("Emission"), Texture);
+        Volume.Material->SetScalarParameterValue(TEXT("EmissionIntensity"), Desc.emission_intensity);
+        Volume.Material->SetScalarParameterValue(TEXT("TemperatureScale"), Desc.temperature_scale);
+    } else if (Keep && Volume.Emission) {
+        Volume.Material->SetTextureParameterValue(TEXT("Emission"), Volume.Emission.Get());
         Volume.Material->SetScalarParameterValue(TEXT("EmissionIntensity"), Desc.emission_intensity);
         Volume.Material->SetScalarParameterValue(TEXT("TemperatureScale"), Desc.temperature_scale);
     } else {
