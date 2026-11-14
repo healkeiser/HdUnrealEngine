@@ -1034,7 +1034,12 @@ READERS = ("ND_geompropvalue_", "ND_UsdPrimvarReader_")
 
 
 def primvar_name(node_id, inputs):
-    """The primvar a reader reads (geompropvalue's geomprop, UsdPrimvarReader's varname), or None."""
+    """The primvar a reader reads (geompropvalue's geomprop, UsdPrimvarReader's varname, texcoord's UV set: st, st1,
+    ... as UE names UV sets, src/hydra/materials.cpp uvPrimvar), or None.
+    """
+    if node_id == "ND_texcoord_vector2":
+        index = int((inputs.get("index") or {}).get("value") or 0)
+        return f"st{index}" if index > 0 else "st"
     for reader in READERS:
         if node_id.startswith(reader):
             item = inputs.get(

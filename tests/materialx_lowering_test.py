@@ -13,6 +13,7 @@ from materialx_lowering import (
     lower_flakes,
     lower_primvars,
     merge_displacements,
+    mesh_primvars,
     upgrade_legacy,
 )
 
@@ -146,6 +147,27 @@ class Lowering(unittest.TestCase):
                 "inputs": {"geomprop": {"value": "st"}},
             }
         }
+        notes = []
+        lower_primvars(doc, exported, nodes, notes)
+        texcoord = source(doc, "result")
+        self.assertEqual(texcoord.getCategory(), "texcoord")
+        self.assertEqual(texcoord.getInput("index").getValueString(), "0")
+        self.assertEqual(notes, [])
+
+    def test_texcoord_index_reads_its_uv_set(self):
+        # texcoord index 2 reads st2 (UE's name for UV set 2), which hdUE uploads as the material's only UV set.
+        doc = document()
+        reader = doc.addNode("texcoord", "uv", "vector2")
+        reader.addInput("index", "integer").setValueString("2")
+        output(doc, "result", "vector2", reader)
+        exported = {"/M/uv": reader}
+        nodes = {
+            "/M/uv": {
+                "id": "ND_texcoord_vector2",
+                "inputs": {"index": {"value": 2}},
+            }
+        }
+        self.assertEqual(mesh_primvars(nodes), (["st2"], ""))
         notes = []
         lower_primvars(doc, exported, nodes, notes)
         texcoord = source(doc, "result")

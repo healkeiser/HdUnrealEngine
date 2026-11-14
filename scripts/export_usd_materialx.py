@@ -535,14 +535,6 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                     item["attribute"], item["value"]
                 )
                 if (
-                    exported[path].getCategory() == "texcoord"
-                    and input_name == "index"
-                    and value != 0
-                ):
-                    raise ValueError(
-                        f"Only UV set 0 is supported: {item['attribute']}"
-                    )
-                if (
                     declared.getType() == "filename"
                     and item["attribute"] not in source["textures"]
                 ):

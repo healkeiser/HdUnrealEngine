@@ -111,11 +111,17 @@ TfToken colorPrimvar(const HdMaterialNode2& node) {
     return TfToken();
 }
 // The UV primvar a coordinate reader reads (UsdPrimvarReader_float2 varname, MaterialX geompropvalue geomprop:
-// exporters name it map1, UVMap, ...); empty otherwise.
+// exporters name it map1, UVMap, ...); empty otherwise. MaterialX's texcoord reads UV set index, which UE names st,
+// st1, st2, ... when it writes USD (USDConversionUtils.cpp UsdUtils::GetUVSetName), and which its USD import fills
+// from the texCoord2f primvars in name order (GetUVSetPrimvars): st, st1, ... in both directions.
 TfToken uvPrimvar(const HdMaterialNode2& node) {
     if (node.nodeTypeId == TfToken("UsdPrimvarReader_float2") ||
         node.nodeTypeId == TfToken("ND_UsdPrimvarReader_vector2"))
         return token(param(node, "varname"));
+    if (node.nodeTypeId == TfToken("ND_texcoord_vector2")) {
+        const int index = value(param(node, "index"), 0);
+        return TfToken(index > 0 ? "st" + std::to_string(index) : "st");
+    }
     return node.nodeTypeId == TfToken("ND_geompropvalue_vector2") ? token(param(node, "geomprop")) : TfToken();
 }
 // The UV primvars a material reads, in node order: its meshes' UV sets 0, 1, ...
@@ -382,10 +388,6 @@ private:
         for (int hop = 0; st && hop < 2; ++hop) {
             const auto node = network_.nodes.find(st->upstreamNode);
             if (node == network_.nodes.end()) break;
-            if (TfStringStartsWith(node->second.nodeTypeId.GetString(), "ND_texcoord_") &&
-                value(param(node->second, "index"), 0) != 0)
-                // UE meshes carry the material's UV primvars as sets 0, 1, ... (uvPrimvars), not MaterialX's indices.
-                data_.warnings.push_back("texcoord index other than 0 is not translated; textures read UV set 0");
             if (const auto name = uvPrimvar(node->second); !name.IsEmpty()) {
                 const auto set = size_t(std::find(uvNames_.begin(), uvNames_.end(), name) - uvNames_.begin());
                 if (set < 4) return uint32_t(set);
