@@ -60,7 +60,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Decisions the plans stop and ask about
 
-- 019 Step 3: which console variables a scene file may still set (`bridge.h` documents `set_post_process` as accepting any cvar).
+- 019 Step 3: which console variables a scene file may still set (`bridge.h` documents `set_post_process` as accepting any cvar). **Decided (2026-11-14): scenes keep setting any console variable**, as UE's Movie Render Queue lets a render configuration set any cvar (Unreal is the benchmark); 019 closes the memory-safety risk instead, by refusing scene-set properties that are not editable (`CPF_Edit`).
 - 020 Step 4: whether husk stops auto-preparing materials for scenes by default. **Decided (2026-11-14): keep the default.** husk preparing unprepared Substrate graphs is a deliberate feature (`7830f22`), and the setting comes from the hdUE Render Settings LOP; the exploit (finding `pwsh` through the current directory) is fixed by 020's process-launch steps.
 - 027 Part A: default UsdUVTexture wrap (UE's repeat vs the spec's black) and where scene-linear colours are converted.
 
@@ -71,7 +71,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - `HOUDINI_PACKAGE_SKIPLIST` is comma-separated (Houdini `ref/env.md`); the first harness fix joined with `;`, so a value already set in the shell made test runs load the installed release. Fixed with shared helpers (`a664228`), verified in the backend log.
 - `tests/husk_prepared_materials.py` fails two checks on this machine because the newest local Substrate libraries under `out/substrate` (2026-11-03) were built by an older compiler version: re-prepare them before relying on that test.
 - The free-view `selection` kind fails on a portrait-only monitor (narrow viewport); environment, not code.
-- The usdview smoke check timed out once (path-traced frames ~31 s each) and passed later; watch it.
+- The usdview smoke check timed out because the Path Tracer default became UE's 2048 samples (`fe2ad87`); it now sets its own 64 (`3c8f7d1`), as does the live COP texture test (`bbf3a2c`).
 - `zensical build --strict` reports four warnings under `docs/audit/` with zensical 0.0.61; check with the pinned 0.1.0 that CI uses.
 
 ## Findings considered and rejected
@@ -85,6 +85,17 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - Blocking texture-streaming flush on every offline realtime warm-up draw (`Bridge.cpp:1332-1344`): Movie Render Queue does the same on every tick (`MoviePipelineRendering.cpp:174`), so hdUE matches Unreal.
 - Sheared-instance product cap: already capped by `HdUEBakesShear` (`delegate.h:162-168`).
 - Subdivision-level change marking every mesh dirty (`delegate.cpp:4055-4057`): a global level change does affect every mesh; only the `surfaceEffects` loop is wasteful (plan 023).
+
+## Mid-point review (2026-11-14)
+
+All work up to plan 016 was verified at `8e389b6`: every build and test tier, a full conformance run (361 runs, 0 failing), the Houdini and usdview suites, and Cornell against the installed v0.5.0 release (Path Tracer identical, realtime 0.1%). Four independent reviewers read the whole diff. Their findings were fixed in two batches (C++ `5987376`..`bbf3a2c`; Python and PowerShell `e1f1915`..`199d85f`), among them: husk again fails a frame when a required native mesh cannot draw; motion samples of changing sizes are no longer interpolated; cancelling an asset import ends the whole cook process tree; a ratio of two black probes fails; picking no longer depends on iteration order.
+
+Found and left open:
+- UE collects garbage only inside the world tick, which Path Tracer requests pause: a viewport left in Path Tracer mode frees destroyed objects only at its next realtime request, edit or session end.
+- `warnOnce` keeps each skip warning once per process, and in Houdini's viewport skipped items reach only the console; a per-session key or a render-stats line would make them easier to see.
+- Native picking from Houdini's UI waits for queued UE work (`ueRun`), which can stall the UI during uploads.
+- The auto viewer light (now On, as the UI and docs say) also lights scenes lit only by emissive materials.
+- `abi_mirror_test.py` compares struct sizes, not field offsets.
 
 ## Not planned (deferred)
 
