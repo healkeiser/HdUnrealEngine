@@ -22,6 +22,23 @@ def unchanged(a, b):
     return (np.abs(a - b).max(-1) > 0.05).sum() < a.shape[0] * a.shape[1] // 100
 
 
+def scene_camera(viewer):
+    """Looks through the stage's first camera, the scene's own framing of its subject. frameAll also frames the
+    lights: small objects then cover under unchanged()'s 1% of the view, so no edit of theirs can change it.
+    """
+    import hdefereval
+    from pxr import UsdGeom
+
+    camera = next(
+        (p for p in viewer.stage().Traverse() if p.IsA(UsdGeom.Camera)), None
+    )
+    if camera is None:
+        raise AssertionError("The scene has no camera to look through")
+    hdefereval.execute_deferred(
+        lambda: viewer.curViewport().setCamera(str(camera.GetPath()))
+    )
+
+
 def flipbook(path):
     """Capture the Solaris compositor to path with a native flipbook (QWidget.grab must not re-enter Houdini's
     Vulkan/GL viewport painting); yields until the file exists, then returns a list that fills when the flipbook ends.

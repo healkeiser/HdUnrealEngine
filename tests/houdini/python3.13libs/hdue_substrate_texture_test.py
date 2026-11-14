@@ -3,7 +3,7 @@
 import hdue_houdini as integration
 import hou
 import numpy as np
-from hdue_houdini_test import unchanged
+from hdue_houdini_test import scene_camera, unchanged
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from pxr import UsdGeom
@@ -24,6 +24,11 @@ class Test(MaterialTest):
         network = hou.node(hou.node("/stage").userData("unreal:startupBuilder"))
         if not network:
             raise AssertionError("The texture Builder was not loaded from HIP")
+        # Through the scene's camera: in the HIP's free view the sphere covered 7%, and a live edit of part of it
+        # stayed under unchanged()'s 1% of the view.
+        scene_camera(viewer)
+        for _ in range(10):
+            yield
         initial = yield from self.image("01-texture-lumen", 0, minimum_meshes=1)
         yield from self.capture("01-texture-lumen-solaris.png")
         session = self.api.status()["session"]

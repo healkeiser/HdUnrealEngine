@@ -1,7 +1,7 @@
 """Verify VOP authoring, native shaders and live Solaris Substrate updates."""
 
 import hdue_houdini as integration
-from hdue_houdini_test import unchanged
+from hdue_houdini_test import scene_camera, unchanged
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from surface_api import SurfaceApi
@@ -11,7 +11,6 @@ _test = None
 
 class Test(MaterialTest):
     def run(self):
-        import hdefereval
         import hdue_substrate
 
         viewer = integration.scene_viewer()
@@ -20,7 +19,8 @@ class Test(MaterialTest):
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(0)
-        hdefereval.execute_deferred(viewer.curViewport().frameAll)
+        # Through the scene's camera: with frameAll (lights too) the spheres covered under 1% of the view.
+        scene_camera(viewer)
         while not self.host.prepared_materials.applied:
             if self.host.material_error:
                 raise ValueError(self.host.material_error)
@@ -45,8 +45,12 @@ class Test(MaterialTest):
         )
         controls = integration.current_settings_node()
         network = hdue_substrate.create(preset="wet", material="/Looks/SS_Coat")
+        # After the displayed node (the Render Settings LOP below the settings node): after the settings node, the
+        # library branched past the render settings and lost the Path Tracer mode this step renders in.
         author = hdue_substrate.author_lop(
-            network, "/Looks/WaterCoating", controls
+            network,
+            "/Looks/WaterCoating",
+            integration.viewer_display(viewer),
         )
         author.cook(force=True)
         for _ in range(15):
