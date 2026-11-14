@@ -1,7 +1,7 @@
 """Verify VOP authoring, native shaders and live Solaris Substrate updates."""
 
 import hdue_houdini as integration
-from hdue_houdini_test import scene_camera, unchanged
+from hdue_houdini_test import scene_camera
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from surface_api import SurfaceApi
@@ -55,12 +55,12 @@ class Test(MaterialTest):
         author.cook(force=True)
         for _ in range(15):
             yield
-        # Edit an actual VOP parameter. Its registered dependency recooks USD.
+        # Edit an actual VOP parameter (wet to dry, the largest change). Its registered dependency recooks USD.
         before = surface.status(session)
         generation = self.api.status()["generation"]
-        network.node("amount").parm("value").set(0.35)
+        network.node("amount").parm("value").set(0)
         changed = yield from self.image("03-vop-coverage", 1, generation)
-        if unchanged(original, changed):
+        if self.unchanged(original, changed):
             raise AssertionError(
                 "Published VOP parameter did not change the image"
             )

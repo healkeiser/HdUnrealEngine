@@ -15,16 +15,9 @@ from PySide6 import QtCore
 _test = None
 
 
-def unchanged(a, b):
-    """Whether fewer than 1% of the pixels of two images differ by more than 0.05 in a channel: changed pixels, not
-    the mean, so the check holds for any viewport size and above render noise (the transform check in Test.run).
-    """
-    return (np.abs(a - b).max(-1) > 0.05).sum() < a.shape[0] * a.shape[1] // 100
-
-
 def scene_camera(viewer):
     """Looks through the stage's first camera, the scene's own framing of its subject. frameAll also frames the
-    lights: small objects then cover under unchanged()'s 1% of the view, so no edit of theirs can change it.
+    lights, and the subject shrinks to a few pixels that no edit of its material can change.
     """
     import hdefereval
     from pxr import UsdGeom
@@ -72,6 +65,9 @@ class Test:
         self.host = host
         self.output = host.log_dir
         self.frames = []
+        self.geometry = (
+            []
+        )  # (image, pixels showing geometry in UE's depth) of every image(), for unchanged()
         self.capture_errors = []
         self.deadline = time.monotonic() + 300
         self.captures = []
@@ -152,6 +148,21 @@ class Test:
 
             hdefereval.execute_deferred(lambda: hou.hscript("quit -f"))
 
+    def unchanged(self, a, b):
+        """Whether fewer than 1% of the pixels showing geometry (UE's depth, in either image) differ by more than 0.05
+        in a channel: changed pixels, not the mean, so the check holds above render noise (the transform check in
+        Test.run) and for any viewport size, and a small subject on an empty background counts as one filling the view.
+        """
+        shown = np.zeros(a.shape[:2], bool)
+        for image, geometry in self.geometry:
+            if image is a or image is b:
+                shown |= geometry
+        if not shown.any():
+            raise AssertionError(
+                "unchanged() compares images that image() did not return"
+            )
+        return (np.abs(a - b).max(-1) > 0.05).sum() < shown.sum() // 100
+
     def image(self, label, mode, previous=0, minimum_meshes=0):
         while True:
             s = self.api.status()
@@ -207,6 +218,7 @@ class Test:
         s["depth_background"] = int(depth.size - len(hits))
         write_pfm(self.output / (label + "-depth.pfm"), depth)
         write_pfm(self.output / (label + ".pfm"), rgb)
+        self.geometry.append((rgb, depth > 0))
         self.frames.append(dict(label=label, **s))
         integration._report("Verified " + label + ": " + repr(s))
         return rgb

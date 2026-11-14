@@ -3,7 +3,7 @@
 import hdue_houdini as integration
 import hou
 import numpy as np
-from hdue_houdini_test import scene_camera, unchanged
+from hdue_houdini_test import scene_camera
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from pxr import UsdGeom
@@ -24,8 +24,7 @@ class Test(MaterialTest):
         network = hou.node(hou.node("/stage").userData("unreal:startupBuilder"))
         if not network:
             raise AssertionError("The texture Builder was not loaded from HIP")
-        # Through the scene's camera: in the HIP's free view the sphere covered 7%, and a live edit of part of it
-        # stayed under unchanged()'s 1% of the view.
+        # Through the scene's camera, its own framing of the sphere (the HIP's free view showed it at 7% of the view).
         scene_camera(viewer)
         for _ in range(10):
             yield
@@ -45,24 +44,25 @@ class Test(MaterialTest):
             "01b-live-uv-lumen", 0, self.frames[-1]["generation"]
         )
         difference = float(np.abs(initial - uv).mean())
-        if unchanged(initial, uv):
+        if self.unchanged(initial, uv):
             raise AssertionError(
                 "Direct UV scale/offset did not update the image"
             )
         self.stats["live_uv_difference"] = difference
         network.node("roughness").parm("channel").set("r")
-        network.node("coat").parm("roughness").set(0.35)
-        network.node("coat").parmTuple("f0").set((0.15, 0.08, 0.03))
+        # A strongly tinted, rough coat: the generated coat (F0 0.02) is faint, so a small edit changed few pixels.
+        network.node("coat").parm("roughness").set(0.5)
+        network.node("coat").parmTuple("f0").set((0.6, 0.3, 0.1))
         slab = yield from self.image(
             "01c-live-slab-channel-lumen", 0, self.frames[-1]["generation"]
         )
-        if unchanged(uv, slab):
+        if self.unchanged(uv, slab):
             raise AssertionError("Direct Slab/channel controls did not update")
         network.node("normal").parm("flip_green").set(0)
         flipped = yield from self.image(
             "01d-live-flip-green-lumen", 0, self.frames[-1]["generation"]
         )
-        if unchanged(slab, flipped):
+        if self.unchanged(slab, flipped):
             raise AssertionError("Flip Green did not update")
         network.node("uv").parmTuple("scale").set((2, 1))
         network.node("uv").parmTuple("offset").set((0.125, 0))
@@ -84,7 +84,7 @@ class Test(MaterialTest):
         direct = yield from self.image(
             "02b-direct-controls-pathtraced", 1, self.frames[-1]["generation"]
         )
-        if unchanged(original, direct):
+        if self.unchanged(original, direct):
             raise AssertionError(
                 "Automatic parameters did not update Path Tracer"
             )
@@ -105,7 +105,7 @@ class Test(MaterialTest):
             )
         flat = yield from self.image("03-normal-strength-zero", 1, generation)
         difference = float(np.abs(original - flat).mean())
-        if unchanged(original, flat):
+        if self.unchanged(original, flat):
             raise AssertionError("Normal Map strength had no visible effect")
         after = surface.status(session)
         if (

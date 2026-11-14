@@ -5,7 +5,7 @@ import threading
 
 import hdue_houdini as integration
 from hdue_houdini_test import Test as ViewportTest
-from hdue_houdini_test import flipbook, unchanged
+from hdue_houdini_test import flipbook
 from hdue_viewport import Materials
 from material_api import MaterialApi
 from pxr import UsdGeom, UsdShade
@@ -117,7 +117,7 @@ class Test(ViewportTest):
         edited = yield from self.image(
             "03-subset-rebound", 0, self.frames[-1]["generation"]
         )
-        if unchanged(original, edited):
+        if self.unchanged(original, edited):
             raise AssertionError(
                 "GeomSubset material edit did not reach the image"
             )

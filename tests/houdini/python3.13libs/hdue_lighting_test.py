@@ -6,7 +6,6 @@ import threading
 import hdue_houdini as integration
 import numpy as np
 from hdue_houdini_test import Test as ViewportTest
-from hdue_houdini_test import unchanged
 from lighting_api import Lighting, Status
 from pxr import UsdGeom
 
@@ -100,7 +99,7 @@ class Test(ViewportTest):
             "03-hdri-rotated", 0, self.frames[-1]["generation"]
         )
         self.lighting(0)
-        if unchanged(original, rotated):
+        if self.unchanged(original, rotated):
             raise AssertionError("HDRI edit did not change the image")
         edit.parm("python").set(
             prefix
