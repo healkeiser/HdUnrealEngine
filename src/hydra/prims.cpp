@@ -303,16 +303,27 @@ HdUEMotionSamples HdUETransformMotion(HdSceneDelegate* delegate, const SdfPath& 
     return HdUERelativeMotion(times, values, count, current, left);
 }
 // SamplePrimvar returns how many samples a primvar has, which can exceed the capacity it fills (sceneDelegate.h); the
-// array overload fetches them all. Past HdUEMaxMotionSamples they are resampled at even times over the same span.
+// array overload fetches them all. Past HdUEMaxMotionSamples they are resampled at even times over the same span, or,
+// when the arrays' sizes change inside it (a FLIP surface's points), 16 evenly spaced raw samples are kept: Hydra's
+// resampling blends arrays elementwise at the first one's size (HdResampleNeighbors) and would read past a shorter one.
 HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> HdUESamplePrimvar(HdSceneDelegate* delegate, const SdfPath& id,
                                                                    const TfToken& name) {
     HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> all;
     delegate->SamplePrimvar(id, name, -HdUEMotionWindow, HdUEMotionWindow, &all);
     if (all.count <= HdUEMaxMotionSamples) return all;
+    bool sameSize = true;
+    for (size_t i = 1; i < all.count && sameSize; ++i)
+        sameSize = all.values[i].GetArraySize() == all.values[0].GetArraySize();
     HdTimeSampleArray<VtValue, HdUEMaxMotionSamples> even;
     even.Resize(HdUEMaxMotionSamples);
     const float first = all.times[0], last = all.times[all.count - 1];
     for (size_t i = 0; i < HdUEMaxMotionSamples; ++i) {
+        if (!sameSize) {
+            const size_t raw = i * (all.count - 1) / (HdUEMaxMotionSamples - 1);
+            even.times[i] = all.times[raw];
+            even.values[i] = all.values[raw];
+            continue;
+        }
         even.times[i] = first + (last - first) * float(i) / float(HdUEMaxMotionSamples - 1);
         even.values[i] = all.Resample(even.times[i]);
     }
