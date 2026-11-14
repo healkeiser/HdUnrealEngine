@@ -2,6 +2,7 @@
 #if !WITH_EDITOR
 #include "Scene.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/MeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAABBTree3.h"
@@ -112,13 +113,18 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
         auto* Static = Actor->FindComponentByClass<UStaticMeshComponent>();
         UStaticMesh* Source = Static ? Static->GetStaticMesh() : nullptr;
         if (!Source || !Source->IsAsset()) continue;
+        // Only a component the ray can reach decides the pick: an unpickable asset elsewhere must not fail it.
+        const FBox Bounds = Static->Bounds.GetBox();
+        if (!FMath::LineBoxIntersection(Bounds, Origin, Origin + Direction * Nearest, Direction * Nearest)) continue;
         TArray<uint32> MaterialFlags;
         for (int32 I = 0; I < Static->GetNumMaterials(); ++I) {
             uint32 Flags = 0;
             const auto Code = InspectMaterial(Static->GetMaterial(I), Flags, Error);
             if (Code != HDUE_OK) return Code;
             if (!(Flags & HDUE_PICK_MATERIAL_OPAQUE) || (Flags & HDUE_PICK_MATERIAL_DEFORMED)) {
-                Error = TEXT("Picking requires opaque materials without vertex/displacement deformation.");
+                Error = FString::Printf(TEXT("Picking requires opaque materials without vertex/displacement "
+                                             "deformation (%s)."),
+                                        *Source->GetPathName());
                 return HDUE_NOT_SUPPORTED;
             }
             MaterialFlags.Add(Flags);
@@ -129,46 +135,56 @@ HdueResult FHdueScene::PickNative(const HdueNativeRay& Request, HdueNativeHit& H
             Error = Geometry->Error;
             return HDUE_NOT_SUPPORTED;
         }
-        const FMatrix LocalToWorld = Static->GetComponentTransform().ToMatrixWithScale();
-        if (FMath::Abs(LocalToWorld.Determinant()) < UE_SMALL_NUMBER) continue;
-        const FMatrix Inverse = LocalToWorld.Inverse();
-        const FVector3d LocalOrigin(Inverse.TransformPosition(Origin));
-        const FVector3d Unnormalized(Inverse.TransformVector(Direction));
-        const double Scale = Unnormalized.Length();
-        if (Scale <= UE_SMALL_NUMBER) continue;
-        const FRay3d Ray(LocalOrigin, Unnormalized / Scale);
-        const double Minimum = Request.minimum_cm * Scale;
-        IMeshSpatial::FQueryOptions Options(Nearest * Scale);
-        Options.TriangleFilterF = [&](int32 T) {
-            const FVector3d Normal = Geometry->Mesh.GetTriNormal(T);
-            const double Denominator = FVector3d::DotProduct(Ray.Direction, Normal);
-            const int32 Slot = Geometry->MaterialIndices[T];
-            const bool TwoSided =
-                MaterialFlags.IsValidIndex(Slot) && (MaterialFlags[Slot] & HDUE_PICK_MATERIAL_TWO_SIDED);
-            if (FMath::Abs(Denominator) < 1e-15 || (!TwoSided && Denominator >= 0)) return false;
-            const auto Vertices = Geometry->Mesh.GetTriangle(T);
-            const double Distance =
-                FVector3d::DotProduct(Geometry->Mesh.GetVertex(Vertices.A) - Ray.Origin, Normal) / Denominator;
-            return Distance >= Minimum;
+        const auto Test = [&](const FMatrix& LocalToWorld) {
+            if (FMath::Abs(LocalToWorld.Determinant()) < UE_SMALL_NUMBER) return;
+            const FMatrix Inverse = LocalToWorld.Inverse();
+            const FVector3d LocalOrigin(Inverse.TransformPosition(Origin));
+            const FVector3d Unnormalized(Inverse.TransformVector(Direction));
+            const double Scale = Unnormalized.Length();
+            if (Scale <= UE_SMALL_NUMBER) return;
+            const FRay3d Ray(LocalOrigin, Unnormalized / Scale);
+            const double Minimum = Request.minimum_cm * Scale;
+            IMeshSpatial::FQueryOptions Options(Nearest * Scale);
+            Options.TriangleFilterF = [&](int32 T) {
+                const FVector3d Normal = Geometry->Mesh.GetTriNormal(T);
+                const double Denominator = FVector3d::DotProduct(Ray.Direction, Normal);
+                const int32 Slot = Geometry->MaterialIndices[T];
+                const bool TwoSided =
+                    MaterialFlags.IsValidIndex(Slot) && (MaterialFlags[Slot] & HDUE_PICK_MATERIAL_TWO_SIDED);
+                if (FMath::Abs(Denominator) < 1e-15 || (!TwoSided && Denominator >= 0)) return false;
+                const auto Vertices = Geometry->Mesh.GetTriangle(T);
+                const double Distance =
+                    FVector3d::DotProduct(Geometry->Mesh.GetVertex(Vertices.A) - Ray.Origin, Normal) / Denominator;
+                return Distance >= Minimum;
+            };
+            double Distance = 0;
+            int32 Triangle = -1;
+            if (!Geometry->Tree.FindNearestHitTriangle(Ray, Distance, Triangle, Options)) return;
+            Nearest = Distance / Scale;
+            const FVector3d Point = Origin + Direction * Nearest;
+            FVector3d Normal(Inverse.GetTransposed().TransformVector(Geometry->Mesh.GetTriNormal(Triangle)));
+            Normal.Normalize();
+            const int32 Slot = Geometry->MaterialIndices[Triangle];
+            if (MaterialFlags.IsValidIndex(Slot) && (MaterialFlags[Slot] & HDUE_PICK_MATERIAL_TWO_SIDED) &&
+                FVector3d::DotProduct(Normal, Direction) > 0)
+                Normal = -Normal;
+            Hit.hit = 1;
+            Hit.flags = Geometry->Flags;
+            Hit.distance_cm = Nearest;
+            ObjectId = Entry.Key;
+            for (int32 I = 0; I < 3; ++I) {
+                Hit.point[I] = Point[I];
+                Hit.normal[I] = Normal[I];
+            }
         };
-        double Distance = 0;
-        int32 Triangle = -1;
-        if (!Geometry->Tree.FindNearestHitTriangle(Ray, Distance, Triangle, Options)) continue;
-        Nearest = Distance / Scale;
-        const FVector3d Point = Origin + Direction * Nearest;
-        FVector3d Normal(Inverse.GetTransposed().TransformVector(Geometry->Mesh.GetTriNormal(Triangle)));
-        Normal.Normalize();
-        const int32 Slot = Geometry->MaterialIndices[Triangle];
-        if (MaterialFlags.IsValidIndex(Slot) && (MaterialFlags[Slot] & HDUE_PICK_MATERIAL_TWO_SIDED) &&
-            FVector3d::DotProduct(Normal, Direction) > 0)
-            Normal = -Normal;
-        Hit.hit = 1;
-        Hit.flags = Geometry->Flags;
-        Hit.distance_cm = Nearest;
-        ObjectId = Entry.Key;
-        for (int32 I = 0; I < 3; ++I) {
-            Hit.point[I] = Point[I];
-            Hit.normal[I] = Normal[I];
+        // Instanced native meshes keep an identity component transform; each instance is drawn at its own.
+        if (const auto* Instanced = Cast<UInstancedStaticMeshComponent>(Static)) {
+            FTransform Transform;
+            for (int32 I = 0; I < Instanced->GetInstanceCount(); ++I)
+                if (Instanced->GetInstanceTransform(I, Transform, /*bWorldSpace*/ true))
+                    Test(Transform.ToMatrixWithScale());
+        } else {
+            Test(Static->GetComponentTransform().ToMatrixWithScale());
         }
     }
     return HDUE_OK;
