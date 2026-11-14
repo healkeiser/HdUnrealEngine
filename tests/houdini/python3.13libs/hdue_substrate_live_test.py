@@ -43,11 +43,24 @@ class Test(MaterialTest):
         controls = integration.current_settings_node()
         integration.configure_live_preparation(controls)
         controls.parm("hdue_substrate_auto_prepare").set(1)
+        live = self.host.live_preparation
+        # The switch is read when materials sync, and a sync with it on prepares the scene's graph in the background
+        # (forget_published removed its library); the progress shows as the host's material error, which image()
+        # fails on. Sync now (the switch may already have been on, changing no setting), then wait for the sync and
+        # its preparation, failing only on a real failure.
+        self.host.materials_dirty = True
+        while self.host.materials_dirty or self.host.material_job:
+            yield
+        while self.host.material_error:
+            if live.phase == "failed":
+                raise AssertionError(live.message)
+            if not (live.wanted or live.active):
+                raise ValueError(self.host.material_error)
+            yield
         network = hou.node(hou.node("/stage").userData("unreal:startupBuilder"))
         self.session = self.api.status()["session"]
         self.pid = os.getpid()
         original = yield from self.image("01-before-topology-edit", 0)
-        live = self.host.live_preparation
         # The jobs before the edits: the scene's own graph, prepared at startup unless a library held it.
         started, completed = live.started, live.completed
         tint = network.createNode(
