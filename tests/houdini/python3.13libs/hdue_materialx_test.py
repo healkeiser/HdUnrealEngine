@@ -84,57 +84,61 @@ class Test(ViewportTest):
                 prim
             ).GetMaterialBindSubsets()
         ]
-        if subsets and len(assets) > 1:
-            subset = max(subsets, key=lambda s: len(s.GetIndicesAttr().Get()))
-            bound = UsdShade.MaterialBindingAPI(
-                subset.GetPrim()
-            ).ComputeBoundMaterial()[0]
-            alternate = max(
-                (path for path in assets if path != str(bound.GetPath())),
-                key=lambda path: self.stats[path]["vector_parameters"],
+        # The subset checks need a GeomSubset and a second prepared material (samples/materialx/showcase_subsets.usda);
+        # a scene without them fails here, not passes with the checks skipped.
+        if not subsets or len(assets) < 2:
+            raise AssertionError(
+                "The subset checks need a materialBind GeomSubset and two prepared materials "
+                f"({len(subsets)} subsets, {len(assets)} materials); use samples/materialx/showcase_subsets.usda"
             )
-            settings = integration.current_settings_node()
-            edit = settings.parent().createNode(
-                "pythonscript", "hdue_subset_verification"
+        subset = max(subsets, key=lambda s: len(s.GetIndicesAttr().Get()))
+        bound = UsdShade.MaterialBindingAPI(
+            subset.GetPrim()
+        ).ComputeBoundMaterial()[0]
+        alternate = max(
+            (path for path in assets if path != str(bound.GetPath())),
+            key=lambda path: self.stats[path]["vector_parameters"],
+        )
+        settings = integration.current_settings_node()
+        edit = settings.parent().createNode(
+            "pythonscript", "hdue_subset_verification"
+        )
+        edit.setInput(0, settings)
+        edit.parm("python").set(
+            "import hou\nfrom pxr import Sdf\nstage=hou.pwd().editableStage()\n"
+            + "stage.GetPrimAtPath("
+            + repr(str(subset.GetPath()))
+            + ').GetRelationship("material:binding").SetTargets([Sdf.Path('
+            + repr(alternate)
+            + ")])"
+        )
+        edit.setDisplayFlag(True)
+        integration.set_mode("realtime")
+        edited = yield from self.image(
+            "03-subset-rebound", 0, self.frames[-1]["generation"]
+        )
+        if unchanged(original, edited):
+            raise AssertionError(
+                "GeomSubset material edit did not reach the image"
             )
-            edit.setInput(0, settings)
-            edit.parm("python").set(
-                "import hou\nfrom pxr import Sdf\nstage=hou.pwd().editableStage()\n"
-                + "stage.GetPrimAtPath("
-                + repr(str(subset.GetPath()))
-                + ').GetRelationship("material:binding").SetTargets([Sdf.Path('
-                + repr(alternate)
-                + ")])"
-            )
-            edit.setDisplayFlag(True)
-            integration.set_mode("realtime")
-            edited = yield from self.image(
-                "03-subset-rebound", 0, self.frames[-1]["generation"]
-            )
-            if unchanged(original, edited):
-                raise AssertionError(
-                    "GeomSubset material edit did not reach the image"
-                )
-            edit.parm("python").set(
-                "import hou\nstage=hou.pwd().editableStage()\nstage.OverridePrim("
-                + repr(str(subset.GetPath()))
-                + ").SetActive(False)"
-            )
-            edit.cook(force=True)
-            viewer.curViewport().draw()
-            yield from self.image(
-                "04-subset-removed", 0, self.frames[-1]["generation"]
-            )
-            settings.setDisplayFlag(True)
-            edit.destroy()
-            viewer.curViewport().draw()
-            yield from self.image(
-                "05-subset-restored", 0, self.frames[-1]["generation"]
-            )
-            if self.frames[-1]["meshes"] != self.frames[0]["meshes"]:
-                raise AssertionError(
-                    "Stale subset partitions survived restoration"
-                )
+        edit.parm("python").set(
+            "import hou\nstage=hou.pwd().editableStage()\nstage.OverridePrim("
+            + repr(str(subset.GetPath()))
+            + ").SetActive(False)"
+        )
+        edit.cook(force=True)
+        viewer.curViewport().draw()
+        yield from self.image(
+            "04-subset-removed", 0, self.frames[-1]["generation"]
+        )
+        settings.setDisplayFlag(True)
+        edit.destroy()
+        viewer.curViewport().draw()
+        yield from self.image(
+            "05-subset-restored", 0, self.frames[-1]["generation"]
+        )
+        if self.frames[-1]["meshes"] != self.frames[0]["meshes"]:
+            raise AssertionError("Stale subset partitions survived restoration")
 
     def capture(self, name):
         path = self.output / name

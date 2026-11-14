@@ -89,7 +89,7 @@ if ($Suite -eq 'extended') {
     Write-Output 'extended: not run: dlss (needs the untracked DLSS plugin); viewport, parity, heavy (benchmarks, no assertions); usdview opacity, glass, assets (private scenes)'
     $Run = New-HdUERun -Name houdini-extended -Create
     $Scenes = [ordered]@{
-        'materials'          = 'samples\materialx\showcase_solaris.usda'
+        'materials'          = 'samples\materialx\showcase_subsets.usda'  # its GeomSubset checks need one
         'lighting'           = 'samples\lighting\lighting.usda'
         'surfaces'           = 'samples\wet_surface\showcase.usda'
         'substrate'          = 'samples\substrate\showcase.usda'
