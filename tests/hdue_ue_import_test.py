@@ -267,6 +267,56 @@ class Publish(Folder):
         self.assertEqual(list(windows.rglob("*.partial")), [])
 
 
+class WriteAtomic(Folder):
+    def test_a_reader_holding_the_file_makes_the_replace_retry(self):
+        target = self.write(self.root / "a.json", "old")
+        real = os.replace
+        calls = []
+
+        def replace(source, destination):
+            calls.append(source)
+            if len(calls) < 3:
+                raise PermissionError
+            real(source, destination)
+
+        with (
+            mock.patch.object(hdue_ue_import.os, "replace", replace),
+            mock.patch.object(hdue_ue_import.time, "sleep"),
+        ):
+            hdue_ue_import._write_atomic(target, "new")
+        self.assertEqual(target.read_text(), "new")
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(list(self.root.glob("*.pending")), [])
+
+    def test_a_replace_that_keeps_failing_raises_and_leaves_no_pending_file(
+        self,
+    ):
+        target = self.write(self.root / "a.json", "old")
+        with (
+            mock.patch.object(
+                hdue_ue_import.os, "replace", side_effect=PermissionError
+            ),
+            mock.patch.object(hdue_ue_import.time, "sleep"),
+            self.assertRaises(PermissionError),
+        ):
+            hdue_ue_import._write_atomic(target, "new")
+        self.assertEqual(target.read_text(), "old")
+        self.assertEqual(list(self.root.glob("*.pending")), [])
+
+    def test_each_write_uses_its_own_pending_name(self):
+        names = []
+        real = os.replace
+
+        def replace(source, destination):
+            names.append(Path(source).name)
+            real(source, destination)
+
+        with mock.patch.object(hdue_ue_import.os, "replace", replace):
+            for _ in range(2):
+                hdue_ue_import._write_atomic(self.root / "a.json", "x")
+        self.assertEqual(len(set(names)), 2)
+
+
 class MergeCatalog(Folder):
     def setUp(self):
         super().setUp()

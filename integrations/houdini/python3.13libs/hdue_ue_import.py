@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import time
+import uuid
 from pathlib import Path
 
 from hdue_batch import runtime_config
@@ -95,11 +96,28 @@ def publish(cooked, windows):
     return stale
 
 
+REPLACE_ATTEMPTS = 6
+
+
 def _write_atomic(path, text):
     # Readers (husk, the delegate, Update-HoudiniRuntime.ps1) must never see half a file.
-    pending = path.with_name(path.name + ".pending")
+    # A name of its own per writer, so two writers never share a pending file.
+    pending = path.with_name(
+        f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.pending"
+    )
     pending.write_text(text, encoding="utf-8")
-    os.replace(pending, path)
+    try:
+        for attempt in range(REPLACE_ATTEMPTS):
+            try:
+                os.replace(pending, path)
+                return
+            except PermissionError:
+                # A reader that opened the file without delete sharing; it lets go in a moment.
+                if attempt == REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 @contextlib.contextmanager
