@@ -10,7 +10,7 @@ Each rendering run must create fresh images, metrics, logs, and `verified.json` 
 
 ## C/C++ contracts
 
-Each SDK build has four native tests covering ABI layout, render-buffer snapshots, picking, and GeomSubset partitioning. These have passed for both builds.
+Each SDK build has the same twelve native tests: ABI layout, render-buffer snapshots, picking, mesh placement, GeomSubset partitioning, instance transforms, render-tag purposes, subdivision, NURBS sampling, displacement dicing, Cryptomatte ranks and the AOV table. CI's build without an SDK (`-DHDUE_BUILD_HYDRA=OFF`) runs the three that need none: ABI layout, Cryptomatte ranks and the AOV table. These have passed for both builds.
 
 ```powershell
 ctest --test-dir build -C Release --output-on-failure

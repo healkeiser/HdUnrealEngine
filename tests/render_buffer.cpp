@@ -2,6 +2,7 @@
 #include "delegate.h"
 #include "depth.h"
 #include <iostream>
+#include <atomic>
 #include <chrono>
 #include <iomanip>
 #include <string_view>
@@ -63,15 +64,33 @@ int main(int argc, char** argv) {
         const auto* pinned = static_cast<const float*>(buffer.Map());
         check(pinned && pinned[0] == 1, "initial image missing");
         check(!buffer.Allocate(GfVec3i(3, 2, 1), HdFormatFloat32Vec4, false), "mapped image was reallocated");
+        std::atomic<bool> publishing = true;
         std::thread publisher([&] {
             for (int i = 0; i < 100; ++i) buffer.publish(frame, std::vector<float>(8, 2));
+            publishing = false;
         });
+        // Read while the publisher runs, not after it joined: the pinned image must not change under the reader.
+        while (publishing)
+            for (int i = 0; i < 8; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
         publisher.join();
         for (int i = 0; i < 8; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
         buffer.Unmap();
         const auto* fresh = static_cast<const float*>(buffer.Map());
         for (int i = 0; i < 8; ++i) check(fresh[i] == 2, "next Map did not see the completed frame");
         buffer.Unmap();
+        // Unpinned maps racing publication see one whole frame, never a mix of two (publish recycles allocations).
+        publishing = true;
+        std::thread alternating([&] {
+            for (int i = 0; i < 2000; ++i) buffer.publish(frame, std::vector<float>(8, float(1 + i % 2)));
+            publishing = false;
+        });
+        while (publishing) {
+            const auto* image = static_cast<const float*>(buffer.Map());
+            check(image && (image[0] == 1 || image[0] == 2), "racing Map returned no frame");
+            for (int i = 1; i < 8; ++i) check(image[i] == image[0], "racing Map mixed two frames");
+            buffer.Unmap();
+        }
+        alternating.join();
         buffer.invalidate();
         check(!buffer.IsConverged(), "new generation kept old convergence");
         check(buffer.Allocate(GfVec3i(2, 2, 1), HdFormatFloat32Vec4, false), "2D allocation failed");
