@@ -17,6 +17,7 @@
 #include "Math/Float16Color.h"
 #include "TextureResource.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "RHIGlobals.h"
 #include "UObject/UnrealType.h"
 
 // The properties UE's Details panel lets a user edit on a placed instance. Scene text sets only these, never internal
@@ -508,7 +509,16 @@ FString FHdueLighting::LoadImageFile(const FString& File) {
 UTexture2D* FHdueLighting::ImageTexture(const FString& File) {
     if (const auto* Existing = LightTextures.Find(File)) return Existing->Get();
     const auto& Image = *Images[File].Image;
+    // A rect light's source and a light function are 2D GPU textures, so the GPU's limit applies (16384 on D3D12;
+    // domes only sample their image into a cubemap and keep LoadImageFile's 32768 limit).
+    const uint32 Max = GetMax2DTextureDimension();
+    if (uint32(Image.SizeX) > Max || uint32(Image.SizeY) > Max) {
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: light image '%s' skipped: %dx%d is above the GPU's %u texture limit"),
+               *File, Image.SizeX, Image.SizeY, Max);
+        return nullptr;
+    }
     TStrongObjectPtr<UTexture2D> Texture(UTexture2D::CreateTransient(Image.SizeX, Image.SizeY, PF_FloatRGBA));
+    if (!Texture) return nullptr;
     Texture->SRGB = false;
     Texture->NeverStream = true;
     auto& Mip = Texture->GetPlatformData()->Mips[0];

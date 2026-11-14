@@ -1751,6 +1751,13 @@ static UTexture* PostProcessTexture(FSession& Session, const FString& Name, cons
         return Cube;
     }
     if (!Class->IsChildOf(UTexture2D::StaticClass()) && Class != UTexture::StaticClass()) return nullptr;
+    // A 2D texture as is: the GPU's limit applies (cubemaps above are resampled to at most 2048 per face).
+    if (uint32(Image.SizeX) > GetMax2DTextureDimension() || uint32(Image.SizeY) > GetMax2DTextureDimension()) {
+        UE_LOG(LogTemp, Warning,
+               TEXT("hdUE: post-process setting %s: cannot read the image '%s' (%dx%d, above the GPU's limit %u)"),
+               *Name, *File, Image.SizeX, Image.SizeY, GetMax2DTextureDimension());
+        return nullptr;
+    }
     ERawImageFormat::Type Raw;
     const EPixelFormat Format = FImageCoreUtils::GetPixelFormatForRawImageFormat(Image.Format, &Raw);
     UTexture2D* Texture = UTexture2D::CreateTransient(Image.SizeX, Image.SizeY, Format);
