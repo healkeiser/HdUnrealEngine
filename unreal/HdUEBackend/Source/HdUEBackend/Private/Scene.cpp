@@ -1955,7 +1955,8 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     }
     // Validate mesh array bounds before mutating the scene. An invalid mesh is skipped (and its previous version
     // removed) with a warning naming it; the rest of the batch still applies, as it does past a material without an ID
-    // or asset and a native mesh asset that is missing. Arrays are int32-addressed in UE.
+    // or asset and a native mesh asset that is missing (which then fails an offline batch, at the end). Arrays are
+    // int32-addressed in UE.
     TArray<bool> ValidMeshes;
     ValidMeshes.Init(true, int32(Batch.mesh_count));
     ParallelFor(int32(Batch.mesh_count), [&](int32 Index) {
@@ -2371,6 +2372,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 BuiltMeshes[Index] = BuildDynamicMesh(Desc);
         },
         EParallelForFlags::Unbalanced);
+    FString NativeFailure;  // the first native mesh that cannot draw (SkipNative)
     for (uint32 Index = 0; Index < Batch.mesh_count; ++Index) {
         const auto& Desc = Batch.meshes[Index];
         if (!ValidMeshes[int32(Index)]) {
@@ -2412,11 +2414,14 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int C = 0; C < 4; ++C) Matrix.M[R][C] = Instanced ? (R == C) : Desc.transform[R * 4 + C];
         Actor->SetActorTransform(FTransform(Matrix));
         UStaticMesh* InstanceMesh = nullptr;
-        // A native asset that cannot draw drops the mesh (and the actor spawned above), with a warning naming it.
+        // A native asset that cannot draw drops the mesh (and the actor spawned above), with a warning naming it; the
+        // first one fails an offline batch once the rest has applied (below).
         const auto SkipNative = [&](const TCHAR* Problem) {
             Remove(Id);
-            UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped mesh %s (native asset %s): %s."), *Id,
-                   UTF8_TO_TCHAR(Desc.native_asset), Problem);
+            const FString Message =
+                FString::Printf(TEXT("mesh %s (native asset %s): %s."), *Id, UTF8_TO_TCHAR(Desc.native_asset), Problem);
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: skipped %s"), *Message);
+            if (NativeFailure.IsEmpty()) NativeFailure = Message;
         };
         if (Native && Instanced) {
             InstanceMesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(Desc.native_asset));
@@ -2529,6 +2534,12 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, PrepareSeconds * 1000,
                TextureSeconds * 1000, Batch.mesh_count, (MeshesDone - MaterialsDone) * 1000,
                (FPlatformTime::Seconds() - MeshesDone) * 1000);
+    // Offline hosts (husk) fail the frame rather than deliver an image without a required mesh, as for a failed
+    // unreal:asset (Bridge.cpp, RequestRender); interactive hosts draw without it and keep the warning.
+    if (!NativeFailure.IsEmpty() && !Interactive) {
+        Error = TEXT("Cannot draw ") + NativeFailure;
+        return false;
+    }
     return true;
 }
 void FHdueScene::UpdateCameraLights(const FVector& Eye, const FVector& Target, const FVector& Up) {

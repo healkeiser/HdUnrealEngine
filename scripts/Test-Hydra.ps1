@@ -55,7 +55,7 @@ try {
     if (-not (Test-Path -LiteralPath $MetricsPath)) { throw 'UE exited before completing the Hydra test.' }
     $Metrics = Get-Content -Raw -LiteralPath $MetricsPath | ConvertFrom-Json
     $PerCycle = if ($Mode -eq 'both') { 2 } else { 1 }
-    if ($SelfTest) { $PerCycle += 17 }
+    if ($SelfTest) { $PerCycle += 16 }  # native-mesh-missing fails its frame (no metrics) by design
     if ($LightingTest) { $PerCycle += 8 }
     if ($Metrics.passed -ne $true -or $Metrics.frames.Count -ne ($PerCycle * $Cycles)) { throw 'Incomplete Hydra rendering evidence.' }
     Write-Output "Verified Hydra/UE output: $RunOutput"

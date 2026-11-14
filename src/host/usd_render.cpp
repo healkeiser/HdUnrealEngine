@@ -506,8 +506,9 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             changed(previous, next, "Lumen GI/reflections enabled versus disabled");
             raw->SetRenderSetting(TfToken("lumenEnabled"), VtValue(true));
             // One bad item does not fail the scene: parameter types UE cannot hold as they are (a bool and a 2-vector,
-            // on M_Native's own Metallic and BaseColor, convert; an empty value is skipped with a warning), and a mesh
-            // mapped to a missing cooked StaticMesh (skipped by the backend with a warning) both render.
+            // on M_Native's own Metallic and BaseColor, convert; an empty value is skipped with a warning) render. A
+            // mesh mapped to a missing cooked StaticMesh fails this offline host's frame, as it fails husk's (an
+            // interactive host draws without it); the restored mapping renders again below.
             VtDictionary mixed{
                 {"Metallic", VtValue(true)}, {"BaseColor", VtValue(GfVec2f(.5f, .25f))}, {"HdUEEmpty", VtValue()}};
             raw->SetRenderSetting(TfToken("nativeMaterialParameters"),
@@ -517,7 +518,14 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             auto missing = nativeMesh;
             missing["/World/Cube"] = VtValue(std::string("/Game/HdUE/DoesNotExist.DoesNotExist"));
             raw->SetRenderSetting(TfToken("nativeMeshAssets"), VtValue(missing));
-            capture("native-mesh-missing");
+            std::string missingError;
+            try {
+                capture("native-mesh-missing");
+            } catch (const std::runtime_error& error) {
+                missingError = error.what();
+            }
+            check(missingError.find("DoesNotExist") != std::string::npos,
+                  "A missing native mesh did not fail the offline frame");
             raw->SetRenderSetting(TfToken("nativeMeshAssets"), VtValue(nativeMesh));
             raw->SetRenderSetting(TfToken("renderMode"), VtValue(std::string("pathtraced")));
             previous = capture("native-assets-pathtraced");
