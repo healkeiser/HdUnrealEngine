@@ -187,6 +187,13 @@ void batchWarning(const std::string& message) {
     std::fprintf(stderr, "hdUE warning: %s\n", message.c_str());
     std::fflush(stderr);
 }
+// A Tf warning once per message: scene preparation, which issues these for items it skips, runs on every Execute.
+void warnOnce(const std::string& message) {
+    static std::mutex warnedMutex;
+    static std::set<std::string> warned;
+    std::lock_guard lock(warnedMutex);
+    if (warned.insert(message).second) TF_WARN("%s", message.c_str());
+}
 // husk shows no Tf warning of a render delegate, even at -V 6: hdUE's own (issued from its sources) also go through
 // batchWarning, once per message. Houdini's UI and other hosts keep their Tf output.
 class HdUEBatchWarnings final : public TfDiagnosticMgr::Delegate {
