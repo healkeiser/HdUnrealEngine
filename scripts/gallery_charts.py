@@ -1,6 +1,6 @@
 """Draws the README comparison charts from the gallery results (out/gallery/results.json and out/gallery/sponza/).
 
-    uv run --with matplotlib python scripts/gallery_charts.py
+    uv run --with matplotlib==3.11.2 python scripts/gallery_charts.py
 
 Writes docs/images/gallery/chart-times-{light,dark}.svg (render time per scene, log scale) and
 chart-accuracy-{light,dark}.svg (mean brightness relative to Karma CPU). Colour encodes the engine (hdUE blue,
@@ -319,12 +319,16 @@ PREVIEW = (
 
 
 def save(fig, name, t):
-    fig.savefig(IMAGES / f"{name}.svg", transparent=True)
+    # No <dc:date> (it changes every run); the hash salt (set in main) fixes the random clip-path ids.
+    fig.savefig(
+        IMAGES / f"{name}.svg", transparent=True, metadata={"Date": None}
+    )
     if PREVIEW:  # PNG copies for checking the layout
         fig.savefig(PREVIEW / f"{name}.png", facecolor=t["surface"], dpi=110)
 
 
 def main():
+    plt.rcParams["svg.hashsalt"] = "hdue"
     # The SVG names its fonts (svg.fonttype none): the generic sans-serif last, or a viewer without Segoe UI or DejaVu
     # Sans (GitHub on macOS, Linux) draws the text in its default serif.
     plt.rcParams.update(
