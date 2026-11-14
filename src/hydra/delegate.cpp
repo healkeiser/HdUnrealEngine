@@ -244,12 +244,28 @@ void ueRun(const std::function<void()>& f) {
     }
     f();
 }
+// The session whose scene this thread prepares or renders: HdUEWarnOnce dedupes and records its warnings there, so a
+// new viewport or Live Render session warns again and lists what it skipped (renderStats).
+thread_local HdUEState* warnSession = nullptr;
+struct WarnScope {
+    HdUEState* previous;
+    explicit WarnScope(HdUEState& state) : previous(std::exchange(warnSession, &state)) {}
+    ~WarnScope() { warnSession = previous; }
+};
 }  // namespace
 void HdUEWarnOnce(const std::string& message) {
-    static std::mutex warnedMutex;
-    static std::set<std::string> warned;
-    std::lock_guard lock(warnedMutex);
-    if (warned.insert(message).second) TF_WARN("%s", message.c_str());
+    if (auto* session = warnSession) {
+        std::lock_guard lock(session->warningsMutex);
+        if (!session->warned.insert(message).second) return;
+        session->warnings.push_back(message);
+    } else {
+        static std::mutex warnedMutex;
+        static std::set<std::string> warned;
+        std::lock_guard lock(warnedMutex);
+        if (!warned.insert(message).second) return;
+    }
+    // husk prints each message once per process whatever the session (HdUEBatchWarnings).
+    TF_WARN("%s", message.c_str());
 }
 // Karma and RenderMan name the beauty Ci or C; treat them like Hydra's color.
 TfToken HdUEBeauty(const TfToken& name) {
@@ -1825,6 +1841,7 @@ bool submitBatch(HdUEState& state, uint64_t meshBudget, bool stream = false,
                  std::map<std::string, std::vector<GfVec3f>> points = {},
                  std::map<std::string, std::vector<GfMatrix4d>> instances = {}) {
     const auto start = std::chrono::steady_clock::now();
+    const WarnScope warnings(state);
     ScenePacket packet;
     packet.stream = stream;
     packet.points = std::move(points);
@@ -2754,6 +2771,7 @@ public:
         };
         HdueFrameInfo traced{};
         bool requested = false;
+        const WarnScope warnings(*state_);
         try {
             auto& s = *state_;
             if (const auto error = s.setting<std::string>("wetValidationError", ""); !error.empty()) {
@@ -4343,9 +4361,26 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
                            " triangles)\nMaterials: " + std::to_string(state.materials.size()) +
                            "\nLights: " + std::to_string(sceneLights) +
                            "\nNative actors: " + std::to_string(state.nativeAssets.actors) + frameTimes;
+    VtStringArray warnings;
+    {
+        std::lock_guard lock(state.warningsMutex);
+        warnings.assign(state.warnings.begin(), state.warnings.end());
+    }
+    // Houdini's viewport shows Tf warnings only in its console: its stats overlay lists what this session skipped.
+    // husk prints them on stderr already, and -V5 prints this annotation every frame.
+    std::string skipped;
+    if (selfHost().continuous && !warnings.empty()) {
+        constexpr size_t shown = 5;
+        skipped = "\nWarnings: " + std::to_string(warnings.size());
+        for (size_t i = 0; i < std::min(shown, warnings.size()); ++i)
+            skipped += "\n  " + (TfStringStartsWith(warnings[i], "hdUE: ") ? warnings[i].substr(6) : warnings[i]);
+        if (warnings.size() > shown)
+            skipped += "\n  and " + std::to_string(warnings.size() - shown) + " more (in Houdini's console)";
+    }
     VtDictionary stats{
         {"renderProgressAnnotation", VtValue(progress)},
-        {"renderStatsAnnotation", VtValue(statsText)},
+        {"renderStatsAnnotation", VtValue(statsText + skipped)},
+        {"warnings", VtValue(warnings)},
         {"error", VtValue(error)},
         {"generation", VtValue(state.generation)},
         // husk exits with this code (farm managers judge frames by it); Houdini's UI keeps rendering after an error.

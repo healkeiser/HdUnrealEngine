@@ -27,6 +27,8 @@ One Houdini session renders one hdUE image at a time: one viewport, or one [Live
 
 Selection works as with Karma: click a prim in the viewport to select it, and Solaris outlines it. The outline appears once the view is still.
 
+What hdUE skips or replaces (an unsupported material parameter, an image it cannot read, a setting out of range) is warned once per viewport session. Houdini shows these warnings only in its console, so the viewport's render stats (**Display Options > Guides > Render Stats**) list them too: the count and the first five.
+
 ## Render settings
 
 hdUE reads its settings from `unreal:*` attributes on the stage's render settings prim. You set them in three places.

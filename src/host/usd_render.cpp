@@ -26,6 +26,7 @@
 #include "pxr/usd/usdLux/domeLight.h"
 #include "pxr/usd/usdLux/rectLight.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -435,6 +436,8 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             UsdGeomXformable(cameraPrim).GetLocalTransformation(&camera, &reset, UsdTimeCode::Default());
             camera.SetTranslateOnly(camera.ExtractTranslation() + GfVec3d(50, 0, 0));
             UsdGeomXformable(cameraPrim).MakeMatrixXform().Set(camera);
+            // A setting hdUE replaces is warned once per session and listed in the session's render stats.
+            raw->SetRenderSetting(TfToken("domeResolution"), VtValue(100));
             auto next = capture("camera-edit");
             changed(previous, next, "camera");
             previous = std::move(next);
@@ -445,6 +448,11 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             next = capture("transform-edit");
             changed(previous, next, "transform");
             previous = std::move(next);
+            const auto warnings = stat<VtStringArray>(raw->GetRenderStats(), "warnings", {});
+            check(std::count_if(
+                      warnings.begin(), warnings.end(),
+                      [](const std::string& w) { return w.find("domeResolution 100") != std::string::npos; }) == 1,
+                  "The session's warnings do not list the replaced domeResolution once");
             auto pointsAttr = UsdGeomMesh(stage->GetPrimAtPath(SdfPath("/World/Cube"))).GetPointsAttr();
             VtVec3fArray points;
             pointsAttr.Get(&points, UsdTimeCode(options.time));

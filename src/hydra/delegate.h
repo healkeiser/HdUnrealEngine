@@ -314,8 +314,9 @@ struct HdUEMaterialData {
     std::vector<std::pair<std::string, VtValue>> nativeParameters;
     bool operator==(const HdUEMaterialData&) const = default;
 };
-// A Tf warning once per message text: scene preparation, which issues these for items it skips, runs on every Execute.
-// A message names the prim or material it is about, so one about another is warned too.
+// A Tf warning once per message text and render session (once per process outside one): scene preparation, which
+// issues these for items it skips, runs on every Execute. A message names the prim or material it is about, so one
+// about another is warned too. The session's render stats list them (HdUEState::warnings).
 void HdUEWarnOnce(const std::string& message);
 // Warns, once per message and material, what a material's translation skipped.
 void HdUEWarnMaterial(const HdUEMaterialData& data);
@@ -474,6 +475,11 @@ struct HdUEState : HdRenderParam {
     uint32_t createThread = 0, executeThread = 0;
     VtDictionary pickResult;
     std::map<std::string, uint32_t> pickMaterialFlags;
+    // This session's skip warnings (HdUEWarnOnce while it prepares and renders its scene), each once, in order: its
+    // render stats list them, since Houdini's viewport shows Tf warnings only in the console.
+    std::mutex warningsMutex;
+    std::set<std::string> warned;
+    std::vector<std::string> warnings;
     bool firstBatch = true;
     bool assetRequestPending = false;
     HdueAssetSceneStatus nativeAssets{sizeof(HdueAssetSceneStatus)};
