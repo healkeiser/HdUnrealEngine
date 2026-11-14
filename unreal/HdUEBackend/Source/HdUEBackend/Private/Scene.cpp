@@ -159,6 +159,7 @@ bool FHdueScene::NaniteFits(const FString& Id, const Nanite::FResources* Nanite)
     return true;
 }
 void FHdueScene::Remove(const FString& Id) {
+    IdTargetsStale = true;
     // Root pages are counted per shared mesh key, returned once UE destroys the shared mesh (the SharedMeshes sweep).
     Lighting->Remove(Id);
     RemoveVolume(Id);
@@ -517,6 +518,7 @@ void FHdueScene::UpdateMeshes(HdueMeshUpdate* Meshes, uint32 Count) {
         FString Ignored;
         SetIdMode(0, Ignored);
     }
+    IdTargetsStale = true;
     for (uint32 Index = 0; Index < Count; ++Index) {
         auto& Mesh = Meshes[Index];
         const FString Id = UTF8_TO_TCHAR(Mesh.id);
@@ -582,48 +584,61 @@ bool FHdueScene::SetIdMode(int32 Mode, FString& Error) {
         return Mesh->GetNumMaterials() > 0;
     };
     int32 Switched = 0, Swapped = 0;
-    const auto Apply = [&](AActor* Actor, int32 Id) {
-        TArray<UMeshComponent*> Meshes;
-        Actor->GetComponents(Meshes);
-        for (auto* Mesh : Meshes) {
-            // A Heterogeneous Volume draws no ID (no GBuffer), and its SetMaterial rebuilds its SVT binding: the ID
-            // material left it empty for every later frame.
-            if (Mesh->IsA<UHeterogeneousVolumeComponent>()) continue;
-            if (On) {
-                // Exact in the float16 readback: both halves stay below 2048.
-                // Instance mode: instanced components emit their per-instance id (custom data 3), the rest -1.
-                const bool Instances = Mode == 2 && Mesh->IsA<UInstancedStaticMeshComponent>();
-                Mesh->SetCustomPrimitiveDataVector4f(0, Id >= 0 && Mode == 1
-                                                            ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0)
-                                                            : FVector4f(0, 0, 0, 0));
-                Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
-                // Already swapped (prim to instance IDs): no switch, and SetMaterial does nothing.
-                if (Switches(Mesh)) {
-                    Mesh->SetCustomPrimitiveDataFloat(5, 1.f);
-                    ++Switched;
-                } else {
-                    for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
-                    ++Swapped;
-                }
-            } else if (Switches(Mesh)) {
-                Mesh->SetCustomPrimitiveDataFloat(5, 0.f);
+    const auto Apply = [&](UMeshComponent* Mesh, int32 Id, bool Switch) {
+        if (On) {
+            // Exact in the float16 readback: both halves stay below 2048.
+            // Instance mode: instanced components emit their per-instance id (custom data 3), the rest -1.
+            const bool Instances = Mode == 2 && Mesh->IsA<UInstancedStaticMeshComponent>();
+            Mesh->SetCustomPrimitiveDataVector4f(
+                0, Id >= 0 && Mode == 1 ? FVector4f(float(Id / 2048), float(Id % 2048), 1, 0) : FVector4f(0, 0, 0, 0));
+            Mesh->SetCustomPrimitiveDataFloat(4, Instances ? 1.f : 0.f);
+            // Already swapped (prim to instance IDs): SetMaterial does nothing.
+            if (Switch) {
+                Mesh->SetCustomPrimitiveDataFloat(5, 1.f);
+                ++Switched;
             } else {
-                for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
-                    if (IdMaterial && Mesh->GetMaterial(Slot) == IdMaterial) {
-                        Mesh->EmptyOverrideMaterials();  // native skeletal meshes kept the ID material before
-                        break;
-                    }
+                for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot) Mesh->SetMaterial(Slot, IdMaterial);
+                ++Swapped;
             }
+        } else if (Switch) {
+            Mesh->SetCustomPrimitiveDataFloat(5, 0.f);
+        } else {
+            for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+                if (IdMaterial && Mesh->GetMaterial(Slot) == IdMaterial) {
+                    Mesh->EmptyOverrideMaterials();  // native skeletal meshes kept the ID material before
+                    break;
+                }
         }
     };
-    for (const auto& Entry : Actors)
-        if (IsValid(Entry.Value)) {
-            const int32* Id = PrimIds.Find(Entry.Key);
-            Apply(Entry.Value, Id ? *Id : -1);
-        }
+    // A Heterogeneous Volume draws no ID (no GBuffer), and its SetMaterial rebuilds its SVT binding: the ID material
+    // left it empty for every later frame.
+    const auto ForEachMesh = [](AActor* Actor, auto&& Visit) {
+        TArray<UMeshComponent*> Meshes;
+        Actor->GetComponents(Meshes);
+        for (auto* Mesh : Meshes)
+            if (!Mesh->IsA<UHeterogeneousVolumeComponent>()) Visit(Mesh);
+    };
+    // The meshes of hdUE's actors, with their ID and whether their materials switch, gathered again only after the
+    // scene changed (IdTargetsStale): the walk over every actor's components and every material's switch took about
+    // 1.8 us per mesh on each switch, which the viewport makes after every still second. Gathered with the meshes'
+    // own materials (IdMode 0); later switches reuse it, so the way back undoes what the way in did.
+    const bool Swap = CVarIdSwap.GetValueOnGameThread() != 0;
+    if (!IdMode && (IdTargetsStale || Swap != IdTargetsSwap)) {
+        IdTargets.Reset();
+        for (const auto& Entry : Actors)
+            if (IsValid(Entry.Value)) {
+                const int32* Id = PrimIds.Find(Entry.Key);
+                ForEachMesh(Entry.Value,
+                            [&](UMeshComponent* Mesh) { IdTargets.Add({Mesh, Id ? *Id : -1, Switches(Mesh)}); });
+            }
+        IdTargetsStale = false;
+        IdTargetsSwap = Swap;
+    }
+    for (const FIdTarget& Target : IdTargets)
+        if (UMeshComponent* Mesh = Target.Mesh.Get()) Apply(Mesh, Target.Id, Target.Switch);
     // ponytail: native catalog assets carry no Hydra prim ID; they read as background in the ID pass.
     for (auto* Actor : Assets.GetActors())
-        if (IsValid(Actor)) Apply(Actor, -1);
+        if (IsValid(Actor)) ForEachMesh(Actor, [&](UMeshComponent* Mesh) { Apply(Mesh, -1, Switches(Mesh)); });
     // Read by tests: meshes of hdUE materials must all switch.
     if (On && !IdMode)
         UE_LOG(LogTemp, Log, TEXT("hdUE ID pass: %d meshes switched, %d swapped to M_HdUEId"), Switched, Swapped);
@@ -1333,7 +1348,10 @@ void FHdueScene::BindMaterials() {
                 continue;
         }
         // UMeshComponent::SetMaterial returns early when the override is already the one asked for.
-        if (Component->GetMaterial(0) != Desired) Component->SetMaterial(0, Desired);
+        if (Component->GetMaterial(0) != Desired) {
+            Component->SetMaterial(0, Desired);
+            IdTargetsStale = true;
+        }
         if (auto* Instances = Cast<UInstancedStaticMeshComponent>(Component))
             SplitVolumeInstances(**Actor, *Instances, Desired);
     }
@@ -1359,6 +1377,7 @@ void FHdueScene::SplitVolumeInstances(AActor& Actor, UInstancedStaticMeshCompone
                   Parts[I]->GetComponentTransform().Equals(Transform);
     }
     if (!Current) {
+        IdTargetsStale = true;
         for (UStaticMeshComponent* Part : Parts) Part->DestroyComponent();
         for (int32 I = 0; I < Count; ++I) {
             FTransform Transform;
@@ -1910,6 +1929,7 @@ void FHdueScene::TickConversions() {
         if (Tried % 50 == 1 || PendingStatic.Num() == 1)
             UE_LOG(LogTemp, Log, TEXT("hdUE Nanite: %d of %d converted meshes have Nanite data"), NaniteMeshes, Tried);
         for (UStaticMeshComponent* Component : Components) Component->SetStaticMesh(Built);
+        IdTargetsStale = true;  // its material slots may differ (SetIdMode)
         ++SwappedBuilds;
         SwappedMeshes += Components.Num();
         It.RemoveCurrent();
@@ -2038,6 +2058,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
         FString Ignored;
         SetIdMode(0, Ignored);
     }
+    IdTargetsStale = true;
     if (Batch.reset_scene) {
         Lighting->Clear();
         Assets.Reset();

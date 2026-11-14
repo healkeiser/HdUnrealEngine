@@ -60,6 +60,7 @@ HdueSurfaceStatus FHdueScene::SurfaceStatus() const {
             SurfaceUpdates};
 }
 HdueResult FHdueScene::ApplySurface(const HdueSurfaceBatch& Batch, FString& Error) {
+    IdTargetsStale = true;  // wet variants bind materials of their own (SetIdMode)
     if (Batch.struct_size != sizeof(Batch) || Batch.binding_count > 100000 ||
         (Batch.binding_count && !Batch.bindings)) {
         Error = TEXT("Invalid surface batch.");

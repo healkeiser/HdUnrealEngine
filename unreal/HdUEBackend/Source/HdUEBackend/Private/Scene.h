@@ -137,6 +137,15 @@ private:
     };
     TMap<FString, FGroom> Grooms;  // upsert_groom, by id
     int32 IdMode = 0;
+    // SetIdMode's meshes, gathered once per scene change: Apply, UpdateMeshes, Remove, ApplySurface, a material bound
+    // (BindMaterials), volume instances split again and background builds swapped in make them stale.
+    struct FIdTarget {
+        TWeakObjectPtr<class UMeshComponent> Mesh;
+        int32 Id = -1;
+        bool Switch = false;
+    };
+    TArray<FIdTarget> IdTargets;
+    bool IdTargetsStale = true, IdTargetsSwap = false;
     // Keyed by path and colour space; an entry no material uses goes at the next Apply (MaterialTextures). shortcut: a
     // file rewritten at the same path keeps its old texture; key on file time if live texture edits matter.
     TMap<FString, FPreviewTexture> PreviewTextures;
