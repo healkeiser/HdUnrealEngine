@@ -27,14 +27,20 @@ bool HdueSceneEditable(const FProperty* Property) {
 }
 
 // Text for one property of Container (FPostProcessSettings, a component); struct fields can also be given as bare
-// numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Shared with
-// set_post_process (Bridge.cpp), compiled in the editor target too.
+// numbers, objects as cooked paths (/Game/..., /Engine/...), loaded here; empty or None clears an object. Other mount
+// points are refused: a scene names content, not engine internals. Shared with set_post_process (Bridge.cpp), compiled
+// in the editor target too.
 bool ImportPropertyValue(FProperty* Property, const FString& Text, void* Container) {
     void* Value = Property->ContainerPtrToValuePtr<void>(Container);
     if (const auto* Object = CastField<FObjectPropertyBase>(Property)) {
         const bool None = Text.IsEmpty() || Text == TEXT("None");
+        if (!None && !Text.StartsWith(TEXT("/Game/")) && !Text.StartsWith(TEXT("/Engine/"))) return false;
         UObject* Loaded = None ? nullptr : LoadObject<UObject>(nullptr, *Text);
         if (!None && (!Loaded || !Loaded->IsA(Object->PropertyClass))) return false;
+        // A class property holds a UClass: it must also derive from the class the property names (UE's class picker).
+        if (const auto* Class = CastField<FClassProperty>(Property);
+            Class && Loaded && !CastChecked<UClass>(Loaded)->IsChildOf(Class->MetaClass))
+            return false;
         Object->SetObjectPropertyValue(Value, Loaded);
         return true;
     }
