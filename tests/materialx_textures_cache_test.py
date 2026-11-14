@@ -6,6 +6,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from materialx_textures import resolved, udim_tiles  # noqa: E402
@@ -62,13 +63,21 @@ class DirectoryCaches(unittest.TestCase):
         self.assertEqual(resolved(file), str(file.resolve()))
         self.assertEqual(resolved(str(file)), str(file.resolve()))
 
-    def test_repeated_lookups_are_cheap(self):
-        udim_tiles(self.pattern)
-        start = time.perf_counter()
-        for _ in range(2000):
+    def test_repeated_lookups_do_not_list_the_folder(self):
+        # One stat per lookup instead of a directory listing and a resolve per tile: count the listings, not the
+        # time, which depends on the machine.
+        listings = []
+        iterdir = Path.iterdir
+
+        def counted(folder):
+            listings.append(folder)
+            return iterdir(folder)
+
+        with mock.patch.object(Path, "iterdir", counted):
             udim_tiles(self.pattern)
-        # One stat per lookup instead of a directory listing and a resolve per tile.
-        self.assertLess(time.perf_counter() - start, 1.0)
+            for _ in range(100):
+                udim_tiles(self.pattern)
+        self.assertEqual(len(listings), 1)
 
 
 if __name__ == "__main__":

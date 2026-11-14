@@ -6,7 +6,7 @@ import time
 import hdue_houdini as integration
 import hdue_substrate
 import hou
-import numpy as np
+from hdue_houdini_test import unchanged
 from hdue_materialx_test import Test as MaterialTest
 
 _test = None
@@ -65,7 +65,7 @@ class Test(MaterialTest):
         added = yield from self.image(
             "02-node-added-lumen", 0, self.frames[-1]["generation"]
         )
-        if float(np.abs(original - added).mean()) < 1e-4:
+        if unchanged(original, added):
             raise AssertionError(
                 "The newly compiled topology did not change the image"
             )
@@ -78,7 +78,7 @@ class Test(MaterialTest):
         edited = yield from self.image(
             "03-added-node-live-value", 0, self.frames[-1]["generation"]
         )
-        if float(np.abs(added - edited).mean()) < 1e-4:
+        if unchanged(added, edited):
             raise AssertionError(
                 "Generated parameters on the new material did not update live"
             )

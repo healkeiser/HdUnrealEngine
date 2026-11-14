@@ -1,7 +1,7 @@
 """Verify VOP authoring, native shaders and live Solaris Substrate updates."""
 
 import hdue_houdini as integration
-import numpy as np
+from hdue_houdini_test import unchanged
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from surface_api import SurfaceApi
@@ -56,7 +56,7 @@ class Test(MaterialTest):
         generation = self.api.status()["generation"]
         network.node("amount").parm("value").set(0.35)
         changed = yield from self.image("03-vop-coverage", 1, generation)
-        if float(np.abs(original - changed).mean()) < 1e-6:
+        if unchanged(original, changed):
             raise AssertionError(
                 "Published VOP parameter did not change the image"
             )

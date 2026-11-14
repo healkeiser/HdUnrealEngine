@@ -15,6 +15,13 @@ from PySide6 import QtCore
 _test = None
 
 
+def unchanged(a, b):
+    """Whether fewer than 1% of the pixels of two images differ by more than 0.05 in a channel: changed pixels, not
+    the mean, so the check holds for any viewport size and above render noise (the transform check in Test.run).
+    """
+    return (np.abs(a - b).max(-1) > 0.05).sum() < a.shape[0] * a.shape[1] // 100
+
+
 def flipbook(path):
     """Capture the Solaris compositor to path with a native flipbook (QWidget.grab must not re-enter Houdini's
     Vulkan/GL viewport painting); yields until the file exists, then returns a list that fills when the flipbook ends.
@@ -101,19 +108,29 @@ class Test:
             self.finish()
 
     def finish(self):
-        hou.hipFile.save(str(self.output / "hdue-test.hip"))
-        self.host.close()
-        if self.verified:
-            if self.host.runtime.status().state != 4:
-                raise AssertionError("UE shutdown incomplete")
-            (self.output / "verified.json").write_text(
-                json.dumps(self.verified, indent=2), encoding="utf-8"
-            )
-        # Let Houdini's own event dispatcher process the exit. SystemExit
-        # raised directly inside a PySide signal does not leave Houdini.
-        import hdefereval
+        try:
+            hou.hipFile.save(str(self.output / "hdue-test.hip"))
+            self.host.close()
+            if self.verified:
+                if self.host.runtime.status().state != 4:
+                    raise AssertionError("UE shutdown incomplete")
+                (self.output / "verified.json").write_text(
+                    json.dumps(self.verified, indent=2), encoding="utf-8"
+                )
+        except BaseException:
+            # Appended: an earlier error stays. Houdini quits anyway, or Launch-Houdini.ps1 sees only its timeout.
+            error = traceback.format_exc()
+            with open(
+                self.output / "test-error.txt", "a", encoding="utf-8"
+            ) as file:
+                file.write(error)
+            integration._report(error)
+        finally:
+            # Let Houdini's own event dispatcher process the exit. SystemExit
+            # raised directly inside a PySide signal does not leave Houdini.
+            import hdefereval
 
-        hdefereval.execute_deferred(lambda: hou.hscript("quit -f"))
+            hdefereval.execute_deferred(lambda: hou.hscript("quit -f"))
 
     def image(self, label, mode, previous=0, minimum_meshes=0):
         while True:

@@ -3,6 +3,7 @@
 import hdue_houdini as integration
 import hou
 import numpy as np
+from hdue_houdini_test import unchanged
 from hdue_materialx_test import Test as MaterialTest
 from material_api import MaterialApi
 from pxr import UsdGeom
@@ -42,7 +43,7 @@ class Test(MaterialTest):
             "01b-live-uv-lumen", 0, self.frames[-1]["generation"]
         )
         difference = float(np.abs(initial - uv).mean())
-        if difference < 1e-4:
+        if unchanged(initial, uv):
             raise AssertionError(
                 "Direct UV scale/offset did not update the image"
             )
@@ -53,13 +54,13 @@ class Test(MaterialTest):
         slab = yield from self.image(
             "01c-live-slab-channel-lumen", 0, self.frames[-1]["generation"]
         )
-        if float(np.abs(uv - slab).mean()) < 1e-4:
+        if unchanged(uv, slab):
             raise AssertionError("Direct Slab/channel controls did not update")
         network.node("normal").parm("flip_green").set(0)
         flipped = yield from self.image(
             "01d-live-flip-green-lumen", 0, self.frames[-1]["generation"]
         )
-        if float(np.abs(slab - flipped).mean()) < 1e-6:
+        if unchanged(slab, flipped):
             raise AssertionError("Flip Green did not update")
         network.node("uv").parmTuple("scale").set((2, 1))
         network.node("uv").parmTuple("offset").set((0.125, 0))
@@ -81,7 +82,7 @@ class Test(MaterialTest):
         direct = yield from self.image(
             "02b-direct-controls-pathtraced", 1, self.frames[-1]["generation"]
         )
-        if float(np.abs(original - direct).mean()) < 1e-4:
+        if unchanged(original, direct):
             raise AssertionError(
                 "Automatic parameters did not update Path Tracer"
             )
@@ -102,7 +103,7 @@ class Test(MaterialTest):
             )
         flat = yield from self.image("03-normal-strength-zero", 1, generation)
         difference = float(np.abs(original - flat).mean())
-        if difference < 1e-5:
+        if unchanged(original, flat):
             raise AssertionError("Normal Map strength had no visible effect")
         after = surface.status(session)
         if (

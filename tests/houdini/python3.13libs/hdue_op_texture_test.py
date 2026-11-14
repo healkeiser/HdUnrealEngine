@@ -2,6 +2,7 @@
 
 import json
 import sys
+import traceback
 
 import hdefereval
 import hdue_houdini as integration
@@ -16,23 +17,33 @@ _test = None
 
 class Test(Probe):
     def finish(self):
-        self.timer.stop()
-        self.host.close()
-        if hasattr(self, "verified"):
-            state = json.loads(
-                (self.host.log_dir / "runtime-state.json").read_text()
-            )
-            if (
-                not state["closed"]
-                or state["runtime_state"] != 4
-                or state["ue_initializations"] != 1
-            ):
-                raise AssertionError("UE lifetime contract failed")
-            self.verified["runtime"] = state
-            (self.host.log_dir / "verified.json").write_text(
-                json.dumps(self.verified, indent=2), encoding="utf-8"
-            )
-        hdefereval.execute_deferred(lambda: hou.hscript("quit -f"))
+        try:
+            self.timer.stop()
+            self.host.close()
+            if hasattr(self, "verified"):
+                state = json.loads(
+                    (self.host.log_dir / "runtime-state.json").read_text()
+                )
+                if (
+                    not state["closed"]
+                    or state["runtime_state"] != 4
+                    or state["ue_initializations"] != 1
+                ):
+                    raise AssertionError("UE lifetime contract failed")
+                self.verified["runtime"] = state
+                (self.host.log_dir / "verified.json").write_text(
+                    json.dumps(self.verified, indent=2), encoding="utf-8"
+                )
+        except BaseException:
+            # Appended: an earlier error stays. Houdini quits anyway, or Launch-Houdini.ps1 sees only its timeout.
+            error = traceback.format_exc()
+            with open(
+                self.host.log_dir / "test-error.txt", "a", encoding="utf-8"
+            ) as file:
+                file.write(error)
+            integration._report(error)
+        finally:
+            hdefereval.execute_deferred(lambda: hou.hscript("quit -f"))
 
     def completed(self, label, mode, previous=0, channel=0):
         while True:
