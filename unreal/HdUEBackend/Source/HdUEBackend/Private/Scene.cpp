@@ -891,13 +891,23 @@ FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Textur
     return Root / FString::Printf(TEXT("%016llx.bin"),
                                   CityHash64(reinterpret_cast<const char*>(*Key), Key.Len() * sizeof(TCHAR)));
 }
-// The cached platform data (mip sizes and blocks straight into bulk data), or null.
+// The cached platform data (mip sizes and blocks straight into bulk data), or null. The mip chain is checked against
+// what PrepareTexture writes (each level half the one above, down to 1x1, in whole blocks): a damaged or foreign file
+// must not size the GPU upload.
 TUniquePtr<FTexturePlatformData> ReadCache(const FString& Path, FHdueScene::FPreviewTexture& Texture) {
     TUniquePtr<FArchive> In(IFileManager::Get().CreateFileReader(*Path, FILEREAD_Silent));
     if (!In) return nullptr;
     int32 Version = 0, SizeX = 0, SizeY = 0, Format = 0, Mips = 0;
     *In << Version << SizeX << SizeY << Format << Mips;
     if (In->IsError() || Version != CacheVersion || Format != BlockFormat(Texture)) return nullptr;
+    const auto Bad = [&Path] {
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: texture cache entry %s is damaged; rebuilding it."), *Path);
+        return nullptr;
+    };
+    const int32 Max = int32(GetMax2DTextureDimension());
+    if (SizeX < 1 || SizeY < 1 || SizeX > Max || SizeY > Max ||
+        Mips != FImageCoreUtils::GetMipCountFromDimensions(SizeX, SizeY, 0, false) || Mips > MAX_TEXTURE_MIP_COUNT)
+        return Bad();
     auto Data = MakeUnique<FTexturePlatformData>();
     Data->SizeX = SizeX;
     Data->SizeY = SizeY;
@@ -907,7 +917,11 @@ TUniquePtr<FTexturePlatformData> ReadCache(const FString& Path, FHdueScene::FPre
         int32 Width = 0, Height = 0;
         int64 Size = 0;
         *In << Width << Height << Size;
-        if (In->IsError() || Size <= 0 || Size > In->TotalSize()) return nullptr;
+        if (In->IsError()) return nullptr;
+        if (Width != FMath::Max(1, SizeX >> Level) || Height != FMath::Max(1, SizeY >> Level) ||
+            Size != int64(GPixelFormats[Format].Get2DImageSizeInBytes(Width, Height)) ||
+            Size > In->TotalSize() - In->Tell())
+            return Bad();
         auto* Mip = new FTexture2DMipMap(Width, Height, 1);
         Data->Mips.Add(Mip);
         Mip->BulkData.Lock(LOCK_READ_WRITE);
