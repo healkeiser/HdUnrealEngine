@@ -55,46 +55,58 @@ int main(int argc, char** argv) {
                   "half-float image not encoded bottom-up");
             half.Unmap();
         }
-        check(buffer.Allocate(GfVec3i(2, 1, 1), HdFormatFloat32Vec4, false), "valid allocation rejected");
+        // Large frames (a publish copies and flips 1 MB) and a common start, so publishing and reading overlap: with
+        // 2x1 frames the publisher had finished before the reader looked. Each publisher keeps going until the reader
+        // has made its minimum of passes, so those passes all race a publish.
+        constexpr int side = 256, minimumReads = 50;
+        const size_t values = size_t(side) * side * 4;
+        check(buffer.Allocate(GfVec3i(side, side, 1), HdFormatFloat32Vec4, false), "valid allocation rejected");
         HdueFrameInfo frame{};
-        frame.width = 2;
-        frame.height = 1;
+        frame.width = frame.height = side;
         frame.converged = 1;
-        buffer.publish(frame, std::vector<float>(8, 1));
+        buffer.publish(frame, std::vector<float>(values, 1));
         const auto* pinned = static_cast<const float*>(buffer.Map());
         check(pinned && pinned[0] == 1, "initial image missing");
         check(!buffer.Allocate(GfVec3i(3, 2, 1), HdFormatFloat32Vec4, false), "mapped image was reallocated");
-        std::atomic<bool> publishing = true;
+        std::atomic<bool> start = false, publishing = true;
+        std::atomic<int> reads = 0;
         std::thread publisher([&] {
-            for (int i = 0; i < 100; ++i) buffer.publish(frame, std::vector<float>(8, 2));
+            while (!start) std::this_thread::yield();
+            for (int i = 0; i < 100 || reads < minimumReads; ++i) buffer.publish(frame, std::vector<float>(values, 2));
             publishing = false;
         });
-        // Read while the publisher runs, not after it joined: the pinned image must not change under the reader.
-        while (publishing)
-            for (int i = 0; i < 8; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
+        start = true;
+        // The pinned image must not change under the reader while frames are published.
+        for (; publishing; ++reads)
+            for (size_t i = 0; i < values; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
         publisher.join();
-        for (int i = 0; i < 8; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
+        for (size_t i = 0; i < values; ++i) check(pinned[i] == 1, "published frames modified mapped memory");
         buffer.Unmap();
         const auto* fresh = static_cast<const float*>(buffer.Map());
-        for (int i = 0; i < 8; ++i) check(fresh[i] == 2, "next Map did not see the completed frame");
+        for (size_t i = 0; i < values; ++i) check(fresh[i] == 2, "next Map did not see the completed frame");
         buffer.Unmap();
         // Unpinned maps racing publication see one whole frame, never a mix of two (publish recycles allocations).
+        start = false;
         publishing = true;
+        reads = 0;
         std::thread alternating([&] {
-            for (int i = 0; i < 2000; ++i) buffer.publish(frame, std::vector<float>(8, float(1 + i % 2)));
+            while (!start) std::this_thread::yield();
+            for (int i = 0; i < 200 || reads < minimumReads; ++i)
+                buffer.publish(frame, std::vector<float>(values, float(1 + i % 2)));
             publishing = false;
         });
-        while (publishing) {
+        start = true;
+        for (; publishing; ++reads) {
             const auto* image = static_cast<const float*>(buffer.Map());
             check(image && (image[0] == 1 || image[0] == 2), "racing Map returned no frame");
-            for (int i = 1; i < 8; ++i) check(image[i] == image[0], "racing Map mixed two frames");
+            for (size_t i = 1; i < values; ++i) check(image[i] == image[0], "racing Map mixed two frames");
             buffer.Unmap();
         }
         alternating.join();
         buffer.invalidate();
         check(!buffer.IsConverged(), "new generation kept old convergence");
         check(buffer.Allocate(GfVec3i(2, 2, 1), HdFormatFloat32Vec4, false), "2D allocation failed");
-        frame.height = 2;
+        frame.width = frame.height = 2;
         std::vector<float> asymmetric(16, 0);
         asymmetric[0] = 3;
         asymmetric[8] = 7;
