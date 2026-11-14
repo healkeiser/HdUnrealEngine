@@ -14,9 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # (Lumen, Path Tracer) brightness bands relative to Karma CPU. Lumen's GI is approximate and darker in a closed box.
 DEFAULT = ((0.65, 1.15), (0.9, 1.1))
-# Known, documented differences.
+# Known, documented differences. Glossy: UE renders the scene brighter than Karma in both modes, and Lumen matches UE's
+# own Path Tracer since the small meshes are not Nanite (UE's USD Stage triangle threshold), so it shares its top.
 BANDS = {
-    "Glossy materials": ((0.65, 1.15), (1.1, 1.3)),
+    "Glossy materials": ((0.65, 1.3), (1.1, 1.3)),
     "Volumes (OpenVDB)": ((0.65, 1.15), (1.2, 1.4)),
 }
 
