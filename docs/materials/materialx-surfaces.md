@@ -152,7 +152,7 @@ Each surface input is a constant or reaches an image through these nodes. Anythi
 | **Mix** with one of `fg`, `bg`, `mix` connected | Offsets and scales that input |
 | **Convert**, **Dot**, **Constant** | Passed through, or the value |
 
-Texture colour spaces follow the image's `colorspace`: names with `srgb` and without `lin` (`srgb_texture`, `sRGB - Texture`, `srgb_tx`) decode sRGB, other names read linear, and an untagged image decodes sRGB in colour inputs and linear in the others. A graph UE imports is given the same rule: hdUE writes those sRGB names, and untagged colour images, as `srgb_texture`, the one name UE's importer decodes as sRGB.
+Texture colour spaces follow the image's `colorspace`: names with `srgb` and without `lin` (`srgb_texture`, `sRGB - Texture`, `srgb_tx`) decode sRGB, other names read linear, and an untagged image decodes sRGB in colour inputs and linear in the others. A graph UE imports is given the same rule: hdUE writes those sRGB names, and untagged colour images, as `srgb_texture`, the one name UE's importer decodes as sRGB. Files UE cannot read (Houdini's `.rat`, for example) leave the input at its constant, with a warning; UE reads PNG, JPEG, EXR, HDR, TGA, BMP, TIFF and DDS.
 
 ## Nodes UE imports
 
