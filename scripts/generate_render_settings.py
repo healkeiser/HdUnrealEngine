@@ -501,7 +501,12 @@ CVARS = [
         "Screen Percentage",
         "Rendering|Anti-Aliasing",
         True,
-        dict(range=(10, 200, True), default=100.0),
+        dict(
+            range=(10, 200, True),
+            default=100.0,
+            # UE declares 0 (the view keeps its own percentage, 100); the slider starts at 10, so it shows 100.
+            override="UE's 0 means the view's own percentage, which is 100",
+        ),
     ),
     (
         "r.HdUE.InteractiveResolution",
@@ -694,6 +699,7 @@ CVARS = [
         dict(
             type="int32",
             default=0,
+            override="the runtime sets 0 in DefaultEngine.ini: tiled OptiX denoising fails in UE 5.8.4",
             range=(0, 4096, True, False),
             help="Tile width of NVIDIA OptiX denoising, 0 for the whole image. UE's default is 256, but in UE 5.8.4 "
             "tiled denoising fails in the OptiX library (OPTIX_ERROR_INVALID_VALUE), so the runtime sets 0.",
@@ -707,6 +713,7 @@ CVARS = [
         dict(
             type="int32",
             default=0,
+            override="the runtime sets 0 in DefaultEngine.ini: tiled OptiX denoising fails in UE 5.8.4",
             range=(0, 4096, True, False),
             help="Tile height of NVIDIA OptiX denoising, 0 for the whole image (see OptiX Tile Width).",
         ),
@@ -1162,8 +1169,15 @@ def parse_enums(*sources):
         re.S,
     )
     for source in sources:
-        for namespace, scoped, name, body in pattern.findall(source):
+        # Comments out first, so one between `namespace X {` and `enum` does not lose the namespace.
+        for namespace, scoped, name, body in pattern.findall(
+            strip_comments(source)
+        ):
             owner = namespace or name
+            if owner in enums:
+                raise SystemExit(
+                    f"enum {owner} is declared twice; the second would replace the first"
+                )
             entries = []
             for item in re.findall(
                 r'(?:[^,("]|"[^"]*"|\((?:[^()"]|"[^"]*")*\))+',
@@ -1173,7 +1187,7 @@ def parse_enums(*sources):
                 if (
                     not match
                     or "UE_DEPRECATED" in item
-                    or re.search(r"UMETA\s*\([^)]*Hidden", item)
+                    or re.search(r"UMETA\s*\([^)]*\bHidden\b", item)
                     or match.group(1).endswith("MAX")
                 ):
                     continue
@@ -1189,6 +1203,17 @@ def parse_enums(*sources):
     return enums
 
 
+# Names a constructor body assigns twice, the last winning, with why that is UE's default.
+# Scene.cpp's FPostProcessSettings constructor assigns the auto-exposure range in an if/else on
+# r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange; the else branch (the variable's default, 0) is last.
+REASSIGNED_DEFAULTS = {
+    "AutoExposureMinBrightness",
+    "AutoExposureMaxBrightness",
+    "HistogramLogMin",
+    "HistogramLogMax",
+}
+
+
 def parse_defaults(
     source, constructor="FPostProcessSettings::FPostProcessSettings("
 ):
@@ -1202,14 +1227,21 @@ def parse_defaults(
         re.M,
     ):
         defaults[name] = expression
+    assigned = set()
     for name, expression in re.findall(r"^\s*(\w+)\s*=\s*(.+?);", body, re.M):
-        defaults[name] = (
-            expression  # the else branch: r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange is 0
-        )
+        if name in assigned and name not in REASSIGNED_DEFAULTS:
+            raise SystemExit(
+                f"{name}: the constructor assigns it twice; read which one is the default and add it to REASSIGNED_DEFAULTS"
+            )
+        assigned.add(name)
+        defaults[name] = expression
     return defaults
 
 
-def default_value(expression, kind, size, enum):
+NUMBER = r"-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?f?"
+
+
+def default_value(expression, kind, size, enum, name="?"):
     if expression is None:
         return (
             [enum[0][0]]
@@ -1228,7 +1260,11 @@ def default_value(expression, kind, size, enum):
         value = expression.split("::")[-1]
         return [next(v for v, _ in enum if v.split("::")[-1] == value)]
     if kind == "toggle":
-        return [expression.strip() not in ("0", "false")]
+        if expression.strip() not in ("0", "1", "true", "false"):
+            raise SystemExit(
+                f"{name}: cannot read the default {expression!r}; add it to the override table"
+            )
+        return [expression.strip() in ("1", "true")]
     if kind == "string":
         return [""]
     if expression.startswith("FColor("):
@@ -1250,14 +1286,24 @@ def default_value(expression, kind, size, enum):
     ):
         numbers = [1.0, 1.0, 1.0]
     else:
-        numbers = [
-            float(n.rstrip("f"))
-            for n in re.findall(
-                r"(?<![\w.])-?(?:\d+\.?\d*|\.\d+)f?", expression
+        # One literal, or the literals of a constructor such as FVector2D(1.0f, 2.0f) or FVector2f{1.0f, 1.0f}; anything else (an
+        # expression, a name) is a default the override tables must state.
+        if not re.fullmatch(
+            rf"\s*{NUMBER}\s*|\s*(?:\w+\s*[({{])?\s*{NUMBER}(?:\s*,\s*{NUMBER})*\s*[)}}]?\s*",
+            expression,
+            re.I,
+        ):
+            raise SystemExit(
+                f"{name}: cannot read the default {expression!r}; add it to the override table"
             )
+        numbers = [
+            float(n.rstrip("fF"))
+            for n in re.findall(rf"(?<![\w.]){NUMBER}", expression, re.I)
         ]
     if not numbers:
-        raise SystemExit(f"cannot read the default {expression!r}")
+        raise SystemExit(
+            f"{name}: cannot read the default {expression!r}; add it to the override table"
+        )
     numbers = (
         (numbers + [numbers[-1]] * size)[:size]
         if kind == "float"
@@ -1316,7 +1362,14 @@ def parse_component(
         encoding="utf-8"
     )
     start = header.index(f"class U{name}")
-    body = header[start : header.index(end, start)]
+    cut = header.index(end, start)
+    body = header[start:cut]
+    # Properties declared after a later `public:` would be lost with the cut: refuse rather than drop them.
+    rest = header[cut : header.find("\n};", cut)]
+    if "UPROPERTY(" in rest:
+        raise SystemExit(
+            f"{name}.h: UPROPERTY after {end.strip()!r} would not be read; widen parse_component's cut"
+        )
     # In-class initializers (DecalColor = FLinearColor::White), then the constructor's, which win.
     defaults = dict(
         re.findall(r"^\s*[\w:<>]+\s+(\w+)\s*=\s*(.+?);", body, re.M)
@@ -1855,6 +1908,7 @@ def parse_properties(
                 {"color": "float", "image": "string"}.get(kind, kind),
                 size,
                 enum,
+                name,
             )
         )
         help_text = (
@@ -1955,13 +2009,33 @@ def ranges(meta, kind):
 def parse_cvars(engine_source, names):
     """Declarations of the curated console variables: name -> (type, default, help, read-only)."""
     found = {}
+    scalability = re.search(
+        r"inline\s+const\s+int32\s+DefaultQualityLevel\s*=\s*(\d+)\s*;",
+        (engine_source / "Runtime/Engine/Public/Scalability.h").read_text(
+            encoding="utf-8"
+        ),
+    )
+    if not scalability:
+        raise SystemExit(
+            "Scalability.h: DefaultQualityLevel is not a literal any more; read how UE sets it"
+        )
     pattern = re.compile(
         r'(?:TAutoConsoleVariable<(\w+)>|FAutoConsoleVariableRef)\s*\w+\s*\(\s*TEXT\(\s*"([\w.]+)"\s*\)\s*,'
         r'\s*([^,]+?)\s*,\s*((?:TEXT\(\s*"(?:[^"\\]|\\.)*"\s*\)\s*)+)(.*?)\)\s*;',
         re.S,
     )
-    for directory in ("Renderer", "Engine", "RenderCore"):
-        for folder, _, files in os.walk(engine_source / "Runtime" / directory):
+    # The engine's renderer, plus its plugins (DLSS, the NNE denoisers) and the project's own (the DLSS download).
+    directories = [
+        engine_source / "Runtime" / name
+        for name in ("Renderer", "Engine", "RenderCore")
+    ] + [engine_source.parent / "Plugins", ROOT / "unreal/HdUEBackend/Plugins"]
+    for directory in directories:
+        if not directory.is_dir():
+            print(
+                f"console variables: no {directory}; its declarations are not checked"
+            )
+            continue
+        for folder, _, files in os.walk(directory):
             for file in files:
                 if not file.endswith(".cpp"):
                     continue
@@ -1994,7 +2068,10 @@ def parse_cvars(engine_source, names):
                     )
                     found[name] = (
                         type_name,
-                        default.replace("Scalability::DefaultQualityLevel", "3")
+                        default.replace(
+                            "Scalability::DefaultQualityLevel",
+                            scalability.group(1),
+                        )
                         .strip()
                         .rstrip("f"),
                         "".join(lines).replace("\\n", " ").replace('\\"', "'"),
@@ -2049,6 +2126,7 @@ def console_settings(engine_root):
     project_settings = project_settings_cvars(engine_root)
     settings = []
     for name, label, folder, viewport, options in CVARS:
+        found = name in declared
         type_name, default, help_text, read_only = declared.get(
             name,
             (
@@ -2066,6 +2144,18 @@ def console_settings(engine_root):
             raise SystemExit(
                 f"{name} is read-only (ECVF_ReadOnly) and cannot change at runtime"
             )
+        if found and "default" in options and "override" not in options:
+            try:
+                same = float(options["default"]) == float(default)
+            except (TypeError, ValueError):
+                same = str(options["default"]).strip('"') == str(default).strip(
+                    '"'
+                )
+            if not same:
+                raise SystemExit(
+                    f"{name}: hand-typed default {options['default']} but UE declares {default}; "
+                    "fix the CVARS entry, or add override=<reason> for an intentional hdUE default"
+                )
         default = options.get("default", configured.get(name, default))
         if options.get("kind") == "toggle" or type_name == "bool":
             kind, value = "toggle", [str(default).lower() not in ("0", "false")]
