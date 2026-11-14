@@ -1558,6 +1558,17 @@ HdueResult HDUE_CALL UpsertGroom(HdueSession Handle, const HdueGroomDesc* Desc) 
     if (Sum != Desc->point_count) return HDUE_INVALID_ARGUMENT;
     for (uint64 I = 0; I < uint64(Desc->point_count) * 3; ++I)
         if (!FMath::IsFinite(Desc->points[I])) return HDUE_INVALID_ARGUMENT;
+    if (Desc->attribute_count && !Desc->attributes)
+        return Fail(HDUE_INVALID_ARGUMENT, TEXT("Groom attributes are missing."));
+    if (Desc->instance_count && !Desc->instance_transforms)
+        return Fail(HDUE_INVALID_ARGUMENT, TEXT("Groom instance transforms are missing."));
+    // Each instance is an actor spawned on the host's UE thread (FHdueScene::UpsertGroom).
+    if (Desc->instance_count > 65536)
+        return Fail(HDUE_INVALID_ARGUMENT, TEXT("Too many groom instances (at most 65536)."));
+    for (uint32 I = 0; I < Desc->point_count; ++I)
+        if (!FMath::IsFinite(Desc->widths_cm[I])) return HDUE_INVALID_ARGUMENT;
+    for (uint64 I = 0; I < uint64(Desc->instance_count) * 16; ++I)
+        if (!FMath::IsFinite(Desc->instance_transforms[I])) return HDUE_INVALID_ARGUMENT;
     const auto Session = Runtime.Session;
     FString Error;
     if (!Session->Scene->UpsertGroom(*Desc, Error)) return Fail(HDUE_ENGINE_ERROR, *Error);
