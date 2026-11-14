@@ -5,8 +5,10 @@
 """Export supported composed USD MaterialX graphs to UE's MaterialX version."""
 
 import argparse
+import functools
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -161,6 +163,36 @@ def inline_materials(stage):
         yield material
 
 
+@functools.cache
+def _from_scene_linear():
+    """The OCIO processor from the config's scene_linear role to linear Rec.709, as the delegate converts authored
+    colours (color_management.cpp management(), HdUEFromSceneLinear); None when nothing converts: colour management
+    off, scene_linear already linear Rec.709, or no PyOpenColorIO (a standalone Python, whose delegate converts none).
+    """
+    if os.environ.get("HDUE_COLOR_MANAGEMENT", "1").lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return None
+    try:
+        import PyOpenColorIO as ocio
+    except ImportError:
+        return None
+    try:
+        config = ocio.GetCurrentConfig()
+        scene = config.getColorSpace(ocio.ROLE_SCENE_LINEAR)
+        if scene is None:
+            return None
+        processor = ocio.Config.GetProcessorToBuiltinColorSpace(
+            config, scene.getName(), "Linear Rec.709 (sRGB)"
+        ).getDefaultCPUProcessor()
+    except ocio.Exception:
+        return None  # the delegate warns and converts none either
+    return None if processor.isNoOp() else processor
+
+
 def record(
     material,
     time=Usd.TimeCode.Default(),
@@ -196,11 +228,25 @@ def record(
                         identities[key] = identity
                 dependencies[key] = identity
             textures[item["attribute"]] = [filename, tiles]
+    # Colour constants in linear Rec.709, as the render-time translation converts them; the worker that writes the
+    # document has no OCIO. shortcut: prepared materials are matched without the config; re-prepare after changing it.
+    colors = {}
+    if convert := _from_scene_linear():
+        for node in graph["nodes"].values():
+            for item in node["inputs"].values():
+                value = item.get("value")
+                if item.get("type", "").startswith("color") and isinstance(
+                    value, list
+                ):
+                    colors[item["attribute"]] = (
+                        list(convert.applyRGB(value[:3])) + value[3:]
+                    )
     return dict(
         material=str(material.GetPrim().GetPath()),
         graph=graph,
         textures=textures,
         dependencies=dependencies,
+        colors=colors,
     )
 
 
@@ -330,7 +376,9 @@ def write(records, output, name, usd_stage="", dependencies=None, extra=None):
                 if item["value"] is None:
                     exported[path].removeInput(input_name)
                     continue
-                value = item["value"]
+                value = source.get("colors", {}).get(
+                    item["attribute"], item["value"]
+                )
                 if (
                     exported[path].getCategory() == "texcoord"
                     and input_name == "index"

@@ -28,7 +28,7 @@ flowchart LR
     class E host
 ```
 
-- **Colours you author** (Preview Surface diffuse and emissive colours, `displayColor`, light colours) are read as values in the config's `scene_linear` role.
+- **Colours you author** are read as values in the config's `scene_linear` role and converted to linear Rec.709 through OCIO: material colours (Preview Surface, MaterialX), constant and varying `displayColor` and per-instance colours, light colours, and the colour values of a MaterialX graph UE's importer prepares. Colour parameters of a prepared or cooked UE material that hdUE sets while you edit are passed as authored: hdUE does not know which of them are colours.
 - **UE renders** in linear Rec.709.
 - **The beauty** comes back in the `scene_linear` role. With Houdini's default config that is linear Rec.709, so nothing is converted. With an ACES config whose `scene_linear` is ACEScg, the beauty is ACEScg.
 

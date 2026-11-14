@@ -292,8 +292,9 @@ def structure_key(graph):
 # (HdUEImportMaterialXCommandlet.cpp), materialx_lowering.py's rewrites and export_usd_materialx.py's output. Bump it
 # when any of them changes what UE imports: published live materials of another version stop matching and age out
 # (live_materials.clean).
-# 5: image colour spaces as the render-time translation decodes them (image_color_space).
-IMPORT_VERSION = 5
+# 5: image colour spaces as the render-time translation decodes them (image_color_space). 6: colour values converted
+# from the OCIO scene_linear role (export_usd_materialx.record).
+IMPORT_VERSION = 6
 
 
 def request_key(graph):

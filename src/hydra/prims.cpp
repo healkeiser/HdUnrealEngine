@@ -723,6 +723,9 @@ public:
                                                      [&](const GfVec3f& c) { return c == colors.values[0]; }))
                 colors = {};
         }
+        // Authored in scene_linear, as constant colours are (HdUEFromSceneLinear).
+        HdUEFromSceneLinear(colors.values.data(), colors.values.size());
+        HdUEFromSceneLinear(mesh.instanceColors.data(), mesh.instanceColors.size());
         std::shared_ptr<const VtDictionary> selectedBindings;
         {
             std::lock_guard lock(state->mutex);
@@ -972,6 +975,9 @@ protected:
 // Points and curves become triangle meshes: one shared sphere instanced per point, and a capped tube
 // per curve. They keep one material (bound, or constant displayColor/displayOpacity).
 void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& state, HdUEMeshData mesh) {
+    // Authored in scene_linear, as constant colours are (HdUEFromSceneLinear).
+    HdUEFromSceneLinear(mesh.colors.data(), mesh.colors.size());
+    HdUEFromSceneLinear(mesh.instanceColors.data(), mesh.instanceColors.size());
     {
         std::lock_guard lock(state.mutex);
         if (mesh.material.empty()) {

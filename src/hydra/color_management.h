@@ -17,8 +17,9 @@ void HdUEToSceneLinear(std::vector<float>& rgba);
 // encode of scene_linear. UE turns its tone curve off when OCIO does the display (the OCIO viewport display, Movie
 // Render Queue's Color Output), so hdUE does too.
 bool HdUEViewTransformsDisplay();
-// A scene_linear colour (authored in USD) to linear Rec.709 for UE.
+// A scene_linear colour (authored in USD) to linear Rec.709 for UE; the array form converts count colours in place.
 GfVec3f HdUEFromSceneLinear(const GfVec3f& color);
+void HdUEFromSceneLinear(GfVec3f* colors, size_t count);
 // Texture colour-space names (UsdUVTexture sourceColorSpace, MaterialX colorspace): raw data, and sRGB-encoded
 // (sRGB, srgb_texture, "sRGB - Texture"; not lin_srgb), which UE decodes to linear Rec.709 itself.
 bool HdUERawColorSpace(const std::string& space);

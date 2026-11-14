@@ -241,6 +241,23 @@ class ExportTests(unittest.TestCase):
             },
         )
 
+    def test_colours_are_written_as_the_host_converted_them(self):
+        try:
+            import MaterialX  # noqa: F401
+        except ImportError:
+            self.skipTest("MaterialX is not installed")
+        from export_usd_materialx import record, write
+
+        _stage, m = material()
+        items = [record(m)]
+        # The host's OCIO conversion from scene_linear (record), which the worker's Python cannot make.
+        items[0]["colors"] = {"/Looks/M/Mix.inputs:fg": [0.25, 0.5, 0.75]}
+        with tempfile.TemporaryDirectory() as folder:
+            manifest = write(items, Path(folder) / "out", "Live")
+            text = Path(manifest["source"]).read_text(encoding="utf-8")
+        self.assertIn('value="0.25, 0.5, 0.75"', text)
+        self.assertIn('value="0.0, 0.0, 1.0"', text)  # bg: as authored
+
     def test_unknown_terminal_nodedef_has_the_intended_error(self):
         try:
             import MaterialX  # noqa: F401

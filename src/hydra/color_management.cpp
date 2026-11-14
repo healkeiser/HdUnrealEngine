@@ -132,6 +132,17 @@ GfVec3f HdUEFromSceneLinear(const GfVec3f& color) {
     return color;
 #endif
 }
+void HdUEFromSceneLinear(GfVec3f* colors, size_t count) {
+#if defined(HDUE_HOUDINI)
+    const auto& m = management();
+    if (m.identity || !count) return;
+    OCIO::PackedImageDesc image(colors, long(count), 1, 3);
+    m.fromScene->apply(image);
+#else
+    (void)colors;
+    (void)count;
+#endif
+}
 bool HdUERawColorSpace(const std::string& space) {
     const auto lower = TfStringToLower(space);
     return lower.find("raw") != std::string::npos || lower == "data";
