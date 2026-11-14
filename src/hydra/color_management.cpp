@@ -249,7 +249,12 @@ std::string HdUELinearRec709Texture(const std::string& file, const std::string& 
         stamps += "|" + tile + std::to_string(stamp.time_since_epoch().count());
     }
     if (images.empty()) return file;
-    const auto key = std::to_string(std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + stamps));
+    // The config's identity and this conversion's version: another config with the same space names (ACES 1 and 2),
+    // or a change to the conversion below, must not reuse an EXR. Bump kConversion when the conversion changes.
+    constexpr int kConversion = 1;
+    const auto key =
+        std::to_string(std::hash<std::string>{}(file + "|" + from + "|" + m.sceneLinear + "|" + m.config->getCacheID() +
+                                                "|" + std::to_string(kConversion) + stamps));
     for (const auto& [source, tile] : images)
         if (!converted(source, folder / (key + (tile.empty() ? "" : "." + tile) + ".exr"))) return file;
     return (folder / (key + (token == std::string::npos ? "" : ".<UDIM>") + ".exr")).string();
