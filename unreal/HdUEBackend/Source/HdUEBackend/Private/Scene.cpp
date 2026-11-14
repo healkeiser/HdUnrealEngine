@@ -2026,6 +2026,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     TextureSeconds = 0;
     TextureImports = 0;
     double PrepareSeconds = 0;
+    // Each texture input's key, made once: TextureKey stats the file, and the binding below (after long decodes in
+    // husk) must find the key the preparation built.
+    TArray<FString> SlotKeys;
+    SlotKeys.SetNum(int32(Batch.material_count) * HDUE_TEXTURE_SLOT_COUNT);
     {
         // This batch's new textures, built on workers (below); PreviewTexture creates the UTexture2Ds on this thread.
         // A texture is rebuilt when inputs read channels its BC4/BC5 repacking left out.
@@ -2039,8 +2043,9 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 const auto& Texture = Desc.textures[Slot];
                 if (!Texture.file || !*Texture.file) continue;
-                const FString File = UTF8_TO_TCHAR(Texture.file),
-                              Key = TextureKey(File, Texture, Slot, CoverageThreshold(Desc, Slot), Virtual);
+                const FString File = UTF8_TO_TCHAR(Texture.file);
+                const FString& Key = SlotKeys[int32(Index) * HDUE_TEXTURE_SLOT_COUNT + Slot] =
+                    TextureKey(File, Texture, Slot, CoverageThreshold(Desc, Slot), Virtual);
                 const bool Vector = !ScalarSlot(Slot);
                 uint8 Read = 0;
                 for (int32 Channel = 0; Channel < 4; ++Channel)
@@ -2188,8 +2193,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                     const FPreviewTexture* Image = nullptr;
                     const bool Udim = HasTexture(Slot) && IsUdim(UTF8_TO_TCHAR(Texture.file));
                     if (HasTexture(Slot)) {
-                        const FString Key = TextureKey(UTF8_TO_TCHAR(Texture.file), Texture, Slot,
-                                                       CoverageThreshold(Desc, Slot), Virtual);
+                        const FString& Key = SlotKeys[int32(Index) * HDUE_TEXTURE_SLOT_COUNT + Slot];
                         FString TextureError;
                         if (PendingTextures.Contains(Key)) {
                             FTextureSlot& Waiting = TextureSlots.Add(Key);
