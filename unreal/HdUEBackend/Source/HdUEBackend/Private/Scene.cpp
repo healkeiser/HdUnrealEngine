@@ -807,14 +807,23 @@ struct FCookLODBias {
     }
     FString Key() const { return FString::Printf(TEXT("|lod %d %d %d"), Bias, MinLOD, MaxLOD); }
 };
+// UE's decoder guesses sRGB for every 8-bit image (ImageWrapperBase.cpp, GetDefaultGammaSpace); the slot decides:
+// data textures (raw, scalar slots, normals) mip in their stored values, as UE's texture build filters non-sRGB
+// textures.
+void TagGamma(FImage& Image, bool SRGB) {
+    if (ERawImageFormat::GetFormatNeedsGammaSpace(Image.Format))
+        Image.GammaSpace = SRGB ? EGammaSpace::sRGB : EGammaSpace::Linear;
+}
 // A texture's mipped (and, for 8-bit images, block-compressed) platform data, on a worker thread. BC needs whole 4x4
 // blocks at the top level; other sizes and float images (EXR/HDR) stay uncompressed.
 TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPreviewTexture& Texture, bool SRGB,
                                                 const FCookLODBias& LOD) {
+    TagGamma(Image, SRGB);
     if (!ERawImageFormat::IsHDR(Image.Format) && Image.Format != ERawImageFormat::BGRA8) {  // grey, 16-bit
         FImage Converted;
         Image.CopyTo(Converted, ERawImageFormat::BGRA8, Image.GammaSpace);
         Image = MoveTemp(Converted);
+        TagGamma(Image, SRGB);  // a 16-bit source was Linear: its BGRA8 copy takes the slot's tag
     }
     TArray<FImage> Chain = MipChain(MoveTemp(Image));
     if (Texture.Coverage > 0.f && Chain[0].Format == ERawImageFormat::BGRA8)  // ponytail: float cutouts keep plain mips
@@ -956,7 +965,10 @@ TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdu
     std::atomic<int32> Unread = INDEX_NONE;
     ParallelFor(Tiles.Num(), [&](int32 Index) {
         UE::TextureUtilitiesCommon::ExtractUDIMCoordinates(Tiles[Index].Key, Blocks[Index].X, Blocks[Index].Y);
-        if (!FImageUtils::LoadImage(*Tiles[Index].Value, Blocks[Index].Image)) Unread = Index;
+        if (!FImageUtils::LoadImage(*Tiles[Index].Value, Blocks[Index].Image))
+            Unread = Index;
+        else
+            TagGamma(Blocks[Index].Image, Texture.SRGB);
     });
     if (Unread != INDEX_NONE) {
         Error = TEXT("cannot read ") + Tiles[Unread].Value;
