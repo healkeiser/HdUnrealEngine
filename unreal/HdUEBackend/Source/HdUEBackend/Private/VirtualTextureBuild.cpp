@@ -143,6 +143,24 @@ bool WriteChunk(const TArray<uint8>& Bytes, FSHAHash& Hash) {
         IFileManager::Get().Delete(*Temporary, false, false, true);
     return IFileManager::Get().FileSize(*Path) == Bytes.Num();
 }
+// An array as TArray's operator<< stores it (its count, then each element), the count refused on load when that many
+// elements of at least MinBytes could not fit in the rest of the file: a damaged count must not allocate gigabytes.
+template <typename T, typename F>
+void SerializeArray(FArchive& Ar, TArray<T>& Array, int64 MinBytes, F&& Element) {
+    int32 Count = Array.Num();
+    Ar << Count;
+    if (Ar.IsLoading()) {
+        if (Ar.IsError() || Count < 0 || Count * MinBytes > Ar.TotalSize() - Ar.Tell()) {
+            Ar.SetError();
+            return;
+        }
+        Array.SetNum(Count);
+    }
+    for (T& Item : Array) Element(Item);
+}
+void SerializeArray(FArchive& Ar, TArray<uint32>& Array) {
+    SerializeArray(Ar, Array, sizeof(uint32), [&](uint32& Value) { Ar << Value; });
+}
 // The set's platform data, its chunks' hashes instead of their bytes, both ways.
 void SerializeManifest(FArchive& Ar, FTexturePlatformData& Platform, FVirtualTextureBuiltData& Data) {
     uint32 Version = ManifestVersion;
@@ -150,8 +168,16 @@ void SerializeManifest(FArchive& Ar, FTexturePlatformData& Platform, FVirtualTex
     int32 SizeX = Platform.SizeX, SizeY = Platform.SizeY, Chunks = Data.Chunks.Num();
     Ar << Version << SizeX << SizeY << Format << Data.NumLayers << Data.NumMips << Data.Width << Data.Height
        << Data.WidthInBlocks << Data.HeightInBlocks << Data.TileSize << Data.TileBorderSize << Layer
-       << Data.LayerFallbackColors[0] << Data.TileDataOffsetPerLayer << Data.BaseOffsetPerMip << Data.ChunkIndexPerMip
-       << Data.TileOffsetData << Chunks;
+       << Data.LayerFallbackColors[0];
+    SerializeArray(Ar, Data.TileDataOffsetPerLayer);
+    SerializeArray(Ar, Data.BaseOffsetPerMip);
+    SerializeArray(Ar, Data.ChunkIndexPerMip);
+    SerializeArray(Ar, Data.TileOffsetData, 20, [&](FVirtualTextureTileOffsetData& Tiles) {
+        Ar << Tiles.Width << Tiles.Height << Tiles.MaxAddress;  // FVirtualTextureTileOffsetData's operator<<
+        SerializeArray(Ar, Tiles.Addresses);
+        SerializeArray(Ar, Tiles.Offsets);
+    });
+    Ar << Chunks;
     if (Ar.IsLoading()) {
         if (Version != ManifestVersion || Chunks < 0 || Chunks > 4096) {
             Ar.SetError();
@@ -207,20 +233,81 @@ struct FBlock {
 };
 }  // namespace
 
+namespace {
+// Whether a loaded manifest has the layout HdueBuildVirtualTexture writes, so UE's streaming (GetTileOffset, which
+// trusts every index and offset) reads tiles only inside their chunk files.
+bool ValidManifest(const FTexturePlatformData& Platform, const FVirtualTextureBuiltData& Data) {
+    FVirtualTextureBuildSettings Settings;
+    Settings.Init();
+    const uint32 Physical = Data.GetPhysicalTileSize(), Mips = Data.NumMips;
+    if (Data.NumLayers != 1 || Data.TileSize != uint32(Settings.TileSize) ||
+        Data.TileBorderSize != uint32(Settings.TileBorderSize) || Data.LayerTypes[0] != Platform.PixelFormat ||
+        Platform.PixelFormat <= PF_Unknown || Platform.PixelFormat >= PF_MAX || Data.Width == 0 || Data.Height == 0 ||
+        Platform.SizeX != int32(Data.Width) || Platform.SizeY != int32(Data.Height) || Data.WidthInBlocks == 0 ||
+        Data.HeightInBlocks == 0 || Data.Width % Data.WidthInBlocks || Data.Height % Data.HeightInBlocks ||
+        !FMath::IsPowerOfTwo(Data.Width / Data.WidthInBlocks) ||
+        !FMath::IsPowerOfTwo(Data.Height / Data.HeightInBlocks) ||
+        FMath::CeilLogTwo(FMath::Max(Data.Width, Data.Height) / Data.TileSize) >
+            VIRTUALTEXTURE_LOG2_MAX_PAGETABLE_SIZE ||
+        Mips != uint32(FMath::FloorLog2(FMath::Max(Data.Width, Data.Height)) + 1) ||
+        Data.ChunkIndexPerMip.Num() != int32(Mips) || Data.BaseOffsetPerMip.Num() != int32(Mips) ||
+        Data.TileOffsetData.Num() != int32(Mips) || Data.TileDataOffsetPerLayer.Num() != 1)
+        return false;
+    const FPixelFormatInfo& Format = GPixelFormats[Platform.PixelFormat];
+    if (!Format.BlockSizeX || !Format.BlockSizeY ||
+        Data.TileDataOffsetPerLayer[0] !=
+            (Physical / Format.BlockSizeX) * (Physical / Format.BlockSizeY) * uint32(Format.BlockBytes))
+        return false;
+    for (const FVirtualTextureDataChunk& Chunk : Data.Chunks)
+        if (Chunk.CodecType[0] != EVirtualTextureCodec::RawGPU ||
+            Chunk.SizeInBytes < sizeof(FVirtualTextureChunkHeader) ||
+            Chunk.CodecPayloadOffset[0] > Chunk.CodecPayloadSize || Chunk.CodecPayloadSize > Chunk.SizeInBytes)
+            return false;
+    uint32 WidthInTiles = FMath::DivideAndRoundUp(Data.Width, Data.TileSize),
+           HeightInTiles = FMath::DivideAndRoundUp(Data.Height, Data.TileSize);
+    for (uint32 Mip = 0; Mip < Mips; ++Mip) {
+        const FVirtualTextureTileOffsetData& Tiles = Data.TileOffsetData[Mip];
+        const uint32 Padded = FMath::RoundUpToPowerOfTwo(FMath::Max(WidthInTiles, HeightInTiles));
+        if (Data.ChunkIndexPerMip[Mip] >= uint32(Data.Chunks.Num()) || Tiles.Width != WidthInTiles ||
+            Tiles.Height != HeightInTiles || Tiles.MaxAddress != Padded * Padded || Tiles.Addresses.IsEmpty() ||
+            Tiles.Addresses.Num() != Tiles.Offsets.Num() || Tiles.Addresses[0] != 0)
+            return false;
+        // Each run of present tiles, from its address to the next run's (or MaxAddress), within the mip's chunk.
+        const int64 Base = Data.BaseOffsetPerMip[Mip], Size = Data.Chunks[Data.ChunkIndexPerMip[Mip]].SizeInBytes;
+        for (int32 Run = 0; Run < Tiles.Addresses.Num(); ++Run) {
+            const uint32 End = Run + 1 < Tiles.Addresses.Num() ? Tiles.Addresses[Run + 1] : Tiles.MaxAddress;
+            if (End <= Tiles.Addresses[Run]) return false;  // sorted, inside the managed area
+            const int64 Last = int64(Tiles.Offsets[Run]) + (End - Tiles.Addresses[Run]);  // past the run's last tile
+            if (Tiles.Offsets[Run] != ~0u && (Base == ~0u || Base + Last * Data.TileDataOffsetPerLayer[0] > Size))
+                return false;
+        }
+        WidthInTiles = FMath::DivideAndRoundUp(WidthInTiles, 2u);
+        HeightInTiles = FMath::DivideAndRoundUp(HeightInTiles, 2u);
+    }
+    return true;
+}
+}  // namespace
+
 TUniquePtr<FTexturePlatformData> HdueLoadVirtualTexture(const FString& Key) {
     if (CacheDirectory().IsEmpty()) return nullptr;
     TArray<uint8> Bytes;
-    if (!FFileHelper::LoadFileToArray(Bytes, *ManifestPath(Key), FILEREAD_Silent)) return nullptr;
+    const FString Path = ManifestPath(Key);
+    if (!FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) return nullptr;
     auto Platform = MakeUnique<FTexturePlatformData>();
     auto* Data = new FVirtualTextureBuiltData;
     Platform->VTData = Data;
     FMemoryReader Reader(Bytes);
     SerializeManifest(Reader, *Platform, *Data);
-    if (Reader.IsError() || !Data->IsInitialized()) return nullptr;
+    if (Reader.IsError() || !Data->IsInitialized() || !ValidManifest(*Platform, *Data)) {
+        // Deleted, so the rebuild writes it again; eviction clears chunks no manifest names.
+        UE_LOG(LogTemp, Warning, TEXT("hdUE: virtual texture cache manifest %s is damaged; rebuilding it."), *Path);
+        IFileManager::Get().Delete(*Path, false, false, true);
+        return nullptr;
+    }
     for (const FVirtualTextureDataChunk& Chunk : Data->Chunks)
         if (IFileManager::Get().FileSize(*(CacheDirectory() / Chunk.BulkDataHash.ToString())) != Chunk.SizeInBytes)
-            return nullptr;                                                     // a chunk file deleted with the cache
-    IFileManager::Get().SetTimeStamp(*ManifestPath(Key), FDateTime::UtcNow());  // a load counts as a use (Evict)
+            return nullptr;                                        // a chunk file deleted with the cache
+    IFileManager::Get().SetTimeStamp(*Path, FDateTime::UtcNow());  // a load counts as a use (Evict)
     Platform->SetNumSlices(1);
     return Platform;
 }
