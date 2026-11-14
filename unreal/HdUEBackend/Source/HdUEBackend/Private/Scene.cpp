@@ -857,7 +857,8 @@ TUniquePtr<FTexturePlatformData> PrepareTexture(FImage&& Image, FHdueScene::FPre
 // Block-compressed textures cached in %LOCALAPPDATA%/hdUE/TextureCache, keyed by the file, its time and size, and what
 // the materials read: reloading a scene skips decoding its images, most of a texture load. Entries unused for a week go
 // when a process first uses the cache, as the Nanite cache's do (a hit counts as a use).
-constexpr int32 CacheVersion = 3;  // 3: data textures mip linearly (TagGamma); every key names its LOD strip.
+// 3: data textures mip linearly (TagGamma); every key names its LOD strip. 4: 16-bit sRGB UDIM tiles too.
+constexpr int32 CacheVersion = 4;
 FString CachePath(const FString& File, const FHdueScene::FPreviewTexture& Texture, bool SRGB, const FCookLODBias& LOD) {
     static const FString Root = [] {
         const FString Folder = FPaths::Combine(FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
@@ -1000,6 +1001,7 @@ TUniquePtr<FTexturePlatformData> PrepareVirtualTexture(const FString& File, FHdu
             FImage Converted;
             Block.Image.CopyTo(Converted, Raw, Block.Image.GammaSpace);
             Block.Image = MoveTemp(Converted);
+            TagGamma(Block.Image, Texture.SRGB);  // a 16-bit tile was Linear: its BGRA8 copy takes the slot's tag
         }
     const bool Compress = !Float && BlockCompression();
     FHdueVirtualTextureCodec Codec;
