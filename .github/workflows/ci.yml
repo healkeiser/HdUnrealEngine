@@ -16,7 +16,7 @@ jobs:
     name: Client library and C ABI
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Configure
         run: cmake -S . -B build -DHDUE_BUILD_HYDRA=OFF
       - name: Build
@@ -28,8 +28,8 @@ jobs:
     name: Formatting and lint
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: false
       - name: Python (Black, Ruff; pyproject.toml)
@@ -56,18 +56,20 @@ jobs:
     name: Workflow lint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: actionlint
         run: |
-          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.4/scripts/download-actionlint.bash) 1.7.4
+          curl -sSLO https://github.com/rhysd/actionlint/releases/download/v1.7.4/actionlint_1.7.4_linux_amd64.tar.gz
+          echo "fc0a6886bbb9a23a39eeec4b176193cadb54ddbe77cdbb19b637933919545395  actionlint_1.7.4_linux_amd64.tar.gz" | sha256sum -c -
+          tar xzf actionlint_1.7.4_linux_amd64.tar.gz actionlint
           ./actionlint -color
 
   cpp-lint:
     name: clang-tidy (client library)
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
-      - uses: ilammy/msvc-dev-cmd@v1.13.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Configure with compile commands
         run: cmake -S . -B tidy -G Ninja -DHDUE_BUILD_HYDRA=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: clang-tidy
@@ -82,8 +84,8 @@ jobs:
     name: Python and PowerShell
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: false # no lock file; scripts run with uv run
       - name: Byte-compile Python (Houdini 22 uses 3.13)

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pefile>=2023.2.7"]
+# dependencies = ["pefile==2024.8.26"]
 # ///
 """Checks that staged UE DLLs still load next to Houdini's copies of the same DLLs.
 
