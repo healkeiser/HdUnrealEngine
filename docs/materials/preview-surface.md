@@ -297,6 +297,6 @@ How to get these looks on a Preview Surface. Inputs not listed stay at their def
 ## Unreal Engine and Karma
 
 - hdUE maps Preview Surface as UE's USD importer does onto its Preview Surface reference materials: opaque, masked (with **Opacity Threshold**) or translucent.
-- `opacityMode` is not read. Partial opacity is presence in hdUE, so it fades reflections too: the rims of a thin see-through pane render at about 0.8 of Karma's.
+- `opacityMode` is not read. Partial opacity is presence in hdUE, so it fades reflections too: the rims of a thin see-through pane render at about 0.8 of Karma's. UE's USD importer passes it as an `OpacityMode` parameter (USDShadeConversion.cpp), but UE 5.8's Preview Surface reference materials have no such parameter, so UE renders it as hdUE does.
 - **Wrap modes**: unauthored `wrapS`/`wrapT` repeat and `useMetadata` clamps, as UE's USD importer reads them (USDShadeConversion.cpp). The specification's default, `useMetadata`, falls back to `black` for files without wrap metadata. An authored `black` stays black, as the specification defines it; UE's importer clamps it.
 - **Occlusion**: the specification notes that path tracers may ignore it.

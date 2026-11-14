@@ -683,6 +683,15 @@ public:
         std::tie(data.uvPrimvars, data.colorPrimvar) = primvarNames(net);
         const auto* shader = surface(net);
         const bool translated = !shader || readSurface(net, *shader, data);
+        // A see-through material renders on the single-slab translucent parent, as UE's Interchange makes such
+        // materials translucent (Scene.cpp, Layered): no subsurface or sheen, and a coat as the base layer's haze.
+        if (data.opacityThreshold <= 0 && data.transmission <= 0 &&
+            (data.opacity < 1 || !data.textures[HDUE_TEXTURE_OPACITY].file.empty()) &&
+            (data.subsurface > 0 || data.sheen > 0 || data.clearcoat > 0 ||
+             !data.textures[HDUE_TEXTURE_CLEARCOAT].file.empty()))
+            data.warnings.push_back(
+                "see-through materials (opacity below 1 without a threshold) render without subsurface and sheen, "
+                "and with a coat as the base layer's haze");
         auto* state = static_cast<HdUEState*>(param);
         std::lock_guard lock(state->mutex);
         if (!translated)

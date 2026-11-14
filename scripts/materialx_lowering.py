@@ -556,6 +556,9 @@ def lower_nodes(g, fps, notes):
         elif category == "generalized_schlick_edf":
             replace_port(g, node, schlick_edf(g, s, node))
         elif category == "thin_surface":
+            notes.append(
+                "thin_surface: its front side on both sides (back_bsdf and back_edf dropped)"
+            )
             inputs = {
                 "bsdf": g.port(node, "front_bsdf"),
                 "edf": g.port(node, "front_edf"),
