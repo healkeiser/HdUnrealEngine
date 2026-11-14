@@ -50,6 +50,7 @@ if ($Suite -in 'unit', 'all') {
 if ($Suite -in 'native', 'all') {
     # The C++ tests of the builds there are (no rebuild: Build-Host.ps1 and Build-Houdini.ps1 build and run them).
     $Standalone = if ($BuildRoot) { [IO.Path]::GetFullPath($BuildRoot) } else { Join-Path $TaskRoot 'build' }
+    $NativeRan = 0
     foreach ($Build in $Standalone, (Get-HdUELocalPath -Key houdini_build_root)) {
         if (-not (Test-Path -LiteralPath (Join-Path $Build 'CTestTestfile.cmake'))) {
             Write-Output "native: skipped $Build (not built)"
@@ -57,8 +58,11 @@ if ($Suite -in 'native', 'all') {
         }
         & ctest --test-dir $Build -C Release --output-on-failure
         if ($LASTEXITCODE) { throw "Native tests failed in $Build." }
+        $NativeRan++
     }
-    $Ran += 'native'
+    # Only a suite that ran counts: -Suite native with nothing built is a failure, and all just says it skipped it.
+    if ($NativeRan) { $Ran += 'native' }
+    elseif ($Suite -eq 'native') { throw 'No native tests ran: neither the standalone nor the Houdini build has a CTestTestfile.cmake (Build-Host.ps1, Build-Houdini.ps1).' }
 }
 if ($Suite -in 'hydra', 'all') {
     # Native UE and Hydra renders, usdview, camera and buffer checks, with evidence (no rebuild).
