@@ -215,8 +215,11 @@ class Viewport:
                     parameters[p].type = 0
                     parameters[p].value[0] = float(value)
                 else:
-                    parameters[p].type = 1
-                    vector = list(value)
+                    # A colour authored in the OCIO scene_linear role (materialx_controls.py):
+                    # HDUE_VIEWPORT_PARAMETER_COLOR, which the delegate converts.
+                    color = isinstance(value, dict)
+                    parameters[p].type = 3 if color else 1
+                    vector = list(value["sceneLinearColor"] if color else value)
                     # Alpha 1, as delegate.cpp and material_api.py send it.
                     vector.extend([0.0] * (3 - len(vector)))
                     if len(vector) == 3:

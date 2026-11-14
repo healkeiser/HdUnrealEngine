@@ -93,13 +93,17 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials
             if (parameter.type == HDUE_PARAMETER_TEXTURE) {
                 if (!text(parameter.texture_asset) || parameter.texture_asset[0] != '/') return HDUE_INVALID_ARGUMENT;
                 fields[parameter.name] = VtValue(std::string(parameter.texture_asset));
-            } else if (parameter.type == HDUE_PARAMETER_SCALAR || parameter.type == HDUE_PARAMETER_VECTOR) {
+            } else if (parameter.type == HDUE_PARAMETER_SCALAR || parameter.type == HDUE_PARAMETER_VECTOR ||
+                       parameter.type == HDUE_VIEWPORT_PARAMETER_COLOR) {
                 for (float value : parameter.value)
                     if (!std::isfinite(value)) return HDUE_INVALID_ARGUMENT;
-                fields[parameter.name] = parameter.type == HDUE_PARAMETER_SCALAR
-                                             ? VtValue(parameter.value[0])
-                                             : VtValue(GfVec4f(parameter.value[0], parameter.value[1],
-                                                               parameter.value[2], parameter.value[3]));
+                const VtValue vector(
+                    GfVec4f(parameter.value[0], parameter.value[1], parameter.value[2], parameter.value[3]));
+                // A colour as the other hosts mark it (materialx_controls.py), for the delegate to convert.
+                fields[parameter.name] = parameter.type == HDUE_PARAMETER_SCALAR ? VtValue(parameter.value[0])
+                                         : parameter.type == HDUE_PARAMETER_VECTOR
+                                             ? vector
+                                             : VtValue(VtDictionary{{"sceneLinearColor", vector}});
             } else
                 return HDUE_INVALID_ARGUMENT;
         }

@@ -325,6 +325,10 @@ class MaterialXLibrary:
                             if len(value) == 4
                             else Gf.Vec3f(*value)
                         )
+                    if p.get("color"):
+                        # Authored in the OCIO scene_linear role: the delegate converts it to UE's linear Rec.709,
+                        # as the import converted the material's own value (export_usd_materialx.record).
+                        value = {"sceneLinearColor": value}
                 else:
                     if not isinstance(value, str) or not value.startswith("/"):
                         raise ValueError(

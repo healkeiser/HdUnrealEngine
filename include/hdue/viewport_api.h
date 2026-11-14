@@ -40,7 +40,10 @@ typedef struct HdueViewportMaterials {
     const HdueViewportMaterial* materials;
 } HdueViewportMaterials;
 /* Version 1. Replace the complete prepared-material binding set atomically.
- * Stale sessions and invalid batches leave existing settings untouched. */
+ * Stale sessions and invalid batches leave existing settings untouched. A parameter's type is a HDUE_PARAMETER_* or
+ * HDUE_VIEWPORT_PARAMETER_COLOR: a vector authored in the OCIO scene_linear role, which the delegate converts to UE's
+ * linear Rec.709 as it converts the colours it translates. */
+enum { HDUE_VIEWPORT_PARAMETER_COLOR = 3 };
 HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials(const HdueViewportMaterials* materials);
 typedef struct HdueViewportWet {
     const char* prim_path;

@@ -50,6 +50,8 @@ def bind(export_file, library_file, output):
                         parameter=name,
                         type=p["type"],
                         default=p["default"],
+                        # Its live values are converted from the OCIO scene_linear role, as its default was.
+                        color=field["type"] in ("color3", "color4"),
                     )
                 )
             if field["type"] == "filename":
