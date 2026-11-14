@@ -547,6 +547,7 @@ struct MeshSyncTimer {
 };
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
+    TfToken instanceColorName_;  // the instance-rate colour primvar the last full Sync read (Sync)
 
     struct Shape {
         VtVec3fArray points;
@@ -617,6 +618,14 @@ public:
         auto* state = static_cast<HdUEState*>(param);
         // An error ends a re-pull too: IsConverged waits for repull to empty.
         const auto giveUp = [&] { state->locked([&] { state->repull.erase(GetId().GetString()); }); };
+        // An instancer edit that only moves this prototype's instances keeps its geometry (MoveInstances). Varying
+        // only marks a prim Hydra saw change in consecutive frames (husk sets it on animated prims).
+        if (!emitted_.empty() && !GetInstancerId().IsEmpty() &&
+            !(*bits & ~(HdChangeTracker::Varying | HdChangeTracker::DirtyInstancer |
+                        HdChangeTracker::DirtyInstanceIndex | HdChangeTracker::DirtyTransform |
+                        HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag)) &&
+            MoveInstances(delegate, *state, bits))
+            return;
         // A transform, visibility or purpose edit of a mesh without instancer keeps its geometry.
         if (!emitted_.empty() && GetInstancerId().IsEmpty() &&
             !(*bits & ~(HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
@@ -712,8 +721,9 @@ public:
         // Vertex colours: an unbound mesh's displayColor when it varies (a uniform one stays the material's constant
         // color), or the primvar a bound material's base colour reads. An instancer's instance-rate primvar of that
         // name replaces the mesh's own, as per-instance colours.
-        if (instancer && !colorName.IsEmpty() && mesh.sceneAsset.empty())
-            mesh.instanceColors = instancer->ComputeInstanceColors(GetId(), colorName);
+        instanceColorName_ = mesh.sceneAsset.empty() ? colorName : TfToken();
+        if (instancer && !instanceColorName_.IsEmpty())
+            mesh.instanceColors = instancer->ComputeInstanceColors(GetId(), instanceColorName_);
         if (mesh.instanceColors.size() != mesh.instances.size()) mesh.instanceColors.clear();
         Triangulated<GfVec3f> colors;
         if (!colorName.IsEmpty() && mesh.sceneAsset.empty() && mesh.instanceColors.empty()) {
@@ -895,6 +905,54 @@ public:
         emitted_ = std::move(current);
         lock.unlock();
         HdUEStreamMeshes(*state);
+    }
+    // The instances of an uploaded prototype after an instancer edit, computed as the full Sync computes them. When
+    // only their matrices changed (same count, same colours, no shear, visibility and purpose unchanged), its parts
+    // keep their geometry and UE moves the instances in place (movedMeshes, set_transforms); otherwise returns false
+    // and the full Sync runs.
+    bool MoveInstances(HdSceneDelegate* delegate, HdUEState& state, HdDirtyBits* bits) {
+        const auto previous = GetInstancerId();
+        _UpdateInstancer(delegate, bits);
+        const auto* instancer = HdUEInstancer(delegate, GetInstancerId());
+        if (GetInstancerId() != previous || !instancer) return false;
+        HdUEMeshData placed;
+        placed.transform = delegate->GetTransform(GetId());
+        const bool visible = delegate->GetVisible(GetId());
+        const auto renderTag = delegate->GetRenderTag(GetId());
+        placed.instances = HdUEInstancePlacements(delegate, GetId(), GetInstancerId(), placed.transform);
+        if (std::any_of(placed.instances.begin(), placed.instances.end(), HdUEHasShear)) return false;
+        instancer->ComputeInstanceMotion(GetId(), HdUEFramesPerSecond(state), placed.instances.size(), placed);
+        placed.motionLeft = HdUETransformMotion(delegate, GetId(), placed.transform, true);
+        if (!instanceColorName_.IsEmpty())
+            placed.instanceColors = instancer->ComputeInstanceColors(GetId(), instanceColorName_);
+        if (placed.instanceColors.size() != placed.instances.size()) placed.instanceColors.clear();
+        HdUEFromSceneLinear(placed.instanceColors.data(), placed.instanceColors.size());
+        std::lock_guard lock(state.mutex);
+        for (const auto& id : emitted_) {
+            const auto part = state.meshes.find(id);
+            if (part == state.meshes.end() || !part->second.instanced || !part->second.sceneAsset.empty() ||
+                part->second.visible != visible || part->second.renderTag != renderTag ||
+                part->second.instances.size() != placed.instances.size() ||
+                part->second.instanceColors != placed.instanceColors || state.meshes.count(HdUEShearedId(id)))
+                return false;
+        }
+        for (const auto& id : emitted_) {
+            auto& part = state.meshes[id];
+            const bool moved = part.instances != placed.instances;
+            part.transform = placed.transform;
+            part.instances = placed.instances;
+            part.motionLeft = placed.motionLeft;
+            part.motionRight = placed.motionRight;
+            part.velocities = placed.velocities;
+            part.accelerations = placed.accelerations;
+            part.angularVelocities = placed.angularVelocities;
+            part.instanceTimes = placed.instanceTimes;
+            part.instanceSamples = placed.instanceSamples;
+            if (moved) state.movedMeshes.insert(id);
+            ++state.revision;  // motion blur reads the new motion even when the instances stay
+        }
+        *bits = HdChangeTracker::Clean;
+        return true;
     }
     void RefreshSelectedMasks(HdSceneDelegate* delegate, HdUEState& state) const {
         // A renderer-setting edit does not change a scene-index data source.

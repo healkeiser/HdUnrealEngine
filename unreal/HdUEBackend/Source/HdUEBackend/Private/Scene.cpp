@@ -495,6 +495,7 @@ void FHdueScene::SetTransforms(const FString& Id, uint32 Count, const double* Ma
         for (uint32 I = 0; I < Count; ++I) Transforms.Add(ToTransform(I));
         // Not a teleport: UE keeps each instance's previous transform for the velocity buffer (motion vectors).
         Instances->BatchUpdateInstancesTransforms(0, Transforms, true, true, false);
+        SplitVolumeInstances(*Actor, *Instances, Instances->GetMaterial(0));  // their own components follow
     } else if (Count == 1)
         Actor->SetActorTransform(ToTransform(0), false, nullptr, ETeleportType::TeleportPhysics);
 }

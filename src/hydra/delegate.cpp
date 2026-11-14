@@ -1072,16 +1072,24 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
         cullBackface,
         state.setting<int64_t>("naniteTriangleThreshold", HdUESettingDefaults::naniteTriangleThreshold)};
     const auto nativeMeshes = state.setting<VtDictionary>("nativeMeshAssets", {});
-    // A moved mesh keeps its geometry in UE; only its actor's transform is sent (HdUEPlacedOnly).
+    // A moved mesh keeps its geometry in UE; only its actor's transform (HdUEPlacedOnly), or its instances' (Mesh's
+    // MoveInstances, the same count UE has), is sent.
+    const auto move = [&](const char* id, const HdUEMeshData& data) {
+        std::vector<double> matrices(16 * (data.instanced ? data.instances.size() : 1));
+        if (data.instanced)
+            for (size_t i = 0; i < data.instances.size(); ++i)
+                rowMajor(inverse * data.instances[i] * basis, &matrices[i * 16]);
+        else
+            rowMajor(inverse * data.transform * basis, matrices.data());
+        packet.moves.push_back({id, uint32_t(matrices.size() / 16), packet.own(packet.doubles, std::move(matrices))});
+    };
     for (const auto& id : packet.movedMeshes) {
         if (packet.dirtyMeshes.count(id)) continue;
         if (packet.firstBatch) {
             packet.dirtyMeshes.insert(id);
             continue;
         }
-        std::vector<double> matrix(16);
-        rowMajor(inverse * state.meshes.at(id).transform * basis, matrix.data());
-        packet.moves.push_back({packet.own(id), 1, packet.own(packet.doubles, std::move(matrix))});
+        move(packet.own(id), state.meshes.at(id));
     }
     for (const auto& id : packet.dirtyMeshes) {
         const auto& data = state.meshes.at(id);
@@ -1097,11 +1105,8 @@ void prepareMeshes(HdUEState& state, ScenePacket& packet) {
             update.prim_id = data.primId;
             packet.updates.push_back(update);
             packet.updateSources.push_back(data.sourceId);
-            if (!data.instanced && !HdUEShears(data.transform)) {  // a move Sync kept released (HdUEPlacedOnly)
-                std::vector<double> matrix(16);
-                rowMajor(inverse * data.transform * basis, matrix.data());
-                packet.moves.push_back({update.id, 1, packet.own(packet.doubles, std::move(matrix))});
-            }
+            // A move Sync kept released (HdUEPlacedOnly), or instances it moved (MoveInstances).
+            if (data.instanced ? packet.movedMeshes.count(id) != 0 : !HdUEShears(data.transform)) move(update.id, data);
             continue;
         }
         if (!data.sceneAsset.empty()) {
