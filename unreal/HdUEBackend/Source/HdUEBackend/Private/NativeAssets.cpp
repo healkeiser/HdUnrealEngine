@@ -18,8 +18,20 @@
 #include "Misc/PackageName.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "NiagaraSystemInstanceController.h"
 
 FHdueNativeAssets::~FHdueNativeAssets() { Reset(); }
+// Whether an effect still simulates towards its desired age: UE seeks for at most MaxSimTime per tick (33 ms by
+// default, NiagaraComponent.cpp), whole seek steps at a time (UNiagaraComponent::TickComponent), so a long seek spans
+// several ticks. A system that completed before that age stops there.
+static bool Seeking(const AActor& Actor) {
+    const auto* C = Actor.FindComponentByClass<UNiagaraComponent>();
+    const auto Controller = C ? C->GetSystemInstanceController() : nullptr;
+    if (!Controller.IsValid() || !Controller->IsValid() || Controller->IsComplete()) return false;
+    const auto* System = C->GetAsset();
+    const float Step = System && System->HasFixedTickDelta() ? System->GetFixedTickDeltaTime() : C->GetSeekDelta();
+    return C->GetDesiredAge() - Controller->GetAge() >= Step;
+}
 void FHdueNativeAssets::Actors(const FEntry& E, TArray<AActor*>& Out) {
     if (E.Actor.IsValid()) {
         Out.Add(E.Actor.Get());
@@ -192,7 +204,10 @@ void FHdueNativeAssets::Tick() {
             if (GFrameCounter >= E.ReadyFrame) E.State = HDUE_ASSET_READY;
         };
         if (E.Actor.IsValid()) {
-            Settle();
+            if (E.Kind == HDUE_ASSET_EFFECT && Seeking(*E.Actor))
+                E.ReadyFrame = 0;  // READY two frames after the seek is done, not after it starts
+            else
+                Settle();
             continue;
         }
         if (E.Level.IsValid()) {
@@ -273,7 +288,6 @@ void FHdueNativeAssets::Tick() {
             C->SetAgeUpdateMode(ENiagaraAgeUpdateMode::DesiredAge);
             C->SetSeekDelta(E.SecondsPerFrame > 0 ? E.SecondsPerFrame : 1.f / 24);
             C->SetLockDesiredAgeDeltaTimeToSeekDelta(true);
-            C->SetMaxSimTime(600);  // a seek reaches its age within one tick, however far
             C->SetCanRenderWhileSeeking(false);
             C->SetRandomSeedOffset(0);
             C->SetMobility(EComponentMobility::Movable);
