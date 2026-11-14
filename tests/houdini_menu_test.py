@@ -117,6 +117,22 @@ class Clearing(unittest.TestCase):
                 ["notes.txt", "project"],
             )
 
+    def test_size_counts_only_what_clearing_would_delete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            (folder / "0123456789ABCDEF0123456789abcdef01234567").write_bytes(
+                b"x" * 10
+            )
+            (folder / "notes.txt").write_bytes(b"x" * 500)
+            (folder / "project").mkdir()
+            (folder / "project/big.bin").write_bytes(b"x" * 500)
+            rule = hdue_menu.CACHE_FILES["virtual_texture"]
+            self.assertEqual(hdue_menu.folder_size(folder), (1010, 3))
+            self.assertEqual(hdue_menu.folder_size(folder, rule), (10, 1))
+            self.assertEqual(
+                hdue_menu.folder_size(folder / "missing", rule), (0, 0)
+            )
+
     def test_fixed_caches_refuse_other_names(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory) / "Documents"

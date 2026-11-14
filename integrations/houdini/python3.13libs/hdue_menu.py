@@ -96,16 +96,32 @@ def cache_directories(env, runtime_project=None):
     return folders
 
 
-def folder_size(folder):
-    """(bytes, files) under folder; 0, 0 for a missing one. Files that vanish or deny access while walking are skipped."""
+def folder_size(folder, owned=None):
+    """(bytes, files) under folder; 0, 0 for a missing one. Files that vanish or deny access while walking are skipped.
+    With owned (a CACHE_FILES rule), only the entries that rule accepts count: what clearing would delete.
+    """
     total = count = 0
-    for root, _, files in os.walk(folder):
-        for name in files:
-            try:
-                total += os.stat(os.path.join(root, name)).st_size
-            except OSError:
-                continue
-            count += 1
+    folder = Path(folder)
+    if owned is None:
+        roots = [folder]
+    else:
+        roots = (
+            [entry for entry in folder.iterdir() if owned(entry)]
+            if folder.is_dir()
+            else []
+        )
+    for root in roots:
+        if root.is_file() or root.is_symlink():
+            walked = [(root.parent, [], [root.name])]
+        else:
+            walked = os.walk(root)
+        for directory, _, files in walked:
+            for name in files:
+                try:
+                    total += os.stat(os.path.join(directory, name)).st_size
+                except OSError:
+                    continue
+                count += 1
     return total, count
 
 
@@ -291,7 +307,7 @@ def clear_caches(*names):
         return
     lines = []
     for name, folder in chosen.items():
-        size, files = folder_size(folder)
+        size, files = folder_size(folder, CACHE_FILES[name])
         lines.append(
             f"{CACHE_LABELS[name]}: {format_size(size)}, {files} files\n    {folder}"
         )
