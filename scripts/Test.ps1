@@ -28,14 +28,14 @@ if ($Suite -in 'unit', 'all') {
     & (Join-Path $TaskRoot 'tests\local_paths.ps1')
     & (Join-Path $TaskRoot 'tests\copy_project_content.ps1')
     foreach ($Test in 'live_materials_test', 'materialx_live_test', 'materialx_textures_cache_test', 'scene_space_test', 'substrate_graph_test', 'surface_effects_test', 'asset_controls_test', 'abi_mirror_test', 'materialx_lowering_test', 'material_versions_test') {
-        & uv run --python 3.11 --with usd-core --with numpy --with MaterialX==1.39.4 python (Join-Path $TaskRoot "tests\$Test.py")
+        & uv run --python 3.11 --with usd-core==26.11 --with numpy==2.4.6 --with MaterialX==1.39.4 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }
     foreach ($Test in 'conformance_status_test') {
-        & uv run --python 3.11 --with usd-core --with numpy --with OpenImageIO python (Join-Path $TaskRoot "tests\$Test.py")
+        & uv run --python 3.11 --with usd-core==26.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot "tests\$Test.py")
         if ($LASTEXITCODE) { throw "$Test failed." }
     }
-    & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\gallery_checks_test.py')
+    & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\gallery_checks_test.py')
     if ($LASTEXITCODE) { throw 'gallery_checks_test failed.' }
     # Houdini 22's Python (shutil.rmtree's onexc needs 3.12); no hou needed.
     & uv run --python 3.13 python (Join-Path $TaskRoot 'tests\houdini_menu_test.py')
@@ -144,10 +144,10 @@ if ($Suite -in 'houdini', 'all') {
     finally { Restore-HdUEEnvironment -Snapshot $Previous }  # the caller's shell keeps its own profile
     # Prepared materials in husk (decal, volume and MaterialX libraries, a stale graph failing the frame).
     $HuskArguments = if ($RuntimeConfig) { @('--runtime-config', [IO.Path]::GetFullPath($RuntimeConfig)) } else { @() }
-    & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
+    & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_prepared_materials.py') @HuskArguments
     if ($LASTEXITCODE) { throw 'husk prepared-material tests failed.' }
     # Streamed scene uploads (a batch per mesh) render as the whole-scene upload.
-    & uv run --python 3.11 --with numpy --with OpenImageIO python (Join-Path $TaskRoot 'tests\husk_streaming.py') @HuskArguments
+    & uv run --python 3.11 --with numpy==2.4.6 --with OpenImageIO==3.2.2.0 python (Join-Path $TaskRoot 'tests\husk_streaming.py') @HuskArguments
     if ($LASTEXITCODE) { throw 'husk streaming test failed.' }
     $Ran += 'houdini'
 }
