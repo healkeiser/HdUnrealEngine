@@ -2352,7 +2352,8 @@ HdueResult HDUE_CALL SetMaterialParameters(HdueSession Handle, const HdueMateria
     if (Code != HDUE_OK) return Fail(Code, *Error);
     Runtime.Session->HasRequest = false;
     ReleaseResidency(Runtime.Session);
-    FlushRenderingCommands();
+    // No render flush: parameters change on live instances (UE queues their render-thread update), and instances that
+    // Apply replaces stay alive until the next Apply (RetiredMaterials).
     Runtime.Error.Empty();
     return HDUE_OK;
 }

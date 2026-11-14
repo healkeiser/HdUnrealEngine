@@ -1712,8 +1712,12 @@ void sendScene(const HdUEState& state, ScenePacket& packet) {
         backend.require(api.upsert_post_process_volume(session, &desc), "upsert_post_process_volume");
     for (const auto& desc : packet.decals) backend.require(api.upsert_decal(session, &desc), "upsert_decal");
     for (const auto& desc : packet.grooms) backend.require(api.upsert_groom(session, &desc), "upsert_groom");
+    const auto updatesStart = std::chrono::steady_clock::now();
     for (const auto& update : packet.materialUpdates)
         backend.require(api.set_material_parameters(session, &update), "set_material_parameters");
+    if (!packet.materialUpdates.empty())
+        trace("hdUE scene submit: %zu material parameter updates in %.1f ms\n", packet.materialUpdates.size(),
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updatesStart).count());
 }
 // HdUEReleasableMesh (scene_bookkeeping.h) for this process's UE host.
 bool releasable(const HdUEState& state, const HdUEMeshData& m) {

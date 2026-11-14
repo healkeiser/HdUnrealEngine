@@ -1,0 +1,2819 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    endTimeCode = 3
+    metersPerUnit = 1
+    renderSettingsPrimPath = "/Render/Settings"
+    startTimeCode = 1
+    subLayers = [
+        @./many.usda@
+    ]
+    upAxis = "Z"
+)
+
+over "World"
+{
+    def "fog"
+    {
+        def Points "p000"
+        {
+            point3f[] points = [(-10, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p001"
+        {
+            point3f[] points = [(-9, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p002"
+        {
+            point3f[] points = [(-8, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p003"
+        {
+            point3f[] points = [(-7, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p004"
+        {
+            point3f[] points = [(-6, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p005"
+        {
+            point3f[] points = [(-5, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p006"
+        {
+            point3f[] points = [(-4, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p007"
+        {
+            point3f[] points = [(-3, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p008"
+        {
+            point3f[] points = [(-2, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p009"
+        {
+            point3f[] points = [(-1, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p010"
+        {
+            point3f[] points = [(0, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p011"
+        {
+            point3f[] points = [(1, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p012"
+        {
+            point3f[] points = [(2, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p013"
+        {
+            point3f[] points = [(3, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p014"
+        {
+            point3f[] points = [(4, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p015"
+        {
+            point3f[] points = [(5, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p016"
+        {
+            point3f[] points = [(6, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p017"
+        {
+            point3f[] points = [(7, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p018"
+        {
+            point3f[] points = [(8, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p019"
+        {
+            point3f[] points = [(9, -5, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p020"
+        {
+            point3f[] points = [(-10, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p021"
+        {
+            point3f[] points = [(-9, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p022"
+        {
+            point3f[] points = [(-8, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p023"
+        {
+            point3f[] points = [(-7, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p024"
+        {
+            point3f[] points = [(-6, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p025"
+        {
+            point3f[] points = [(-5, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p026"
+        {
+            point3f[] points = [(-4, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p027"
+        {
+            point3f[] points = [(-3, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p028"
+        {
+            point3f[] points = [(-2, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p029"
+        {
+            point3f[] points = [(-1, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p030"
+        {
+            point3f[] points = [(0, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p031"
+        {
+            point3f[] points = [(1, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p032"
+        {
+            point3f[] points = [(2, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p033"
+        {
+            point3f[] points = [(3, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p034"
+        {
+            point3f[] points = [(4, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p035"
+        {
+            point3f[] points = [(5, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p036"
+        {
+            point3f[] points = [(6, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p037"
+        {
+            point3f[] points = [(7, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p038"
+        {
+            point3f[] points = [(8, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p039"
+        {
+            point3f[] points = [(9, -4, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p040"
+        {
+            point3f[] points = [(-10, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p041"
+        {
+            point3f[] points = [(-9, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p042"
+        {
+            point3f[] points = [(-8, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p043"
+        {
+            point3f[] points = [(-7, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p044"
+        {
+            point3f[] points = [(-6, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p045"
+        {
+            point3f[] points = [(-5, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p046"
+        {
+            point3f[] points = [(-4, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p047"
+        {
+            point3f[] points = [(-3, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p048"
+        {
+            point3f[] points = [(-2, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p049"
+        {
+            point3f[] points = [(-1, -3, 1)]
+            color3f primvars:unreal:fog:albedo (
+                interpolation = "constant"
+            )
+            color3f primvars:unreal:fog:albedo.timeSamples = {
+                1: (1, 1, 1),
+                2: (0.9, 0.2, 0.1),
+            }
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+            float[] widths.timeSamples = {
+                1: [0.5],
+                2: [0.51],
+            }
+        }
+
+        def Points "p050"
+        {
+            point3f[] points = [(0, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p051"
+        {
+            point3f[] points = [(1, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p052"
+        {
+            point3f[] points = [(2, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p053"
+        {
+            point3f[] points = [(3, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p054"
+        {
+            point3f[] points = [(4, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p055"
+        {
+            point3f[] points = [(5, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p056"
+        {
+            point3f[] points = [(6, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p057"
+        {
+            point3f[] points = [(7, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p058"
+        {
+            point3f[] points = [(8, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p059"
+        {
+            point3f[] points = [(9, -3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p060"
+        {
+            point3f[] points = [(-10, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p061"
+        {
+            point3f[] points = [(-9, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p062"
+        {
+            point3f[] points = [(-8, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p063"
+        {
+            point3f[] points = [(-7, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p064"
+        {
+            point3f[] points = [(-6, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p065"
+        {
+            point3f[] points = [(-5, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p066"
+        {
+            point3f[] points = [(-4, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p067"
+        {
+            point3f[] points = [(-3, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p068"
+        {
+            point3f[] points = [(-2, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p069"
+        {
+            point3f[] points = [(-1, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p070"
+        {
+            point3f[] points = [(0, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p071"
+        {
+            point3f[] points = [(1, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p072"
+        {
+            point3f[] points = [(2, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p073"
+        {
+            point3f[] points = [(3, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p074"
+        {
+            point3f[] points = [(4, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p075"
+        {
+            point3f[] points = [(5, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p076"
+        {
+            point3f[] points = [(6, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p077"
+        {
+            point3f[] points = [(7, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p078"
+        {
+            point3f[] points = [(8, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p079"
+        {
+            point3f[] points = [(9, -2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p080"
+        {
+            point3f[] points = [(-10, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p081"
+        {
+            point3f[] points = [(-9, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p082"
+        {
+            point3f[] points = [(-8, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p083"
+        {
+            point3f[] points = [(-7, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p084"
+        {
+            point3f[] points = [(-6, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p085"
+        {
+            point3f[] points = [(-5, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p086"
+        {
+            point3f[] points = [(-4, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p087"
+        {
+            point3f[] points = [(-3, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p088"
+        {
+            point3f[] points = [(-2, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p089"
+        {
+            point3f[] points = [(-1, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p090"
+        {
+            point3f[] points = [(0, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p091"
+        {
+            point3f[] points = [(1, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p092"
+        {
+            point3f[] points = [(2, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p093"
+        {
+            point3f[] points = [(3, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p094"
+        {
+            point3f[] points = [(4, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p095"
+        {
+            point3f[] points = [(5, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p096"
+        {
+            point3f[] points = [(6, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p097"
+        {
+            point3f[] points = [(7, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p098"
+        {
+            point3f[] points = [(8, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p099"
+        {
+            point3f[] points = [(9, -1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p100"
+        {
+            point3f[] points = [(-10, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p101"
+        {
+            point3f[] points = [(-9, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p102"
+        {
+            point3f[] points = [(-8, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p103"
+        {
+            point3f[] points = [(-7, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p104"
+        {
+            point3f[] points = [(-6, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p105"
+        {
+            point3f[] points = [(-5, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p106"
+        {
+            point3f[] points = [(-4, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p107"
+        {
+            point3f[] points = [(-3, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p108"
+        {
+            point3f[] points = [(-2, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p109"
+        {
+            point3f[] points = [(-1, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p110"
+        {
+            point3f[] points = [(0, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p111"
+        {
+            point3f[] points = [(1, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p112"
+        {
+            point3f[] points = [(2, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p113"
+        {
+            point3f[] points = [(3, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p114"
+        {
+            point3f[] points = [(4, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p115"
+        {
+            point3f[] points = [(5, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p116"
+        {
+            point3f[] points = [(6, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p117"
+        {
+            point3f[] points = [(7, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p118"
+        {
+            point3f[] points = [(8, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p119"
+        {
+            point3f[] points = [(9, 0, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p120"
+        {
+            point3f[] points = [(-10, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p121"
+        {
+            point3f[] points = [(-9, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p122"
+        {
+            point3f[] points = [(-8, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p123"
+        {
+            point3f[] points = [(-7, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p124"
+        {
+            point3f[] points = [(-6, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p125"
+        {
+            point3f[] points = [(-5, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p126"
+        {
+            point3f[] points = [(-4, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p127"
+        {
+            point3f[] points = [(-3, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p128"
+        {
+            point3f[] points = [(-2, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p129"
+        {
+            point3f[] points = [(-1, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p130"
+        {
+            point3f[] points = [(0, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p131"
+        {
+            point3f[] points = [(1, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p132"
+        {
+            point3f[] points = [(2, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p133"
+        {
+            point3f[] points = [(3, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p134"
+        {
+            point3f[] points = [(4, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p135"
+        {
+            point3f[] points = [(5, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p136"
+        {
+            point3f[] points = [(6, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p137"
+        {
+            point3f[] points = [(7, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p138"
+        {
+            point3f[] points = [(8, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p139"
+        {
+            point3f[] points = [(9, 1, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p140"
+        {
+            point3f[] points = [(-10, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p141"
+        {
+            point3f[] points = [(-9, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p142"
+        {
+            point3f[] points = [(-8, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p143"
+        {
+            point3f[] points = [(-7, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p144"
+        {
+            point3f[] points = [(-6, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p145"
+        {
+            point3f[] points = [(-5, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p146"
+        {
+            point3f[] points = [(-4, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p147"
+        {
+            point3f[] points = [(-3, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p148"
+        {
+            point3f[] points = [(-2, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p149"
+        {
+            point3f[] points = [(-1, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p150"
+        {
+            point3f[] points = [(0, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p151"
+        {
+            point3f[] points = [(1, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p152"
+        {
+            point3f[] points = [(2, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p153"
+        {
+            point3f[] points = [(3, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p154"
+        {
+            point3f[] points = [(4, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p155"
+        {
+            point3f[] points = [(5, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p156"
+        {
+            point3f[] points = [(6, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p157"
+        {
+            point3f[] points = [(7, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p158"
+        {
+            point3f[] points = [(8, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p159"
+        {
+            point3f[] points = [(9, 2, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p160"
+        {
+            point3f[] points = [(-10, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p161"
+        {
+            point3f[] points = [(-9, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p162"
+        {
+            point3f[] points = [(-8, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p163"
+        {
+            point3f[] points = [(-7, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p164"
+        {
+            point3f[] points = [(-6, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p165"
+        {
+            point3f[] points = [(-5, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p166"
+        {
+            point3f[] points = [(-4, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p167"
+        {
+            point3f[] points = [(-3, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p168"
+        {
+            point3f[] points = [(-2, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p169"
+        {
+            point3f[] points = [(-1, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p170"
+        {
+            point3f[] points = [(0, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p171"
+        {
+            point3f[] points = [(1, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p172"
+        {
+            point3f[] points = [(2, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p173"
+        {
+            point3f[] points = [(3, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p174"
+        {
+            point3f[] points = [(4, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p175"
+        {
+            point3f[] points = [(5, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p176"
+        {
+            point3f[] points = [(6, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p177"
+        {
+            point3f[] points = [(7, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p178"
+        {
+            point3f[] points = [(8, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p179"
+        {
+            point3f[] points = [(9, 3, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p180"
+        {
+            point3f[] points = [(-10, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p181"
+        {
+            point3f[] points = [(-9, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p182"
+        {
+            point3f[] points = [(-8, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p183"
+        {
+            point3f[] points = [(-7, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p184"
+        {
+            point3f[] points = [(-6, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p185"
+        {
+            point3f[] points = [(-5, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p186"
+        {
+            point3f[] points = [(-4, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p187"
+        {
+            point3f[] points = [(-3, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p188"
+        {
+            point3f[] points = [(-2, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p189"
+        {
+            point3f[] points = [(-1, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p190"
+        {
+            point3f[] points = [(0, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p191"
+        {
+            point3f[] points = [(1, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p192"
+        {
+            point3f[] points = [(2, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p193"
+        {
+            point3f[] points = [(3, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p194"
+        {
+            point3f[] points = [(4, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p195"
+        {
+            point3f[] points = [(5, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p196"
+        {
+            point3f[] points = [(6, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p197"
+        {
+            point3f[] points = [(7, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p198"
+        {
+            point3f[] points = [(8, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+
+        def Points "p199"
+        {
+            point3f[] points = [(9, 4, 1)]
+            color3f primvars:unreal:fog:albedo = (1, 1, 1) (
+                interpolation = "constant"
+            )
+            float primvars:unreal:fog:extinction = 0.5 (
+                interpolation = "constant"
+            )
+            float[] widths = [0.5]
+        }
+    }
+}
+
