@@ -48,6 +48,9 @@ def flipbook(path):
 
 
 class Test:
+    # Scenes whose subject is not the smoke test's red cube (the lighting scene's is grey) only need a lit frame.
+    red_cube = True
+
     def __init__(self, host):
         self.host = host
         self.output = host.log_dir
@@ -431,7 +434,9 @@ UsdGeom.Xformable(p).AddTranslateOp().Set(Gf.Vec3d(0,1,0))
         blue = int(((b > 30) & (b > r * 1.5) & (b > g * 1.3)).sum())
         # Houdini's selection highlight tints the selected red cube.
         if lit < image.width() * image.height() * 0.005 or (
-            not selected and red < image.width() * image.height() * 0.0001
+            not selected
+            and self.red_cube
+            and red < image.width() * image.height() * 0.0001
         ):
             raise AssertionError(
                 f"Solaris did not display the red cube: {name}, lit={lit}, red={red}"

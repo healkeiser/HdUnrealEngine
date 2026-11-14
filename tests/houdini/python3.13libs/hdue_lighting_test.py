@@ -14,6 +14,8 @@ _test = None
 
 
 class Test(ViewportTest):
+    red_cube = False
+
     def lighting(self, mode, domes=1):
         status = self.lights.status(self.api.status()["session"])
         if (
