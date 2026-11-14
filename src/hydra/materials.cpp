@@ -655,7 +655,14 @@ public:
         if (displacement(previous == state->materials.end() ? HdUEMaterialData() : previous->second) !=
             displacement(data))
             for (const auto& [id, mesh] : state->meshes)
-                if (mesh.material == data.id) state->dirtyMeshes.insert(id);
+                if (mesh.material == data.id) {
+                    state->dirtyMeshes.insert(id);
+                    // Displacement is diced from the mesh's arrays: a released mesh comes back from Hydra.
+                    if (mesh.released) {
+                        state->fullUploads.insert(id);
+                        state->repull.insert(mesh.sourceId);
+                    }
+                }
         // Its meshes read other primvars now: their UVs or colours come again from Hydra (HdUERepullMeshes).
         if (previous != state->materials.end() &&
             (previous->second.uvPrimvars != data.uvPrimvars || previous->second.colorPrimvar != data.colorPrimvar))

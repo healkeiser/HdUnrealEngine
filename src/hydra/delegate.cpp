@@ -3992,8 +3992,11 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         dirtyChangedEntries(previousDictionary, currentDictionary, state_->meshes, changed);
         for (const auto& id : changed) {
             state_->dirtyMeshes.insert(id);
+            const auto& mesh = state_->meshes.at(id);
+            // A released mesh mapped to (or from) a cooked asset uploads in full: update_meshes carries no asset.
+            if (mesh.released) state_->fullUploads.insert(id);
             // Whether its sheared instances bake (HdUEStoreShearCompanion) is decided at Sync.
-            if (state_->meshes.at(id).instanced) state_->repull.insert(state_->meshes.at(id).sourceId);
+            if (mesh.instanced || mesh.released) state_->repull.insert(mesh.sourceId);
         }
         ++state_->revision;
     }
