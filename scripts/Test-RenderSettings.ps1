@@ -10,7 +10,7 @@ $TaskRoot = Split-Path -Parent $PSScriptRoot
 $Run = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot ('out\settings\' + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 New-Item -ItemType Directory -Force -Path $Run | Out-Null
 $Settings = Join-Path $Run 'settings.json'
-& python (Join-Path $PSScriptRoot 'generate_render_settings.py') --defaults-json $Settings
+& uv run --python 3.11 python (Join-Path $PSScriptRoot 'generate_render_settings.py') --defaults-json $Settings
 if ($LASTEXITCODE) { throw 'Generating the default settings failed.' }
 # The run's own UE log (-ABSLOG): UE writes HdUEBackend_2.log, _3, ... when another process still holds HdUEBackend.log,
 # so the default name can hold an older run.

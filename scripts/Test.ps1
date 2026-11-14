@@ -92,7 +92,11 @@ if ($Suite -eq 'extended') {
     $Failed = @()
     foreach ($Kind in $Scenes.Keys) {
         $Output = Join-Path $Run $Kind
+        # references: the MaterialX showcase's cooked library by default (Import-MaterialX.ps1 -Source
+        # samples\materialx\standard_surface.mtlx,samples\materialx\open_pbr_surface.mtlx -OutputDirectory out\materialx).
+        $Library = if ($Kind -eq 'references' -and -not $MaterialXLibrary) { Join-Path $TaskRoot 'out\materialx\library.json' } else { $MaterialXLibrary }
         try {
+            if ($Kind -eq 'references' -and -not (Test-Path -LiteralPath $Library)) { throw "No cooked MaterialX library at $Library; run Import-MaterialX.ps1." }
             $Source = if ($Scenes[$Kind]) { @{ InputUsd = Join-Path $TaskRoot $Scenes[$Kind] } } else {
                 # The texture Builder's editable HIP (substrate-builder.md), made from the directly textured scene.
                 $Hip = Join-Path $Run 'substrate-textures.hip'
@@ -103,9 +107,10 @@ if ($Suite -eq 'extended') {
                 }
                 @{ HipFile = $Hip }
             }
-            & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $RuntimeConfig -MaterialXLibrary $MaterialXLibrary -SubstrateLibrary $SubstrateLibrary @Source -LogDirectory $Output -TestKind $Kind
+            & (Join-Path $PSScriptRoot 'Launch-Houdini.ps1') -RuntimeConfig $RuntimeConfig -MaterialXLibrary $Library -SubstrateLibrary $SubstrateLibrary @Source -LogDirectory $Output -TestKind $Kind
             $Result = Get-Content -LiteralPath (Join-Path $Output 'verified.json') -Raw | ConvertFrom-Json
             if (-not $Result.passed) { throw 'verified.json does not say passed' }
+            if ($Kind -eq 'references' -and ($Result.frames.Count -lt 4 -or $Result.captures.Count -lt 2 -or -not $Result.material_stats)) { throw 'Incomplete reference evidence' }
             Write-Output "extended: verified $Kind ($Output)"
         }
         catch {

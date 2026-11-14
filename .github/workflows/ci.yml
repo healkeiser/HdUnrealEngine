@@ -98,7 +98,7 @@ jobs:
               foreach ($e in $errors) { $failed++; Write-Output "::error file=$($_.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)" }
           }
           if ($failed) { exit 1 }
-      - name: Unit suite (repository scope, local paths, usd-core tests, gallery brightness bands)
+      - name: Unit suite (repository scope, local paths, usd-core tests, gallery docs consistency)
         shell: pwsh
         run: ./scripts/Test.ps1 -Suite unit
       - name: Package installer (Windows PowerShell 5.1, as Install.cmd runs it)

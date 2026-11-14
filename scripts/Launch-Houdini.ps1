@@ -68,7 +68,11 @@ try {
     $Process = Start-Process -FilePath $HoudiniExe -ArgumentList $LaunchArguments -PassThru -RedirectStandardOutput (Join-Path $LogDirectory 'houdini.log') -RedirectStandardError (Join-Path $LogDirectory 'houdini-error.log')
     Write-Output "Houdini PID $($Process.Id), logs: $LogDirectory"
     if ($TestKind) {
-        if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) { throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR." }
+        if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
+            # The whole tree (Houdini starts child processes): a timed-out Houdini would keep UE, its DLL and the caches.
+            taskkill /PID $Process.Id /T /F | Out-Null
+            throw "Houdini verification timed out (PID $($Process.Id)); see $env:HDUE_HOUDINI_LOG_DIR."
+        }
         if ($Process.ExitCode) { throw 'Houdini / hdUE exited with an error.' }
         if (Test-Path -LiteralPath (Join-Path $env:HDUE_HOUDINI_LOG_DIR 'test-error.txt')) { throw 'Solaris integration test failed; see test-error.txt.' }
     }
