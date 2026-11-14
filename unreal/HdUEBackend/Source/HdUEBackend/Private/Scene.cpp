@@ -2215,7 +2215,20 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             auto* Parent = LoadObject<UMaterialInterface>(
                 nullptr, *FString::Printf(TEXT("/Game/HdUE/%s.%s"), *ParentName, *ParentName));
             if (Parent) {
-                auto* Instance = UMaterialInstanceDynamic::Create(Parent, World);
+                // An edit on the same parent reuses its instance, as the native branch above does, so meshes keep
+                // their binding (a new instance made BindMaterials set it on every mesh drawn with it). Its one-sided
+                // twin takes the new values below; a wet variant made from it is dropped, as for a new instance.
+                const auto* Entry = Materials.Find(UTF8_TO_TCHAR(Desc.id));
+                auto* Instance = Entry ? Cast<UMaterialInstanceDynamic>(Entry->Get()) : nullptr;
+                const bool Reused = Instance && Instance->Parent == Parent;
+                if (Reused) {
+                    Instance->ClearParameterValues();
+                    for (auto It = TextureSlots.CreateIterator(); It; ++It)  // the old version's pending textures
+                        if (It.Value().Instance.Get() == Instance) It.RemoveCurrent();
+                    for (auto& [MeshId, Wet] : WetBindings)
+                        if (Wet->Base == Instance) Wet->Base = nullptr;
+                } else
+                    Instance = UMaterialInstanceDynamic::Create(Parent, World);
                 const FLinearColor Constants[HDUE_TEXTURE_SLOT_COUNT] = {
                     FLinearColor(Desc.base_color[0], Desc.base_color[1], Desc.base_color[2], 1),
                     FLinearColor(Desc.emissive_color[0], Desc.emissive_color[1], Desc.emissive_color[2], 0),
@@ -2286,6 +2299,10 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                 }
                 Instance->SetScalarParameterValue(TEXT("UseVertexColor"),
                                                   (Desc.flags & HDUE_MATERIAL_VERTEX_COLOR) ? 1.f : 0.f);
+                if (const FOneSided* Twin = Reused ? OneSided.Find(UTF8_TO_TCHAR(Desc.id)) : nullptr;
+                    Twin && Twin->Base == Instance)
+                    if (auto* Copy = Cast<UMaterialInstanceDynamic>(Twin->Material.Get()))
+                        Copy->CopyParameterOverrides(Instance);
                 Material = Instance;
             }
         }
