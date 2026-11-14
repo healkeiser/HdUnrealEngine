@@ -1279,7 +1279,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
 #endif
             if (Job->Shared.enabled)
                 HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot,
-                                             Job->Shared.color_scale, Job->Generation, Converges(*Job));
+                                             Job->Shared.color_scale, Job->Generation, Job->Samples, Converges(*Job));
             if (!ReadBack) return;
             auto& Readback = Session->Readbacks[Job->Slot];
             if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));

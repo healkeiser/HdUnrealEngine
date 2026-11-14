@@ -462,6 +462,14 @@ struct HdUEState : HdRenderParam {
     double requestCpuMsTotal = 0;
     std::string error;
     HdueFrameInfo lastFrame{};
+    // The newest shared GPU frame (Houdini's viewport): its draws are not read back until they converge, so the
+    // Path Tracer's progress comes from here.
+    uint64_t sharedGeneration = 0;
+    uint32_t sharedSamples = 0;
+    // Path Tracer samples of the current request: the newest frame read back or shared.
+    uint32_t completedSamples() const {
+        return std::max(lastFrame.completed_samples, sharedGeneration == generation ? sharedSamples : 0u);
+    }
     HdueRendererInfo rendererInfo{sizeof(HdueRendererInfo)};
     uint32_t createThread = 0, executeThread = 0;
     VtDictionary pickResult;

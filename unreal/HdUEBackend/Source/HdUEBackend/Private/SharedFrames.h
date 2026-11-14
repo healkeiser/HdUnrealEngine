@@ -24,5 +24,5 @@ int32 BeginFrame(FRHICommandListImmediate& RHICmdList, uint32 Width, uint32 Heig
 void WriteDepth(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* SceneDepth, int32 Slot,
                 const HdueRenderRequest& Request, float DepthScale, float ScreenFraction);
 void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale,
-                uint64 Generation, bool Converged);
+                uint64 Generation, uint32 Samples, bool Converged);
 }  // namespace HdueSharedFrames

@@ -80,6 +80,7 @@ struct FState {
     uint64 NextRing = 1, NextValue = 0;
     int32 Newest = -1;
     uint64 Generation = 0;
+    uint32 Samples = 0;  // Path Tracer samples of the newest frame, for the host's progress
     bool Converged = false;
     // The newest frame the host acquired: until the release fence reaches it, slots holding frames above the
     // release value and up to it may still be read and are not rewritten.
@@ -170,6 +171,7 @@ HdueResult Poll(HdueSession Session, HdueFrameInfo& Frame) {
     Frame.height = State.Ring->Height;
     Frame.generation = State.Generation;
     Frame.frame_id = State.Ring->Frames[State.Newest];
+    Frame.completed_samples = State.Samples;
     Frame.converged = State.Converged;
     return HDUE_OK;
 }
@@ -276,7 +278,7 @@ void WriteDepth(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* 
                                  FComputeShaderUtils::GetGroupCount(FIntPoint(Ring->Width, Ring->Height), 8));
 }
 void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale,
-                uint64 Generation, bool Converged) {
+                uint64 Generation, uint32 Samples, bool Converged) {
     const FRingRef Ring = CurrentRing();
     if (!Ring || Slot < 0 || !Source) return;
     FRDGBuilder GraphBuilder(RHICmdList);
@@ -301,6 +303,7 @@ void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32
     Ring->Frames[Slot] = Value;
     State.Newest = Slot;
     State.Generation = Generation;
+    State.Samples = Samples;
     State.Converged = Converged;
 }
 }  // namespace HdueSharedFrames

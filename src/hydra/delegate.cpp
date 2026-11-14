@@ -2180,7 +2180,11 @@ class Pass final : public HdRenderPass {
         // The host redraws the viewport when publishedFrames changes.
         if (polled == HDUE_OK && frame.frame_id != gpuFrame_) {
             gpuFrame_ = frame.frame_id;
-            s.locked([&] { ++s.publishedFrames; });
+            s.locked([&] {
+                ++s.publishedFrames;
+                s.sharedGeneration = frame.generation;
+                s.sharedSamples = frame.completed_samples;
+            });
         }
     }
 #endif
@@ -4320,11 +4324,11 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     state.printedError = error;  // once per message: husk asks for its stats many times a frame
     // Houdini shows these under the viewport's progress bar and in its render stats; husk -V5 prints the second.
     const auto spp = state.samplesPerPixel();
+    const auto samples = state.completedSamples();
     std::string progress =
         !error.empty() ? "Error: " + error
         : state.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
-            ? "Path Tracer: " + std::to_string(std::min(int(state.lastFrame.completed_samples), spp)) + "/" +
-                  std::to_string(spp) + " samples"
+            ? "Path Tracer: " + std::to_string(std::min(int(samples), spp)) + "/" + std::to_string(spp) + " samples"
         : state.lastFrame.converged ? "Realtime: converged"
                                     : "Realtime: warming up";
     if (residency.phase == HDUE_RESIDENCY_PREPARING)
@@ -4402,12 +4406,11 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"autoLightActive", VtValue(state.autoLightActive)},
         {"triangles", VtValue(triangles)},
         {"frameId", VtValue(state.lastFrame.frame_id)},
-        {"completedSamples", VtValue(int(state.lastFrame.completed_samples))},
+        {"completedSamples", VtValue(int(samples))},
         {"percentDone",
          VtValue(state.lastFrame.converged ? 100.f
-                 : state.lastFrame.frame_id &&
-                         state.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
-                     ? std::min(99.f, 100.f * float(state.lastFrame.completed_samples) / float(state.samplesPerPixel()))
+                 : state.setting<std::string>("renderMode", HdUESettingDefaults::renderMode) == "pathtraced"
+                     ? std::min(99.f, 100.f * float(samples) / float(spp))
                      : 0.f)},
         {"totalClockTime", VtValue(state.lastFrame.request_to_frame_ms / 1000.)},
         {"peakMemory", VtValue(int64_t(hdue::peak_memory_bytes()))},

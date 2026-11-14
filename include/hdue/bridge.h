@@ -743,7 +743,7 @@ typedef struct HdueApi {
     HdueResult(HDUE_CALL* get_surface_status)(HdueSession session, HdueSurfaceStatus* status);
 
     HdueResult(HDUE_CALL* configure_gpu_frames)(HdueSession session, const HdueGpuOptions* options);
-    /* The newest shared frame (frame_id, generation, size, converged) without holding it. */
+    /* The newest shared frame (frame_id, generation, size, Path Tracer samples, converged) without holding it. */
     HdueResult(HDUE_CALL* poll_gpu_frame)(HdueSession session, HdueFrameInfo* frame);
     /* Any thread (see HdueGpuFrame). */
     HdueResult(HDUE_CALL* acquire_gpu_frame)(HdueSession session, HdueGpuFrame* frame);
