@@ -23,8 +23,8 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 006 | [Cache clears cannot delete user files](006-cache-clears-cannot-delete-user-files.md) | main | P1 | S | — | DONE |
 | 007 | [Groom upload validation and actor lifetime](007-groom-upload-validation-and-actor-lifetime.md) | main | P1 | S | — | DONE |
 | 008 | [Python ABI mirrors checked in CI](008-python-abi-mirrors-checked-in-ci.md) | side | P1 | S | — | DONE |
-| 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE (it found Flake3D realtime too dark: under investigation) |
-| 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | DONE (follow-ups: lighting and shared-builds test bugs) |
+| 009 | [Conformance and gallery checks can fail](009-conformance-and-gallery-checks-can-fail.md) | side | P1 | M | — | DONE |
+| 010 | [Test tiers run everything they claim](010-test-tiers-run-everything-they-claim.md) | main | P1 | M | — | DONE |
 | 011 | [Render-time MaterialX matches the spec](011-render-time-materialx-matches-the-spec.md) | main | P1 | S | — | DONE |
 | 012 | [Texture mips and cache keys](012-texture-mips-and-cache-keys.md) | main | P1 | S | — | DONE |
 | 013 | [Generate hdUE setting defaults once](013-generate-hdue-setting-defaults-once.md) | main | P2 | M | 005 | TODO |
@@ -34,7 +34,7 @@ Review points: a review of each plan's diff before it lands; a mid-point review 
 | 017 | [Houdini host UX fixes](017-houdini-host-ux-fixes.md) | side | P2 | M | — | DONE (manual Esc check pending) |
 | 018 | [Asset import writes shared files safely](018-asset-import-writes-shared-files-safely.md) | side | P2 | M | 017 | DONE (manual re-import check pending) |
 | 019 | [Limit what scene content can set](019-limit-what-scene-content-can-set.md) | main | P2 | M | 001 | TODO |
-| 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | DONE (husk EXR header and Test.ps1 houdini checks pending) |
+| 020 | [Harden processes and supply chain](020-harden-processes-and-supply-chain.md) | main | P2 | M | 001, 017 | DONE |
 | 021 | [Validate cache files on read](021-validate-cache-files-on-read.md) | main | P3 | M | 012 | TODO |
 | 022 | [Environment background and depth at render resolution](022-environment-background-and-depth-at-render-resolution.md) | main | P2 | S | — | TODO |
 | 023 | [Interactive performance: measure, then fix](023-interactive-performance-measure-then-fix.md) | main | P2 | M | 010 | TODO |
@@ -66,8 +66,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Follow-ups found during execution
 
-- Plan 009's new value checks found `materialx/lowered_nodes` Flake3D too dark in realtime (0.194 against 0.243-0.297; the Path Tracer passes). Under investigation; not a test to loosen.
-- Plan 010 ran test kinds no runner ran before and found older test bugs: `lighting` reuses the smoke test's red-cube check on a scene whose cube is not red; `shared-builds` reads UE's log from `<runtime_project>\Saved\Logs`, but since `4c51d6f` UE writes it under `%LOCALAPPDATA%\hdUE\Saved\Logs`.
+- Plan 009's new value checks found Flake3D 22% darker in realtime than MaterialX's mean. Investigated (`44aeece`): the material is right in both modes (Path Tracer 0.247, MaterialX 0.2445, realtime with AA off at 1024 px 0.2438); UE's TSR weights samples by 1/(luma+4) (`TSRColorSpace.ush:195`), which darkens sub-pixel bright patterns, so the value check now runs in the Path Tracer only and realtime keeps the hue check.
+- Plan 010 ran test kinds no runner ran before and found older test bugs, now fixed: `lighting` reused the smoke test's red-cube check (`b7d2da7`); `shared-builds` and the DLSS test read UE's log from the runtime project instead of `%LOCALAPPDATA%\hdUE` (`05da76b`).
+- `HOUDINI_PACKAGE_SKIPLIST` is comma-separated (Houdini `ref/env.md`); the first harness fix joined with `;`, so a value already set in the shell made test runs load the installed release. Fixed with shared helpers (`a664228`), verified in the backend log.
+- `tests/husk_prepared_materials.py` fails two checks on this machine because the newest local Substrate libraries under `out/substrate` (2026-11-03) were built by an older compiler version: re-prepare them before relying on that test.
 - The free-view `selection` kind fails on a portrait-only monitor (narrow viewport); environment, not code.
 - The usdview smoke check timed out once (path-traced frames ~31 s each) and passed later; watch it.
 - `zensical build --strict` reports four warnings under `docs/audit/` with zensical 0.0.61; check with the pinned 0.1.0 that CI uses.
