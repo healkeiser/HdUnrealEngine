@@ -253,7 +253,7 @@ A **USD UV Texture** (`UsdUVTexture`) can drive every input above. hdUE reads:
 | --- | --- |
 | `file` | The image. `<UDIM>` patterns stream as UE virtual textures ([UDIMs](../materials.md#normal-maps-and-udims)); `op:` paths read Copernicus images ([COP textures](cop-textures.md)) |
 | `st` | The UV primvar, usually through a **USD Primvar Reader** (`st`). A material reads up to 4 UV primvars |
-| `wrapS`, `wrapT` | `repeat`, `clamp`, `mirror` or `black`. The default, `useMetadata`, falls back to `black` |
+| `wrapS`, `wrapT` | `repeat`, `clamp`, `mirror` or `black`. Unauthored repeats, as UE's USD importer imports it; `useMetadata` clamps, as there (hdUE does not read wrap metadata from the file) |
 | `sourceColorSpace` | `raw` (data), `sRGB` (8-bit colour), `auto` (default: sRGB for colour inputs, raw for the others) |
 | `scale`, `bias` | Multiply then add to the texel |
 | `fallback` | The value when the file cannot be read; (0, 0, 0, 1) by default |
@@ -285,7 +285,7 @@ How to get these looks on a Preview Surface. Inputs not listed stay at their def
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| A texture is black outside the 0..1 UV square (tiling UVs show one tile) | `wrapS`/`wrapT` default to `useMetadata`, which falls back to `black` | Set **Wrap S** and **Wrap T** to `repeat` |
+| A texture is black outside the 0..1 UV square (tiling UVs show one tile) | `wrapS`/`wrapT` is `black` | Set **Wrap S** and **Wrap T** to `repeat`, or leave them unauthored |
 | A colour texture looks washed out | Read as `raw` | Set **Source Color Space** to `sRGB` or `auto` |
 | A roughness or mask texture reads too dark (surface too glossy) | Read as sRGB | Set **Source Color Space** to `raw` |
 | A texture input renders black or flat | The file does not resolve, so `fallback` is used | Fix the path |
@@ -298,4 +298,5 @@ How to get these looks on a Preview Surface. Inputs not listed stay at their def
 
 - hdUE maps Preview Surface as UE's USD importer does onto its Preview Surface reference materials: opaque, masked (with **Opacity Threshold**) or translucent.
 - `opacityMode` is not read. Partial opacity is presence in hdUE, so it fades reflections too: the rims of a thin see-through pane render at about 0.8 of Karma's.
+- **Wrap modes**: unauthored `wrapS`/`wrapT` repeat and `useMetadata` clamps, as UE's USD importer reads them (USDShadeConversion.cpp). The specification's default, `useMetadata`, falls back to `black` for files without wrap metadata. An authored `black` stays black, as the specification defines it; UE's importer clamps it.
 - **Occlusion**: the specification notes that path tracers may ignore it.

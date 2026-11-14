@@ -266,19 +266,20 @@ private:
                          : space.empty() || space == "auto" ? HDUE_TEXTURE_ENCODING_AUTO
                                                             : HDUE_TEXTURE_ENCODING_LINEAR;
             // wrapS/wrapT; MaterialX u/vaddressmode (constant reads its default, 0 unless authored: black).
-            // ponytail: useMetadata (UsdUVTexture's default) does not read the file's wrap metadata; it falls back
-            // to black, as the spec says for files without it.
+            // UsdUVTexture as UE's USD importer reads it (USDShadeConversion.cpp:584-607): unauthored repeats, and an
+            // authored useMetadata clamps (the file's wrap metadata is not read). An authored black stays black, as
+            // the spec defines it, where UE's importer clamps it as "the closest we can get".
             const auto wrap = [&](const char* input, const char* fallback) {
                 auto mode = token(param(node, input)).GetString();
                 if (mode.empty()) mode = fallback;
-                return mode == "repeat" || mode == "periodic" ? HDUE_WRAP_REPEAT
-                       : mode == "clamp"                      ? HDUE_WRAP_CLAMP
-                       : mode == "mirror"                     ? HDUE_WRAP_MIRROR
-                                                              : HDUE_WRAP_BLACK;
+                return mode == "repeat" || mode == "periodic"     ? HDUE_WRAP_REPEAT
+                       : mode == "clamp" || mode == "useMetadata" ? HDUE_WRAP_CLAMP
+                       : mode == "mirror"                         ? HDUE_WRAP_MIRROR
+                                                                  : HDUE_WRAP_BLACK;
             };
             if (!starts("ND_tiledimage_")) {
-                t.wrap[0] = wrap(usd ? "wrapS" : "uaddressmode", usd ? "useMetadata" : "periodic");
-                t.wrap[1] = wrap(usd ? "wrapT" : "vaddressmode", usd ? "useMetadata" : "periodic");
+                t.wrap[0] = wrap(usd ? "wrapS" : "uaddressmode", usd ? "repeat" : "periodic");
+                t.wrap[1] = wrap(usd ? "wrapT" : "vaddressmode", usd ? "repeat" : "periodic");
             }
             if (usd) {
                 affine(value(param(node, "scale"), GfVec4f(1)), value(param(node, "bias"), GfVec4f(0)));

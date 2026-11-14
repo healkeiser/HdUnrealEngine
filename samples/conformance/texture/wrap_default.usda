@@ -1,0 +1,136 @@
+#usda 1.0
+(
+    doc = """UsdUVTexture without wrapS/wrapT repeats, as UE's USD importer imports it (USDShadeConversion.cpp:584-607:
+an unauthored wrap is TA_Wrap). The spec's default, useMetadata, falls back to black for files without wrap
+metadata; hdUE follows UE for the unauthored case. A UsdTransform2d with scale (2, 1) maps the quad's u to 0..2 on
+red_blue.png (left half red, right half blue): the quad's right half shows the texture again, red then blue."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdUVTexture",
+ "feature": "wrapS / wrapT unauthored: repeat, as UE's USD importer",
+ "frames": 1,
+ "checks": [
+  {
+   "name": "u 0.1-0.3 red",
+   "color": {
+    "region": [
+     -4.0,
+     -1.0,
+     -3.0,
+     1.0
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "u 0.7-0.9 blue",
+   "color": {
+    "region": [
+     -1.4,
+     -1.0,
+     -0.6,
+     1.0
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "u 1.1-1.4 red again (repeat, not black)",
+   "color": {
+    "region": [
+     0.6,
+     -1.0,
+     1.8,
+     1.0
+    ]
+   },
+   "rgb": [
+    0.9,
+    0.05,
+    0.05
+   ],
+   "tol": 0.25
+  },
+  {
+   "name": "u 1.7-1.9 blue again (repeat, not black)",
+   "color": {
+    "region": [
+     3.2,
+     -1.0,
+     4.0,
+     1.0
+    ]
+   },
+   "rgb": [
+    0.05,
+    0.05,
+    0.9
+   ],
+   "tol": 0.25
+  }
+ ]
+}"""
+    }
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+    timeCodesPerSecond = 24
+    renderSettingsPrimPath = "/Render/Settings"
+    subLayers = [@../common/stage.usda@]
+)
+def Material "Unauthored"
+{
+    token outputs:surface.connect = </Unauthored/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </Unauthored/t.outputs:rgb>
+        int inputs:useSpecularWorkflow = 1
+        color3f inputs:specularColor = (0, 0, 0)
+        token outputs:surface
+    }
+    def Shader "t"
+    {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @../textures/red_blue.png@
+        float2 inputs:st.connect = </Unauthored/scale.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "scale"
+    {
+        uniform token info:id = "UsdTransform2d"
+        float2 inputs:in.connect = </Unauthored/st.outputs:result>
+        float2 inputs:scale = (2, 1)
+        float2 outputs:result
+    }
+    def Shader "st"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+def Mesh "Quad" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-4.5, -2, 0), (4.5, -2, 0), (4.5, 2, 0), (-4.5, 2, 0)]
+    uniform token subdivisionScheme = "none"
+    texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+        interpolation = "vertex"
+    )
+    rel material:binding = </Unauthored>
+}
