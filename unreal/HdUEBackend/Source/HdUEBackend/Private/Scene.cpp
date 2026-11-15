@@ -2273,12 +2273,28 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             } else {
                 // Decode, mip and block-compress this batch's new textures on all cores: decoding them one by one on
                 // this thread took most of a large scene's load (111 Sponza textures, ~19 s), and uncompressed they
-                // held ~9 GB.
-                ParallelFor(Work.Num(), [&](int32 Index) {
-                    TArray<FPreviewTexture*> Entries;
-                    for (const FString& Key : Work[Index].Value) Entries.Add(&PreviewTextures[Key]);
-                    BuildTextureFile(Work[Index].Key, Entries, LOD);
-                });
+                // held ~9 GB. Files start while their memory fits, as TickTextures starts background builds (one
+                // always runs): one per core, 72 16K images ended husk at a 40 GB job memory limit in 12 s.
+                TArray<UE::Tasks::FTask> Running;
+                TArray<int64> RunningMemory;
+                int64 Reserved = 0;
+                for (int32 Index = 0; Index < Work.Num(); ++Index) {
+                    const int64 Memory = TextureBuildMemory(Work[Index].Key);
+                    while (!Running.IsEmpty() && Memory > AvailableBuildMemory() - Reserved) {
+                        const int32 Done = UE::Tasks::WaitAny(Running);
+                        Reserved -= RunningMemory[Done];
+                        Running.RemoveAtSwap(Done);
+                        RunningMemory.RemoveAtSwap(Done);
+                    }
+                    Reserved += Memory;
+                    RunningMemory.Add(Memory);
+                    Running.Add(UE::Tasks::Launch(TEXT("HdueTexture"), [this, &Work, &LOD, Index] {
+                        TArray<FPreviewTexture*> Entries;
+                        for (const FString& Key : Work[Index].Value) Entries.Add(&PreviewTextures[Key]);
+                        BuildTextureFile(Work[Index].Key, Entries, LOD);
+                    }));
+                }
+                UE::Tasks::Wait(Running);
             }
             PrepareSeconds = FPlatformTime::Seconds() - PrepareStart;
         }
