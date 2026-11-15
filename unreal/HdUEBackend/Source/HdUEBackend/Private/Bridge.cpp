@@ -152,6 +152,8 @@ struct FReadbackJob {
     TArray<TArray<float>> Buffers;  // HDUE_AOV_BUFFERS: each pipe's RGBA, filled on the render thread
     bool Guides = false;  // a converging Path Tracer draw: also read back its albedo and normal (FSession::Guides)
     TAtomic<bool> GuidesQueued{false};
+    // Depth and guide copies queued in the render graph whose pass has not run yet (AddJobCopyPass).
+    TAtomic<int32> CopiesPending{0};
     bool MegaLightsActive = false;
     FTextureRHIRef Environment;
     float EnvironmentScale = 1;
@@ -252,6 +254,23 @@ struct FSession {
     HdueRenderRequest GuideRequest{};
     HdueFrameInfo GuideFrame{};
 };
+BEGIN_SHADER_PARAMETER_STRUCT(FHdueCopyPass, )
+RDG_TEXTURE_ACCESS(Texture, ERHIAccess::CopySrc)
+END_SHADER_PARAMETER_STRUCT()
+// UE's AddEnqueueCopyPass (RenderGraphUtils.cpp), counted in the job until its pass runs: the graph runs its passes on
+// tasks after the render thread has moved on, and until then the readback's IsReady reports the slot's previous copy,
+// so a poll took that frame's depth and freed the slot for a draw whose copy then raced the pending one.
+void AddJobCopyPass(FRDGBuilder& GraphBuilder, FRHIGPUTextureReadback* Readback, FRDGTextureRef Source,
+                    const TSharedPtr<FReadbackJob, ESPMode::ThreadSafe>& Job) {
+    auto* Parameters = GraphBuilder.AllocParameters<FHdueCopyPass>();
+    Parameters->Texture = Source;
+    ++Job->CopiesPending;
+    GraphBuilder.AddPass(RDG_EVENT_NAME("HdueReadback(%s)", Source->Name), Parameters, ERDGPassFlags::Readback,
+                         [Readback, Source, Job](FRDGAsyncTask, FRHICommandList& Commands) {
+                             Readback->EnqueueCopy(Commands, Source->GetRHI());
+                             --Job->CopiesPending;
+                         });
+}
 // Attached only to hdUE's explicit view family. It receives the real scene
 // depth after the Lumen or Path Tracer primary pass and before post processing.
 class FHdueDepthCapture final : public FSceneViewExtensionBase {
@@ -287,7 +306,7 @@ public:
             for (int32 Index = 0; Index < 2; ++Index) {
                 auto& Readback = Session->GuideReadbacks[Job->Slot][Index];
                 if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueGuide"));
-                AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Textures[Index]);
+                AddJobCopyPass(GraphBuilder, Readback.Get(), Textures[Index], Job);
             }
             Job->GuidesQueued.Store(true);
         }
@@ -310,7 +329,7 @@ public:
                            FIntPoint::ZeroValue, Size, TStaticSamplerState<SF_Point>::GetRHI());
         auto& Readback = Session->DepthReadbacks[Job->Slot];
         if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueDepth"));
-        AddEnqueueCopyPass(GraphBuilder, Readback.Get(), Target);
+        AddJobCopyPass(GraphBuilder, Readback.Get(), Target, Job);
         Job->DepthQueued.Store(true);
     }
 };
@@ -563,7 +582,9 @@ HdueResult HDUE_CALL DestroySession(HdueSession Handle) {
         if (Placed.Value.IsValid()) Placed.Value->Destroy();
     Session->Scene.Reset();
     // Render commands run in order: one flush drains the callbacks and the readback release before rooted UObjects
-    // or the persistent view go.
+    // or the persistent view go. The first flush waits for the render graph's copy tasks, which still use the
+    // readbacks after the render thread has moved past their graph (freeing them earlier crashed in EnqueueCopy).
+    FlushRenderingCommands();
     ENQUEUE_RENDER_COMMAND(HdueReleaseReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
@@ -1399,7 +1420,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         [Session, Job, FrameId, Width, Height, Request, RequestedAt](FRHICommandListImmediate&) {
             const auto& Readback = Session->Readbacks[Job->Slot];
             const auto& DepthReadback = Session->DepthReadbacks[Job->Slot];
-            if (Job->Complete.Load() || !Readback || !Readback->IsReady()) return;
+            if (Job->Complete.Load() || Job->CopiesPending.Load() || !Readback || !Readback->IsReady()) return;
             if (Job->DepthEnabled && (!DepthReadback || !DepthReadback->IsReady())) return;
             auto& GuideReadbacks = Session->GuideReadbacks[Job->Slot];
             if (Job->GuidesQueued.Load() && (!GuideReadbacks[0]->IsReady() || !GuideReadbacks[1]->IsReady())) return;
@@ -2453,7 +2474,9 @@ HdueResult HDUE_CALL ResizeSession(HdueSession Handle, uint32 Width, uint32 Heig
     if (const HdueResult Size = CheckResolution(Width, Height); Size != HDUE_OK) return Size;
     const auto Session = Runtime.Session;
     if (Session->Width == Width && Session->Height == Height) return HDUE_OK;
-    // In-flight readbacks reference the old target size: release them after the commands already queued.
+    // In-flight readbacks reference the old target size: release them once the commands already queued, and the render
+    // graph's copy tasks that still use them, are done (the flush), as DestroySession does.
+    FlushRenderingCommands();
     ENQUEUE_RENDER_COMMAND(HdueResizeReadback)([Session](FRHICommandListImmediate&) {
         for (auto& R : Session->Readbacks) R.Reset();
         for (auto& R : Session->DepthReadbacks) R.Reset();
