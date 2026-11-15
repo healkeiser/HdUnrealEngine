@@ -235,9 +235,12 @@ assert (
 ), attribute
 alone.parm("hdue_lumenHitLighting").set(0)
 assert not settings_prim().GetAttribute(ray), ray
-# Layout: the Essential | Advanced strip first, then UE's categories as tabs, each sub-category in one place.
+# Layout: the Essential | Advanced strip right above the Unreal Engine box, then UE's categories as tabs, each
+# sub-category in one place.
 group = alone.parmTemplateGroup()
-strip = group.entries()[0]
+names = [t.name() for t in group.entries()]
+assert names.index("hdue_enginefolder") - names.index("hdue_show") == 3, names
+strip = group.entries()[names.index("hdue_show")]
 assert strip.name() == "hdue_show" and strip.isButtonStrip(), strip
 assert strip.menuItems() == ("essential", "advanced"), strip.menuItems()
 tabs = [

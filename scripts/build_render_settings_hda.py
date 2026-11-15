@@ -399,7 +399,7 @@ def build():
         conditionals=hidden,
         help="Switches Show to Advanced, which shows the changed settings Essential hides.",
     )
-    group = hou.ParmTemplateGroup([show, reveal, notice])
+    group = hou.ParmTemplateGroup()
     # As Karma Render Settings: the prim path in the header of a closed section.
     group.append(
         hou.FolderParmTemplate(
@@ -456,7 +456,10 @@ def build():
             template.setItemGeneratorScriptLanguage(hou.scriptLanguage.Python)
         group.append(template)
     # The Unreal settings above the tabs (render mode, samples, tonemapper, ...) in a group of their own, apart from
-    # the renderer-independent output, camera and resolution above them. Its box replaces the .ds separator.
+    # the renderer-independent output, camera and resolution above them. Its box replaces the .ds separator. The
+    # Essential | Advanced strip, which filters only the Unreal settings, sits right above it.
+    for template in (show, reveal, notice):
+        group.append(template)
     group.append(
         hou.FolderParmTemplate(
             "hdue_enginefolder",
