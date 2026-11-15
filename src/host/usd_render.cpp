@@ -2,6 +2,7 @@
 #include <windows.h>
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/setenv.h"
+#include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/vt/dictionary.h"
@@ -448,7 +449,7 @@ void cycle(HdRendererPlugin* plugin, const Options& options, uint32_t cycleIndex
             next = capture("transform-edit");
             changed(previous, next, "transform");
             previous = std::move(next);
-            const auto warnings = stat<VtStringArray>(raw->GetRenderStats(), "warnings", {});
+            const auto warnings = TfStringSplit(stat<std::string>(raw->GetRenderStats(), "warnings", ""), "\n");
             check(std::count_if(
                       warnings.begin(), warnings.end(),
                       [](const std::string& w) { return w.find("domeResolution 100") != std::string::npos; }) == 1,

@@ -4361,10 +4361,10 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
                            " triangles)\nMaterials: " + std::to_string(state.materials.size()) +
                            "\nLights: " + std::to_string(sceneLights) +
                            "\nNative actors: " + std::to_string(state.nativeAssets.actors) + frameTimes;
-    VtStringArray warnings;
+    std::vector<std::string> warnings;
     {
         std::lock_guard lock(state.warningsMutex);
-        warnings.assign(state.warnings.begin(), state.warnings.end());
+        warnings = state.warnings;
     }
     // Houdini's viewport shows Tf warnings only in its console: its stats overlay lists what this session skipped.
     // husk prints them on stderr already, and -V5 prints this annotation every frame.
@@ -4380,7 +4380,9 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     VtDictionary stats{
         {"renderProgressAnnotation", VtValue(progress)},
         {"renderStatsAnnotation", VtValue(statsText + skipped)},
-        {"warnings", VtValue(warnings)},
+        // One per line: hosts serialise stats to JSON (husk's verbose callback, usdview's tests), which a VtArray is
+        // not.
+        {"warnings", VtValue(TfStringJoin(warnings, "\n"))},
         {"error", VtValue(error)},
         {"generation", VtValue(state.generation)},
         // husk exits with this code (farm managers judge frames by it); Houdini's UI keeps rendering after an error.
@@ -4451,7 +4453,8 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"peakMemory", VtValue(int64_t(hdue::peak_memory_bytes()))},
         {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)},
         {"readbackMs", VtValue(state.lastFrame.readback_ms)}};
-    // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images (UsdRenderers.json).
+    // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images
+    // (UsdRenderers.json).
     for (const auto& [key, value] : state.cryptomatte) stats[key] = value;
     return stats;
 }
@@ -4624,8 +4627,8 @@ PXR_NAMESPACE_CLOSE_SCOPE
 #if defined(HDUE_HOUDINI)
 // Ends UE that hdUE runs on its own thread in Houdini's UI (hdue_houdini calls this when Houdini quits).
 extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_shutdown_ue() { PXR_NS::shutdownSelfHost(); }
-// Runs task(context) on the thread that owns UE and waits for it (inline on that thread, or while nothing owns UE): the
-// backend accepts calls from its owner only, and in Houdini's UI that is hdUE's UE thread, not the host's.
+// Runs task(context) on the thread that owns UE and waits for it (inline on that thread, or while nothing owns UE):
+// the backend accepts calls from its owner only, and in Houdini's UI that is hdUE's UE thread, not the host's.
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_run_on_ue_thread(void(HDUE_CALL* task)(void*),
                                                                            void* context) {
     if (!task) return HDUE_INVALID_ARGUMENT;
