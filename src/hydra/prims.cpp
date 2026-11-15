@@ -135,7 +135,7 @@ HdInterpolation interpolation(HdSceneDelegate* delegate, const SdfPath& id, cons
 // colours, and its displayOpacity. displayColor is the base colour, as UE's USD importer draws unbound prims (its
 // DisplayColor reference material, USDProjectSettings.h, feeds the vertex colour straight into Base Color); without
 // one it is white, the vertex colour UE's importer gives a mesh without displayColor (USDGeomMeshConversion.cpp).
-// The material's id is the prim's with ".displayColor".
+// Its id is the look's (displayColorMaterial), shared by every mesh that has it.
 // UsdLux MeshLightAPI: UsdImaging puts the light (isLight) and its MeshLight node (intensity, exposure, colour,
 // colour temperature) on the mesh prim itself. UE's USD importer ignores MeshLightAPI; UE lights a scene from emissive
 // surfaces (Lumen, Path Tracer), so the mesh emits that radiance from its display-colour material. Zero when the
@@ -171,11 +171,11 @@ GfVec3f HdUEMeshLightEmission(HdSceneDelegate* delegate, const SdfPath& id) {
     }
     return GfVec3f(1);  // a light without parameters: UsdLux's fallback intensity 1
 }
-// emission: HdUEMeshLightEmission, which the caller has already computed.
+// emission: HdUEMeshLightEmission, which the caller has already computed. own: the host names this prim's material
+// (HdUEState::ownDisplayColors), which then stays the prim's, "<prim>.displayColor".
 HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& id, const HdUEMeshData& mesh,
-                                      const GfVec3f& emission) {
+                                      const GfVec3f& emission, bool own) {
     HdUEMaterialData material;
-    material.id = mesh.id + ".displayColor";
     const auto color = value(delegate->Get(id, HdTokens->displayColor), VtVec3fArray());
     material.vertexColor = !mesh.colors.empty() || !mesh.instanceColors.empty();
     material.color = material.vertexColor || color.empty() ? GfVec3f(1) : HdUEFromSceneLinear(color[0]);
@@ -188,6 +188,14 @@ HdUEMaterialData displayColorMaterial(HdSceneDelegate* delegate, const SdfPath& 
         if (std::isfinite(opacity[0])) material.opacity = std::clamp(opacity[0], 0.f, 1.f);
     }
     material.emissive = emission;
+    // Otherwise one material per look, shared by every mesh that has it, as UE's USD importer shares its display colour
+    // material instances: 50,000 unbound meshes made 50,000 materials (1.1 s to create in UE, 1.6 s to bind).
+    // shortcut: a look no mesh uses any more stays until the session ends; drop it with a use count if scenes cycle
+    // through many.
+    material.id = own ? id.GetString() + ".displayColor"
+                      : TfStringPrintf("hdue:displayColor:%a,%a,%a:%a:%a,%a,%a:%d.displayColor", material.color[0],
+                                       material.color[1], material.color[2], material.opacity, material.emissive[0],
+                                       material.emissive[1], material.emissive[2], int(material.vertexColor));
     return material;
 }
 // Varying colors only: a uniform displayColor stays the material's constant color.
@@ -347,9 +355,11 @@ double HdUEFramesPerSecond(const HdUEState& state) {
 }
 // Instance transforms as hdEmbree composes them (HdUEInstanceTransform), then nested instancers apply after (child *
 // parent). Masked instances (invisibleIds, inactiveIds) are already absent from GetInstanceIndices.
-// Bumped by every instancer Sync: memoized placements (Instancer::ComputeInstanceTransforms) older than it are stale.
-std::atomic<uint64_t> instancerEpoch{1};
 class Instancer final : public HdInstancer {
+    // Bumped by this instancer's Sync. Memoized placements (ComputeInstanceTransforms) hold the sum of the versions up
+    // the parent chain: one instancer syncing no longer drops every other instancer's placements, as a global counter
+    // did while Hydra synced many in parallel. Versions only grow, so any Sync up the chain changes the sum.
+    std::atomic<uint64_t> version_{1};
     std::map<TfToken, VtValue> primvars_;
     bool visible_ = true;
     // Placements per prototype at an epoch: each nested prototype's Sync asks its parents for theirs several times
@@ -391,7 +401,7 @@ class Instancer final : public HdInstancer {
 public:
     Instancer(HdSceneDelegate* delegate, const SdfPath& id) : HdInstancer(delegate, id) {}
     void Sync(HdSceneDelegate* delegate, HdRenderParam*, HdDirtyBits* bits) override {
-        ++instancerEpoch;
+        ++version_;
         _UpdateInstancer(delegate, bits);
         if (*bits & HdChangeTracker::DirtyVisibility) visible_ = delegate->GetVisible(GetId());
         if (HdChangeTracker::IsAnyPrimvarDirty(*bits, GetId())) {
@@ -478,7 +488,8 @@ public:
     VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototype,
                                               const std::map<TfToken, VtValue>* sampled = nullptr) const {
         if (!visible_) return {};
-        const uint64_t epoch = instancerEpoch;
+        uint64_t epoch = 0;
+        for (const Instancer* level = this; level; level = level->parent()) epoch += level->version_;
         if (!sampled) {
             std::lock_guard lock(placementsMutex_);
             if (const auto it = placements_.find(prototype); it != placements_.end() && it->second.first == epoch)
@@ -776,9 +787,11 @@ public:
         HdUEFromSceneLinear(colors.values.data(), colors.values.size());
         HdUEFromSceneLinear(mesh.instanceColors.data(), mesh.instanceColors.size());
         std::shared_ptr<const VtDictionary> selectedBindings;
+        bool ownDisplayColor = false;
         {
             std::lock_guard lock(state->mutex);
             selectedBindings = state->wetBindings;
+            ownDisplayColor = state->ownDisplayColors->count(mesh.id + ".displayColor");
         }
         const auto& wetBindings = *selectedBindings;
         std::set<std::string> maskNames;
@@ -900,7 +913,8 @@ public:
         std::optional<HdUEMaterialData> displayColor;
         const auto emission = HdUEMeshLightEmission(delegate, GetId());
         if ((mesh.material.empty() || emission != GfVec3f(0)) && mesh.sceneAsset.empty())
-            mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh, emission)).id;
+            mesh.material =
+                displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh, emission, ownDisplayColor)).id;
         const bool asset = !mesh.sceneAsset.empty();
         std::vector<HdUEMeshData> parts;
         try {
@@ -1083,7 +1097,8 @@ void HdUEStoreShape(HdSceneDelegate* delegate, const SdfPath& id, HdUEState& sta
     {
         std::lock_guard lock(state.mutex);
         if (mesh.material.empty()) {
-            const auto material = displayColorMaterial(delegate, id, mesh, HdUEMeshLightEmission(delegate, id));
+            const auto material = displayColorMaterial(delegate, id, mesh, HdUEMeshLightEmission(delegate, id),
+                                                       state.ownDisplayColors->count(id.GetString() + ".displayColor"));
             mesh.material = material.id;
             const auto previous = state.materials.find(material.id);
             if (previous == state.materials.end() || previous->second.color != material.color ||

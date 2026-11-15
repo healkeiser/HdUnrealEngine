@@ -20,19 +20,37 @@ class OpacityTest(SceneCheck):
         previous = self.frames[-1]["generation"] if self.frames else 0
         return (yield from self.wait_image(label, previous, samples=samples))
 
-    def material(self, prim, opacity):
-        info = self.api.material_stats(
-            self.stats()["sessionHandle"], str(prim.GetPath()) + ".displayColor"
-        )
-        if (
-            info["blend_mode"] != (2 if opacity < 1 else 0)
-            or not info["substrate_enabled"]
-        ):
-            raise AssertionError(
-                f"Wrong opacity material at {prim.GetPath()}: {info}"
+    def materials(self, targets):
+        """The meshes drawn translucent are the targets whose displayOpacity is below 1, and the displayColor
+        materials in use (one per look, shared by the meshes that have it) are blended exactly when some are.
+        """
+        expected = sum(
+            1
+            for prim in targets
+            if any(
+                float(x) < 1
+                for x in UsdGeom.Gprim(prim).GetDisplayOpacityPrimvar().Get()
+                or [1]
             )
+        )
+        stats = self.stats()
+        if stats["translucentMeshes"] != expected:
+            raise AssertionError(
+                f"{stats['translucentMeshes']} translucent meshes, expected {expected}"
+            )
+        looks = {
+            look: self.api.material_stats(stats["sessionHandle"], look)
+            for look in stats["displayColorMaterials"]
+        }
+        blended = [
+            look for look, info in looks.items() if info["blend_mode"] == 2
+        ]
+        if bool(blended) != bool(expected) or not all(
+            info["substrate_enabled"] for info in looks.values()
+        ):
+            raise AssertionError(f"Wrong opacity materials: {looks}")
         self.material_checks.append(
-            dict(prim=str(prim.GetPath()), opacity=opacity, **info)
+            dict(translucent=expected, looks=len(looks), blended=len(blended))
         )
 
     def run(self):
@@ -79,24 +97,22 @@ class OpacityTest(SceneCheck):
                     self.launcher.select_mode(mode)
                 yield
                 baseline = yield from self.image(mode + "-scene-07", samples)
-                if self.stats()["translucentMaterials"] != 13:
+                if self.stats()["translucentMeshes"] != 13:
                     raise AssertionError(
                         "Review scene opacity primvars were not imported"
                     )
-                for prim in targets:
-                    self.material(prim, 0.7)
+                self.materials(targets)
                 submitted = self.stats()["submittedMeshes"]
                 for prim in targets:
                     UsdGeom.Gprim(prim).GetDisplayOpacityPrimvar().Set(
                         Vt.FloatArray([1])
                     )
                 yield from self.image(mode + "-scene-opaque", samples)
-                if self.stats()["translucentMaterials"]:
+                if self.stats()["translucentMeshes"]:
                     raise AssertionError(
                         "Opaque edits did not select opaque parents"
                     )
-                for prim in targets:
-                    self.material(prim, 1)
+                self.materials(targets)
                 for prim in targets:
                     UsdGeom.Gprim(
                         prim
@@ -194,7 +210,7 @@ class OpacityTest(SceneCheck):
                         pictures[label] = yield from self.image(
                             f"{mode}-{index:02}-{label}", samples
                         )
-                        self.material(prim, opacity)
+                        self.materials(targets)
                     opaque = pictures["opaque"].astype(float)
                     clear = pictures["clear"].astype(float)
                     partial = pictures["07"].astype(float)

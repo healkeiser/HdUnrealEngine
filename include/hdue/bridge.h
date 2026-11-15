@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 27u
+#define HDUE_ABI_VERSION 28u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -128,8 +128,12 @@ typedef struct HdueRenderRequest {
        P2, and the principal point in normalized image coordinates (0.5, 0.5 is the centre). All zero: no distortion. */
     float lens_distortion[5];
     float lens_principal_point[2];
-    uint32_t reserved;
+    uint32_t flags; /* ABI 28: HDUE_REQUEST_* */
 } HdueRenderRequest;
+/* ABI 28: realtime frames render at 100% with r.ScreenPercentage 0 (UE's default, based on the display resolution in
+   interactive hosts): the host previews the final image's resolution (Houdini's viewport sized by the render settings
+   prim). */
+enum { HDUE_REQUEST_FULL_RESOLUTION = 1 };
 /* Non-color AOVs are rasterized GBuffer channels (Substrate first BSDF), in RGB. */
 enum {
     HDUE_AOV_COLOR = 0,

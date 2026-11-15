@@ -74,7 +74,7 @@ These settings are on the **Rendering** tab, under Anti-Aliasing. They apply to 
 | Setting | Attribute | Default | What it does |
 | --- | --- | --- | --- |
 | [Anti-Aliasing Method](../reference/render-settings/rendering.md#unreal-cvar-r-antialiasingmethod) | `unreal:cvar:r:AntiAliasingMethod` | TSR | None, FXAA, TAA or TSR |
-| [Screen Percentage](../reference/render-settings/rendering.md#unreal-cvar-r-screenpercentage) | `unreal:cvar:r:ScreenPercentage` | 100 | render resolution in percent of the output, upscaled by the anti-aliasing method; 50 renders a quarter of the pixels |
+| [Screen Percentage](../reference/render-settings/rendering.md#unreal-cvar-r-screenpercentage) | `unreal:cvar:r:ScreenPercentage` | 0 | render resolution in percent of the output, upscaled by the anti-aliasing method; 50 renders a quarter of the pixels. 0, UE's default: based on the display resolution while Houdini's viewport navigates its own camera (100% up to 720 lines, less above, as UE's game and editor viewports); 100% through a scene camera (Houdini then sizes the image from the render settings prim), in husk (as Movie Render Queue) and with DLSS on |
 | [Lower Resolution While Moving](../reference/render-settings/rendering.md#unreal-cvar-r-hdue-interactiveresolution) | `unreal:cvar:r:HdUE:InteractiveResolution` | on | Houdini's viewport renders at Moving Screen Percentage (50) while the view changes |
 | [NVIDIA DLSS](../reference/render-settings/rendering.md#unreal-cvar-r-ngx-dlss-enable) | `unreal:cvar:r:NGX:DLSS:Enable` | off | DLSS Super Resolution replaces TAA or TSR |
 

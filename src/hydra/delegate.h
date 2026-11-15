@@ -440,6 +440,14 @@ struct HdUEState : HdRenderParam {
         return settings;
     }
     std::shared_ptr<const VtDictionary> wetBindings = std::make_shared<const VtDictionary>();
+    // "<prim>.displayColor" ids the host's nativeMaterialAssets or nativeMaterialParameters name (glass profiles):
+    // those prims keep a displayColor material of their own; the others share one per look (displayColorMaterial).
+    // Replaced, never edited, under mutex (SetRenderSetting).
+    std::shared_ptr<const std::set<std::string>> ownDisplayColors = std::make_shared<const std::set<std::string>>();
+    // Render stats counted per scene revision, under mutex (renderStats).
+    uint64_t materialStatsRevision = 0;
+    int translucentMeshes = 0;
+    VtDictionary displayColorMaterials;
     std::shared_ptr<hdue::Backend> backend;
     HdueSession session = 0;
     std::shared_ptr<HdUEGpuFrames> gpuFrames;  // Houdini's GL viewport (gpu_frames.h); set under mutex by SetDrivers

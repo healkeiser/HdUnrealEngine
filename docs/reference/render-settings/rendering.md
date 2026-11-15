@@ -21,9 +21,9 @@ Engine default (project setting) for AntiAliasingMethod is (postprocess volume/c
 
 #### Screen Percentage { #unreal-cvar-r-screenpercentage }
 
-<dl class="hdue-facts"><div><dt>Default</dt><dd><code>100</code></dd></div><div><dt>Range</dt><dd>10 to 200</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:ScreenPercentage</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrScreenPercentage_1kbeb</code></dd></div></dl>
+<dl class="hdue-facts"><div><dt>Default</dt><dd><code>0</code></dd></div><div><dt>Range</dt><dd>0 to 200</dd></div><div><dt>USD attribute</dt><dd><code>unreal:cvar:r:ScreenPercentage</code></dd></div><div><dt>Houdini parameter</dt><dd><code>xn__unrealcvarrScreenPercentage_1kbeb</code></dd></div></dl>
 
-To render in lower resolution and upscale for better performance (combined up with the blenable post process setting). 70 is a good value for low aliasing and performance, can be verified with 'show TestImage' in percent, \>0 and \<=100, larger numbers are possible (supersampling) but the downsampling quality is improvable.\<=0 compute the screen percentage is determined by r.ScreenPercentage.Default cvars. Console variable r.ScreenPercentage (process-wide).
+Resolution realtime frames render at, upsampled by the anti-aliasing method (TSR by default). 0, UE's default: based on the display resolution while Houdini's viewport navigates its own camera (100% up to 720 lines, less above, as UE's game and editor viewports); 100% through a scene camera (the viewport then sizes the image from the render settings prim), in husk (as Movie Render Queue renders) and with DLSS on. Realtime mode only. Console variable r.ScreenPercentage (process-wide).
 
 <div class="hdue-figure" data-figure="ref-screen-percentage"></div>
 

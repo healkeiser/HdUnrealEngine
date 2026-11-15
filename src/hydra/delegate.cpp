@@ -329,6 +329,12 @@ bool houdiniUi() {
 }
 // Starts UE on hdUE's thread and ticks it until its world and RHI are ready. wait = false (Houdini's UI) returns at
 // once: work posted meanwhile runs once UE is ready, and a failure is kept in HdUESelfHost::bootError.
+// Whether the foreground window belongs to this process (Houdini, or one of its floating panels).
+bool hostForeground() {
+    DWORD process = 0;
+    GetWindowThreadProcessId(GetForegroundWindow(), &process);
+    return process == GetCurrentProcessId();
+}
 void startSelfHost(const std::string& dll, const std::string& project, bool wait) {
     auto& host = selfHost();
     if (project.empty())
@@ -371,8 +377,15 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 const auto due = [&host] { return host.stopping || !host.queue.empty(); };
                 // UE idles while every viewport is paused, and between husk's Executes once its frame is drawn.
                 const bool ticking = host.continuous ? host.delegates > host.paused : host.drawing;
+                // Houdini's UI: once the frame is drawn (tick_pending), UE ticks at its editor's rates, 120 Hz in the
+                // foreground (t.MaxFPS of UE's editor) and 3 Hz behind another application (Use Less CPU when in
+                // Background, EditorEngine.cpp), for the background builds and streaming. Queued work wakes it.
+                const auto wait = !host.continuous   ? std::chrono::milliseconds(0)
+                                  : host.drawing     ? std::chrono::milliseconds(2)
+                                  : hostForeground() ? std::chrono::milliseconds(8)
+                                                     : std::chrono::milliseconds(333);
                 if (ticking)
-                    host.queueReady.wait_for(lock, std::chrono::milliseconds(host.continuous ? 2 : 0), due);
+                    host.queueReady.wait_for(lock, wait, due);
                 else
                     host.queueReady.wait(lock, due);
                 if (host.stopping && host.queue.empty()) return;
@@ -390,6 +403,7 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 } catch (...) {
                     TF_RUNTIME_ERROR("hdUE UE-thread task failed");
                 }
+                if (host.continuous) host.drawing = true;  // a request or an edit: tick promptly until it is drawn
                 const double ms =
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
                 if (ms > 20) trace("hdUE slow task: %.1f ms\n", ms);
@@ -397,7 +411,8 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 const auto start = std::chrono::steady_clock::now();
                 try {
                     host.tick();
-                    if (host.drawing) host.drawing = host.backend->api().tick_pending() == HDUE_PENDING;
+                    if (host.drawing || host.continuous)
+                        host.drawing = host.backend->api().tick_pending() == HDUE_PENDING;
                 } catch (const std::exception& e) {
                     host.drawing = false;  // the next Execute reports it
                     TF_RUNTIME_ERROR("hdUE tick: %s", e.what());
@@ -3102,6 +3117,11 @@ public:
                 for (int i = 0; i < 5; ++i) request.lens_distortion[i] = pass->distortion[i];
                 request.lens_principal_point[0] = pass->distortion[5];
                 request.lens_principal_point[1] = pass->distortion[6];
+                // Through a scene camera Houdini's viewport sizes the image from the render settings prim (its Image
+                // Resolution option), a preview of the final image at its resolution; navigating its own camera, it
+                // sizes it to the viewport, which takes UE's display-based screen percentage (ViewFraction).
+                if (pass->camera && !TfStringContains(pass->cameraId.GetString(), "__HoudiniFreeCamera__"))
+                    request.flags |= HDUE_REQUEST_FULL_RESOLUTION;
                 // UsdRenderSettings disableDepthOfField renders every camera in focus.
                 if (lens[0] > 0 && lens[1] > 0 && !s.setting<bool>("disableDepthOfField", false)) {
                     request.fstop = lens[0];
@@ -4104,6 +4124,21 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         value.IsHolding<VtDictionary>() ? value.UncheckedGet<VtDictionary>() : VtDictionary();
     if (key == TfToken("nativeMaterialParameters") || key == TfToken("nativeMaterialAssets")) {
         dirtyChangedEntries(previousDictionary, currentDictionary, state_->materials, state_->dirtyMaterials);
+        // The prims whose displayColor material the host names keep one of their own (displayColorMaterial): a prim
+        // entering or leaving the mapping syncs its material again.
+        std::set<std::string> own;
+        for (const char* name : {"nativeMaterialAssets", "nativeMaterialParameters"})
+            for (const auto& [id, entry] : state_->setting<VtDictionary>(name, {}))
+                if (TfStringEndsWith(id, ".displayColor")) own.insert(id);
+        std::vector<std::string> switched;
+        std::set_symmetric_difference(own.begin(), own.end(), state_->ownDisplayColors->begin(),
+                                      state_->ownDisplayColors->end(), std::back_inserter(switched));
+        if (state_->renderIndex)
+            for (const auto& id : switched)
+                if (const SdfPath prim(id.substr(0, id.size() - std::strlen(".displayColor")));
+                    state_->renderIndex->GetRprim(prim))
+                    state_->renderIndex->GetChangeTracker().MarkRprimDirty(prim, HdChangeTracker::DirtyMaterialId);
+        state_->ownDisplayColors = std::make_shared<const std::set<std::string>>(std::move(own));
         // Volumes bound to a changed entry take their new material or parameters.
         for (const auto& [id, volume] : state_->volumes) {
             const auto entry = [&](const VtDictionary& d) {
@@ -4335,6 +4370,24 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
     const auto nativeMaterials = state.setting<VtDictionary>("nativeMaterialAssets", {});
     for (const auto& [id, material] : state.materials)
         if (material.opacity < 1.f && asset(nativeMaterials, id).empty()) ++translucentMaterials;
+    // Meshes share a displayColor material per look (displayColorMaterial): the meshes drawn translucent, and each
+    // look's material with the meshes on it, for hosts and tests that check a prim's material.
+    // Counted again only when the scene changed (revision): Houdini asks for the stats ten times a second.
+    if (state.materialStatsRevision != state.revision) {
+        state.materialStatsRevision = state.revision;
+        state.translucentMeshes = 0;
+        state.displayColorMaterials.clear();
+        for (const auto& [id, mesh] : state.meshes) {
+            const auto material = state.materials.find(mesh.material);
+            if (material == state.materials.end()) continue;
+            if (material->second.opacity < 1.f && asset(nativeMaterials, mesh.material).empty())
+                ++state.translucentMeshes;
+            if (TfStringEndsWith(mesh.material, ".displayColor")) {
+                auto& count = state.displayColorMaterials[mesh.material];
+                count = VtValue((count.IsHolding<int>() ? count.UncheckedGet<int>() : 0) + 1);
+            }
+        }
+    }
     int sceneLights = int(state.nativeAssets.lights);
     HdueLightingStatus lighting{};
     lighting.struct_size = sizeof(lighting);
@@ -4412,6 +4465,8 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"vtPreparationMs", VtValue(residency.preparation_ms)},
         {"materialGraphBlocked", VtValue(!state.setting<bool>("materialGraphValid", true))},
         {"translucentMaterials", VtValue(translucentMaterials)},
+        {"translucentMeshes", VtValue(state.translucentMeshes)},
+        {"displayColorMaterials", VtValue(state.displayColorMaterials)},
         {"megaLightsProject", VtValue(bool(lighting.mega_lights_project))},
         {"megaLightsAllowed", VtValue(bool(lighting.mega_lights_allowed))},
         {"megaLightsActive", VtValue(bool(lighting.mega_lights_active))},

@@ -381,6 +381,10 @@ int32 CVarInt(const TCHAR* Name) {
     const IConsoleVariable* CVar = FindCVar(Name);
     return CVar ? CVar->GetInt() : 0;
 }
+float CVarFloat(const TCHAR* Name) {
+    const IConsoleVariable* CVar = FindCVar(Name);
+    return CVar ? CVar->GetFloat() : 0.f;
+}
 void SetCVar(const TCHAR* Name, int32 Value) {
     if (IConsoleVariable* CVar = FindCVar(Name)) CVar->Set(Value, ECVF_SetByCode);
 }
@@ -1342,6 +1346,22 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         });
 }
 
+// A realtime frame's screen percentage as UE's game viewport resolves it (GameViewportClient.cpp,
+// FStaticResolutionFractionHeuristic): r.ScreenPercentage when above 0, else UE's default for desktop views
+// (r.ScreenPercentage.Default.Desktop.Mode: based on the display resolution, the [Rendering.AutoScreenPercentage]
+// table, 100% up to 720 lines). With r.ScreenPercentage 0, offline hosts render at 100% as Movie Render Queue does, and
+// so does a request for the full resolution (HDUE_REQUEST_FULL_RESOLUTION: Houdini's viewport sized by the render
+// settings prim, a preview of the final image) or with DLSS on, whose quality modes accept only their own fractions.
+float ViewFraction(const FSession& Session) {
+    if (CVarFloat(TEXT("r.ScreenPercentage")) > 0.f) return FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
+    if (!IsInteractive() || (Session.Request.flags & HDUE_REQUEST_FULL_RESOLUTION) ||
+        CVarInt(TEXT("r.NGX.DLSS.Enable")))
+        return 1.f;
+    FStaticResolutionFractionHeuristic Heuristic;
+    Heuristic.Settings.PullRunTimeRenderingSettings(EViewStatusForScreenPercentage::Desktop);
+    Heuristic.TotalDisplayedPixelCount = int32(FMath::Min<uint64>(uint64(Session.Width) * Session.Height, MAX_int32));
+    return Heuristic.ResolveResolutionFraction();
+}
 void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     if (Session->RestartNext) {
         Session->RestartNext = false;
@@ -1367,7 +1387,7 @@ void Draw(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session) {
     const float ScreenFraction =
         PathTracing || Aov ? 1.f
         : Moving           ? FMath::Clamp(CVarInteractiveScreenPercentage.GetValueOnGameThread() / 100.f, .1f, 1.f)
-                           : FLegacyScreenPercentageDriver::GetCVarResolutionFraction();
+                           : ViewFraction(*Session);
     // Every readback slot busy: a frame drawn now could never be read back and would only queue GPU work ahead of the
     // frames that can (adding latency).
     if (IsInteractive() && Session->InFlight.Num() >= FSession::ReadbackSlots) return;

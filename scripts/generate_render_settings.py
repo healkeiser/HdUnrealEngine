@@ -502,10 +502,13 @@ CVARS = [
         "Rendering|Anti-Aliasing",
         True,
         dict(
-            range=(10, 200, True),
-            default=100.0,
-            # UE declares 0 (the view keeps its own percentage, 100); the slider starts at 10, so it shows 100.
-            override="UE's 0 means the view's own percentage, which is 100",
+            range=(0, 200, True),
+            default=0.0,
+            help="Resolution realtime frames render at, upsampled by the anti-aliasing method (TSR by default). 0, "
+            "UE's default: based on the display resolution while Houdini's viewport navigates its own camera (100% "
+            "up to 720 lines, less above, as UE's game and editor viewports); 100% through a scene camera (the "
+            "viewport then sizes the image from the render settings prim), in husk (as Movie Render Queue renders) "
+            "and with DLSS on. Realtime mode only.",
         ),
     ),
     (
