@@ -339,7 +339,21 @@ def build():
         'ch("../setlayerrendersettings")'
     )
     default.parm("rendersettings").set('`chs("../primpath")`')
-    subnet.node("output0").setInput(0, default)
+    # Settings that cannot take effect, as a warning badge on the node (Houdini's Error LOP; cooking continues): DLSS
+    # turned on where this Houdini's UE cannot run it (the backend's reason), Ray Reconstruction without DLSS. An empty
+    # message reports nothing.
+    problems = subnet.createNode("error", "setting_problems")
+    problems.setInput(0, default)
+    problems.parm("numerror").set(2)
+    for index, check in enumerate(
+        ("dlss_problem", "ray_reconstruction_problem"), 1
+    ):
+        problems.parm(f"errormsg{index}").set(
+            f"`pythonexprs(\"__import__('hdue_houdini').{check}()\")`"
+        )
+        problems.parm(f"severity{index}").set("warn")
+        problems.parm(f"enable{index}").set(1)
+    subnet.node("output0").setInput(0, problems)
     product.parm("orderedVars").set(
         VARS
         + "C"
@@ -623,6 +637,7 @@ def build():
         "import loputils\nloputils.updateResolutionParameters(kwargs['node'])\n",
         max_inputs=2,
         input_labels=("Input Stage", "Additional Render Vars"),
+        message_nodes=("setting_problems",),
     )
 
 
@@ -767,6 +782,7 @@ def save(
     max_inputs=1,
     input_labels=(),
     submenu="Rendering",
+    message_nodes=(),
 ):
     """Turn the subnet into the asset saved to hda, with the parameters, icon, TAB menu entry (in hdUE/submenu) and
     help card.
@@ -789,6 +805,10 @@ def save(
     definition.setIcon(icon)
     definition.addSection("Tools.shelf", TOOL.replace("SUBMENU", submenu))
     definition.addSection("Help", help_text)
+    if (
+        message_nodes
+    ):  # Type Properties' Message Nodes: their warnings and errors show on the asset node
+        definition.addSection("MessageNodes", " ".join(message_nodes))
     if on_created:
         definition.addSection("OnCreated", on_created)
         definition.setExtraFileOption("OnCreated/IsPython", True)

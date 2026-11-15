@@ -25,7 +25,7 @@ _Static_assert(sizeof(HdueInitDesc) == 48, "InitDesc C ABI layout");
 _Static_assert(sizeof(HdueStatus) == 552, "Status C ABI layout");
 _Static_assert(sizeof(HdueSessionDesc) == 16, "SessionDesc C ABI layout");
 _Static_assert(sizeof(HdueRenderRequest) == 208, "RenderRequest C ABI layout");
-_Static_assert(HDUE_ABI_VERSION == 26u, "ABI 26: one function table, no extension tables");
+_Static_assert(HDUE_ABI_VERSION == 27u, "ABI 27: one function table, no extension tables");
 _Static_assert(sizeof(HdueLoadStatus) == 32, "Load status C ABI layout");
 _Static_assert(sizeof(HdueFrameInfo) == 72, "FrameInfo C ABI layout");
 _Static_assert(sizeof(HdueSceneBatch) == 48, "Scene batch C ABI layout");
@@ -38,7 +38,7 @@ _Static_assert(sizeof(HdueVolumeDesc) == 224, "Volume C ABI layout (ABI 20: mate
 _Static_assert(sizeof(HdueNativeRay) == 72, "Native ray C ABI layout");
 _Static_assert(sizeof(HdueNativeHit) == 72, "Native hit C ABI layout");
 _Static_assert(sizeof(HduePickMaterialInfo) == 8, "Material info C ABI layout");
-_Static_assert(sizeof(HdueRendererInfo) == 20, "Renderer info C ABI layout");
+_Static_assert(sizeof(HdueRendererInfo) == 148, "Renderer info C ABI layout");
 _Static_assert(sizeof(HdueMaterialParameter) == 40, "Material parameter C ABI layout");
 _Static_assert(sizeof(HdueMaterialUpdate) == 24, "Material update C ABI layout");
 _Static_assert(sizeof(HdueMaterialStats) == 32, "Material stats C ABI layout");

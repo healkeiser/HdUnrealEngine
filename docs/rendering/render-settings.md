@@ -37,11 +37,13 @@ Lumen also approximates bounce light. In the Bistro, lit by its lamps, compare R
     3. Find the rest in the tabs, laid out as UE's editor lays them out: Rendering, Lens, Color Grading, Lighting, Fog, Sky, Rendering Features, Engine Quality.
     4. On hdUE Render Settings, click **Show: Advanced** to see the settings UE's editor keeps behind its Advanced expanders. A notice under the strip names the changed settings that Essential hides.
 
+    The node shows a warning badge when a setting cannot take effect: **NVIDIA DLSS** turned on where this Houdini's Unreal Engine cannot run it (the reason comes from Unreal Engine, for example an old driver), or **DLSS Ray Reconstruction** without DLSS.
+
     Each control authors nothing until you change it, as on Karma's render settings. Settings that one render mode ignores are hidden in that mode.
 
     ![The hdUE Render Settings LOP's parameters: Essential and Advanced, output and camera, the Unreal Engine settings and the category tabs](../images/houdini/render-settings-parameters.png)
     /// caption
-    hdUE Render Settings: **Show: Essential | Advanced**, the output and camera, the main Unreal Engine settings, then one tab per UE category.
+    hdUE Render Settings: the output and camera, **Show: Essential | Advanced**, the main Unreal Engine settings, then one tab per UE category.
     ///
 
     The viewport's **Display Options** have an **Unreal Engine** tab with the settings you change while working: render mode, samples, warmup, debug view, motion blur, Lumen, subdivision, the tonemapper and the main scalability groups. The **Unreal** menu in Houdini's main menu bar switches **Render Mode** too.
@@ -153,6 +155,7 @@ The [render settings reference](../reference/render-settings/index.md) lists eve
 | Exposure Compensation does nothing | the Unreal Tonemapper is off | Turn **Unreal Tonemapper** on, or use the camera's `exposure`. |
 | Colours look wrong with the tonemapper on | the viewer applies its own display transform, or none (Raw) | Set the viewer to Un-tone-mapped sRGB. |
 | A setting is missing from the LOP | it applies to the other render mode, or it is Advanced | Switch **Render Mode**, or click **Show: Advanced**. |
+| hdUE Render Settings shows a warning about DLSS | DLSS cannot run on this GPU, driver or setup, or Ray Reconstruction is on without DLSS | Follow the reason in the warning (update the NVIDIA driver, close a graphics capture tool), or turn DLSS on for Ray Reconstruction. Frames upscale with TSR meanwhile. |
 
 ## Unreal Engine and Karma
 

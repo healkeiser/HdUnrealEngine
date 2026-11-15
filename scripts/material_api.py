@@ -15,7 +15,7 @@ class RendererInfo(C.Structure):
             "project_closures_per_pixel",
             "bytes_per_pixel",
         )
-    ]
+    ] + [("dlss_unavailable", C.c_char * 128)]
 
 
 class Parameter(C.Structure):
@@ -58,7 +58,7 @@ class MaterialApi:
         self.runtime = runtime
         if tuple(
             map(C.sizeof, (RendererInfo, Parameter, Update, MaterialStats))
-        ) != (20, 40, 24, 32):
+        ) != (148, 40, 24, 32):
             raise RuntimeError("Material C ABI layout mismatch")
         table = runtime.api
         self.get_info = runtime.bind(
@@ -81,7 +81,11 @@ class MaterialApi:
         info = RendererInfo(struct_size=C.sizeof(RendererInfo))
         self.require(self.get_info(C.byref(info)))
         return {
-            n: int(getattr(info, n))
+            n: (
+                getattr(info, n).decode("utf-8", "replace")
+                if n == "dlss_unavailable"
+                else int(getattr(info, n))
+            )
             for n, _ in info._fields_
             if n != "struct_size"
         }

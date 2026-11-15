@@ -2430,6 +2430,12 @@ HdueResult HDUE_CALL GetRendererInfo(HdueRendererInfo* Info) {
                              !Substrate::IsSubstrateBlendableGBufferEnabled(EShaderPlatform(GMaxRHIShaderPlatform));
     Info->project_closures_per_pixel = CVarInt(TEXT("r.Substrate.ProjectClosuresPerPixel"));
     Info->bytes_per_pixel = CVarInt(TEXT("r.Substrate.BytesPerPixel"));
+#if HDUE_WITH_DLSS
+    const TCHAR* Dlss = HdueDlssUnavailable(FModuleManager::GetModulePtr<IDLSSModuleInterface>(TEXT("DLSS")));
+#else
+    const TCHAR* Dlss = TEXT("the backend was built without NVIDIA's DLSS plugin");
+#endif
+    HdueCopyMessage(Info->dlss_unavailable, Dlss ? FString(Dlss) : FString());
     return HDUE_OK;
 }
 HdueResult HDUE_CALL SetMaterialParameters(HdueSession Handle, const HdueMaterialUpdate* Update) {

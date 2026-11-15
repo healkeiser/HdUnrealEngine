@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 26u
+#define HDUE_ABI_VERSION 27u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -331,6 +331,8 @@ typedef struct HdueRendererInfo {
     uint32_t adaptive_gbuffer;
     uint32_t project_closures_per_pixel;
     uint32_t bytes_per_pixel;
+    /* ABI 27: why NVIDIA DLSS (and its Ray Reconstruction) cannot run in this process, empty when it can. UTF-8. */
+    char dlss_unavailable[128];
 } HdueRendererInfo;
 typedef struct HdueMaterialParameter {
     const char* name;

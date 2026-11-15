@@ -1330,6 +1330,50 @@ def _hidden(node, groups, show):
     return any(terms and all(holds(*t) for t in terms) for terms in groups)
 
 
+_dlss_unavailable = None  # why DLSS cannot run in this session's UE ("" when it can); fixed once UE has started
+DLSS = "unreal:cvar:r:NGX:DLSS:Enable"
+RAY_RECONSTRUCTION = "unreal:cvar:r:HdUE:DLSS:RayReconstruction"
+
+
+def _turned_on(node, attribute):
+    parm = node.parm(hou.text.encode(attribute))
+    return bool(parm and parm.eval())
+
+
+def dlss_problem(node=None):
+    """The warning hdUE Render Settings' Error LOP shows when NVIDIA DLSS is on there but cannot run in this Houdini's
+    Unreal Engine (the reason from the backend's renderer info): its frames then upscale with TSR, as the backend
+    also logs. Empty with DLSS off, outside Houdini's UI, or before UE has started (the next cook warns).
+    """
+    global _dlss_unavailable
+    node = node or hou.pwd().parent()
+    if not _turned_on(node, DLSS):
+        return ""
+    if _dlss_unavailable is None:
+        if (
+            not (_host and _host.running) or _host.runtime.status().state != 2
+        ):  # HDUE_STATE_READY
+            return ""
+        from material_api import MaterialApi
+
+        _dlss_unavailable = MaterialApi(_host.runtime).renderer_info()[
+            "dlss_unavailable"
+        ]
+    if not _dlss_unavailable:
+        return ""
+    return f"NVIDIA DLSS cannot run here: {_dlss_unavailable}. Unreal's TSR upscales instead."
+
+
+def ray_reconstruction_problem(node=None):
+    """The Error LOP's warning for DLSS Ray Reconstruction turned on without NVIDIA DLSS, which it needs: the backend
+    then leaves it off (Bridge.cpp), and UE's own denoisers run.
+    """
+    node = node or hou.pwd().parent()
+    if _turned_on(node, RAY_RECONSTRUCTION) and not _turned_on(node, DLSS):
+        return "DLSS Ray Reconstruction needs NVIDIA DLSS on: UE's own denoisers run instead."
+    return ""
+
+
 def hidden_changes(node=None, limit=3):
     """The notice of hdUE Render Settings in Essential: the changed settings (not at their default) only Advanced shows,
     e.g. "2 changed settings hidden in Advanced: Intensity (Lens > Bloom), ...". Empty in Advanced or without any.
