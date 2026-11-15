@@ -140,9 +140,9 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 
 ### Interactive and offline profiles
 
-`Backend::boot` passes `HDUE_INIT_INTERACTIVE` exactly in Houdini's UI (`houdiniUi()`); every other host gets the offline profile.
+UE runs the interactive profile in the viewers: `Backend::boot` passes `HDUE_INIT_INTERACTIVE` in Houdini's UI (`houdiniUi()`), and usdview's launcher passes it to `initialize` (`scripts/hdue_runtime.py`). husk, hython and the hydra test host (`hdue_usd_render`) get the offline profile. The delegate's own branches on `HdUESelfHost::continuous` concern Houdini's UI only (UE ticking on hdUE's thread, posted Executes, shared GPU frames, Houdini's buffers and purposes); in usdview the delegate still fails a frame on a failed native asset, as in husk, because it cannot tell usdview from `hdue_usd_render` without an ABI field.
 
-| | Offline (husk, hython) | Interactive (Houdini's UI) |
+| | Offline (husk, hython) | Interactive (Houdini's UI, usdview) |
 | --- | --- | --- |
 | Scalability | Cinematic, keeping the resolution quality; `r.Streaming.FullyLoadUsedTextures=1`, `r.D3D12.GPUTimeout=0`, faster Lumen surface cache updates (`Initialize`) | project defaults |
 | PSOs | a draw does not count towards convergence while PSOs compile (observed: "hdUE request 1 waits for 2996 PSO compilations") | not waited for; meshes appear when their PSOs are ready (UE's `r.PSOPrecache.ProxyCreationStrategy` 1) |
@@ -150,7 +150,7 @@ Houdini's UI adds the same UE set (615 threads in all) next to Houdini's own: it
 | Lumen cards and Nanite | built inline in `ApplyScene` | the mesh shows first, `UE::Tasks` build cards and Nanite, `TickConversions` swaps them in |
 | Resolution while moving | full | `r.HdUE.InteractiveScreenPercentage` (50) until requests stop for 250 ms |
 | Readbacks | one in flight: the first draw, the converging one, and one per 250 ms for progress | up to three in flight, every draw (or only converged ones with shared GPU frames) |
-| UE ticks | inside `Execute` | continuously on the UE thread |
+| UE ticks | inside `Execute` | continuously on the UE thread (usdview: on its own timer) |
 
 ## Startup and shutdown
 

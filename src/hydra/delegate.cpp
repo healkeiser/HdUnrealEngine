@@ -4453,8 +4453,7 @@ VtDictionary HdUERenderDelegate::renderStats(HdUEState& state) {
         {"peakMemory", VtValue(int64_t(hdue::peak_memory_bytes()))},
         {"requestToFrameMs", VtValue(state.lastFrame.request_to_frame_ms)},
         {"readbackMs", VtValue(state.lastFrame.readback_ms)}};
-    // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images
-    // (UsdRenderers.json).
+    // The Cryptomatte layers' name, hash, conversion and manifest: husk writes them into images (UsdRenderers.json).
     for (const auto& [key, value] : state.cryptomatte) stats[key] = value;
     return stats;
 }
@@ -4627,8 +4626,8 @@ PXR_NAMESPACE_CLOSE_SCOPE
 #if defined(HDUE_HOUDINI)
 // Ends UE that hdUE runs on its own thread in Houdini's UI (hdue_houdini calls this when Houdini quits).
 extern "C" HDUE_VIEWPORT_EXPORT void HDUE_CALL hdue_shutdown_ue() { PXR_NS::shutdownSelfHost(); }
-// Runs task(context) on the thread that owns UE and waits for it (inline on that thread, or while nothing owns UE):
-// the backend accepts calls from its owner only, and in Houdini's UI that is hdUE's UE thread, not the host's.
+// Runs task(context) on the thread that owns UE and waits for it (inline on that thread, or while nothing owns UE): the
+// backend accepts calls from its owner only, and in Houdini's UI that is hdUE's UE thread, not the host's.
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_run_on_ue_thread(void(HDUE_CALL* task)(void*),
                                                                            void* context) {
     if (!task) return HDUE_INVALID_ARGUMENT;

@@ -10,6 +10,7 @@ U32, U64, I64 = C.c_uint32, C.c_uint64, C.c_int64
 Result = C.c_int32
 ABI_VERSION = 25  # HDUE_ABI_VERSION
 API_FUNCTIONS = 45  # entries in HdueApi (tests/abi_layout.c; tests/abi_mirror_test.py checks the names)
+INIT_INTERACTIVE = 1  # HDUE_INIT_INTERACTIVE
 Task = C.CFUNCTYPE(
     None, C.py_object
 )  # hdue_run_on_ue_thread's task, called with the Python callable to run
@@ -239,9 +240,12 @@ class Runtime:
             f' -abslog="{Path(log).resolve()}"' if log else ""
         )
         project_bytes = str(Path(project).resolve()).encode("utf-8")
+        # The host that starts UE here is usdview, a viewer: UE's interactive profile (Bridge.cpp IsInteractive), as in
+        # Houdini's viewport, so a camera move shows UE's frames as they come instead of each waiting for an offline
+        # warm-up.
         desc = InitDesc(
             C.sizeof(InitDesc),
-            0,
+            INIT_INTERACTIVE,
             instance,
             self.window,
             project_bytes,
