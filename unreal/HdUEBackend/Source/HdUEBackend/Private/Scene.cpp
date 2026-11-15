@@ -24,6 +24,7 @@
 #include "MaterialDomain.h"
 #include "MaterialShared.h"
 #include "RHI.h"
+#include "ContentStreaming.h"
 #include "Algo/AllOf.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HeterogeneousVolumeComponent.h"
@@ -1164,6 +1165,25 @@ bool VirtualMaterial(const HdueMaterialDesc& Desc) {
         }
     return false;
 }
+// UE streams the mips of its imported textures within the texture streaming pool (r.Streaming.PoolSize, 3000 MB at
+// Cinematic, the offline profile; 0 is no limit) and drops mips when they would exceed it (AsyncTextureStreaming.cpp).
+// UE streams mips only from cooked files, so hdUE's 2D textures, built at run time, stay whole: Da Vinci's 1,280 held
+// 15 GB of a 24 GB GPU. Past the pool, a material's textures stream as virtual textures instead (VirtualMaterial),
+// within UE's fixed virtual texture pools.
+int64 TexturePoolBytes() {
+    static const IConsoleVariable* PoolSize = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Streaming.PoolSize"));
+    const int32 Megabytes = PoolSize ? PoolSize->GetInt() : -1;
+    // -1: the pool UE's streamer chose (a share of the GPU's memory, or none)
+    return Megabytes >= 0 ? int64(Megabytes) << 20
+                          : IStreamingManager::Get().GetTextureStreamingManager().GetPoolSize();
+}
+// A 2D texture's memory once block-compressed with its mips: a byte per texel (BC7 and BC5, the largest formats hdUE
+// builds) and a third for the mips. shortcut: 0 for images whose size the header does not give (other than PNG and
+// JPEG, as for r.VT.EnableAutoImport), which stay 2D; read EXR and TIFF headers if such scenes overflow.
+int64 TextureMemoryEstimate(const FString& File) {
+    const FIntPoint Size = ImageSize(File);
+    return int64(Size.X) * Size.Y * 4 / 3;
+}
 // One texture per file, decoding and wrap (UE keeps the sampler's address mode on the texture), the clip value its
 // mips keep the coverage of (other uses of the file keep plain mips), and whether it is virtual.
 FString TextureKey(const FString& File, const HdueTextureDesc& Texture, int32 Slot, float Coverage, bool Virtual) {
@@ -2150,16 +2170,41 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
     // husk) must find the key the preparation built.
     TArray<FString> SlotKeys;
     SlotKeys.SetNum(int32(Batch.material_count) * HDUE_TEXTURE_SLOT_COUNT);
+    // Whether each material draws on the virtual parents, chosen once for its textures and its parent.
+    TArray<bool> MaterialVirtual;
+    MaterialVirtual.SetNumZeroed(int32(Batch.material_count));
     {
         // This batch's new textures, built on workers (below); PreviewTexture creates the UTexture2Ds on this thread.
         // A texture is rebuilt when inputs read channels its BC4/BC5 repacking left out.
         TMap<FString, TArray<FString>> Files;  // each file's variants to build (sRGB decoding, wrap), by key
+        // The 2D textures' files and memory, against UE's texture pool (TexturePoolBytes).
+        const int64 Pool = TexturePoolBytes();
+        TMap<FString, int64> Resident;
+        int64 ResidentBytes = 0;
+        for (const auto& [Key, Entry] : PreviewTextures)
+            if (const FString File = Key.Left(Key.Find(TEXT("|")));
+                Pool > 0 && !Entry.Virtual && !Resident.Contains(File))
+                ResidentBytes += Resident.Add(File, TextureMemoryEstimate(File));
         for (uint32 Index = 0; Index < Batch.material_count; ++Index) {
             const auto& Desc = Batch.materials[Index];
             TArray<FString>* Used = Desc.id ? &MaterialTextures.FindOrAdd(UTF8_TO_TCHAR(Desc.id)) : nullptr;
             if (Used) Used->Reset();
             if (Desc.native_asset && *Desc.native_asset) continue;
-            const bool Virtual = VirtualMaterial(Desc);
+            bool Virtual = VirtualMaterial(Desc);
+            if (!Virtual && Pool > 0) {
+                TMap<FString, int64> Added;
+                int64 AddedBytes = 0;
+                for (const auto& Texture : Desc.textures)
+                    if (const FString File = UTF8_TO_TCHAR(Texture.file ? Texture.file : "");
+                        !File.IsEmpty() && !Resident.Contains(File) && !Added.Contains(File))
+                        AddedBytes += Added.Add(File, TextureMemoryEstimate(File));
+                Virtual = ResidentBytes + AddedBytes > Pool;
+                if (!Virtual) {
+                    Resident.Append(Added);
+                    ResidentBytes += AddedBytes;
+                }
+            }
+            MaterialVirtual[Index] = Virtual;
             for (int32 Slot = 0; Slot < HDUE_TEXTURE_SLOT_COUNT; ++Slot) {
                 const auto& Texture = Desc.textures[Slot];
                 if (!Texture.file || !*Texture.file) continue;
@@ -2279,7 +2324,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                               !(Desc.flags & HDUE_MATERIAL_SPECULAR_WORKFLOW);
             const bool Layered = Transmissive || (!Translucent && (Desc.subsurface > 0.f || Desc.sheen > 0.f || Coat));
             const bool Thin = (Desc.flags & HDUE_MATERIAL_THIN_WALLED) != 0;
-            const bool Virtual = VirtualMaterial(Desc);
+            const bool Virtual = MaterialVirtual[Index];
             const FString ParentName =
                 FString(Transmissive
                             ? FString::Printf(TEXT("M_StandardSurfaceTranslucent%s"), Thin ? TEXT("Thin") : TEXT(""))
