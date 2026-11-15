@@ -9,6 +9,7 @@
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 #include "DynamicMesh/MeshNormals.h"
+#include "DynamicMesh/MeshTangents.h"
 #include "DynamicMesh/NonManifoldMappingSupport.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
@@ -2076,6 +2077,11 @@ UE::Geometry::FDynamicMesh3 BuildDynamicMesh(const HdueMeshDesc& Desc) {
     }
     if (!Desc.normals) FMeshNormals::InitializeOverlayToPerTriangleNormals(NormalOverlay);
     if (!Sources.IsEmpty()) FNonManifoldMappingSupport::AttachNonManifoldVertexMappingData(Sources, Mesh);
+    // The tangents UDynamicMeshComponent's AutoCalculated mode computes (UpdateAutoCalculatedTangents:
+    // ComputeTriVertexTangents of the primary normals and UVs), here on Apply's workers: AutoCalculated computed them
+    // on the game thread whenever the mesh changed, 1.5 s per frame for 16 deforming meshes of 131k triangles. The
+    // component reads them from the mesh (ExternallyProvided).
+    FMeshTangentsf::ComputeDefaultOverlayTangents(Mesh);
     return Mesh;
 }
 }  // namespace
@@ -2609,7 +2615,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
             else
                 AddRootComponent<UDynamicMeshComponent>(Actor, [](UDynamicMeshComponent& Component) {
                     Component.SetEnableRaytracing(true);
-                    Component.SetTangentsType(EDynamicMeshComponentTangentsMode::AutoCalculated);
+                    Component.SetTangentsType(EDynamicMeshComponentTangentsMode::ExternallyProvided);
                     Component.SetVertexColorSpaceTransformMode(EDynamicMeshVertexColorTransformMode::NoTransform);
                 });
         }
