@@ -207,6 +207,7 @@ struct FSession {
     TStrongObjectPtr<UMaterialInterface> DebugMaterial;
     bool MegaLightsActive = false;
     bool VideoMemoryWarned = false;                          // UE's over-budget warning was logged (Tick)
+    bool DlssWarned = false;                                 // DLSS was requested where it cannot run (Draw)
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial;  // PP_HdUEAov, weights select HDUE_AOV_*.
     // set_post_process: beauty overrides; the materials stay referenced while they are blendables.
     FPostProcessSettings PostProcess;
@@ -1148,6 +1149,26 @@ uint32 PendingProxies() {
             ++Count;
     return Count;
 }
+#if HDUE_WITH_DLSS
+// Why DLSS cannot run, from the plugin's own support query; nullptr where it can.
+const TCHAR* HdueDlssUnavailable(const IDLSSModuleInterface* Dlss) {
+    if (!Dlss) return TEXT("its plugin is not loaded");
+    switch (Dlss->QueryDLSSSRSupport()) {
+        case EDLSSSupport::Supported:
+            return nullptr;
+        case EDLSSSupport::NotSupportedIncompatibleHardware:
+            return TEXT("this GPU has no DLSS");
+        case EDLSSSupport::NotSupportedDriverOutOfDate:
+            return TEXT("the NVIDIA driver is too old");
+        case EDLSSSupport::NotSupportedOperatingSystemOutOfDate:
+            return TEXT("Windows is too old");
+        case EDLSSSupport::NotSupportedIncompatibleAPICaptureToolActive:
+            return TEXT("a graphics capture tool is attached");
+        default:
+            return TEXT("NVIDIA NGX is off (r.NGX.Enable 0) or the GPU is not NVIDIA");
+    }
+}
+#endif
 void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session, FSceneViewFamily& Family,
                        FTextureRenderTargetResource* Resource, bool PathTracing, bool Aov, bool Moving,
                        float ScreenFraction) {
@@ -1266,11 +1287,19 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
             CVarDlssRayReconstruction.GetValueOnGameThread() && CVarInt(TEXT("r.NGX.DLSS.Enable"));
         RayReconstruction != UDLSSLibrary::IsDLSSRREnabled())
         UDLSSLibrary::EnableDLSSRR(RayReconstruction);
-    if (!PathTracing && CVarInt(TEXT("r.NGX.DLSS.Enable")) && CVarInt(TEXT("r.TemporalAA.Upscaler")))
-        if (const auto* Dlss = FModuleManager::GetModulePtr<IDLSSModuleInterface>(TEXT("DLSS"));
-            Dlss && Dlss->QueryDLSSSRSupport() == EDLSSSupport::Supported)
+    if (!PathTracing && CVarInt(TEXT("r.NGX.DLSS.Enable")) && CVarInt(TEXT("r.TemporalAA.Upscaler"))) {
+        const auto* Dlss = FModuleManager::GetModulePtr<IDLSSModuleInterface>(TEXT("DLSS"));
+        if (Dlss && Dlss->QueryDLSSSRSupport() == EDLSSSupport::Supported) {
             if (const auto Extension = Dlss->GetDLSSUpscalerViewExtension())
                 Family.ViewExtensions.Add(Extension.ToSharedRef());
+        } else if (!Session->DlssWarned) {
+            // UE then upscales with its own temporal upscaler (TSR), as a game whose DLSS is unsupported does. The
+            // plugin logs why at startup (non-NVIDIA GPU, old driver, r.NGX.Enable 0); this says which render it hit.
+            Session->DlssWarned = true;
+            UE_LOG(LogTemp, Warning, TEXT("hdUE: NVIDIA DLSS is not available: %s. Unreal's TSR upscales instead."),
+                   HdueDlssUnavailable(Dlss));
+        }
+    }
 #endif
     // The engine's and plugins' active view extensions, set up as Movie Render Queue sets them up
     // (MoviePipelineImagePassBase.cpp): UE's Path Tracer denoisers (NNEDenoiser registers its denoiser from its view

@@ -62,6 +62,14 @@ A sudden change between frames, such as a light switched on, therefore catches u
 
 Each render node needs the hdUE package installed ([Installation](../getting-started/installation.md)), a Houdini 22.0 build the package supports, and a DirectX 12 GPU with hardware ray tracing.
 
+NVIDIA's DLSS plugin loads its two models while Unreal Engine starts, about 1.3 s of every husk process on an RTX 4090 (Cornell box: 7.8 s to 6.5 s per process). Jobs that never use [NVIDIA DLSS](../reference/render-settings/rendering.md#unreal-cvar-r-ngx-dlss-enable) can skip it with the plugin's own switch:
+
+```powershell
+$env:HDUE_UE_ARGS = '-DPCVars=r.NGX.Enable=0'
+```
+
+DLSS and Ray Reconstruction are then unavailable in that process: a frame that asks for them renders with Unreal Engine's TSR, and husk warns `NVIDIA DLSS is not available: NVIDIA NGX is off`. NVIDIA's `-ngxdisable` only works with `r.NGX.Enable.AllowCommandLine`, which is off by default.
+
 ## Render products and AOVs
 
 husk writes every render product of the render settings. Use hdUE's LOPs to author them:
