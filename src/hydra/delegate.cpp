@@ -130,6 +130,10 @@ struct HdUESelfHost {
     // waiting for the host to call Execute (keyed by render pass; touched only on this thread).
     std::map<const void*, std::function<void()>> pumps;
     bool pumping = false;  // pumps run right after the loop's tick, so Execute skips its own
+    // husk, usdview: an Execute returned before its frame converged, and UE keeps drawing it until tick_pending says
+    // it is done. husk calls again about 100 ms later, which UE spent idle: 28% of a 512-sample Path Tracer frame, and
+    // UE's own engine loop does not wait between frames. Touched only on this thread.
+    bool drawing = false;
     bool stopping = false;
     template <class F>
     auto run(F&& f) -> decltype(f()) {
@@ -365,10 +369,10 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
             {
                 std::unique_lock lock(host.queueMutex);
                 const auto due = [&host] { return host.stopping || !host.queue.empty(); };
-                const bool ticking =
-                    host.continuous && host.delegates > host.paused;  // UE idles while every viewport is paused
+                // UE idles while every viewport is paused, and between husk's Executes once its frame is drawn.
+                const bool ticking = host.continuous ? host.delegates > host.paused : host.drawing;
                 if (ticking)
-                    host.queueReady.wait_for(lock, std::chrono::milliseconds(2), due);
+                    host.queueReady.wait_for(lock, std::chrono::milliseconds(host.continuous ? 2 : 0), due);
                 else
                     host.queueReady.wait(lock, due);
                 if (host.stopping && host.queue.empty()) return;
@@ -393,7 +397,9 @@ void startSelfHost(const std::string& dll, const std::string& project, bool wait
                 const auto start = std::chrono::steady_clock::now();
                 try {
                     host.tick();
+                    if (host.drawing) host.drawing = host.backend->api().tick_pending() == HDUE_PENDING;
                 } catch (const std::exception& e) {
+                    host.drawing = false;  // the next Execute reports it
                     TF_RUNTIME_ERROR("hdUE tick: %s", e.what());
                 }
                 host.pumping = true;
@@ -2725,6 +2731,7 @@ public:
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
             do executeOnce(pass);
             while (!IsConverged() && state_->error.empty() && std::chrono::steady_clock::now() < deadline);
+            host.drawing = !IsConverged() && state_->error.empty();
         });
     }
     std::mutex latestMutex_;

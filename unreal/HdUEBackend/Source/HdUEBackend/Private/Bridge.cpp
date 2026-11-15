@@ -1526,6 +1526,18 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         });
 }
 
+// The current request's frame has converged: Tick has nothing left to draw.
+bool Drawn(FSession& Session) {
+    FScopeLock Lock(&Session.FrameMutex);
+    const auto& Current = Session.Request.aov == HDUE_AOV_COLOR ? Session.Frame : Session.AovFrame;
+    return Current.generation == Session.Request.generation && Current.converged;
+}
+HdueResult HDUE_CALL TickPending() {
+    HDUE_RETURN_UNLESS_READY();
+    const auto Session = Runtime.Session;
+    if (!Session || !Session->HasRequest) return HDUE_OK;
+    return Session->InFlight.Num() || Session->Preparing || !Drawn(*Session) ? HDUE_PENDING : HDUE_OK;
+}
 HdueResult HDUE_CALL Tick() {
     HDUE_RETURN_UNLESS_READY();
     if (UELibrary_Tick() != 0) return Fail(HDUE_ENGINE_ERROR, TEXT("UELibrary_Tick failed."));
@@ -1568,11 +1580,7 @@ HdueResult HDUE_CALL Tick() {
             Session->Preparing = false;
         }
     }
-    {
-        FScopeLock Lock(&Session->FrameMutex);
-        const auto& Current = Session->Request.aov == HDUE_AOV_COLOR ? Session->Frame : Session->AovFrame;
-        if (Current.generation == Session->Request.generation && Current.converged) return HDUE_OK;
-    }
+    if (Drawn(*Session)) return HDUE_OK;
     Draw(Session);
     // Past the GPU's memory budget, Windows moves allocations to system memory (DXGI's demoted memory), which the
     // process is charged for and the GPU reads slowly. UE prints this warning on the frame
@@ -2592,7 +2600,8 @@ extern "C" HDUE_EXPORT HdueResult HDUE_CALL hdue_get_api(uint32_t Version, uint3
             .upsert_groom = UpsertGroom,
             .upsert_post_process_volume = UpsertPostProcessVolume,
             .upsert_decal = UpsertDecal,
-            .get_load_status = GetLoadStatus};
+            .get_load_status = GetLoadStatus,
+            .tick_pending = TickPending};
     return HDUE_OK;
 }
 #endif

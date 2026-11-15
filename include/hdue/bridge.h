@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define HDUE_ABI_VERSION 25u
+#define HDUE_ABI_VERSION 26u
 #define HDUE_ENGINE_MAJOR 5u
 #define HDUE_ENGINE_MINOR 8u
 #define HDUE_ENGINE_PATCH 4u
@@ -762,6 +762,11 @@ typedef struct HdueApi {
 
     /* Any thread. */
     HdueResult(HDUE_CALL* get_load_status)(HdueLoadStatus* status);
+
+    /* ABI 26: HDUE_PENDING while tick has frames left to draw for the current request (it has not converged, or a
+     * readback is in flight), HDUE_OK once it has, or without a request. Hosts that tick UE between their own calls
+     * stop there. */
+    HdueResult(HDUE_CALL* tick_pending)(void);
 } HdueApi;
 
 /* The backend's one export. Does not initialize the engine. The DLL must remain loaded until process exit. */
