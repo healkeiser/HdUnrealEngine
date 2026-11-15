@@ -1,0 +1,61 @@
+#usda 1.0
+(
+    doc = """A "bounds" model's computed extent follows its descendants: the sphere under the middle model shrinks from
+radius 1.2 to 0.4 at frame 2, and its bounding box with it. On frame 1 the box's right edge (x = 1.2) covers the probe;
+on frame 2 the box ends at x = 0.4 and the probe is empty. Before, the stand-in kept frame 1's box."""
+    customLayerData = {
+        string conformance = """{
+ "schema": "UsdGeomModelAPI",
+ "feature": "model:drawMode bounds of an animated model",
+ "frames": 2,
+ "checks": [
+  {
+   "name": "frame 1 draws the large box",
+   "value": {
+    "frame": 1,
+    "region": [
+     1.0,
+     -0.3,
+     1.4,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "min": 0.1
+  },
+  {
+   "name": "frame 2 draws the small box",
+   "value": {
+    "frame": 2,
+    "region": [
+     1.0,
+     -0.3,
+     1.4,
+     0.3
+    ],
+    "stat": "coverage"
+   },
+   "max": 0.02
+  }
+ ]
+}"""
+    }
+    endTimeCode = 2
+    metersPerUnit = 1
+    renderSettingsPrimPath = "/Render/Settings"
+    startTimeCode = 1
+    subLayers = [@./draw_mode.usda@]
+    timeCodesPerSecond = 24
+    upAxis = "Y"
+)
+
+over "Bounds"
+{
+    over "Ball"
+    {
+        double radius.timeSamples = {
+            1: 1.2,
+            2: 0.4,
+        }
+    }
+}

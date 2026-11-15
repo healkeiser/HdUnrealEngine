@@ -92,6 +92,8 @@ The Cornell box with the denoiser off.
 !!! tip
     With the [denoiser](denoising.md) on, you need far fewer samples: the gallery's Sponza renders with 256. Raise the samples when the denoised image smears fine texture or contact shadows.
 
+UE draws one sample per frame. Each sample costs its GPU work plus about 2 ms of UE's own frame (the Cornell box at 640 x 360 renders 512 samples in about 1.6 s), so a simple scene is bound by the frame, a complex one by the GPU. UE's Path Tracer page names two console variables for performance, both left at UE's defaults and settable as `unreal:cvar:r:PathTracing:...` on the render settings prim: **Shader Execution Reordering** (`r.PathTracing.ShaderExecutionReordering`, on), which helps scenes with many materials and can slow simple ones, and **Compaction Depth** (`r.PathTracing.CompactionDepth`, 6), the bounce up to which UE compacts the live paths between its dispatches (later bounces run within one dispatch) ([Path Tracer in Unreal Engine](https://dev.epicgames.com/documentation/unreal-engine/path-tracer-in-unreal-engine)).
+
 ## Warmup Frames
 
 **Warmup Frames** (`unreal:warmupFrames`), default 64, range 1 to 256. Realtime only.

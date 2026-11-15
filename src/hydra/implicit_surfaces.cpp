@@ -272,51 +272,134 @@ protected:
     }
 #endif
 };
+// A model's extent: the union of its descendants' extents (or points), in its space.
+GfRange3d HdUEModelExtent(const HdSceneIndexBase& input, const SdfPath& path) {
+    const auto world = [](const HdContainerDataSourceHandle& source) {
+        const auto matrix = HdXformSchema::GetFromParent(source).GetMatrix();
+        return matrix ? matrix->GetTypedValue(0) : GfMatrix4d(1);
+    };
+    const auto toModel = world(input.GetPrim(path).dataSource).GetInverse();
+    GfRange3d box;
+    SdfPathVector stack = input.GetChildPrimPaths(path);
+    while (!stack.empty()) {
+        const auto child = stack.back();
+        stack.pop_back();
+        const auto source = input.GetPrim(child).dataSource;
+        // Its extent, else the bounds of its points.
+        const auto extent = HdExtentSchema::GetFromParent(source);
+        GfRange3d local;
+        if (extent.GetMin() && extent.GetMax())
+            local = GfRange3d(extent.GetMin()->GetTypedValue(0), extent.GetMax()->GetTypedValue(0));
+        else if (const auto points = HdUENurbsSampling::primvar(source, HdPrimvarsSchemaTokens->points);
+                 points.IsHolding<VtVec3fArray>())
+            for (const auto& point : points.UncheckedGet<VtVec3fArray>()) local.UnionWith(GfVec3d(point));
+        if (!local.IsEmpty()) box.UnionWith(GfBBox3d(local, world(source) * toModel).ComputeAlignedRange());
+        for (const auto& grandchild : input.GetChildPrimPaths(child)) stack.push_back(grandchild);
+    }
+    return box;
+}
+// One corner of a model's computed extent, computed when read: UsdImaging's draw-mode stand-in keeps the model's data
+// source from when the model was added, and reads the extent from it again when the extent is dirtied.
+class HdUE_ModelExtentCorner final : public HdTypedSampledDataSource<GfVec3d> {
+public:
+    HD_DECLARE_DATASOURCE(HdUE_ModelExtentCorner);
+    VtValue GetValue(Time time) override { return VtValue(GetTypedValue(time)); }
+    GfVec3d GetTypedValue(Time) override {
+        const HdSceneIndexBaseRefPtr input(input_);
+        if (!input) return GfVec3d(0);
+        const auto box = HdUEModelExtent(*input, path_);
+        return box.IsEmpty() ? GfVec3d(0) : max_ ? box.GetMax() : box.GetMin();
+    }
+    bool GetContributingSampleTimesForInterval(Time, Time, std::vector<Time>*) override { return false; }
+
+private:
+    HdUE_ModelExtentCorner(const HdSceneIndexBaseRefPtr& input, const SdfPath& path, bool max)
+        : input_(input), path_(path), max_(max) {}
+    HdSceneIndexBasePtr input_;  // weak: the stand-ins downstream hold this source
+    SdfPath path_;
+    bool max_;
+};
+// The extent of model:drawMode models without one authored (extent below), which depends on their descendants: any
+// edit under such a model (an implicit radius dirties only its own schema) dirties the model's extent too, which
+// UsdImaging's draw-mode scene index then draws again (it was left stale). Only the stand-in redraws: a model drawn
+// by its draw mode does not draw its descendants. Notices arrive on one thread; GetPrim may run on Sync threads.
+class HdUE_DrawModeExtentSceneIndex final : public HdSingleInputFilteringSceneIndexBase {
+public:
+    using Extent = HdContainerDataSourceHandle (*)(const HdSceneIndexBaseRefPtr&, const SdfPath&,
+                                                   const HdSceneIndexPrim&);
+    HdUE_DrawModeExtentSceneIndex(const HdSceneIndexBaseRefPtr& input, Extent extent)
+        : HdSingleInputFilteringSceneIndexBase(input), extent_(extent) {}
+    HdSceneIndexPrim GetPrim(const SdfPath& path) const override {
+        auto prim = _GetInputSceneIndex()->GetPrim(path);
+        if (prim.dataSource)
+            if (auto edited = extent_(_GetInputSceneIndex(), path, prim)) {
+                prim.dataSource = edited;
+                std::lock_guard lock(mutex_);
+                models_.insert(path);
+            }
+        return prim;
+    }
+    SdfPathVector GetChildPrimPaths(const SdfPath& path) const override {
+        return _GetInputSceneIndex()->GetChildPrimPaths(path);
+    }
+
+protected:
+    void _PrimsAdded(const HdSceneIndexBase&, const HdSceneIndexObserver::AddedPrimEntries& entries) override {
+        _SendPrimsAdded(entries);
+    }
+    void _PrimsRemoved(const HdSceneIndexBase&, const HdSceneIndexObserver::RemovedPrimEntries& entries) override {
+        {
+            std::lock_guard lock(mutex_);
+            for (const auto& entry : entries)
+                for (auto it = models_.lower_bound(entry.primPath);
+                     it != models_.end() && it->HasPrefix(entry.primPath);)
+                    it = models_.erase(it);
+        }
+        _SendPrimsRemoved(entries);
+    }
+    void _PrimsDirtied(const HdSceneIndexBase&, const HdSceneIndexObserver::DirtiedPrimEntries& entries) override {
+        std::set<SdfPath> models;
+        {
+            std::lock_guard lock(mutex_);
+            if (!models_.empty())
+                for (const auto& entry : entries)
+                    for (const auto& model : models_)
+                        if (entry.primPath != model && entry.primPath.HasPrefix(model)) models.insert(model);
+        }
+        if (models.empty()) return _SendPrimsDirtied(entries);
+        auto all = entries;
+        for (const auto& model : models) all.emplace_back(model, HdExtentSchema::GetDefaultLocator());
+        _SendPrimsDirtied(all);
+    }
+
+private:
+    Extent extent_;
+    mutable std::mutex mutex_;
+    mutable std::set<SdfPath> models_;  // the models whose extent was computed here
+};
 // model:drawMode origin/bounds/cards, which UE's USD importer applies (USDGeomXformableTranslator.cpp,
 // UUsdDrawModeComponent): UsdImaging's own draw-mode scene index, which husk does not add for a renderer.
 class HdUE_DrawModeSceneIndexPlugin final : public HdSceneIndexPlugin {
 protected:
     HdSceneIndexBaseRefPtr _AppendSceneIndex(const HdSceneIndexBaseRefPtr& input,
                                              const HdContainerDataSourceHandle&) override {
-        return UsdImagingDrawModeSceneIndex::New(TfCreateRefPtr(new HdUE_EditingSceneIndex(input, extent)), nullptr);
+        return UsdImagingDrawModeSceneIndex::New(TfCreateRefPtr(new HdUE_DrawModeExtentSceneIndex(input, extent)),
+                                                 nullptr);
     }
     // The stand-ins span the model's extent, which UsdImaging's scene index takes from an authored extentsHint only;
     // UE (USDGeomXformableTranslator.cpp, UsdGeomBBoxCache) and UsdImaging's legacy draw-mode adapter compute it
-    // otherwise: here, the union of the descendants' extents (or points).
-    static HdContainerDataSourceHandle extent(const HdSceneIndexBase& input, const SdfPath& path,
+    // otherwise (HdUEModelExtent), here when the stand-in reads it (HdUE_ModelExtentCorner).
+    static HdContainerDataSourceHandle extent(const HdSceneIndexBaseRefPtr& input, const SdfPath& path,
                                               const HdSceneIndexPrim& prim) {
         const auto model = UsdImagingGeomModelSchema::GetFromParent(prim.dataSource);
         const auto apply = model.GetApplyDrawMode();
         const auto mode = model.GetDrawMode() ? model.GetDrawMode()->GetTypedValue(0) : TfToken();
         if (!apply || !apply->GetTypedValue(0) || mode.IsEmpty() || mode == "default" || mode == "inherited" ||
-            HdExtentSchema::GetFromParent(prim.dataSource))
+            HdExtentSchema::GetFromParent(prim.dataSource) || HdUEModelExtent(*input, path).IsEmpty())
             return nullptr;
-        const auto world = [](const HdContainerDataSourceHandle& source) {
-            const auto matrix = HdXformSchema::GetFromParent(source).GetMatrix();
-            return matrix ? matrix->GetTypedValue(0) : GfMatrix4d(1);
-        };
-        const auto toModel = world(prim.dataSource).GetInverse();
-        GfRange3d box;
-        SdfPathVector stack = input.GetChildPrimPaths(path);
-        while (!stack.empty()) {
-            const auto child = stack.back();
-            stack.pop_back();
-            const auto source = input.GetPrim(child).dataSource;
-            // Its extent, else the bounds of its points.
-            const auto extent = HdExtentSchema::GetFromParent(source);
-            GfRange3d local;
-            if (extent.GetMin() && extent.GetMax())
-                local = GfRange3d(extent.GetMin()->GetTypedValue(0), extent.GetMax()->GetTypedValue(0));
-            else if (const auto points = HdUENurbsSampling::primvar(source, HdPrimvarsSchemaTokens->points);
-                     points.IsHolding<VtVec3fArray>())
-                for (const auto& point : points.UncheckedGet<VtVec3fArray>()) local.UnionWith(GfVec3d(point));
-            if (!local.IsEmpty()) box.UnionWith(GfBBox3d(local, world(source) * toModel).ComputeAlignedRange());
-            for (const auto& grandchild : input.GetChildPrimPaths(child)) stack.push_back(grandchild);
-        }
-        if (box.IsEmpty()) return nullptr;
         const auto extent = HdExtentSchema::Builder()
-                                .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(box.GetMin()))
-                                .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(box.GetMax()))
+                                .SetMin(HdUE_ModelExtentCorner::New(input, path, false))
+                                .SetMax(HdUE_ModelExtentCorner::New(input, path, true))
                                 .Build();
         return HdContainerDataSourceEditor(prim.dataSource).Set(HdExtentSchema::GetDefaultLocator(), extent).Finish();
     }
