@@ -68,7 +68,7 @@ This is a fork of [K240/hdUE](https://github.com/K240/hdUE). See [Credits](#cred
 The tables below give the numbers behind both charts; regenerate the charts with `uv run --with matplotlib python scripts/gallery_charts.py`.
 
 <!-- gallery:start -->
-Every scene is the [CC0 Cornell box](samples/cornell) plus one small layer from [samples/cornell/variants](samples/cornell/variants), rendered with husk at 512 × 512:
+Every scene is the [CC0 Cornell box](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/cornell) plus one small layer from [samples/cornell/variants](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/cornell/variants), rendered with husk at 512 × 512:
 
 - **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 512 samples per pixel, up to 32 bounces.
@@ -81,22 +81,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 48 ms | 2.34 s | 8.08 s | 49.70 s | 168x / 3x | 0.98 / 1.01 |
-| Glossy materials | 49 ms | 2.29 s | 5.88 s | 30.30 s | 121x / 3x | 1.06 / 1.22 |
-| Depth of field | 48 ms | 2.36 s | 8.40 s | 51.03 s | 173x / 4x | 0.98 / 1.01 |
-| Motion blur | 49 ms | 2.53 s | 7.92 s | 50.24 s | 162x / 3x | 0.98 / 1.01 |
-| Subdivision surfaces | 46 ms | 2.37 s | 7.60 s | 48.27 s | 163x / 3x | 0.98 / 1.01 |
-| Instances, points, curves | 49 ms | 2.40 s | 7.63 s | 50.05 s | 155x / 3x | 0.98 / 1.03 |
-| Volumes (OpenVDB) | 49 ms | 4.04 s | 8.21 s | 58.66 s | 167x / 2x | 1.10 / 1.31 |
-| IES profile | 48 ms | 1.99 s | 9.81 s | 68.45 s | 205x / 5x | 1.02 / 1.09 |
-| Light linking | 48 ms | 2.37 s | 9.74 s | 64.69 s | 203x / 4x | 0.99 / 1.00 |
-| Clearcoat | 49 ms | 1.97 s | 6.34 s | 37.10 s | 129x / 3x | 0.99 / 1.00 |
-| Render region | 34 ms | 2.25 s | 2.33 s | 13.71 s | 70x / 1x | 0.98 / 1.04 |
-| Lens shift | 45 ms | 2.25 s | 5.63 s | 34.78 s | 125x / 3x | 0.97 / 1.03 |
-| Orthographic camera | 49 ms | 2.29 s | 7.23 s | 44.68 s | 149x / 3x | 0.85 / 1.04 |
-| Camera exposure | 49 ms | 2.34 s | 8.98 s | 57.14 s | 182x / 4x | 0.97 / 1.01 |
-| Unreal post-processing | 50 ms | 2.40 s | 7.77 s | 47.66 s | 154x / 3x | n/a |
-| **All 15** | **711 ms** | **36.19 s** | **111.57 s** | **706.49 s** | **157x / 3x** | |
+| Global illumination | 45 ms | 1.62 s | 8.08 s | 49.70 s | 181x / 5x | 0.97 / 1.01 |
+| Glossy materials | 45 ms | 1.61 s | 5.88 s | 30.30 s | 130x / 4x | 1.18 / 1.22 |
+| Depth of field | 48 ms | 1.62 s | 8.40 s | 51.03 s | 174x / 5x | 0.97 / 1.01 |
+| Motion blur | 46 ms | 1.62 s | 7.92 s | 50.24 s | 173x / 5x | 0.97 / 1.01 |
+| Subdivision surfaces | 47 ms | 1.62 s | 7.60 s | 48.27 s | 161x / 5x | 0.97 / 1.01 |
+| Instances, points, curves | 48 ms | 1.86 s | 7.63 s | 50.05 s | 161x / 4x | 0.98 / 1.03 |
+| Volumes (OpenVDB) | 47 ms | 3.01 s | 8.21 s | 58.66 s | 176x / 3x | 1.09 / 1.31 |
+| IES profile | 47 ms | 1.58 s | 9.81 s | 68.45 s | 209x / 6x | 1.01 / 1.09 |
+| Light linking | 46 ms | 1.64 s | 9.74 s | 64.69 s | 211x / 6x | 0.98 / 1.00 |
+| Clearcoat | 46 ms | 1.61 s | 6.34 s | 37.10 s | 139x / 4x | 0.99 / 1.01 |
+| Render region | 32 ms | 1.27 s | 2.33 s | 13.71 s | 72x / 2x | 0.97 / 1.04 |
+| Lens shift | 43 ms | 1.46 s | 5.63 s | 34.78 s | 131x / 4x | 0.96 / 1.03 |
+| Orthographic camera | 45 ms | 1.60 s | 7.23 s | 44.68 s | 160x / 5x | 0.84 / 1.04 |
+| Camera exposure | 46 ms | 1.63 s | 8.98 s | 57.14 s | 194x / 6x | 0.97 / 1.01 |
+| Unreal post-processing | 50 ms | 1.65 s | 7.77 s | 47.66 s | 157x / 5x | n/a |
+| **All 15** | **680 ms** | **25.39 s** | **111.57 s** | **706.49 s** | **164x / 4x** | |
 
 ![Global illumination: The CC0 Cornell box with its measured camera and a RectLight matching the ceiling light.](docs/images/gallery/cornell.png)
 
@@ -132,7 +132,7 @@ Regenerate with `hython scripts/render_gallery.py`.
 ### Sponza
 
 <!-- sponza:start -->
-[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. hdUE's Path Tracer image is denoised by UE's default denoiser (NNEDenoiser, PathTracingEnableDenoiser on); Karma's is not. Ray tracing uses Nanite's fallback meshes, as in UE (r.RayTracing.Nanite.Mode 0): the tree and the curtains are simplified in the Path Tracer, and Nanite Ray Tracing (Streamed Out Mesh) traces them in full. The scene has no lights, so [samples/sponza/lighting.usda](samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
+[Intel's Sponza 2022](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-processing-research/samples.html) (Frank Meinl and Anton Kaplanyan, CC BY 4.0; not included in this repository), from its main camera. Intel exports UsdPreviewSurface only; [samples/sponza/materials.usda](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/sponza/materials.usda) gives every material a MaterialX standard_surface network on Intel's textures (stone, metal, wood, sheen and translucent curtains, translucent leaves cut out by their alpha, glass), which hdUE and Karma render. hdUE's Path Tracer image is denoised by UE's default denoiser (NNEDenoiser, PathTracingEnableDenoiser on); Karma's is not. Ray tracing uses Nanite's fallback meshes, as in UE (r.RayTracing.Nanite.Mode 0): the tree and the curtains are simplified in the Path Tracer, and Nanite Ray Tracing (Streamed Out Mesh) traces them in full. The scene has no lights, so [samples/sponza/lighting.usda](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/sponza/lighting.usda) adds a sun and a sky dome fitted to Intel's own renders of the scene, and levels the camera as Intel's render does; [samples/sponza/no_decals.usda](https://github.com/healkeiser/HdUnrealEngine/blob/main/samples/sponza/no_decals.usda) deactivates the dirt decal meshes. Add-ons from the same package, sublayered unchanged: `NewSponza_Curtains_USD_YUp.usda`, `NewSponza_CypressTree_USDA_YUp.usda`. Rendered with husk at 960 × 540:
 
 - **hdUE Lumen**: realtime mode, 64 warmup frames on a sequence's first frame, then one draw per frame (as Movie Render Queue).
 - **hdUE Path Tracer**: 256 samples per pixel, up to 32 bounces.

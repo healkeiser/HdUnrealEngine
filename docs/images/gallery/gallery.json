@@ -25,11 +25,11 @@
      "title": "Global illumination",
      "renders": {
       "lumen": {
-       "seconds": 0.0481,
-       "luminance": 0.06017171816343239
+       "seconds": 0.0447,
+       "luminance": 0.05969724960696926
       },
       "pathtraced": {
-       "seconds": 2.3448,
+       "seconds": 1.6222,
        "luminance": 0.06219975823013288
       },
       "xpu": {
@@ -47,12 +47,12 @@
      "title": "Glossy materials",
      "renders": {
       "lumen": {
-       "seconds": 0.0486,
-       "luminance": 0.050717836976340185
+       "seconds": 0.0451,
+       "luminance": 0.056288698804764455
       },
       "pathtraced": {
-       "seconds": 2.289,
-       "luminance": 0.05795684925460628
+       "seconds": 1.6065,
+       "luminance": 0.057989190483003314
       },
       "xpu": {
        "seconds": 5.8812,
@@ -69,11 +69,11 @@
      "title": "Depth of field",
      "renders": {
       "lumen": {
-       "seconds": 0.0485,
-       "luminance": 0.060069705953897164
+       "seconds": 0.0483,
+       "luminance": 0.05959301152220546
       },
       "pathtraced": {
-       "seconds": 2.3562,
+       "seconds": 1.6227,
        "luminance": 0.06201848540694418
       },
       "xpu": {
@@ -91,12 +91,12 @@
      "title": "Motion blur",
      "renders": {
       "lumen": {
-       "seconds": 0.049,
-       "luminance": 0.05821113056958091
+       "seconds": 0.0458,
+       "luminance": 0.05777028047306023
       },
       "pathtraced": {
-       "seconds": 2.5292,
-       "luminance": 0.059925875166282117
+       "seconds": 1.6199,
+       "luminance": 0.059950887072637564
       },
       "xpu": {
        "seconds": 7.9204,
@@ -113,12 +113,12 @@
      "title": "Subdivision surfaces",
      "renders": {
       "lumen": {
-       "seconds": 0.0465,
-       "luminance": 0.057598260473062365
+       "seconds": 0.0471,
+       "luminance": 0.057206176952985466
       },
       "pathtraced": {
-       "seconds": 2.3733,
-       "luminance": 0.059652044758123565
+       "seconds": 1.6161,
+       "luminance": 0.05972197106992043
       },
       "xpu": {
        "seconds": 7.6023,
@@ -135,12 +135,12 @@
      "title": "Instances, points, curves",
      "renders": {
       "lumen": {
-       "seconds": 0.0492,
-       "luminance": 0.057124181522242676
+       "seconds": 0.0475,
+       "luminance": 0.0566912555959604
       },
       "pathtraced": {
-       "seconds": 2.404,
-       "luminance": 0.06009558319785101
+       "seconds": 1.8555,
+       "luminance": 0.06009528791809662
       },
       "xpu": {
        "seconds": 7.6291,
@@ -157,12 +157,12 @@
      "title": "Volumes (OpenVDB)",
      "renders": {
       "lumen": {
-       "seconds": 0.0492,
-       "luminance": 0.05989483817054338
+       "seconds": 0.0467,
+       "luminance": 0.05949735072195148
       },
       "pathtraced": {
-       "seconds": 4.038,
-       "luminance": 0.07156116391777209
+       "seconds": 3.0108,
+       "luminance": 0.07155932740486695
       },
       "xpu": {
        "seconds": 8.2146,
@@ -179,11 +179,11 @@
      "title": "IES profile",
      "renders": {
       "lumen": {
-       "seconds": 0.0479,
-       "luminance": 0.6282899670762356
+       "seconds": 0.047,
+       "luminance": 0.6232869719502095
       },
       "pathtraced": {
-       "seconds": 1.9909,
+       "seconds": 1.5799,
        "luminance": 0.6690991550635903
       },
       "xpu": {
@@ -201,11 +201,11 @@
      "title": "Lens shift",
      "renders": {
       "lumen": {
-       "seconds": 0.0449,
-       "luminance": 0.047133634005059134
+       "seconds": 0.043,
+       "luminance": 0.046615107639433336
       },
       "pathtraced": {
-       "seconds": 2.2467,
+       "seconds": 1.455,
        "luminance": 0.04985946775862267
       },
       "xpu": {
@@ -223,11 +223,11 @@
      "title": "Orthographic camera",
      "renders": {
       "lumen": {
-       "seconds": 0.0486,
-       "luminance": 0.06219016391612063
+       "seconds": 0.0451,
+       "luminance": 0.06159419596125025
       },
       "pathtraced": {
-       "seconds": 2.2872,
+       "seconds": 1.599,
        "luminance": 0.0762436636756558
       },
       "xpu": {
@@ -245,11 +245,11 @@
      "title": "Camera exposure",
      "renders": {
       "lumen": {
-       "seconds": 0.0493,
-       "luminance": 0.12034006808573804
+       "seconds": 0.0464,
+       "luminance": 0.11939131312912304
       },
       "pathtraced": {
-       "seconds": 2.34,
+       "seconds": 1.6278,
        "luminance": 0.12439951646026576
       },
       "xpu": {
@@ -267,11 +267,11 @@
      "title": "Unreal post-processing",
      "renders": {
       "lumen": {
-       "seconds": 0.0505,
-       "luminance": 0.30526842443665747
+       "seconds": 0.0495,
+       "luminance": 0.3032085476813957
       },
       "pathtraced": {
-       "seconds": 2.4028,
+       "seconds": 1.6537,
        "luminance": 0.3125566018846393
       },
       "xpu": {
@@ -289,11 +289,11 @@
      "title": "Light linking",
      "renders": {
       "lumen": {
-       "seconds": 0.048,
-       "luminance": 0.05838515872132374
+       "seconds": 0.0462,
+       "luminance": 0.058130932015155526
       },
       "pathtraced": {
-       "seconds": 2.3728,
+       "seconds": 1.6401,
        "luminance": 0.059077468718670846
       },
       "xpu": {
@@ -311,12 +311,12 @@
      "title": "Clearcoat",
      "renders": {
       "lumen": {
-       "seconds": 0.049,
-       "luminance": 0.06466138628900744
+       "seconds": 0.0457,
+       "luminance": 0.06445460708013598
       },
       "pathtraced": {
-       "seconds": 1.9681,
-       "luminance": 0.06571361935103805
+       "seconds": 1.6143,
+       "luminance": 0.0658765800635048
       },
       "xpu": {
        "seconds": 6.3431,
@@ -333,11 +333,11 @@
      "title": "Render region",
      "renders": {
       "lumen": {
-       "seconds": 0.0335,
-       "luminance": 0.019854470534261055
+       "seconds": 0.0322,
+       "luminance": 0.019638181748616625
       },
       "pathtraced": {
-       "seconds": 2.2466,
+       "seconds": 1.2668,
        "luminance": 0.021014600464632528
       },
       "xpu": {

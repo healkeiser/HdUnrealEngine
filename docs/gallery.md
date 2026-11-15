@@ -21,22 +21,22 @@ Regenerate with `hython scripts/render_gallery.py`.
 
 | Scene | hdUE Lumen | hdUE Path Tracer | Karma XPU | Karma CPU | Faster than Karma XPU (Lumen / Path Tracer) | Brightness vs Karma CPU (Lumen / Path Tracer) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Global illumination | 48 ms | 2.34 s | 8.08 s | 49.70 s | 168x / 3x | 0.98 / 1.01 |
-| Glossy materials | 49 ms | 2.29 s | 5.88 s | 30.30 s | 121x / 3x | 1.06 / 1.22 |
-| Depth of field | 48 ms | 2.36 s | 8.40 s | 51.03 s | 173x / 4x | 0.98 / 1.01 |
-| Motion blur | 49 ms | 2.53 s | 7.92 s | 50.24 s | 162x / 3x | 0.98 / 1.01 |
-| Subdivision surfaces | 46 ms | 2.37 s | 7.60 s | 48.27 s | 163x / 3x | 0.98 / 1.01 |
-| Instances, points, curves | 49 ms | 2.40 s | 7.63 s | 50.05 s | 155x / 3x | 0.98 / 1.03 |
-| Volumes (OpenVDB) | 49 ms | 4.04 s | 8.21 s | 58.66 s | 167x / 2x | 1.10 / 1.31 |
-| IES profile | 48 ms | 1.99 s | 9.81 s | 68.45 s | 205x / 5x | 1.02 / 1.09 |
-| Light linking | 48 ms | 2.37 s | 9.74 s | 64.69 s | 203x / 4x | 0.99 / 1.00 |
-| Clearcoat | 49 ms | 1.97 s | 6.34 s | 37.10 s | 129x / 3x | 0.99 / 1.00 |
-| Render region | 34 ms | 2.25 s | 2.33 s | 13.71 s | 70x / 1x | 0.98 / 1.04 |
-| Lens shift | 45 ms | 2.25 s | 5.63 s | 34.78 s | 125x / 3x | 0.97 / 1.03 |
-| Orthographic camera | 49 ms | 2.29 s | 7.23 s | 44.68 s | 149x / 3x | 0.85 / 1.04 |
-| Camera exposure | 49 ms | 2.34 s | 8.98 s | 57.14 s | 182x / 4x | 0.97 / 1.01 |
-| Unreal post-processing | 50 ms | 2.40 s | 7.77 s | 47.66 s | 154x / 3x | n/a |
-| **All 15** | **711 ms** | **36.19 s** | **111.57 s** | **706.49 s** | **157x / 3x** | |
+| Global illumination | 45 ms | 1.62 s | 8.08 s | 49.70 s | 181x / 5x | 0.97 / 1.01 |
+| Glossy materials | 45 ms | 1.61 s | 5.88 s | 30.30 s | 130x / 4x | 1.18 / 1.22 |
+| Depth of field | 48 ms | 1.62 s | 8.40 s | 51.03 s | 174x / 5x | 0.97 / 1.01 |
+| Motion blur | 46 ms | 1.62 s | 7.92 s | 50.24 s | 173x / 5x | 0.97 / 1.01 |
+| Subdivision surfaces | 47 ms | 1.62 s | 7.60 s | 48.27 s | 161x / 5x | 0.97 / 1.01 |
+| Instances, points, curves | 48 ms | 1.86 s | 7.63 s | 50.05 s | 161x / 4x | 0.98 / 1.03 |
+| Volumes (OpenVDB) | 47 ms | 3.01 s | 8.21 s | 58.66 s | 176x / 3x | 1.09 / 1.31 |
+| IES profile | 47 ms | 1.58 s | 9.81 s | 68.45 s | 209x / 6x | 1.01 / 1.09 |
+| Light linking | 46 ms | 1.64 s | 9.74 s | 64.69 s | 211x / 6x | 0.98 / 1.00 |
+| Clearcoat | 46 ms | 1.61 s | 6.34 s | 37.10 s | 139x / 4x | 0.99 / 1.01 |
+| Render region | 32 ms | 1.27 s | 2.33 s | 13.71 s | 72x / 2x | 0.97 / 1.04 |
+| Lens shift | 43 ms | 1.46 s | 5.63 s | 34.78 s | 131x / 4x | 0.96 / 1.03 |
+| Orthographic camera | 45 ms | 1.60 s | 7.23 s | 44.68 s | 160x / 5x | 0.84 / 1.04 |
+| Camera exposure | 46 ms | 1.63 s | 8.98 s | 57.14 s | 194x / 6x | 0.97 / 1.01 |
+| Unreal post-processing | 50 ms | 1.65 s | 7.77 s | 47.66 s | 157x / 5x | n/a |
+| **All 15** | **680 ms** | **25.39 s** | **111.57 s** | **706.49 s** | **164x / 4x** | |
 
 ### Global illumination
 
@@ -45,11 +45,11 @@ The CC0 Cornell box with its measured camera and a RectLight matching the ceilin
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/cornell/lumen.jpg" alt="Global illumination, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">45 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/cornell/pathtraced.jpg" alt="Global illumination, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.34 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.62 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/cornell/xpu.jpg" alt="Global illumination, Karma XPU" loading="lazy">
@@ -68,11 +68,11 @@ Glossy metal on the tall box and a glossy dielectric ball.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/glossy/lumen.jpg" alt="Glossy materials, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 1.06× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">45 ms</span><span class="hdue-note">64 warmup, then 1 · 1.18× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/glossy/pathtraced.jpg" alt="Glossy materials, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.29 s</span><span class="hdue-note">512 spp · 1.22× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.61 s</span><span class="hdue-note">512 spp · 1.22× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/glossy/xpu.jpg" alt="Glossy materials, Karma XPU" loading="lazy">
@@ -91,11 +91,11 @@ Thin-lens depth of field focused on the tall box (USD lens units: tenths of a sc
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/depth_of_field/lumen.jpg" alt="Depth of field, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/depth_of_field/pathtraced.jpg" alt="Depth of field, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.36 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.62 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/depth_of_field/xpu.jpg" alt="Depth of field, Karma XPU" loading="lazy">
@@ -114,11 +114,11 @@ A ball crossing the box during a half-frame shutter.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/motion_blur/lumen.jpg" alt="Motion blur, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">46 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/motion_blur/pathtraced.jpg" alt="Motion blur, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.53 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.62 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/motion_blur/xpu.jpg" alt="Motion blur, Karma XPU" loading="lazy">
@@ -137,11 +137,11 @@ A Catmull-Clark cube (USD default scheme) with a red GeomSubset on two faces, re
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/subdivision/lumen.jpg" alt="Subdivision surfaces, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">46 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">47 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/subdivision/pathtraced.jpg" alt="Subdivision surfaces, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.37 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.62 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/subdivision/xpu.jpg" alt="Subdivision surfaces, Karma XPU" loading="lazy">
@@ -160,11 +160,11 @@ A PointInstancer, Points and a cubic BasisCurves helix, with per-instance and pe
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/instances/lumen.jpg" alt="Instances, points, curves, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/instances/pathtraced.jpg" alt="Instances, points, curves, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.40 s</span><span class="hdue-note">512 spp · 1.03× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.86 s</span><span class="hdue-note">512 spp · 1.03× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/instances/xpu.jpg" alt="Instances, points, curves, Karma XPU" loading="lazy">
@@ -183,11 +183,11 @@ A fog sphere (OpenVDB, density field) in the middle of the box.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/volume/lumen.jpg" alt="Volumes (OpenVDB), hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 1.10× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">47 ms</span><span class="hdue-note">64 warmup, then 1 · 1.09× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/volume/pathtraced.jpg" alt="Volumes (OpenVDB), hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">4.04 s</span><span class="hdue-note">512 spp · 1.31× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">3.01 s</span><span class="hdue-note">512 spp · 1.31× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/volume/xpu.jpg" alt="Volumes (OpenVDB), Karma XPU" loading="lazy">
@@ -206,11 +206,11 @@ The ceiling light replaced by a point light with an IES profile.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/ies/lumen.jpg" alt="IES profile, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 1.02× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">47 ms</span><span class="hdue-note">64 warmup, then 1 · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/ies/pathtraced.jpg" alt="IES profile, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.99 s</span><span class="hdue-note">512 spp · 1.09× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.58 s</span><span class="hdue-note">512 spp · 1.09× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/ies/xpu.jpg" alt="IES profile, Karma XPU" loading="lazy">
@@ -229,11 +229,11 @@ A warm light linked only to the tall box and a cool one only to the short box; t
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/light_linking/lumen.jpg" alt="Light linking, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">48 ms</span><span class="hdue-note">64 warmup, then 1 · 0.99× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">46 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/light_linking/pathtraced.jpg" alt="Light linking, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.37 s</span><span class="hdue-note">512 spp · 1.00× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.64 s</span><span class="hdue-note">512 spp · 1.00× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/light_linking/xpu.jpg" alt="Light linking, Karma XPU" loading="lazy">
@@ -252,11 +252,11 @@ Preview Surface clearcoat: red lacquer (clearcoat 1 over a rough red base, left)
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/clearcoat/lumen.jpg" alt="Clearcoat, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 0.99× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">46 ms</span><span class="hdue-note">64 warmup, then 1 · 0.99× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/clearcoat/pathtraced.jpg" alt="Clearcoat, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.97 s</span><span class="hdue-note">512 spp · 1.00× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.61 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/clearcoat/xpu.jpg" alt="Clearcoat, Karma XPU" loading="lazy">
@@ -275,11 +275,11 @@ A render region: dataWindowNDC (0.25, 0.15)-(0.75, 0.65) renders only that part 
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/render_region/lumen.jpg" alt="Render region, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">34 ms</span><span class="hdue-note">64 warmup, then 1 · 0.98× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">32 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/render_region/pathtraced.jpg" alt="Render region, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.25 s</span><span class="hdue-note">512 spp · 1.04× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.27 s</span><span class="hdue-note">512 spp · 1.04× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/render_region/xpu.jpg" alt="Render region, Karma XPU" loading="lazy">
@@ -298,11 +298,11 @@ Horizontal and vertical aperture offsets (lens shift).
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/lens_shift/lumen.jpg" alt="Lens shift, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">45 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">43 ms</span><span class="hdue-note">64 warmup, then 1 · 0.96× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/lens_shift/pathtraced.jpg" alt="Lens shift, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.25 s</span><span class="hdue-note">512 spp · 1.03× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.46 s</span><span class="hdue-note">512 spp · 1.03× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/lens_shift/xpu.jpg" alt="Lens shift, Karma XPU" loading="lazy">
@@ -321,11 +321,11 @@ Orthographic projection with a 6.2 m window.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/orthographic/lumen.jpg" alt="Orthographic camera, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 0.85× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">45 ms</span><span class="hdue-note">64 warmup, then 1 · 0.84× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/orthographic/pathtraced.jpg" alt="Orthographic camera, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.29 s</span><span class="hdue-note">512 spp · 1.04× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.60 s</span><span class="hdue-note">512 spp · 1.04× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/orthographic/xpu.jpg" alt="Orthographic camera, Karma XPU" loading="lazy">
@@ -344,11 +344,11 @@ Camera exposure of +1 stop.
 <div class="hdue-band">
 <figure class="hdue-shot">
 <img src="images/gallery/exposure/lumen.jpg" alt="Camera exposure, hdUE Lumen" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">49 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--lumen">hdUE Lumen</span><span class="hdue-time">46 ms</span><span class="hdue-note">64 warmup, then 1 · 0.97× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/exposure/pathtraced.jpg" alt="Camera exposure, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.34 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.63 s</span><span class="hdue-note">512 spp · 1.01× brightness</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/exposure/xpu.jpg" alt="Camera exposure, Karma XPU" loading="lazy">
@@ -371,7 +371,7 @@ UE's tonemapper (+2.5 stops), bloom, vignette, chromatic aberration, lens flares
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/post_processing/pathtraced.jpg" alt="Unreal post-processing, hdUE Path Tracer" loading="lazy">
-<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">2.40 s</span><span class="hdue-note">512 spp</span></figcaption>
+<figcaption><span class="hdue-renderer hdue-renderer--pathtraced">hdUE Path Tracer</span><span class="hdue-time">1.65 s</span><span class="hdue-note">512 spp</span></figcaption>
 </figure>
 <figure class="hdue-shot">
 <img src="images/gallery/post_processing/xpu.jpg" alt="Unreal post-processing, Karma XPU" loading="lazy">
