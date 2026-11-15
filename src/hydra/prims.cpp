@@ -548,6 +548,8 @@ struct MeshSyncTimer {
 class Mesh final : public HdMesh {
     std::set<std::string> emitted_;
     TfToken instanceColorName_;  // the instance-rate colour primvar the last full Sync read (Sync)
+    bool bindingOnly_ = false;   // a binding edit may keep the geometry (Sync)
+    std::pair<TfTokenVector, TfToken> builtPrimvars_;  // the UV sets and colour primvar the geometry was built with
 
     struct Shape {
         VtVec3fArray points;
@@ -658,6 +660,41 @@ public:
                 return;
             }
         }
+        // A material binding, light-link (categories) or sidedness edit keeps the geometry when the new material reads
+        // the primvars the mesh was built with: they choose its UV sets and colour, nothing else of the geometry
+        // depends on the binding. The part's fields change and UE updates the mesh without its geometry
+        // (update_meshes), as the full Sync's unchanged hash would after re-reading and re-triangulating everything.
+        constexpr HdDirtyBits bindingBits =
+            HdChangeTracker::DirtyMaterialId | HdChangeTracker::DirtyCategories | HdChangeTracker::DirtyDoubleSided;
+        if (bindingOnly_ && GetInstancerId().IsEmpty() && (*bits & bindingBits) &&
+            !(*bits & ~(bindingBits | HdChangeTracker::Varying | HdChangeTracker::DirtyTransform |
+                        HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyRenderTag))) {
+            const auto material = delegate->GetMaterialId(GetId());
+            if (!material.IsEmpty() && HdUEMeshLightEmission(delegate, GetId()) == GfVec3f(0) &&
+                meshPrimvars(delegate, *state, material, delegate->GetMeshTopology(GetId())) == builtPrimvars_) {
+                const auto transform = delegate->GetTransform(GetId());
+                const bool visible = delegate->GetVisible(GetId());
+                const auto renderTag = delegate->GetRenderTag(GetId());
+                const auto motion = HdUETransformMotion(delegate, GetId(), transform, true);
+                const auto categories = delegate->GetCategories(GetId());
+                const bool doubleSided = delegate->GetDoubleSided(GetId());
+                std::lock_guard lock(state->mutex);
+                if (const auto part = state->meshes.find(*emitted_.begin()); part != state->meshes.end()) {
+                    part->second.material = material.GetString();
+                    part->second.categories = categories;
+                    part->second.doubleSided = doubleSided;
+                    part->second.transform = transform;
+                    part->second.visible = visible;
+                    part->second.renderTag = renderTag;
+                    part->second.motionLeft = motion;
+                    state->dirtyMeshes.insert(part->first);
+                    ++state->revision;
+                    *bits = HdChangeTracker::Clean;
+                    return;
+                }
+            }
+        }
+        bindingOnly_ = false;  // set again once this Sync stores its parts
         HdUEMeshData mesh;
         mesh.id = GetId().GetString();
         mesh.sourceId = mesh.id;
@@ -864,6 +901,7 @@ public:
         const auto emission = HdUEMeshLightEmission(delegate, GetId());
         if ((mesh.material.empty() || emission != GfVec3f(0)) && mesh.sceneAsset.empty())
             mesh.material = displayColor.emplace(displayColorMaterial(delegate, GetId(), mesh, emission)).id;
+        const bool asset = !mesh.sceneAsset.empty();
         std::vector<HdUEMeshData> parts;
         try {
             parts = HdUEPartitionSubsets(std::move(mesh), topology, parameters);
@@ -907,6 +945,10 @@ public:
         emitted_ = std::move(current);
         lock.unlock();
         HdUEStreamMeshes(*state);
+        // What a later binding edit may keep (above): one part, bound to a material of its own (not the displayColor
+        // or emission material), not a native asset's proxy, and the primvars it read.
+        bindingOnly_ = emitted_.size() == 1 && !displayColor && !asset;
+        builtPrimvars_ = {uvNames, colorName};
     }
     // The instances of an uploaded prototype after an instancer edit, computed as the full Sync computes them. When
     // only their matrices changed (same count, same colours, no shear, visibility and purpose unchanged), its parts
