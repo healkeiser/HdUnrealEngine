@@ -4,6 +4,7 @@
 uint2 Size;
 
 float ColorScale;
+uint Opaque; // a debug view mode: UE shows it opaque, and its alpha is not coverage
 Texture2D<float4> SourceColor;
 RWTexture2D<float4> OutputColor;
 
@@ -12,7 +13,7 @@ void ColorCS(uint3 Id:SV_DispatchThreadID) {
     if(any(Id.xy>=Size)) return;
     float4 Color=SourceColor.Load(int3(Id.x,Size.y-1-Id.y,0));
     // UE keeps 1 - coverage in alpha (r.PostProcessing.PropagateAlpha); hosts expect straight alpha.
-    OutputColor[Id.xy]=float4(Color.rgb*ColorScale,1-Color.a);
+    OutputColor[Id.xy]=float4(Color.rgb*ColorScale,Opaque?1:1-Color.a);
 }
 
 int2 ViewMin;

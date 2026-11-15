@@ -158,6 +158,9 @@ struct FReadbackJob {
     FTextureRHIRef Environment;
     float EnvironmentScale = 1;
     float ScreenFraction = 1;
+    // Drawn in a debug view mode: UE shows those as an opaque image, and their scene colour alpha is not coverage
+    // (without lighting, the deferred renderer's subsurface pass that clears it to 0 for opaque pixels never runs).
+    bool Opaque = false;
     // configure_gpu_frames: the draw also goes to the shared ring (enabled set), into a slot the render thread picks.
     HdueGpuOptions Shared{};
     int32 SharedSlot = -1;
@@ -1204,6 +1207,7 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
+    Job->Opaque = Family.ViewMode != VMI_Lit;
     if (Compiling) {
         static uint64 Logged = 0;
         if (Logged != Request.generation) {
@@ -1334,7 +1338,8 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
 #endif
             if (Job->Shared.enabled)
                 HdueSharedFrames::WriteColor(Commands, Resource->GetRenderTargetTexture(), Job->SharedSlot,
-                                             Job->Shared.color_scale, Job->Generation, Job->Samples, Converges(*Job));
+                                             Job->Shared.color_scale, Job->Opaque, Job->Generation, Job->Samples,
+                                             Converges(*Job));
             if (!ReadBack) return;
             auto& Readback = Session->Readbacks[Job->Slot];
             if (!Readback) Readback = MakeUnique<FRHIGPUTextureReadback>(TEXT("HdueColor"));
@@ -1496,7 +1501,7 @@ void PollReadback(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
                         // UE keeps 1 - coverage in scene colour alpha (r.PostProcessing.PropagateAlpha); output
                         // straight alpha.
                         Pixels[Index + 2] = P.B.GetFloat();
-                        Pixels[Index + 3] = 1.f - P.A.GetFloat();
+                        Pixels[Index + 3] = Job->Opaque ? 1.f : 1.f - P.A.GetFloat();
                         if (DepthData) {
                             const float Z = DepthData[uint64(Y) * DepthPitch + X];
                             DepthPixels[uint64(Y) * Width + X] =

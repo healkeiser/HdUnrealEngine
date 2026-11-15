@@ -23,6 +23,6 @@ HdueResult Acquire(HdueSession Session, HdueGpuFrame& Frame);
 int32 BeginFrame(FRHICommandListImmediate& RHICmdList, uint32 Width, uint32 Height, bool Depth);
 void WriteDepth(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* SceneDepth, int32 Slot,
                 const HdueRenderRequest& Request, float DepthScale, float ScreenFraction);
-void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale,
+void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale, bool Opaque,
                 uint64 Generation, uint32 Samples, bool Converged);
 }  // namespace HdueSharedFrames

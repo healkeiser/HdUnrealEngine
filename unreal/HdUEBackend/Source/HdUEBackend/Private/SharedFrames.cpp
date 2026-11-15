@@ -13,6 +13,7 @@ public:
     BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
     SHADER_PARAMETER(FUintVector2, Size)
     SHADER_PARAMETER(float, ColorScale)
+    SHADER_PARAMETER(uint32, Opaque)
     SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SourceColor)
     SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutputColor)
     END_SHADER_PARAMETER_STRUCT()
@@ -277,7 +278,7 @@ void WriteDepth(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDGTexture* 
     FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("hdUE shared depth"), Shader, Parameters,
                                  FComputeShaderUtils::GetGroupCount(FIntPoint(Ring->Width, Ring->Height), 8));
 }
-void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale,
+void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32 Slot, float ColorScale, bool Opaque,
                 uint64 Generation, uint32 Samples, bool Converged) {
     const FRingRef Ring = CurrentRing();
     if (!Ring || Slot < 0 || !Source) return;
@@ -285,6 +286,7 @@ void WriteColor(FRHICommandListImmediate& RHICmdList, FRHITexture* Source, int32
     auto* Parameters = GraphBuilder.AllocParameters<FHdueSharedColorCS::FParameters>();
     Parameters->Size = FUintVector2(Ring->Width, Ring->Height);
     Parameters->ColorScale = ColorScale;
+    Parameters->Opaque = Opaque;
     Parameters->SourceColor = Register(GraphBuilder, Source, TEXT("Hdue.FrameColor"));
     Parameters->OutputColor =
         GraphBuilder.CreateUAV(Register(GraphBuilder, Ring->Color[Slot], TEXT("Hdue.SharedColor")));

@@ -14,7 +14,7 @@ The Bistro in UE's lighting view modes.
 
 **Debug View** (`unreal:debugView`), default Lit (`off`). Realtime only, Advanced.
 
-AOVs and Path Tracer renders are unchanged by a debug view.
+AOVs and Path Tracer renders are unchanged by a debug view. A debug view's image is opaque (alpha 1), as UE's viewport shows it, so it has no coverage alpha to composite with. UE's own alpha is not coverage there: in **Unlit**, which turns UE's lighting off, it marks every pixel uncovered (the subsurface pass that marks opaque pixels covered is a lighting pass).
 
 ## Lighting views
 
