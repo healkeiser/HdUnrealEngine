@@ -98,6 +98,8 @@ In Process Explorer this thread is **`GameThread`** with a start address in `ucr
 
 Work from other threads reaches the owner through `ueRun` (`delegate.cpp`): with the worker, `run(f)`; without one, inline. `hdue_run_on_ue_thread` runs a task through the same path and returns when it has run; the attached Python host sends every backend call it makes through it (`Runtime.on_ue_thread`, `scripts/hdue_runtime.py`). Live Render creates the delegate on one thread and executes it on others, which this indirection covers. In usdview, `hdue_runtime.Runtime(start=True)` initializes and ticks UE on usdview's Python thread; the delegate finds UE `READY` and starts no thread.
 
+Houdini's UI updates the USD stage on a background thread (`allowbackgroundupdate`, Houdini's default, in `UsdRenderers.json`). Probed in Houdini 22.0.368: that thread inserts prims into Hydra's render index, so the delegate's `CreateRprim`, `CreateSprim` and `CreateRenderPass` run there; Sync, `Execute` and Houdini's own `SetRenderSetting` calls stay on the UI thread, after the update. Those create functions only construct objects, and removals (`Finalize`) take the state lock. The hdUE host's settings (wet surfaces, native material assignments, from its `QTimer`) arrive outside Houdini's update, so `SetRenderSetting` never touches the render index: the rprims to re-sync are queued (`pendingDirty`, `pendingAllDirty`) and the render pass marks them in its `_Sync`, which Hydra runs on the UI thread before it collects the frame's dirty rprims.
+
 ### Thread inventory
 
 husk, realtime and Path Tracer (177-178 threads once UE is up; 60 two seconds after launch):

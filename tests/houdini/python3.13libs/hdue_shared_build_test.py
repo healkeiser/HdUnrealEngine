@@ -28,9 +28,10 @@ from hdue_menu import saved_directory
 from surface_api import SurfaceApi
 
 _test = None
-# Key: (rings, segments) of a sphere. Four keys of ten copies, dense enough (360k triangles) that their builds outlast
-# the edits.
-KEYS = {"A": (300, 600), "B": (290, 600), "C": (280, 600), "D": (270, 600)}
+# Key: (rings, segments) of a sphere. Four keys of ten copies, dense enough (640k triangles) that their builds outlast
+# the edits: with Houdini's background stage update an edit took up to 2 s to arrive, and 360k-triangle builds had
+# all finished by then.
+KEYS = {"A": (400, 800), "B": (390, 800), "C": (380, 800), "D": (370, 800)}
 COPIES = 10
 # 2.6M vertices with normals, UVs and colours: its build's estimate (7 times its arrays) is over 1 GB.
 BIG = {"Big": (2000, 1300)}

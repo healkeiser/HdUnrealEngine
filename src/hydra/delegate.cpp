@@ -2456,12 +2456,31 @@ public:
         if (selfHost().continuous && selfHost().worker.joinable())
             selfHost().run([this] { selfHost().pumps.erase(this); });
     }
+    // Hydra syncs render tasks, and so this pass, before it collects the dirty rprims of the same SyncAll.
+    void _Sync() override {
+        std::map<SdfPath, HdDirtyBits> dirty;
+        HdDirtyBits all = 0;
+        state_->locked([&] {
+            dirty.swap(state_->pendingDirty);
+            all = std::exchange(state_->pendingAllDirty, 0);
+        });
+        auto& index = *GetRenderIndex();
+        auto& tracker = index.GetChangeTracker();
+        if (all)
+            for (const auto& id : index.GetRprimIds()) tracker.MarkRprimDirty(id, all);
+        for (const auto& [id, bits] : dirty)
+            if (index.GetRprim(id)) tracker.MarkRprimDirty(id, bits);
+        if ((all & HdChangeTracker::DirtyPrimvar) && HdUETraceScene())
+            TF_STATUS("hdUE wet settings: rprims=%zu", index.GetRprimIds().size());
+    }
     bool IsConverged() const override {
         if (const auto error = state_->setting<std::string>("wetValidationError", ""); !error.empty())
             return converged_ && state_->locked([&] { return state_->error == error; });  // the UE thread writes it
         if (!state_->setting<bool>("materialGraphValid", true)) return true;
         return converged_ && aovsDone_ && settingsVersion_ == state_->requestSettingsRevision &&
-               state_->submittedRevision == state_->revision && state_->locked([&] { return state_->repull.empty(); });
+               state_->submittedRevision == state_->revision && state_->locked([&] {
+                   return state_->repull.empty() && state_->pendingDirty.empty() && !state_->pendingAllDirty;
+               });
     }
     // What Execute reads from Hydra's render pass state, copied on the calling thread: Houdini reuses that object for
     // its other drawing once Execute returns, so a posted Execute must not read it later.
@@ -2947,11 +2966,14 @@ public:
             if (!buffer || !buffer->GetWidth() || !buffer->GetHeight()) {
                 // Houdini's viewport: a bound buffer Hydra has not created yet, or released after this Execute was
                 // posted (Houdini recreates them), leaves this pass nothing to draw into; the next Execute has the
-                // new ones. Failing the session for it was the references test's intermittent "missing buffer". husk
-                // keeps its buffers for the render, so there a missing one fails the frame instead of waiting.
-                if (!buffer && selfHost().continuous &&
-                    std::any_of(pass->buffers.begin(), pass->buffers.end(),
-                                [](const HdRenderBuffer* b) { return !HdUERenderBuffer::alive(b); }))
+                // new ones. Failing the session for it was the references test's intermittent "missing buffer". A
+                // released buffer is deallocated (Finalize) before its deletion, which is queued behind this Execute
+                // (DestroyBprim): alive, of size 0, without an allocation error. husk keeps its buffers for the
+                // render, so there a missing one fails the frame instead of waiting.
+                if (selfHost().continuous &&
+                    (buffer ? buffer->allocationError().empty()
+                            : std::any_of(pass->buffers.begin(), pass->buffers.end(),
+                                          [](const HdRenderBuffer* b) { return !HdUERenderBuffer::alive(b); })))
                     return;
                 std::string bindings;
                 for (const auto& aov : pass->aovs)
@@ -3887,7 +3909,6 @@ const TfTokenVector& HdUERenderDelegate::GetSupportedBprimTypes() const {
     return t;
 }
 HdRenderPassSharedPtr HdUERenderDelegate::CreateRenderPass(HdRenderIndex* index, const HdRprimCollection& collection) {
-    state_->renderIndex = index;
     return std::make_shared<Pass>(index, collection, state_);
 }
 HdInstancer* HdUERenderDelegate::CreateInstancer(HdSceneDelegate* delegate, const SdfPath& id) {
@@ -4133,11 +4154,9 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         std::vector<std::string> switched;
         std::set_symmetric_difference(own.begin(), own.end(), state_->ownDisplayColors->begin(),
                                       state_->ownDisplayColors->end(), std::back_inserter(switched));
-        if (state_->renderIndex)
-            for (const auto& id : switched)
-                if (const SdfPath prim(id.substr(0, id.size() - std::strlen(".displayColor")));
-                    state_->renderIndex->GetRprim(prim))
-                    state_->renderIndex->GetChangeTracker().MarkRprimDirty(prim, HdChangeTracker::DirtyMaterialId);
+        for (const auto& id : switched)
+            state_->pendingDirty[SdfPath(id.substr(0, id.size() - std::strlen(".displayColor")))] |=
+                HdChangeTracker::DirtyMaterialId;
         state_->ownDisplayColors = std::make_shared<const std::set<std::string>>(std::move(own));
         // Volumes bound to a changed entry take their new material or parameters.
         for (const auto& [id, volume] : state_->volumes) {
@@ -4194,12 +4213,7 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
     }
     if (key == TfToken("surfaceEffects") || key == TfToken("wetMaskPreview") || key == TfToken("wetValidationError")) {
         ++state_->revision;
-        if (key == TfToken("surfaceEffects") && state_->renderIndex)
-            for (const auto& id : state_->renderIndex->GetRprimIds())
-                state_->renderIndex->GetChangeTracker().MarkRprimDirty(id, HdChangeTracker::DirtyPrimvar);
-        if (key == TfToken("surfaceEffects") && HdUETraceScene())
-            TF_STATUS("hdUE wet settings: renderIndex=%p rprims=%zu", state_->renderIndex,
-                      state_->renderIndex ? state_->renderIndex->GetRprimIds().size() : 0);
+        if (key == TfToken("surfaceEffects")) state_->pendingAllDirty |= HdChangeTracker::DirtyPrimvar;
     }
     // "heightFog" covers heightFog, heightFogHeight and heightFog:*.
     if (key == TfToken("renderMode") || key == TfToken("samplesPerPixel") || key == TfToken("warmupFrames") ||
@@ -4216,9 +4230,8 @@ void HdUERenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& val
         HdUETimeFromFrame(*state_);
         ++state_->requestSettingsRevision;
     }
-    if ((key == TfToken("subdivisionLevel") || key == TfToken("maxSubdivisionLevel")) && state_->renderIndex) {
-        for (const auto& id : state_->renderIndex->GetRprimIds())
-            state_->renderIndex->GetChangeTracker().MarkRprimDirty(id, HdChangeTracker::DirtyTopology);
+    if (key == TfToken("subdivisionLevel") || key == TfToken("maxSubdivisionLevel")) {
+        state_->pendingAllDirty |= HdChangeTracker::DirtyTopology;
         ++state_->revision;
     }
     if (key == TfToken("autoViewerLight") || key == TfToken("viewerLightIntensity")) {

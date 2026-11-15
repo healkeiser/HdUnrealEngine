@@ -395,7 +395,11 @@ struct HdUEState : HdRenderParam {
     std::set<std::string> dirtyVolumes, dirtyActors, dirtyGrooms;
     std::set<std::string> volumeParameters;  // bound volume materials' parameter edits (no grid upload)
     std::map<std::string, uint64_t> geometryRevisions;
-    HdRenderIndex* renderIndex = nullptr;
+    // Rprim dirty bits SetRenderSetting queues for Hydra's change tracker. Houdini's hdUE host sets those settings from
+    // its own timer, while Houdini's background stage update (allowbackgroundupdate) may be inserting prims into the
+    // render index: the render pass applies them in its Sync, on the thread that drives Hydra.
+    std::map<SdfPath, HdDirtyBits> pendingDirty;
+    HdDirtyBits pendingAllDirty = 0;  // for every rprim
     std::set<std::string> dirtyMeshes, dirtyMaterials, dirtyLights, removed;
     // Rprims (sourceId) of released meshes an upload needs again: the render pass re-syncs them (HdUERepullMeshes),
     // and that Sync erases them. Frames do not converge meanwhile.

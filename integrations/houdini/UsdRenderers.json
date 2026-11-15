@@ -3,7 +3,7 @@
     "valid": "env:HDUE_RUNTIME_CONFIG",
     "menulabel": "Unreal Engine",
     "menupriority": 30,
-    "allowbackgroundupdate": false,
+    "allowbackgroundupdate": true,
     "viewportrenderer": false,
     "destroyifdeactivated": false,
     "pauseonupdate": false,
