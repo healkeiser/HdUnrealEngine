@@ -27,9 +27,9 @@ def "Looks"
 {
     def Material "Textured"
     {
-        custom int unreal:substrate:version = 1
-        token outputs:unreal:surface.connect = </Looks/Textured/Graph/layer.outputs:out>
         token outputs:surface.connect = </Looks/Textured/Preview.outputs:surface>
+        token outputs:unreal:surface.connect = </Looks/Textured/Graph/layer.outputs:out>
+        custom int unreal:substrate:version = 1
 
         def "Graph"
         {
@@ -37,8 +37,11 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:uv"
                 float inputs:index = 0
+                float inputs:index.connect = None
                 float2 inputs:offset = (0.125, 0)
+                float2 inputs:offset.connect = None
                 float2 inputs:scale = (2, 1)
+                float2 inputs:scale.connect = None
                 float2 outputs:out
             }
 
@@ -46,8 +49,11 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
+                string inputs:address.connect = None
                 string inputs:color_space = "srgb"
-                asset inputs:file = @textures\color.png@
+                string inputs:color_space.connect = None
+                asset inputs:file = @textures/color.png@
+                asset inputs:file.connect = None
                 float2 inputs:uv.connect = </Looks/Textured/Graph/uv.outputs:out>
                 float outputs:a
                 float outputs:b
@@ -61,8 +67,11 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
+                string inputs:address.connect = None
                 string inputs:color_space = "raw"
-                asset inputs:file = @textures\packed.png@
+                string inputs:color_space.connect = None
+                asset inputs:file = @textures/packed.png@
+                asset inputs:file.connect = None
                 float2 inputs:uv.connect = </Looks/Textured/Graph/uv.outputs:out>
                 float outputs:a
                 float outputs:b
@@ -76,8 +85,11 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:texture"
                 string inputs:address = "wrap"
+                string inputs:address.connect = None
                 string inputs:color_space = "raw"
-                asset inputs:file = @textures\normal.png@
+                string inputs:color_space.connect = None
+                asset inputs:file = @textures/normal.png@
+                asset inputs:file.connect = None
                 float2 inputs:uv.connect = </Looks/Textured/Graph/uv.outputs:out>
                 float outputs:a
                 float outputs:b
@@ -91,6 +103,7 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:channel"
                 string inputs:channel = "g"
+                string inputs:channel.connect = None
                 color4f inputs:value.connect = </Looks/Textured/Graph/packed_data.outputs:rgba>
                 float outputs:out
             }
@@ -99,6 +112,7 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:channel"
                 string inputs:channel = "a"
+                string inputs:channel.connect = None
                 color4f inputs:value.connect = </Looks/Textured/Graph/packed_data.outputs:rgba>
                 float outputs:out
             }
@@ -107,7 +121,9 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:scalar"
                 string inputs:parameter_name = "NormalStrength"
+                string inputs:parameter_name.connect = None
                 float inputs:value = 1
+                float inputs:value.connect = None
                 float outputs:out
             }
 
@@ -116,6 +132,7 @@ def "Looks"
                 uniform token info:id = "unreal:substrate:normalmap"
                 color3f inputs:color.connect = </Looks/Textured/Graph/normal_texture.outputs:out>
                 bool inputs:flip_green = 1
+                bool inputs:flip_green.connect = None
                 float inputs:strength.connect = </Looks/Textured/Graph/normal_strength.outputs:out>
                 color3f outputs:out
             }
@@ -124,11 +141,22 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo.connect = </Looks/Textured/Graph/base_color.outputs:out>
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
                 color3f inputs:f0 = (0.04, 0.04, 0.04)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
                 color3f inputs:mfp = (0, 0, 0)
+                color3f inputs:mfp.connect = None
                 color3f inputs:normal.connect = </Looks/Textured/Graph/normal.outputs:out>
                 float inputs:roughness.connect = </Looks/Textured/Graph/roughness.outputs:out>
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
                 string inputs:subsurface = "none"
+                string inputs:subsurface.connect = None
                 token outputs:out
             }
 
@@ -136,10 +164,25 @@ def "Looks"
             {
                 uniform token info:id = "unreal:substrate:slab"
                 color3f inputs:diffuse_albedo = (0, 0, 0)
+                color3f inputs:diffuse_albedo.connect = None
+                color3f inputs:emission = None
+                color3f inputs:emission.connect = None
                 color3f inputs:f0 = (0.02, 0.02, 0.02)
+                color3f inputs:f0.connect = None
+                color3f inputs:f90 = None
+                color3f inputs:f90.connect = None
                 color3f inputs:mfp = (1000000, 1000000, 1000000)
+                color3f inputs:mfp.connect = None
+                color3f inputs:normal = None
+                color3f inputs:normal.connect = None
                 float inputs:roughness = 0.06
+                float inputs:roughness.connect = None
+                float inputs:second_roughness = None
+                float inputs:second_roughness.connect = None
+                float inputs:second_roughness_weight = None
+                float inputs:second_roughness_weight.connect = None
                 string inputs:subsurface = "simple_volume"
+                string inputs:subsurface.connect = None
                 token outputs:out
             }
 
@@ -156,7 +199,9 @@ def "Looks"
                 uniform token info:id = "unreal:substrate:vertical"
                 token inputs:base.connect = </Looks/Textured/Graph/base.outputs:out>
                 bool inputs:parameter_blending = 0
+                bool inputs:parameter_blending.connect = None
                 float inputs:thickness = 0.01
+                float inputs:thickness.connect = None
                 token inputs:top.connect = </Looks/Textured/Graph/masked_coat.outputs:out>
                 token outputs:out
             }
@@ -185,9 +230,9 @@ def "Lights"
 {
     def RectLight "Key"
     {
+        float inputs:exposure = 3.585
         float inputs:height = 40
         float inputs:intensity = 1
-        float inputs:exposure = 3.585
         float inputs:width = 120
         matrix4d xformOp:transform = ( (0.9284766908852591, -0.37139067635410367, 0, 0), (0.2721655269759086, 0.6804138174397715, 0.6804138174397715, 0), (-0.25269934785963444, -0.631748369649086, 0.7328281087929398, 0), (-99.99999999999999, -249.99999999999994, 349.9999999999999, 1) )
         uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -202,3 +247,4 @@ def "Lights"
         uniform token[] xformOpOrder = ["xformOp:transform"]
     }
 }
+
