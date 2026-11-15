@@ -206,6 +206,7 @@ struct FSession {
     FName DebugName;
     TStrongObjectPtr<UMaterialInterface> DebugMaterial;
     bool MegaLightsActive = false;
+    bool VideoMemoryWarned = false;                          // UE's over-budget warning was logged (Tick)
     TStrongObjectPtr<UMaterialInstanceDynamic> AovMaterial;  // PP_HdUEAov, weights select HDUE_AOV_*.
     // set_post_process: beauty overrides; the materials stay referenced while they are blendables.
     FPostProcessSettings PostProcess;
@@ -1573,6 +1574,18 @@ HdueResult HDUE_CALL Tick() {
         if (Current.generation == Session->Request.generation && Current.converged) return HDUE_OK;
     }
     Draw(Session);
+    // Past the GPU's memory budget, Windows moves allocations to system memory (DXGI's demoted memory), which the
+    // process is charged for and the GPU reads slowly. UE prints this warning on the frame
+    // (r.DemotedLocalMemoryWarning, SceneRendering.cpp), which no host sees offscreen: it goes to the host's console
+    // instead, once per session.
+    if (GDemotedLocalMemorySize && !Session->VideoMemoryWarned && CVarInt(TEXT("r.DemotedLocalMemoryWarning"))) {
+        Session->VideoMemoryWarned = true;
+        UE_LOG(LogTemp, Warning,
+               TEXT("hdUE: Video memory has been exhausted (%.0f MB over budget). Expect extremely poor performance. A "
+                    "lower resolution or quality, or fewer 2D textures (r.Streaming.PoolSize, r.VT.EnableAutoImport, "
+                    "r.GlobalTextureLODBias), lowers the GPU's use."),
+               double(GDemotedLocalMemorySize) / (1024 * 1024));
+    }
     return HDUE_OK;
 }
 
