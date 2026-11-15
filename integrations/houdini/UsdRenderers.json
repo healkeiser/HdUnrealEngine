@@ -29,6 +29,7 @@
       "nativeMeshes",
       "completedSamples"
     ],
+    "husk.fast-exit": 1,
     "husk.verbose_callback": "hdue_stats.py",
     "husk.verbose_interval": 1,
     "husk.stats_metadata": "",

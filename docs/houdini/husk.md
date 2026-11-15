@@ -50,6 +50,8 @@ On an RTX 4090, measured on scenes of this repository:
 | Cornell box, 512 x 512, Realtime | about 3 s | about 50 ms |
 | Intel's Sponza, 2560 x 1440, Realtime, animated camera and sun | about 30 s (UE and the scene's meshes) | about 0.3 s, of which 0.2 s is husk writing the float EXR |
 
+husk exits as soon as the last image is written, without tearing the scene down first (`husk.fast-exit` in hdUE's `UsdRenderers.json`, as Karma sets it): on a scene with 40 textures of 16384 x 16384, tearing down took 15 of a 29 s process. `--fast-exit 0` restores the tear-down. A failed frame still exits non-zero.
+
 [Nanite](../geometry/nanite.md) builds are cached on disk across processes, so the second husk run of a scene skips most of its mesh building.
 
 ### Realtime sequences
