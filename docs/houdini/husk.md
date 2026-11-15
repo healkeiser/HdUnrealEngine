@@ -42,6 +42,7 @@ Unreal Engine starts once per husk process, and stays until the process exits. B
 
 - USD Render ROP: **Render All Frames with a Single Process** (`allframesatonce`).
 - USD Render TOP: **Frames per Batch** (`framesperbatch`), or **All Frames in One Batch** (`batchall`). At its default of 1, every frame is its own process and pays Unreal Engine's startup again.
+- Several render settings prims (passes) in one husk call (`-s "/Render/A /Render/B"`, the USD Render ROP's **Render Settings** pattern): husk recreates hdUE's renderer for each, and Unreal Engine stays loaded (Cornell box: the second pass loaded in 0.3 s instead of 5.8 s).
 
 On an RTX 4090, measured on scenes of this repository:
 
