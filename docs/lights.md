@@ -431,7 +431,7 @@ Rect lights also take UE's barn doors: [Barn Door Angle](reference/light-propert
 | An edited HDRI file does not update the viewport. | A changed file alone sends no light update. | Touch any dome parameter, or restart the render. |
 | The sky shows through gaps in a closed room. | The dome is visible to camera rays that escape. | Turn off **Visible to Camera**. |
 | The HDRI looks blurred in the background and reflections. | **Environment Cube Resolution** is 128. | Raise it to 512 or 1024. |
-| An unlit scene renders lit. | **Light Unlit Scenes** adds a camera key and fill when the scene has no lights. | Add a light, or turn off [Light Unlit Scenes](reference/render-settings/lighting.md#unreal-autoviewerlight). |
+| An unlit scene renders lit. | **Light Unlit Scenes** adds a camera key and fill when the scene has no lights. Emissive materials do not count as lights, as in Houdini's viewport, which adds its headlight when a scene has no light prims. | Add a light, or turn off [Light Unlit Scenes](reference/render-settings/lighting.md#unreal-autoviewerlight). |
 
 ## Unreal Engine and Karma
 
