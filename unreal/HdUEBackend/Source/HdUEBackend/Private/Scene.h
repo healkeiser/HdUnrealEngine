@@ -176,7 +176,8 @@ private:
     void TickTextures();
     int64 AvailableBuildMemory() const;
     double TextureSeconds = 0;
-    int32 TextureImports = 0;                                       // per Apply, for its timing log
+    int32 TextureImports = 0;         // per Apply, for its timing log
+    int64 UnflushedTextureBytes = 0;  // mips uploaded since the last RHI frame ended (PreviewTexture)
     TArray<TStrongObjectPtr<UMaterialInterface>> RetiredMaterials;  // replaced last Apply; released next Apply
     // A static mesh's render data (with Lumen cards if asked), and Nanite data for the version TickConversions swaps
     // in.

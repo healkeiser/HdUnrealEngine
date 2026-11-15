@@ -1274,6 +1274,20 @@ FHdueScene::FPreviewTexture TextureSettings(const FHdueScene::FPreviewTexture& E
     return Settings;
 }
 }  // namespace
+// D3D12 copies a new texture's or buffer's data through a block of its upload heap pool, which UE's RHI frees and
+// reuses only at the end of a frame, once the GPU's copy is done (FD3D12Adapter::EndFrame). husk applies a whole scene
+// before UE renders a frame, so its uploads grew the pool without bound (Da Vinci: 12.5 GB for textures and 5 GB for
+// meshes, system memory charged to the process, which ended at its job memory limit). This ends an RHI frame as UE's
+// high-resolution screenshot and loading screens end the frames they render outside the engine loop
+// (UnrealClient.cpp, DefaultGameMoviePlayer.cpp).
+static void EndUploadFrame() {
+    ENQUEUE_RENDER_COMMAND(HdueUploadFrame)([](FRHICommandListImmediate& RHICmdList) {
+        GFrameNumberRenderThread++;
+        FCoreDelegates::OnBeginFrameRT.Broadcast();
+        FCoreDelegates::OnEndFrameRT.Broadcast();
+        RHICmdList.EndFrame();
+    });
+}
 // A texture Apply prepared, created on this thread (UObjects and render resources need it) on first use.
 const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key, FString& Error) {
     FPreviewTexture* Texture = PreviewTextures.Find(Key);
@@ -1289,11 +1303,25 @@ const FHdueScene::FPreviewTexture* FHdueScene::PreviewTexture(const FString& Key
         // (FTexturePlatformData::TryLoadMips) was 99% of texture creation, ~680 ms for Sponza's 111 textures, and kept
         // a CPU copy of every texture for the scene's lifetime. ponytail: the resource can't be rebuilt from this
         // texture; it is never updated again (create a new one).
-        for (FTexture2DMipMap& Mip : Texture->Pending->Mips) Mip.BulkData.SetBulkDataFlags(BULKDATA_AlwaysAllowDiscard);
+        int64 Bytes = 0;
+        for (FTexture2DMipMap& Mip : Texture->Pending->Mips) {
+            Mip.BulkData.SetBulkDataFlags(BULKDATA_AlwaysAllowDiscard);
+            Bytes += Mip.BulkData.GetBulkDataSize();
+        }
         // A virtual texture streams its tiles from the chunks in VTData, kept in memory (Apply-ResidencyPatch.ps1).
         Created->VirtualTextureStreaming = Texture->Pending->VTData != nullptr;
         Created->SetPlatformData(Texture->Pending.Release());
         Created->UpdateResource();
+        // A texture's upload buffers are released by an RHI frame (EndUploadFrame), every
+        // r.Streaming.MaxTempMemoryAllowed (50 MB) of mips, as UE's texture streamer bounds its in-flight mip uploads:
+        // Da Vinci's 1,400 textures, created in one batch, grew the upload pool to 12.5 GB.
+        static const IConsoleVariable* MaxTemp =
+            IConsoleManager::Get().FindConsoleVariable(TEXT("r.Streaming.MaxTempMemoryAllowed"));
+        UnflushedTextureBytes += Bytes;
+        if (UnflushedTextureBytes >= (int64(MaxTemp ? MaxTemp->GetInt() : 50) << 20)) {
+            EndUploadFrame();
+            UnflushedTextureBytes = 0;
+        }
         Texture->Texture.Reset(Created);
         TextureSeconds += FPlatformTime::Seconds() - CreateStart;
         ++TextureImports;
@@ -2652,6 +2680,7 @@ bool FHdueScene::Apply(const HdueSceneBatch& Batch, FString& Error) {
                Batch.material_count, (MaterialsDone - ApplyStart) * 1000, TextureImports, PrepareSeconds * 1000,
                TextureSeconds * 1000, Batch.mesh_count, (MeshesDone - MaterialsDone) * 1000,
                (FPlatformTime::Seconds() - MeshesDone) * 1000);
+    EndUploadFrame();  // the batch's mesh and texture uploads
     // Offline hosts (husk) fail the frame rather than deliver an image without a required mesh, as for a failed
     // unreal:asset (Bridge.cpp, RequestRender); interactive hosts draw without it and keep the warning.
     if (!NativeFailure.IsEmpty() && !Interactive) {
