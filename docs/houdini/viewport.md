@@ -23,6 +23,8 @@ The first time in a session, Unreal Engine starts inside Houdini; the image appe
     2. In the viewport's lighting menu, pick the lighting Unreal Engine uses (**High Quality Lighting** by default).
     3. Save the hip file: it keeps the choice per renderer.
 
+    Switching between Unreal Engine and another Hydra renderer, such as Karma, also drops hdUE's scene, because each Scene Viewer keeps one renderer besides Houdini VK alive. Set `HOUDINI_ACTIVE_RENDER_DELEGATE_COUNT=2` (in `houdini.env`, or your environment before Houdini starts) to keep both: switching back is then immediate, and both renderers hold their scene in memory meanwhile ([Houdini's environment variables](https://www.sidefx.com/docs/houdini22.0/ref/env.html)).
+
 One Houdini session renders one hdUE image at a time: one viewport, or one [Live Render](live-render.md).
 
 Selection works as with Karma: click a prim in the viewport to select it, and Solaris outlines it. The outline appears once the view is still.

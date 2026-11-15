@@ -38,7 +38,10 @@ A USD Render ROP after the render settings, its **Render Delegate** set to **Unr
 
 ## Frame ranges and farms
 
-Unreal Engine starts once per husk process, and stays until the process exits. Between frames, husk sends only what changed. Render a frame range in one husk call, and give farm tasks chunks of frames, not one frame each.
+Unreal Engine starts once per husk process, and stays until the process exits. Between frames, husk sends only what changed. Render a frame range in one husk call, and give farm tasks chunks of frames, not one frame each:
+
+- USD Render ROP: **Render All Frames with a Single Process** (`allframesatonce`).
+- USD Render TOP: **Frames per Batch** (`framesperbatch`), or **All Frames in One Batch** (`batchall`). At its default of 1, every frame is its own process and pays Unreal Engine's startup again.
 
 On an RTX 4090, measured on scenes of this repository:
 
