@@ -186,7 +186,10 @@ class Test:
                     )
                     if not np.isfinite(rgb).all():
                         raise AssertionError("Non-finite image")
-                    if rgb.max() > 0.01:
+                    # The same frame's depth: its copy can still be pending, or a newer frame replaced it (the
+                    # delegate retries the same way); a frame that never gets one runs into the test's deadline.
+                    depth = self.api.depth_pixels(s, frame.frame_id)
+                    if rgb.max() > 0.01 and depth is not None:
                         break
             yield
         kernel = C.WinDLL("kernel32")
@@ -201,9 +204,6 @@ class Test:
         s["backend_alpha_max"] = float(alpha.max())
         if mode == 1 and frame.completed_samples < 64:
             raise AssertionError("PT converged early")
-        depth = self.api.depth_pixels(s)
-        if depth is None:
-            raise AssertionError("Converged color has no matching depth")
         depth = np.ctypeslib.as_array(depth).reshape(frame.height, frame.width)
         hits = depth[depth > 0]
         if (

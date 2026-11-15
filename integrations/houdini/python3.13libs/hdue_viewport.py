@@ -285,9 +285,10 @@ class Viewport:
         self.runtime.check(code, "viewport surfaces")
         return True
 
-    def depth_pixels(self, status):
-        # The depth of UE's newest frame, by UE's own frame id: the viewport status tracks the frames Houdini shows,
-        # which (with GPU frames) are numbered separately.
+    def depth_pixels(self, status, frame_id=None):
+        # The depth of UE's newest frame (or of frame_id, a frame pixels() returned), by UE's own frame id: the
+        # viewport status tracks the frames Houdini shows, which (with GPU frames) are numbered separately. None while
+        # the copy is pending or the frame was replaced: poll again.
         f = Frame()
         f.struct_size = C.sizeof(f)
         code = self.poll(status["session"], C.byref(f))
@@ -295,6 +296,8 @@ class Viewport:
             return None
         self.runtime.check(code, "poll image")
         if not f.frame_id:
+            return None
+        if frame_id and frame_id != f.frame_id:
             return None
         pixels = (C.c_float * (f.width * f.height))()
         code = self.copy_depth(
