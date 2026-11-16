@@ -427,8 +427,10 @@ class MergeCatalog(Folder):
             os.environ, {"HDUE_RUNTIME_CONFIG": str(self.profile)}
         ):
             resolved = hdue_ue_import.runtime_config()["asset_catalog"]
+        # resolve(): a short (8.3) temp folder, as CI's RUNNER~1, reads back in its long form.
         self.assertEqual(
-            Path(resolved), self.project.parent / "hdue_catalog.json"
+            Path(resolved),
+            (self.project.parent / "hdue_catalog.json").resolve(),
         )
 
     def test_concurrent_merges_keep_both_entries(self):
