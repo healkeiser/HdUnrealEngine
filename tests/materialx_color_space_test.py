@@ -190,13 +190,13 @@ class ColorSpaces(unittest.TestCase):
                 write([item], Path(folder) / "out", "Live")["source"]
             ).read_text(encoding="utf-8")
         self.assertIn(Path(self.texture(item, 0)[0]).as_posix(), text)
-        # A second preparation reuses the conversion.
+        # A second preparation reuses the conversion. The resolved path, as recorded: the key hashes its spelling, and
+        # a short (8.3) temp folder such as CI's RUNNER~1 resolves to another.
         converted = Path(self.texture(item, 0)[0])
         stamp = converted.stat().st_mtime_ns
+        (emit,) = (f for f in item["dependencies"] if f.endswith("emit.exr"))
         self.assertEqual(
-            export_usd_materialx._linear_rec709(
-                str(self.folder / "emit.exr"), None, ""
-            ),
+            export_usd_materialx._linear_rec709(emit, None, ""),
             str(converted),
         )
         self.assertEqual(converted.stat().st_mtime_ns, stamp)
