@@ -1,0 +1,62 @@
+name: Bug report
+description: A render looks wrong, Houdini or husk crashes, or the delegate will not start
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, what hdUE rendered or did instead. A screenshot next to UE's or Karma's render helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest scene that shows it. A small .usda or .hip beats a description.
+    validations:
+      required: true
+
+  - type: input
+    id: hdue
+    attributes:
+      label: hdUE version
+      description: The delegate DLL's file properties, Details tab (for example v0.5.0), or the commit you built.
+    validations:
+      required: true
+
+  - type: input
+    id: houdini
+    attributes:
+      label: Houdini build
+      placeholder: 22.0.466
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host
+    attributes:
+      label: Where
+      options:
+        - Houdini viewport
+        - husk
+        - usdview
+        - Several
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: RTX 4090, driver 581.57
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The end of the newest backend log in %LOCALAPPDATA%\hdUE\Saved\Logs, and any error in Houdini's console or husk's output.
+      render: text

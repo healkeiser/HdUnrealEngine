@@ -1,0 +1,23 @@
+name: Feature request
+description: A USD, MaterialX or Unreal feature hdUE does not render or expose yet
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task in Houdini or in your pipeline, not the implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: unreal
+    attributes:
+      label: How Unreal does it
+      description: hdUE follows Unreal. Name the UE feature, setting or importer behaviour this should map to, if you know it.
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
+      description: Another renderer, a manual step, or a workaround in the scene.
