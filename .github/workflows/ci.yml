@@ -115,6 +115,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'Install.ps1 failed' }
           $package = Get-Content "$packages/hdUE.json" -Raw | ConvertFrom-Json
           if ($package.hpath -ne '$HDUE/integrations/houdini' -or -not $package.load_package_once -or $package.enable -notmatch "houdini_version >= '22.0.368' .*houdini_os == 'windows'" -or
-              ($package.env | Where-Object { $_.PXR_PLUGINPATH_NAME }).PXR_PLUGINPATH_NAME.method -ne 'append') { throw "Unexpected package: $($package | ConvertTo-Json -Depth 5)" }
+              ($package.env | Where-Object { $_.PXR_PLUGINPATH_NAME }).PXR_PLUGINPATH_NAME.method -ne 'append' -or
+              ($package.env | Where-Object { $_.HDUE_RUNTIME_CONFIG }).HDUE_RUNTIME_CONFIG -ne '${HDUE_RUNTIME_CONFIG-$HDUE/runtime.json}') { throw "Unexpected package: $($package | ConvertTo-Json -Depth 5)" }
           powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Uninstall.ps1" -PackagesDirectory $packages
           if (Test-Path "$packages/hdUE.json") { throw 'Uninstall.ps1 left the package file' }

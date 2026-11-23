@@ -315,7 +315,7 @@ The package file sets `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_ENABLE` (and `HDUE
 
 | Variable | Description |
 |----------|-------------|
-| `HDUE_RUNTIME_CONFIG` | Runtime profile (`backend_dll`, `runtime_project`) the delegate starts UE from |
+| `HDUE_RUNTIME_CONFIG` | Runtime profile (`backend_dll`, `runtime_project`) the delegate starts UE from. A value set before Houdini starts wins over the package's `runtime.json` |
 | `HDUE_HOUDINI_ENABLE` | `1` lets hdUE's Python host start in Houdini's UI when a viewer selects hdUE |
 | `HDUE_BACKEND_DLL` | Backend DLL, overriding the runtime profile |
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |

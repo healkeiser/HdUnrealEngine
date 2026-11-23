@@ -26,7 +26,9 @@ $Package = [ordered]@{
         @{HDUE = ($Root -replace '\\', '/') },
         @{HDUE_VERSION = "$($Runtime.hdue_version)" },
         @{HDUE_HOUDINI_ENABLE = '1' },
-        @{HDUE_RUNTIME_CONFIG = '$HDUE/runtime.json' },
+        # A value set before Houdini starts (a studio launcher) wins; Houdini's ${VAR-DEFAULT} uses the package's
+        # profile only when none is set.
+        @{HDUE_RUNTIME_CONFIG = '${HDUE_RUNTIME_CONFIG-$HDUE/runtime.json}' },
         @{PXR_PLUGINPATH_NAME = [ordered]@{value = '$HDUE/plugin/resources'; method = 'append' } }
     )
     hpath             ='$HDUE/integrations/houdini'

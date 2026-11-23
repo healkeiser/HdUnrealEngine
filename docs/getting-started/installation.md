@@ -71,6 +71,12 @@ Write the package file into a shared package folder instead of each user's Docum
 
 Point every machine's `HOUDINI_PACKAGE_DIR` at that folder.
 
+### Choosing the runtime profile
+
+The package's `runtime.json` names the Unreal Engine runtime it ships. To change a setting in it (for example `asset_catalog` or `materialx_library`), edit the file in the package folder: Houdini reads it again at its next start, no rebuild needed. Only a new hdUE build needs a new package.
+
+A studio launcher can also choose another profile: set `HDUE_RUNTIME_CONFIG` to its path before Houdini or husk starts. A value set this way wins over the package's own `runtime.json`; without it, the package's file is used. Relative paths inside a profile resolve against the profile's folder ([building](../building.md#runtime-profile) lists its keys). Packages installed before this option existed always use their own file: run `Install.ps1` again.
+
 ## Checking that it works
 
 1. In a Solaris Scene Viewer, open the renderer menu. **Unreal Engine** is listed.

@@ -6,7 +6,7 @@ Most installs need no variable set by hand: `Install.cmd` writes a Houdini packa
 
 | You want to | Use |
 | --- | --- |
-| Run hdUE at all | `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` (set by the package) |
+| Run hdUE at all | `HDUE_RUNTIME_CONFIG`, `HDUE_HOUDINI_ENABLE` (set by the package; a `HDUE_RUNTIME_CONFIG` set before Houdini starts wins, see [Installation](installation.md#choosing-the-runtime-profile)) |
 | Keep Unreal Engine's logs and Nanite cache on another drive | `HDUE_USER_DIR` (default `%LOCALAPPDATA%\hdUE`), a folder only you (or the render account) can write |
 | See where a frame's time goes | `HDUE_TRACE_TIMING`, `HDUE_TRACE_FILE` |
 | Check what reaches Unreal Engine | `HDUE_TRACE_SETTINGS`, `HDUE_TRACE_SCENE`, `HDUE_TRACE_PASS` |
