@@ -200,7 +200,7 @@ struct FSession {
     TSharedPtr<FHdueVirtualTextureResidency, ESPMode::ThreadSafe> Residency;
     TArray<const UTexture2D*> ResidencyTextures;  // the virtual textures Residency warms up
     bool Preparing = false;
-    bool CompileWait = false;  // an offline draw of this request waited for PSOs or render proxies (RenderAndReadBack)
+    bool CompileWait = false;  // a draw of this request waited for PSOs or render proxies (RenderAndReadBack)
     bool RestartNext = false;  // the next Draw restarts the accumulation (RestartAccumulation) before its view
     uint64 ProxiesReady = 0;   // the request generation whose render proxies were all found created (PendingProxies)
     // unreal:debugView: UE's viewport view mode and its visualization (the FSceneView member that names it).
@@ -1187,23 +1187,25 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
     // no sample drawn without them counts.
     // Interactive frames wait for the background mesh builds (FHdueScene::PendingConversions): until they swap in,
     // meshes draw a first pass without Lumen cards or nothing, and the viewport stops drawing once a frame converges.
-    uint32 Compiling = 0;
-    if (IsInteractive())
-        Compiling = Session->Scene->PendingConversions();
-    else {
-        Compiling = FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests();
-        // Scanned until found done once per request: nothing registers components within one, and the scan walks
-        // every primitive component on each of a Path Tracer frame's draws.
-        if (!Compiling && Session->ProxiesReady != Request.generation)
-            if (!(Compiling = PendingProxies())) Session->ProxiesReady = Request.generation;
-        if (Compiling)
-            Session->CompileWait = true;
-        else if (Session->CompileWait) {
-            Session->CompileWait = false;
-            Session->RestartNext = true;
-            Compiling = 1;
-        }
+    // They wait for the delayed render proxies too, and restart the same way: a native asset swapped in while its PSOs
+    // compiled converged without it in usdview, and the viewport stopped drawing.
+    const bool Offline = !IsInteractive();
+    uint32 Compiling =
+        Offline ? FShaderPipelineCache::NumPrecompilesRemaining() + PipelineStateCache::NumActivePrecacheRequests()
+                : Session->Scene->PendingConversions();
+    // Scanned until found done once per request: nothing registers components within one, and the scan walks every
+    // primitive component on each of a Path Tracer frame's draws. Moving frames never converge: no scan for them.
+    uint32 Proxies = 0;
+    if (!Compiling && !Moving && Session->ProxiesReady != Request.generation)
+        if (!(Proxies = PendingProxies())) Session->ProxiesReady = Request.generation;
+    if (Proxies || (Offline && Compiling))
+        Session->CompileWait = true;
+    else if (Session->CompileWait && !Compiling) {
+        Session->CompileWait = false;
+        Session->RestartNext = true;
+        Proxies = 1;
     }
+    Compiling += Proxies;
     const auto Job = MakeShared<FReadbackJob, ESPMode::ThreadSafe>();
     Job->Generation = Request.generation;
     Job->DrawIndex = ++Session->Draws;
@@ -1212,8 +1214,9 @@ void RenderAndReadBack(const TSharedPtr<FSession, ESPMode::ThreadSafe>& Session,
         static uint64 Logged = 0;
         if (Logged != Request.generation) {
             Logged = Request.generation;
-            UE_LOG(LogTemp, Log, TEXT("hdUE request %llu waits for %u %s"), Request.generation, Compiling,
-                   IsInteractive() ? *Session->Scene->DescribePending() : TEXT("PSO compilations or render proxies"));
+            UE_LOG(
+                LogTemp, Log, TEXT("hdUE request %llu waits for %u %s"), Request.generation, Compiling,
+                Offline || Proxies ? TEXT("PSO compilations or render proxies") : *Session->Scene->DescribePending());
         }
     }
     Job->FullResIndex = Moving || Compiling ? 0 : ++Session->FullResDraws;
