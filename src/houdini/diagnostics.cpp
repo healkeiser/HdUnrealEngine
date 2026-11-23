@@ -8,15 +8,29 @@
 #include <cmath>
 #include "pxr/base/gf/vec4f.h"
 namespace {
+// With background updates Houdini creates the new delegate on its update thread while the UI thread destroys the old
+// one: unlocked, the old one's unregistering could clear the new one's half-done registration, and the host would not
+// see the new delegate.
+std::mutex Registration;
 std::weak_ptr<PXR_NS::HdUEState> Viewport;
 PXR_NS::HdUERenderDelegate* Delegate = nullptr;
+struct Registered {
+    std::shared_ptr<PXR_NS::HdUEState> state;
+    PXR_NS::HdUERenderDelegate* delegate;
+};
+Registered current() {
+    std::lock_guard lock(Registration);
+    return {Viewport.lock(), Delegate};
+}
 }  // namespace
 PXR_NAMESPACE_OPEN_SCOPE
 void HdUERegisterViewport(const std::shared_ptr<HdUEState>& state, HdUERenderDelegate* delegate) {
+    std::lock_guard lock(Registration);
     Viewport = state;
     Delegate = delegate;
 }
 void HdUEUnregisterViewport(HdUERenderDelegate* delegate) {
+    std::lock_guard lock(Registration);
     if (Delegate == delegate) {
         Delegate = nullptr;
         Viewport.reset();
@@ -36,8 +50,8 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_surfaces(
     if (!update || update->struct_size != sizeof(*update) || update->abi_version != 2 || update->mask_preview > 1 ||
         update->binding_count > 100000 || (update->binding_count && !update->bindings))
         return HDUE_INVALID_ARGUMENT;
-    const auto state = Viewport.lock();
-    if (!state || !Delegate) return HDUE_PENDING;
+    const auto [state, delegate] = current();
+    if (!state || !delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     if (!update->session || update->session != state->session) return HDUE_INVALID_STATE;
     using namespace PXR_NS;
@@ -59,18 +73,18 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_surfaces(
         bindings[b.prim_path] = VtValue(fields);
     }
     if (!update->validation_error || !*update->validation_error)
-        Delegate->SetRenderSetting(TfToken("surfaceEffects"), VtValue(bindings));
-    Delegate->SetRenderSetting(TfToken("wetValidationError"),
+        delegate->SetRenderSetting(TfToken("surfaceEffects"), VtValue(bindings));
+    delegate->SetRenderSetting(TfToken("wetValidationError"),
                                VtValue(std::string(update->validation_error ? update->validation_error : "")));
-    Delegate->SetRenderSetting(TfToken("wetMaskPreview"), VtValue(bool(update->mask_preview)));
+    delegate->SetRenderSetting(TfToken("wetMaskPreview"), VtValue(bool(update->mask_preview)));
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials(const HdueViewportMaterials* update) {
     if (!update || update->struct_size != sizeof(*update) || update->abi_version != 1 || update->reserved ||
         update->material_count > 65536 || (update->material_count && !update->materials))
         return HDUE_INVALID_ARGUMENT;
-    const auto state = Viewport.lock();
-    if (!state || !Delegate) return HDUE_PENDING;
+    const auto [state, delegate] = current();
+    if (!state || !delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     if (!update->session || update->session != state->session) return HDUE_INVALID_STATE;
     using namespace PXR_NS;
@@ -109,16 +123,16 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_materials
         }
         overrides[material.material_id] = VtValue(fields);
     }
-    Delegate->SetRenderSetting(TfToken("nativeMaterialAssets"), VtValue(assets));
-    Delegate->SetRenderSetting(TfToken("nativeMaterialParameters"), VtValue(overrides));
+    delegate->SetRenderSetting(TfToken("nativeMaterialAssets"), VtValue(assets));
+    delegate->SetRenderSetting(TfToken("nativeMaterialParameters"), VtValue(overrides));
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_textures(const HdueViewportTextures* update) {
     if (!update || update->struct_size != sizeof(*update) || update->abi_version != 1 || update->reserved ||
         update->texture_count > 65536 || (update->texture_count && !update->textures))
         return HDUE_INVALID_ARGUMENT;
-    const auto state = Viewport.lock();
-    if (!state || !Delegate) return HDUE_PENDING;
+    const auto [state, delegate] = current();
+    if (!state || !delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     if (!update->session || update->session != state->session) return HDUE_INVALID_STATE;
     using namespace PXR_NS;
@@ -131,24 +145,24 @@ extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_textures(
             return HDUE_INVALID_ARGUMENT;
         files[t.uri] = VtValue(std::string(t.file));
     }
-    Delegate->SetRenderSetting(TfToken("opTextures"), VtValue(files));
+    delegate->SetRenderSetting(TfToken("opTextures"), VtValue(files));
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_set_viewport_up_axis(uint32_t z_up) {
     if (z_up > 1) return HDUE_INVALID_ARGUMENT;
-    const auto state = Viewport.lock();
-    if (!state || !Delegate) return HDUE_PENDING;
+    const auto [state, delegate] = current();
+    if (!state || !delegate) return HDUE_PENDING;
     if (!onHostThread(*state)) return HDUE_WRONG_THREAD;
     using namespace PXR_NS;
     // Like Houdini's stageMetersPerUnit: an authored unreal:upAxis overrides it.
-    Delegate->SetRenderSetting(TfToken("stageUpAxis"), VtValue(std::string(z_up ? "Z" : "Y")));
+    delegate->SetRenderSetting(TfToken("stageUpAxis"), VtValue(std::string(z_up ? "Z" : "Y")));
     return HDUE_OK;
 }
 extern "C" HDUE_VIEWPORT_EXPORT HdueResult HDUE_CALL hdue_get_viewport_status(HdueViewportStatus* status) {
     if (!status || status->struct_size != sizeof(*status)) return HDUE_INVALID_ARGUMENT;
     HdueViewportStatus out{};
     out.struct_size = sizeof(out);
-    if (const auto s = Viewport.lock()) {
+    if (const auto s = current().state) {
         // Houdini's UI thread polls this: while an upload is being prepared under the state lock, answer with the last
         // status.
         std::unique_lock lock(s->mutex, std::try_to_lock);
