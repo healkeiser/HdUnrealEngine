@@ -65,6 +65,22 @@ Individual steps:
 
 `Stage-Runtime.ps1` replaces the staged binaries, including the hashed Houdini copy of the backend, so run `Update-HoudiniRuntime.ps1` after every stage.
 
+### Runtime profile
+
+No script writes `.local/runtime.json`: create it once, after the first `Stage-Runtime.ps1`. It names the staged runtime (by default under `out\runtime`):
+
+```json
+{
+  "version": 1,
+  "runtime_project": "../out/runtime/Windows/HdUEBackend/HdUEBackend.uproject",
+  "backend_dll": "../out/runtime/Windows/HdUEBackend/Binaries/Win64/HdUEBackend.dll"
+}
+```
+
+`version` must be 1. Relative paths resolve against the profile's folder, so these start with `../`; absolute paths work too. With `Stage-Runtime.ps1 -OutputDirectory`, point both paths into that folder. Two optional keys: `asset_catalog`, a catalog of a project's assets (`Prepare-ProjectAssets.ps1` writes a complete profile with one), and `materialx_library`, a prepared MaterialX library ([materials](developer/internals/materials.md)).
+
+`Update-HoudiniRuntime.ps1` reads this profile and writes the Houdini one (`runtime-houdini.json`): the same keys, with `backend_dll` replaced by the hashed copy. Do not edit the Houdini profile by hand.
+
 ### Test tiers
 
 `.\scripts\Test.ps1 -Suite <name>` runs one tier:
