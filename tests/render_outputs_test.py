@@ -316,6 +316,34 @@ resolution = group.find("resolution")
 assert (resolution.minValue(), resolution.maxValue()) == (1, 16384) and (
     resolution.minIsStrict() and not resolution.maxIsStrict()
 )
+# Each Resolution Mode authors the asset's own two sizes. The internal Render Settings LOP stays in Manual with both
+# sizes unlocked: following the mode, its callback failed inside the locked asset and Manual ignored the height.
+internal = alone.node("rendersettings")
+assert internal.parm("res_mode").rawValue() == "manual" and not any(
+    p.isLocked() for p in internal.parmTuple("resolution")
+)
+for mode, locked in (
+    ("manual", (False, False)),
+    ("autowidth", (True, False)),
+    ("autoheight", (False, True)),
+    ("manual", (False, False)),
+):
+    alone.parm("res_mode").set(mode)
+    alone.parm(
+        "res_mode"
+    ).pressButton()  # the menu's callback, as the parameter editor runs it
+    assert tuple(p.isLocked() for p in alone.parmTuple("resolution")) == locked
+    for parm, value in zip(alone.parmTuple("resolution"), (1000, 300)):
+        if not parm.isLocked():
+            parm.set(value)
+    size = alone.evalParmTuple("resolution")
+    assert size == ((1000, 300) if mode == "manual" else size) and min(size) > 0
+    assert (
+        tuple(UsdRender.Settings(settings_prim()).GetResolutionAttr().Get())
+        == size
+    ), (mode, size)
+alone.parm("res_mode").set("autoheight")
+alone.parm("res_mode").pressButton()
 # Essential names the changed settings it hides; Show in Advanced switches the strip.
 notice = alone.parm("hdue_hiddenchanges")
 alone.parm("hdue_show").set(0)

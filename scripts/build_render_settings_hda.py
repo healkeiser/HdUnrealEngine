@@ -587,10 +587,16 @@ def build():
     subnet.setParmTemplateGroup(group)
     # The internal Render Settings LOP follows the asset's parameters.
     settings.parm("primpath").set('`chs("../primpath")`')
-    # (The internal resolution's locked height expression computes from the referenced mode, camera and width.)
+    # The asset's own resolution parameters compute the automatic size (its res_mode callback); the internal node only
+    # authors both of them. Its mode stays a plain Manual: referencing the asset's would run the internal callback
+    # too (Houdini runs the callbacks of referencing parameters), which cannot unlock a parameter of a locked asset,
+    # and its own locked height expression would ignore a manual height.
+    settings.parm("res_mode").set("manual")
+    __import__("loputils").updateResolutionParameters(settings)
     for template in group.entriesWithoutFolders():
         if template.name() not in (
             "primpath",
+            "res_mode",
             "resolutionMenu",
         ) and settings.parmTuple(template.name()):
             for parm, source in zip(
