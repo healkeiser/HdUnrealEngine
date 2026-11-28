@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ColorGainMidtones"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "1, 1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGainMidtones = (1, 1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1.2, 1, 0.8, 1",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGainMidtones = (1.2, 1, 0.8, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "0.8, 0.9, 1.3, 1",
+   "set": {
+    "/Render/Settings": [
+     "float4 unreal:postProcess:ColorGainMidtones = (0.8, 0.9, 1.3, 1)"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:ChromaticAberrationStartOffset"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float unreal:postProcess:SceneFringeIntensity = 5"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ChromaticAberrationStartOffset = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:ChromaticAberrationStartOffset = 0.5"
+    ]
+   }
+  }
+ ]
+}

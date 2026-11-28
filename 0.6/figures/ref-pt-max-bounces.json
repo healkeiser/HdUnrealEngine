@@ -1,0 +1,38 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:PathTracingMaxBounces"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:postProcess:PathTracingMaxBounces = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:postProcess:PathTracingMaxBounces = 2"
+    ]
+   }
+  },
+  {
+   "caption": "32 (default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:postProcess:PathTracingMaxBounces = 32"
+    ]
+   }
+  }
+ ]
+}

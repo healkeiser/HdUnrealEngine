@@ -1,0 +1,23 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {},
+ "values": [
+  {
+   "caption": "Realtime (Lumen)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"realtime\""
+    ]
+   }
+  },
+  {
+   "caption": "Path Tracer",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

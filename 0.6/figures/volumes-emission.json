@@ -1,0 +1,28 @@
+{
+ "scene": "cornell/variants/volume.usda",
+ "display": "linear",
+ "base": {
+  "/cornell_box/fog": [
+   "token primvars:unreal:emissionField = \"density\"",
+   "float primvars:unreal:temperatureScale = 2500"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Emission Intensity 0",
+   "set": {
+    "/cornell_box/fog": [
+     "float primvars:unreal:emissionIntensity = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/cornell_box/fog": [
+     "float primvars:unreal:emissionIntensity = 1"
+    ]
+   }
+  }
+ ]
+}

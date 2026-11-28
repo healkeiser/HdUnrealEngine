@@ -1,0 +1,31 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:metallic = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:metallic = 0.5"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:metallic = 1"
+    ]
+   }
+  }
+ ]
+}

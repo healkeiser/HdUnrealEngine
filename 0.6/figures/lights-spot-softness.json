@@ -1,0 +1,46 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/spot": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:softness = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.2",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:softness = 0.2"
+    ]
+   }
+  },
+  {
+   "caption": "0.6",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:softness = 0.6"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:softness = 1"
+    ]
+   }
+  }
+ ]
+}

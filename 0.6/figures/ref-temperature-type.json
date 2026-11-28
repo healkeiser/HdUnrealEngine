@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:TemperatureType"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float unreal:postProcess:WhiteTemp = 4500"
+  ]
+ },
+ "values": [
+  {
+   "caption": "White Balance (default), 4500 K",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TemperatureType = \"TEMP_WhiteBalance\""
+    ]
+   }
+  },
+  {
+   "caption": "Color Temperature, 4500 K",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TemperatureType = \"TEMP_ColorTemperature\""
+    ]
+   }
+  }
+ ]
+}

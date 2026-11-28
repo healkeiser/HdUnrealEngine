@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:IndirectLightingColor"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:postProcess:IndirectLightingColor = (1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 0.7, 0.5",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:postProcess:IndirectLightingColor = (1, 0.7, 0.5)"
+    ]
+   }
+  }
+ ]
+}

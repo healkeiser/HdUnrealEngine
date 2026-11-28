@@ -1,0 +1,26 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:VolumetricFogEmissive"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0, 0, 0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:heightFog:VolumetricFogEmissive = (0, 0, 0)"
+    ]
+   }
+  },
+  {
+   "caption": "0.02, 0.01, 0",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:heightFog:VolumetricFogEmissive = (0.02, 0.01, 0)"
+    ]
+   }
+  }
+ ]
+}

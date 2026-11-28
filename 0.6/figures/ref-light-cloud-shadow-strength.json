@@ -1,0 +1,45 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:light:CloudShadowStrength"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)",
+   "bool unreal:light:bCastCloudShadows = 1"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1",
+   "bool unreal:volumetricCloud = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.25",
+   "set": {
+    "/scene/sun": [
+     "float unreal:light:CloudShadowStrength = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/scene/sun": [
+     "float unreal:light:CloudShadowStrength = 1"
+    ]
+   }
+  }
+ ]
+}

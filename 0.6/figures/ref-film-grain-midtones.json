@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:FilmGrainIntensityMidtones"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "float unreal:postProcess:FilmGrainIntensity = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmGrainIntensityMidtones = 1"
+    ]
+   }
+  },
+  {
+   "caption": "0",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmGrainIntensityMidtones = 0"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "scene": "docs/hair.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "realtime (default)",
+   "set": {}
+  },
+  {
+   "caption": "pathtraced",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LocalExposureMethod"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Bilateral (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:LocalExposureMethod = \"ELocalExposureMethod::Bilateral\""
+    ]
+   }
+  },
+  {
+   "caption": "Fusion",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:LocalExposureMethod = \"ELocalExposureMethod::Fusion\""
+    ]
+   }
+  }
+ ]
+}

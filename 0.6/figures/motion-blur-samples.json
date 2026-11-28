@@ -1,0 +1,34 @@
+{
+ "scene": "cornell/variants/motion_blur.usda",
+ "display": "linear",
+ "settings": [
+  "unreal:motionSamples"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:motionSamples = 2"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:motionSamples = 4"
+    ]
+   }
+  },
+  {
+   "caption": "16 (default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:motionSamples = 16"
+    ]
+   }
+  }
+ ]
+}

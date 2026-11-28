@@ -1,0 +1,52 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Pinhole (fStop 0)",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500",
+     "bool unreal:heightFog = 1"
+    ]
+   }
+  },
+  {
+   "caption": "f/2.8, focused at 1.37 m",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0",
+     "float fStop = 2.8"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500",
+     "bool unreal:heightFog = 1"
+    ]
+   }
+  }
+ ]
+}

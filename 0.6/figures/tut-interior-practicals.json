@@ -1,0 +1,26 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Lamps only",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0"
+    ],
+    "/atmosphere/key": [
+     "(active = false)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500"
+    ]
+   }
+  }
+ ]
+}

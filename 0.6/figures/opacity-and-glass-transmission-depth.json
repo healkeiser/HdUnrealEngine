@@ -1,0 +1,53 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0",
+     "color3f inputs:transmission_color = (0.3, 0.7, 0.45)",
+     "float inputs:transmission_depth = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.02",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0",
+     "color3f inputs:transmission_color = (0.3, 0.7, 0.45)",
+     "float inputs:transmission_depth = 0.02"
+    ]
+   }
+  },
+  {
+   "caption": "0.1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0",
+     "color3f inputs:transmission_color = (0.3, 0.7, 0.45)",
+     "float inputs:transmission_depth = 0.1"
+    ]
+   }
+  }
+ ]
+}

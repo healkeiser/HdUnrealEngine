@@ -1,0 +1,28 @@
+{
+ "scene": "docs/hair.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "UE's default hair material (default)",
+   "set": {}
+  },
+  {
+   "caption": "groom_color",
+   "set": {
+    "/scene/hair": [
+     "color3f[] primvars:groom_color = [(0.4, 0.09, 0.03)] (interpolation = \"constant\")"
+    ]
+   }
+  },
+  {
+   "caption": "a Substrate Hair material",
+   "set": {
+    "/scene/hair": [
+     "(prepend apiSchemas = [\"MaterialBindingAPI\"])",
+     "rel material:binding = </scene/Looks/hair>"
+    ]
+   }
+  }
+ ]
+}

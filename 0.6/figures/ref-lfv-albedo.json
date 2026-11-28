@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:localFogVolume:FogAlbedo"
+ ],
+ "base": {
+  "/scene/localFog": [
+   "(active = true)"
+  ],
+  "/Render/Settings": [
+   "float unreal:cvar:r:LocalFogVolume:GlobalStartDistance = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1, 1, 1 (default)",
+   "set": {
+    "/scene/localFog": [
+     "color3f unreal:localFogVolume:FogAlbedo = (1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 0.5, 0.2",
+   "set": {
+    "/scene/localFog": [
+     "color3f unreal:localFogVolume:FogAlbedo = (1, 0.5, 0.2)"
+    ]
+   }
+  }
+ ]
+}

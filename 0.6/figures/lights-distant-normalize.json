@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/sun": [
+     "bool inputs:normalize = 0"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/sun": [
+     "bool inputs:normalize = 1"
+    ]
+   }
+  }
+ ]
+}

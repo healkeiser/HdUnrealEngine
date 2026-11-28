@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenSkylightLeaking"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenSkylightLeaking = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.3",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenSkylightLeaking = 0.3"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:r:RayTracing:Shadows"
+ ],
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Off (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:RayTracing:Shadows = 0"
+    ]
+   }
+  },
+  {
+   "caption": "On",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:cvar:r:RayTracing:Shadows = 1"
+    ]
+   }
+  }
+ ]
+}

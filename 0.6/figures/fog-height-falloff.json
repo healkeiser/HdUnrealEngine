@@ -1,0 +1,34 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:FogHeightFalloff"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0.2 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:FogHeightFalloff = 0.2"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:FogHeightFalloff = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:heightFog:FogHeightFalloff = 2"
+    ]
+   }
+  }
+ ]
+}

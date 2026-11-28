@@ -1,0 +1,43 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Metalness (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "int inputs:useSpecularWorkflow = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Specular, (0, 0, 0)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "int inputs:useSpecularWorkflow = 1",
+     "color3f inputs:specularColor = (0, 0, 0)"
+    ]
+   }
+  },
+  {
+   "caption": "Specular, (0.04, 0.04, 0.04)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "int inputs:useSpecularWorkflow = 1",
+     "color3f inputs:specularColor = (0.04, 0.04, 0.04)"
+    ]
+   }
+  },
+  {
+   "caption": "Specular, (1, 0.71, 0.29), black diffuse",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "int inputs:useSpecularWorkflow = 1",
+     "color3f inputs:specularColor = (1, 0.71, 0.29)",
+     "color3f inputs:diffuseColor = (0, 0, 0)"
+    ]
+   }
+  }
+ ]
+}

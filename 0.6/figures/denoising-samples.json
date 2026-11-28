@@ -1,0 +1,31 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {},
+ "values": [
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 4"
+    ]
+   }
+  },
+  {
+   "caption": "16",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 16"
+    ]
+   }
+  },
+  {
+   "caption": "64",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 64"
+    ]
+   }
+  }
+ ]
+}

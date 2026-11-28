@@ -1,0 +1,41 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:cvar:sg:ShadowQuality"
+ ],
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Low",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:sg:ShadowQuality = \"0\""
+    ]
+   }
+  },
+  {
+   "caption": "High",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:sg:ShadowQuality = \"2\""
+    ]
+   }
+  },
+  {
+   "caption": "Epic (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:cvar:sg:ShadowQuality = \"3\""
+    ]
+   }
+  }
+ ]
+}

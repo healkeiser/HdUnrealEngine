@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:TonemappingMethod"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Filmic (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TonemappingMethod = \"ETonemappingMethod::Filmic\""
+    ]
+   }
+  },
+  {
+   "caption": "Standard ACES",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TonemappingMethod = \"ETonemappingMethod::StandardACES\""
+    ]
+   }
+  }
+ ]
+}

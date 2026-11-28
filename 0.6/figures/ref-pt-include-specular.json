@@ -1,0 +1,30 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:PathTracingIncludeSpecular"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:PathTracingIncludeSpecular = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:PathTracingIncludeSpecular = 0"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:volumetricCloud:LayerBottomAltitude"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1",
+   "bool unreal:volumetricCloud = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:volumetricCloud:LayerBottomAltitude = 2"
+    ]
+   }
+  },
+  {
+   "caption": "5 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:volumetricCloud:LayerBottomAltitude = 5"
+    ]
+   }
+  }
+ ]
+}

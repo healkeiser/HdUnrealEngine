@@ -1,0 +1,33 @@
+{
+ "scene": "cornell/variants/motion_blur.usda",
+ "display": "linear",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.25 frame",
+   "set": {
+    "/cornell_box/camera": [
+     "double shutter:open = -0.125",
+     "double shutter:close = 0.125"
+    ]
+   }
+  },
+  {
+   "caption": "0.5 frame (scene)",
+   "set": {}
+  },
+  {
+   "caption": "1 frame",
+   "set": {
+    "/cornell_box/camera": [
+     "double shutter:open = -0.5",
+     "double shutter:close = 0.5"
+    ]
+   }
+  }
+ ]
+}

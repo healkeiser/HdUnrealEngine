@@ -1,0 +1,32 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:postProcess:TranslucencyType = \"ETranslucencyType::RayTraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Preview Surface, opacity 0.2",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:opacity = 0.2",
+     "float inputs:roughness = 0"
+    ]
+   }
+  },
+  {
+   "caption": "standard_surface, transmission 1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0"
+    ]
+   }
+  }
+ ]
+}

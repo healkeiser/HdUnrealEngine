@@ -1,0 +1,35 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:BloomDirtMask"
+ ],
+ "base": {
+  "/scene/key": [
+   "float inputs:exposure = 7"
+  ],
+  "/Render/Settings": [
+   "float unreal:postProcess:AutoExposureBias = -2.5",
+   "float unreal:postProcess:BloomIntensity = 2",
+   "float unreal:postProcess:BloomDirtMaskIntensity = 20"
+  ]
+ },
+ "values": [
+  {
+   "caption": "(empty) (default)",
+   "set": {
+    "/Render/Settings": [
+     "asset unreal:postProcess:BloomDirtMask = @@"
+    ]
+   }
+  },
+  {
+   "caption": "lens_dirt.png",
+   "set": {
+    "/Render/Settings": [
+     "asset unreal:postProcess:BloomDirtMask = @../../../samples/docs/textures/lens_dirt.png@"
+    ]
+   }
+  }
+ ]
+}

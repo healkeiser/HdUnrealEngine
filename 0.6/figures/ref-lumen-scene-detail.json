@@ -1,0 +1,38 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenSceneDetail"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.25",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenSceneDetail = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenSceneDetail = 1"
+    ]
+   }
+  },
+  {
+   "caption": "4",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenSceneDetail = 4"
+    ]
+   }
+  }
+ ]
+}

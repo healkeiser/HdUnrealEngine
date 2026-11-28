@@ -1,0 +1,46 @@
+{
+ "scene": "docs/row.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/camera": [
+   "float focalLength = 0.5",
+   "float horizontalAperture = 0.36",
+   "float verticalAperture = 0.2025",
+   "float fStop = 1.4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "2.4",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 2.4"
+    ]
+   }
+  },
+  {
+   "caption": "3.6",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 3.6"
+    ]
+   }
+  },
+  {
+   "caption": "6",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 6"
+    ]
+   }
+  },
+  {
+   "caption": "8.4",
+   "set": {
+    "/scene/camera": [
+     "float focusDistance = 8.4"
+    ]
+   }
+  }
+ ]
+}

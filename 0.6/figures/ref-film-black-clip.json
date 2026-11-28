@@ -1,0 +1,26 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:FilmBlackClip"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmBlackClip = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.02",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:FilmBlackClip = 0.02"
+    ]
+   }
+  }
+ ]
+}

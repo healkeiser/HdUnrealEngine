@@ -1,0 +1,19 @@
+{
+ "scene": "docs/veach.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Realtime (Lumen)",
+   "set": {}
+  },
+  {
+   "caption": "Path Tracer, 256 samples",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

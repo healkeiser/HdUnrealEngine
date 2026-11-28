@@ -1,0 +1,35 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/Looks/ball/S": [
+   "float inputs:opacity = 0.4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:opacityThreshold = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.3",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:opacityThreshold = 0.3"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:opacityThreshold = 0.5"
+    ]
+   }
+  }
+ ]
+}

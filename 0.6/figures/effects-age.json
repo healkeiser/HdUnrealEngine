@@ -1,0 +1,63 @@
+{
+ "scene": "docs/effects.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "1 frame",
+   "set": {
+    "/scene/fire": [
+     "float primvars:unreal:effect:startFrame = 0"
+    ],
+    "/scene/coil": [
+     "float primvars:unreal:effect:startFrame = 0"
+    ],
+    "/scene/electricity": [
+     "float primvars:unreal:effect:startFrame = 0"
+    ]
+   }
+  },
+  {
+   "caption": "3 frames",
+   "set": {
+    "/scene/fire": [
+     "float primvars:unreal:effect:startFrame = -2"
+    ],
+    "/scene/coil": [
+     "float primvars:unreal:effect:startFrame = -2"
+    ],
+    "/scene/electricity": [
+     "float primvars:unreal:effect:startFrame = -2"
+    ]
+   }
+  },
+  {
+   "caption": "1 s",
+   "set": {
+    "/scene/fire": [
+     "float primvars:unreal:effect:startFrame = -23"
+    ],
+    "/scene/coil": [
+     "float primvars:unreal:effect:startFrame = -23"
+    ],
+    "/scene/electricity": [
+     "float primvars:unreal:effect:startFrame = -23"
+    ]
+   }
+  },
+  {
+   "caption": "4 s",
+   "set": {
+    "/scene/fire": [
+     "float primvars:unreal:effect:startFrame = -95"
+    ],
+    "/scene/coil": [
+     "float primvars:unreal:effect:startFrame = -95"
+    ],
+    "/scene/electricity": [
+     "float primvars:unreal:effect:startFrame = -95"
+    ]
+   }
+  }
+ ]
+}

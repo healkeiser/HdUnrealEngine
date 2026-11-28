@@ -1,0 +1,26 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenReflectionsScreenTraces"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:LumenReflectionsScreenTraces = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:LumenReflectionsScreenTraces = 0"
+    ]
+   }
+  }
+ ]
+}

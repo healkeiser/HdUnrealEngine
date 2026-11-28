@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:localFogVolume:FogEmissive"
+ ],
+ "base": {
+  "/scene/localFog": [
+   "(active = true)"
+  ],
+  "/Render/Settings": [
+   "float unreal:cvar:r:LocalFogVolume:GlobalStartDistance = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "0, 0, 0 (default)",
+   "set": {
+    "/scene/localFog": [
+     "color3f unreal:localFogVolume:FogEmissive = (0, 0, 0)"
+    ]
+   }
+  },
+  {
+   "caption": "0.2, 0.05, 0",
+   "set": {
+    "/scene/localFog": [
+     "color3f unreal:localFogVolume:FogEmissive = (0.2, 0.05, 0)"
+    ]
+   }
+  }
+ ]
+}

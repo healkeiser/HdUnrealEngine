@@ -1,0 +1,44 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:skyAtmosphere"
+ ],
+ "base": {
+  "/scene/sky": [
+   "(active = false)"
+  ],
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/sun": [
+   "(active = true)",
+   "float3 xformOp:rotateXYZ = (-15, 170, 0)"
+  ],
+  "/scene/camera": [
+   "float3 xformOp:rotateXYZ = (0, 0, 0)"
+  ],
+  "/Render/Settings": [
+   "bool unreal:skyAtmosphere = 1",
+   "bool unreal:skyAtmosphere = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Off (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:skyAtmosphere = 0"
+    ]
+   }
+  },
+  {
+   "caption": "On",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:skyAtmosphere = 1"
+    ]
+   }
+  }
+ ]
+}

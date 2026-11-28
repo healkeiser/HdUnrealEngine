@@ -1,0 +1,26 @@
+{
+ "scene": "docs/fog.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:heightFog:VolumetricFogAlbedo"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "1, 1, 1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:heightFog:VolumetricFogAlbedo = (1, 1, 1)"
+    ]
+   }
+  },
+  {
+   "caption": "1, 0.6, 0.3",
+   "set": {
+    "/Render/Settings": [
+     "color3f unreal:heightFog:VolumetricFogAlbedo = (1, 0.6, 0.3)"
+    ]
+   }
+  }
+ ]
+}

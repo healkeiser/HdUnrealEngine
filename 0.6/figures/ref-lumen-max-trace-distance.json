@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenMaxTraceDistance"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "200",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenMaxTraceDistance = 200"
+    ]
+   }
+  },
+  {
+   "caption": "20000 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenMaxTraceDistance = 20000"
+    ]
+   }
+  }
+ ]
+}

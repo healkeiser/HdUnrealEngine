@@ -1,0 +1,59 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Mirror chrome",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.9, 0.9, 0.9)",
+     "float inputs:metallic = 1",
+     "float inputs:roughness = 0"
+    ]
+   }
+  },
+  {
+   "caption": "Rough aluminium",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.91, 0.92, 0.92)",
+     "float inputs:metallic = 1",
+     "float inputs:roughness = 0.35"
+    ]
+   }
+  },
+  {
+   "caption": "Plastic",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.05, 0.3, 0.8)",
+     "float inputs:metallic = 0",
+     "float inputs:roughness = 0.25"
+    ]
+   }
+  },
+  {
+   "caption": "Car paint",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.4, 0.01, 0.02)",
+     "float inputs:metallic = 0",
+     "float inputs:roughness = 0.4",
+     "float inputs:clearcoat = 1",
+     "float inputs:clearcoatRoughness = 0.02"
+    ]
+   }
+  },
+  {
+   "caption": "Emissive panel",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0, 0, 0)",
+     "float inputs:roughness = 0.5",
+     "color3f inputs:emissiveColor = (5, 4.5, 4)"
+    ]
+   }
+  }
+ ]
+}

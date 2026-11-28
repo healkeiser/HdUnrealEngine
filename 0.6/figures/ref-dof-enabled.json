@@ -1,0 +1,34 @@
+{
+ "scene": "docs/row.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:DepthOfFieldEnabled"
+ ],
+ "base": {
+  "/scene/camera": [
+   "float focalLength = 0.5",
+   "float horizontalAperture = 0.36",
+   "float verticalAperture = 0.2025",
+   "float fStop = 1.4",
+   "float focusDistance = 2.4"
+  ]
+ },
+ "values": [
+  {
+   "caption": "On (default)",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:DepthOfFieldEnabled = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:DepthOfFieldEnabled = 0"
+    ]
+   }
+  }
+ ]
+}

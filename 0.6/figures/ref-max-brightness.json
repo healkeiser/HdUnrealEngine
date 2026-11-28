@@ -1,0 +1,31 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:AutoExposureMaxBrightness"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\"",
+   "token unreal:postProcess:AutoExposureMethod = \"AEM_Histogram\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0.1",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureMaxBrightness = 0.1"
+    ]
+   }
+  },
+  {
+   "caption": "8 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:AutoExposureMaxBrightness = 8"
+    ]
+   }
+  }
+ ]
+}

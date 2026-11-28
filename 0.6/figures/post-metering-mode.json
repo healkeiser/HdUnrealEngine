@@ -1,0 +1,30 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:AutoExposureMethod"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Manual (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:AutoExposureMethod = \"AEM_Manual\""
+    ]
+   }
+  },
+  {
+   "caption": "Auto Exposure Histogram",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:AutoExposureMethod = \"AEM_Histogram\""
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "(0.18, 0.18, 0.18) (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.18, 0.18, 0.18)"
+    ]
+   }
+  },
+  {
+   "caption": "(0.8, 0.25, 0.08)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.8, 0.25, 0.08)"
+    ]
+   }
+  },
+  {
+   "caption": "(0.05, 0.3, 0.8)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:diffuseColor = (0.05, 0.3, 0.8)"
+    ]
+   }
+  }
+ ]
+}

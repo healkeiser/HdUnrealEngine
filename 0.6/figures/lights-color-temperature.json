@@ -1,0 +1,43 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "bool inputs:enableColorTemperature = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "2700",
+   "set": {
+    "/scene/key": [
+     "float inputs:colorTemperature = 2700"
+    ]
+   }
+  },
+  {
+   "caption": "4000",
+   "set": {
+    "/scene/key": [
+     "float inputs:colorTemperature = 4000"
+    ]
+   }
+  },
+  {
+   "caption": "6500 (default)",
+   "set": {
+    "/scene/key": [
+     "float inputs:colorTemperature = 6500"
+    ]
+   }
+  },
+  {
+   "caption": "10000",
+   "set": {
+    "/scene/key": [
+     "float inputs:colorTemperature = 10000"
+    ]
+   }
+  }
+ ]
+}

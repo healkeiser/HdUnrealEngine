@@ -1,0 +1,24 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"pathtraced\"",
+   "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "16 spp",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 16"
+    ]
+   }
+  },
+  {
+   "caption": "256 spp",
+   "set": {}
+  }
+ ]
+}

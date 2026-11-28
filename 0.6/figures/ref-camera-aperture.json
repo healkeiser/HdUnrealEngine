@@ -1,0 +1,39 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:DepthOfFieldFstop"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:postProcess:AutoExposureApplyPhysicalCameraExposure = 1",
+   "float unreal:postProcess:AutoExposureBias = 9"
+  ]
+ },
+ "values": [
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:DepthOfFieldFstop = 2"
+    ]
+   }
+  },
+  {
+   "caption": "4 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:DepthOfFieldFstop = 4"
+    ]
+   }
+  },
+  {
+   "caption": "8",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:DepthOfFieldFstop = 8"
+    ]
+   }
+  }
+ ]
+}

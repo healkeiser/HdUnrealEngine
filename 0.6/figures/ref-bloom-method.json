@@ -1,0 +1,33 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:BloomMethod"
+ ],
+ "base": {
+  "/scene/key": [
+   "float inputs:exposure = 7"
+  ],
+  "/Render/Settings": [
+   "float unreal:postProcess:AutoExposureBias = -2.5"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Standard (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:BloomMethod = \"BM_SOG\""
+    ]
+   }
+  },
+  {
+   "caption": "Convolution",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:BloomMethod = \"BM_FFT\""
+    ]
+   }
+  }
+ ]
+}

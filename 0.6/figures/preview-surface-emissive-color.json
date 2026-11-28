@@ -1,0 +1,39 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "(0, 0, 0) (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:emissiveColor = (0, 0, 0)"
+    ]
+   }
+  },
+  {
+   "caption": "(1, 0.3, 0.05)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:emissiveColor = (1, 0.3, 0.05)"
+    ]
+   }
+  },
+  {
+   "caption": "(5, 1.5, 0.25)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:emissiveColor = (5, 1.5, 0.25)"
+    ]
+   }
+  },
+  {
+   "caption": "(20, 6, 1)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "color3f inputs:emissiveColor = (20, 6, 1)"
+    ]
+   }
+  }
+ ]
+}

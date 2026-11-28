@@ -1,0 +1,59 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:postProcess:TranslucencyType = \"ETranslucencyType::RayTraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "0",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.15",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0.15"
+    ]
+   }
+  },
+  {
+   "caption": "0.3",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0.3"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0.5"
+    ]
+   }
+  }
+ ]
+}

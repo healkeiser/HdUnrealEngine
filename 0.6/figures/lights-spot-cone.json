@@ -1,0 +1,39 @@
+{
+ "scene": "docs/lights.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/key": [
+   "(active = false)"
+  ],
+  "/scene/spot": [
+   "(active = true)",
+   "float inputs:shaping:cone:softness = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "10",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:angle = 10"
+    ]
+   }
+  },
+  {
+   "caption": "25",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:angle = 25"
+    ]
+   }
+  },
+  {
+   "caption": "45",
+   "set": {
+    "/scene/spot": [
+     "float inputs:shaping:cone:angle = 45"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.8, 0.25, 0.08)",
+     "float inputs:specular_roughness = 0.6",
+     "float inputs:coat_roughness = 0.05",
+     "float inputs:coat = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.8, 0.25, 0.08)",
+     "float inputs:specular_roughness = 0.6",
+     "float inputs:coat_roughness = 0.05",
+     "float inputs:coat = 0.5"
+    ]
+   }
+  },
+  {
+   "caption": "1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.8, 0.25, 0.08)",
+     "float inputs:specular_roughness = 0.6",
+     "float inputs:coat_roughness = 0.05",
+     "float inputs:coat = 1"
+    ]
+   }
+  },
+  {
+   "caption": "1, coat_color (0.9, 0.6, 0.2)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.8, 0.25, 0.08)",
+     "float inputs:specular_roughness = 0.6",
+     "float inputs:coat_roughness = 0.05",
+     "float inputs:coat = 1",
+     "color3f inputs:coat_color = (0.9, 0.6, 0.2)"
+    ]
+   }
+  }
+ ]
+}

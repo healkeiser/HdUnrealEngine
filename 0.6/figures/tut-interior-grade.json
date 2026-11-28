@@ -1,0 +1,34 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {},
+ "values": [
+  {
+   "caption": "Neutral",
+   "set": {
+    "/BistroInterior/group13/Camera": [
+     "float fStop = 0",
+     "float fStop = 2.8"
+    ],
+    "/atmosphere/key": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/atmosphere/dust": [
+     "(active = false)",
+     "(active = true)"
+    ],
+    "/Render/Settings": [
+     "bool unreal:heightFog = 0",
+     "float unreal:postProcess:FilmGrainIntensity = 0",
+     "float unreal:postProcess:WhiteTemp = 6500",
+     "bool unreal:heightFog = 1"
+    ]
+   }
+  },
+  {
+   "caption": "Film grain 0.12, White Temp 6000 K",
+   "set": {}
+  }
+ ]
+}

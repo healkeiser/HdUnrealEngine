@@ -1,0 +1,24 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "Manual, compensation 0 (default)",
+   "set": {}
+  },
+  {
+   "caption": "Auto Exposure Histogram, compensation 1",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:AutoExposureMethod = \"AEM_Histogram\"",
+     "float unreal:postProcess:AutoExposureBias = 1"
+    ]
+   }
+  }
+ ]
+}

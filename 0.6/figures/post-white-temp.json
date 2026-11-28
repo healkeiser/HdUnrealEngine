@@ -1,0 +1,38 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:WhiteTemp"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "bool unreal:tonemapper = 1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "4000 K",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTemp = 4000"
+    ]
+   }
+  },
+  {
+   "caption": "6500 K (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTemp = 6500"
+    ]
+   }
+  },
+  {
+   "caption": "9000 K",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTemp = 9000"
+    ]
+   }
+  }
+ ]
+}

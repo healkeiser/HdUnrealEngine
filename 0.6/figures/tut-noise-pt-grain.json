@@ -1,0 +1,32 @@
+{
+ "scene": "cornell/cornell.usda",
+ "display": "linear",
+ "base": {},
+ "values": [
+  {
+   "caption": "16 spp, denoiser off",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 16",
+     "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
+    ]
+   }
+  },
+  {
+   "caption": "512 spp, denoiser off",
+   "set": {
+    "/Render/Settings": [
+     "bool unreal:postProcess:PathTracingEnableDenoiser = 0"
+    ]
+   }
+  },
+  {
+   "caption": "16 spp, denoiser on (default)",
+   "set": {
+    "/Render/Settings": [
+     "int unreal:samplesPerPixel = 16"
+    ]
+   }
+  }
+ ]
+}

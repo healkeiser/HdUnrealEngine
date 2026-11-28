@@ -1,0 +1,56 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/Render/Settings": [
+   "token unreal:postProcess:TranslucencyType = \"ETranslucencyType::RayTraced\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "UsdPreviewSurface",
+   "set": {
+    "/scene/Looks/ball/S": []
+   }
+  },
+  {
+   "caption": "standard_surface, transmission 1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "float inputs:base = 0",
+     "float inputs:specular_IOR = 1.5",
+     "float inputs:transmission = 1",
+     "float inputs:specular_roughness = 0"
+    ]
+   }
+  },
+  {
+   "caption": "standard_surface, subsurface 1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.8, 0.5, 0.4)",
+     "float inputs:specular_roughness = 0.4",
+     "float inputs:subsurface = 1",
+     "color3f inputs:subsurface_color = (0.9, 0.45, 0.3)",
+     "color3f inputs:subsurface_radius = (1, 0.35, 0.2)",
+     "float inputs:subsurface_scale = 0.02"
+    ]
+   }
+  },
+  {
+   "caption": "standard_surface, sheen 1",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+     "color3f inputs:base_color = (0.3, 0.05, 0.1)",
+     "float inputs:specular_roughness = 0.7",
+     "float inputs:sheen = 1",
+     "color3f inputs:sheen_color = (1, 0.85, 0.9)",
+     "float inputs:sheen_roughness = 0.3"
+    ]
+   }
+  }
+ ]
+}

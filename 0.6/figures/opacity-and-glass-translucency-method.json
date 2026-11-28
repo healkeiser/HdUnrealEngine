@@ -1,0 +1,42 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:TranslucencyType"
+ ],
+ "base": {
+  "/scene/Looks/ball/S": [
+   "uniform token info:id = \"ND_standard_surface_surfaceshader\"",
+   "float inputs:base = 0",
+   "float inputs:specular_IOR = 1.5",
+   "float inputs:transmission = 1",
+   "float inputs:specular_roughness = 0"
+  ]
+ },
+ "values": [
+  {
+   "caption": "Raster (default)",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TranslucencyType = \"ETranslucencyType::Raster\""
+    ]
+   }
+  },
+  {
+   "caption": "Ray Traced",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:postProcess:TranslucencyType = \"ETranslucencyType::RayTraced\""
+    ]
+   }
+  },
+  {
+   "caption": "Path Tracer",
+   "set": {
+    "/Render/Settings": [
+     "token unreal:renderMode = \"pathtraced\""
+    ]
+   }
+  }
+ ]
+}

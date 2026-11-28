@@ -1,0 +1,30 @@
+{
+ "scene": "docs/bistro.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:LumenDiffuseColorBoost"
+ ],
+ "base": {
+  "/Render/Settings": [
+   "token unreal:renderMode = \"realtime\""
+  ]
+ },
+ "values": [
+  {
+   "caption": "1 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenDiffuseColorBoost = 1"
+    ]
+   }
+  },
+  {
+   "caption": "2",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:LumenDiffuseColorBoost = 2"
+    ]
+   }
+  }
+ ]
+}

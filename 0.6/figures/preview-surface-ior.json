@@ -1,0 +1,36 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "base": {
+  "/scene/Looks/ball/S": [
+   "color3f inputs:diffuseColor = (0.02, 0.02, 0.02)",
+   "float inputs:roughness = 0.1"
+  ]
+ },
+ "values": [
+  {
+   "caption": "1.33",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:ior = 1.33"
+    ]
+   }
+  },
+  {
+   "caption": "1.5 (default)",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:ior = 1.5"
+    ]
+   }
+  },
+  {
+   "caption": "2.4",
+   "set": {
+    "/scene/Looks/ball/S": [
+     "float inputs:ior = 2.4"
+    ]
+   }
+  }
+ ]
+}

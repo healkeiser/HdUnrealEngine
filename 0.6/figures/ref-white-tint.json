@@ -1,0 +1,34 @@
+{
+ "scene": "docs/lookdev.usda",
+ "display": "tonemapped",
+ "settings": [
+  "unreal:postProcess:WhiteTint"
+ ],
+ "base": {},
+ "values": [
+  {
+   "caption": "-0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTint = -0.5"
+    ]
+   }
+  },
+  {
+   "caption": "0 (default)",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTint = 0"
+    ]
+   }
+  },
+  {
+   "caption": "0.5",
+   "set": {
+    "/Render/Settings": [
+     "float unreal:postProcess:WhiteTint = 0.5"
+    ]
+   }
+  }
+ ]
+}
