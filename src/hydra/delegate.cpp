@@ -88,18 +88,30 @@ FILE* traceSink() {
 void trace(const char* format, ...);
 }  // namespace
 namespace {
-void trace(const char* format, ...) {
+void traceArgs(const char* format, va_list args) {
     static const bool enabled = TfGetenvBool("HDUE_TRACE_TIMING", false);
     if (!enabled) return;
     static const auto origin = std::chrono::steady_clock::now();
     std::fprintf(traceSink(), "%9.1f ",
                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - origin).count());
-    va_list args;
-    va_start(args, format);
     std::vfprintf(traceSink(), format, args);
-    va_end(args);
     std::fflush(traceSink());
 }
+void trace(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    traceArgs(format, args);
+    va_end(args);
+}
+}  // namespace
+// The same timeline for the GL thread's side (gpu_frames.cpp): which of UE's frames each viewport redraw shows.
+void HdUETrace(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    traceArgs(format, args);
+    va_end(args);
+}
+namespace {
 // Hosts such as husk never start UE. The first delegate created while the
 // runtime is cold starts it on its own thread and ticks it from Execute, as
 // hdue_usd_render does. UE allows one lifetime per process, so it stays until the process exits (husk
@@ -2218,6 +2230,9 @@ class Pass final : public HdRenderPass {
         // The host redraws the viewport when publishedFrames changes.
         if (polled == HDUE_OK && frame.frame_id != gpuFrame_) {
             gpuFrame_ = frame.frame_id;
+            trace("hdUE gpu frame %llu: generation %llu of %llu requested, %u samples, converged %d\n",
+                  (unsigned long long)frame.frame_id, (unsigned long long)frame.generation,
+                  (unsigned long long)s.generation, frame.completed_samples, int(frame.converged));
             s.locked([&] {
                 ++s.publishedFrames;
                 s.sharedGeneration = frame.generation;
@@ -3976,12 +3991,20 @@ void HdUERenderDelegate::SetDrivers(const HdDriverVector& drivers) {
             if (auto* hgi = driver->driver.UncheckedGet<Hgi*>()) kind += " " + hgi->GetAPIName().GetString();
         trace("hdUE driver %s: %s\n", driver->name.GetText(), kind.c_str());
 #if defined(HDUE_HOUDINI)
-        // Houdini's GL viewport composites UE's frames from shared GPU textures (gpu_frames.h); HDUE_GPU_FRAMES=0
-        // keeps the CPU buffers.
+        // Houdini's viewport composites UE's frames from shared GPU textures (gpu_frames.h) while it draws a
+        // delegate's OpenGL texture. Since 22.0.439 it composites in Vulkan ("internal rework of viewport
+        // framebuffers to do frame compositing in Vulkan", SideFX's changelog) and no longer draws that texture: it
+        // still asks for it on every redraw, then shows the last image it took from the CPU buffers, so the picture
+        // stood still while the camera moved and the Path Tracer refined (recorded: 22.0.368 follows, 22.0.508 does
+        // not, and its own Storm draws nothing there). Those builds get every frame in the CPU buffers.
+        // HDUE_GPU_FRAMES=0 or 1 overrides the choice.
+        int major = 0, minor = 0, build = 0;
+        const bool drawsGlTextures = !HdUERunningHoudini(major, minor, build) ||
+                                     std::make_tuple(major, minor, build) < std::make_tuple(22, 0, 439);
         if (driver->driver.IsHolding<Hgi*>())
             if (auto* hgi = driver->driver.UncheckedGet<Hgi*>(); hgi && hgi->GetAPIName() == HgiTokens->OpenGL &&
                                                                  selfHost().continuous &&
-                                                                 TfGetenvBool("HDUE_GPU_FRAMES", true))
+                                                                 TfGetenvBool("HDUE_GPU_FRAMES", drawsGlTextures))
                 state_->locked([&] {
                     if (!state_->gpuFrames) state_->gpuFrames = std::make_shared<HdUEGpuFrames>(hgi, state_->backend);
                 });

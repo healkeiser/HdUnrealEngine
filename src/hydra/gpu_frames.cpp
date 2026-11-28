@@ -8,6 +8,7 @@
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
+void HdUETrace(const char* format, ...);  // delegate.cpp (HDUE_TRACE_TIMING)
 namespace {
 void closeHandles(const HdueGpuFrame& frame) {
     for (uint32_t slot = 0; slot < HDUE_GPU_SLOTS; ++slot) {
@@ -92,6 +93,9 @@ VtValue HdUEGpuFrames::color(uint32_t width, uint32_t height, bool converged) {
     frame.struct_size = sizeof(frame);
     frame.ring = ring_;
     if (backend_->api().acquire_gpu_frame(session, &frame) != HDUE_OK) return {};
+    HdUETrace("hdUE redraw: GPU frame %llu, generation %llu, %ux%u for a %ux%u buffer\n",
+              (unsigned long long)frame.frame_id, (unsigned long long)frame.generation, frame.width, frame.height,
+              width, height);
     clearErrors();  // Houdini's own drawing may have left errors behind
     if (frame.ring != ring_ && !import(frame)) return {};
     // Copied again on every redraw: the tasks after HdxAovInputTask may draw into the texture they are given.

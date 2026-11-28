@@ -41,6 +41,9 @@ class HdUEGpuFrames;
 struct HdUEStopped : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
+#if defined(HDUE_HOUDINI)
+bool HdUERunningHoudini(int& major, int& minor, int& build);  // plugin.cpp
+#endif
 // Diagnostic switches, read once (they were read per prim and per Execute).
 inline bool HdUETraceScene() {
     static const bool on = TfGetenvBool("HDUE_TRACE_SCENE", false);

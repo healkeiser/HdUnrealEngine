@@ -321,7 +321,7 @@ The package file sets `HDUE_RUNTIME_CONFIG` and `HDUE_HOUDINI_ENABLE` (and `HDUE
 | `HDUE_HOUDINI_LOG_DIR` | Where the Houdini host writes its logs and state |
 | `HDUE_NANITE` | `0` builds regular static meshes instead of Nanite |
 | `HDUE_USER_DIR` | Where UE writes its logs and Nanite cache (default `%LOCALAPPDATA%\hdUE`). Use a folder only the user or render account using it can write: hdUE trusts what it reads back from there |
-| `HDUE_GPU_FRAMES` | `0` reads Houdini viewport frames back to the CPU instead of sharing GPU textures |
+| `HDUE_GPU_FRAMES` | `0` reads Houdini viewport frames back to the CPU instead of sharing GPU textures (already the case from Houdini 22.0.439, whose viewport no longer draws them; `1` shares them there too) |
 | `HDUE_TRACE_PASS` | `1` prints one line per render pass to stderr |
 | `HDUE_TRACE_SETTINGS` | `1` prints every render setting the delegate receives |
 | `HDUE_TRACE_SCENE` | `1` prints scene submissions |

@@ -123,7 +123,7 @@ While you tumble, scrub or play, the viewport renders a cheaper image, then refi
 | The viewport renders far more pixels than it shows. | Display Options > Render > Image Resolution is set to the render settings' resolution. | Use the viewport's size while you work. |
 | Materials first show flat colours, then their textures. | Textures decode and compress in the background. The progress line under the viewport counts the files done and the time left. | Wait; the second load of a scene reads them from the texture cache. |
 | Meshes appear a moment after the scene loads. | Meshes upload as standard meshes first, then are swapped for [Nanite](../geometry/nanite.md) meshes in the background. | Wait; Nanite builds are cached on disk, so the next session skips most of them. |
-| The viewport shows a black or stale image while husk renders fine. | Frames pass from Unreal Engine to Houdini's OpenGL viewport on the GPU, which needs the GPU driver's shared-memory extensions. | Set `HDUE_GPU_FRAMES=0` before starting Houdini to copy frames through the CPU instead. |
+| The viewport shows a black or stale image while husk renders fine. | Up to Houdini 22.0.438, frames pass from Unreal Engine to Houdini's viewport on the GPU, which needs the GPU driver's shared-memory extensions. Since 22.0.439, Houdini composites its viewport in Vulkan and no longer draws that texture, so hdUE copies every frame through the CPU there. | On Houdini 22.0.438 or older, set `HDUE_GPU_FRAMES=0` before starting Houdini to copy frames through the CPU too. |
 
 To measure where a frame's time goes, set `HDUE_TRACE_TIMING=1` and `HDUE_TRACE_FILE=<path>` before starting Houdini ([Environment variables](../getting-started/environment-variables.md)).
 

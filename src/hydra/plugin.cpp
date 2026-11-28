@@ -13,24 +13,31 @@
 #endif
 PXR_NAMESPACE_OPEN_SCOPE
 #if defined(HDUE_HOUDINI)
+// The Houdini running the delegate, read from libUT.dll's version resource (false when it cannot be read).
+bool HdUERunningHoudini(int& major, int& minor, int& build) {
+    std::vector<wchar_t> path(32768);
+    HMODULE ut = GetModuleHandleW(L"libUT.dll");
+    DWORD size = ut && GetModuleFileNameW(ut, path.data(), DWORD(path.size()))
+                     ? GetFileVersionInfoSizeW(path.data(), nullptr)
+                     : 0;
+    std::vector<char> info(size);
+    VS_FIXEDFILEINFO* fixed = nullptr;
+    UINT length = 0;
+    if (!size || !GetFileVersionInfoW(path.data(), 0, size, info.data()) ||
+        !VerQueryValueW(info.data(), L"\\", reinterpret_cast<void**>(&fixed), &length) || !fixed)
+        return false;
+    major = HIWORD(fixed->dwFileVersionMS);
+    minor = LOWORD(fixed->dwFileVersionMS);
+    build = LOWORD(fixed->dwFileVersionLS);
+    return true;
+}
 // The HDK only guarantees its ABI within one build (HDK_API_VERSION is the build number): say so when the Houdini
-// running the delegate, read from libUT.dll's version resource, is not the build the delegate was compiled against.
+// running the delegate is not the build the delegate was compiled against.
 static void HdUEWarnOnHoudiniBuildMismatch() {
     static std::once_flag once;
     std::call_once(once, [] {
-        std::vector<wchar_t> path(32768);
-        HMODULE ut = GetModuleHandleW(L"libUT.dll");
-        DWORD size = ut && GetModuleFileNameW(ut, path.data(), DWORD(path.size()))
-                         ? GetFileVersionInfoSizeW(path.data(), nullptr)
-                         : 0;
-        std::vector<char> info(size);
-        VS_FIXEDFILEINFO* fixed = nullptr;
-        UINT length = 0;
-        if (!size || !GetFileVersionInfoW(path.data(), 0, size, info.data()) ||
-            !VerQueryValueW(info.data(), L"\\", reinterpret_cast<void**>(&fixed), &length) || !fixed)
-            return;
-        const int major = HIWORD(fixed->dwFileVersionMS), minor = LOWORD(fixed->dwFileVersionMS),
-                  build = LOWORD(fixed->dwFileVersionLS);
+        int major = 0, minor = 0, build = 0;
+        if (!HdUERunningHoudini(major, minor, build)) return;
         if (major == SYS_VERSION_MAJOR_INT && minor == SYS_VERSION_MINOR_INT && build == SYS_VERSION_BUILD_INT) return;
         const std::string message = TfStringPrintf(
             "hdUE was built against Houdini %s but runs in Houdini %d.%d.%d. SideFX only guarantees the HDK ABI "
