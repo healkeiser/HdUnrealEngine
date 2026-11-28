@@ -333,7 +333,9 @@ for mode, locked in (
         "res_mode"
     ).pressButton()  # the menu's callback, as the parameter editor runs it
     assert tuple(p.isLocked() for p in alone.parmTuple("resolution")) == locked
-    for parm, value in zip(alone.parmTuple("resolution"), (1000, 300)):
+    for parm, value in zip(
+        alone.parmTuple("resolution"), (1000, 300), strict=True
+    ):
         if not parm.isLocked():
             parm.set(value)
     size = alone.evalParmTuple("resolution")
