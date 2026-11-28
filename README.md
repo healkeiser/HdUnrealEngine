@@ -273,9 +273,9 @@ The delegate and UE share the host process. UE only accepts calls from the threa
 Requires Houdini 22.0 on Windows x64 and a DirectX 12 GPU with hardware ray tracing. Unreal Engine, Visual Studio and OpenUSD are not needed.
 
 > [!NOTE]
-> There is no public binary download. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. [Build the package from source](docs/building.md) with your own Unreal Engine access.
+> Packages are for Unreal Engine licensees only. The backend links Unreal Engine Developer modules, which the [Unreal Engine EULA](https://www.unrealengine.com/eula/unreal) (section 6(d)) only lets us distribute through Fab or a fork of Epic's UnrealEngine GitHub network. They are published as **[releases of hdUE's UnrealEngine fork](https://github.com/healkeiser/UnrealEngine/releases)**: the link works once your GitHub account is linked to your Epic Games account ([how](https://www.unrealengine.com/en-US/ue-on-github)); otherwise it shows a 404.
 
-1. Build `hdUE-<version>-houdini22.0.<build>-win64` with `Package-Houdini.ps1` (see [Installing on another machine](docs/getting-started/installation.md)).
+1. Download `hdUE-<version>-houdini22.0.<build>-win64.zip` from the [latest release](https://github.com/healkeiser/UnrealEngine/releases/latest), or [build it from source](docs/building.md).
 2. Unzip it anywhere; the folder may be shared and read-only, since UE writes its shader cache and logs per user.
 3. Run `Install.cmd`. It writes `Documents\houdini22.0\packages\hdUE.json`.
 4. Restart Houdini.

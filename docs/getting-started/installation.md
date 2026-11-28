@@ -1,9 +1,15 @@
 # Installation
 
-hdUE ships as one folder plus a Houdini package file, the way HtoA or Redshift install. You build the folder once on a machine with the Unreal Engine source, then copy it to each workstation or render node.
+hdUE ships as one folder plus a Houdini package file, the way HtoA or Redshift install. You download the folder (or build it once on a machine with the Unreal Engine source), then copy it to each workstation or render node.
 
 !!! warning "Unreal Engine licensees only"
-    The package contains Unreal Engine Developer modules, which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows sharing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio, or with other Unreal Engine licensees. Never publish it as a public download. There is no prebuilt download for this reason: you build your own package.
+    The package contains Unreal Engine Developer modules, which the Unreal Engine EULA calls Engine Tools. Section 6(d) allows sharing such a package only through Fab or a fork of Epic's UnrealEngine GitHub network: inside your studio, or with other Unreal Engine licensees. Never publish it as a public download.
+
+## Downloading the package
+
+Packages are published as releases of hdUE's fork of Epic's UnrealEngine repository: **[github.com/healkeiser/UnrealEngine/releases](https://github.com/healkeiser/UnrealEngine/releases)**. Like Epic's repository, the fork is private: you can open it once your GitHub account is linked to your Epic Games account ([Epic's instructions](https://www.unrealengine.com/en-US/ue-on-github)). Before that, the link shows GitHub's 404 page.
+
+Download `hdUE-<version>-houdini<build>-win64.zip` from the [latest release](https://github.com/healkeiser/UnrealEngine/releases/latest), then follow [Installing on a workstation](#installing-on-a-workstation). To build the package yourself instead, read on.
 
 ## Requirements
 
