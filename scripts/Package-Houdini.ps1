@@ -58,7 +58,10 @@ if (-not $AllowDirty) {
     if ($Stamp.ProductVersion -ne $Version) { throw "$Delegate was built from $($Stamp.ProductVersion), not ${Version}: run Build-Houdini.ps1, or pass -AllowDirty." }
 }
 $Out = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $TaskRoot 'out\package' }
-$Name = "hdUE-$Version-houdini$HoudiniBuild-win64"
+# The UE version the runtime carries is in the name: packages of one hdUE line may ship different engines.
+$Engine = Get-Content -Raw -LiteralPath (Join-Path $EngineRoot 'Engine\Build\Build.version') | ConvertFrom-Json
+$UEVersion = "$($Engine.MajorVersion).$($Engine.MinorVersion).$($Engine.PatchVersion)"
+$Name = "hdUE-$Version-ue$UEVersion-houdini$HoudiniBuild-win64"
 $Package = Join-Path $Out $Name
 if (Test-Path -LiteralPath $Package) { Remove-Item -LiteralPath $Package -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Package | Out-Null
@@ -97,7 +100,7 @@ Copy-Item -LiteralPath $BackendDll -Destination $BinTarget
 & uv run --quiet (Join-Path $PSScriptRoot 'check_shared_dlls.py') $RuntimeTarget (Join-Path (Get-HdUELocalPath -Key houdini_root) 'bin')
 if ($LASTEXITCODE) { throw 'A staged DLL imports symbols that Houdini''s copy of the same DLL lacks.' }
 $Relative = { param($Path) 'runtime/Windows/' + ([IO.Path]::GetRelativePath($RuntimeRoot, $Path) -replace '\\', '/') }
-$Runtime = [ordered]@{version = 1; hdue_version = $Version; houdini_build = $HoudiniBuild; backend_dll = (& $Relative $BackendDll); runtime_project = (& $Relative $Project) }
+$Runtime = [ordered]@{version = 1; hdue_version = $Version; ue_version = $UEVersion; houdini_build = $HoudiniBuild; backend_dll = (& $Relative $BackendDll); runtime_project = (& $Relative $Project) }
 [IO.File]::WriteAllText((Join-Path $Package 'runtime.json'), ($Runtime | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 Copy-Item -Path (Join-Path $TaskRoot 'packaging\houdini\*') -Destination $Package
 # License terms: hdUE's MIT license, the package terms the Unreal Engine EULA requires (4(c), 7(a)) and the

@@ -9,7 +9,7 @@ hdUE ships as one folder plus a Houdini package file, the way HtoA or Redshift i
 
 Packages are published as releases of hdUE's fork of Epic's UnrealEngine repository: **[github.com/healkeiser/UnrealEngine/releases](https://github.com/healkeiser/UnrealEngine/releases)**. Like Epic's repository, the fork is private: you can open it once your GitHub account is linked to your Epic Games account ([Epic's instructions](https://www.unrealengine.com/en-US/ue-on-github)). Before that, the link shows GitHub's 404 page.
 
-Download `hdUE-<version>-houdini<build>-win64.zip` from the [latest release](https://github.com/healkeiser/UnrealEngine/releases/latest), then follow [Installing on a workstation](#installing-on-a-workstation). To build the package yourself instead, read on.
+Download `hdUE-<version>-ue<engine>-houdini<build>-win64.zip` from the [latest release](https://github.com/healkeiser/UnrealEngine/releases/latest), then follow [Installing on a workstation](#installing-on-a-workstation). To build the package yourself instead, read on.
 
 ## Requirements
 
@@ -50,11 +50,11 @@ The result is in `out\package\`:
 
 | File | Contents |
 | --- | --- |
-| `hdUE-<version>-houdini<build>-win64\` | The package folder, about 1.2 GB. For example `hdUE-v0.2.0-houdini22.0.368-win64`. |
-| `hdUE-<version>-houdini<build>-win64.zip` | The same folder zipped, about 0.9 GB. |
-| `hdUE-<version>-houdini<build>-win64-symbols.zip` | Debug symbols. Keep it with the release to read crash dumps; do not ship it. |
+| `hdUE-<version>-ue<engine>-houdini<build>-win64\` | The package folder, about 1.2 GB. For example `hdUE-v0.7.0-ue5.8.4-houdini22.0.368-win64`. |
+| `hdUE-<version>-ue<engine>-houdini<build>-win64.zip` | The same folder zipped, about 0.9 GB. |
+| `hdUE-<version>-ue<engine>-houdini<build>-win64-symbols.zip` | Debug symbols. Keep it with the release to read crash dumps; do not ship it. |
 
-`<version>` is the checkout's `git describe`. The delegate DLL's file properties (Details tab) show the same version and the Houdini build it was compiled for.
+`<version>` is the checkout's `git describe`, and `<engine>` the Unreal Engine version the runtime carries (also in the package's `runtime.json`, as `ue_version`). Workstations need no Unreal Engine of their own; the version matters for UE assets you load from your own project, which must not be saved by a newer engine. The delegate DLL's file properties (Details tab) show the same version and the Houdini build it was compiled for.
 
 ## Installing on a workstation
 

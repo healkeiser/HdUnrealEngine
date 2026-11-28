@@ -137,6 +137,10 @@ The HDK only guarantees its ABI within one Houdini daily build. `Build-Houdini.p
 | --- | --- | --- |
 | v0.2.0 and later | Houdini 22.0.368 | 22.0.368 |
 
+## Unreal Engine versions
+
+`main` follows one Unreal Engine version at a time (`Build-Backend.ps1` pins it: 5.8.4 today). Moving to a new engine is ordinary work on `main`, released as a new minor version; the package name (`-ue<engine>-`) and the release notes say which engine a package carries, and earlier packages stay downloadable from earlier releases. A `release/ue<x.y>` branch is made from the last tag on an engine only when a fix must ship on that engine after `main` has moved on.
+
 ### Release checklist
 
 GitHub runners cannot build Unreal Engine, so releases are built locally:
@@ -146,7 +150,7 @@ GitHub runners cannot build Unreal Engine, so releases are built locally:
 3. Render the gallery (`hython scripts/render_gallery.py --dev`). It fails when a scene's brightness against Karma CPU leaves its band (`scripts/check_gallery.py`, which CI also runs on the committed `docs/gallery.md`) or a Cornell hdUE render departs from its tile baseline (`tests/gallery_baselines.json`); after an intended change, check the images and store new baselines with `--bless`.
 4. `.\scripts\Build-Houdini.ps1`, `.\scripts\Build-Backend.ps1 -Configuration Test` and `.\scripts\Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig .local\runtime-release.json`, then `.\scripts\Package-Houdini.ps1 -RuntimeConfig .local\runtime-release.json -Zip -UnrealLicenseesOnly`. It refuses uncommitted changes, a delegate built from another commit, and a backend that is not the current Test build (packages ship Test; see [houdini](getting-started/installation.md)).
 5. Add the build to the table above. Keep the package zip and its `-symbols.zip` together; distribute the package only as [Installation](getting-started/installation.md) describes.
-6. Publish the package zip (never the `-symbols.zip`) as a release of the licensee fork, on its README-only `hdue` branch: `gh release create vx.y.z --repo healkeiser/UnrealEngine --target hdue --title "hdUE x.y.z" --notes-file <notes> --latest <zip>`. Put the zip's SHA-256 in the notes.
+6. Publish the package zip (never the `-symbols.zip`) as a release of the licensee fork, on its README-only `hdue` branch: `gh release create vx.y.z --repo healkeiser/UnrealEngine --target hdue --title "hdUE x.y.z" --notes-file <notes> --latest <zip>`. The notes open with what the package carries (`hdUE x.y.z for Houdini <build> (and later 22.0 builds), Windows x64. Unreal Engine <engine> runtime.`), say so first when the Unreal Engine version changed since the last release, and end with the zip's SHA-256.
 7. Publish the same notes as a release of this repository, with no file attached and a download link to the fork's release at the top, so the repository's Releases list shows the version: `gh release create vx.y.z --verify-tag --title "hdUE x.y.z" --notes-file <notes> --latest`. Never attach a package to a release of this repository.
 
 ## Standalone rendering and usdview
