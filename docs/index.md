@@ -18,7 +18,7 @@ hdUE follows Unreal Engine and Movie Render Queue: a setting means what it means
 
     ---
 
-    Build the package, install it in Houdini, check that it loads.
+    Download the package (or build it), install it in Houdini, check that it loads.
 
     [:lucide-arrow-right: Install hdUE](getting-started/installation.md)
 
