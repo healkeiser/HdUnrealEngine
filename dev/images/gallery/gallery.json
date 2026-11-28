@@ -25,11 +25,11 @@
      "title": "Global illumination",
      "renders": {
       "lumen": {
-       "seconds": 0.0447,
-       "luminance": 0.05969724960696926
+       "seconds": 0.0523,
+       "luminance": 0.059729042767479895
       },
       "pathtraced": {
-       "seconds": 1.6222,
+       "seconds": 1.8264,
        "luminance": 0.06219975823013288
       },
       "xpu": {
@@ -47,11 +47,11 @@
      "title": "Glossy materials",
      "renders": {
       "lumen": {
-       "seconds": 0.0451,
-       "luminance": 0.056288698804764455
+       "seconds": 0.0551,
+       "luminance": 0.056258482760148484
       },
       "pathtraced": {
-       "seconds": 1.6065,
+       "seconds": 1.682,
        "luminance": 0.057989190483003314
       },
       "xpu": {
@@ -69,11 +69,11 @@
      "title": "Depth of field",
      "renders": {
       "lumen": {
-       "seconds": 0.0483,
-       "luminance": 0.05959301152220546
+       "seconds": 0.0568,
+       "luminance": 0.05959259124008659
       },
       "pathtraced": {
-       "seconds": 1.6227,
+       "seconds": 1.6351,
        "luminance": 0.06201848540694418
       },
       "xpu": {
@@ -91,11 +91,11 @@
      "title": "Motion blur",
      "renders": {
       "lumen": {
-       "seconds": 0.0458,
-       "luminance": 0.05777028047306023
+       "seconds": 0.0532,
+       "luminance": 0.057766205066788145
       },
       "pathtraced": {
-       "seconds": 1.6199,
+       "seconds": 1.669,
        "luminance": 0.059950887072637564
       },
       "xpu": {
@@ -113,11 +113,11 @@
      "title": "Subdivision surfaces",
      "renders": {
       "lumen": {
-       "seconds": 0.0471,
-       "luminance": 0.057206176952985466
+       "seconds": 0.058,
+       "luminance": 0.057205484672979215
       },
       "pathtraced": {
-       "seconds": 1.6161,
+       "seconds": 1.8168,
        "luminance": 0.05972197106992043
       },
       "xpu": {
@@ -135,11 +135,11 @@
      "title": "Instances, points, curves",
      "renders": {
       "lumen": {
-       "seconds": 0.0475,
-       "luminance": 0.0566912555959604
+       "seconds": 0.0553,
+       "luminance": 0.05702019029136632
       },
       "pathtraced": {
-       "seconds": 1.8555,
+       "seconds": 1.9337,
        "luminance": 0.06009528791809662
       },
       "xpu": {
@@ -157,12 +157,12 @@
      "title": "Volumes (OpenVDB)",
      "renders": {
       "lumen": {
-       "seconds": 0.0467,
-       "luminance": 0.05949735072195148
+       "seconds": 0.0559,
+       "luminance": 0.059496177283444786
       },
       "pathtraced": {
-       "seconds": 3.0108,
-       "luminance": 0.07155932740486695
+       "seconds": 2.9814,
+       "luminance": 0.0715601285820002
       },
       "xpu": {
        "seconds": 8.2146,
@@ -179,11 +179,11 @@
      "title": "IES profile",
      "renders": {
       "lumen": {
-       "seconds": 0.047,
-       "luminance": 0.6232869719502095
+       "seconds": 0.0504,
+       "luminance": 0.6232474158272976
       },
       "pathtraced": {
-       "seconds": 1.5799,
+       "seconds": 1.6691,
        "luminance": 0.6690991550635903
       },
       "xpu": {
@@ -201,11 +201,11 @@
      "title": "Lens shift",
      "renders": {
       "lumen": {
-       "seconds": 0.043,
-       "luminance": 0.046615107639433336
+       "seconds": 0.0466,
+       "luminance": 0.046615338540578706
       },
       "pathtraced": {
-       "seconds": 1.455,
+       "seconds": 1.4627,
        "luminance": 0.04985946775862267
       },
       "xpu": {
@@ -223,11 +223,11 @@
      "title": "Orthographic camera",
      "renders": {
       "lumen": {
-       "seconds": 0.0451,
-       "luminance": 0.06159419596125025
+       "seconds": 0.0486,
+       "luminance": 0.061593568644340485
       },
       "pathtraced": {
-       "seconds": 1.599,
+       "seconds": 1.6191,
        "luminance": 0.0762436636756558
       },
       "xpu": {
@@ -245,11 +245,11 @@
      "title": "Camera exposure",
      "renders": {
       "lumen": {
-       "seconds": 0.0464,
-       "luminance": 0.11939131312912304
+       "seconds": 0.0535,
+       "luminance": 0.11939166465766456
       },
       "pathtraced": {
-       "seconds": 1.6278,
+       "seconds": 1.8187,
        "luminance": 0.12439951646026576
       },
       "xpu": {
@@ -267,11 +267,11 @@
      "title": "Unreal post-processing",
      "renders": {
       "lumen": {
-       "seconds": 0.0495,
-       "luminance": 0.3032085476813957
+       "seconds": 0.0518,
+       "luminance": 0.3032061467692357
       },
       "pathtraced": {
-       "seconds": 1.6537,
+       "seconds": 1.6897,
        "luminance": 0.3125566018846393
       },
       "xpu": {
@@ -289,11 +289,11 @@
      "title": "Light linking",
      "renders": {
       "lumen": {
-       "seconds": 0.0462,
-       "luminance": 0.058130932015155526
+       "seconds": 0.0507,
+       "luminance": 0.05813058440769478
       },
       "pathtraced": {
-       "seconds": 1.6401,
+       "seconds": 1.6914,
        "luminance": 0.059077468718670846
       },
       "xpu": {
@@ -311,11 +311,11 @@
      "title": "Clearcoat",
      "renders": {
       "lumen": {
-       "seconds": 0.0457,
-       "luminance": 0.06445460708013598
+       "seconds": 0.052,
+       "luminance": 0.06467189465640036
       },
       "pathtraced": {
-       "seconds": 1.6143,
+       "seconds": 1.6522,
        "luminance": 0.0658765800635048
       },
       "xpu": {
@@ -333,11 +333,11 @@
      "title": "Render region",
      "renders": {
       "lumen": {
-       "seconds": 0.0322,
-       "luminance": 0.019638181748616625
+       "seconds": 0.0354,
+       "luminance": 0.01963701320707114
       },
       "pathtraced": {
-       "seconds": 1.2668,
+       "seconds": 1.443,
        "luminance": 0.021014600464632528
       },
       "xpu": {
