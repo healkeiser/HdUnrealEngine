@@ -7,7 +7,13 @@ on:
     branches: [main]
     tags: ["v*"]
     paths: [docs/**, overrides/**, zensical.toml, README.md, .github/workflows/docs.yml]
+  # A manual run with `release` set republishes that version ("latest") from the chosen branch: for docs fixes that
+  # apply to the current release but were committed after its tag.
   workflow_dispatch:
+    inputs:
+      release:
+        description: Republish this X.Y version as "latest" (leave empty for "dev")
+        required: false
 permissions:
   contents: write
 concurrency:
@@ -37,5 +43,11 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           mike deploy --push --update-aliases "${version%.*}" latest
           mike set-default --push latest
-      - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      - if: ${{ inputs.release != '' && !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          mike deploy --push --update-aliases "$RELEASE" latest
+          mike set-default --push latest
+        env:
+          RELEASE: ${{ inputs.release }}
+      - if: ${{ !inputs.release && !startsWith(github.ref, 'refs/tags/v') }}
         run: mike deploy --push dev
