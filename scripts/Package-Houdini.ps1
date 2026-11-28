@@ -46,7 +46,7 @@ foreach ($Path in $BackendDll, $Project, $Delegate, (Join-Path $Build 'resources
 $TestBuild = Join-Path $TaskRoot 'unreal\HdUEBackend\Binaries\Win64\HdUEBackend-Win64-Test.dll'
 if (-not (Test-Path -LiteralPath $TestBuild) -or
     (Get-FileHash -LiteralPath $TestBuild).Hash -ne (Get-FileHash -LiteralPath $BackendDll).Hash) {
-    throw "$BackendDll is not the Test build. Run Build-Backend.ps1 -Configuration Test and Update-HoudiniRuntime.ps1 -Configuration Test -OutputConfig <profile>, then package that profile."
+    throw "$BackendDll is not the Test build. Run Build-Backend.ps1 -Configuration Test and Update-HoudiniRuntime.ps1 -Configuration Test -RuntimeConfig <staged runtime.json> -OutputConfig <profile>, then package that profile."
 }
 $Version = (& git -C $TaskRoot describe --tags --always --dirty).Trim()
 # The delegate's version resource (resources/version.rc.in) names the commit and the Houdini build it was built from.

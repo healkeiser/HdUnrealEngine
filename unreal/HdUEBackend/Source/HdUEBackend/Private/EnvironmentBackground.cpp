@@ -39,7 +39,7 @@ void HdUEDrawEnvironment(FRDGBuilder& GraphBuilder, const FSceneView& View, FRDG
         AddCopyTexturePass(GraphBuilder, SceneColor, Destination);
     }
     auto* Parameters = GraphBuilder.AllocParameters<FHdueEnvironmentCS::FParameters>();
-    Parameters->ClipToTranslatedWorld = FMatrix44f(View.ViewMatrices.GetInvTranslatedViewProjectionMatrix());
+    Parameters->ClipToTranslatedWorld = FMatrix44f(View.ViewMatrices.GetClipToTranslatedWorld());
     Parameters->TranslatedEye =
         FVector3f(View.ViewMatrices.GetViewOrigin() + View.ViewMatrices.GetPreViewTranslation());
     // After the base pass the scene textures are at the render resolution (FViewInfo::ViewRect: the output times the
